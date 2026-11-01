@@ -24,7 +24,7 @@ decision. In each picture the recommended option has a **green outline**. The im
 | Q15 | Mii rows | list with the bust where one exists |
 | Q16 | Fighter portraits and mods | read at run time, like stages |
 | Q17 | Which chips show the game's DI / SDI visual | DI and SDI only |
-| Q18 | When a CPU setting change takes effect | at the change, plus a new SDI roll every hit |
+| Q18 | When a CPU setting change takes effect | follow the fork: apply at the next CPU frame |
 | S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed |
 | S2 | Corrupt settings file | keep a copy, load field by field |
 | B1 | Plugin name | `training_rooms` |
@@ -37,6 +37,7 @@ decision. In each picture the recommended option has a **green outline**. The im
 | B8 | Behaviour changes from the fork | accept the batch |
 | B9 | Upstream developer-only code | drop it from the shipped build |
 | B10 | README media | reuse the GIFs that show no menu |
+| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI |
 
 ## Menu
 
@@ -181,18 +182,23 @@ chip it would suggest something those options do not do. Cost: none; this is how
 
 ### Q18 · When a CPU setting change takes effect
 
-**The fork:** a changed SDI Direction applies only at the next Training reset, and the menu does not say so.
-This is being fixed in the fork's next build, which applies the change at once. **Clean room:** should it
-follow the same rule?
-Options: (A) the same as the fork's fix: apply at the change, one roll; (B) apply at the change and roll a
-new SDI direction every hitlag episode (`SPEC-cpu-02` questions 1 and 9); (C) keep reset-only and label the
-row "applies on next reset".
-**Recommendation: B.** With two or more directions selected, every hit then varies, and that is what a
-weighted pick is for. Upstream's own source marks the roll-once behaviour as a bug. Shield Tilt and the other
-per-reset rolls follow the same rule. Cost: one roll per hitlag episode; parity with the fork's fix is lost
-only when several directions are selected.
+**The fork (stage M5o):** a changed SDI Direction or Shield Tilt now applies at the next CPU frame, with a
+new weighted roll; DI was already read live at each hit. (Before M5o, SDI Direction applied only at the next
+Training reset, and the menu did not say so.) **Clean room:** should it follow the fork?
+Options: (A) follow the fork: apply at the next CPU frame, one roll that holds until the next reset or the
+next change of that row; (B) apply the same way and also roll a new SDI direction every hitlag episode
+(`SPEC-cpu-02` questions 1 and 9); (C) keep reset-only and label the row "applies on next reset".
+**Recommendation: A, follow the fork.** It is built and was checked in Eden (the SDI Up → In change, and the
+Shield Tilt change, applied with no reset). The menu then means the same in both plugins, and Shield Tilt and
+the other per-reset rolls follow the same rule. Cost: with two or more directions selected, SDI keeps one
+direction until the next reset or change, which upstream's own source marks as a bug. B would vary it every
+hit at the price of one roll per hitlag episode and a parity difference from the fork; it stays open if you
+want it.
 
 ![Q18 apply on change](decisions/18-apply-on-change.png)
+
+Fork evidence: `artifacts/…/parked-reuse175/refactor/c1162/di-sdi-apply/RESULT.md` (Eden rows R-APPLY1–3
+passed on the patch's own builds; `PATCH.patch` is in the same folder); the picture's rolls are examples.
 
 ## Files
 
@@ -317,6 +323,23 @@ Cost: the README has no menu pictures until then.
 
 ![B10 README media](decisions/B10-readme-media.png)
 
+### B11 · Ledge options changed while the CPU is already on the ledge (`SPEC-cpu-03`)
+
+**Applies to both the fork (unchanged there) and the clean room.** Found while checking Q18: a CPU rolls its
+ledge option once per hang and holds it until it leaves the ledge; the held roll also survives while the
+Ledge Options row is empty. A CPU already parked on the ledge (for example with Wait) therefore ignores a
+newly selected option until it leaves the ledge and grabs again. The throw option behaves the same way for a CPU already
+holding someone. The fork's SDI and Shield Tilt rolls no longer have this problem (Q18).
+Options: (a) re-roll the ledge options (and the throw options) when the menu changes them, like SDI
+Direction: the CPU takes the new option during the same hang; (b) apply on the next ledge grab, which is
+what the fork does today and what `SPEC-cpu-03` currently says.
+**Recommendation: (a).** The menu then does what it says without a second hang, and it follows the same
+rule as Q18. Cost: one more roll cleared on a menu change; a CPU already hanging can act differently the
+moment the row changes; the fork keeps (b) until it gets the same change. Source: the fork's
+`c1162/di-sdi-apply/PROGRESS.md`, "For the primary" item 2.
+
+![B11 ledge change](decisions/B11-ledge-change.png)
+
 ## Already answered (not repeated above)
 
 | Item | Answer | Where |
@@ -337,4 +360,4 @@ Cost: the README has no menu pictures until then.
 
 The remaining *Open questions* in `specs/` are technical: site guards, hook placement, measurements, RNG
 source, cost-only changes and Eden rows to run. Each has a written recommendation that stands unless the
-operator objects; they are not repeated here. The operator-facing ones are pulled into Q18 and S1–B10 above.
+operator objects; they are not repeated here. The operator-facing ones are pulled into Q18 and S1–B11 above.

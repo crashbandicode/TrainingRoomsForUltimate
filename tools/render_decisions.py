@@ -478,7 +478,7 @@ def d_applychange():
     x0, x1 = 300, WIDE - 40
     ev = {"change": 0.18, "hit1": 0.33, "hit2": 0.46, "reset": 0.62, "hit3": 0.78, "hit4": 0.9}
     X = {k: x0 + v * (x1 - x0) for k, v in ev.items()}
-    c.text(28, 24, "SDI Direction changed from Neutral to {Up, In} in the menu, then four hits", "h", FG)
+    c.text(28, 24, "SDI Direction changed from Neutral to {Up, In} in the menu, then four hits (example rolls)", "h", FG)
     ty = 68
     c.line([(x0, ty + 14), (x1, ty + 14)], LINE, 2)
     for k, lab in (("change", "menu change"), ("hit1", "hit 1"), ("hit2", "hit 2"), ("reset", "L+R+A reset"),
@@ -486,9 +486,11 @@ def d_applychange():
         col = ADV if k in ("change", "reset") else FG
         c.line([(X[k], ty + 6), (X[k], 420)], (60, 66, 80), 1, dash=(4, 4))
         c.text(X[k], ty - 12, lab, "xs", col, "m")
-    lanes = [("Fork today", None, ["Neutral", "Neutral", "Up", "Up"], "old direction until the next reset"),
-             ("Fork next build", "being fixed", ["Up", "Up", "Up", "Up"], "applies at the change; one roll"),
-             ("Clean room, proposed", "recommended", ["Up", "In", "In", "Up"], "applies at the change; a new roll every hit")]
+    lanes = [("Fork before M5o", None, ["Neutral", "Neutral", "Up", "Up"], "old direction until the next reset"),
+             ("A · fork, stage M5o", "recommended", ["Up", "Up", "In", "In"],
+              "applies at the next CPU frame; one roll per reset"),
+             ("B · fork + roll per hit", "alternative", ["Up", "In", "In", "Up"],
+              "applies at the change; a new roll every hit")]
     y = 120
     for name, badge, picks, note in lanes:
         c.rect(24, y - 8, WIDE - 24, y + 84, fill=TILE, outline=OURS if badge == "recommended" else LINE,
@@ -781,10 +783,50 @@ def d_readme():
     c.save("B10-readme-media")
 
 
+def d_ledgechange():
+    c = DCanvas(WIDE, 380)
+    c.rect(12, 12, WIDE - 12, 368, fill=PANEL, outline=LINE, radius=8)
+    x0, x1 = 300, WIDE - 40
+    ev = {"grab": 0.04, "change": 0.30, "leave": 0.66, "regrab": 0.82}
+    X = {k: x0 + v * (x1 - x0) for k, v in ev.items()}
+    c.text(28, 24, "Ledge Options changed from Wait to Jump while the CPU is already hanging on the ledge", "h", FG)
+    tx = tag(c, 28, 52, "applies to the fork", ADV)
+    tag(c, tx + 8, 52, "and the clean room", ADV)
+    ty = 112
+    c.line([(x0, ty + 14), (x1, ty + 14)], LINE, 2)
+    for k, lab in (("grab", "CPU grabs the ledge"), ("change", "menu change"), ("regrab", "CPU grabs again")):
+        col = ADV if k == "change" else FG
+        c.line([(X[k], ty + 6), (X[k], 350)], (60, 66, 80), 1, dash=(4, 4))
+        c.text(X[k], ty - 12, lab, "xs", col, "m")
+    jump_end = X["change"] + 215          # lane A: the CPU jumps off during the same hang
+    lanes = [("A · re-roll on menu change", "recommended", "like SDI Direction", jump_end,
+              [(X["grab"], X["change"], "hangs · holds Wait", LINE),
+               (X["change"], jump_end, "re-rolled: Jump", OURS),
+               (X["regrab"], x1, "rolls: Jump", LINE)],
+              "the CPU acts on the new option during this hang", MUTED),
+             ("B · apply on the next grab", "current", "the held roll stays", X["leave"],
+              [(X["grab"], X["leave"], "holds Wait · the new setting is ignored", BAD),
+               (X["regrab"], x1, "rolls: Jump", LINE)],
+              "nothing changes until the CPU leaves the ledge and grabs again", BAD)]
+    y = 150
+    for name, badge, sub, off_from, segs, result, rcol in lanes:
+        rec = badge == "recommended"
+        c.rect(24, y - 8, WIDE - 24, y + 92, fill=TILE, outline=OURS if rec else LINE, width=3 if rec else 1, radius=6)
+        c.text(36, y, name, "s", FG)
+        tag(c, 36, y + 26, badge, OURS if rec else ADV)
+        c.text(36, y + 56, sub, "xxs", MUTED)
+        for xa, xb, lab, col in segs:
+            box(c, xa, y + 4, xb, y + 48, [lab], col=col, fill=TILE_HI, font="xs")
+        c.text((off_from + X["regrab"]) / 2, y + 20, "off the ledge", "xxs", MUTED, "m")
+        c.text(x0 + 12, y + 64, result, "xxs", rcol)
+        y += 112
+    c.save("B11-ledge-change")
+
+
 ALL = [d_pages, d_dropdown, d_delays, d_subscreens, d_firstpage, d_itemonload, d_replaycapture, d_preloadsamples,
        d_shortcuts, d_helptext, d_p1fallback, d_weights, d_paging, d_miirows, d_portraits, d_dichips, d_applychange,
        d_import, d_corrupt, d_name, d_panic, d_layoutmods, d_p1ai, d_playback, d_perfighter, d_inout, d_fixes,
-       d_devcode, d_readme]
+       d_devcode, d_readme, d_ledgechange]
 
 
 def main():

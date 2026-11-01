@@ -2,6 +2,27 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Decisions page refresh (Q18, new B11) — 2026-11-01
+
+- Worker: Claude session `c0296db6-c2d5-4ad1-adec-70d4f39242d8` under primary `b81ec740`. Model gate
+  from its own transcript: `claude-sonnet-5-5` / `high` (66/66 assistant records at the check). No
+  watcher (single bounded docs turn); no Eden, no build.
+- **Q18** now records the fork's answer: stage M5o applies a changed SDI Direction / Shield Tilt at the
+  next CPU frame (DI was already read live per hit; evidence `…/refactor/c1162/di-sdi-apply/RESULT.md`,
+  `PATCH.patch`). The open question for the clean room is *follow the fork?* Recommendation is now
+  **A, follow the fork**; the per-hit SDI roll is kept as option B (it was the recommendation before;
+  `SPEC-cpu-02` question 9, `MENU-DRAFT.md` question 18 and `docs/MENU-PROPOSAL.md` v9 still describe
+  the pre-M5o fork and were not edited). Picture 18 keeps the timeline; lane labels, the green outline
+  and the example rolls changed; one evidence line added under it.
+- **B11 (new):** ledge options changed while the CPU is already on the ledge (W11 finding, fork
+  unchanged; `SPEC-cpu-03` currently says changes apply on the next grab). Options: (a) re-roll on menu
+  change like SDI (recommended), (b) next ledge grab (current). Marked as relevant to both the fork and
+  the clean room. Picture `B11-ledge-change.png` (menu change → CPU on ledge → each option).
+- `tools/render_decisions.py`: `d_applychange` edited, `d_ledgechange` added; 30 decisions, 30
+  pictures. Changed PNGs 18 and B11 were both viewed; all other PNGs are byte-identical.
+- Next: the operator answers `docs/DECISIONS.md`; fold Q18 / B11 into `MENU-DRAFT.md` §4 and the
+  specs (`SPEC-cpu-02` Q9, `SPEC-cpu-03` §settings change) once decided.
+
 ## Illustrated decisions page — 2026-11-01
 
 - Worker: Claude session `62132d68-754d-4266-9bfe-9759abe5e159` under primary `b81ec740`.
