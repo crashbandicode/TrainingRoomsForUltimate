@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18, 22, 30)"/><stop offset="1" stop-color="rgb(40, 46, 58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/><rect y="560" width="1280" height="40" fill="rgb(52,58,72)"/>
+<rect x="28" y="24" width="1224" height="672" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70, 76, 90)"/>
+<rect x="48" y="40" width="68" height="36" fill="rgb(176, 52, 42)"/>
+<text x="62" y="65" font-size="22" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">CPU</text>
+<text x="1220" y="65" font-size="16" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="end">TrainingRooms</text>
+<line x1="48" y1="88" x2="1232" y2="88" stroke="rgb(70, 76, 90)"/><line x1="48" y1="628" x2="1232" y2="628" stroke="rgb(70, 76, 90)"/>
+<text x="48" y="116" font-size="20" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">CPU &gt; Reactions  &gt;  Situation overrides</text>
+<text x="58" y="162" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Situation</text>
+<text x="1220" y="162" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">&lt;  Ledge roll  &gt;</text>
+<text x="58" y="202" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Use Mash set</text>
+<text x="1220" y="202" font-size="20" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="end">[OFF]</text>
+<rect x="58" y="228" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<rect x="62" y="232" width="12" height="12" fill="rgb(176, 52, 42)"/>
+<text x="92" y="242" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Airdodge</text>
+<rect x="650" y="228" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<rect x="654" y="232" width="12" height="12" fill="rgb(176, 52, 42)"/>
+<text x="684" y="242" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Jump</text>
+<rect x="58" y="264" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="92" y="278" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Shield</text>
+<rect x="650" y="264" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="684" y="278" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Spotdodge</text>
+<rect x="58" y="300" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="92" y="314" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Roll In</text>
+<rect x="650" y="300" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="684" y="314" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Roll Out</text>
+<rect x="58" y="336" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<rect x="62" y="340" width="12" height="12" fill="rgb(176, 52, 42)"/>
+<text x="92" y="350" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Aerial</text>
+<rect x="650" y="336" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="684" y="350" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Jab</text>
+<rect x="58" y="372" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="92" y="386" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Tilts</text>
+<rect x="650" y="372" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="684" y="386" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Smash Attacks</text>
+<rect x="58" y="408" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="92" y="422" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Grab</text>
+<rect x="650" y="408" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="684" y="422" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Dash</text>
+<rect x="58" y="444" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
+<text x="92" y="458" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Dash Attack</text>
+<text x="56" y="651" font-size="16" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Pick the situation with the dropdown, then tick the actions. The page row shows how many situations are set.</text>
+<text x="56" y="675" font-size="14" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+</svg>
