@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v4) as PNG and SVG screens in the
+"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v5) as PNG and SVG screens in the
 in-game overlay look, 1280x720 (Switch handheld).
 
 v3 added the fork's grid pickers (portrait roster grid 13x7, stage thumbnail pages 4x4, item grid 4x8)
@@ -7,13 +7,16 @@ and a 3x3 direction grid for DI / SDI / Airdodge / Shield Tilt. v4 draws the por
 stage grid with the real fighter icons and stage thumbnails, cropped from captures of the fork's own
 pickers by tools/crop_menu_captures.py into docs/menu-mockup/captures/ (review material only, never
 shipped), and replaces the Kirby Hats, Solo Popo and character-items pictograms with one neutral
-placeholder: their final icons are open until the functionality is settled.
+placeholder: their final icons are open until the functionality is settled. v5 draws the item grid with
+the fork's own 38 item icons (byte copies in docs/menu-mockup/captures/items/) and labels the stage grid
+as a mock of run-time thumbnails: the clean room reads each stage's own game UI texture when the grid
+opens, so a stage mod's picture shows; the stage crops stand in for that.
 
 Every screen is drawn once through `Canvas`, which records the primitives and writes both the PNG
 (Pillow) and a text SVG (images referenced by relative path), so the two never drift.
 
 Output: docs/menu-mockup/NN-<screen>.png and .svg plus index.md. Pillow only; DejaVu Sans Mono for the
-modpack-style monospace text. Item icons are still stand-ins.
+modpack-style monospace text.
 """
 import json
 import math
@@ -41,7 +44,6 @@ TILE = (28, 32, 42)
 TILE_HI = (46, 52, 66)
 P1 = (232, 72, 72)      # the fork's red Player order
 CPU = (72, 150, 232)    # the fork's blue CPU order
-INK = (14, 16, 20)      # item stand-in fills on the dark panel
 
 FONTS = {"tab": (FONT_B, 22), "h": (FONT_B, 20), "t": (FONT, 20), "s": (FONT, 16), "xs": (FONT, 14),
          "xxs": (FONT, 12), "b": (FONT_B, 13), "hh": (FONT_B, 24), "tiny": (FONT, 10)}
@@ -181,15 +183,6 @@ def dashed(pts, on, off):
     return out
 
 
-def star(cx, cy, r, points=5, inner=0.45):
-    pts = []
-    for i in range(points * 2):
-        a = -math.pi / 2 + i * math.pi / points
-        rr = r if i % 2 == 0 else r * inner
-        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
-    return pts
-
-
 # ---------------------------------------------------------------------------------------------------
 # Placeholder chip (Kirby Hats, Solo Popo, character items): the final icons are open and will be
 # designed once the functionality is settled; until then one neutral, clearly marked placeholder.
@@ -251,7 +244,7 @@ def chip_direction(c, cx, cy, s, name, selected=False, weight=0, absolute=False,
 
 
 # ---------------------------------------------------------------------------------------------------
-# Grid tiles (portraits and stage thumbnails: crops of the fork's grids; item icons: still stand-ins)
+# Grid tiles (portraits and stage thumbnails: crops of the fork's grids; item icons: the fork's own files)
 # ---------------------------------------------------------------------------------------------------
 def tile_portrait(c, x, y, w, h, name, rank_p=None, rank_c=None, solo=None, cursor=False, kind="fighter"):
     c.rect(x, y, x + w, y + h, fill=TILE_HI if cursor else TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
@@ -277,7 +270,8 @@ def tile_stage(c, x, y, w, h, name, rank=None, form=None, cursor=False, all_tile
         c.image("captures/stages/all.png", x + w / 2 - 36, y + 5, x + w / 2 + 36, y + th)
         c.text(x + w / 2, y + h - 19, "All (listed order)", "xxs", FG, "m")
         return
-    # the stage's real thumbnail as the fork's stage grid draws it; Waiting Room is a text tile there too
+    # a capture of the stock thumbnail as the fork's grid draws it; the clean room reads each stage's own game
+    # UI texture at run time instead (so a stage mod's picture shows). Waiting Room is a text tile in both.
     if name != "Waiting Room":
         c.image(f"captures/stages/{slug(name)}.png", x + 6, y + 5, x + w - 6, y + th)
     label = name if len(name) <= 24 else name[:23] + "…"
@@ -290,89 +284,10 @@ def tile_stage(c, x, y, w, h, name, rank=None, form=None, cursor=False, all_tile
         c.text(x + w - 23, y + 8, form, "xxs", OURS, "m")
 
 
-ITEM_GLYPHS = {
-    "bomb": "bomb", "grenade": "grenade", "egg": "egg", "mechakoopa": "koopa", "turnip": "turnip", "saturn": "saturn",
-    "banana": "banana", "peanut": "peanut", "crown": "crown", "arrow": "arrow", "blade": "blade", "cherry": "fruit",
-    "strawberry": "fruit", "orange": "fruit", "apple": "fruit", "melon": "fruit", "galaxian": "ship", "bell": "bell",
-    "key": "key", "water": "flask", "gyro": "gyro", "tome": "book", "sword": "sword", "chip": "chip",
-}
-
-
-def item_glyph(c, cx, cy, s, name):
-    kind = next((g for k, g in ITEM_GLYPHS.items() if k in name.lower()), "box")
-    w = 2
-    if kind == "bomb":
-        c.circle(cx, cy + s * 0.08, s * 0.3, fill=FG)
-        c.arc(cx + s * 0.1, cy - s * 0.3, s * 0.18, s * 0.14, 180, 330, FG, w)
-    elif kind == "grenade":
-        c.ellipse(cx - s * 0.24, cy - s * 0.18, cx + s * 0.24, cy + s * 0.36, fill=INK, outline=FG, width=w)
-        c.rect(cx - s * 0.1, cy - s * 0.34, cx + s * 0.1, cy - s * 0.16, fill=FG)
-    elif kind == "egg":
-        c.ellipse(cx - s * 0.22, cy - s * 0.32, cx + s * 0.22, cy + s * 0.32, fill=INK, outline=FG, width=w)
-        c.circle(cx - s * 0.06, cy - s * 0.05, s * 0.05, fill=FG)
-        c.circle(cx + s * 0.08, cy + s * 0.12, s * 0.05, fill=FG)
-    elif kind == "koopa":
-        c.ellipse(cx - s * 0.3, cy - s * 0.1, cx + s * 0.3, cy + s * 0.3, fill=INK, outline=FG, width=w)
-        c.rect(cx - s * 0.06, cy - s * 0.32, cx + s * 0.06, cy - s * 0.08, fill=FG)
-    elif kind == "turnip":
-        c.circle(cx, cy + s * 0.1, s * 0.24, fill=INK, outline=FG, width=w)
-        c.polygon([(cx - s * 0.04, cy - s * 0.1), (cx - s * 0.22, cy - s * 0.36), (cx, cy - s * 0.14)], fill=FG)
-        c.polygon([(cx + s * 0.04, cy - s * 0.1), (cx + s * 0.22, cy - s * 0.36), (cx, cy - s * 0.14)], fill=FG)
-        c.circle(cx - s * 0.08, cy + s * 0.06, s * 0.035, fill=FG)
-        c.circle(cx + s * 0.08, cy + s * 0.06, s * 0.035, fill=FG)
-    elif kind == "saturn":
-        c.circle(cx, cy + s * 0.05, s * 0.26, fill=INK, outline=FG, width=w)
-        c.line([(cx, cy - s * 0.2), (cx, cy - s * 0.36)], FG, w)
-        c.circle(cx, cy - s * 0.38, s * 0.04, fill=FG)
-    elif kind == "banana":
-        c.polygon([(cx - s * 0.32, cy + s * 0.1), (cx - s * 0.2, cy - s * 0.2), (cx + s * 0.05, cy - s * 0.3), (cx + s * 0.3, cy - s * 0.1),
-                   (cx + s * 0.1, cy - s * 0.02), (cx - s * 0.12, cy + s * 0.14)], fill=INK, outline=FG, width=w)
-    elif kind == "peanut":
-        c.ellipse(cx - s * 0.16, cy - s * 0.3, cx + s * 0.16, cy + s * 0.02, fill=INK, outline=FG, width=w)
-        c.ellipse(cx - s * 0.18, cy - s * 0.04, cx + s * 0.18, cy + s * 0.32, fill=INK, outline=FG, width=w)
-    elif kind == "crown":
-        c.polygon([(cx - s * 0.3, cy + s * 0.22), (cx - s * 0.3, cy - s * 0.2), (cx - s * 0.12, cy), (cx, cy - s * 0.3),
-                   (cx + s * 0.12, cy), (cx + s * 0.3, cy - s * 0.2), (cx + s * 0.3, cy + s * 0.22)], fill=INK, outline=FG, width=w)
-    elif kind == "arrow":
-        c.line([(cx - s * 0.3, cy + s * 0.3), (cx + s * 0.22, cy - s * 0.22)], FG, w)
-        c.polygon([(cx + s * 0.3, cy - s * 0.3), (cx + s * 0.08, cy - s * 0.24), (cx + s * 0.24, cy - s * 0.08)], fill=FG)
-    elif kind == "blade":
-        c.polygon(star(cx, cy, s * 0.32, 4, 0.5), fill=INK, outline=FG, width=w)
-        c.circle(cx, cy, s * 0.08, fill=FG)
-    elif kind == "fruit":
-        c.circle(cx, cy + s * 0.06, s * 0.26, fill=INK, outline=FG, width=w)
-        c.line([(cx, cy - s * 0.2), (cx + s * 0.1, cy - s * 0.36)], FG, w)
-    elif kind == "ship":
-        c.polygon([(cx, cy - s * 0.3), (cx + s * 0.3, cy + s * 0.2), (cx, cy + s * 0.05), (cx - s * 0.3, cy + s * 0.2)], fill=INK, outline=FG, width=w)
-    elif kind == "bell":
-        c.polygon([(cx - s * 0.26, cy + s * 0.18), (cx - s * 0.16, cy - s * 0.1), (cx, cy - s * 0.3), (cx + s * 0.16, cy - s * 0.1),
-                   (cx + s * 0.26, cy + s * 0.18)], fill=INK, outline=FG, width=w)
-        c.circle(cx, cy + s * 0.26, s * 0.06, fill=FG)
-    elif kind == "key":
-        c.circle(cx - s * 0.12, cy - s * 0.1, s * 0.16, fill=INK, outline=FG, width=w)
-        c.line([(cx, cy + s * 0.02), (cx + s * 0.3, cy + s * 0.3)], FG, w + 1)
-        c.line([(cx + s * 0.18, cy + s * 0.18), (cx + s * 0.08, cy + s * 0.28)], FG, w)
-    elif kind == "flask":
-        c.polygon([(cx - s * 0.1, cy - s * 0.32), (cx + s * 0.1, cy - s * 0.32), (cx + s * 0.1, cy - s * 0.1), (cx + s * 0.26, cy + s * 0.3),
-                   (cx - s * 0.26, cy + s * 0.3), (cx - s * 0.1, cy - s * 0.1)], fill=INK, outline=FG, width=w)
-    elif kind == "gyro":
-        c.polygon([(cx - s * 0.3, cy - s * 0.1), (cx + s * 0.3, cy - s * 0.1), (cx, cy + s * 0.3)], fill=INK, outline=FG, width=w)
-        c.rect(cx - s * 0.04, cy - s * 0.34, cx + s * 0.04, cy - s * 0.1, fill=FG)
-    elif kind == "book":
-        c.rect(cx - s * 0.24, cy - s * 0.3, cx + s * 0.24, cy + s * 0.3, fill=INK, outline=FG, width=w, radius=2)
-        c.line([(cx - s * 0.1, cy - s * 0.3), (cx - s * 0.1, cy + s * 0.3)], FG, w)
-    elif kind == "sword":
-        c.polygon([(cx - s * 0.26, cy + s * 0.26), (cx + s * 0.2, cy - s * 0.28), (cx + s * 0.28, cy - s * 0.2), (cx - s * 0.18, cy + s * 0.34)], fill=FG)
-        c.line([(cx - s * 0.3, cy + s * 0.12), (cx - s * 0.12, cy + s * 0.3)], FG, w + 1)
-    elif kind == "chip":
-        c.polygon([(cx - s * 0.3, cy + s * 0.1), (cx - s * 0.05, cy - s * 0.3), (cx + s * 0.3, cy - s * 0.12), (cx + s * 0.1, cy + s * 0.3)], fill=INK, outline=FG, width=w)
-    else:
-        c.rect(cx - s * 0.26, cy - s * 0.26, cx + s * 0.26, cy + s * 0.26, fill=INK, outline=FG, width=w)
-
-
-def tile_item(c, x, y, w, h, name, cursor=False):
+def tile_item(c, x, y, w, h, index, name, cursor=False):
     c.rect(x, y, x + w, y + h, fill=TILE_HI if cursor else TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
-    item_glyph(c, x + 26, y + h / 2, 34, name)
+    # the fork's own item-grid picture (scripts/item-icons/assets/icon-NN.png, 64x64), copied unchanged
+    c.image(f"captures/items/icon-{index:02}.png", x + 6, y + 4, x + 46, y + h - 4)
     who, what = name.split(": ", 1)
     c.text(x + 50, y + 7, what if len(what) <= 24 else what[:23] + "…", "xxs", FG)
     c.text(x + 50, y + 25, who, "tiny", MUTED)
@@ -833,7 +748,7 @@ def render_roster_grid(hats=False):
 
 def render_item_grid():
     c = Canvas()
-    frame(c, ["Fighters & Stages"], 0, "A gives Player 1 the item now (one at a time). The icons are the game's own item pictures.",
+    frame(c, ["Fighters & Stages"], 0, "A gives Player 1 the item now (one at a time). L/R pages.",
           "Fighters & Stages  >  Extras  >  Give item")
     chip_placeholder(c, 620, 112, 40, "ITEMS")
     c.text(W - 60, 100, "page 1 / 2   (38 items)", "s", MUTED, "r")
@@ -841,7 +756,9 @@ def render_item_grid():
     x0, y0 = 48 + (W - 96 - 4 * px + 12) / 2, 136
     for i, name in enumerate(ITEMS[:32]):
         col, row = i % 4, i // 4
-        tile_item(c, x0 + col * px, y0 + row * py, tw, th, name, cursor=(i == 8))
+        tile_item(c, x0 + col * px, y0 + row * py, tw, th, i, name, cursor=(i == 8))
+    c.text(x0, y0 + 8 * py + 2, "Icons: the fork's 38 item pictures (scripts/item-icons), made from the game's own item files.",
+           "xs", MUTED)
     return c
 
 
@@ -861,6 +778,8 @@ def render_stage_grid():
             rank, form = STAGE_ORDER.get(name, (None, None))
             tile_stage(c, x0 + col * px, y0 + row * py, tw, th, name, rank, form, cursor=(name == "Small Battlefield"))
     c.text(x0, y0 + 4 * py + 2, "Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)", "xs", FG)
+    c.text(x0, y0 + 4 * py + 24, "Thumbnails: read at run time from each stage's own game UI texture, so a stage mod's "
+           "picture shows; this mock shows stock captures.", "xs", MUTED)
     return c
 
 
@@ -892,8 +811,9 @@ def image_sources():
     """index.md section: every source capture (path, sha256) and every crop box, from captures/crops.json."""
     m = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))
     out = ["", "## Image sources (review mockup only, not shipped artwork)", "",
-           "The crops in `captures/` are game-asset captures (stock fighter icons, stage thumbnails) as the fork's own grid "
-           "pickers show them in Training. They exist for this review mockup only; the plugin never ships them. Written by "
+           "The crops in `captures/` are game-asset captures (stock fighter icons, stock stage thumbnails) as the fork's own grid "
+           "pickers show them in Training; `captures/items/` holds byte copies of the fork's item icons. They exist for this "
+           "review mockup only; the plugin never ships these files. Written by "
            "`tools/crop_menu_captures.py` (pins each source by sha256); the manifest is `captures/crops.json`. Eden captures are "
            "1920x1080 window grabs with the game frame at (361,181) scaled 1198x674; the two `docs/feature-walkthroughs/` images "
            "are the fork's own 1280x720 frames (byte-identical in the fork worktree). Upstream's menu icons are not used (PROVENANCE §C).", "",
@@ -905,6 +825,15 @@ def image_sources():
             "picture in the fork's stage grid and none here.", "", "| cell | crop | source | box |", "| --- | --- | --- | --- |"]
     for cell in m["cells"]:
         out.append(f"| {cell['cell']} | `captures/{cell['file']}` | {cell['source']} | {tuple(cell['box'])} |")
+    it = m["item_icons"]
+    out += ["", "Item icons (proposal v5): byte copies of the fork's own item-grid pictures, not crops. Source directory "
+            f"`{it['path']}` (the frozen M5k stage; byte-identical to the fork worktree's `scripts/item-icons/assets/`), "
+            f"manifest `sources.json` sha256 `{it['manifest_sha256']}`. Each icon's sha256 is checked against that manifest "
+            "before the copy. The manifest records how the fork made each one: native `item_0` UI icons for Mr. Saturn, "
+            "Bob-omb and Banana Peel, renders of the item's own game model and textures for the rest.", "",
+            "| # | item | file | sha256 |", "| --- | --- | --- | --- |"]
+    for item in m["items"]:
+        out.append(f"| {item['index']} | {item['cell']} | `captures/{item['file']}` | `{item['sha256']}` |")
     return out
 
 
@@ -914,12 +843,14 @@ def main():
         old.unlink()
     for old in OUT.glob("*.svg"):
         old.unlink()
-    index = ["# Menu mockup screens (proposal v4, in-game look, 1280x720)", "",
+    index = ["# Menu mockup screens (proposal v5, in-game look, 1280x720)", "",
              "Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; "
-             "the help bar shows the focused item's text. The portrait grid and the stage grid use the real fighter icons and stage "
-             "thumbnails, cropped from captures of the fork's own grid pickers (table below). The Kirby Hats, Solo Popo and "
+             "the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the "
+             "fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows "
+             "captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run "
+             "time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and "
              "character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality "
-             "is settled. Item icons on the item grid are still stand-ins; the direction glyphs are the clean room's own vector art.", ""]
+             "is settled. The direction glyphs are the clean room's own vector art.", ""]
     screens = [
         ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids)"),
         ("02-saves", lambda: render_page(1), "page Saves"),
@@ -931,8 +862,9 @@ def main():
         ("08-swap-groups", lambda: render_subscreen(2), "sub-screen Swap groups (Fighters & Stages > Loading)"),
         ("09-direction-grid", render_direction_grid, "sub-screen DI Direction: the 3x3 direction grid with absolute Left/Right and weights"),
         ("10-character-grid", lambda: render_roster_grid(False), "sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges"),
-        ("11-item-grid", render_item_grid, "sub-screen Give item: 4x8 item grid, page 1 of 2"),
-        ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages: 4x4 stage thumbnail page with All, order badges and form tags"),
+        ("11-item-grid", render_item_grid, "sub-screen Give item: 4x8 item grid with the fork's own item icons, page 1 of 2"),
+        ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time "
+         "each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures"),
         ("13-kirby-hats-grid", lambda: render_roster_grid(True), "sub-screen Kirby Hats: the same portrait grid as a two-role hat order"),
         ("14-fighters-extras", lambda: render_page(3, 1), "page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)"),
         ("15-fighters-stage-rows", lambda: render_page(3, 2), "page Fighters & Stages (Stages group: stage order preview)"),

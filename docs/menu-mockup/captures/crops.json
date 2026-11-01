@@ -1,5 +1,5 @@
 {
- "purpose": "Review mockup only; game-asset captures of the fork's grid pickers; not shipped artwork.",
+ "purpose": "Review mockup only; game-asset captures of the fork's grid pickers and byte copies of the fork's item icons; not shipped artwork.",
  "sources": {
   "change-player": {
    "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/gs-panic-pool14/evidence-m5f/surface/captures/072638-gsp9-p1grid.png",
@@ -21,6 +21,10 @@
    "sha256": "84dbcd0e8da2e657c26251170843ff54bdb53e5f7b369e4977d1bdfa8092d412",
    "geometry": "frame"
   }
+ },
+ "item_icons": {
+  "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5k/stage/scripts/item-icons/assets",
+  "manifest_sha256": "8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887"
  },
  "cells": [
   {
@@ -1144,6 +1148,236 @@
     1152,
     593
    ]
+  }
+ ],
+ "items": [
+  {
+   "index": 0,
+   "cell": "Banjo & Kazooie: Grenade Egg",
+   "file": "items/icon-00.png",
+   "sha256": "3d32ba4b3b6aaaa2f796dfbf1eedcf5aea9f342d89e50ea1323831bcc17a1065"
+  },
+  {
+   "index": 1,
+   "cell": "Bowser Jr.: Mechakoopa",
+   "file": "items/icon-01.png",
+   "sha256": "90f5a8f7482ae7cdb5c583b7d349f52de90d5a7eab7507bbe5ed993aea73b735"
+  },
+  {
+   "index": 2,
+   "cell": "Daisy: Smile Turnip",
+   "file": "items/icon-02.png",
+   "sha256": "ee643fab9b28a2aa17b198e95d5fcefcd7aad694a411f39026438c86a1d918ce"
+  },
+  {
+   "index": 3,
+   "cell": "Daisy: Winky Turnip",
+   "file": "items/icon-03.png",
+   "sha256": "ae1128531822d7f46b0117453e126b6d7af701b35e2078158f454f6459d083d0"
+  },
+  {
+   "index": 4,
+   "cell": "Daisy: Dot-Eyes Turnip",
+   "file": "items/icon-04.png",
+   "sha256": "ef7967d410d8b5af487973cd48e875a1595906a1a4a7b9fe0d54c9f36f4641d6"
+  },
+  {
+   "index": 5,
+   "cell": "Daisy: Stitch-Face Turnip",
+   "file": "items/icon-05.png",
+   "sha256": "4e459691982911c1badaf1a440313b90bf0bca91b0293d9a313e1524e50a36c6"
+  },
+  {
+   "index": 6,
+   "cell": "Daisy: Mr. Saturn",
+   "file": "items/icon-06.png",
+   "sha256": "918c87d08f790d805a10ca56b4be71902c90cc174c4fee5f4fdc52146c73bcca"
+  },
+  {
+   "index": 7,
+   "cell": "Daisy: Bob-omb",
+   "file": "items/icon-07.png",
+   "sha256": "d4d894be9fa6bc4016c14eec92814fc2c759926948c6a856009fb26e4b973eea"
+  },
+  {
+   "index": 8,
+   "cell": "Diddy Kong: Banana Peel",
+   "file": "items/icon-08.png",
+   "sha256": "c1c7d74fc6da1152dede1462ddd1ec731e3edbf093122a00e6e002cc8b6509ca"
+  },
+  {
+   "index": 9,
+   "cell": "Diddy Kong: Peanut",
+   "file": "items/icon-09.png",
+   "sha256": "6ce930342a8d715305b177d5fa176b8ae3eafd2c1286b6a2cfae8dfdb7aedb26"
+  },
+  {
+   "index": 10,
+   "cell": "King K. Rool: Crown",
+   "file": "items/icon-10.png",
+   "sha256": "f39120f31655bbcd33f3b78cce7789f751b969c0705b463f4e0ad7afd48140eb"
+  },
+  {
+   "index": 11,
+   "cell": "Link: Remote Bomb",
+   "file": "items/icon-11.png",
+   "sha256": "826961ac749989535578113b0a4c3314f903d4e7d02b97b185ba9473dcbdcfc9"
+  },
+  {
+   "index": 12,
+   "cell": "Link: Arrow",
+   "file": "items/icon-12.png",
+   "sha256": "69e8d6ed411964fa129caedacf494fdafd3b4229238d66562cfa6a15b714c441"
+  },
+  {
+   "index": 13,
+   "cell": "Mega Man: Metal Blade",
+   "file": "items/icon-13.png",
+   "sha256": "724282a79bde109d50d30f3376b6d51f3176db9eab972a09bafa567155de07f4"
+  },
+  {
+   "index": 14,
+   "cell": "Pac-Man: Cherry",
+   "file": "items/icon-14.png",
+   "sha256": "44447262eb791551f03c6d924a944c2bf43729606a43f3e963bfeeb141dc0437"
+  },
+  {
+   "index": 15,
+   "cell": "Pac-Man: Strawberry",
+   "file": "items/icon-15.png",
+   "sha256": "6c00d18a79c59544b2af32b9d6f444a879fa3157a50d192679c98bee34163720"
+  },
+  {
+   "index": 16,
+   "cell": "Pac-Man: Orange",
+   "file": "items/icon-16.png",
+   "sha256": "f24254d6fb357a41db5765d0448a6ec103efd0f693f21dfac02b0e52bdc0a2ec"
+  },
+  {
+   "index": 17,
+   "cell": "Pac-Man: Apple",
+   "file": "items/icon-17.png",
+   "sha256": "8a98c9b006dd82b2d65e5ee914919ac2a91b20f7c07072d92178ebc5d0882ca5"
+  },
+  {
+   "index": 18,
+   "cell": "Pac-Man: Melon",
+   "file": "items/icon-18.png",
+   "sha256": "d763b83fa88d7f9526f40b2c307324a5055199927cd321f759e8e18313d61e76"
+  },
+  {
+   "index": 19,
+   "cell": "Pac-Man: Galaxian",
+   "file": "items/icon-19.png",
+   "sha256": "96028383dd49c9aaedca2beda752d5f7424bc63c4f434d52524a4a6d5f2c2392"
+  },
+  {
+   "index": 20,
+   "cell": "Pac-Man: Bell",
+   "file": "items/icon-20.png",
+   "sha256": "c6477c1b71920ab76c986dc131bbc6121861b3ba95f5ae459f5a77bd20b74e96"
+  },
+  {
+   "index": 21,
+   "cell": "Pac-Man: Key",
+   "file": "items/icon-21.png",
+   "sha256": "2822de83b6eda7b1ff752b85790f94bf9669eea1456b7cf3d1d9854f74c86ab5"
+  },
+  {
+   "index": 22,
+   "cell": "Peach: Smile Turnip",
+   "file": "items/icon-22.png",
+   "sha256": "4abbb9a61dcced2c65b3e104588ce19aef3d7c87425aea9c860cfa4cfa495fee"
+  },
+  {
+   "index": 23,
+   "cell": "Peach: Winky Turnip",
+   "file": "items/icon-23.png",
+   "sha256": "0cd6f8c78294e6b2d95dfef3d71e3902ccbc39cf6d1e6e86409fcaf5adaf8aa6"
+  },
+  {
+   "index": 24,
+   "cell": "Peach: Dot-Eyes Turnip",
+   "file": "items/icon-24.png",
+   "sha256": "aeaa8cac778ea511445db3961373d89ef787e5598077fadb33d083b78b989a02"
+  },
+  {
+   "index": 25,
+   "cell": "Peach: Stitch-Face Turnip",
+   "file": "items/icon-25.png",
+   "sha256": "d94484daaeade3fa89ce4d220796166e1ea26525cc6f0e315e581361b0c5fd97"
+  },
+  {
+   "index": 26,
+   "cell": "Peach: Mr. Saturn",
+   "file": "items/icon-26.png",
+   "sha256": "918c87d08f790d805a10ca56b4be71902c90cc174c4fee5f4fdc52146c73bcca"
+  },
+  {
+   "index": 27,
+   "cell": "Peach: Bob-omb",
+   "file": "items/icon-27.png",
+   "sha256": "d4d894be9fa6bc4016c14eec92814fc2c759926948c6a856009fb26e4b973eea"
+  },
+  {
+   "index": 28,
+   "cell": "Richter: Holy Water",
+   "file": "items/icon-28.png",
+   "sha256": "151759e5e2d31d5e7249338326617693789bbf50ee78612c82977024fcfd2456"
+  },
+  {
+   "index": 29,
+   "cell": "R.O.B.: Gyro",
+   "file": "items/icon-29.png",
+   "sha256": "aa50909bf4224a22fce1f32fd4f66d1e1d8606955472fa3a02d5c983d6960d6b"
+  },
+  {
+   "index": 30,
+   "cell": "Robin: Tome",
+   "file": "items/icon-30.png",
+   "sha256": "5fd3b9493ed7b94365d41d0b568a866b98f3c91996327a7bbdc945bef9efaa28"
+  },
+  {
+   "index": 31,
+   "cell": "Robin: Levin Sword",
+   "file": "items/icon-31.png",
+   "sha256": "04c227ea2313c9d73a4ebfbc3bb3bab8449ed25b12258fc9ad97106ce52a7fc1"
+  },
+  {
+   "index": 32,
+   "cell": "Sheik: Burst Grenade",
+   "file": "items/icon-32.png",
+   "sha256": "c270c03a96f515285f9301024a455994b20c0d97e9660ae8ebf8e01e50ef63dd"
+  },
+  {
+   "index": 33,
+   "cell": "Simon: Holy Water",
+   "file": "items/icon-33.png",
+   "sha256": "151759e5e2d31d5e7249338326617693789bbf50ee78612c82977024fcfd2456"
+  },
+  {
+   "index": 34,
+   "cell": "Snake: Hand Grenade",
+   "file": "items/icon-34.png",
+   "sha256": "a589d64af7f963ce7fe7ad3ce185db10c7f0fbbb4c2114832f7958ec23155e56"
+  },
+  {
+   "index": 35,
+   "cell": "Toon Link: Bomb",
+   "file": "items/icon-35.png",
+   "sha256": "bcf3878cebb06ba72fa31b9357d9ecf67d35eb40ebb1ffba3e5cf0984b560d7b"
+  },
+  {
+   "index": 36,
+   "cell": "Villager: Wood Chip",
+   "file": "items/icon-36.png",
+   "sha256": "0af3312adee081227d9300119e649d886371a075e5b6f648768b7e8a6bfbe2db"
+  },
+  {
+   "index": 37,
+   "cell": "Young Link: Bomb",
+   "file": "items/icon-37.png",
+   "sha256": "9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef"
   }
  ]
 }

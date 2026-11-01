@@ -183,8 +183,12 @@ generated assets (`scripts/roster-grid`, `scripts/stage-grid`,
 `scripts/item-icons`) are carried over with their `sources.json` manifests.
 They are game pictures: the stage and item sets were extracted from the
 game's files, while the roster's 89 stock icons are SmashWiki copies of the
-game's icons, per its manifest. Whether the MIT repo commits them, as the
-fork does, is `MENU-DRAFT.md` question 13.
+game's icons, per its manifest. `MENU-DRAFT.md` question 13 (answered in
+draft 5, 2026-11-01) settles two of the three sets. The 115 stage thumbnails
+are **not** carried over: the clean room reads each stage's own UI texture
+from the game at run time, so stage mods show, and commits or bakes no stage
+picture (SPEC-core-07 §4.5). The 38 item icons are used as the fork ships
+them. Whether the 89 roster icons follow the stage rule is question 16.
 
 **Review-mockup crops (2026-11-01, menu proposal v4).**
 `docs/menu-mockup/captures/` holds 102 crops (87 fighter cells, 15 stage cells)
@@ -194,7 +198,14 @@ fork's `docs/feature-walkthroughs/kirby-grid.png` and `stage-rotation.png`.
 `docs/menu-mockup/index.md` lists every crop box. These are game-asset
 captures, used only to render the review mockup. They are not shipped
 artwork: the plugin, its release and its layout never include them. None of
-upstream's menu icons (above) is used in the mockup.
+upstream's menu icons (above) is used in the mockup. Proposal v5 adds
+`docs/menu-mockup/captures/items/`: 38 byte copies of the fork's
+`scripts/item-icons/assets/icon-00..37.png`, taken from the frozen M5k stage
+copy (byte-identical to the fork worktree). `tools/crop_menu_captures.py`
+checks the manifest sha256 (`8fbed7ab…`) and each icon's sha256 before
+copying, and `docs/menu-mockup/index.md` lists every one. They are review
+material in the same sense. The stage crops now stand in for thumbnails
+that the plugin reads at run time.
 
 ### D. Drop
 

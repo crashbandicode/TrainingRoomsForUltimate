@@ -88,4 +88,5 @@
 <rect x="1171.0" y="466.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
 <text x="1188.0" y="477.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">Ω</text>
 <text x="69.0" y="581.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)</text>
+<text x="69.0" y="603.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Thumbnails: read at run time from each stage's own game UI texture, so a stage mod's picture shows; this mock shows stock captures.</text>
 </svg>

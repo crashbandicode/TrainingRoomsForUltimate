@@ -2,6 +2,38 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v5 — 2026-11-01 (operator's review of v4)
+
+- Worker: Claude session `b124dad3-7453-40aa-8f6f-b448f4448014` under primary
+  `b81ec740`. Model gate from its own transcript: `claude-opus-5-5` / `high`
+  (10 of 10 assistant records). No watcher was armed for this single-turn,
+  docs-only task.
+- Item grid: `captures/items/icon-00..37.png` are byte copies of the fork's
+  `scripts/item-icons/assets/` from the frozen M5k stage. Manifest
+  `sources.json` `8fbed7ab…` and all 38 icon hashes are identical in the stage
+  and the worktree, and match the manifest. `tools/crop_menu_captures.py`
+  re-checks them on every run. The stand-in glyph code (`item_glyph`, `star`,
+  `INK`) was removed from the renderer.
+- Stage grid: `MENU-DRAFT.md` draft 5 (*Grid pictures*), `docs/MENU-PROPOSAL.md`
+  v5 and `specs/SPEC-core-07` §4.5 now say thumbnails are read at run time
+  from `ui/replace[_patch]/stage/stage_1/stage_1_<name_id>.bntx` through the
+  mod-aware view, never through `arc:/` (vanilla) and never baked. Fork
+  evidence: `stage_grid.rs` only toggles the 115 baked `stage_icon_NNN`
+  panes; `stage_asset_probe.rs` (feature-gated) lists the 115 `stage_1`
+  paths; the ARCropolis 4.1.1 audit is `artifacts/enhancements/arc-stage-assets/REPORT.md`;
+  the probe log `plan4-native-08` has `stage_1` at 20,584 B and `stage_2` /
+  `stage_3` at 135,272 B. Open: U1–U8 in §4.5 (load route and lock rules,
+  `mods:/` semantics, the game-loader entry, binding a BNTX to a pane, which
+  slot mods replace, forms, cost, added stages). Question 13 is answered;
+  question 16 (fighter portraits and mods) is added and left open.
+- Re-rendered: only 11 and 12 (PNG and SVG) changed. The 102 v4 crops and
+  screens 01–10 and 13–16 are byte-identical. Both changed PNGs were viewed;
+  all 232 SVG image references resolve. No Eden run, no build.
+- Not checked: the file list of the operator's Final Destination mod (U5).
+  `SPEC-core-07` §1 and the §4.4 roster row still say the portraits are
+  decoded from the game's files; the v4 manifest finding (SmashWiki copies)
+  contradicts that. Left unchanged as outside this request.
+
 ## Menu proposal v4 — 2026-11-01 (operator's review of v3)
 
 - Worker: Claude session `e5bac3f4-4a52-47b9-923f-8a968f5c5505` under primary

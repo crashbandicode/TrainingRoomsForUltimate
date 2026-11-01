@@ -1,6 +1,6 @@
-# Menu mockup screens (proposal v4, in-game look, 1280x720)
+# Menu mockup screens (proposal v5, in-game look, 1280x720)
 
-Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; the help bar shows the focused item's text. The portrait grid and the stage grid use the real fighter icons and stage thumbnails, cropped from captures of the fork's own grid pickers (table below). The Kirby Hats, Solo Popo and character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality is settled. Item icons on the item grid are still stand-ins; the direction glyphs are the clean room's own vector art.
+Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality is settled. The direction glyphs are the clean room's own vector art.
 
 - `01-cpu.png` / `.svg` — page CPU (Defence group: direction grids)
 - `02-saves.png` / `.svg` — page Saves
@@ -12,8 +12,8 @@ Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the
 - `08-swap-groups.png` / `.svg` — sub-screen Swap groups (Fighters & Stages > Loading)
 - `09-direction-grid.png` / `.svg` — sub-screen DI Direction: the 3x3 direction grid with absolute Left/Right and weights
 - `10-character-grid.png` / `.svg` — sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges
-- `11-item-grid.png` / `.svg` — sub-screen Give item: 4x8 item grid, page 1 of 2
-- `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages: 4x4 stage thumbnail page with All, order badges and form tags
+- `11-item-grid.png` / `.svg` — sub-screen Give item: 4x8 item grid with the fork's own item icons, page 1 of 2
+- `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures
 - `13-kirby-hats-grid.png` / `.svg` — sub-screen Kirby Hats: the same portrait grid as a two-role hat order
 - `14-fighters-extras.png` / `.svg` — page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)
 - `15-fighters-stage-rows.png` / `.svg` — page Fighters & Stages (Stages group: stage order preview)
@@ -21,7 +21,7 @@ Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the
 
 ## Image sources (review mockup only, not shipped artwork)
 
-The crops in `captures/` are game-asset captures (stock fighter icons, stage thumbnails) as the fork's own grid pickers show them in Training. They exist for this review mockup only; the plugin never ships them. Written by `tools/crop_menu_captures.py` (pins each source by sha256); the manifest is `captures/crops.json`. Eden captures are 1920x1080 window grabs with the game frame at (361,181) scaled 1198x674; the two `docs/feature-walkthroughs/` images are the fork's own 1280x720 frames (byte-identical in the fork worktree). Upstream's menu icons are not used (PROVENANCE §C).
+The crops in `captures/` are game-asset captures (stock fighter icons, stock stage thumbnails) as the fork's own grid pickers show them in Training; `captures/items/` holds byte copies of the fork's item icons. They exist for this review mockup only; the plugin never ships these files. Written by `tools/crop_menu_captures.py` (pins each source by sha256); the manifest is `captures/crops.json`. Eden captures are 1920x1080 window grabs with the game frame at (361,181) scaled 1198x674; the two `docs/feature-walkthroughs/` images are the fork's own 1280x720 frames (byte-identical in the fork worktree). Upstream's menu icons are not used (PROVENANCE §C).
 
 | source | file | sha256 |
 | --- | --- | --- |
@@ -136,3 +136,46 @@ Crop boxes (x0, y0, x1, y1 in source pixels). Portraits come from `change-player
 | Princess Peach's Castle | `captures/stages/princess-peach-s-castle.png` | stage-rotation | (435, 506, 539, 593) |
 | Rainbow Cruise | `captures/stages/rainbow-cruise.png` | stage-rotation | (741, 506, 845, 593) |
 | Kongo Falls | `captures/stages/kongo-falls.png` | stage-rotation | (1048, 506, 1152, 593) |
+
+Item icons (proposal v5): byte copies of the fork's own item-grid pictures, not crops. Source directory `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5k/stage/scripts/item-icons/assets` (the frozen M5k stage; byte-identical to the fork worktree's `scripts/item-icons/assets/`), manifest `sources.json` sha256 `8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887`. Each icon's sha256 is checked against that manifest before the copy. The manifest records how the fork made each one: native `item_0` UI icons for Mr. Saturn, Bob-omb and Banana Peel, renders of the item's own game model and textures for the rest.
+
+| # | item | file | sha256 |
+| --- | --- | --- | --- |
+| 0 | Banjo & Kazooie: Grenade Egg | `captures/items/icon-00.png` | `3d32ba4b3b6aaaa2f796dfbf1eedcf5aea9f342d89e50ea1323831bcc17a1065` |
+| 1 | Bowser Jr.: Mechakoopa | `captures/items/icon-01.png` | `90f5a8f7482ae7cdb5c583b7d349f52de90d5a7eab7507bbe5ed993aea73b735` |
+| 2 | Daisy: Smile Turnip | `captures/items/icon-02.png` | `ee643fab9b28a2aa17b198e95d5fcefcd7aad694a411f39026438c86a1d918ce` |
+| 3 | Daisy: Winky Turnip | `captures/items/icon-03.png` | `ae1128531822d7f46b0117453e126b6d7af701b35e2078158f454f6459d083d0` |
+| 4 | Daisy: Dot-Eyes Turnip | `captures/items/icon-04.png` | `ef7967d410d8b5af487973cd48e875a1595906a1a4a7b9fe0d54c9f36f4641d6` |
+| 5 | Daisy: Stitch-Face Turnip | `captures/items/icon-05.png` | `4e459691982911c1badaf1a440313b90bf0bca91b0293d9a313e1524e50a36c6` |
+| 6 | Daisy: Mr. Saturn | `captures/items/icon-06.png` | `918c87d08f790d805a10ca56b4be71902c90cc174c4fee5f4fdc52146c73bcca` |
+| 7 | Daisy: Bob-omb | `captures/items/icon-07.png` | `d4d894be9fa6bc4016c14eec92814fc2c759926948c6a856009fb26e4b973eea` |
+| 8 | Diddy Kong: Banana Peel | `captures/items/icon-08.png` | `c1c7d74fc6da1152dede1462ddd1ec731e3edbf093122a00e6e002cc8b6509ca` |
+| 9 | Diddy Kong: Peanut | `captures/items/icon-09.png` | `6ce930342a8d715305b177d5fa176b8ae3eafd2c1286b6a2cfae8dfdb7aedb26` |
+| 10 | King K. Rool: Crown | `captures/items/icon-10.png` | `f39120f31655bbcd33f3b78cce7789f751b969c0705b463f4e0ad7afd48140eb` |
+| 11 | Link: Remote Bomb | `captures/items/icon-11.png` | `826961ac749989535578113b0a4c3314f903d4e7d02b97b185ba9473dcbdcfc9` |
+| 12 | Link: Arrow | `captures/items/icon-12.png` | `69e8d6ed411964fa129caedacf494fdafd3b4229238d66562cfa6a15b714c441` |
+| 13 | Mega Man: Metal Blade | `captures/items/icon-13.png` | `724282a79bde109d50d30f3376b6d51f3176db9eab972a09bafa567155de07f4` |
+| 14 | Pac-Man: Cherry | `captures/items/icon-14.png` | `44447262eb791551f03c6d924a944c2bf43729606a43f3e963bfeeb141dc0437` |
+| 15 | Pac-Man: Strawberry | `captures/items/icon-15.png` | `6c00d18a79c59544b2af32b9d6f444a879fa3157a50d192679c98bee34163720` |
+| 16 | Pac-Man: Orange | `captures/items/icon-16.png` | `f24254d6fb357a41db5765d0448a6ec103efd0f693f21dfac02b0e52bdc0a2ec` |
+| 17 | Pac-Man: Apple | `captures/items/icon-17.png` | `8a98c9b006dd82b2d65e5ee914919ac2a91b20f7c07072d92178ebc5d0882ca5` |
+| 18 | Pac-Man: Melon | `captures/items/icon-18.png` | `d763b83fa88d7f9526f40b2c307324a5055199927cd321f759e8e18313d61e76` |
+| 19 | Pac-Man: Galaxian | `captures/items/icon-19.png` | `96028383dd49c9aaedca2beda752d5f7424bc63c4f434d52524a4a6d5f2c2392` |
+| 20 | Pac-Man: Bell | `captures/items/icon-20.png` | `c6477c1b71920ab76c986dc131bbc6121861b3ba95f5ae459f5a77bd20b74e96` |
+| 21 | Pac-Man: Key | `captures/items/icon-21.png` | `2822de83b6eda7b1ff752b85790f94bf9669eea1456b7cf3d1d9854f74c86ab5` |
+| 22 | Peach: Smile Turnip | `captures/items/icon-22.png` | `4abbb9a61dcced2c65b3e104588ce19aef3d7c87425aea9c860cfa4cfa495fee` |
+| 23 | Peach: Winky Turnip | `captures/items/icon-23.png` | `0cd6f8c78294e6b2d95dfef3d71e3902ccbc39cf6d1e6e86409fcaf5adaf8aa6` |
+| 24 | Peach: Dot-Eyes Turnip | `captures/items/icon-24.png` | `aeaa8cac778ea511445db3961373d89ef787e5598077fadb33d083b78b989a02` |
+| 25 | Peach: Stitch-Face Turnip | `captures/items/icon-25.png` | `d94484daaeade3fa89ce4d220796166e1ea26525cc6f0e315e581361b0c5fd97` |
+| 26 | Peach: Mr. Saturn | `captures/items/icon-26.png` | `918c87d08f790d805a10ca56b4be71902c90cc174c4fee5f4fdc52146c73bcca` |
+| 27 | Peach: Bob-omb | `captures/items/icon-27.png` | `d4d894be9fa6bc4016c14eec92814fc2c759926948c6a856009fb26e4b973eea` |
+| 28 | Richter: Holy Water | `captures/items/icon-28.png` | `151759e5e2d31d5e7249338326617693789bbf50ee78612c82977024fcfd2456` |
+| 29 | R.O.B.: Gyro | `captures/items/icon-29.png` | `aa50909bf4224a22fce1f32fd4f66d1e1d8606955472fa3a02d5c983d6960d6b` |
+| 30 | Robin: Tome | `captures/items/icon-30.png` | `5fd3b9493ed7b94365d41d0b568a866b98f3c91996327a7bbdc945bef9efaa28` |
+| 31 | Robin: Levin Sword | `captures/items/icon-31.png` | `04c227ea2313c9d73a4ebfbc3bb3bab8449ed25b12258fc9ad97106ce52a7fc1` |
+| 32 | Sheik: Burst Grenade | `captures/items/icon-32.png` | `c270c03a96f515285f9301024a455994b20c0d97e9660ae8ebf8e01e50ef63dd` |
+| 33 | Simon: Holy Water | `captures/items/icon-33.png` | `151759e5e2d31d5e7249338326617693789bbf50ee78612c82977024fcfd2456` |
+| 34 | Snake: Hand Grenade | `captures/items/icon-34.png` | `a589d64af7f963ce7fe7ad3ce185db10c7f0fbbb4c2114832f7958ec23155e56` |
+| 35 | Toon Link: Bomb | `captures/items/icon-35.png` | `bcf3878cebb06ba72fa31b9357d9ecf67d35eb40ebb1ffba3e5cf0984b560d7b` |
+| 36 | Villager: Wood Chip | `captures/items/icon-36.png` | `0af3312adee081227d9300119e649d886371a075e5b6f648768b7e8a6bfbe2db` |
+| 37 | Young Link: Bomb | `captures/items/icon-37.png` | `9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef` |

@@ -5,6 +5,7 @@
 - **Status:** draft
 - **Spec writer:** Claude agent (Fable 5.1), spec-writer role, 2026-11-01
 - **Upstream reference read (spec writer only):** `src/static/img/*.svg` (42 files; metadata and a few small files read in full, the rest by metadata search), `src/static/layout.arc` (member names and `TrMod*` pane names extracted by string search of the binary; no archive was unpacked), `src/training/ui/{menu,mod,display,input_log}.rs` (pane names referenced), `photos/*` (README images, by name only) at commit `97cbe9b9` (unchanged in `077a8e43`); fork: `src/static/layout.arc` (size only), `src/static/waiting_ui.patch`, `scripts/make_waiting_patch.py`, `scripts/waiting_patch_manifest.json`, `scripts/roster-grid/README.md`, `scripts/stage-grid/README.md`, `scripts/item-icons/assets/sources.json` (head), from `docs/provenance/provenance-files.md`.
+- **Revision 2026-11-01 (menu proposal v5; Claude agent, Opus 5.5, menu-draft worker):** §4.5 added. The stage grid reads its thumbnails at run time from the game's own stage UI textures (MENU-DRAFT.md question 13, answered). Fork sources read for it: `src/stage_asset_probe.rs`, `src/training/ui/stage_grid.rs`, `scripts/stage-grid/{README.md,decode_owned.py,catalog.json,assets/sources.json}`. Also read: the fork campaign's ARCropolis 4.1.1 API audit `artifacts/enhancements/arc-stage-assets/REPORT.md` and the probe log `artifacts/enhancements/plan4-native-08/practice-diagnostics.log`, both under `/home/intpa/smash-training-lobby/`. All are fork-owned; no upstream file was opened.
 - **Implementers must not open the upstream paths above.** Everything an implementer and a designer need is in this file and in SPEC-core-03/05.
 
 ## 1. Purpose (one paragraph)
@@ -19,7 +20,7 @@ This spec lists every piece of upstream artwork and layout data the fork inherit
 
 ## 3. Inputs
 
-None at runtime beyond the archive (SPEC-core-05). At build time: the player's own stock `info_training` layout archive (and, for the fork's waiting room, the stock `info_waiting` archive), the redrawn icons, the fork's generated portraits/stage/item images.
+At run time: the archive (SPEC-core-05) and, for the stage grid only, the game's per-stage UI textures read through the mod-aware file view (§4.5). At build time: the player's own stock `info_training` layout archive (and, for the fork's waiting room, the stock `info_waiting` archive), the redrawn icons, the fork's generated portraits/stage/item images.
 
 ## 4. Outputs and native state touched
 
@@ -98,15 +99,52 @@ Screenshots and GIFs of the upstream menu and features (`mash_settings.png`, `de
 | Generator | Output | Source of pixels | Notes |
 | --- | --- | --- | --- |
 | `scripts/roster-grid/` (Rust builder `main.rs`, `menu_pictures.rs`, `stage_panel.rs`, `mips.rs`, `validation.rs`; `reproduce.py`; `make_all_icon.py`; `grid.json`) | the fork's `layout.arc` (7,820,940 B) with a `roster_grid` panel (89 `roster_icon_XX` portraits, 87 badge pairs `roster_p_NN`/`roster_c_NN`, cursor, background, title/name/help/role text) appended under `TrModMenu` in `info_training.bflyt` and `trmod_waiting.bflyt`; plus the stage panel | 89 PNG fighter portraits decoded from the game's own character-select textures (`assets/fighter-XX.png`, digests in `assets/sources.json`); `all-smash-ball.png` | uses the external `nx-layout-toolbox` library; verifies three baseline archive digests and every PNG digest; proves reversal to the original layout byte-for-byte |
-| `scripts/stage-grid/` (`decode_owned.py`, `catalog.json`, `assets/sources.json`) | `stage_grid` panel: 16 tiles, cursor, labels, ranks, 115 hidden `stage_icon_NNN` pictures (108×90, aspect-fit into 340×130), `stage_all_icon` | 115 PNGs decoded from the game's `stage_1` textures; names from the game's `ui_stage_db.prc` and `msg_name+us_en.msbt` | the Waiting Room has no image and uses a text tile |
+| `scripts/stage-grid/` (`decode_owned.py`, `catalog.json`, `assets/sources.json`) | `stage_grid` panel: 16 tiles, cursor, labels, ranks, 115 hidden `stage_icon_NNN` pictures (108×90, aspect-fit into 340×130), `stage_all_icon` | 115 PNGs decoded from the game's `stage_1` textures; names from the game's `ui_stage_db.prc` and `msg_name+us_en.msbt` | the Waiting Room has no image and uses a text tile. **Clean room (2026-11-01): the tile, label, rank, cursor and pane contract carry over; the 115 baked `stage_icon_NNN` pictures and `decode_owned.py` do not. Thumbnails are read at run time (§4.5).** `catalog.json` (ids, `name_id`, patch flag, names; no pixels) carries over as the stage list |
 | `scripts/item-icons/` (`assets/icon-00..37.png`, `sources.json`) | 38 item icons (64×64 RGBA) as `item_icon_NN` pictures for the character-item picker | native `item_0` UI icons where they exist, otherwise renders of the item's own model and textures from the game archive (fixed orthographic camera), recorded per icon with arc paths and digests | raw captures and pre-fit renders kept outside the repo |
 | `scripts/make_waiting_patch.py` + `scripts/waiting_patch_manifest.json` | `src/static/waiting_ui.patch` (92,398 B, format `TMW1`) | copy ranges from the stock `info_waiting` archive and the fork's Training archive plus 60,435 literal bytes; no complete game archive is embedded | manifest records sha256 of stock, donor, target and patch |
 
-These derive from the game's own data; the clean room keeps them (and their READMEs' pane contracts) as-is. They are not upstream artwork.
+These derive from the game's own data; the clean room keeps them (and their READMEs' pane contracts) as-is, except the baked stage pictures (§4.5). They are not upstream artwork. Fighter portraits: whether they follow §4.5 is MENU-DRAFT.md question 16 (open).
+
+### 4.5 Stage-grid thumbnails at run time (MENU-DRAFT.md draft 5, question 13)
+
+**Rule.** Every stage tile draws the stage's own UI texture, read from the game's file system when the page is shown. That is the same file a stage mod replaces through ARCropolis, so a mod that changes a stage's icon (e.g. a Final Destination replacement) shows in the grid. No stage picture is committed to the repository or baked into the layout archive. The *All* tile keeps the stock Smash Ball texture already in the stock archive (the fork reuses `roster_5e`).
+
+**What the fork does today (for contrast).** `scripts/stage-grid/decode_owned.py` decoded the stock `ui/{replace,replace_patch}/stage/stage_1/stage_1_<name_id>.bntx` files once. The fork's development probe `src/stage_asset_probe.rs` (cargo feature `stage-asset-probe`, off in release builds) lists exactly these 115 `stage_1` paths. Its README does not name the capture route. The decoded PNGs were baked into `layout.arc` as 115 hidden `stage_icon_NNN` panes (108×90 each), and `src/training/ui/stage_grid.rs` only toggles their visibility and position. The probe reads through ARCropolis's `arc:/` mount. Its `ArcFuse` / `VanillaArc` deliberately serve the vanilla archive. Either way the baked set is fixed at build time, so a stage mod never shows in the fork's grid.
+
+**Which file, per stage.**
+
+| Field | Value | Source |
+| --- | --- | --- |
+| Path | `ui/replace/stage/stage_1/stage_1_<name_id lower-case>.bntx`; `ui/replace_patch/…` when the stage is a patch stage (12 of 115) | fork `decode_owned.py` (`source_path`), `catalog.json` (`is_patch`) |
+| `name_id` | from the game's `ui/param/database/ui_stage_db.prc` (`can_select = true`, sorted by `disp_order`); differs from the native package name for some stages | fork `scripts/stage-grid/README.md`, `catalog.json` |
+| Examples | Battlefield `stage_1_battlefield.bntx`; Final Destination `stage_1_end.bntx`; Small Battlefield `replace_patch/…/stage_1_battlefields.bntx`; Hyrule Castle `stage_1_zelda_hyrule.bntx`; Kongo Falls `stage_1_dk_waterfall.bntx` | `catalog.json`, fork `assets/sources.json` |
+| Stock size | `stage_1`: one texture, 108×90, 20,584 B per file (Battlefield, Final Destination); `stage_2` and `stage_3`: 135,272 B per file for the same two stages | fork `sources.json`; probe log (`plan4-native-08`) |
+| Hash | ARCropolis / the game address files by `hash40` of the archive-relative path (no `arc:/` prefix), e.g. `stage_1_battlefield` `0x31c16bfb09`, `stage_1_end` `0x294cd46fe9` | ARCropolis audit, hash table |
+
+The stage list (native id → `name_id`, patch flag, display name) is data, not pictures. It carries over from the fork's `catalog.json`.
+
+**How it is resolved so mod replacements apply.** The read has to see ARCropolis's replacement view. The audit (source-established for ARCropolis 4.1.1, API 1.9; not yet proven at run time on this profile) names three candidates:
+
+1. **`arcrop_load_file(hash40, buffer, length, &out_size)`** after `arcrop_get_decompressed_size`. It loads through `GlobalFilesystem::load_into` and `ModFs::read_into`, so a mod's file wins. Precondition: the export skips ARCropolis's global lock because it expects to run inside an API callback that already holds it. Calling it from an arbitrary thread is not an established contract (unknown U1).
+2. **The `mods:/` mount.** ARCropolis mounts it after mod processing and then raises `ModFilesystemMounted` (event 1). Whether `mods:/<path>` serves only mod files or the merged view is not established (U2). If it serves only mod files: try `mods:/<path>` first, then fall back to the stock file.
+3. **The game's own resource loader**, which ARCropolis already redirects. This is the path the game's own stage-select screen uses, so it sees exactly what the player sees. The 13.0.5 entry point and its thread and lock rules are not identified yet (U3).
+
+Never `arc:/` for these thumbnails: it is the vanilla view. Resolve the ARCropolis exports optionally (`skyline::nn::ro::LookupSymbol`, require API major 1, minor ≥ 9), register the event callback in the plugin's early `main` (events are not replayed for late subscribers), and read nothing before `ModFilesystemMounted`. Without ARCropolis no ARCropolis mod can be active. The tile then shows the stock texture through route 3, or the text tile.
+
+**Drawing.** The layout carries 16 picture panes, one per tile, with no stage texture. On page open the plugin reads at most 16 files and decodes or binds each BNTX to its tile's pane, aspect-fit into the fork's 340×130 picture box (native 1920×1080 canvas). It releases them when the page or grid closes. How a run-time BNTX is bound to an `nn::ui2d` picture pane (texture-info creation, GPU memory pool, alignment) is unknown U4. A CPU decode to RGBA plus an upload is the fallback design. A mod's texture may differ in size or format from stock: accept any size up to a cap (proposal: 1 MiB per file, the probe's cap), aspect-fit it, and on a missing file, a refused read, an unexpected magic (`BNTX\0\0\0\0`), an oversize file or a decode failure draw the text tile, as the Waiting Room does. Never substitute a baked picture.
+
+**Unknowns (to resolve before the stage grid is implemented).**
+
+- U1–U4 above.
+- U5 **Texture slot.** The fork draws `stage_1` (108×90). Which slots stage mods actually replace (`stage_1`, or only the larger `stage_2` / `stage_3`) is not recorded; nor is which slot the game's own stage-select tile uses. The file list of the operator's Final Destination mod (under `sd:/ultimate/mods/`) is the first data point. If mods commonly ship only `stage_2`, read `stage_2` and scale it down, or try `stage_1` and then `stage_2`.
+- U6 **Forms.** Whether Omega and Battlefield forms have their own UI textures; the fork shows the stage's one picture for every form.
+- U7 **Timing and cost.** The time to read and decode 16 files on page open on the console, and whether a one-page cache is needed (16 × 20,584 B ≈ 330 KB stock; mods may be larger).
+- U8 **Added stages.** Stage-expansion mods that add entries to `ui_stage_db.prc` are out of scope; the list stays the fork's 115 (+ Waiting Room).
+
 
 ## 5. Timing and frame rules
 
-Build time only.
+Build time, except the stage-grid thumbnails (§4.5): no read before ARCropolis's `ModFilesystemMounted` event; at most 16 reads when a stage page opens, off the frame hook if U1–U3 allow; nothing kept after the grid closes (unless U7 calls for a one-page cache).
 
 ## 6. Edge cases and interactions
 
@@ -125,6 +163,7 @@ None.
 | --- | --- | --- | --- |
 | Archive on disk | upstream 4,213,268 B; fork 7,820,940 B (+ 92,398 B waiting recipe) | ≤ fork, with icons as small indexed textures (W5) | file size; `nro_size.py` (`.rodata`, deflated) |
 | Icon textures | 42 icons rasterized into the atlas (sizes unknown; the SVGs are 80×80 or Font Awesome 448×512 viewBoxes) | one atlas page for all menu icons; sizes chosen by the designer with the 96 px button in mind | builder report |
+| Stage thumbnails | 115 baked 108×90 pictures in the fork's `layout.arc` (share of its 7,820,940 B not measured) | none in the archive; ≤ 16 files read per open page (stock `stage_1` 20,584 B each, ≈ 330 KB), released on close | builder report (archive without `stage_icon_NNN`); read time and heap use logged in `diag` (U7) |
 
 ## 9. Test provenance
 
@@ -135,6 +174,7 @@ None.
 | Stock members byte-identical to the player's archive; reversal proof | builder validation (fork tool) | — | builder report |
 | Pane-name contract (SPEC-core-03 §4.2) satisfied by the archive | `core07_pane_contract` (parse the built BFLYT names) | `core07-E1` | — |
 | Fork generators reproduce from recorded digests | fork `reproduce.py` checks | — | `scripts/*/assets/sources.json` |
+| Stage grid draws the run-time texture, mods apply, no baked stage picture (§4.5) | `core07_no_stage_pictures` (no `stage_icon_NNN` texture in the built archive; no stage PNG in the repo); `core07_stage_paths` (every catalog row maps to its `replace` / `replace_patch` path) | `core07-E2`: the stage grid on a profile with a stage mod that replaces a stage's UI texture (e.g. the Final Destination mod) shows the mod's picture on that tile and stock pictures elsewhere; `core07-E3`: the same without the mod shows stock; `core07-E4`: a missing or refused file shows the text tile | `docs/EDEN-RESULTS.md` |
 
 ## 10. Open questions
 
@@ -142,3 +182,5 @@ None.
 2. **What is committed.** Shipping the built archive commits game-owned bytes (as upstream and the fork do). Recommendation: commit the plugin's own parts, icons and the recipe; build the archive from the player's stock files in CI/locally, like the fork's waiting-room recipe already does.
 3. **`quick_menu.svg` and `m_retnormal.svg` usage** could not be confirmed from code (no pane named after them); the archive's texture names were not extracted. Resolve when the archive is rebuilt from scratch (they will simply not exist).
 4. **Check mark and digits.** Replace the Font Awesome check with an original glyph; the digits `1`–`5` are text rendered as pictures upstream — the clean room could use the game font in a text pane instead of pictures (fewer textures).
+5. **Stage thumbnails at run time (§4.5).** Decided: read at run time, never baked. Open: U1–U8 (load route and its thread/lock rules, `mods:/` semantics, the game-loader entry point, binding a run-time BNTX to a picture pane, the texture slot mods replace, forms, cost, added stages). Recommendation: resolve U5 first from the operator's Final Destination mod's file list, then U1–U3 with one bounded development probe that reads one stock and one modded stage through each candidate route and logs size and sha256.
+6. **Fighter portraits** (MENU-DRAFT.md question 16, open): whether the portrait grid follows the same rule so character and costume mods show. Not decided here.

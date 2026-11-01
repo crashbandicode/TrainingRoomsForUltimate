@@ -1,10 +1,12 @@
 #!/usr/bin/python3 -I
-"""Crop the fork's real grid-picker captures into per-cell images for the menu mockup (proposal v4).
+"""Crop the fork's real grid-picker captures into per-cell images for the menu mockup (proposal v4),
+and copy the fork's 38 item icons byte for byte (proposal v5).
 
 Review-mockup material only, never shipped artwork: the crops show game assets (stock fighter icons,
-stage thumbnails) exactly as the fork's own grid pickers draw them in Training. Every source capture
-is pinned by sha256 and every crop box is written to docs/menu-mockup/captures/crops.json, which the
-renderer copies into docs/menu-mockup/index.md.
+stage thumbnails) exactly as the fork's own grid pickers draw them in Training; the item icons are the
+fork's own `scripts/item-icons/assets/icon-NN.png` files, unchanged. Every source capture, the item
+manifest and every item icon are pinned by sha256; every crop box and copy is written to
+docs/menu-mockup/captures/crops.json, which the renderer copies into docs/menu-mockup/index.md.
 
 Usage: /usr/bin/python3 -I tools/crop_menu_captures.py [ARTIFACTS_REFACTOR_ROOT]
 The default root is the fork campaign's `parked-reuse175/refactor` directory on the review host.
@@ -38,6 +40,11 @@ SOURCES = {
 # Cells that carry a cursor, an order badge or the original-CPU tint in the main source come from a
 # capture where the same cell is clean.
 PORTRAIT_SOURCE = {"Fox": "change-cpu", "Sora": "change-cpu", "ALL": "kirby-grid"}
+# The fork's item-grid pictures (38 PNG, 64x64 RGBA) and their manifest, in the frozen M5k stage copy
+# (byte-identical to the fork worktree's scripts/item-icons/assets/). Each icon's sha256 is checked
+# against the pinned manifest's entry before it is copied unchanged.
+ITEM_ICONS = ("stages/m5k/stage/scripts/item-icons/assets",
+              "8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887")
 
 
 def load_renderer():
@@ -68,7 +75,7 @@ def main():
         if digest != sha:
             sys.exit(f"{path}: sha256 {digest} != pinned {sha}")
         images[key] = Image.open(path).convert("RGB")
-    for sub in ("portraits", "stages"):
+    for sub in ("portraits", "stages", "items"):
         (OUT / sub).mkdir(parents=True, exist_ok=True)
         for old in (OUT / sub).glob("*.png"):
             old.unlink()
@@ -96,13 +103,33 @@ def main():
         out = f"stages/{r.slug(name)}.png"
         images["stage-rotation"].crop(b).save(OUT / out, optimize=True)
         cells.append({"cell": name, "file": out, "source": "stage-rotation", "box": b})
+    # Item grid: the fork's own icon files, copied unchanged (no crop, no re-encode), in ITEM_NAMES order.
+    item_dir = ROOT / ITEM_ICONS[0]
+    raw = (item_dir / "sources.json").read_bytes()
+    if hashlib.sha256(raw).hexdigest() != ITEM_ICONS[1]:
+        sys.exit(f"{item_dir / 'sources.json'}: sha256 differs from the pinned {ITEM_ICONS[1]}")
+    icons = json.loads(raw)["icons"]
+    if [i["label"] for i in icons] != r.ITEMS:
+        sys.exit("item manifest labels differ from the renderer's ITEMS (character_items.rs ITEM_NAMES order)")
+    items = []
+    for icon in icons:
+        data = (item_dir / icon["filename"]).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != icon["sha256"]:
+            sys.exit(f"{icon['filename']}: sha256 {digest} != manifest {icon['sha256']}")
+        out = f"items/{icon['filename']}"
+        (OUT / out).write_bytes(data)
+        items.append({"index": icon["index"], "cell": icon["label"], "file": out, "sha256": digest})
     manifest = {
-        "purpose": "Review mockup only; game-asset captures of the fork's grid pickers; not shipped artwork.",
+        "purpose": "Review mockup only; game-asset captures of the fork's grid pickers and byte copies of the fork's "
+                   "item icons; not shipped artwork.",
         "sources": {k: {"path": str(ROOT / rel), "sha256": sha, "geometry": kind} for k, (rel, sha, kind) in SOURCES.items()},
+        "item_icons": {"path": str(item_dir), "manifest_sha256": ITEM_ICONS[1]},
         "cells": cells,
+        "items": items,
     }
     (OUT / "crops.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote {len(cells)} crops to {OUT}")
+    print(f"wrote {len(cells)} crops and {len(items)} item icons to {OUT}")
 
 
 if __name__ == "__main__":

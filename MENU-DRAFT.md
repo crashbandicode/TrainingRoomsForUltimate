@@ -1,16 +1,19 @@
 # MENU-DRAFT — the clean-room menu, for the operator's green light
 
-Draft 4, 2026-11-01, project lead (drafts 2 and 3 the same day; draft 3 is the
+Draft 5, 2026-11-01, project lead (drafts 2 to 4 the same day; draft 3 is the
 operator's redraft: the fork's grid, item and stage visuals where they fit, a
 direction grid for DI / SDI / Airdodge / Shield Tilt; draft 4 follows the
 operator's review of v3: the Kirby Hats, Solo Popo and character-items chips
 are a neutral placeholder — their final icons are open and will be designed
 once the functionality is settled — and the portrait and stage grids show the
 real fighter icons and stage thumbnails, cropped from captures of the fork's
-own grids for the review only). Supersedes `docs/menu-redesign.md`
+own grids for the review only; draft 5 follows the operator's review of v4:
+the item grid uses the fork's own 38 item icons, and the stage grid draws
+each thumbnail from the stage's own game UI texture at run time, so a stage
+mod's picture shows — see *Grid pictures* below). Supersedes `docs/menu-redesign.md`
 (draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
 here is built; the menu is implemented only after the operator approves this
-page. Rendered screens: `docs/MENU-PROPOSAL.md` (v4).
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (v5).
 
 Sources for §1: the fork's menu definition as shipped in C116.1
 (`training_mod_consts/src/lib.rs`, `options.rs`, `cycle_preload_config.rs`,
@@ -37,10 +40,34 @@ Control vocabulary used in both tables:
 | `editor` | **new name** for `action`: opens a sub-screen (grid, list, chord editor, override editor) |
 | `info` | read-only row |
 | `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction line; A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots |
-| `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the stock fighter icons (source: question 13), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
-| `item grid` | the fork's paged 4×8 item grid with the game's item pictures (`training_mod_consts/src/character_items.rs`, 38 items) |
-| `stage grid` | the fork's paged 4×4 stage thumbnails, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`) |
+| `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the stock fighter icons (whether they follow the stage rule below is question 16), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
+| `item grid` | the fork's paged 4×8 item grid (`training_mod_consts/src/character_items.rs`, 38 items) with **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, 64×64, made from the game's own item files; draft 5) |
+| `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below) |
 | `chip` | an icon at the row's right edge (Kirby Hats, Solo Popo, character items); **draft 4: a neutral placeholder** (dashed rounded square, short label); the final icons are open and will be designed once the functionality is settled |
+
+**Grid pictures (draft 5; answers question 13 for stages and items).**
+
+- **Stage grid: no baked thumbnails.** When the grid opens a page, the clean
+  room reads each visible stage's own UI texture from the game's file system
+  at run time and draws it in the tile. That is the same file a stage mod
+  replaces, so a mod that changes a stage's icon (for example a Final
+  Destination replacement on the operator's card) shows in the grid. The
+  repository and the layout archive carry no stage picture. The fork, by
+  contrast, bakes 115 stock thumbnails into its `layout.arc`
+  (`scripts/stage-grid/assets/stage-NNN.png`, decoded from the stock
+  `stage_1` textures), so a stage mod never shows there. File per stage:
+  `ui/replace/stage/stage_1/stage_1_<name_id>.bntx`, or `ui/replace_patch/…`
+  for the 12 patch stages, with `name_id` from the game's `ui_stage_db.prc`
+  (Final Destination: `stage_1_end.bntx`). The read must go through the
+  mod-aware view (ARCropolis's mod file system or the game's own loader),
+  never through ARCropolis's vanilla `arc:/` view. If no read succeeds, the
+  tile falls back to a text tile, never to a baked picture. Contract,
+  candidate load routes and unknowns: `specs/SPEC-core-07-assets-inventory.md`
+  §4.5. Which texture slot mods actually replace (`stage_1` as the fork
+  uses, or the larger `stage_2` / `stage_3`) is one of those unknowns.
+- **Item grid:** the fork's own 38 item icons, as the fork ships them.
+- **Portrait grid:** unchanged for now; whether fighter portraits follow the
+  stage rule is question 16.
 
 ## 1. Inventory: the menu as the fork ships it (C116.1)
 
@@ -243,12 +270,12 @@ change, so existing `training_modpack.json` files load as they are.
 | Fighters & Stages | Player 1 and CPU | Character Cycles | editor (portrait grid, two roles) | ordered P1 (red) and CPU (blue) picks | as today | ours | row previews both orders with badges; hidden CPU order and Solo Popo marks edited here |
 | Fighters & Stages | Player 1 and CPU | Solo Popo (original Ice Climbers) | toggle + chip | On, Off | Off | ours | chip: placeholder (final icon open) |
 | Fighters & Stages | Extras | Kirby Hats | editor (portrait grid, two roles) + chip | hat order per role | as today | ours | chip: placeholder (final icon open) |
-| Fighters & Stages | Extras | Give item | editor (item grid) + chip | 38 items, 4×8 per page | none | ours | chip: placeholder (final icon open) |
+| Fighters & Stages | Extras | Give item | editor (item grid) + chip | 38 items, 4×8 per page | none | ours | tiles: the fork's own item icons; chip: placeholder (final icon open) |
 | Fighters & Stages | Extras | Mii Brawler | dropdown (list) | saved Miis, replay Miis, Add New… | role's saved pick | ours | ZR switches role inside the list |
 | Fighters & Stages | Extras | Mii Swordfighter | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Extras | Mii Gunner | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Stages | Lobby Practice | toggle | On, Off | Off | ours | from Misc |
-| Fighters & Stages | Stages | Lobby Stages | editor (stage grid) | ordered legal stages + All, 4×4 per page; Y cycles form | as today | ours | from Misc; row previews the first ordered stages |
+| Fighters & Stages | Stages | Lobby Stages | editor (stage grid) | ordered legal stages + All, 4×4 per page; Y cycles form | as today | ours | from Misc; row previews the first ordered stages; thumbnails read at run time from each stage's game UI texture (stage mods show) |
 | Fighters & Stages | Stages | Training Stage Rotation | toggle | On, Off | Off | ours | from Misc |
 | Fighters & Stages | Stages | Stage Hazards | toggle | On, Off | Off | upstream | from Misc; grouped with the stage rows (mockup v1's placement, adopted) |
 | Fighters & Stages | Loading *(advanced)* | Cycle Preload | dropdown | Off, 1–5 | built-in max | ours | was single |
@@ -311,7 +338,7 @@ carries this page): the MIT copyright holder is the handle
 with a one-time first-boot import of the fork's settings, save states, Mii
 presets and macro library, originals untouched (`specs/SPEC-core-08`). The
 persistence behind every row above therefore lives under the new root.
-Questions 1–11 below remain open.
+Question 13 is answered (draft 5); questions 1–12 and 14–16 remain open.
 
 1. **Five pages as laid out**, or the variants in `docs/menu-redesign.md` (four pages by merging *Display & Controls* into *Saves*; six by splitting *Stages & Lobby* out of *Fighters & Stages*)?
 2. **Dropdown input**: ◂/▸ cycles the value in place without opening the list (fast, but easier to change by accident). Keep, or require A to open?
@@ -325,9 +352,10 @@ Questions 1–11 below remain open.
 10. **Help text position and length**: one line at the bottom as today, or a two-line panel so the longer fork help texts (group rows) do not need shortening?
 11. **P1 CPU fallback** (the standalone pilot now owns P1): when the pilot is absent, show the two fallback rows on the CPU page (as proposed), keep the fallback INI-only, or drop the TM-side control altogether and require the pilot?
 12. **Direction grid weights** (draft 3): show the weight digit on a selected chip (upstream's counts, today's semantics, as drawn) or plain on/off chips with a uniform random pick?
-13. **Grid picture source** (restated in draft 4; draft 3 wrongly said the fork builds them from the player's files): the fork commits its grid pictures — `scripts/roster-grid/assets/` 89 stock icons (`sources.json`: SmashWiki copies), `scripts/stage-grid/assets/` 115 thumbnails decoded from the game's `stage_1` textures, `scripts/item-icons/assets/` 38 icons rendered from the game's item files — and builds them into its patched `layout.arc`. For the MIT repo: carry them over as the fork does, or extract them from the player's own game files at build time so no game picture is committed? The review crops in `docs/menu-mockup/captures/` are mockup-only either way.
+13. **Grid picture source** — *answered 2026-11-01 (draft 5).* Background (draft 4): the fork commits its grid pictures — `scripts/roster-grid/assets/` 89 stock icons (`sources.json`: SmashWiki copies), `scripts/stage-grid/assets/` 115 thumbnails decoded from the game's `stage_1` textures, `scripts/item-icons/assets/` 38 icons rendered from the game's item files — and builds them into its patched `layout.arc`. **Answer:** stage thumbnails are not carried over or baked at all; the stage grid reads each stage's own game UI texture at run time, through the mod-aware file view, so stage mods show (*Grid pictures* in the vocabulary section; `specs/SPEC-core-07` §4.5). The item grid uses the fork's own 38 item icons. Fighter portraits: question 16. The review crops and copies in `docs/menu-mockup/captures/` stay mockup-only.
 14. **Grid paging** (draft 3): items 4×8 per page (two pages of 38) and stages 4×4 (eight pages of All + 117) as the fork does, or denser pages so the items fit on one screen?
 15. **Mii rows** (draft 3): lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only? (Saved Miis have no stock portrait, so a portrait grid does not apply.)
+16. **Fighter portraits and mods** (draft 5, open): should the portrait grid follow the stage rule — read each fighter's own UI portrait texture from the game at run time, so character and costume mods show — or keep a fixed set of stock icons, as the fork does with its 89 committed icons? Not decided.
 
 ## 5. Reconciliation with the coordinator's mockup v1
 
