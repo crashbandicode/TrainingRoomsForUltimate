@@ -2,6 +2,8 @@
 
 Proposal v9, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 8: every item, option list and default, taken from the shipped C116.1 menu definition). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). Nothing is built until a version is approved.
 
+**Every open decision, one picture each, with a recommendation: [`DECISIONS.md`](DECISIONS.md)** (menu questions 1–18 below, plus the import, behaviour and product choices from the specs).
+
 **What changed from v8 (new evidence):** the **SDI spark is captured**: a white spiky burst with a ring outline on the CPU's head, pointing along the SDI vector (Up: a crown of spikes above the head; In: the same shape lying sideways). The DI streak is confirmed to turn with the DI-corrected launch. The **DI and SDI chips** on 01, 09, 16 and the new **SDI grid (17)** are now **renders made from the game's own effect file**, one still per effect turned to each direction. The chip sheet shows crops of the real captures beside them as the check. New **question 18**: in the fork, a changed SDI Direction applies only at the next Training reset, and the menu does not say so. Facts: `specs/SPEC-core-07-assets-inventory.md` §4.6, `specs/SPEC-cpu-02` question 9; sources: `menu-mockup/index.md`.
 
 **v8:** the visuals are identified. **DI** is the game's system effect `sys_vector` (a blue streak with white sparkle lines, turned to the DI-corrected launch angle); **SDI** is a different effect, `sys_hitstop_spark` (a white spark on the head per SDI input frame). Screens 01, 09 and 16 now draw the **DI chips from a real crop of the streak** in a capture, turned to each direction as the game turns the effect; the **SDI chips are the neutral placeholder** until an SDI capture exists. Airdodge Direction and Shield Tilt keep the arrows (question 17, unchanged). The operator's Final Destination mod replaces all four stage UI slots; the game's stage select follows it and the fork's baked grid does not (question 13's rule stands). Facts and remaining unknowns: `specs/SPEC-core-07-assets-inventory.md` §4.5–4.6; crop provenance: `menu-mockup/index.md`.
@@ -216,6 +218,8 @@ What the plugin shows while you play, unchanged in meaning from the fork unless 
 | Install line | `sd:/ultimate/TrainingRooms/practice-diagnostics.log` (not on screen) | one line at boot: version, sites checked, authoritative groups, anything skipped |
 
 ## Decisions for you
+
+Illustrated, with options, recommendation and cost: [`DECISIONS.md`](DECISIONS.md).
 
 1. **Pages:** these five, or four (fold Display & Controls into Saves), or six (split Stages & Lobby out of Fighters & Stages)?
 2. **Dropdown input:** `◂`/`▸` cycle in place (fast, easy to bump), or `A` must open the list?

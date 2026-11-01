@@ -2,6 +2,25 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Illustrated decisions page — 2026-11-01
+
+- Worker: Claude session `62132d68-754d-4266-9bfe-9759abe5e159` under primary `b81ec740`.
+  Model gate from its own transcript: `claude-opus-5-5` / `high` (109/109 assistant records before
+  the commit). No watcher was armed; this was a single bounded docs turn.
+- `docs/DECISIONS.md`: 29 open operator decisions, each with options, a recommendation, a cost and
+  one picture (`docs/decisions/*.png`, drawn by the new `tools/render_decisions.py`, which reuses
+  `render_menu_mockup.py`). Menu Q1–Q12 and Q14–Q18 (Q18 is recorded as *fork: being fixed in its
+  next build; clean room: same rule?*, recommendation: apply at once plus a new SDI roll per
+  hitlag), S1 (the five `SPEC-core-08` import details), S2 (corrupt file), B1–B10 (plugin name,
+  panic, layout mods, AI-driven P1, playback vs settings, per-fighter state, In/Out convention,
+  a batch of 13 behaviour fixes plus 6 kept behaviours, dev-only code, README media). The
+  "Already answered" table records where each closed item was answered.
+- Pictures reuse only the review crops/renders already in `docs/menu-mockup/captures/` (no new
+  game-derived file). All 29 PNGs were viewed. Links: `docs/MENU-PROPOSAL.md` (top and *Decisions
+  for you*), `README.md` Status.
+- Next: the operator answers `docs/DECISIONS.md`. Fold the answers into `MENU-DRAFT.md` §4 and the
+  specs' §10, then re-render.
+
 ## Menu proposal v9 — 2026-11-01 (real SDI chips; DI / SDI chips from W9 renders)
 
 - Worker: Claude session `d1ae5b05-ff6e-4452-b66e-8d8ba639b068` under primary `b81ec740`.

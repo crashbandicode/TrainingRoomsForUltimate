@@ -1,0 +1,340 @@
+# Decisions open for the operator
+
+2026-11-01. This page lists every decision that is still waiting for the operator, one illustration per
+decision. In each picture the recommended option has a **green outline**. The images are in
+[`decisions/`](decisions/) and are drawn by `tools/render_decisions.py` in the menu mockup's style. Sources:
+`MENU-DRAFT.md` §4 (the menu questions keep their numbers), the specs' *Open questions* sections,
+`PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10. Nothing here is built.
+
+| # | Decision | Recommendation |
+| --- | --- | --- |
+| Q1 | Number of pages | five, as drawn |
+| Q2 | Dropdown input | Left / Right cycle in place; A opens the list |
+| Q3 | Random-among-a-set delays | keep the checklists |
+| Q4 | Overrides, chords, swap groups | one editor row each |
+| Q5 | First page on open | the last page used |
+| Q6 | Item on load (older saves) | keep the row for now |
+| Q7 | Replay capture in the menu | add the toggle |
+| Q8 | Preload Samples | diag build only |
+| Q9 | Menu shortcuts | read-only; the INI is the editor |
+| Q10 | Help text | two-line panel |
+| Q11 | P1 CPU fallback without the pilot | fallback rows, as drawn |
+| Q12 | Direction grid weights | weight digit on the chip |
+| Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) |
+| Q15 | Mii rows | list with the bust where one exists |
+| Q16 | Fighter portraits and mods | read at run time, like stages |
+| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only |
+| Q18 | When a CPU setting change takes effect | at the change, plus a new SDI roll every hit |
+| S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed |
+| S2 | Corrupt settings file | keep a copy, load field by field |
+| B1 | Plugin name | `training_rooms` |
+| B2 | Panic policy | log it, no pop-up |
+| B3 | Another mod's training HUD layout | inject anyway, document it |
+| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused |
+| B5 | Input playback and the CPU settings | the recording wins |
+| B6 | Ice Climbers state | one state per fighter |
+| B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere |
+| B8 | Behaviour changes from the fork | accept the batch |
+| B9 | Upstream developer-only code | drop it from the shipped build |
+| B10 | README media | reuse the GIFs that show no menu |
+
+## Menu
+
+### Q1 · Number of pages
+
+Five pages, four (Saves and Display & Controls merged) or six (Stages & Lobby split out)?
+**Recommendation: five.** Each page has one theme, and no page is very long or nearly empty. Cost: none; the
+mockups already show five.
+
+![Q1 pages](decisions/01-pages.png)
+
+### Q2 · Dropdown input
+
+Should Left / Right change a dropdown's value in place, or must A open the list first?
+**Recommendation: in place, as drawn.** A still opens the full list. It is one press per change instead of
+three. Cost: a stray Left / Right changes the value.
+
+![Q2 dropdown](decisions/02-dropdown.png)
+
+### Q3 · Random-among-a-set delays
+
+Aerial, fast-fall, throw, pummel and ledge delays, OoS offset, reaction time and the slot sets: keep them as
+checklists, or use a min–max slider?
+**Recommendation: checklists.** They keep today's meaning, so saved files load unchanged. A range slider
+cannot express a set like {0, 5, 10}. Cost: a checklist is a longer popup than a slider.
+
+![Q3 delays](decisions/03-delays.png)
+
+### Q4 · Situation overrides, Button chords, Swap groups
+
+Should these three be sub-screens (one row each), or should all their rows sit on the page?
+**Recommendation: sub-screens.** Putting the rows on the page adds 12 rows to CPU, 6 to Fighters & Stages
+and 5 to Display & Controls. Cost: one more press (A) to reach them.
+
+![Q4 sub-screens](decisions/04-subscreens.png)
+
+### Q5 · First page on open
+
+Should the menu open on the last page used (today's behaviour) or always on CPU?
+**Recommendation: the last page used.** A drill loop (record, test, adjust) comes back to the same page.
+Cost: none; this is today's behaviour.
+
+![Q5 first page](decisions/05-first-page.png)
+
+### Q6 · Item on load (older saves)
+
+Keep this legacy row for saves made before the fork's item snapshot, or convert those saves once at import
+and drop the row?
+**Recommendation: keep it for now.** It carries no risk, and new saves never use it. Revisit once the import
+has been tested on real cards. Cost: one rarely used row on Saves.
+
+![Q6 item on load](decisions/06-item-on-load.png)
+
+### Q7 · Replay capture in the menu
+
+Should there be a menu toggle that writes `replay_capture.ini` and matches the Deluxe Plugins row, or should
+the setting stay INI / Deluxe only?
+**Recommendation: add the toggle.** It can then be changed in game, and all three places always agree. Cost:
+one row, and one small INI write when the row changes.
+
+![Q7 replay capture](decisions/07-replay-capture.png)
+
+### Q8 · Preload Samples
+
+Ship this diagnostics row under *Loading (advanced)*, or put it in the `diag` build only?
+**Recommendation: diag build only.** Players never need it, and the playbook's `diag` feature exists for
+exactly this. Cost: measuring on a card then needs the diag build.
+
+![Q8 preload samples](decisions/08-preload-samples.png)
+
+### Q9 · Menu shortcuts
+
+Show the INI shortcuts read-only in the menu, or make them editable there with the INI as the file of
+record? (This also answers `PROVENANCE.md` open question 5.)
+**Recommendation: read-only.** No second chord editor is needed, and the behaviour matches the fork
+(restart to apply). Cost: changing a shortcut means editing `button_config.ini`.
+
+![Q9 menu shortcuts](decisions/09-menu-shortcuts.png)
+
+### Q10 · Help text
+
+Keep one help line at the bottom, or use a two-line panel?
+**Recommendation: two lines.** The fork's longer help texts (the group rows, for example) then fit without
+being cut. Cost: the item list shows one row fewer.
+
+![Q10 help text](decisions/10-help-text.png)
+
+### Q11 · P1 CPU fallback when the pilot plugin is absent
+
+Show the two hidden fallback rows (as proposed), make it INI only, or drop the TM-side control and require
+the pilot?
+**Recommendation: the fallback rows.** P1 control still works on a card without the pilot. With the pilot
+installed, only the info row shows. Cost: two rows, shown only when the pilot is absent.
+
+![Q11 P1 fallback](decisions/11-p1-fallback.png)
+
+### Q12 · Direction grid weights
+
+Show a weight digit on each selected chip (today's counts), or use plain on/off chips with an even pick?
+**Recommendation: weights.** They keep today's semantics, and saved files carry the counts. Cost: a small
+badge per chip, and A adds weight instead of only toggling.
+
+![Q12 weights](decisions/12-direction-weights.png)
+
+### Q14 · Grid paging
+
+Keep items at 4 × 8 per page (two pages) and stages at 4 × 4 (eight pages), as the fork does, or use denser
+pages?
+**Recommendation: as the fork.** This layout is tested on the console, and the item names stay readable.
+Cost: L / R to reach items 33–38.
+
+![Q14 paging](decisions/14-grid-paging.png)
+
+### Q15 · Mii rows
+
+Lists with the fork's bust thumbnail beside each saved Mii where one exists, or text only?
+**Recommendation: busts where they exist.** They make saved Miis easy to tell apart, and the fork already
+makes them. Cost: one small texture per visible Mii. (The picture uses a neutral silhouette in place of a
+bust.)
+
+![Q15 Mii rows](decisions/15-mii-rows.png)
+
+### Q16 · Fighter portraits and mods
+
+Should the portrait grid read each fighter's own UI portrait from the game at run time, as the stage grid
+does (so character and costume mods show), or keep fixed stock icons as the fork does?
+**Recommendation: read at run time, falling back to a text tile.** This is the same rule as stages and
+DI / SDI chips: nothing is baked or committed, and mods show. Cost: the run-time read has the same open
+unknowns as the stage thumbnails (`SPEC-core-07` §4.5, U1–U8), plus choosing the right costume, so it needs
+one more development probe.
+
+![Q16 portraits](decisions/16-fighter-portraits.png)
+
+### Q17 · Which chips show the game's DI / SDI visual
+
+Should only the DI and SDI chips show the game's own visual, with Airdodge Direction and Shield Tilt keeping
+the clean room's arrows?
+**Recommendation: yes, DI and SDI only.** The game's visual shows launch influence; on an air-dodge or shield
+chip it would suggest something those options do not do. Cost: none; this is how the mockups are drawn.
+
+![Q17 chips](decisions/17-di-sdi-chips.png)
+
+### Q18 · When a CPU setting change takes effect
+
+**The fork:** a changed SDI Direction applies only at the next Training reset, and the menu does not say so.
+This is being fixed in the fork's next build, which applies the change at once. **Clean room:** should it
+follow the same rule?
+Options: (A) the same as the fork's fix: apply at the change, one roll; (B) apply at the change and roll a
+new SDI direction every hitlag episode (`SPEC-cpu-02` questions 1 and 9); (C) keep reset-only and label the
+row "applies on next reset".
+**Recommendation: B.** With two or more directions selected, every hit then varies, and that is what a
+weighted pick is for. Upstream's own source marks the roll-once behaviour as a bug. Shield Tilt and the other
+per-reset rolls follow the same rule. Cost: one roll per hitlag episode; parity with the fork's fix is lost
+only when several directions are selected.
+
+![Q18 apply on change](decisions/18-apply-on-change.png)
+
+## Files
+
+### S1 · Five import details (`SPEC-core-08` §10)
+
+The storage root and the import are decided. Five details remain; each has a numbered tag in the picture.
+
+- **1 · settings file name:** rename to `settings.json`, or keep `training_modpack.json`? *Rename*; the loader
+  also accepts the old name once.
+- **2 · the two INIs** (`button_config.ini`, `replay_capture.ini`): import them too? *Yes*, under the same
+  rules, so shortcuts and the capture choice survive.
+- **3 · `replay_captures/`:** not imported (the Replay Window starts empty), or imported below a size cap
+  (for example 64 MiB)? *Not imported*; the README explains how to copy it by hand.
+- **4 · TOML-only cards** (the fork before its JSON port): *not converted*; the fork's
+  `tools/port_save_states.py` is the documented offline path.
+- **5 · re-running the import:** by deleting `migration.json` only, or also from a menu row? *The marker only*;
+  no menu row.
+
+Cost: item 2 adds two small files to the copy list. The others cost nothing.
+
+![S1 import details](decisions/S1-import-details.png)
+
+### S2 · Corrupt settings file (`SPEC-core-04` question 2)
+
+Delete the file and start from defaults (upstream), or keep a renamed copy and load it field by field?
+**Recommendation: keep a copy, default per field.** One bad field no longer wipes every setting. Cost: one
+renamed file on the card until the player deletes it.
+
+![S2 corrupt settings](decisions/S2-corrupt-settings.png)
+
+## Behaviour and product
+
+### B1 · Plugin name (`SPEC-core-01` question 6)
+
+Name the plugin `training_rooms` (`libtraining_rooms.nro`), or keep `training_modpack`?
+**Recommendation: `training_rooms`.** The two plugins can then be told apart on a card and in logs. They must
+never be installed together, because they hook the same sites. Cost: none.
+
+![B1 plugin name](decisions/B1-plugin-name.png)
+
+### B2 · Panic policy (`SPEC-core-01` question 1)
+
+Show the error pop-up on a panic (upstream: the game is unusable until it is closed), or write the panic to
+the diagnostics file and the Skyline log with no pop-up?
+**Recommendation: log it, no pop-up**, as the playbook's plugins do. Cost: the player sees no message on
+screen; the reason is in the logs.
+
+![B2 panic](decisions/B2-panic-policy.png)
+
+### B3 · Another mod's training HUD layout (`SPEC-core-05` question 2)
+
+When another mod ships its own `info_training` layout, should the plugin inject its layout anyway and
+document the conflict, or detect it and skip injection (the other mod's HUD stays and our menu is off)?
+**Recommendation: inject anyway, document it.** The install line notes the other layout. Cost: that mod's
+training HUD does not show while this plugin is installed.
+
+![B3 layout mods](decisions/B3-layout-mods.png)
+
+### B4 · P1 driven by an AI (`SPEC-cpu-01` question 7, `SPEC-input-01` question 7)
+
+When the pilot or the fallback drives P1: should the CPU settings (Mash, DI, SDI, ledge, tech, shield …)
+apply to P1 too, and what should Record do?
+**Recommendation: the CPU settings apply to the CPU role only, and Record is refused with a notice.** Two
+drivers never fight over P1, and no new game site is needed. Cost: recording the AI's line would need the
+alternative (reading P1's controller slot).
+
+![B4 P1 AI](decisions/B4-p1-ai.png)
+
+### B5 · Input playback and the CPU settings (`SPEC-cpu-02` question 7, `SPEC-cpu-04` question 6, `SPEC-cpu-06` question 7)
+
+While a recording plays on the CPU, should the DI, SDI, air-dodge, tech and throw settings override it
+(upstream), or should the recording win?
+**Recommendation: the recording wins**, the same way shield and stick already yield to playback. Cost: none;
+the settings apply again when playback ends.
+
+![B5 playback](decisions/B5-playback-vs-settings.png)
+
+### B6 · Ice Climbers state (cross-cutting; `SPEC-cpu-02` … `-06` question 4 or 5)
+
+Should Popo and Nana share one set of CPU counters and cases (upstream), or have one each?
+**Recommendation: one per fighter.** Nana's SDI count, DI case and delays then stop leaking into Popo's.
+Cost: a few bytes per CPU fighter.
+
+![B6 per fighter](decisions/B6-per-fighter-state.png)
+
+### B7 · In / Out for Airdodge and Shield Tilt (`SPEC-cpu-02` question 2, `SPEC-cpu-05` question 2)
+
+Upstream's air dodge mirrors only when the player is on the CPU's right, and its shield tilt is absolute.
+Should both use the opponent-relative rule that DI and SDI use?
+**Recommendation: yes, toward the opponent everywhere.** The direction grid labels its chips In and Out, so
+they should mean the same on every row and on both sides. Cost: a visible change against the fork when the
+player stands on the CPU's left.
+
+![B7 in out](decisions/B7-in-out-convention.png)
+
+### B8 · Behaviour changes from the fork, as a batch
+
+The specs recommend thirteen small user-visible fixes (top of the picture) and six behaviours to keep as
+the fork has them (bottom).
+**Recommendation: accept the batch.** Any single line can be reversed by naming it. Each line's spec
+question has the details. Cost: each fix is a small parity change against the fork, and the release notes
+list them.
+
+![B8 behaviour changes](decisions/B8-behaviour-changes.png)
+
+### B9 · Upstream developer-only code (`PROVENANCE.md` questions 3 and 4)
+
+Drop `dev_config`, the debug hooks and `raygun_printer` from the shipped build, or keep them as diag-only
+behaviour? Should `training_mod_sync` (36 lines of lock helpers) be kept, or should the code use
+`parking_lot` directly?
+**Recommendation: drop them, and add a diag version only if a developer asks; use `parking_lot` directly.**
+Cost: none for players.
+
+![B9 dev code](decisions/B9-dev-only-code.png)
+
+### B10 · README media (`PROVENANCE.md` question 2)
+
+Reuse the fork's walkthrough GIFs now (some show the old menu), reuse only those without the menu, or ship
+no media until the new menu is built?
+**Recommendation: reuse the GIFs that show no menu now, and re-record the menu GIFs after the build.**
+Cost: the README has no menu pictures until then.
+
+![B10 README media](decisions/B10-readme-media.png)
+
+## Already answered (not repeated above)
+
+| Item | Answer | Where |
+| --- | --- | --- |
+| MIT copyright holder | the handle (`Copyright (c) 2026 intpa`) | `LICENSE`; `PROVENANCE.md` question 1; `MENU-DRAFT.md` §4 |
+| Storage root and import | `sd:/ultimate/TrainingRooms/`, one-time copy of the fork's data | `specs/SPEC-core-08`; `MENU-DRAFT.md` §4 (also closes `SPEC-core-01` Q2, `SPEC-core-04` Q3, `SPEC-input-01` Q15, `SPEC-state-01` Q9) |
+| Q13 grid picture source | stage thumbnails read at run time, never baked; item grid uses the fork's own icons | `MENU-DRAFT.md` draft 5; `SPEC-core-07` §4.5 |
+| Placeholder chips (Kirby Hats, Solo Popo, items) | neutral placeholder until the icons are designed | `MENU-DRAFT.md` draft 4 |
+| Origin tags on screens | removed | `docs/MENU-PROPOSAL.md` v6 |
+| DI / SDI chips | the game's own visual, read at run time | `MENU-DRAFT.md` draft 6; `SPEC-core-07` §4.6 (Q17 asks only whether Airdodge / Shield Tilt keep the arrows) |
+| Who drives P1 | the standalone CPU pilot owns P1; only the fallback is open (Q11) | `MENU-DRAFT.md` §2/§3; `specs/INDEX-cpu.md` |
+| Menu shortcuts (`PROVENANCE.md` question 5) | merged into Q9 | above |
+| Upstream HEAD `077a8e43` inverted reset gate | not adopted | `SPEC-cpu-07` Q5, `SPEC-cpu-01` Q8 |
+| Auto-update, Menu Open Start Press | dropped from the menu; old keys read and ignored | `MENU-DRAFT.md` §3; `SPEC-core-02` Q4 |
+| Pushing `review/menu-proposal` | docs-only pushes allowed (standing order); any other push, the Forgejo release and the Switch install still need an explicit order | `TRAININGROOMS-HANDOFF.md` |
+
+## Left to the lead
+
+The remaining *Open questions* in `specs/` are technical: site guards, hook placement, measurements, RNG
+source, cost-only changes and Eden rows to run. Each has a written recommendation that stands unless the
+operator objects; they are not repeated here. The operator-facing ones are pulled into Q18 and S1–B10 above.

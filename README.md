@@ -24,7 +24,9 @@ Phase 0 (provenance) and the start of phase 1 (feature inventory and
 behavioural specifications). Nothing is built or installable yet. See
 [PROVENANCE.md](PROVENANCE.md) for the fork-versus-upstream table,
 [TRAININGROOMS-HANDOFF.md](TRAININGROOMS-HANDOFF.md) for the live state, and
-`specs/` for the behavioural specifications.
+`specs/` for the behavioural specifications. The menu proposal is
+[docs/MENU-PROPOSAL.md](docs/MENU-PROPOSAL.md); the decisions still open for the
+operator, one picture each, are in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Layout (planned)
 
