@@ -212,7 +212,16 @@ DI effect (`sys_vector`) cut from one frame of the fork campaign's Eden capture
 apart from an alpha feather at its edges. It stands in for the effect the
 plugin reads from the player's `ef_common.eff` at run time (SPEC-core-07 §4.6)
 and is review material in the same sense. No game-derived file from the static
-trace (`c1162/di-sdi-trace/re/`) is in the repository.
+trace (`c1162/di-sdi-trace/re/`) is in the repository. Proposal v9 adds
+`docs/menu-mockup/captures/sdi/` (two crops of the SDI spark from W8's
+`c1162/captures-ally-sdi` frames `sdiup_f+12` and `sdiin_f+12`, pixels
+unchanged, alpha feather and whiteness key only) and
+`docs/menu-mockup/captures/renders/` (byte copies of W9's two Up chip renders,
+`di-up-4x-layer.png` and `sdi-up-4x-layer.png`, made from the stock
+`ef_common.eff`; W9 manifest sha256 `e6ac05dd…`). The renders draw the chips;
+the crops are the visual check. Both are review material in the same sense.
+No `.eff`, texture, mesh or parameter file from W9 (`c1162/di-sdi-extract/re/`)
+is in the repository.
 
 ### D. Drop
 

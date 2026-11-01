@@ -1,13 +1,15 @@
 #!/usr/bin/python3 -I
 """Crop the fork's real grid-picker captures into per-cell images for the menu mockup (proposal v4),
-copy the fork's 38 item icons byte for byte (proposal v5), and crop the game's DI streak from a real
-capture for the DI direction chips (proposal v8).
+copy the fork's 38 item icons byte for byte (proposal v5), crop the game's DI streak from a real
+capture for the DI direction chips (proposal v8), and crop the game's SDI spark from a real capture for
+the SDI direction chips, plus one captured In spark as a visual check (proposal v9).
 
 Review-mockup material only, never shipped artwork: the crops show game assets (stock fighter icons,
 stage thumbnails) exactly as the fork's own grid pickers draw them in Training; the item icons are the
-fork's own `scripts/item-icons/assets/icon-NN.png` files, unchanged; the DI streak is the game's own
-DI visual (`sys_vector`) in one frame of an Eden capture. The clean room reads that visual from the
-player's game files at run time (SPEC-core-07 §4.6) and never ships a picture of it. Every source
+fork's own `scripts/item-icons/assets/icon-NN.png` files, unchanged; the DI streak and the SDI spark are
+the game's own DI / SDI visuals (`sys_vector`, `sys_hitstop_spark`) in single frames of Eden captures.
+The clean room reads those visuals from the player's game files at run time (SPEC-core-07 §4.6) and
+never ships a picture of them. Every source
 capture, the item manifest and every item icon are pinned by sha256; every crop box and copy is
 written to docs/menu-mockup/captures/crops.json, which the renderer copies into
 docs/menu-mockup/index.md.
@@ -67,6 +69,47 @@ DI_STREAK = {
     "feather": (20, 10),
     "file": "di/di-streak.png",
 }
+# The game's SDI spark (proposal v9): the c1162 W8 Ally Eden capture (SDI Direction = Up, Strength High, DI none,
+# Hitbox Visualization off; same recorder and frame as W5), frame +12 after the hit flash, where the spark is one tall
+# spike above a ring around the CPU's head. Cut as the DI streak, with the spark's axis (straight up, 90 degrees) along
+# +x and CENTRE on the ring's centre (the head), which sits on the chip centre. The spark is pure white (W8 §1, W7
+# §3.3), so besides the edge feather the alpha also carries a whiteness key, smoothstep((min(R,G,B) - KEY[0]) /
+# (KEY[1] - KEY[0])): the grey smoke, the stage and both fighters behind it drop out. Pixels are kept as captured.
+SDI_SPARK = {
+    "source": ("c1162/captures-ally-sdi/sdi-up/frames/sdiup_f+12.png",
+               "34084656526eec369da73ca3eaf49a355a5a4758561663450cbdd23f2e343c37"),
+    "centre": (595, 262),
+    "angle_deg": 90.0,
+    "along": (-64, 142),
+    "half": 62,
+    "feather": (10, 10),
+    "key": (200, 245),
+    "file": "sdi/sdi-spark.png",
+}
+# A visual check only (proposal v9): the spark in the SDI In run (the CPU stood right of the player, so In points
+# left), frame +12, cut the same way along its own axis (180 degrees). The chip sheet shows it beside the Up crop
+# turned to In, so a reviewer can compare the game's own In with the mock's rotation. It is not used on any chip.
+SDI_SPARK_CHECK = {
+    "source": ("c1162/captures-ally-sdi/sdi-in/frames/sdiin_f+12.png",
+               "c43059336aa8823978b13602ead400d39347b9fd9179ac4ae719a3cf3c22d124"),
+    "centre": (463, 352),
+    "angle_deg": 180.0,
+    "along": (-80, 86),
+    "half": 66,
+    "feather": (10, 10),
+    "key": (200, 245),
+    "file": "sdi/sdi-spark-in-check.png",
+}
+# The chips themselves (proposal v9): game-derived renders of the DI and SDI effects by the c1162 W9 extraction
+# (`di-sdi-extract/RESULT.md` §4: the emitters' own textures, meshes and colours from the stock 13.0.5
+# `ef_common.eff`, one still at particle life t = 0.3, effect origin on the chip centre, reach 0.46 x chip size; a
+# 432 px RGBA light layer, alpha = max channel). Only the two Up layers are copied, byte for byte; the renderer turns
+# each to every direction, as the game turns the one effect. W9's own manifest and the two files are pinned by sha256.
+# Nothing else from W9 (no .eff, texture, mesh or parameter file) is copied.
+W9_RENDERS = ("c1162/di-sdi-extract/out/chips",
+              "e6ac05dded1b811ab43987d3a57c5d2c15d68afd55ad528ee890b3de59362661",
+              {"di-up-4x-layer.png": "b87f8d8122ed5c752f623a95f4832f34fea1f7242cf82851105524910c494ccb",
+               "sdi-up-4x-layer.png": "9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254"})
 
 
 def load_renderer():
@@ -93,9 +136,9 @@ def smoothstep(t):
     return t * t * (3 - 2 * t)
 
 
-def di_streak():
-    """Cut the DI streak strip (see DI_STREAK) and return its crops.json record."""
-    d = DI_STREAK
+def strip_crop(d):
+    """Cut a rotated strip of a pinned frame (DI_STREAK, SDI_SPARK, SDI_SPARK_CHECK) and return its crops.json
+    record. Pixels stay as captured; only the alpha changes (edge feather, and the whiteness key if `key` is set)."""
     rel, sha = d["source"]
     path = ROOT / rel
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -107,23 +150,29 @@ def di_streak():
     strip = strip.convert("RGBA")
     w, h = strip.size
     fa, fh = d["feather"]
+    key = d.get("key")
     px = strip.load()
     for y in range(h):
         for x in range(w):
             r, g, b, _ = px[x, y]
             k = smoothstep(min(x, w - 1 - x) / fa) * smoothstep(min(y, h - 1 - y) / fh)
+            if key:
+                k *= smoothstep((min(r, g, b) - key[0]) / (key[1] - key[0]))
             px[x, y] = (r, g, b, round(255 * k))
     (OUT / d["file"]).parent.mkdir(parents=True, exist_ok=True)
     strip.save(OUT / d["file"], optimize=True)
     t = math.radians(ang)
     corners = [[round(cx + a * math.cos(t) + b * math.sin(t), 1), round(cy - a * math.sin(t) + b * math.cos(t), 1)]
                for a, b in ((a0, -half), (a1, -half), (a1, half), (a0, half))]
-    return {"file": d["file"], "source": str(path), "sha256": sha, "frame_geometry": "1280x720 game frame",
-            "centre": list(d["centre"]), "angle_deg": ang, "along": list(d["along"]), "half_width": half,
-            "feather": list(d["feather"]), "size": [w, h], "corners_in_source": corners,
-            "bbox_in_source": [math.floor(min(p[0] for p in corners)), math.floor(min(p[1] for p in corners)),
-                               math.ceil(max(p[0] for p in corners)), math.ceil(max(p[1] for p in corners))],
-            "pivot_in_crop": [-a0, half]}
+    rec = {"file": d["file"], "source": str(path), "sha256": sha, "frame_geometry": "1280x720 game frame",
+           "centre": list(d["centre"]), "angle_deg": ang, "along": list(d["along"]), "half_width": half,
+           "feather": list(d["feather"])}
+    if key:
+        rec["whiteness_key"] = list(key)
+    return rec | {"size": [w, h], "corners_in_source": corners,
+                  "bbox_in_source": [math.floor(min(p[0] for p in corners)), math.floor(min(p[1] for p in corners)),
+                                     math.ceil(max(p[0] for p in corners)), math.ceil(max(p[1] for p in corners))],
+                  "pivot_in_crop": [-a0, half]}
 
 
 def main():
@@ -135,7 +184,7 @@ def main():
         if digest != sha:
             sys.exit(f"{path}: sha256 {digest} != pinned {sha}")
         images[key] = Image.open(path).convert("RGB")
-    for sub in ("portraits", "stages", "items", "di"):
+    for sub in ("portraits", "stages", "items", "di", "sdi", "renders"):
         (OUT / sub).mkdir(parents=True, exist_ok=True)
         for old in (OUT / sub).glob("*.png"):
             old.unlink()
@@ -180,18 +229,38 @@ def main():
         out = f"items/{icon['filename']}"
         (OUT / out).write_bytes(data)
         items.append({"index": icon["index"], "cell": icon["label"], "file": out, "sha256": digest})
-    streak = di_streak()
+    streak = strip_crop(DI_STREAK)
+    spark = strip_crop(SDI_SPARK)
+    spark_check = strip_crop(SDI_SPARK_CHECK)
+    render_dir, render_manifest_sha, render_files = W9_RENDERS
+    render_dir = ROOT / render_dir
+    digest = hashlib.sha256((render_dir / "manifest.json").read_bytes()).hexdigest()
+    if digest != render_manifest_sha:
+        sys.exit(f"{render_dir / 'manifest.json'}: sha256 {digest} != pinned {render_manifest_sha}")
+    renders = []
+    for name, sha in render_files.items():
+        data = (render_dir / name).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != sha:
+            sys.exit(f"{render_dir / name}: sha256 {digest} != pinned {sha}")
+        (OUT / "renders" / name).write_bytes(data)
+        renders.append({"file": f"renders/{name}", "source": str(render_dir / name), "sha256": sha,
+                        "size": list(Image.open(render_dir / name).size)})
     manifest = {
         "purpose": "Review mockup only; game-asset captures of the fork's grid pickers, byte copies of the fork's "
-                   "item icons and a crop of the game's DI streak from an Eden capture; not shipped artwork.",
+                   "item icons, crops of the game's DI streak and SDI spark from Eden captures and two game-derived DI / "
+                   "SDI chip renders (c1162 W9); not shipped artwork.",
         "sources": {k: {"path": str(ROOT / rel), "sha256": sha, "geometry": kind} for k, (rel, sha, kind) in SOURCES.items()},
         "item_icons": {"path": str(item_dir), "manifest_sha256": ITEM_ICONS[1]},
         "cells": cells,
         "items": items,
         "di_streak": streak,
+        "sdi_spark": spark,
+        "sdi_spark_check": spark_check,
+        "w9_renders": {"path": str(render_dir), "manifest_sha256": render_manifest_sha, "files": renders},
     }
     (OUT / "crops.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote {len(cells)} crops, {len(items)} item icons and the DI streak to {OUT}")
+    print(f"wrote {len(cells)} crops, {len(items)} item icons, the DI streak and the SDI spark (+ In check) to {OUT}")
 
 
 if __name__ == "__main__":

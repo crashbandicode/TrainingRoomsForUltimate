@@ -1,6 +1,6 @@
 # MENU-DRAFT — the clean-room menu, for the operator's green light
 
-Draft 7, 2026-11-01, project lead (drafts 2 to 6 the same day; draft 3 is the
+Draft 8, 2026-11-01, project lead (drafts 2 to 7 the same day; draft 3 is the
 operator's redraft: the fork's grid, item and stage visuals where they fit, a
 direction grid for DI / SDI / Airdodge / Shield Tilt; draft 4 follows the
 operator's review of v3: the Kirby Hats, Solo Popo and character-items chips
@@ -13,7 +13,7 @@ each thumbnail from the stage's own game UI texture at run time, so a stage
 mod's picture shows — see *Grid pictures* below). Supersedes `docs/menu-redesign.md`
 (draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
 here is built; the menu is implemented only after the operator approves this
-page. Rendered screens: `docs/MENU-PROPOSAL.md` (v8; the screens carry no
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (v9; the screens carry no
 origin tags, the Origin column in the tables below is the internal record).
 
 **Draft 6 (the operator's review of v6):** the DI and SDI direction chips show
@@ -29,6 +29,16 @@ chips stay a placeholder until an SDI capture exists. The operator's Final
 Destination mod replaces all four stage UI slots, and the fork's baked stage
 grid does not follow it (*Grid pictures*). Evidence: `specs/SPEC-core-07`
 §4.5–4.6.
+
+**Draft 8 (new evidence, no design change):** the SDI spark is captured (a
+white spiky burst with a ring outline on the CPU's head, pointing along the
+SDI vector; W8), and the DI streak is confirmed to turn with the launch. The
+rendered DI and SDI chips are now renders made from the game's own effect
+file (W9), one still per effect turned per direction, with crops of the
+captures beside them on the chip sheet as the check; screen 17 is the SDI
+grid. New question 18: in the fork a changed SDI Direction applies only at
+the next Training reset, and the menu does not say so. Evidence:
+`specs/SPEC-core-07` §4.6, `specs/SPEC-cpu-02` question 9.
 
 Sources for §1: the fork's menu definition as shipped in C116.1
 (`training_mod_consts/src/lib.rs`, `options.rs`, `cycle_preload_config.rs`,
@@ -54,7 +64,7 @@ Control vocabulary used in both tables:
 | `multi-select` | **new**: a set, edited in a popup checklist (A toggles, ZL all/none) |
 | `editor` | **new name** for `action`: opens a sub-screen (grid, list, chord editor, override editor) |
 | `info` | read-only row |
-| `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction (DI and SDI: the game's own DI / SDI visual, read at run time, draft 6; Airdodge and Shield Tilt: the clean room's own arrow; *Direction chips* below); A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots (DI: the selected chips themselves, draft 7; SDI: the placeholder until captured) |
+| `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction (DI and SDI: the game's own DI / SDI visual, read at run time, draft 6; Airdodge and Shield Tilt: the clean room's own arrow; *Direction chips* below); A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots (DI: the selected chips themselves, draft 7; SDI: the same, draft 8) |
 | `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the stock fighter icons (whether they follow the stage rule below is question 16), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
 | `item grid` | the fork's paged 4×8 item grid (`training_mod_consts/src/character_items.rs`, 38 items) with **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, 64×64, made from the game's own item files; draft 5) |
 | `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below) |
@@ -111,9 +121,10 @@ Control vocabulary used in both tables:
   use the same picture as In / Out, marked `abs`.
 - **One picture rotated (draft 7).** The game draws one effect and turns it to
   the DI-corrected launch angle (SDI: to the SDI vector), so each chip is one
-  picture turned to its angle of `SPEC-cpu-02` §2. The rendered DI chips do
-  the same with a crop of the captured streak; the SDI chips are a placeholder
-  until an SDI capture exists.
+  picture turned to its angle of `SPEC-cpu-02` §2. The rendered DI and SDI
+  chips do the same with one render per effect made from the game's effect
+  file (draft 8); crops of the captured streak and spark sit beside them on
+  the chip sheet as the check.
 - **Fallback:** if the asset cannot be read, the chip shows the clean room's
   own arrow, never a baked copy of the game's picture.
 
@@ -258,7 +269,7 @@ change, so existing `training_modpack.json` files load as they are.
 | CPU | Reactions | Situation overrides | editor | sub-screen: dropdown of 13 situations + multi-select of 13 actions; row shows "n of 13 set" | none | upstream | replaces the 13-row Override tab |
 | CPU | Defence | Airdodge Direction | direction grid | 9 relative chips + Left / Right, weighted | none | upstream | draft 3: chips instead of an 11-row checklist |
 | CPU | Defence | DI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own DI visual, read at run time (draft 7: `sys_vector`) |
-| CPU | Defence | SDI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own SDI visual, read at run time (draft 7: `sys_hitstop_spark`; capture pending) |
+| CPU | Defence | SDI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own SDI visual, read at run time (draft 7: `sys_hitstop_spark`; draft 8: captured, screen 17); when a change applies: question 18 |
 | CPU | Defence | SDI Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Clatter Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Dodge Staling | toggle | On, Off | On | upstream | |
@@ -386,7 +397,7 @@ carries this page): the MIT copyright holder is the handle
 with a one-time first-boot import of the fork's settings, save states, Mii
 presets and macro library, originals untouched (`specs/SPEC-core-08`). The
 persistence behind every row above therefore lives under the new root.
-Question 13 is answered (draft 5); questions 1–12 and 14–16 remain open.
+Question 13 is answered (draft 5); questions 1–12 and 14–18 remain open.
 
 1. **Five pages as laid out**, or the variants in `docs/menu-redesign.md` (four pages by merging *Display & Controls* into *Saves*; six by splitting *Stages & Lobby* out of *Fighters & Stages*)?
 2. **Dropdown input**: ◂/▸ cycles the value in place without opening the list (fast, but easier to change by accident). Keep, or require A to open?
@@ -404,7 +415,8 @@ Question 13 is answered (draft 5); questions 1–12 and 14–16 remain open.
 14. **Grid paging** (draft 3): items 4×8 per page (two pages of 38) and stages 4×4 (eight pages of All + 117) as the fork does, or denser pages so the items fit on one screen?
 15. **Mii rows** (draft 3): lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only? (Saved Miis have no stock portrait, so a portrait grid does not apply.)
 16. **Fighter portraits and mods** (draft 5, open): should the portrait grid follow the stage rule — read each fighter's own UI portrait texture from the game at run time, so character and costume mods show — or keep a fixed set of stock icons, as the fork does with its 89 committed icons? Not decided.
-17. **DI / SDI visual** (draft 6, open): (a) confirm that only the DI and SDI chips show the game's own visual and that Airdodge Direction and Shield Tilt keep the clean room's arrows (as proposed; unchanged in draft 7); (b) *status, draft 7:* the visuals are identified (DI `sys_vector`, SDI `sys_hitstop_spark`, two different effects) and the DI streak is captured; an SDI capture is still to be scheduled (`specs/SPEC-core-07` §4.6).
+17. **DI / SDI visual** (draft 6, open): (a) confirm that only the DI and SDI chips show the game's own visual and that Airdodge Direction and Shield Tilt keep the clean room's arrows (as proposed; unchanged in draft 7); (b) *status, draft 7:* the visuals are identified (DI `sys_vector`, SDI `sys_hitstop_spark`, two different effects) and the DI streak is captured; an SDI capture is still to be scheduled (`specs/SPEC-core-07` §4.6). *Status, draft 8:* the SDI spark is captured (Up and In) and the DI turn with the launch is confirmed; the screens draw renders made from the game's effect file, the captures are the check. (a) is still open.
+18. **When a CPU setting change takes effect** (draft 8, open): in the fork, a CPU SDI Direction changed in the menu takes effect only at the next Training reset (`sdi::roll_direction()` ← `reset::on_reset()`), and the menu does not say so; other per-reset rolls (shield tilt) may do the same. Recommendation: apply the change immediately (re-roll when the row changes), or at least show "applies on next reset" on the row. Not decided (`specs/SPEC-cpu-02` question 9).
 
 ## 5. Reconciliation with the coordinator's mockup v1
 

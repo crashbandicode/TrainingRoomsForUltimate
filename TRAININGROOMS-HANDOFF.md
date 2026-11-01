@@ -2,6 +2,32 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v9 — 2026-11-01 (real SDI chips; DI / SDI chips from W9 renders)
+
+- Worker: Claude session `d1ae5b05-ff6e-4452-b66e-8d8ba639b068` under primary `b81ec740`.
+  Model gate from its own transcript: `claude-opus-5-5` / `high` (18/18 assistant records at
+  the start, 192/192 before the commit). Watcher: scratchpad `/tmp/claude-d1ae5b05/watcher.ps1`,
+  PID 2287338, bound to harness PID 2282691, log `ok claude-opus-5-5/high`; not a repo artifact.
+- Evidence read (cited, not copied; `C1162` as in v8): `C1162/captures-ally-sdi/RESULT.md` (W8)
+  and `C1162/di-sdi-extract/RESULT.md` (W9, sha256 `5145b560…`; it appeared during this task).
+- Chips: **DI and SDI chips draw W9's game-derived renders** (one Up still per effect, byte
+  copies in `captures/renders/`, W9 manifest `e6ac05dd…`, turned per direction). **Captures
+  are the check** on 16: the v8 DI streak crop, plus two new crops in `captures/sdi/` cut from
+  W8 `sdiup_f+12` (`34084656…`; centre (595,262), axis 90°) and `sdiin_f+12` (`c4305933…`;
+  (463,352), 180°), pixels unchanged, alpha = edge feather × whiteness key (200, 245).
+  Boxes are in `index.md`. No W9 `.eff` / texture / mesh / parameter file is in the repo.
+- Screens: 01 (SDI row previews Up + In; SDI Strength shown High), 09 (render chips, legend),
+  16 (re-laid out: DI and SDI render rows + capture check column, smaller arrow row), new 17
+  (SDI grid, layout of 09). 02–08 and 10–15 and the 102 crops, 38 icons and DI crop are
+  byte-identical. All four changed PNGs viewed; 280 SVG image refs resolve; no origin words.
+- Specs: `SPEC-core-07` §4.6 (W8 SDI look and timing, run-B root cause, DI rotation in motion,
+  W9 renders; V7 answered; Q7). `SPEC-cpu-02` question 9 (a changed SDI Direction applies only at
+  the next Training reset in the fork; recommendation, not decided). `MENU-DRAFT.md` draft 8
+  (question 17 status, new question 18), `docs/MENU-PROPOSAL.md` v9, `PROVENANCE.md` §C note.
+- Not done: W9's own statement is "never commit `re/` and `out/`"; per the primary's brief, only
+  the two render PNGs are committed as review material. The primary should confirm this.
+- No Eden run, no build. Pushed to `origin/review/menu-proposal` (docs-only standing order).
+
 ## Menu proposal v8 — 2026-11-01 (DI / SDI visuals identified; DI chips from a real crop)
 
 - Worker: Claude session `97acad8a-5569-4f1e-bd76-027160168778` under primary

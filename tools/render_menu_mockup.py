@@ -16,8 +16,11 @@ the provenance table of docs/MENU-PROPOSAL.md; the fourth field of each row belo
 internal record and is never drawn. v8 draws the DI Direction chips with the game's own DI streak (the
 system effect `sys_vector`), a crop of one frame of a real Eden capture (tools/crop_menu_captures.py,
 docs/menu-mockup/captures/di/), rotated per direction as the game rotates that effect to the launch angle
-(SPEC-core-07 §4.6); the SDI Direction chips are the neutral placeholder until an SDI capture exists;
-Airdodge Direction and Shield Tilt keep the clean room's arrows.
+(SPEC-core-07 §4.6); Airdodge Direction and Shield Tilt keep the clean room's arrows. v9 draws the DI and
+SDI Direction chips from game-derived renders of the two effects (c1162 W9: the effect file's own textures,
+meshes and colours; docs/menu-mockup/captures/renders/), one still per effect turned per direction; adds the
+SDI Direction grid (screen 17); and puts crops of the real captures (the DI streak, the SDI spark Up and In,
+docs/menu-mockup/captures/di/ and sdi/) beside the renders on the chip sheet as the visual check.
 
 Every screen is drawn once through `Canvas`, which records the primitives and writes both the PNG
 (Pillow) and a text SVG (images referenced by relative path), so the two never drift.
@@ -250,18 +253,44 @@ def di_streak():
     return f"captures/{rec['file']}", (rec["feather"][0] // 2, h / 2), w
 
 
+def sdi_spark(which="sdi_spark"):
+    """An SDI spark crop (tools/crop_menu_captures.py): file, the anchor that sits on the chip centre (the
+    spark's ring centre, i.e. the CPU's head) and its reach toward the direction (crop pixels)."""
+    rec = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))[which]
+    return f"captures/{rec['file']}", tuple(rec["pivot_in_crop"]), rec["along"][1]
+
+
+def w9_render(visual):
+    """The game-derived chip render (c1162 W9, copied by tools/crop_menu_captures.py): file, its centre (the
+    effect origin, which sits on the chip centre) and its size; drawn pointing Up, reach 0.46 x chip size."""
+    rec = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))["w9_renders"]
+    f = next(r for r in rec["files"] if r["file"].endswith(f"/{visual}-up-4x-layer.png"))
+    return f"captures/{f['file']}", (f["size"][0] / 2, f["size"][1] / 2), f["size"][0]
+
+
 def chip_direction(c, cx, cy, s, name, selected=False, weight=0, absolute=False, cursor=False, visual="arrow"):
     """One direction chip. visual="arrow": a bold stroke from the centre with an arrowhead (Airdodge, Shield
-    Tilt). visual="di": the game's DI streak, rotated to the direction as the game rotates it to the launch
-    angle (SPEC-core-07 §4.6). Neutral is a ring and a dot in both."""
+    Tilt). visual="di" / "sdi": the game-derived render of the DI / SDI effect (c1162 W9), its origin on the chip
+    centre, turned from Up to the direction as the game turns the one effect to the launch angle / SDI vector
+    (SPEC-core-07 §4.6). The captures, for the chip sheet's check column: visual="di-capture" (the DI streak
+    crop), "sdi-capture" (the SDI Up spark crop, ring centre on the chip centre), "sdi-check" (the SDI In spark
+    crop). Neutral is a ring and a dot in all."""
     half = s / 2
     c.rect(cx - half, cy - half, cx + half, cy + half, fill=TILE_HI if selected else TILE,
            outline=SEL if cursor else (FG if selected else LINE), width=3 if cursor else 2, radius=s * 0.14)
     dx, dy = DIRS[name]
     col = FG if selected else MUTED
-    if visual == "di" and (dx, dy) != (0, 0):
+    if visual in ("di", "sdi") and (dx, dy) != (0, 0):
+        rel, anchor, size = w9_render(visual)
+        c.image_rotated(rel, cx, cy, s / size, math.degrees(math.atan2(dy, dx)) + 90, anchor, 1.0 if selected else 0.5)
+        c.circle(cx, cy, max(2, s * 0.05), fill=col)
+    elif visual == "di-capture" and (dx, dy) != (0, 0):
         rel, anchor, length = di_streak()
         c.image_rotated(rel, cx, cy, 0.46 * s / length, math.degrees(math.atan2(dy, dx)), anchor, 1.0 if selected else 0.5)
+        c.circle(cx, cy, max(2, s * 0.05), fill=col)
+    elif visual in ("sdi-capture", "sdi-check") and (dx, dy) != (0, 0):
+        rel, anchor, reach = sdi_spark("sdi_spark" if visual == "sdi-capture" else "sdi_spark_check")
+        c.image_rotated(rel, cx, cy, 0.40 * s / reach, math.degrees(math.atan2(dy, dx)), anchor, 1.0 if selected else 0.5)
         c.circle(cx, cy, max(2, s * 0.05), fill=col)
     elif (dx, dy) == (0, 0):
         c.circle(cx, cy, s * 0.2, outline=col, width=max(2, round(s / 22)))
@@ -349,8 +378,8 @@ PAGES = [
         ("Defence", False, [
             ("Airdodge Direction", "dirgrid", "0 selected", "up"),
             ("DI Direction", "digrid", "3 selected", "up"),
-            ("SDI Direction", "sdigrid", "0 selected", "up"),
-            ("SDI Strength", "drop", "None", "up"),
+            ("SDI Direction", "sdigrid", "2 selected", "up"),
+            ("SDI Strength", "drop", "High", "up"),
             ("Clatter Strength", "drop", "None", "up"),
             ("Dodge Staling", "toggle", "ON", "up"),
         ]),
@@ -547,6 +576,7 @@ ITEMS = [  # training_mod_consts/src/character_items.rs ITEM_NAMES (38); page 1 
 ]
 
 DI_SELECTED = {"Up In": 2, "Up": 1, "Up Out": 1}
+SDI_SELECTED = {"Up": 1, "In": 1}  # the two directions captured in W8 (with Strength High)
 KEYS = "L/R page   D-pad move   A change / open   B back   X reset page"
 
 
@@ -618,9 +648,12 @@ def draw_control(c, kind, value, y, right):
             x -= 34
             chip_direction(c, x + 15, y + 11, 30, name, selected=True, visual="di")
         c.text(x - 10, y + 4, f"{value}  >", "s", FG, "r")
-    elif kind == "sdigrid":  # SDI chips: placeholder until an SDI capture exists
-        chip_placeholder(c, right - 18, y + 12, 34, "SDI")
-        c.text(right - 44, y + 4, f"{value}  >", "s", FG, "r")
+    elif kind == "sdigrid":  # the selected SDI chips, each the game's SDI spark at that direction
+        x = right
+        for name in reversed(list(SDI_SELECTED)):
+            x -= 34
+            chip_direction(c, x + 15, y + 11, 30, name, selected=True, visual="sdi")
+        c.text(x - 10, y + 4, f"{value}  >", "s", FG, "r")
     elif kind == "dirsingle":
         x = mini_dirgrid(c, right, y, {value} if value != "Neutral" else {"Neutral"})
         c.text(x - 10, y + 4, f"<  {value}  >", "s", FG, "r")
@@ -727,37 +760,51 @@ def render_subscreen(si):
     return c
 
 
-def render_direction_grid():
+DIR_GRIDS = {  # breadcrumb title, selection, chip visual, cursor chip, legend lines
+    "di": ("DI Direction", DI_SELECTED, "di", "Up Out",
+           ["In / Out mirror with the CPU's facing;", "Left / Right never mirror. Nothing", "selected: the CPU does not DI.",
+            "", "Chip: the game's own DI streak, turned", "to each direction as the game turns it", "to the launch angle. Read from the",
+            "game's files when the grid opens.", "(This mock: a render from the game's", "effect file; captures on the sheet.)",
+            "", "SDI Direction: same grid with the", "game's SDI spark (screen 17).", "Airdodge and Shield Tilt: arrows",
+            "(Shield Tilt: one chip only)."]),
+    "sdi": ("SDI Direction", SDI_SELECTED, "sdi", "In",
+            ["In / Out mirror with the CPU's facing;", "Left / Right never mirror. Nothing", "selected, or SDI Strength None:",
+             "the CPU does not SDI.",
+             "", "Chip: the game's own SDI spark on", "the CPU's head, turned to each", "direction as the game turns it to",
+             "the SDI vector. Read from the game's", "files when the grid opens.", "(This mock: a render from the game's",
+             "effect file; captures on the sheet.)"]),
+}
+
+
+def render_direction_grid(which="di"):
+    title, selected, visual, cursor, legend = DIR_GRIDS[which]
     c = Canvas()
     frame(c, ["CPU"], 0, "A adds one weight to the chip (random pick is by weight), Y clears it, ZL all / none, B back.",
-          "CPU  >  Defence  >  DI Direction")
+          f"CPU  >  Defence  >  {title}")
     s, pitch = 108, 132
     gx, gy = 150, 338  # centre column x, centre row y
     c.text(gx, 128, "In (toward the opponent)", "xs", MUTED, "m")
     c.text(gx + 2 * pitch, 128, "Out (away)", "xs", MUTED, "m")
     for name, (dx, dy) in list(DIRS.items())[:9]:
         cx, cy = gx + (dx + 1) * pitch, gy + dy * pitch
-        chip_direction(c, cx, cy, s, name, name in DI_SELECTED, DI_SELECTED.get(name, 0), cursor=(name == "Up Out"), visual="di")
-        c.text(cx, cy + s / 2 + 5, name, "xs", FG if name in DI_SELECTED else MUTED, "m")
+        chip_direction(c, cx, cy, s, name, name in selected, selected.get(name, 0), cursor=(name == cursor), visual=visual)
+        c.text(cx, cy + s / 2 + 5, name, "xs", FG if name in selected else MUTED, "m")
     ax = gx + 3 * pitch + 80
     c.text(ax, 128, "absolute", "xs", MUTED, "m")
     for name, cy in (("Left", gy - 72), ("Right", gy + 72)):
-        chip_direction(c, ax, cy, s, name, absolute=True, visual="di")
+        chip_direction(c, ax, cy, s, name, absolute=True, visual=visual)
         c.text(ax, cy + s / 2 + 5, name, "xs", MUTED, "m")
     # legend
     lx = ax + 100
     c.rect(lx, 120, W - 48, H - 112, fill=HILITE, outline=LINE, radius=6)
     c.text(lx + 16, 132, "Selected (weight)", "h", FG)
     y = 168
-    for name, wgt in DI_SELECTED.items():
+    for name, wgt in selected.items():
         c.text(lx + 16, y, f"{name}", "t", FG)
         c.text(W - 64, y, f"x{wgt}", "t", OURS, "r")
         y += 30
     y += 10
-    for line in ["In / Out mirror with the CPU's facing;", "Left / Right never mirror. Nothing", "selected: the CPU does not DI.",
-                 "", "Chip: the game's own DI streak, turned", "to each direction as the game turns it", "to the launch angle. Read from the",
-                 "game's files when the grid opens.", "(This mock: a crop of one capture.)",
-                 "", "SDI Direction: same grid; chips wait", "for an SDI capture. Airdodge and", "Shield Tilt: arrows (one chip only)."]:
+    for line in legend:
         c.text(lx + 16, y, line, "xs", MUTED if line else FG)
         y += 22
     return c
@@ -839,27 +886,36 @@ def render_chip_sheet():
                                                ("Solo Popo", "POPO", "Player 1 and CPU > Solo Popo row"),
                                                ("Character items", "ITEMS", "Extras > Give item row, item grid header")]):
         x = 150 + i * 390
-        c.rect(x - 110, 140, x + 110, 360, fill=TILE, outline=LINE, radius=10)
-        chip_placeholder(c, x, 250, 190, label)
-        c.rect(x + 130, 190, x + 190, 250, fill=TILE, outline=LINE, radius=6)
-        chip_placeholder(c, x + 160, 220, 34, label)
-        c.text(x + 160, 258, "row size", "tiny", MUTED, "m")
-        c.text(x, 372, name, "h", FG, "m")
-        c.text(x, 398, where, "tiny", MUTED, "m")
+        c.rect(x - 90, 132, x + 90, 300, fill=TILE, outline=LINE, radius=10)
+        chip_placeholder(c, x, 216, 150, label)
+        c.rect(x + 110, 176, x + 170, 236, fill=TILE, outline=LINE, radius=6)
+        chip_placeholder(c, x + 140, 206, 34, label)
+        c.text(x + 140, 244, "row size", "tiny", MUTED, "m")
+        c.text(x, 308, name, "h", FG, "m")
+        c.text(x, 332, where, "tiny", MUTED, "m")
     names = ["Up In", "Up", "Up Out", "In", "Neutral", "Out", "Down In", "Down", "Down Out", "Left", "Right"]
-    c.text(48, 418, "DI Direction: the game's DI streak, turned to each direction as the game turns it. SDI: placeholder until captured.", "xs", FG)
+    c.text(48, 352, "DI Direction: render of the game's DI effect, turned as the game turns it to the launch angle.   Check: capture", "xs", FG)
     for i, name in enumerate(names):
         x = 84 + i * 88
-        chip_direction(c, x, 474, 64, name, selected=(name in DI_SELECTED), weight=DI_SELECTED.get(name, 0),
+        chip_direction(c, x, 406, 60, name, selected=(name in DI_SELECTED), weight=DI_SELECTED.get(name, 0),
                        absolute=name in ("Left", "Right"), visual="di")
-        c.text(x, 510, name, "tiny", MUTED, "m")
-    chip_placeholder(c, 1150, 474, 64, "SDI", "pending")
-    c.text(1150, 510, "SDI: capture pending", "tiny", MUTED, "m")
-    c.text(48, 530, "Airdodge Direction and Shield Tilt: the clean room's arrows; Neutral is a ring; Left/Right carry 'abs'.", "xs", FG)
+        c.text(x, 440, name, "tiny", MUTED, "m")
+    chip_direction(c, 1150, 406, 60, "Up Out", selected=True, visual="di-capture")  # the captured streak, launch ~45°
+    c.text(1150, 440, "captured (launch ~45°)", "tiny", FG, "m")
+    c.text(48, 458, "SDI Direction: render of the game's SDI spark on the head, turned as the game turns it to the SDI vector.", "xs", FG)
     for i, name in enumerate(names):
         x = 84 + i * 88
-        chip_direction(c, x, 580, 52, name, absolute=name in ("Left", "Right"))
-        c.text(x, 610, name, "tiny", MUTED, "m")
+        chip_direction(c, x, 512, 60, name, selected=(name in SDI_SELECTED), weight=SDI_SELECTED.get(name, 0),
+                       absolute=name in ("Left", "Right"), visual="sdi")
+        c.text(x, 546, name, "tiny", MUTED, "m")
+    chip_direction(c, 1080, 512, 60, "Up", selected=True, visual="sdi-capture")  # the game's own Up, for comparison
+    c.text(1080, 546, "Up, captured", "tiny", FG, "m")
+    chip_direction(c, 1170, 512, 60, "In", selected=True, visual="sdi-check")  # the game's own In, for comparison
+    c.text(1170, 546, "In, captured", "tiny", FG, "m")
+    c.text(48, 564, "Airdodge Direction and Shield Tilt: the clean room's arrows; Neutral is a ring; Left/Right carry 'abs'.", "xs", FG)
+    for i, name in enumerate(names):
+        x = 84 + i * 88
+        chip_direction(c, x, 600, 40, name, absolute=name in ("Left", "Right"))
     return c
 
 
@@ -891,17 +947,32 @@ def image_sources():
     for item in m["items"]:
         out.append(f"| {item['index']} | {item['cell']} | `captures/{item['file']}` | `{item['sha256']}` |")
     d = m["di_streak"]
-    out += ["", "DI streak (proposal v8): the game's own DI visual (system effect `sys_vector`), cut from one frame of a real "
-            "capture. The DI chips on 01, 09 and 16 draw this one crop, rotated to each direction; the rotation mirrors the game's "
-            "own: it draws one effect and turns it about Z to the DI-corrected launch angle (SPEC-core-07 §4.6, from the static "
+    r9 = m["w9_renders"]
+    out += ["", "DI and SDI chip renders (proposal v9): the DI and SDI chips on 01, 09, 16 and 17 draw game-derived renders made "
+            "by the c1162 W9 extraction (`c1162/di-sdi-extract/RESULT.md` §4): each effect's own emitter textures, meshes and "
+            "colours read from the stock 13.0.5 `effect/system/common/ef_common.eff` (DI `P_CmnVector`, SDI `P_CmnHitStopSpark`), "
+            "composited as one still at particle life t = 0.3 with the effect origin on the chip centre and its reach at 0.46 x "
+            "the chip size. Only the two Up layers (432 px RGBA light, alpha = max channel) are byte copies here; the renderer "
+            "turns each to every direction, as the game turns its one effect to the launch angle / SDI vector. Field meanings "
+            "behind the render are W9 inference, and one SDI emitter (`spark1`) is placed by calibration against the capture "
+            "(RESULT.md §4.8, §7). The clean room renders the same from the player's own file at run time; nothing from this "
+            "folder ships. No `.eff`, texture, mesh or parameter file is in the repository. The captures below stay as the "
+            f"visual check (chip sheet 16). W9 manifest `{r9['path']}/manifest.json` sha256 `{r9['manifest_sha256']}`.", "",
+            "| render | file | source | sha256 |", "| --- | --- | --- | --- |"]
+    for f in r9["files"]:
+        out.append(f"| {'DI' if '/di-' in f['file'] else 'SDI'} Up ({f['size'][0]}x{f['size'][1]}) | `captures/{f['file']}` | "
+                   f"`{f['source']}` | `{f['sha256']}` |")
+    out += ["", "DI streak (proposal v8; the visual check since v9): the game's own DI visual (system effect `sys_vector`), cut "
+            "from one frame of a real capture. v8 drew the DI chips from this crop; since v9 the chip sheet (16) shows it once, as "
+            "captured, beside the rendered DI chips. The game draws one effect and turns it about Z to the DI-corrected launch "
+            "angle (SPEC-core-07 §4.6, from the static "
             "trace `c1162/di-sdi-trace/RESULT.md` §3.1). The clean room reads the effect from the player's game files at run time "
             "and never ships a picture of it. Capture: `c1162/captures-ally` run A (Ally Eden, fork M5l, Training on Final "
             "Destination, Steve forward smash on CPU Sora, DI Direction = Up, Hitbox Visualization off), Eden's GIF recorder, "
             "1280x720 game frame, 256-colour palette; frame +13 after first contact (the streak shows from about +5 to +15). The "
             "strip: rotate the frame about the centre by the streak's measured axis so the streak points along +x, cut along and "
             "across it, feather the strip's edges in alpha (smoothstep; pixels unchanged). The frame's background and the CPU's "
-            "keyblade show through. SDI chips stay the placeholder: no SDI capture exists yet (the game requests "
-            "`sys_hitstop_spark` on the CPU's head on each SDI input frame; run B showed no distinct visual).", "",
+            "keyblade show through.", "",
             "| field | value |", "| --- | --- |",
             f"| crop | `captures/{d['file']}` ({d['size'][0]}x{d['size'][1]}) |",
             f"| source | `{d['source']}` |",
@@ -911,6 +982,30 @@ def image_sources():
             f"| crop box in the source | corners {', '.join(str(tuple(p)) for p in d['corners_in_source'])}; bounding box {tuple(d['bbox_in_source'])} |",
             f"| rotation centre in the crop | {tuple(d['pivot_in_crop'])} px; on a chip the strip's tail end sits on the chip "
             "centre and the streak runs toward the direction |"]
+    out += ["", "SDI spark (proposal v9, the visual check): the game's own SDI visual (system effect `sys_hitstop_spark`, a white "
+            "spiky burst with a ring outline drawn on the CPU's head and pointing along the SDI vector), cut from one frame of a "
+            "real capture. The chip sheet (16) shows it as captured, with its ring centre (the head) on the chip centre, beside "
+            "the rendered SDI chips. The clean room reads the effect from the player's game files at run time and never ships a "
+            "picture of it. Capture: `c1162/captures-ally-sdi` (W8; Ally Eden, fork M5l, "
+            "Training on stock Final Destination, Steve forward smash on CPU Fox at 100 %, SDI Direction Up, Strength High, DI "
+            "none, Hitbox Visualization off), the same recorder and frame as the DI capture; offset 0 is the first frame of the "
+            "hit flash; the spark shows from about +6 to +17 and is absent in the no-SDI control (`sdi-none/`). The strip is cut as "
+            "the DI streak; its alpha also carries a whiteness key (smoothstep of min(R,G,B) between the two key values), because "
+            "the spark is pure white and the stage, the smoke and both fighters sit behind it; pixels are unchanged. A second crop "
+            "from the SDI In run (the CPU stood right of the player, so In points left) is shown once on the chip sheet, as "
+            "captured, beside the rendered In chip: a visual check of the rotation.", "",
+            "| field | SDI Up (16, check) | SDI In (16, check) |", "| --- | --- | --- |"]
+    s, k = m["sdi_spark"], m["sdi_spark_check"]
+    rows = [("crop", lambda r: f"`captures/{r['file']}` ({r['size'][0]}x{r['size'][1]})"),
+            ("source", lambda r: f"`{r['source']}`"),
+            ("sha256", lambda r: f"`{r['sha256']}`"),
+            ("centre, axis", lambda r: f"{tuple(r['centre'])}, {r['angle_deg']}° counter-clockwise from +x"),
+            ("along, across", lambda r: f"{tuple(r['along'])} px along, ±{r['half_width']} px across; feather {tuple(r['feather'])}"),
+            ("whiteness key", lambda r: f"{tuple(r['whiteness_key'])} on min(R,G,B)"),
+            ("crop box in the source", lambda r: f"corners {', '.join(str(tuple(p)) for p in r['corners_in_source'])}; "
+                                                 f"bounding box {tuple(r['bbox_in_source'])}"),
+            ("rotation centre in the crop", lambda r: f"{tuple(r['pivot_in_crop'])} px (the ring centre, on the chip centre)")]
+    out += [f"| {label} | {fn(s)} | {fn(k)} |" for label, fn in rows]
     return out
 
 
@@ -920,22 +1015,23 @@ def main():
         old.unlink()
     for old in OUT.glob("*.svg"):
         old.unlink()
-    index = ["# Menu mockup screens (proposal v8, in-game look, 1280x720)", "",
+    index = ["# Menu mockup screens (proposal v9, in-game look, 1280x720)", "",
              "Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; "
              "the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the "
              "fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows "
              "captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run "
              "time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and "
              "character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality "
-             "is settled. The DI Direction chips show the game's own DI streak, a crop of one real capture rotated to each "
-             "direction; the rotation mirrors the game's own rotation of that effect to the launch angle (SPEC-core-07 §4.6). The "
-             "SDI Direction chips are the neutral placeholder until an SDI capture exists. The Airdodge Direction and Shield Tilt "
+             "is settled. The DI and SDI Direction chips show the game's own DI streak and SDI spark as renders made from the "
+             "game's effect file (one still per effect, turned to each direction as the game turns that effect to the launch "
+             "angle / SDI vector; SPEC-core-07 §4.6); the chip sheet shows crops of real captures beside them as the visual "
+             "check. The Airdodge Direction and Shield Tilt "
              "arrows are the clean room's own vector art. The screens carry no origin tags "
              "(upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table "
              "in `docs/MENU-PROPOSAL.md`.", ""]
     screens = [
-        ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids; the DI row previews its selected "
-         "chips, the SDI row the placeholder)"),
+        ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids; the DI and SDI rows preview their "
+         "selected chips)"),
         ("02-saves", lambda: render_page(1), "page Saves"),
         ("03-recording", lambda: render_page(2), "page Recording"),
         ("04-fighters-stages", lambda: render_page(3), "page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)"),
@@ -952,8 +1048,10 @@ def main():
         ("13-kirby-hats-grid", lambda: render_roster_grid(True), "sub-screen Kirby Hats: the same portrait grid as a two-role hat order"),
         ("14-fighters-extras", lambda: render_page(3, 1), "page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)"),
         ("15-fighters-stage-rows", lambda: render_page(3, 2), "page Fighters & Stages (Stages group: stage order preview)"),
-        ("16-chip-sheet", render_chip_sheet, "review sheet: the placeholder chip at full and row size for its three uses, the DI streak chips, the SDI "
-         "placeholder, and the Airdodge / Shield Tilt arrows"),
+        ("16-chip-sheet", render_chip_sheet, "review sheet: the placeholder chip at full and row size for its three uses, the rendered DI and "
+         "SDI chips with crops of the captures beside them as the check, and the Airdodge / Shield Tilt arrows"),
+        ("17-sdi-direction-grid", lambda: render_direction_grid("sdi"), "sub-screen SDI Direction: the 3x3 direction grid of SDI "
+         "spark chips with absolute Left/Right and weights (same layout as 09)"),
     ]
     for name, fn, what in screens:
         fn().save(name)

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="67.8" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">CPU</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">A adds one weight to the chip (random pick is by weight), Y clears it, ZL all / none, B back.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">CPU  &gt;  Defence  &gt;  SDI Direction</text>
+<text x="150.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">In (toward the opponent)</text>
+<text x="414.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out (away)</text>
+<rect x="96.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(-45.0 150 206)" opacity="0.50"/>
+<ellipse cx="150.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="150.0" y="276.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Up In</text>
+<rect x="228.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="228" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(0.0 282 206)"/>
+<ellipse cx="282.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
+<ellipse cx="320.9" cy="167.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
+<text x="320.9" y="170.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
+<text x="282.0" y="276.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">Up</text>
+<rect x="360.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(45.0 414 206)" opacity="0.50"/>
+<ellipse cx="414.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="414.0" y="276.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Up Out</text>
+<rect x="96.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(176,52,42)" stroke-width="3"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 150 338)"/>
+<ellipse cx="150.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
+<ellipse cx="188.9" cy="299.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
+<text x="188.9" y="302.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
+<text x="150.0" y="408.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">In</text>
+<rect x="228.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<ellipse cx="282.0" cy="338.0" rx="21.6" ry="21.6" fill="none" stroke="rgb(150,156,170)" stroke-width="5"/>
+<ellipse cx="282.0" cy="338.0" rx="7.6" ry="7.6" fill="rgb(150,156,170)"/>
+<text x="282.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
+<rect x="360.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 414 338)" opacity="0.50"/>
+<ellipse cx="414.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="414.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
+<rect x="96.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(225.0 150 470)" opacity="0.50"/>
+<ellipse cx="150.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="150.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
+<rect x="228.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="228" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(180.0 282 470)" opacity="0.50"/>
+<ellipse cx="282.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="282.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
+<rect x="360.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(135.0 414 470)" opacity="0.50"/>
+<ellipse cx="414.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="414.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
+<text x="626.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">absolute</text>
+<rect x="572.0" y="212.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="572" y="212" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 626 266)" opacity="0.50"/>
+<ellipse cx="626.0" cy="266.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="626.0" y="300.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="626.0" y="336.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
+<rect x="572.0" y="356.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="572" y="356" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 626 410)" opacity="0.50"/>
+<ellipse cx="626.0" cy="410.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
+<text x="626.0" y="444.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="626.0" y="480.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Right</text>
+<rect x="726.0" y="120.0" width="506.0" height="488.0" rx="6" fill="rgb(38,42,52)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="742.0" y="148.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Selected (weight)</text>
+<text x="742.0" y="184.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Up</text>
+<text x="1216.0" y="184.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">x1</text>
+<text x="742.0" y="214.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">In</text>
+<text x="1216.0" y="214.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">x1</text>
+<text x="742.0" y="249.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">In / Out mirror with the CPU's facing;</text>
+<text x="742.0" y="271.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Left / Right never mirror. Nothing</text>
+<text x="742.0" y="293.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">selected, or SDI Strength None:</text>
+<text x="742.0" y="315.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">the CPU does not SDI.</text>
+<text x="742.0" y="337.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start"></text>
+<text x="742.0" y="359.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Chip: the game's own SDI spark on</text>
+<text x="742.0" y="381.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">the CPU's head, turned to each</text>
+<text x="742.0" y="403.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">direction as the game turns it to</text>
+<text x="742.0" y="425.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">the SDI vector. Read from the game's</text>
+<text x="742.0" y="447.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">files when the grid opens.</text>
+<text x="742.0" y="469.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">(This mock: a render from the game's</text>
+<text x="742.0" y="491.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">effect file; captures on the sheet.)</text>
+</svg>

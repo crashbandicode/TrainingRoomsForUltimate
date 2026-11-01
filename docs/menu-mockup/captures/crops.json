@@ -1,5 +1,5 @@
 {
- "purpose": "Review mockup only; game-asset captures of the fork's grid pickers, byte copies of the fork's item icons and a crop of the game's DI streak from an Eden capture; not shipped artwork.",
+ "purpose": "Review mockup only; game-asset captures of the fork's grid pickers, byte copies of the fork's item icons, crops of the game's DI streak and SDI spark from Eden captures and two game-derived DI / SDI chip renders (c1162 W9); not shipped artwork.",
  "sources": {
   "change-player": {
    "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/gs-panic-pool14/evidence-m5f/surface/captures/072638-gsp9-p1grid.png",
@@ -1430,6 +1430,142 @@
   "pivot_in_crop": [
    45,
    22
+  ]
+ },
+ "sdi_spark": {
+  "file": "sdi/sdi-spark.png",
+  "source": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/captures-ally-sdi/sdi-up/frames/sdiup_f+12.png",
+  "sha256": "34084656526eec369da73ca3eaf49a355a5a4758561663450cbdd23f2e343c37",
+  "frame_geometry": "1280x720 game frame",
+  "centre": [
+   595,
+   262
+  ],
+  "angle_deg": 90.0,
+  "along": [
+   -64,
+   142
+  ],
+  "half_width": 62,
+  "feather": [
+   10,
+   10
+  ],
+  "whiteness_key": [
+   200,
+   245
+  ],
+  "size": [
+   206,
+   124
+  ],
+  "corners_in_source": [
+   [
+    533.0,
+    326.0
+   ],
+   [
+    533.0,
+    120.0
+   ],
+   [
+    657.0,
+    120.0
+   ],
+   [
+    657.0,
+    326.0
+   ]
+  ],
+  "bbox_in_source": [
+   533,
+   120,
+   657,
+   326
+  ],
+  "pivot_in_crop": [
+   64,
+   62
+  ]
+ },
+ "sdi_spark_check": {
+  "file": "sdi/sdi-spark-in-check.png",
+  "source": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/captures-ally-sdi/sdi-in/frames/sdiin_f+12.png",
+  "sha256": "c43059336aa8823978b13602ead400d39347b9fd9179ac4ae719a3cf3c22d124",
+  "frame_geometry": "1280x720 game frame",
+  "centre": [
+   463,
+   352
+  ],
+  "angle_deg": 180.0,
+  "along": [
+   -80,
+   86
+  ],
+  "half_width": 66,
+  "feather": [
+   10,
+   10
+  ],
+  "whiteness_key": [
+   200,
+   245
+  ],
+  "size": [
+   166,
+   132
+  ],
+  "corners_in_source": [
+   [
+    543.0,
+    418.0
+   ],
+   [
+    377.0,
+    418.0
+   ],
+   [
+    377.0,
+    286.0
+   ],
+   [
+    543.0,
+    286.0
+   ]
+  ],
+  "bbox_in_source": [
+   377,
+   286,
+   543,
+   418
+  ],
+  "pivot_in_crop": [
+   80,
+   66
+  ]
+ },
+ "w9_renders": {
+  "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/di-sdi-extract/out/chips",
+  "manifest_sha256": "e6ac05dded1b811ab43987d3a57c5d2c15d68afd55ad528ee890b3de59362661",
+  "files": [
+   {
+    "file": "renders/di-up-4x-layer.png",
+    "source": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/di-sdi-extract/out/chips/di-up-4x-layer.png",
+    "sha256": "b87f8d8122ed5c752f623a95f4832f34fea1f7242cf82851105524910c494ccb",
+    "size": [
+     432,
+     432
+    ]
+   },
+   {
+    "file": "renders/sdi-up-4x-layer.png",
+    "source": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/di-sdi-extract/out/chips/sdi-up-4x-layer.png",
+    "sha256": "9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254",
+    "size": [
+     432,
+     432
+    ]
+   }
   ]
  }
 }
