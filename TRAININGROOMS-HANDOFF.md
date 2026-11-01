@@ -2,6 +2,31 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v6 — 2026-11-01 (origin tags off the screens)
+
+- Worker: Claude session `4156eb7d-f07f-4a1a-83c7-2bf3e9e95661` under primary
+  `b81ec740`. Model gate from its own transcript: `claude-sonnet-5-5` / `high`
+  (28 of 28 assistant records). No watcher was armed for this single-turn,
+  docs-only task.
+- Change: `tools/render_menu_mockup.py` `render_page` no longer draws the small
+  `upstream` / `ours` / `upstream+ours` tag after each row label; the unused `UP`
+  colour is gone. The fourth field of each row stays in the data as the internal
+  record and is never drawn. Sub-screens, grids and the chip sheet never drew it.
+- Re-rendered all 16 screens. Changed: 01, 02, 03, 04, 05, 14, 15 (41 tags: 6,
+  11, 4, 5, 6, 5, 4), PNG and SVG. 06–13 and 16 are byte-identical (git shows no
+  change). Evidence: a whole-word search finds no `upstream` / `ours` /
+  `origin` in any SVG; for each changed screen, deleting the tag `<text>` lines
+  from the v5 SVG gives the v6 SVG exactly, and every differing PNG pixel lies
+  inside an old tag box. PNGs 01, 04, 06 and 16 were viewed.
+- Docs: `docs/MENU-PROPOSAL.md` is v6 (one line that the screens carry no origin
+  tags and the *Visual sources* table is the internal record; the legend row for
+  the tag removed; the table itself unchanged). `MENU-DRAFT.md` only had its
+  pointer line updated; its Origin column is unchanged. `docs/menu-mockup/index.md`
+  is regenerated (title v6, one sentence). `PROVENANCE.md` is untouched.
+- Push: the commit is pushed to `origin/review/menu-proposal` under the standing
+  order for docs-only draft commits on this branch (relayed by primary `b81ec740`);
+  confirm with `git status -sb`. No Eden run, no build.
+
 ## Menu proposal v5 — 2026-11-01 (operator's review of v4)
 
 - Worker: Claude session `b124dad3-7453-40aa-8f6f-b448f4448014` under primary
@@ -109,7 +134,9 @@ on the operator's menu decisions.
   `origin/review/menu-proposal`. The local checkout is on this branch.
 - Policy (relayed by the coordinator): local commits are allowed on review and
   feature branches; **no push without the operator's explicit order** (the
-  coordinator relays it); no tag, no Switch write.
+  coordinator relays it); no tag, no Switch write. Standing order, relayed
+  2026-11-01 by primary `b81ec740`: docs-only draft commits on
+  `review/menu-proposal` may be pushed; anything else still needs an order.
 - Next branch: `pkg1/skeleton` for implementation package 1, after the
   operator's menu decisions.
 

@@ -1,8 +1,10 @@
-# TrainingRooms menu — proposal v5 for review
+# TrainingRooms menu — proposal v6 for review
 
-Proposal v5, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 5: every item, option list and default, taken from the shipped C116.1 menu definition). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). Nothing is built until a version is approved.
+Proposal v6, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 5: every item, option list and default, taken from the shipped C116.1 menu definition). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). Nothing is built until a version is approved.
 
-**What changed from v4 (the operator's review):**
+**What changed from v5 (the operator's decision):** the screens no longer carry origin tags (`upstream` / `ours`); origin is internal, and the *Visual sources* table below and `PROVENANCE.md` are the internal record. Nothing else on the screens changed.
+
+**v5 (still standing) — what changed from v4 (the operator's review):**
 
 - The **item grid** shows **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, made from the game's item files), copied unchanged and pinned by sha256 in [`menu-mockup/index.md`](menu-mockup/index.md). The stand-in glyphs are gone.
 - **Stage thumbnails are read at run time, never baked.** Each tile draws the stage's own game UI texture (`ui/replace[_patch]/stage/stage_1/stage_1_<name_id>.bntx`), read through the mod-aware file view when the page opens. That is the same file a stage mod replaces, so a mod that changes a stage's icon (for example a Final Destination replacement) shows in the grid. The fork bakes 115 stock thumbnails into its layout archive instead, so mods never show there. The contract, the candidate load routes and the unknowns are in `specs/SPEC-core-07-assets-inventory.md` §4.5. The stage-grid mockup still shows captures of the stock thumbnails, and its caption says so.
@@ -60,7 +62,6 @@ The clean room may carry over everything the fork wrote (`PROVENANCE.md` §B) an
 | placeholder chip + `>` | **item grid** behind *Give item*; **Kirby Hats** grid behind *Kirby Hats* | the fork's grid |
 | placeholder chip + `[OFF]` | Solo Popo toggle | toggle |
 | `…  >` | editor / list: opens a sub-screen | a submenu |
-| small `upstream` / `ours` tag | origin: a clean-roomed upstream feature, or our own code carried over | — |
 | `advanced` on a group | collapsed by default on the console | — |
 
 ## Chips

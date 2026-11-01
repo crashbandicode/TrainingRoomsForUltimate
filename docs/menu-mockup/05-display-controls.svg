@@ -22,21 +22,15 @@
 <rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
 <rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
 <text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">HUD</text>
-<text x="468.1" y="119.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="120.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">[ON]</text>
 <text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Hitbox Visualization</text>
-<text x="672.9" y="157.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="158.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
 <text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Frame Advantage</text>
-<text x="612.7" y="195.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="196.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
 <text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Display</text>
-<text x="588.6" y="233.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Smash Inputs  &gt;</text>
 <text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Group inputs by status</text>
-<text x="697.0" y="271.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
 <text x="418.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Delay</text>
-<text x="564.5" y="309.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
 <text x="1220.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  0 frames  &gt;</text>
 </svg>

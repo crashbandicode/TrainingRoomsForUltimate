@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v5) as PNG and SVG screens in the
+"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v6) as PNG and SVG screens in the
 in-game overlay look, 1280x720 (Switch handheld).
 
 v3 added the fork's grid pickers (portrait roster grid 13x7, stage thumbnail pages 4x4, item grid 4x8)
@@ -10,7 +10,10 @@ shipped), and replaces the Kirby Hats, Solo Popo and character-items pictograms 
 placeholder: their final icons are open until the functionality is settled. v5 draws the item grid with
 the fork's own 38 item icons (byte copies in docs/menu-mockup/captures/items/) and labels the stage grid
 as a mock of run-time thumbnails: the clean room reads each stage's own game UI texture when the grid
-opens, so a stage mod's picture shows; the stage crops stand in for that.
+opens, so a stage mod's picture shows; the stage crops stand in for that. v6 removes the small origin tags
+("upstream" / "ours") from the page rows: origin is internal information and lives in PROVENANCE.md and
+the provenance table of docs/MENU-PROPOSAL.md; the fourth field of each row below is kept as that
+internal record and is never drawn.
 
 Every screen is drawn once through `Canvas`, which records the primitives and writes both the PNG
 (Pillow) and a text SVG (images referenced by relative path), so the two never drift.
@@ -37,7 +40,6 @@ FG = (236, 236, 232)
 MUTED = (150, 156, 170)
 SEL = (176, 52, 42)
 OURS = (111, 195, 154)
-UP = (168, 155, 240)
 ADV = (210, 170, 80)
 HILITE = (38, 42, 52)  # selected row: a solid lift over the panel (Pillow's RGBA draw does not blend alpha fills)
 TILE = (28, 32, 42)
@@ -642,13 +644,11 @@ def render_page(pi, selected_group=0):
         y += 40
     c.line([(388, 96), (388, H - 100)], LINE)
     y = 104
-    for ii, (label, kind, value, origin) in enumerate(items):
+    for ii, (label, kind, value, _origin) in enumerate(items):  # _origin: internal only, never drawn (v6)
         if ii == 0:
             c.rect(404, y - 6, W - 48, y + 26, fill=HILITE)
             c.rect(404, y - 6, 408, y + 26, fill=SEL)
         c.text(418, y, label, "t", FG)
-        tag = {"ours": ("ours", OURS), "up": ("upstream", UP), "mixed": ("upstream+ours", MUTED)}[origin]
-        c.text(418 + c.textlength(label, "t") + 14, y + 4, tag[0], "xs", tag[1])
         draw_control(c, kind, value, y, W - 60)
         y += 38
         if y > H - 120:
@@ -843,14 +843,16 @@ def main():
         old.unlink()
     for old in OUT.glob("*.svg"):
         old.unlink()
-    index = ["# Menu mockup screens (proposal v5, in-game look, 1280x720)", "",
+    index = ["# Menu mockup screens (proposal v6, in-game look, 1280x720)", "",
              "Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; "
              "the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the "
              "fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows "
              "captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run "
              "time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and "
              "character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality "
-             "is settled. The direction glyphs are the clean room's own vector art.", ""]
+             "is settled. The direction glyphs are the clean room's own vector art. The screens carry no origin tags "
+             "(upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table "
+             "in `docs/MENU-PROPOSAL.md`.", ""]
     screens = [
         ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids)"),
         ("02-saves", lambda: render_page(1), "page Saves"),

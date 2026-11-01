@@ -13,7 +13,8 @@ each thumbnail from the stage's own game UI texture at run time, so a stage
 mod's picture shows — see *Grid pictures* below). Supersedes `docs/menu-redesign.md`
 (draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
 here is built; the menu is implemented only after the operator approves this
-page. Rendered screens: `docs/MENU-PROPOSAL.md` (v5).
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (v6; the screens no longer carry
+origin tags, the Origin column in the tables below is the internal record).
 
 Sources for §1: the fork's menu definition as shipped in C116.1
 (`training_mod_consts/src/lib.rs`, `options.rs`, `cycle_preload_config.rs`,

@@ -25,24 +25,19 @@
 <rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
 <rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
 <text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Kirby Hats</text>
-<text x="552.5" y="119.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1185.0" y="99.0" width="34.0" height="34.0" rx="5.44" fill="rgb(28,32,42)"/>
 <polyline points="1213.6,99.0 1215.0,99.2 1216.3,99.7 1217.4,100.6 1218.3,101.7 1218.8,103.0 1219.0,104.4 1219.0,127.6 1218.8,129.0 1218.3,130.3 1217.4,131.4 1216.3,132.3 1215.0,132.8 1213.6,133.0 1190.4,133.0 1189.0,132.8 1187.7,132.3 1186.6,131.4 1185.7,130.3 1185.2,129.0 1185.0,127.6 1185.0,104.4 1185.2,103.0 1185.7,101.7 1186.6,100.6 1187.7,99.7 1189.0,99.2 1190.4,99.0 1213.6,99.0" fill="none" stroke="rgb(150,156,170)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2"/>
 <text x="1202.0" y="120.4" font-size="13" fill="rgb(150,156,170)" text-anchor="middle" font-weight="bold">?</text>
 <text x="1176.0" y="118.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">P1 6 / CPU 6 hats  &gt;</text>
 <text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Give item</text>
-<text x="540.4" y="157.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1185.0" y="137.0" width="34.0" height="34.0" rx="5.44" fill="rgb(28,32,42)"/>
 <polyline points="1213.6,137.0 1215.0,137.2 1216.3,137.7 1217.4,138.6 1218.3,139.7 1218.8,141.0 1219.0,142.4 1219.0,165.6 1218.8,167.0 1218.3,168.3 1217.4,169.4 1216.3,170.3 1215.0,170.8 1213.6,171.0 1190.4,171.0 1189.0,170.8 1187.7,170.3 1186.6,169.4 1185.7,168.3 1185.2,167.0 1185.0,165.6 1185.0,142.4 1185.2,141.0 1185.7,139.7 1186.6,138.6 1187.7,137.7 1189.0,137.2 1190.4,137.0 1213.6,137.0" fill="none" stroke="rgb(150,156,170)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2"/>
 <text x="1202.0" y="158.4" font-size="13" fill="rgb(150,156,170)" text-anchor="middle" font-weight="bold">?</text>
 <text x="1176.0" y="156.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">none  &gt;</text>
 <text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Brawler</text>
-<text x="564.5" y="195.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <text x="1220.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
 <text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Swordfighter</text>
-<text x="624.8" y="233.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
 <text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Gunner</text>
-<text x="552.5" y="271.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <text x="1220.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
 </svg>
