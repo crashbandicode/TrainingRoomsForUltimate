@@ -1,13 +1,15 @@
-# TrainingRooms menu — proposal v3 for review
+# TrainingRooms menu — proposal v4 for review
 
-Proposal v3, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 3: every item, option list and default, taken from the shipped C116.1 menu definition). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). Nothing is built until a version is approved.
+Proposal v4, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 4: every item, option list and default, taken from the shipped C116.1 menu definition). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). Nothing is built until a version is approved.
 
-**What changed from v2 (the operator's redraft request):**
+**What changed from v3 (the operator's review):**
 
-- The fork's **grid pickers** are back where they make sense: the 13×7 portrait grid for Player / CPU Character, Character Cycles and Kirby Hats; the paged **item grid** with the game's item pictures for *Give item*; the paged **stage thumbnail grid** (All first, order badges, form tags) for *Lobby Stages*. Page rows show a small preview of the grid's state (portrait, order badges, first stages) instead of a bare count.
-- **DI / SDI / Airdodge Direction / Shield Tilt** are a **direction grid**: a 3×3 of chips (In · Neutral · Out across, Up · – · Down down, relative to the opponent) plus two absolute chips (Left, Right). Pick the chip that shows the line you want; the chip carries the weight for the random pick. Shield Tilt takes one chip.
-- Three **pictogram chips** mark the rows the operator asked for: Kirby Hats (Kirby in a star nightcap with two hat silhouettes above), Solo Popo (Popo raising the hammer, a dotted trail), Character items (a hand dropping a lit bomb over a banana peel, a turnip and a top). They are our own vector art drawn from the operator's sketches as a brief; nothing is traced or embedded (see *Visual sources*).
-- Correction: the item grid has **38** named items (`character_items.rs` `ITEM_NAMES`), not 45 as draft 2 said.
+- **Kirby Hats, Solo Popo and Character items** show one neutral **placeholder** chip (a dashed rounded square with a short label, `?` at row size). Their final icons are open and will be designed once the functionality is settled.
+- The **portrait grid** (Character Cycles, Kirby Hats, the Player / CPU Character rows) and the **stage grid** (Lobby Stages and its row preview) keep the v3 layout but show the **real fighter icons and stage thumbnails**, cropped from captures of the fork's own grid pickers. Every source capture (path, sha256) and crop box is listed in [`menu-mockup/index.md`](menu-mockup/index.md); the crops are review material only, not shipped artwork.
+- The item grid's tiles are unchanged stand-ins.
+- Question 13 is restated: the fork does not build its grid pictures from the player's files; it keeps them in its repository (see *Visual sources*).
+
+**v3 (still standing):** the fork's grid pickers where they fit, with a small preview on each page row; **DI / SDI / Airdodge Direction / Shield Tilt** as a **direction grid** (3×3 chips In · Neutral · Out across, Up · – · Down down, relative to the opponent, plus absolute Left / Right; a chip carries the weight for the random pick; Shield Tilt takes one chip); the item grid has **38** named items (`character_items.rs` `ITEM_NAMES`).
 
 Everything else from v2 stands: 5 pages, 76 rows, dropdowns for single choices, checklists for sets, sliders for ranges, the three sub-screen editors. Setting ids do not change, so existing settings files load as they are.
 
@@ -19,12 +21,13 @@ The clean room may carry over everything the fork wrote (`PROVENANCE.md` §B) an
 
 | Visual | Status | Fork source (file:line, stage M5i) | In the clean room |
 | --- | --- | --- | --- |
-| Portrait roster grid: 13 columns × 7 rows (6 full rows + a centred 9-cell row = 87 cells), P1 red / CPU blue order badges, ZR role switch, S marks for Solo Popo, PT / Aegis form preview on X, the All cell | **ours, carry over** | model `training_mod_tui/src/roster_grid.rs:8-14` (COLUMNS, ROWS, CELLS) and `:103-200` (GRID order); native panel `src/training/ui/roster_grid.rs:43-56` (`roster_icon_XX`, `roster_p_N`, `roster_c_N`, `roster_all_*`, cursor, title, name, help, role, solo marks), colours `:9-11` | same grid; portraits come from the player's own game files at build time through the carried-over builder `scripts/roster-grid/` (`sources.json` manifest), never from the repo |
-| Stage thumbnail grid: pages of 4 × 4, All first, rotation rank badges, Y cycles Normal / Omega / Battlefield, L / R page | **ours, carry over** | `training_mod_tui/src/stage_menu.rs:5-7` (PAGE_ROWS 4 × `NX_SUBMENU_COLUMNS` 4), `:52-58` (All + 117 stages = 8 pages); native panel `src/training/ui/stage_grid.rs:20-30` (`stage_icon_N`, `stage_tile_N`, `stage_label_N`, `stage_rank_N`, `stage_all_icon`); list `training_mod_consts/src/lobby_stages.rs:13` | same grid; thumbnails from the player's files through `scripts/stage-grid/` |
-| Item grid: 38 named items with the game's item pictures, turnip faces included | **ours, carry over** | `training_mod_consts/src/character_items.rs:5-18` (`ITEM_NAMES`), icons `src/training/ui/menu.rs:403` (`item_icon_NN`), give action `src/common/menu.rs:387-394` | same 4 × 8 pages (`NX_SUBMENU_ROWS` 8); icons through `scripts/item-icons/` |
+| Portrait roster grid: 13 columns × 7 rows (6 full rows + a centred 9-cell row = 87 cells), P1 red / CPU blue order badges, ZR role switch, S marks for Solo Popo, PT / Aegis form preview on X, the All cell | **ours, carry over** | model `training_mod_tui/src/roster_grid.rs:8-14` (COLUMNS, ROWS, CELLS) and `:103-200` (GRID order); native panel `src/training/ui/roster_grid.rs:43-56` (`roster_icon_XX`, `roster_p_N`, `roster_c_N`, `roster_all_*`, cursor, title, name, help, role, solo marks), colours `:9-11` | same grid; the fork keeps 89 stock-icon PNGs in `scripts/roster-grid/assets/` (`sources.json`: SmashWiki copies, sha256 each) and builds them into its patched `layout.arc`; how the clean room sources them is question 13 |
+| Stage thumbnail grid: pages of 4 × 4, All first, rotation rank badges, Y cycles Normal / Omega / Battlefield, L / R page | **ours, carry over** | `training_mod_tui/src/stage_menu.rs:5-7` (PAGE_ROWS 4 × `NX_SUBMENU_COLUMNS` 4), `:52-58` (All + 117 stages = 8 pages); native panel `src/training/ui/stage_grid.rs:20-30` (`stage_icon_N`, `stage_tile_N`, `stage_label_N`, `stage_rank_N`, `stage_all_icon`); list `training_mod_consts/src/lobby_stages.rs:13` | same grid; the fork keeps 115 thumbnails decoded from the game's `stage_1` textures in `scripts/stage-grid/assets/` (`sources.json`); question 13 |
+| Item grid: 38 named items with the game's item pictures, turnip faces included | **ours, carry over** | `training_mod_consts/src/character_items.rs:5-18` (`ITEM_NAMES`), icons `src/training/ui/menu.rs:403` (`item_icon_NN`), give action `src/common/menu.rs:387-394` | same 4 × 8 pages (`NX_SUBMENU_ROWS` 8); the fork keeps 38 icons rendered from the game's item files in `scripts/item-icons/assets/` (`sources.json`); question 13 |
 | Direction option list (Out, Up Out, Up, Up In, In, Down In, Down, Down Out, Neutral, Left, Right; weighted multi-select) | behaviour **upstream → clean-roomed** (`specs/SPEC-cpu-02`, table §2) | option values `training_mod_consts/src/options.rs`; weights = `training_mod_tui/src/containers/toggle.rs:5-9` (`value`, `max`) | the **direction grid** (new control); chips are new vector art |
-| Menu icons for DI, SDI, Airdodge, Shield Tilt, Character item | **upstream artwork, replace** | `src/static/img/{di_state,sdi_state,air_dodge_dir,shield_tilt,character_item}.svg` (PROVENANCE §C; SPEC-core-07 rows 35, 38, 42, 68, 71) | not used; replaced by the direction chips and the character-items chip |
-| Kirby Hats, Solo Popo, Character items row chips | **new** | — (the fork marks these rows with text only) | our pictograms, `tools/render_menu_mockup.py` `chip_kirby` / `chip_popo` / `chip_items`, MIT with the repo |
+| Menu icons for DI, SDI, Airdodge, Shield Tilt, Character item | **upstream artwork, replace** | `src/static/img/{di_state,sdi_state,air_dodge_dir,shield_tilt,character_item}.svg` (PROVENANCE §C; SPEC-core-07 rows 35, 38, 42, 68, 71) | not used; replaced by the direction chips and the character-items placeholder |
+| Kirby Hats, Solo Popo, Character items row chips | **new, open** | — (the fork marks these rows with text only) | a neutral placeholder (`tools/render_menu_mockup.py` `chip_placeholder`) until the final icons are designed, once the functionality is settled |
+| Mockup crops `menu-mockup/captures/` (87 fighter cells, 15 stage cells) | **game-asset captures, review only** | captures of the fork's grids: `docs/feature-walkthroughs/kirby-grid.png`, `stage-rotation.png` and two Eden grabs (`menu-mockup/index.md`) | shown in this review only; never part of the plugin or its release (`PROVENANCE.md` §C, review-mockup note) |
 | Mii lists (saved Miis, replay Miis, Add New…) | **ours, carry over** | `training_mod_tui/src/mii_menu.rs` | stay lists: saved Miis have no stock portrait; the fork's exact bust can sit beside each entry where it exists (question 15) |
 
 ## Opening and navigating
@@ -53,24 +56,24 @@ The clean room may carry over everything the fork wrote (`PROVENANCE.md` §B) an
 | `n selected  >` + nine dots | **direction grid**: the lit dots are the chosen chips; opens the 3×3 grid | a 11-row "ToggleMultiple" list |
 | portrait tile(s) + `>` | **portrait grid**: the fork's roster grid; order grids show the first badges | the fork's grid |
 | stage tile(s) + `>` | **stage grid**: the fork's stage pages; the first ordered stages are previewed | the fork's grid |
-| chip + `>` | **item grid** behind the character-items chip; **Kirby Hats** behind the Kirby chip | the fork's grid |
-| chip + `[OFF]` | Solo Popo toggle with its chip | toggle |
+| placeholder chip + `>` | **item grid** behind *Give item*; **Kirby Hats** grid behind *Kirby Hats* | the fork's grid |
+| placeholder chip + `[OFF]` | Solo Popo toggle | toggle |
 | `…  >` | editor / list: opens a sub-screen | a submenu |
 | small `upstream` / `ours` tag | origin: a clean-roomed upstream feature, or our own code carried over | — |
 | `advanced` on a group | collapsed by default on the console | — |
 
-## Pictogram chips
+## Chips
 
 ![Chip review sheet](menu-mockup/16-chip-sheet.png)
 
 | Chip | What it shows | Where |
 | --- | --- | --- |
-| Kirby Hats | Kirby in a star nightcap; two hat silhouettes float above (a winged star cap, a flaming sailor cap) with a dashed arc between them: the copy ability changes | the *Kirby Hats* row and the hat grid's header |
-| Solo Popo | Popo in his parka with the hammer raised; a dotted trail to his right: he walks alone | the *Solo Popo (original Ice Climbers)* row |
-| Character items | a rounded badge: a hand drops a lit bomb over a banana peel, a turnip and a spinning top | the *Give item* row and the item grid's header |
+| Kirby Hats | placeholder: dashed rounded square, label `HATS` | the *Kirby Hats* row and the hat grid's header |
+| Solo Popo | placeholder, label `POPO` | the *Solo Popo (original Ice Climbers)* row |
+| Character items | placeholder, label `ITEMS` | the *Give item* row and the item grid's header |
 | Direction chips | a bold stroke from the centre with an arrowhead; Neutral is a ring; Left / Right carry `abs` | the direction grids and the nine-dot row previews |
 
-At row size (38 px) each chip drops its small parts (the floating hats, the trail loop, the small items) so it stays legible; the full drawing is used on the sub-screen headers.
+The three placeholders mark where an icon goes and nothing more: the final icons are open and will be designed once the functionality is settled. At row size (34 px) a placeholder shows `?` instead of its label.
 
 ## Page 1 · CPU
 
@@ -134,8 +137,8 @@ Who is on screen and where: swaps, cycles, hats, items, Miis, the stage rows, an
 
 | Group | Items (control) |
 | --- | --- |
-| Player 1 and CPU | Player Swapping (toggle) · Player Character, CPU Character (portrait grids; the row shows the chosen portrait) · Character Cycles (two-role portrait grid; the row previews the P1 and CPU orders with their badges; `ZR` switches role; Solo Popo marks edited here) · Solo Popo (original Ice Climbers) (toggle with the Popo chip) |
-| Extras | Kirby Hats (two-role portrait grid behind the Kirby chip) · Give item (item grid behind the items chip, 38 items) · Mii Brawler / Swordfighter / Gunner (lists: saved Miis, replay Miis, Add New…) |
+| Player 1 and CPU | Player Swapping (toggle) · Player Character, CPU Character (portrait grids; the row shows the chosen portrait) · Character Cycles (two-role portrait grid; the row previews the P1 and CPU orders with their badges; `ZR` switches role; Solo Popo marks edited here) · Solo Popo (original Ice Climbers) (toggle with a placeholder chip) |
+| Extras | Kirby Hats (two-role portrait grid; placeholder chip) · Give item (item grid, 38 items; placeholder chip) · Mii Brawler / Swordfighter / Gunner (lists: saved Miis, replay Miis, Add New…) |
 | Stages | Lobby Practice (toggle) · Lobby Stages (stage grid; the row previews the first ordered stages) · Training Stage Rotation (toggle) · Stage Hazards (toggle) |
 | Loading *(advanced)* | Cycle Preload (dropdown Off, 1–5) · Preload (dropdown: Fighters, Hats, Both) · Ready Fighters (number, default 8) · Ready Fighter Bodies (dropdown: Off, 2, 3) · Group Swap (toggle) · **Swap groups** (checklist of the 7 switches; entries grey with the reason when a dependency is off) · Preload Samples (toggle; question 8) |
 
@@ -143,13 +146,13 @@ Who is on screen and where: swaps, cycles, hats, items, Miis, the stage rows, an
 
 ![Character Cycles grid](menu-mockup/10-character-grid.png)
 
-The fork's roster grid as shipped: 13 columns, six full rows and a centred last row ending in *ALL*; red badges number the P1 order, blue the CPU order; `ZR` switches which order `A` edits; the red *S* on Ice Climbers is the Solo Popo mark; `X` previews the Pokémon Trainer and Pyra / Mythra forms. *Player Character* and *CPU Character* open the same grid as a one-shot picker (no badges). Portraits are stand-ins here; the build takes the stock portraits from the player's game files, as the fork does.
+The fork's roster grid as shipped: 13 columns, six full rows and a centred last row ending in *ALL*; red badges number the P1 order, blue the CPU order; `ZR` switches which order `A` edits; the red *S* on Ice Climbers is the Solo Popo mark; `X` previews the Pokémon Trainer and Pyra / Mythra forms. *Player Character* and *CPU Character* open the same grid as a one-shot picker (no badges). The portraits are the real fighter icons, cropped from captures of the fork's own grid (sources in `menu-mockup/index.md`); badges, tiles and labels are drawn by the mockup.
 
 ### Sub-screen · Kirby Hats
 
 ![Kirby Hats grid](menu-mockup/13-kirby-hats-grid.png)
 
-The same grid with the Kirby chip in the header: the badges are the hat order per role; Kirby takes the next hat in that order on each hat cycle.
+The same grid with the placeholder chip in the header: the badges are the hat order per role; Kirby takes the next hat in that order on each hat cycle.
 
 ### Sub-screen · Give item (item grid)
 
@@ -161,7 +164,7 @@ The same grid with the Kirby chip in the header: the badges are the hat order pe
 
 ![Lobby Stages grid](menu-mockup/12-stage-grid.png)
 
-4 × 4 thumbnails per page, 8 pages for All + 117 stages; *All (listed order)* is the first tile. Red badges number the rotation order, the tag at the top right is the form (`N` normal, `Ω` omega, `BF` battlefield), `Y` cycles it on the focused stage. Training Stage Rotation uses this order.
+4 × 4 thumbnails per page, 8 pages for All + 117 stages; *All (listed order)* is the first tile. Red badges number the rotation order, the tag at the top right is the form (`N` normal, `Ω` omega, `BF` battlefield), `Y` cycles it on the focused stage. Training Stage Rotation uses this order. The thumbnails and the All icon are cropped from the fork's own stage-grid capture; *Waiting Room* is a text tile there too.
 
 ### Sub-screen · Swap groups
 
@@ -213,8 +216,8 @@ What the plugin shows while you play, unchanged in meaning from the fork unless 
 10. **Help text:** one line as today, or a two-line panel?
 11. **P1 CPU fallback when the pilot plugin is absent:** show the hidden group (as proposed), INI-only, or drop it?
 12. **Direction grid weights:** show the weight digit on a selected chip (upstream's counts, today's semantics, as drawn) or plain on/off chips with a uniform random pick?
-13. **Portrait source:** keep the fork's rule that portraits, stage thumbnails and item pictures are built from the player's own game files at build time and never enter the repo (needed for the MIT packaging) — confirm.
+13. **Grid picture source:** the fork keeps its grid pictures in its repository (89 stock icons copied from SmashWiki, 115 stage thumbnails and 38 item icons extracted from the game) and builds them into its `layout.arc`. For the MIT repo: carry them over as the fork does, or have the build extract them from the player's own game files so no game picture is committed? (The review crops in `menu-mockup/captures/` are mockup-only either way.)
 14. **Grid paging:** items 4 × 8 per page (two pages) and stages 4 × 4 (eight pages) as the fork does, or denser pages so the items fit on one screen?
 15. **Mii rows:** lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only?
 
-Answered: license holder = handle; storage root = `sd:/ultimate/TrainingRooms/`; grids and item / stage visuals reused where they fit; direction grid for DI / SDI; the three pictogram chips as sketched (this v3).
+Answered: license holder = handle; storage root = `sd:/ultimate/TrainingRooms/`; grids and item / stage visuals reused where they fit; direction grid for DI / SDI; the portrait and stage grids show the real fighter icons and stage thumbnails; Kirby Hats, Solo Popo and character items use a placeholder until their final icons are designed (this v4).

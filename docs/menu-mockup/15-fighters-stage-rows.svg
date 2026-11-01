@@ -30,18 +30,15 @@
 <text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Lobby Stages</text>
 <text x="576.6" y="157.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1174.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<polygon points="1182.0,160.0 1208.0,160.0 1204.0,165.0 1186.0,165.0" fill="rgb(133,53,172)"/>
-<rect x="1188.0" y="150.0" width="14.0" height="2.0" fill="rgb(133,53,172)"/>
+<image href="captures/stages/small-battlefield.png" x="1180" y="140" width="31" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1180.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="1180.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">3</text>
 <rect x="1128.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<polygon points="1136.0,160.0 1162.0,160.0 1158.0,165.0 1140.0,165.0" fill="rgb(109,185,65)"/>
-<rect x="1142.0" y="150.0" width="14.0" height="2.0" fill="rgb(109,185,65)"/>
+<image href="captures/stages/battlefield.png" x="1134" y="140" width="31" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1134.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="1134.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">2</text>
 <rect x="1082.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<polygon points="1090.0,160.0 1116.0,160.0 1112.0,165.0 1094.0,165.0" fill="rgb(57,178,123)"/>
-<rect x="1096.0" y="150.0" width="14.0" height="2.0" fill="rgb(57,178,123)"/>
+<text x="1105.0" y="156.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">WR</text>
 <ellipse cx="1088.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="1088.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">1</text>
 <text x="1072.0" y="156.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">12 ordered + All  &gt;</text>

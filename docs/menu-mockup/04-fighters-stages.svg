@@ -30,70 +30,48 @@
 <text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Player Character</text>
 <text x="624.8" y="157.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1188.0" y="138.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1202.0" cy="148.0" rx="5.0" ry="5.0" fill="rgb(180,121,58)"/>
-<polygon points="1192.0,162.0 1197.0,153.0 1207.0,153.0 1212.0,162.0" fill="rgb(180,121,58)"/>
+<image href="captures/portraits/mr-game-watch.png" x="1189" y="140" width="26" height="26" preserveAspectRatio="none"/>
 <text x="1178.0" y="156.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">Mr. Game &amp; Watch  &gt;</text>
 <text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">CPU Character</text>
 <text x="588.6" y="195.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1188.0" y="176.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1202.0" cy="186.0" rx="5.0" ry="5.0" fill="rgb(189,94,75)"/>
-<polygon points="1192.0,200.0 1197.0,191.0 1207.0,191.0 1212.0,200.0" fill="rgb(189,94,75)"/>
+<image href="captures/portraits/pikachu.png" x="1189" y="178" width="26" height="26" preserveAspectRatio="none"/>
 <text x="1178.0" y="194.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">Pikachu  &gt;</text>
 <text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Character Cycles</text>
 <text x="624.8" y="233.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
 <rect x="1188.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1202.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(189,78,91)"/>
-<polygon points="1192.0,238.0 1197.0,229.0 1207.0,229.0 1212.0,238.0" fill="rgb(189,78,91)"/>
+<image href="captures/portraits/bayonetta.png" x="1189" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1193.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(72,150,232)"/>
 <text x="1193.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">4</text>
 <rect x="1156.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1170.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(143,164,51)"/>
-<polygon points="1160.0,238.0 1165.0,229.0 1175.0,229.0 1180.0,238.0" fill="rgb(143,164,51)"/>
+<image href="captures/portraits/bowser.png" x="1157" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1161.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(72,150,232)"/>
 <text x="1161.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">3</text>
 <rect x="1124.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1138.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(184,64,110)"/>
-<polygon points="1128.0,238.0 1133.0,229.0 1143.0,229.0 1148.0,238.0" fill="rgb(184,64,110)"/>
+<image href="captures/portraits/kirby.png" x="1125" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1129.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(72,150,232)"/>
 <text x="1129.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">2</text>
 <rect x="1092.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1106.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(189,94,75)"/>
-<polygon points="1096.0,238.0 1101.0,229.0 1111.0,229.0 1116.0,238.0" fill="rgb(189,94,75)"/>
+<image href="captures/portraits/pikachu.png" x="1093" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1097.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(72,150,232)"/>
 <text x="1097.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">1</text>
 <rect x="1050.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1064.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(189,94,75)"/>
-<polygon points="1054.0,238.0 1059.0,229.0 1069.0,229.0 1074.0,238.0" fill="rgb(189,94,75)"/>
+<image href="captures/portraits/pikachu.png" x="1051" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1055.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="1055.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">3</text>
 <rect x="1018.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1032.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(91,78,189)"/>
-<polygon points="1022.0,238.0 1027.0,229.0 1037.0,229.0 1042.0,238.0" fill="rgb(91,78,189)"/>
+<image href="captures/portraits/palutena.png" x="1019" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="1023.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="1023.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">2</text>
 <rect x="986.0" y="214.0" width="28.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<ellipse cx="1000.0" cy="224.0" rx="5.0" ry="5.0" fill="rgb(180,121,58)"/>
-<polygon points="990.0,238.0 995.0,229.0 1005.0,229.0 1010.0,238.0" fill="rgb(180,121,58)"/>
+<image href="captures/portraits/mr-game-watch.png" x="987" y="216" width="26" height="26" preserveAspectRatio="none"/>
 <ellipse cx="991.0" cy="219.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
 <text x="991.0" y="221.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">1</text>
 <text x="976.0" y="232.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">P1 3 / CPU 4  &gt;</text>
 <text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Solo Popo (original Ice Climbers)</text>
 <text x="829.5" y="271.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
-<ellipse cx="1195.9" cy="291.0" rx="3.6" ry="1.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<ellipse cx="1205.0" cy="291.0" rx="3.6" ry="1.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<rect x="1191.8" y="277.3" width="17.3" height="13.2" rx="3.6479999999999997" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<polyline points="1191.8,288.7 1209.1,288.7" fill="none" stroke="rgb(236,236,232)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="1200.5" cy="271.8" rx="9.1" ry="9.1" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<ellipse cx="1200.5" cy="272.5" rx="6.2" ry="6.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<ellipse cx="1198.5" cy="271.4" rx="0.7" ry="1.6" fill="rgb(236,236,232)"/>
-<ellipse cx="1202.5" cy="271.4" rx="0.7" ry="1.6" fill="rgb(236,236,232)"/>
-<polyline points="1202.2,274.6 1202.1,274.7 1202.0,274.9 1201.9,275.0 1201.8,275.1 1201.6,275.2 1201.5,275.2 1201.3,275.3 1201.1,275.4 1201.0,275.4 1200.8,275.4 1200.6,275.4 1200.4,275.4 1200.2,275.4 1200.0,275.4 1199.8,275.4 1199.6,275.3 1199.5,275.2 1199.3,275.2 1199.2,275.1 1199.0,275.0 1198.9,274.9 1198.8,274.7 1198.8,274.6" fill="none" stroke="rgb(236,236,232)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="1194.1,280.0 1186.8,261.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="1186.8" cy="261.8" rx="2.3" ry="2.3" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
-<polyline points="1186.8,261.8 1195.0,247.2" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<polygon points="1186.3,246.3 1196.4,239.4 1200.0,244.9 1190.0,251.7" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1" stroke-linejoin="round"/>
-<ellipse cx="1213.4" cy="264.2" rx="1.5" ry="1.5" fill="rgb(236,236,232)"/>
-<ellipse cx="1213.4" cy="270.7" rx="1.5" ry="1.5" fill="rgb(236,236,232)"/>
-<ellipse cx="1213.4" cy="277.1" rx="1.5" ry="1.5" fill="rgb(236,236,232)"/>
+<rect x="1185.0" y="251.0" width="34.0" height="34.0" rx="5.44" fill="rgb(28,32,42)"/>
+<polyline points="1213.6,251.0 1215.0,251.2 1216.3,251.7 1217.4,252.6 1218.3,253.7 1218.8,255.0 1219.0,256.4 1219.0,279.6 1218.8,281.0 1218.3,282.3 1217.4,283.4 1216.3,284.3 1215.0,284.8 1213.6,285.0 1190.4,285.0 1189.0,284.8 1187.7,284.3 1186.6,283.4 1185.7,282.3 1185.2,281.0 1185.0,279.6 1185.0,256.4 1185.2,255.0 1185.7,253.7 1186.6,252.6 1187.7,251.7 1189.0,251.2 1190.4,251.0 1213.6,251.0" fill="none" stroke="rgb(150,156,170)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2"/>
+<text x="1202.0" y="272.4" font-size="13" fill="rgb(150,156,170)" text-anchor="middle" font-weight="bold">?</text>
 <text x="1176.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
 </svg>

@@ -1,23 +1,28 @@
 #!/usr/bin/python3 -I
-"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v3) as PNG and SVG screens in the
+"""Render the proposed TrainingRooms menu (MENU-DRAFT.md §2, proposal v4) as PNG and SVG screens in the
 in-game overlay look, 1280x720 (Switch handheld).
 
-v3 adds the fork's grid pickers (portrait roster grid 13x7, stage thumbnail pages 4x4, item grid 4x8),
-a 3x3 direction grid for DI / SDI / Airdodge / Shield Tilt, and three pictogram chips (Kirby hats,
-Solo Popo, character items) drawn from primitives. Every screen is drawn once through `Canvas`, which
-records the primitives and writes both the PNG (Pillow) and a text SVG, so the two never drift.
+v3 added the fork's grid pickers (portrait roster grid 13x7, stage thumbnail pages 4x4, item grid 4x8)
+and a 3x3 direction grid for DI / SDI / Airdodge / Shield Tilt. v4 draws the portrait grid and the
+stage grid with the real fighter icons and stage thumbnails, cropped from captures of the fork's own
+pickers by tools/crop_menu_captures.py into docs/menu-mockup/captures/ (review material only, never
+shipped), and replaces the Kirby Hats, Solo Popo and character-items pictograms with one neutral
+placeholder: their final icons are open until the functionality is settled.
 
-Output: docs/menu-mockup/NN-<screen>.png and .svg plus index.md. Pillow only (no external converter on
-this host); DejaVu Sans Mono for the modpack-style monospace text. No game asset, no third-party
-artwork: portraits, stage thumbnails and item icons are stand-ins for the images the fork's own
-builders derive from the player's game files at build time.
+Every screen is drawn once through `Canvas`, which records the primitives and writes both the PNG
+(Pillow) and a text SVG (images referenced by relative path), so the two never drift.
+
+Output: docs/menu-mockup/NN-<screen>.png and .svg plus index.md. Pillow only; DejaVu Sans Mono for the
+modpack-style monospace text. Item icons are still stand-ins.
 """
+import json
 import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1280, 720
 OUT = Path(__file__).resolve().parent.parent / "docs" / "menu-mockup"
+CAPS = OUT / "captures"  # per-cell crops of the fork's grid pickers (tools/crop_menu_captures.py)
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 FONT_B = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 
@@ -36,7 +41,7 @@ TILE = (28, 32, 42)
 TILE_HI = (46, 52, 66)
 P1 = (232, 72, 72)      # the fork's red Player order
 CPU = (72, 150, 232)    # the fork's blue CPU order
-INK = (14, 16, 20)      # pictogram fills on the dark panel
+INK = (14, 16, 20)      # item stand-in fills on the dark panel
 
 FONTS = {"tab": (FONT_B, 22), "h": (FONT_B, 20), "t": (FONT, 20), "s": (FONT, 16), "xs": (FONT, 14),
          "xxs": (FONT, 12), "b": (FONT_B, 13), "hh": (FONT_B, 24), "tiny": (FONT, 10)}
@@ -55,6 +60,12 @@ def opacity(c):
 
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def slug(name):
+    """File name of a grid cell crop: 'Mr. Game & Watch' -> 'mr-game-watch', 'Pokémon Trainer' -> 'pokemon-trainer'."""
+    s = name.lower().replace("é", "e").replace("&", " ")
+    return "-".join("".join(ch if ch.isalnum() else " " for ch in s).split())
 
 
 class Canvas:
@@ -134,6 +145,15 @@ class Canvas:
     def textlength(self, s, font="t"):
         return self.d.textlength(s, font=self.fonts[font])
 
+    def image(self, rel, x0, y0, x1, y1):
+        """A crop from docs/menu-mockup/<rel>, aspect kept and centred in the box; SVG refers to the file."""
+        im = Image.open(OUT / rel).convert("RGBA")
+        k = min((x1 - x0) / im.width, (y1 - y0) / im.height)
+        w, h = max(1, round(im.width * k)), max(1, round(im.height * k))
+        ix, iy = round(x0 + (x1 - x0 - w) / 2), round(y0 + (y1 - y0 - h) / 2)
+        self.img.alpha_composite(im.resize((w, h), Image.LANCZOS), (ix, iy))
+        self.svg.append(f'<image href="{rel}" x="{ix}" y="{iy}" width="{w}" height="{h}" preserveAspectRatio="none"/>')
+
     def save(self, slug):
         self.img.convert("RGB").save(OUT / f"{slug}.png")
         (OUT / f"{slug}.svg").write_text("\n".join(self.svg + ["</svg>"]) + "\n", encoding="utf-8")
@@ -171,139 +191,28 @@ def star(cx, cy, r, points=5, inner=0.45):
 
 
 # ---------------------------------------------------------------------------------------------------
-# Pictogram chips (our own vector art; the operator's sketches are the brief, not the source)
+# Placeholder chip (Kirby Hats, Solo Popo, character items): the final icons are open and will be
+# designed once the functionality is settled; until then one neutral, clearly marked placeholder.
 # ---------------------------------------------------------------------------------------------------
-def chip_kirby(c, cx, cy, s, simple=None):
-    """Kirby in a star nightcap, two hat silhouettes floating above, a dashed arc between them.
-    Below 60 px (a menu row) the floating hats are dropped and Kirby fills the chip."""
-    simple = s < 60 if simple is None else simple
-    w = max(1, round(s / 28))
-    # body
-    bx, by, br = (cx, cy + s * 0.14, s * 0.26) if not simple else (cx - s * 0.06, cy + s * 0.08, s * 0.34)
-    c.ellipse(bx - br * 0.95, by + br * 0.55, bx - br * 0.15, by + br * 1.05, fill=INK, outline=FG, width=w)  # feet
-    c.ellipse(bx + br * 0.15, by + br * 0.55, bx + br * 0.95, by + br * 1.05, fill=INK, outline=FG, width=w)
-    c.circle(bx, by, br, fill=INK, outline=FG, width=w)
-    c.circle(bx - br * 1.0, by, br * 0.32, fill=INK, outline=FG, width=w)  # arms
-    c.circle(bx + br * 1.0, by, br * 0.32, fill=INK, outline=FG, width=w)
-    # face
-    c.ellipse(bx - br * 0.36, by - br * 0.42, bx - br * 0.16, by + br * 0.1, fill=FG)
-    c.ellipse(bx + br * 0.16, by - br * 0.42, bx + br * 0.36, by + br * 0.1, fill=FG)
-    c.arc(bx, by + br * 0.18, br * 0.26, br * 0.2, 20, 160, FG, w)
-    # nightcap: band + cone drooping right + pompom
-    c.polygon([(bx - br * 0.98, by - br * 0.52), (bx + br * 0.98, by - br * 0.52), (bx + br * 1.55, by + br * 0.05),
-               (bx + br * 1.1, by - br * 0.9), (bx + br * 0.3, by - br * 1.3), (bx - br * 0.6, by - br * 1.1)],
-              fill=INK, outline=FG, width=w)
-    c.circle(bx + br * 1.6, by + br * 0.1, br * 0.22, fill=FG)
-    c.polygon(star(bx - br * 0.2, by - br * 0.92, br * 0.17), fill=FG)
-    if simple:
-        return
-    c.polygon(star(bx + br * 0.45, by - br * 0.78, br * 0.14), fill=FG)
-    # floating hats: a winged star cap (left) and a flaming sailor cap (right)
-    hy = cy - s * 0.3
-    lx, rx = cx - s * 0.27, cx + s * 0.27
-    hr = s * 0.11
-    # winged star cap: a filled dome on a brim, a star, two wings
-    dome = [(lx + hr * 1.1 * math.cos(math.radians(a)), hy + hr * 0.9 * math.sin(math.radians(a))) for a in range(180, 361, 15)]
-    c.polygon(dome, fill=INK, outline=FG, width=w)
-    c.rect(lx - hr * 1.3, hy - hr * 0.08, lx + hr * 1.3, hy + hr * 0.25, fill=INK, outline=FG, width=w, radius=hr * 0.1)
-    c.polygon([(lx - hr * 1.25, hy - hr * 0.35), (lx - hr * 2.2, hy - hr * 1.0), (lx - hr * 1.35, hy + hr * 0.05)], fill=FG)
-    c.polygon([(lx + hr * 1.25, hy - hr * 0.35), (lx + hr * 2.2, hy - hr * 1.0), (lx + hr * 1.35, hy + hr * 0.05)], fill=FG)
-    c.polygon(star(lx, hy - hr * 0.4, hr * 0.36), fill=FG)
-    # flaming sailor cap: a flat crown with a brim, a flame on top
-    c.rect(rx - hr * 1.0, hy - hr * 0.55, rx + hr * 1.0, hy + hr * 0.05, fill=INK, outline=FG, width=w, radius=hr * 0.15)
-    c.rect(rx - hr * 1.3, hy - hr * 0.05, rx + hr * 1.3, hy + hr * 0.25, fill=INK, outline=FG, width=w, radius=hr * 0.1)
-    c.circle(rx, hy - hr * 0.25, hr * 0.18, fill=FG)
-    c.polygon([(rx - hr * 0.7, hy - hr * 0.6), (rx - hr * 0.45, hy - hr * 1.5), (rx - hr * 0.1, hy - hr * 1.0),
-               (rx + hr * 0.1, hy - hr * 2.0), (rx + hr * 0.45, hy - hr * 1.15), (rx + hr * 0.7, hy - hr * 0.6)],
-              fill=INK, outline=FG, width=w)
-    # dashed arc from one hat to the other: the copy ability changes
-    c.arc(cx, hy + hr * 0.6, s * 0.13, s * 0.09, 205, 335, FG, w + 1, dash=(max(3, s / 26), max(3, s / 30)))
+def rounded_path(x0, y0, x1, y1, r, step=15):
+    pts = []
+    for cx, cy, a0 in ((x1 - r, y0 + r, 270), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
+        for a in range(a0, a0 + 91, step):
+            pts.append((cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a))))
+    return pts + [pts[0]]
 
 
-def chip_popo(c, cx, cy, s, simple=None):
-    """Popo in his parka raising the hammer, a dotted looping path trailing to the right.
-    Below 60 px the loop becomes three dots and the motion marks are dropped."""
-    simple = s < 60 if simple is None else simple
-    w = max(1, round(s / 28))
-    px, py = (cx - s * 0.12, cy + s * 0.05) if not simple else (cx - s * 0.04, cy + s * 0.1)
-    hr = s * 0.2 if not simple else s * 0.24
-    # body (parka) and feet
-    c.ellipse(px - hr * 0.9, py + hr * 1.9, px - hr * 0.1, py + hr * 2.3, fill=INK, outline=FG, width=w)
-    c.ellipse(px + hr * 0.1, py + hr * 1.9, px + hr * 0.9, py + hr * 2.3, fill=INK, outline=FG, width=w)
-    c.rect(px - hr * 0.95, py + hr * 0.6, px + hr * 0.95, py + hr * 2.05, fill=INK, outline=FG, width=w, radius=hr * 0.4)
-    c.line([(px - hr * 0.95, py + hr * 1.85), (px + hr * 0.95, py + hr * 1.85)], FG, w)  # fur hem
-    # hood + face
-    c.circle(px, py, hr, fill=INK, outline=FG, width=w)
-    c.circle(px, py + hr * 0.08, hr * 0.68, fill=INK, outline=FG, width=w)
-    c.ellipse(px - hr * 0.3, py - hr * 0.22, px - hr * 0.14, py + hr * 0.14, fill=FG)
-    c.ellipse(px + hr * 0.14, py - hr * 0.22, px + hr * 0.3, py + hr * 0.14, fill=FG)
-    c.arc(px, py + hr * 0.26, hr * 0.2, hr * 0.14, 20, 160, FG, w)
-    # raised arm and hammer
-    ax, ay = px - hr * 1.5, py - hr * 1.1
-    c.line([(px - hr * 0.7, py + hr * 0.9), (ax, ay)], FG, w * 2)
-    c.circle(ax, ay, hr * 0.25, fill=INK, outline=FG, width=w)  # mitten
-    c.line([(ax, ay), (ax + hr * 0.9, ay - hr * 1.6)], FG, w * 2)  # handle
-    hx, hy = ax + hr * 0.9, ay - hr * 1.6
-    c.polygon([(hx - hr * 0.95, hy - hr * 0.1), (hx + hr * 0.15, hy - hr * 0.85), (hx + hr * 0.55, hy - hr * 0.25),
-               (hx - hr * 0.55, hy + hr * 0.5)], fill=INK, outline=FG, width=w)
-    if simple:
-        for i in range(3):  # a short dotted trail: Popo walks alone
-            c.circle(cx + s * 0.3, cy - s * 0.1 + i * s * 0.17, max(1.5, s * 0.035), fill=FG)
-        return
-    for a in (-100, -70, -40):  # motion marks
-        c.line([(hx + hr * 0.9 + hr * 0.3 * math.cos(math.radians(a)), hy - hr * 0.2 + hr * 0.3 * math.sin(math.radians(a))),
-                (hx + hr * 0.9 + hr * 0.8 * math.cos(math.radians(a)), hy - hr * 0.2 + hr * 0.8 * math.sin(math.radians(a)))], FG, w)
-    # dotted looping path (Solo Popo walks alone)
-    ox, oy = cx + s * 0.24, cy + s * 0.08
-    pts = [(ox + s * 0.17 * math.sin(t) * 0.9, oy - s * 0.26 + s * 0.42 * (t / (4 * math.pi)) + s * 0.08 * math.cos(2 * t))
-           for t in [i * 4 * math.pi / 90 for i in range(91)]]
-    c.line(pts, FG, w, dash=(max(2, s / 36), max(2, s / 36)))
-
-
-def chip_items(c, cx, cy, s, simple=None):
-    """A rounded badge: a hand drops a lit bomb over a banana peel, a turnip and a spinning top.
-    Below 60 px only the hand and the bomb remain."""
-    simple = s < 60 if simple is None else simple
-    w = max(1, round(s / 28))
-    half = s * 0.46
-    c.rect(cx - half, cy - half, cx + half, cy + half, fill=INK, outline=FG, width=w, radius=s * 0.12)
-    gy = cy + s * 0.3
-    if simple:
-        hx, hy = cx + s * 0.1, cy - s * 0.18
-        c.ellipse(hx - s * 0.2, hy - s * 0.12, hx + s * 0.24, hy + s * 0.14, fill=INK, outline=FG, width=w)
-        c.line([(hx + s * 0.24, hy), (cx + half, hy - s * 0.06)], FG, w)
-        bx, by, br = cx - s * 0.06, cy + s * 0.14, s * 0.19
-        c.circle(bx, by, br, fill=FG)
-        c.arc(bx - br * 0.5, by - br * 1.2, br * 0.5, br * 0.4, 200, 330, FG, w)
-        c.polygon(star(bx - br * 1.2, by - br * 1.5, br * 0.4, 6, 0.5), fill=INK, outline=FG, width=w)
-        return
-    c.line([(cx - s * 0.36, gy), (cx + s * 0.36, gy)], FG, w)  # ground
-    # hand (palm + fingers) at the top right
-    hx, hy = cx + s * 0.14, cy - s * 0.2
-    c.ellipse(hx - s * 0.17, hy - s * 0.1, hx + s * 0.19, hy + s * 0.12, fill=INK, outline=FG, width=w)
-    for i, (dx, dy) in enumerate([(-0.17, 0.02), (-0.1, 0.08), (0.0, 0.1)]):
-        c.ellipse(hx + s * dx - s * 0.045, hy + s * dy, hx + s * dx + s * 0.045, hy + s * dy + s * 0.13, fill=INK, outline=FG, width=w)
-    c.line([(hx + s * 0.19, hy - s * 0.04), (cx + half, hy - s * 0.12)], FG, w)  # wrist to the badge edge
-    c.line([(hx + s * 0.19, hy + s * 0.1), (cx + half, hy + s * 0.06)], FG, w)
-    # bomb with a fuse and a spark
-    bx, by, br = cx - s * 0.02, cy + s * 0.07, s * 0.12
-    c.circle(bx, by, br, fill=FG)
-    c.ellipse(bx - br * 0.6, by - br * 0.55, bx - br * 0.2, by - br * 0.1, fill=INK)  # highlight
-    c.arc(bx - br * 0.6, by - br * 1.2, br * 0.5, br * 0.4, 200, 330, FG, w)
-    c.polygon(star(bx - br * 1.25, by - br * 1.55, br * 0.35, 6, 0.5), fill=INK, outline=FG, width=w)
-    # banana peel, turnip, spinning top on the ground
-    bax = cx - s * 0.27
-    c.polygon([(bax - s * 0.08, gy), (bax - s * 0.1, gy - s * 0.1), (bax - s * 0.02, gy - s * 0.16), (bax + s * 0.02, gy - s * 0.1),
-               (bax + s * 0.08, gy - s * 0.02), (bax + s * 0.1, gy)], fill=INK, outline=FG, width=w)
-    tx = cx + s * 0.02
-    c.circle(tx, gy - s * 0.07, s * 0.07, fill=INK, outline=FG, width=w)
-    c.polygon([(tx - s * 0.02, gy - s * 0.13), (tx - s * 0.07, gy - s * 0.22), (tx, gy - s * 0.15)], fill=FG)
-    c.polygon([(tx + s * 0.02, gy - s * 0.13), (tx + s * 0.07, gy - s * 0.22), (tx, gy - s * 0.15)], fill=FG)
-    c.circle(tx - s * 0.025, gy - s * 0.08, s * 0.012, fill=FG)
-    c.circle(tx + s * 0.025, gy - s * 0.08, s * 0.012, fill=FG)
-    sx = cx + s * 0.27
-    c.polygon([(sx - s * 0.08, gy - s * 0.12), (sx + s * 0.08, gy - s * 0.12), (sx, gy)], fill=INK, outline=FG, width=w)
-    c.rect(sx - s * 0.02, gy - s * 0.2, sx + s * 0.02, gy - s * 0.12, fill=FG)
+def chip_placeholder(c, cx, cy, s, label):
+    """A dashed rounded square with a short label; below 60 px (a menu row) the label is dropped."""
+    half = s / 2
+    c.rect(cx - half, cy - half, cx + half, cy + half, fill=TILE, radius=s * 0.16)
+    dash = (max(3, s / 12), max(2, s / 18))
+    c.line(rounded_path(cx - half, cy - half, cx + half, cy + half, s * 0.16), MUTED, max(1, round(s / 40)) + 1, dash=dash)
+    if s >= 60:
+        c.text(cx, cy - s * 0.16, label, "b" if s < 120 else "h", FG, "m")
+        c.text(cx, cy + s * 0.08, "icon TBD", "tiny" if s < 120 else "xs", MUTED, "m")
+    else:
+        c.text(cx, cy - 6, "?", "b", MUTED, "m")
 
 
 DIRS = {  # name: (dx, dy) in screen space; In is toward the opponent (drawn left), Out away (right)
@@ -342,29 +251,15 @@ def chip_direction(c, cx, cy, s, name, selected=False, weight=0, absolute=False,
 
 
 # ---------------------------------------------------------------------------------------------------
-# Grid tiles (stand-ins for the fork's generated portraits / thumbnails / item icons)
+# Grid tiles (portraits and stage thumbnails: crops of the fork's grids; item icons: still stand-ins)
 # ---------------------------------------------------------------------------------------------------
-def hue(name):
-    h = sum(ord(ch) * (i + 7) for i, ch in enumerate(name)) % 360
-    r, g, b = [int(120 + 70 * math.cos(math.radians(h + o))) for o in (0, 120, 240)]
-    return (r, g, b)
-
-
 def tile_portrait(c, x, y, w, h, name, rank_p=None, rank_c=None, solo=None, cursor=False, kind="fighter"):
     c.rect(x, y, x + w, y + h, fill=TILE_HI if cursor else TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
-    if kind == "all":
-        for i in range(3):
-            for j in range(3):
-                c.rect(x + w / 2 - 15 + j * 11, y + 8 + i * 11, x + w / 2 - 7 + j * 11, y + 16 + i * 11, fill=MUTED)
-        c.text(x + w / 2, y + h - 15, "ALL", "xxs", FG, "m")
-        return
-    col = hue(name) if kind != "unsupported" else (70, 74, 84)
-    cx, top = x + w / 2, y + 5
-    # bust silhouette: head and shoulders, the stand-in for the stock portrait
-    c.circle(cx, top + 12, 9, fill=col)
-    c.polygon([(cx - 19, top + 36), (cx - 12, top + 23), (cx + 12, top + 23), (cx + 19, top + 36)], fill=col)
-    label = name if len(name) <= 11 else name[:10] + "…"
-    c.text(cx, y + h - 15, label, "tiny", FG if kind != "unsupported" else MUTED, "m")
+    cx = x + w / 2
+    # the fighter's real icon as the fork's portrait grid draws it (a crop of a capture of that grid)
+    c.image(f"captures/portraits/{slug(name)}.png", cx - 20, y + 3, cx + 20, y + h - 15)
+    label = "ALL" if kind == "all" else (name if len(name) <= 11 else name[:10] + "…")
+    c.text(cx, y + h - 14, label, "tiny", FG, "m")
     if rank_p is not None:
         c.circle(x + 9, y + 9, 8, fill=P1)
         c.text(x + 9, y + 2, str(rank_p), "tiny", FG, "m")
@@ -379,21 +274,12 @@ def tile_stage(c, x, y, w, h, name, rank=None, form=None, cursor=False, all_tile
     c.rect(x, y, x + w, y + h, fill=TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
     th = h - 24
     if all_tile:
-        for i in range(2):
-            for j in range(4):
-                c.rect(x + w / 2 - 44 + j * 23, y + 10 + i * 23, x + w / 2 - 26 + j * 23, y + 28 + i * 23, fill=MUTED)
+        c.image("captures/stages/all.png", x + w / 2 - 36, y + 5, x + w / 2 + 36, y + th)
         c.text(x + w / 2, y + h - 19, "All (listed order)", "xxs", FG, "m")
         return
-    # thumbnail stand-in: sky band + main stage + platforms derived from the name
-    col = hue(name)
-    c.rect(x + 6, y + 6, x + w - 6, y + th, fill=(col[0] // 4 + 10, col[1] // 4 + 12, col[2] // 4 + 18), radius=4)
-    seed = sum(map(ord, name))
-    mw = w * (0.45 + (seed % 5) * 0.06)
-    c.polygon([(x + w / 2 - mw / 2, y + th - 14), (x + w / 2 + mw / 2, y + th - 14), (x + w / 2 + mw / 2 - 12, y + th - 4),
-               (x + w / 2 - mw / 2 + 12, y + th - 4)], fill=col)
-    for k in range((seed % 3)):
-        px = x + w / 2 - mw / 3 + k * mw / 3
-        c.rect(px - 20, y + th - 30 - k * 6, px + 20, y + th - 27 - k * 6, fill=col)
+    # the stage's real thumbnail as the fork's stage grid draws it; Waiting Room is a text tile there too
+    if name != "Waiting Room":
+        c.image(f"captures/stages/{slug(name)}.png", x + 6, y + 5, x + w - 6, y + th)
     label = name if len(name) <= 24 else name[:23] + "…"
     c.text(x + w / 2, y + h - 19, label, "xxs", FG, "m")
     if rank is not None:
@@ -745,9 +631,7 @@ def mini_portraits(c, right, y, names, color=None, ranks=False):
     for i, name in reversed(list(enumerate(names))):
         x -= 32
         c.rect(x, y, x + 28, y + 30, fill=TILE, outline=LINE, radius=4)
-        col = hue(name)
-        c.circle(x + 14, y + 10, 5, fill=col)
-        c.polygon([(x + 4, y + 24), (x + 9, y + 15), (x + 19, y + 15), (x + 24, y + 24)], fill=col)
+        c.image(f"captures/portraits/{slug(name)}.png", x + 1, y + 2, x + 27, y + 28)
         if ranks:
             c.circle(x + 5, y + 5, 5, fill=color)
             c.text(x + 5, y - 1, str(i + 1), "tiny", FG, "m")
@@ -758,10 +642,11 @@ def mini_stages(c, right, y, names):
     x = right
     for i, name in reversed(list(enumerate(names))):
         x -= 46
-        col = hue(name)
         c.rect(x, y, x + 42, y + 30, fill=TILE, outline=LINE, radius=4)
-        c.polygon([(x + 8, y + 22), (x + 34, y + 22), (x + 30, y + 27), (x + 12, y + 27)], fill=col)
-        c.rect(x + 14, y + 12, x + 28, y + 14, fill=col)
+        if name == "Waiting Room":
+            c.text(x + 23, y + 10, "WR", "tiny", FG, "m")  # a text tile in the fork's grid as well
+        else:
+            c.image(f"captures/stages/{slug(name)}.png", x + 2, y + 2, x + 40, y + 28)
         c.circle(x + 6, y + 6, 5, fill=P1)
         c.text(x + 6, y, str(i + 1), "tiny", FG, "m")
     return x
@@ -784,13 +669,13 @@ def draw_control(c, kind, value, y, right):
         x = mini_portraits(c, x - 10, y - 4, P1_CYCLE, P1, True)
         c.text(x - 10, y + 2, f"{value}  >", "s", FG, "r")
     elif kind == "hats":
-        chip_kirby(c, right - 18, y + 12, 36)
+        chip_placeholder(c, right - 18, y + 12, 34, "HATS")
         c.text(right - 44, y + 2, f"{value}  >", "s", FG, "r")
     elif kind == "items":
-        chip_items(c, right - 18, y + 12, 36)
+        chip_placeholder(c, right - 18, y + 12, 34, "ITEMS")
         c.text(right - 44, y + 2, f"{value}  >", "s", FG, "r")
     elif kind == "popo":
-        chip_popo(c, right - 18, y + 12, 38)
+        chip_placeholder(c, right - 18, y + 12, 34, "POPO")
         t, col = control_text("toggle", value)
         c.text(right - 44, y, t, "t", col, "r")
     elif kind == "stages":
@@ -920,12 +805,12 @@ def render_roster_grid(hats=False):
     c = Canvas()
     title = "Kirby Hats" if hats else "Character Cycles"
     frame(c, ["Fighters & Stages"], 0,
-          "A adds the fighter to the P1 order, ZR switches to the CPU order (blue), Y marks Solo Popo on Ice Climbers, X previews a form." if not hats
-          else "A adds the hat to the P1 order, ZR switches to the CPU order (blue). Kirby takes the next hat in this order on each hat cycle.",
+          "A adds to the P1 order, ZR: CPU order (blue), Y marks Solo Popo on Ice Climbers, X previews a form." if not hats
+          else "A adds the hat to the P1 order, ZR: CPU order (blue). Kirby takes the next hat in this order each cycle.",
           f"Fighters & Stages  >  {'Extras' if hats else 'Player 1 and CPU'}  >  {title}")
     c.text(W - 60, 100, "editing: P1 order (red)   ZR: CPU order", "s", P1, "r")
     if hats:
-        chip_kirby(c, 620, 112, 46)
+        chip_placeholder(c, 620, 112, 40, "HATS")
     p1 = P1_HATS if hats else P1_CYCLE
     cpu = CPU_HATS if hats else CPU_CYCLE
     tw, th, px, py = 82, 56, 88, 64
@@ -950,7 +835,7 @@ def render_item_grid():
     c = Canvas()
     frame(c, ["Fighters & Stages"], 0, "A gives Player 1 the item now (one at a time). The icons are the game's own item pictures.",
           "Fighters & Stages  >  Extras  >  Give item")
-    chip_items(c, 620, 112, 46)
+    chip_placeholder(c, 620, 112, 40, "ITEMS")
     c.text(W - 60, 100, "page 1 / 2   (38 items)", "s", MUTED, "r")
     tw, th, px, py = 280, 48, 292, 54
     x0, y0 = 48 + (W - 96 - 4 * px + 12) / 2, 136
@@ -980,18 +865,18 @@ def render_stage_grid():
 
 
 def render_chip_sheet():
-    """The three pictogram chips at review size, their row size, and the direction chip set."""
+    """The placeholder chip at review size and row size (three uses), and the direction chip set."""
     c = Canvas()
-    frame(c, ["Chips"], 0, "Our own vector art (MIT): a brief from the operator's sketches, redrawn from primitives; no asset is traced or embedded.",
-          "Pictogram chips  >  review sheet")
-    for i, (name, fn, where) in enumerate([("Kirby Hats", chip_kirby, "Fighters & Stages > Extras > Kirby Hats row, and the hat grid header"),
-                                            ("Solo Popo", chip_popo, "Fighters & Stages > Player 1 and CPU > Solo Popo row"),
-                                            ("Character items", chip_items, "Fighters & Stages > Extras > Give item row, and the item grid header")]):
+    frame(c, ["Chips"], 0, "Placeholders: the final Kirby Hats, Solo Popo and item icons are open until the functionality is settled.",
+          "Chips  >  review sheet")
+    for i, (name, label, where) in enumerate([("Kirby Hats", "HATS", "Extras > Kirby Hats row, hat grid header"),
+                                               ("Solo Popo", "POPO", "Player 1 and CPU > Solo Popo row"),
+                                               ("Character items", "ITEMS", "Extras > Give item row, item grid header")]):
         x = 150 + i * 390
         c.rect(x - 110, 140, x + 110, 360, fill=TILE, outline=LINE, radius=10)
-        fn(c, x, 250, 190)
+        chip_placeholder(c, x, 250, 190, label)
         c.rect(x + 130, 190, x + 190, 250, fill=TILE, outline=LINE, radius=6)
-        fn(c, x + 160, 220, 38)
+        chip_placeholder(c, x + 160, 220, 34, label)
         c.text(x + 160, 258, "row size", "tiny", MUTED, "m")
         c.text(x, 372, name, "h", FG, "m")
         c.text(x, 398, where, "tiny", MUTED, "m")
@@ -1003,21 +888,43 @@ def render_chip_sheet():
     return c
 
 
+def image_sources():
+    """index.md section: every source capture (path, sha256) and every crop box, from captures/crops.json."""
+    m = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))
+    out = ["", "## Image sources (review mockup only, not shipped artwork)", "",
+           "The crops in `captures/` are game-asset captures (stock fighter icons, stage thumbnails) as the fork's own grid "
+           "pickers show them in Training. They exist for this review mockup only; the plugin never ships them. Written by "
+           "`tools/crop_menu_captures.py` (pins each source by sha256); the manifest is `captures/crops.json`. Eden captures are "
+           "1920x1080 window grabs with the game frame at (361,181) scaled 1198x674; the two `docs/feature-walkthroughs/` images "
+           "are the fork's own 1280x720 frames (byte-identical in the fork worktree). Upstream's menu icons are not used (PROVENANCE §C).", "",
+           "| source | file | sha256 |", "| --- | --- | --- |"]
+    for k, s in m["sources"].items():
+        out.append(f"| {k} | `{s['path']}` | `{s['sha256']}` |")
+    out += ["", "Crop boxes (x0, y0, x1, y1 in source pixels). Portraits come from `change-player` except cells that carry the "
+            "cursor or an order badge there (Fox, Sora: `change-cpu`) and the ALL cell (`kirby-grid`); Waiting Room has no "
+            "picture in the fork's stage grid and none here.", "", "| cell | crop | source | box |", "| --- | --- | --- | --- |"]
+    for cell in m["cells"]:
+        out.append(f"| {cell['cell']} | `captures/{cell['file']}` | {cell['source']} | {tuple(cell['box'])} |")
+    return out
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.png"):
         old.unlink()
     for old in OUT.glob("*.svg"):
         old.unlink()
-    index = ["# Menu mockup screens (proposal v3, in-game look, 1280x720)", "",
+    index = ["# Menu mockup screens (proposal v4, in-game look, 1280x720)", "",
              "Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; "
-             "the help bar shows the focused item's text. Portraits, stage thumbnails and item icons are stand-ins for the images the "
-             "fork's builders derive from the player's own game files at build time; the chips and direction glyphs are the clean room's own vector art.", ""]
+             "the help bar shows the focused item's text. The portrait grid and the stage grid use the real fighter icons and stage "
+             "thumbnails, cropped from captures of the fork's own grid pickers (table below). The Kirby Hats, Solo Popo and "
+             "character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality "
+             "is settled. Item icons on the item grid are still stand-ins; the direction glyphs are the clean room's own vector art.", ""]
     screens = [
         ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids)"),
         ("02-saves", lambda: render_page(1), "page Saves"),
         ("03-recording", lambda: render_page(2), "page Recording"),
-        ("04-fighters-stages", lambda: render_page(3), "page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo chip)"),
+        ("04-fighters-stages", lambda: render_page(3), "page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)"),
         ("05-display-controls", lambda: render_page(4), "page Display & Controls"),
         ("06-situation-overrides", lambda: render_subscreen(0), "sub-screen Situation overrides (CPU > Reactions)"),
         ("07-button-chords", lambda: render_subscreen(1), "sub-screen Button chords (Display & Controls > Controls)"),
@@ -1027,13 +934,14 @@ def main():
         ("11-item-grid", render_item_grid, "sub-screen Give item: 4x8 item grid, page 1 of 2"),
         ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages: 4x4 stage thumbnail page with All, order badges and form tags"),
         ("13-kirby-hats-grid", lambda: render_roster_grid(True), "sub-screen Kirby Hats: the same portrait grid as a two-role hat order"),
-        ("14-fighters-extras", lambda: render_page(3, 1), "page Fighters & Stages (Extras group: Kirby hats chip, items chip, Mii lists)"),
+        ("14-fighters-extras", lambda: render_page(3, 1), "page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)"),
         ("15-fighters-stage-rows", lambda: render_page(3, 2), "page Fighters & Stages (Stages group: stage order preview)"),
-        ("16-chip-sheet", render_chip_sheet, "review sheet: the three pictogram chips at full and row size, and the direction chip set"),
+        ("16-chip-sheet", render_chip_sheet, "review sheet: the placeholder chip at full and row size for its three uses, and the direction chip set"),
     ]
-    for slug, fn, what in screens:
-        fn().save(slug)
-        index.append(f"- `{slug}.png` / `.svg` — {what}")
+    for name, fn, what in screens:
+        fn().save(name)
+        index.append(f"- `{name}.png` / `.svg` — {what}")
+    index += image_sources()
     (OUT / "index.md").write_text("\n".join(index) + "\n", encoding="utf-8")
     print(f"wrote {2 * len(screens)} files to {OUT}")
 

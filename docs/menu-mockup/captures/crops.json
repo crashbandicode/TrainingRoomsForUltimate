@@ -1,0 +1,1149 @@
+{
+ "purpose": "Review mockup only; game-asset captures of the fork's grid pickers; not shipped artwork.",
+ "sources": {
+  "change-player": {
+   "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/gs-panic-pool14/evidence-m5f/surface/captures/072638-gsp9-p1grid.png",
+   "sha256": "c0a2e5b48e3a80ba1a6244b1c617fbebfa385935e9a2baac1243242be5e878fb",
+   "geometry": "eden"
+  },
+  "change-cpu": {
+   "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/gs-panic-pool14/evidence-m5h/surface/captures/121311-s40-cpugrid.png",
+   "sha256": "50869bfcfa1f05e502ab7648a1049d9b9513149ebea88c446862b9b7bd39df53",
+   "geometry": "eden"
+  },
+  "kirby-grid": {
+   "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5k/stage/docs/feature-walkthroughs/kirby-grid.png",
+   "sha256": "dda1ba4b0112ba92eb4106a0a51beac4a9efd0aa771428b5852fc8f3d363cba8",
+   "geometry": "frame"
+  },
+  "stage-rotation": {
+   "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5k/stage/docs/feature-walkthroughs/stage-rotation.png",
+   "sha256": "84dbcd0e8da2e657c26251170843ff54bdb53e5f7b369e4977d1bdfa8092d412",
+   "geometry": "frame"
+  }
+ },
+ "cells": [
+  {
+   "cell": "Mario",
+   "file": "portraits/mario.png",
+   "source": "change-player",
+   "box": [
+    438,
+    275,
+    494,
+    331
+   ]
+  },
+  {
+   "cell": "Donkey Kong",
+   "file": "portraits/donkey-kong.png",
+   "source": "change-player",
+   "box": [
+    520,
+    275,
+    576,
+    331
+   ]
+  },
+  {
+   "cell": "Link",
+   "file": "portraits/link.png",
+   "source": "change-player",
+   "box": [
+    602,
+    275,
+    659,
+    331
+   ]
+  },
+  {
+   "cell": "Samus",
+   "file": "portraits/samus.png",
+   "source": "change-player",
+   "box": [
+    685,
+    275,
+    741,
+    331
+   ]
+  },
+  {
+   "cell": "Dark Samus",
+   "file": "portraits/dark-samus.png",
+   "source": "change-player",
+   "box": [
+    767,
+    275,
+    823,
+    331
+   ]
+  },
+  {
+   "cell": "Yoshi",
+   "file": "portraits/yoshi.png",
+   "source": "change-player",
+   "box": [
+    850,
+    275,
+    906,
+    331
+   ]
+  },
+  {
+   "cell": "Kirby",
+   "file": "portraits/kirby.png",
+   "source": "change-player",
+   "box": [
+    932,
+    275,
+    988,
+    331
+   ]
+  },
+  {
+   "cell": "Fox",
+   "file": "portraits/fox.png",
+   "source": "change-cpu",
+   "box": [
+    1014,
+    275,
+    1070,
+    331
+   ]
+  },
+  {
+   "cell": "Pikachu",
+   "file": "portraits/pikachu.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    275,
+    1153,
+    331
+   ]
+  },
+  {
+   "cell": "Luigi",
+   "file": "portraits/luigi.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    275,
+    1235,
+    331
+   ]
+  },
+  {
+   "cell": "Ness",
+   "file": "portraits/ness.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    275,
+    1318,
+    331
+   ]
+  },
+  {
+   "cell": "Captain Falcon",
+   "file": "portraits/captain-falcon.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    275,
+    1400,
+    331
+   ]
+  },
+  {
+   "cell": "Jigglypuff",
+   "file": "portraits/jigglypuff.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    275,
+    1482,
+    331
+   ]
+  },
+  {
+   "cell": "Peach",
+   "file": "portraits/peach.png",
+   "source": "change-player",
+   "box": [
+    438,
+    340,
+    494,
+    396
+   ]
+  },
+  {
+   "cell": "Daisy",
+   "file": "portraits/daisy.png",
+   "source": "change-player",
+   "box": [
+    520,
+    340,
+    576,
+    396
+   ]
+  },
+  {
+   "cell": "Bowser",
+   "file": "portraits/bowser.png",
+   "source": "change-player",
+   "box": [
+    602,
+    340,
+    659,
+    396
+   ]
+  },
+  {
+   "cell": "Ice Climbers",
+   "file": "portraits/ice-climbers.png",
+   "source": "change-player",
+   "box": [
+    685,
+    340,
+    741,
+    396
+   ]
+  },
+  {
+   "cell": "Sheik",
+   "file": "portraits/sheik.png",
+   "source": "change-player",
+   "box": [
+    767,
+    340,
+    823,
+    396
+   ]
+  },
+  {
+   "cell": "Zelda",
+   "file": "portraits/zelda.png",
+   "source": "change-player",
+   "box": [
+    850,
+    340,
+    906,
+    396
+   ]
+  },
+  {
+   "cell": "Dr. Mario",
+   "file": "portraits/dr-mario.png",
+   "source": "change-player",
+   "box": [
+    932,
+    340,
+    988,
+    396
+   ]
+  },
+  {
+   "cell": "Pichu",
+   "file": "portraits/pichu.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    340,
+    1070,
+    396
+   ]
+  },
+  {
+   "cell": "Falco",
+   "file": "portraits/falco.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    340,
+    1153,
+    396
+   ]
+  },
+  {
+   "cell": "Marth",
+   "file": "portraits/marth.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    340,
+    1235,
+    396
+   ]
+  },
+  {
+   "cell": "Lucina",
+   "file": "portraits/lucina.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    340,
+    1318,
+    396
+   ]
+  },
+  {
+   "cell": "Young Link",
+   "file": "portraits/young-link.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    340,
+    1400,
+    396
+   ]
+  },
+  {
+   "cell": "Ganondorf",
+   "file": "portraits/ganondorf.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    340,
+    1482,
+    396
+   ]
+  },
+  {
+   "cell": "Mewtwo",
+   "file": "portraits/mewtwo.png",
+   "source": "change-player",
+   "box": [
+    438,
+    406,
+    494,
+    462
+   ]
+  },
+  {
+   "cell": "Roy",
+   "file": "portraits/roy.png",
+   "source": "change-player",
+   "box": [
+    520,
+    406,
+    576,
+    462
+   ]
+  },
+  {
+   "cell": "Chrom",
+   "file": "portraits/chrom.png",
+   "source": "change-player",
+   "box": [
+    602,
+    406,
+    659,
+    462
+   ]
+  },
+  {
+   "cell": "Mr. Game & Watch",
+   "file": "portraits/mr-game-watch.png",
+   "source": "change-player",
+   "box": [
+    685,
+    406,
+    741,
+    462
+   ]
+  },
+  {
+   "cell": "Meta Knight",
+   "file": "portraits/meta-knight.png",
+   "source": "change-player",
+   "box": [
+    767,
+    406,
+    823,
+    462
+   ]
+  },
+  {
+   "cell": "Pit",
+   "file": "portraits/pit.png",
+   "source": "change-player",
+   "box": [
+    850,
+    406,
+    906,
+    462
+   ]
+  },
+  {
+   "cell": "Dark Pit",
+   "file": "portraits/dark-pit.png",
+   "source": "change-player",
+   "box": [
+    932,
+    406,
+    988,
+    462
+   ]
+  },
+  {
+   "cell": "Zero Suit Samus",
+   "file": "portraits/zero-suit-samus.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    406,
+    1070,
+    462
+   ]
+  },
+  {
+   "cell": "Wario",
+   "file": "portraits/wario.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    406,
+    1153,
+    462
+   ]
+  },
+  {
+   "cell": "Snake",
+   "file": "portraits/snake.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    406,
+    1235,
+    462
+   ]
+  },
+  {
+   "cell": "Ike",
+   "file": "portraits/ike.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    406,
+    1318,
+    462
+   ]
+  },
+  {
+   "cell": "Pokémon Trainer",
+   "file": "portraits/pokemon-trainer.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    406,
+    1400,
+    462
+   ]
+  },
+  {
+   "cell": "Diddy Kong",
+   "file": "portraits/diddy-kong.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    406,
+    1482,
+    462
+   ]
+  },
+  {
+   "cell": "Lucas",
+   "file": "portraits/lucas.png",
+   "source": "change-player",
+   "box": [
+    438,
+    471,
+    494,
+    527
+   ]
+  },
+  {
+   "cell": "Sonic",
+   "file": "portraits/sonic.png",
+   "source": "change-player",
+   "box": [
+    520,
+    471,
+    576,
+    527
+   ]
+  },
+  {
+   "cell": "King Dedede",
+   "file": "portraits/king-dedede.png",
+   "source": "change-player",
+   "box": [
+    602,
+    471,
+    659,
+    527
+   ]
+  },
+  {
+   "cell": "Olimar",
+   "file": "portraits/olimar.png",
+   "source": "change-player",
+   "box": [
+    685,
+    471,
+    741,
+    527
+   ]
+  },
+  {
+   "cell": "Lucario",
+   "file": "portraits/lucario.png",
+   "source": "change-player",
+   "box": [
+    767,
+    471,
+    823,
+    527
+   ]
+  },
+  {
+   "cell": "R.O.B.",
+   "file": "portraits/r-o-b.png",
+   "source": "change-player",
+   "box": [
+    850,
+    471,
+    906,
+    527
+   ]
+  },
+  {
+   "cell": "Toon Link",
+   "file": "portraits/toon-link.png",
+   "source": "change-player",
+   "box": [
+    932,
+    471,
+    988,
+    527
+   ]
+  },
+  {
+   "cell": "Wolf",
+   "file": "portraits/wolf.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    471,
+    1070,
+    527
+   ]
+  },
+  {
+   "cell": "Villager",
+   "file": "portraits/villager.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    471,
+    1153,
+    527
+   ]
+  },
+  {
+   "cell": "Mega Man",
+   "file": "portraits/mega-man.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    471,
+    1235,
+    527
+   ]
+  },
+  {
+   "cell": "Wii Fit Trainer",
+   "file": "portraits/wii-fit-trainer.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    471,
+    1318,
+    527
+   ]
+  },
+  {
+   "cell": "Rosalina & Luma",
+   "file": "portraits/rosalina-luma.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    471,
+    1400,
+    527
+   ]
+  },
+  {
+   "cell": "Little Mac",
+   "file": "portraits/little-mac.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    471,
+    1482,
+    527
+   ]
+  },
+  {
+   "cell": "Greninja",
+   "file": "portraits/greninja.png",
+   "source": "change-player",
+   "box": [
+    438,
+    537,
+    494,
+    593
+   ]
+  },
+  {
+   "cell": "Palutena",
+   "file": "portraits/palutena.png",
+   "source": "change-player",
+   "box": [
+    520,
+    537,
+    576,
+    593
+   ]
+  },
+  {
+   "cell": "PAC-MAN",
+   "file": "portraits/pac-man.png",
+   "source": "change-player",
+   "box": [
+    602,
+    537,
+    659,
+    593
+   ]
+  },
+  {
+   "cell": "Robin",
+   "file": "portraits/robin.png",
+   "source": "change-player",
+   "box": [
+    685,
+    537,
+    741,
+    593
+   ]
+  },
+  {
+   "cell": "Shulk",
+   "file": "portraits/shulk.png",
+   "source": "change-player",
+   "box": [
+    767,
+    537,
+    823,
+    593
+   ]
+  },
+  {
+   "cell": "Bowser Jr.",
+   "file": "portraits/bowser-jr.png",
+   "source": "change-player",
+   "box": [
+    850,
+    537,
+    906,
+    593
+   ]
+  },
+  {
+   "cell": "Duck Hunt",
+   "file": "portraits/duck-hunt.png",
+   "source": "change-player",
+   "box": [
+    932,
+    537,
+    988,
+    593
+   ]
+  },
+  {
+   "cell": "Ryu",
+   "file": "portraits/ryu.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    537,
+    1070,
+    593
+   ]
+  },
+  {
+   "cell": "Ken",
+   "file": "portraits/ken.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    537,
+    1153,
+    593
+   ]
+  },
+  {
+   "cell": "Cloud",
+   "file": "portraits/cloud.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    537,
+    1235,
+    593
+   ]
+  },
+  {
+   "cell": "Corrin",
+   "file": "portraits/corrin.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    537,
+    1318,
+    593
+   ]
+  },
+  {
+   "cell": "Bayonetta",
+   "file": "portraits/bayonetta.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    537,
+    1400,
+    593
+   ]
+  },
+  {
+   "cell": "Inkling",
+   "file": "portraits/inkling.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    537,
+    1482,
+    593
+   ]
+  },
+  {
+   "cell": "Ridley",
+   "file": "portraits/ridley.png",
+   "source": "change-player",
+   "box": [
+    438,
+    602,
+    494,
+    658
+   ]
+  },
+  {
+   "cell": "Simon",
+   "file": "portraits/simon.png",
+   "source": "change-player",
+   "box": [
+    520,
+    602,
+    576,
+    658
+   ]
+  },
+  {
+   "cell": "Richter",
+   "file": "portraits/richter.png",
+   "source": "change-player",
+   "box": [
+    602,
+    602,
+    659,
+    658
+   ]
+  },
+  {
+   "cell": "King K. Rool",
+   "file": "portraits/king-k-rool.png",
+   "source": "change-player",
+   "box": [
+    685,
+    602,
+    741,
+    658
+   ]
+  },
+  {
+   "cell": "Isabelle",
+   "file": "portraits/isabelle.png",
+   "source": "change-player",
+   "box": [
+    767,
+    602,
+    823,
+    658
+   ]
+  },
+  {
+   "cell": "Incineroar",
+   "file": "portraits/incineroar.png",
+   "source": "change-player",
+   "box": [
+    850,
+    602,
+    906,
+    658
+   ]
+  },
+  {
+   "cell": "Piranha Plant",
+   "file": "portraits/piranha-plant.png",
+   "source": "change-player",
+   "box": [
+    932,
+    602,
+    988,
+    658
+   ]
+  },
+  {
+   "cell": "Joker",
+   "file": "portraits/joker.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    602,
+    1070,
+    658
+   ]
+  },
+  {
+   "cell": "Hero",
+   "file": "portraits/hero.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    602,
+    1153,
+    658
+   ]
+  },
+  {
+   "cell": "Banjo & Kazooie",
+   "file": "portraits/banjo-kazooie.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    602,
+    1235,
+    658
+   ]
+  },
+  {
+   "cell": "Terry",
+   "file": "portraits/terry.png",
+   "source": "change-player",
+   "box": [
+    1261,
+    602,
+    1318,
+    658
+   ]
+  },
+  {
+   "cell": "Byleth",
+   "file": "portraits/byleth.png",
+   "source": "change-player",
+   "box": [
+    1344,
+    602,
+    1400,
+    658
+   ]
+  },
+  {
+   "cell": "Min Min",
+   "file": "portraits/min-min.png",
+   "source": "change-player",
+   "box": [
+    1426,
+    602,
+    1482,
+    658
+   ]
+  },
+  {
+   "cell": "Steve",
+   "file": "portraits/steve.png",
+   "source": "change-player",
+   "box": [
+    602,
+    668,
+    659,
+    724
+   ]
+  },
+  {
+   "cell": "Sephiroth",
+   "file": "portraits/sephiroth.png",
+   "source": "change-player",
+   "box": [
+    685,
+    668,
+    741,
+    724
+   ]
+  },
+  {
+   "cell": "Pyra / Mythra",
+   "file": "portraits/pyra-mythra.png",
+   "source": "change-player",
+   "box": [
+    767,
+    668,
+    823,
+    724
+   ]
+  },
+  {
+   "cell": "Kazuya",
+   "file": "portraits/kazuya.png",
+   "source": "change-player",
+   "box": [
+    850,
+    668,
+    906,
+    724
+   ]
+  },
+  {
+   "cell": "Sora",
+   "file": "portraits/sora.png",
+   "source": "change-cpu",
+   "box": [
+    932,
+    668,
+    988,
+    724
+   ]
+  },
+  {
+   "cell": "Mii Brawler",
+   "file": "portraits/mii-brawler.png",
+   "source": "change-player",
+   "box": [
+    1014,
+    668,
+    1070,
+    724
+   ]
+  },
+  {
+   "cell": "Mii Swordfighter",
+   "file": "portraits/mii-swordfighter.png",
+   "source": "change-player",
+   "box": [
+    1097,
+    668,
+    1153,
+    724
+   ]
+  },
+  {
+   "cell": "Mii Gunner",
+   "file": "portraits/mii-gunner.png",
+   "source": "change-player",
+   "box": [
+    1179,
+    668,
+    1235,
+    724
+   ]
+  },
+  {
+   "cell": "ALL",
+   "file": "portraits/all.png",
+   "source": "kirby-grid",
+   "box": [
+    962,
+    520,
+    1022,
+    580
+   ]
+  },
+  {
+   "cell": "ALL",
+   "file": "stages/all.png",
+   "source": "stage-rotation",
+   "box": [
+    136,
+    106,
+    223,
+    194
+   ]
+  },
+  {
+   "cell": "Battlefield",
+   "file": "stages/battlefield.png",
+   "source": "stage-rotation",
+   "box": [
+    741,
+    106,
+    845,
+    194
+   ]
+  },
+  {
+   "cell": "Small Battlefield",
+   "file": "stages/small-battlefield.png",
+   "source": "stage-rotation",
+   "box": [
+    1048,
+    106,
+    1152,
+    194
+   ]
+  },
+  {
+   "cell": "Big Battlefield",
+   "file": "stages/big-battlefield.png",
+   "source": "stage-rotation",
+   "box": [
+    128,
+    240,
+    232,
+    327
+   ]
+  },
+  {
+   "cell": "Final Destination",
+   "file": "stages/final-destination.png",
+   "source": "stage-rotation",
+   "box": [
+    435,
+    240,
+    539,
+    327
+   ]
+  },
+  {
+   "cell": "Peach's Castle",
+   "file": "stages/peach-s-castle.png",
+   "source": "stage-rotation",
+   "box": [
+    741,
+    240,
+    845,
+    327
+   ]
+  },
+  {
+   "cell": "Kongo Jungle",
+   "file": "stages/kongo-jungle.png",
+   "source": "stage-rotation",
+   "box": [
+    1048,
+    240,
+    1152,
+    327
+   ]
+  },
+  {
+   "cell": "Hyrule Castle",
+   "file": "stages/hyrule-castle.png",
+   "source": "stage-rotation",
+   "box": [
+    128,
+    373,
+    232,
+    460
+   ]
+  },
+  {
+   "cell": "Super Happy Tree",
+   "file": "stages/super-happy-tree.png",
+   "source": "stage-rotation",
+   "box": [
+    435,
+    373,
+    539,
+    460
+   ]
+  },
+  {
+   "cell": "Dream Land",
+   "file": "stages/dream-land.png",
+   "source": "stage-rotation",
+   "box": [
+    741,
+    373,
+    845,
+    460
+   ]
+  },
+  {
+   "cell": "Saffron City",
+   "file": "stages/saffron-city.png",
+   "source": "stage-rotation",
+   "box": [
+    1048,
+    373,
+    1152,
+    460
+   ]
+  },
+  {
+   "cell": "Mushroom Kingdom",
+   "file": "stages/mushroom-kingdom.png",
+   "source": "stage-rotation",
+   "box": [
+    128,
+    506,
+    232,
+    593
+   ]
+  },
+  {
+   "cell": "Princess Peach's Castle",
+   "file": "stages/princess-peach-s-castle.png",
+   "source": "stage-rotation",
+   "box": [
+    435,
+    506,
+    539,
+    593
+   ]
+  },
+  {
+   "cell": "Rainbow Cruise",
+   "file": "stages/rainbow-cruise.png",
+   "source": "stage-rotation",
+   "box": [
+    741,
+    506,
+    845,
+    593
+   ]
+  },
+  {
+   "cell": "Kongo Falls",
+   "file": "stages/kongo-falls.png",
+   "source": "stage-rotation",
+   "box": [
+    1048,
+    506,
+    1152,
+    593
+   ]
+  }
+ ]
+}

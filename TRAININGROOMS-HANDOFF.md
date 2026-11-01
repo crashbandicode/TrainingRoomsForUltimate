@@ -2,6 +2,35 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v4 — 2026-11-01 (operator's review of v3)
+
+- Worker: Claude session `e5bac3f4-4a52-47b9-923f-8a968f5c5505` under primary
+  `b81ec740`; model gate from its transcript: `claude-opus-5-5` / `high`
+  (6 of 6 assistant records); watcher in the session scratchpad, bound to
+  the harness PID, not a repository artifact.
+- Feedback handled: the Kirby Hats, Solo Popo and character-items pictograms
+  are replaced by one placeholder chip (`chip_placeholder`). Their final
+  icons are open until the functionality is settled. The portrait and stage
+  grids keep the v3 layout with the real icons and thumbnails, cropped by the
+  new `tools/crop_menu_captures.py` from four pinned captures of the fork's
+  own grids into `docs/menu-mockup/captures/` (102 crops, `crops.json`).
+  Every crop box is in `docs/menu-mockup/index.md`.
+- Sources (sha256): m5f `072638-gsp9-p1grid.png` `c0a2e5b4…`, m5h
+  `121311-s40-cpugrid.png` `50869bfc…` (Fox and Sora: clean there), fork
+  docs `kirby-grid.png` `dda1ba4b…` (ALL cell only; its Ike carries the
+  original-CPU tint) and `stage-rotation.png` `84dbcd0e…` (byte-identical in
+  the fork worktree and the m5k stage).
+- Re-rendered 04 and 10–16 (PNG and SVG); 01–09 are byte-identical. Each
+  changed PNG was viewed, and all 200 SVG image references resolve. Text
+  that ran past the panel edge was shortened on 10, 13 and 16 (10 and 13
+  already overflowed in v3).
+- Docs: `MENU-DRAFT.md` draft 4, `docs/MENU-PROPOSAL.md` v4, `PROVENANCE.md`
+  §C review-mockup note. Question 13 is restated: the fork commits its grid
+  pictures (89 roster, 115 stage, 38 item) and does not build them from the
+  player's files, as draft 3 said.
+- Not done: the item grid still uses stand-in glyphs (outside this request);
+  no push (needs the operator's order).
+
 ## Menu proposal v3 — 2026-11-01 (redraft on the operator's request)
 
 - Operator feedback on v2: the mockup lacked the fork's grid and item / stage

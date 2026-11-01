@@ -180,8 +180,21 @@ with the pane that uses it and what the redraw must convey, plus the archive's
 member list (5 plugin layouts, 14 stock layouts, 157 stock animations, one
 texture atlas) and every plugin pane name; the fork's own
 generated assets (`scripts/roster-grid`, `scripts/stage-grid`,
-`scripts/item-icons`) derive from the game's files and are carried over with
-their `sources.json` manifests.
+`scripts/item-icons`) are carried over with their `sources.json` manifests.
+They are game pictures: the stage and item sets were extracted from the
+game's files, while the roster's 89 stock icons are SmashWiki copies of the
+game's icons, per its manifest. Whether the MIT repo commits them, as the
+fork does, is `MENU-DRAFT.md` question 13.
+
+**Review-mockup crops (2026-11-01, menu proposal v4).**
+`docs/menu-mockup/captures/` holds 102 crops (87 fighter cells, 15 stage cells)
+cut from four captures of the fork's own grid pickers: two Eden grabs and the
+fork's `docs/feature-walkthroughs/kirby-grid.png` and `stage-rotation.png`.
+`tools/crop_menu_captures.py` pins each source by sha256, and
+`docs/menu-mockup/index.md` lists every crop box. These are game-asset
+captures, used only to render the review mockup. They are not shipped
+artwork: the plugin, its release and its layout never include them. None of
+upstream's menu icons (above) is used in the mockup.
 
 ### D. Drop
 
