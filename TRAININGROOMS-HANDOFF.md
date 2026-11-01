@@ -1,6 +1,6 @@
 # TrainingRoomsForUltimate — handoff
 
-Updated 2026-11-01 ~14:05 UTC by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
+Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
 ## Objective and scope
 
@@ -8,15 +8,29 @@ Clean-room, MIT-licensed reimplementation of the **upstream-origin** features of
 the Training Modpack, carrying over as-is everything the fork wrote itself.
 Plan of record: `/home/intpa/smash-training-lobby/TRAININGROOMS-PLAN.md`
 (phases 0–5). Brief: `/home/intpa/smash-training-lobby/TRAININGROOMS-BRIEF.md`.
-Current work: phase 0 (provenance) done in draft; phase 1 (inventory, specs)
-running; the phase-2 menu mockup drafted for the operator.
+Current work: phase 0 (provenance) done; phase 1 (inventory, specs) done in
+draft; the phase-2 menu proposal is with the operator; phase 3 package 1 starts
+on the operator's menu decisions.
+
+## Repository state (2026-11-01, after the operator-ordered first push)
+
+- Remote `origin` = `https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate.git`
+  (private Forgejo repo, created and pushed by the coordinator on the
+  operator's order).
+- `main` = `3a8117f` "TrainingRoomsForUltimate: license and README"
+  (LICENSE + README only), tracking `origin/main`.
+- `review/menu-proposal` = `a86e8f1` "Phase 0 for review: menu proposal,
+  provenance, specs, mockup screens" (68 files: the whole phase-0/1 tree incl.
+  `specs/SPEC-core-08`, the decision notes, `docs/MENU-PROPOSAL.md`,
+  `docs/menu-mockup/` and `tools/render_menu_mockup.py`), tracking
+  `origin/review/menu-proposal`. The local checkout is on this branch.
+- Policy (relayed by the coordinator): local commits are allowed on review and
+  feature branches; **no push without the operator's explicit order** (the
+  coordinator relays it); no tag, no Switch write.
+- Next branch: `pkg1/skeleton` for implementation package 1, after the
+  operator's menu decisions.
 
 ## Decisions so far
-
-- Repo is local only (`git init`, branch `main`, no remote, **no commits yet**,
-  everything untracked). The Forgejo repo
-  `git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate` needs the
-  operator's explicit order at push time.
 - MIT copyright line reads `Copyright (c) 2026 intpa` — **decided 2026-11-01:
   the handle.**
 - **Storage root decided 2026-11-01:** `sd:/ultimate/TrainingRooms/`; a
