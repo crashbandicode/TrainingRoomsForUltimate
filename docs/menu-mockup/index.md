@@ -1,8 +1,8 @@
-# Menu mockup screens (proposal v6, in-game look, 1280x720)
+# Menu mockup screens (proposal v8, in-game look, 1280x720)
 
-Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality is settled. The direction glyphs are the clean room's own vector art. The screens carry no origin tags (upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table in `docs/MENU-PROPOSAL.md`.
+Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality is settled. The DI Direction chips show the game's own DI streak, a crop of one real capture rotated to each direction; the rotation mirrors the game's own rotation of that effect to the launch angle (SPEC-core-07 §4.6). The SDI Direction chips are the neutral placeholder until an SDI capture exists. The Airdodge Direction and Shield Tilt arrows are the clean room's own vector art. The screens carry no origin tags (upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table in `docs/MENU-PROPOSAL.md`.
 
-- `01-cpu.png` / `.svg` — page CPU (Defence group: direction grids)
+- `01-cpu.png` / `.svg` — page CPU (Defence group: direction grids; the DI row previews its selected chips, the SDI row the placeholder)
 - `02-saves.png` / `.svg` — page Saves
 - `03-recording.png` / `.svg` — page Recording
 - `04-fighters-stages.png` / `.svg` — page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)
@@ -10,14 +10,14 @@ Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the
 - `06-situation-overrides.png` / `.svg` — sub-screen Situation overrides (CPU > Reactions)
 - `07-button-chords.png` / `.svg` — sub-screen Button chords (Display & Controls > Controls)
 - `08-swap-groups.png` / `.svg` — sub-screen Swap groups (Fighters & Stages > Loading)
-- `09-direction-grid.png` / `.svg` — sub-screen DI Direction: the 3x3 direction grid with absolute Left/Right and weights
+- `09-direction-grid.png` / `.svg` — sub-screen DI Direction: the 3x3 direction grid of DI streak chips with absolute Left/Right and weights
 - `10-character-grid.png` / `.svg` — sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges
 - `11-item-grid.png` / `.svg` — sub-screen Give item: 4x8 item grid with the fork's own item icons, page 1 of 2
 - `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures
 - `13-kirby-hats-grid.png` / `.svg` — sub-screen Kirby Hats: the same portrait grid as a two-role hat order
 - `14-fighters-extras.png` / `.svg` — page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)
 - `15-fighters-stage-rows.png` / `.svg` — page Fighters & Stages (Stages group: stage order preview)
-- `16-chip-sheet.png` / `.svg` — review sheet: the placeholder chip at full and row size for its three uses, and the direction chip set
+- `16-chip-sheet.png` / `.svg` — review sheet: the placeholder chip at full and row size for its three uses, the DI streak chips, the SDI placeholder, and the Airdodge / Shield Tilt arrows
 
 ## Image sources (review mockup only, not shipped artwork)
 
@@ -179,3 +179,15 @@ Item icons (proposal v5): byte copies of the fork's own item-grid pictures, not 
 | 35 | Toon Link: Bomb | `captures/items/icon-35.png` | `bcf3878cebb06ba72fa31b9357d9ecf67d35eb40ebb1ffba3e5cf0984b560d7b` |
 | 36 | Villager: Wood Chip | `captures/items/icon-36.png` | `0af3312adee081227d9300119e649d886371a075e5b6f648768b7e8a6bfbe2db` |
 | 37 | Young Link: Bomb | `captures/items/icon-37.png` | `9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef` |
+
+DI streak (proposal v8): the game's own DI visual (system effect `sys_vector`), cut from one frame of a real capture. The DI chips on 01, 09 and 16 draw this one crop, rotated to each direction; the rotation mirrors the game's own: it draws one effect and turns it about Z to the DI-corrected launch angle (SPEC-core-07 §4.6, from the static trace `c1162/di-sdi-trace/RESULT.md` §3.1). The clean room reads the effect from the player's game files at run time and never ships a picture of it. Capture: `c1162/captures-ally` run A (Ally Eden, fork M5l, Training on Final Destination, Steve forward smash on CPU Sora, DI Direction = Up, Hitbox Visualization off), Eden's GIF recorder, 1280x720 game frame, 256-colour palette; frame +13 after first contact (the streak shows from about +5 to +15). The strip: rotate the frame about the centre by the streak's measured axis so the streak points along +x, cut along and across it, feather the strip's edges in alpha (smoothstep; pixels unchanged). The frame's background and the CPU's keyblade show through. SDI chips stay the placeholder: no SDI capture exists yet (the game requests `sys_hitstop_spark` on the CPU's head on each SDI input frame; run B showed no distinct visual).
+
+| field | value |
+| --- | --- |
+| crop | `captures/di/di-streak.png` (137x44) |
+| source | `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/captures-ally/di-sdi/runA/frames/runA_f+13.png` |
+| sha256 | `4c7efe013c29de1a7ff6c49c5db769523c886355695366ee73fa61cb40515300` |
+| centre, axis | (738, 332), 44.8° counter-clockwise from +x |
+| along, across | (-45, 92) px along the streak, ±22 px across; feather (20, 10) |
+| crop box in the source | corners (690.6, 348.1), (787.8, 251.6), (818.8, 282.8), (721.6, 379.3); bounding box (690, 251, 819, 380) |
+| rotation centre in the crop | (45, 22) px; on a chip the strip's tail end sits on the chip centre and the streak runs toward the direction |

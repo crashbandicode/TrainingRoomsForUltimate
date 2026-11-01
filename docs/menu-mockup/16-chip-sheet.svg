@@ -47,67 +47,119 @@
 <text x="1090.0" y="266.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">row size</text>
 <text x="930.0" y="388.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">Character items</text>
 <text x="930.0" y="406.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Extras &gt; Give item row, item grid header</text>
-<text x="48.0" y="451.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Direction chips (DI, SDI, Airdodge, Shield Tilt): a bold stroke from the centre with an arrowhead; Neutral is a ring; Left/Right carry 'abs'.</text>
-<rect x="54.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<polyline points="90.0,520.0 78.8,508.8" fill="none" stroke="rgb(236,236,232)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="90.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(236,236,232)"/>
-<polygon points="72.7,502.7 85.9,504.7 74.7,515.9" fill="rgb(236,236,232)"/>
-<ellipse cx="115.9" cy="494.1" rx="7.9" ry="7.9" fill="rgb(176,52,42)"/>
-<text x="115.9" y="497.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">2</text>
-<text x="90.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up In</text>
-<rect x="154.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<polyline points="190.0,520.0 190.0,504.2" fill="none" stroke="rgb(236,236,232)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="190.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(236,236,232)"/>
-<polygon points="190.0,495.5 197.9,506.3 182.1,506.3" fill="rgb(236,236,232)"/>
-<ellipse cx="215.9" cy="494.1" rx="7.9" ry="7.9" fill="rgb(176,52,42)"/>
-<text x="215.9" y="497.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
-<text x="190.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
-<rect x="254.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<polyline points="290.0,520.0 301.2,508.8" fill="none" stroke="rgb(236,236,232)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="290.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(236,236,232)"/>
-<polygon points="307.3,502.7 305.3,515.9 294.1,504.7" fill="rgb(236,236,232)"/>
-<ellipse cx="315.9" cy="494.1" rx="7.9" ry="7.9" fill="rgb(176,52,42)"/>
-<text x="315.9" y="497.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
-<text x="290.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up Out</text>
-<rect x="354.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="390.0,520.0 374.2,520.0" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="390.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="365.5,520.0 376.3,512.1 376.3,527.9" fill="rgb(150,156,170)"/>
-<text x="390.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
-<rect x="454.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<ellipse cx="490.0" cy="520.0" rx="14.4" ry="14.4" fill="none" stroke="rgb(150,156,170)" stroke-width="3"/>
-<ellipse cx="490.0" cy="520.0" rx="5.0" ry="5.0" fill="rgb(150,156,170)"/>
-<text x="490.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
-<rect x="554.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="590.0,520.0 605.8,520.0" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="590.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="614.5,520.0 603.7,527.9 603.7,512.1" fill="rgb(150,156,170)"/>
-<text x="590.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
-<rect x="654.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="690.0,520.0 678.8,531.2" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="690.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="672.7,537.3 674.7,524.1 685.9,535.3" fill="rgb(150,156,170)"/>
-<text x="690.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
-<rect x="754.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="790.0,520.0 790.0,535.8" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="790.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="790.0,544.5 782.1,533.7 797.9,533.7" fill="rgb(150,156,170)"/>
-<text x="790.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
-<rect x="854.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="890.0,520.0 901.2,531.2" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="890.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="907.3,537.3 894.1,535.3 905.3,524.1" fill="rgb(150,156,170)"/>
-<text x="890.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
-<rect x="954.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="990.0,520.0 974.2,520.0" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="990.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="965.5,520.0 976.3,512.1 976.3,527.9" fill="rgb(150,156,170)"/>
-<text x="990.0" y="546.2" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
-<text x="990.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
-<rect x="1054.0" y="484.0" width="72.0" height="72.0" rx="10.080000000000002" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="1090.0,520.0 1105.8,520.0" fill="none" stroke="rgb(150,156,170)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="1090.0" cy="520.0" rx="4.3" ry="4.3" fill="rgb(150,156,170)"/>
-<polygon points="1114.5,520.0 1103.7,527.9 1103.7,512.1" fill="rgb(150,156,170)"/>
-<text x="1090.0" y="546.2" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
-<text x="1090.0" y="570.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Right</text>
+<text x="48.0" y="429.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">DI Direction: the game's DI streak, turned to each direction as the game turns it. SDI: placeholder until captured.</text>
+<rect x="52.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="82" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(-135.0 84 474)"/>
+<ellipse cx="84.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(236,236,232)"/>
+<ellipse cx="107.0" cy="451.0" rx="7.0" ry="7.0" fill="rgb(176,52,42)"/>
+<text x="107.0" y="454.4" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">2</text>
+<text x="84.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up In</text>
+<rect x="140.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="170" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(-90.0 172 474)"/>
+<ellipse cx="172.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(236,236,232)"/>
+<ellipse cx="195.0" cy="451.0" rx="7.0" ry="7.0" fill="rgb(176,52,42)"/>
+<text x="195.0" y="454.4" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
+<text x="172.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="228.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="258" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(-45.0 260 474)"/>
+<ellipse cx="260.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(236,236,232)"/>
+<ellipse cx="283.0" cy="451.0" rx="7.0" ry="7.0" fill="rgb(176,52,42)"/>
+<text x="283.0" y="454.4" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
+<text x="260.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up Out</text>
+<rect x="316.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="346" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(180.0 348 474)" opacity="0.50"/>
+<ellipse cx="348.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="348.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<rect x="404.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<ellipse cx="436.0" cy="474.0" rx="12.8" ry="12.8" fill="none" stroke="rgb(150,156,170)" stroke-width="3"/>
+<ellipse cx="436.0" cy="474.0" rx="4.5" ry="4.5" fill="rgb(150,156,170)"/>
+<text x="436.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
+<rect x="492.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="522" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(0.0 524 474)" opacity="0.50"/>
+<ellipse cx="524.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="524.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
+<rect x="580.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="610" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(135.0 612 474)" opacity="0.50"/>
+<ellipse cx="612.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="612.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
+<rect x="668.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="698" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(90.0 700 474)" opacity="0.50"/>
+<ellipse cx="700.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="700.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
+<rect x="756.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="786" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(45.0 788 474)" opacity="0.50"/>
+<ellipse cx="788.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="788.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
+<rect x="844.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="874" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(180.0 876 474)" opacity="0.50"/>
+<ellipse cx="876.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="876.0" y="496.7" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="876.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
+<rect x="932.0" y="442.0" width="64.0" height="64.0" rx="8.96" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<image href="captures/di/di-streak.png" x="962" y="469" width="29" height="9" preserveAspectRatio="none" transform="rotate(0.0 964 474)" opacity="0.50"/>
+<ellipse cx="964.0" cy="474.0" rx="3.2" ry="3.2" fill="rgb(150,156,170)"/>
+<text x="964.0" y="496.7" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="964.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Right</text>
+<rect x="1118.0" y="442.0" width="64.0" height="64.0" rx="10.24" fill="rgb(28,32,42)"/>
+<polyline points="1171.8,442.0 1174.4,442.3 1176.9,443.4 1179.0,445.0 1180.6,447.1 1181.7,449.6 1182.0,452.2 1182.0,495.8 1181.7,498.4 1180.6,500.9 1179.0,503.0 1176.9,504.6 1174.4,505.7 1171.8,506.0 1128.2,506.0 1125.6,505.7 1123.1,504.6 1121.0,503.0 1119.4,500.9 1118.3,498.4 1118.0,495.8 1118.0,452.2 1118.3,449.6 1119.4,447.1 1121.0,445.0 1123.1,443.4 1125.6,442.3 1128.2,442.0 1171.8,442.0" fill="none" stroke="rgb(150,156,170)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5.333333333333333 3.5555555555555554"/>
+<text x="1150.0" y="474.2" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">SDI</text>
+<text x="1150.0" y="487.1" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">pending</text>
+<text x="1150.0" y="518.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">SDI: capture pending</text>
+<text x="48.0" y="541.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Airdodge Direction and Shield Tilt: the clean room's arrows; Neutral is a ring; Left/Right carry 'abs'.</text>
+<rect x="58.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="84.0,580.0 75.9,571.9" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="84.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="71.5,567.5 81.1,569.0 73.0,577.1" fill="rgb(150,156,170)"/>
+<text x="84.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up In</text>
+<rect x="146.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="172.0,580.0 172.0,568.6" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="172.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="172.0,562.3 177.7,570.1 166.3,570.1" fill="rgb(150,156,170)"/>
+<text x="172.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="234.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="260.0,580.0 268.1,571.9" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="260.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="272.5,567.5 271.0,577.1 262.9,569.0" fill="rgb(150,156,170)"/>
+<text x="260.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up Out</text>
+<rect x="322.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="348.0,580.0 336.6,580.0" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="348.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="330.3,580.0 338.1,574.3 338.1,585.7" fill="rgb(150,156,170)"/>
+<text x="348.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<rect x="410.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<ellipse cx="436.0" cy="580.0" rx="10.4" ry="10.4" fill="none" stroke="rgb(150,156,170)" stroke-width="2"/>
+<ellipse cx="436.0" cy="580.0" rx="3.6" ry="3.6" fill="rgb(150,156,170)"/>
+<text x="436.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
+<rect x="498.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="524.0,580.0 535.4,580.0" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="524.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="541.7,580.0 533.9,585.7 533.9,574.3" fill="rgb(150,156,170)"/>
+<text x="524.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
+<rect x="586.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="612.0,580.0 603.9,588.1" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="612.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="599.5,592.5 601.0,582.9 609.1,591.0" fill="rgb(150,156,170)"/>
+<text x="612.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
+<rect x="674.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="700.0,580.0 700.0,591.4" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="700.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="700.0,597.7 694.3,589.9 705.7,589.9" fill="rgb(150,156,170)"/>
+<text x="700.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
+<rect x="762.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="788.0,580.0 796.1,588.1" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="788.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="800.5,592.5 790.9,591.0 799.0,582.9" fill="rgb(150,156,170)"/>
+<text x="788.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
+<rect x="850.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="876.0,580.0 864.6,580.0" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="876.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="858.3,580.0 866.1,574.3 866.1,585.7" fill="rgb(150,156,170)"/>
+<text x="876.0" y="600.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="876.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
+<rect x="938.0" y="554.0" width="52.0" height="52.0" rx="7.280000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
+<polyline points="964.0,580.0 975.4,580.0" fill="none" stroke="rgb(150,156,170)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="964.0" cy="580.0" rx="3.1" ry="3.1" fill="rgb(150,156,170)"/>
+<polygon points="981.7,580.0 973.9,585.7 973.9,574.3" fill="rgb(150,156,170)"/>
+<text x="964.0" y="600.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
+<text x="964.0" y="618.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Right</text>
 </svg>

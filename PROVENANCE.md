@@ -205,7 +205,14 @@ copy (byte-identical to the fork worktree). `tools/crop_menu_captures.py`
 checks the manifest sha256 (`8fbed7ab…`) and each icon's sha256 before
 copying, and `docs/menu-mockup/index.md` lists every one. They are review
 material in the same sense. The stage crops now stand in for thumbnails
-that the plugin reads at run time.
+that the plugin reads at run time. Proposal v8 adds
+`docs/menu-mockup/captures/di/di-streak.png`: one rotated strip of the game's
+DI effect (`sys_vector`) cut from one frame of the fork campaign's Eden capture
+(`c1162/captures-ally` run A, frame +13, sha256 `4c7efe01…`), pixels unchanged
+apart from an alpha feather at its edges. It stands in for the effect the
+plugin reads from the player's `ef_common.eff` at run time (SPEC-core-07 §4.6)
+and is review material in the same sense. No game-derived file from the static
+trace (`c1162/di-sdi-trace/re/`) is in the repository.
 
 ### D. Drop
 

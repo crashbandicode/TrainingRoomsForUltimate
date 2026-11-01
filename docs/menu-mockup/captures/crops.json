@@ -1,5 +1,5 @@
 {
- "purpose": "Review mockup only; game-asset captures of the fork's grid pickers and byte copies of the fork's item icons; not shipped artwork.",
+ "purpose": "Review mockup only; game-asset captures of the fork's grid pickers, byte copies of the fork's item icons and a crop of the game's DI streak from an Eden capture; not shipped artwork.",
  "sources": {
   "change-player": {
    "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/gs-panic-pool14/evidence-m5f/surface/captures/072638-gsp9-p1grid.png",
@@ -1379,5 +1379,57 @@
    "file": "items/icon-37.png",
    "sha256": "9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef"
   }
- ]
+ ],
+ "di_streak": {
+  "file": "di/di-streak.png",
+  "source": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/captures-ally/di-sdi/runA/frames/runA_f+13.png",
+  "sha256": "4c7efe013c29de1a7ff6c49c5db769523c886355695366ee73fa61cb40515300",
+  "frame_geometry": "1280x720 game frame",
+  "centre": [
+   738,
+   332
+  ],
+  "angle_deg": 44.8,
+  "along": [
+   -45,
+   92
+  ],
+  "half_width": 22,
+  "feather": [
+   20,
+   10
+  ],
+  "size": [
+   137,
+   44
+  ],
+  "corners_in_source": [
+   [
+    690.6,
+    348.1
+   ],
+   [
+    787.8,
+    251.6
+   ],
+   [
+    818.8,
+    282.8
+   ],
+   [
+    721.6,
+    379.3
+   ]
+  ],
+  "bbox_in_source": [
+   690,
+   251,
+   819,
+   380
+  ],
+  "pivot_in_crop": [
+   45,
+   22
+  ]
+ }
 }

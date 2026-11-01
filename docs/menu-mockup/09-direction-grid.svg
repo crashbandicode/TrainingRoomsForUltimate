@@ -14,66 +14,56 @@
 <text x="150.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">In (toward the opponent)</text>
 <text x="414.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out (away)</text>
 <rect x="96.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<polyline points="150.0,206.0 133.2,189.2" fill="none" stroke="rgb(236,236,232)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="150.0" cy="206.0" rx="6.5" ry="6.5" fill="rgb(236,236,232)"/>
-<polygon points="124.0,180.0 143.9,183.1 127.1,199.9" fill="rgb(236,236,232)"/>
+<image href="captures/di/di-streak.png" x="146" y="198" width="50" height="16" preserveAspectRatio="none" transform="rotate(-135.0 150 206)"/>
+<ellipse cx="150.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
 <ellipse cx="188.9" cy="167.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
 <text x="188.9" y="170.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">2</text>
 <text x="150.0" y="276.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">Up In</text>
 <rect x="228.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<polyline points="282.0,206.0 282.0,182.2" fill="none" stroke="rgb(236,236,232)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="282.0" cy="206.0" rx="6.5" ry="6.5" fill="rgb(236,236,232)"/>
-<polygon points="282.0,169.3 293.9,185.5 270.1,185.5" fill="rgb(236,236,232)"/>
+<image href="captures/di/di-streak.png" x="278" y="198" width="50" height="16" preserveAspectRatio="none" transform="rotate(-90.0 282 206)"/>
+<ellipse cx="282.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
 <ellipse cx="320.9" cy="167.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
 <text x="320.9" y="170.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
 <text x="282.0" y="276.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">Up</text>
 <rect x="360.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(176,52,42)" stroke-width="3"/>
-<polyline points="414.0,206.0 430.8,189.2" fill="none" stroke="rgb(236,236,232)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="414.0" cy="206.0" rx="6.5" ry="6.5" fill="rgb(236,236,232)"/>
-<polygon points="440.0,180.0 436.9,199.9 420.1,183.1" fill="rgb(236,236,232)"/>
+<image href="captures/di/di-streak.png" x="410" y="198" width="50" height="16" preserveAspectRatio="none" transform="rotate(-45.0 414 206)"/>
+<ellipse cx="414.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
 <ellipse cx="452.9" cy="167.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
 <text x="452.9" y="170.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
 <text x="414.0" y="276.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">Up Out</text>
 <rect x="96.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="150.0,338.0 126.2,338.0" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="150.0" cy="338.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="113.3,338.0 129.5,326.1 129.5,349.9" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="146" y="330" width="50" height="16" preserveAspectRatio="none" transform="rotate(180.0 150 338)" opacity="0.50"/>
+<ellipse cx="150.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="150.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">In</text>
 <rect x="228.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
 <ellipse cx="282.0" cy="338.0" rx="21.6" ry="21.6" fill="none" stroke="rgb(150,156,170)" stroke-width="5"/>
 <ellipse cx="282.0" cy="338.0" rx="7.6" ry="7.6" fill="rgb(150,156,170)"/>
 <text x="282.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
 <rect x="360.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="414.0,338.0 437.8,338.0" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="414.0" cy="338.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="450.7,338.0 434.5,349.9 434.5,326.1" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="410" y="330" width="50" height="16" preserveAspectRatio="none" transform="rotate(0.0 414 338)" opacity="0.50"/>
+<ellipse cx="414.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="414.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
 <rect x="96.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="150.0,470.0 133.2,486.8" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="150.0" cy="470.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="124.0,496.0 127.1,476.1 143.9,492.9" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="146" y="462" width="50" height="16" preserveAspectRatio="none" transform="rotate(135.0 150 470)" opacity="0.50"/>
+<ellipse cx="150.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="150.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
 <rect x="228.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="282.0,470.0 282.0,493.8" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="282.0" cy="470.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="282.0,506.7 270.1,490.5 293.9,490.5" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="278" y="462" width="50" height="16" preserveAspectRatio="none" transform="rotate(90.0 282 470)" opacity="0.50"/>
+<ellipse cx="282.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="282.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
 <rect x="360.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="414.0,470.0 430.8,486.8" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="414.0" cy="470.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="440.0,496.0 420.1,492.9 436.9,476.1" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="410" y="462" width="50" height="16" preserveAspectRatio="none" transform="rotate(45.0 414 470)" opacity="0.50"/>
+<ellipse cx="414.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="414.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
 <text x="626.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">absolute</text>
 <rect x="572.0" y="212.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="626.0,266.0 602.2,266.0" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="626.0" cy="266.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="589.3,266.0 605.5,254.1 605.5,277.9" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="622" y="258" width="50" height="16" preserveAspectRatio="none" transform="rotate(180.0 626 266)" opacity="0.50"/>
+<ellipse cx="626.0" cy="266.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="626.0" y="300.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
 <text x="626.0" y="336.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
 <rect x="572.0" y="356.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<polyline points="626.0,410.0 649.8,410.0" fill="none" stroke="rgb(150,156,170)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-<ellipse cx="626.0" cy="410.0" rx="6.5" ry="6.5" fill="rgb(150,156,170)"/>
-<polygon points="662.7,410.0 646.5,421.9 646.5,398.1" fill="rgb(150,156,170)"/>
+<image href="captures/di/di-streak.png" x="622" y="402" width="50" height="16" preserveAspectRatio="none" transform="rotate(0.0 626 410)" opacity="0.50"/>
+<ellipse cx="626.0" cy="410.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="626.0" y="444.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
 <text x="626.0" y="480.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Right</text>
 <rect x="726.0" y="120.0" width="506.0" height="488.0" rx="6" fill="rgb(38,42,52)" stroke="rgb(70,76,90)" stroke-width="1"/>
@@ -84,16 +74,17 @@
 <text x="1216.0" y="214.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">x1</text>
 <text x="742.0" y="244.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Up Out</text>
 <text x="1216.0" y="244.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">x1</text>
-<text x="742.0" y="279.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">In / Out mirror with the CPU's facing:</text>
-<text x="742.0" y="301.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">the stick angle flips when the player</text>
-<text x="742.0" y="323.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">stands on the other side.</text>
+<text x="742.0" y="279.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">In / Out mirror with the CPU's facing;</text>
+<text x="742.0" y="301.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Left / Right never mirror. Nothing</text>
+<text x="742.0" y="323.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">selected: the CPU does not DI.</text>
 <text x="742.0" y="345.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start"></text>
-<text x="742.0" y="367.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Left / Right never mirror.</text>
-<text x="742.0" y="389.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start"></text>
-<text x="742.0" y="411.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Nothing selected: the CPU does not</text>
-<text x="742.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">influence its launch.</text>
-<text x="742.0" y="455.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start"></text>
-<text x="742.0" y="477.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Same grid for SDI Direction,</text>
-<text x="742.0" y="499.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Airdodge Direction and Shield Tilt</text>
-<text x="742.0" y="521.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">(Shield Tilt: one chip only).</text>
+<text x="742.0" y="367.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Chip: the game's own DI streak, turned</text>
+<text x="742.0" y="389.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">to each direction as the game turns it</text>
+<text x="742.0" y="411.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">to the launch angle. Read from the</text>
+<text x="742.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">game's files when the grid opens.</text>
+<text x="742.0" y="455.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">(This mock: a crop of one capture.)</text>
+<text x="742.0" y="477.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start"></text>
+<text x="742.0" y="499.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">SDI Direction: same grid; chips wait</text>
+<text x="742.0" y="521.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">for an SDI capture. Airdodge and</text>
+<text x="742.0" y="543.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Shield Tilt: arrows (one chip only).</text>
 </svg>

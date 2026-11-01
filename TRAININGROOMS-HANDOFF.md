@@ -2,6 +2,42 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v8 — 2026-11-01 (DI / SDI visuals identified; DI chips from a real crop)
+
+- Worker: Claude session `97acad8a-5569-4f1e-bd76-027160168778` under primary
+  `b81ec740`. Model gate from its own transcript: `claude-opus-5-5` / `high`
+  (Documentation row of the routing table). Watcher: a background PowerShell
+  loop in this session, polling that transcript's model/effort, bound to the
+  harness PID 2227236; not a repository artifact.
+- Evidence read (cited, not copied; `C1162` = `artifacts/…/parked-reuse175/refactor/c1162`):
+  `C1162/di-sdi-trace/RESULT.md` (static trace, 13.0.5) and
+  `C1162/captures-ally/RESULT.md` (Ally Eden, M5l). No `re/` file was copied.
+- `specs/SPEC-core-07` §4.6 rewritten: V1 DI `sys_vector` → `P_CmnVector`,
+  SDI `sys_hitstop_spark` → `P_CmnHitStopSpark` (two visuals,
+  `effect/system/common/ef_common.eff`); V2 one effect rotated to the
+  DI-corrected launch angle / SDI vector; V3 emitter colours over greyscale
+  masks; run-time steps for a chip; open V4–V7 (parse the `.eff` and emitter
+  colours, cost, resident copy, SDI capture). §4.5 U5: the FD mod replaces
+  `stage_1`…`stage_4` at stock sizes; the fork's baked grid tile is identical
+  with and without it. §3 inputs and §10 Q5 / Q7 updated; `SPEC-cpu-02` §2
+  pointer updated.
+- Mockup: `tools/crop_menu_captures.py` cuts `captures/di/di-streak.png`
+  (137×44) from run A frame +13 (sha256 `4c7efe01…`; centre (738,332), axis
+  44.8°, along −45…92, ±22, alpha feather only). `tools/render_menu_mockup.py`
+  turns it per direction (`image_rotated`, SVG `rotate` transform). DI chips on
+  01 (row preview), 09 and 16; SDI chips are the placeholder ("pending");
+  Airdodge / Shield Tilt arrows unchanged. Re-run of the crop tool left the
+  102 crops and 38 icons byte-identical. Changed: 01, 09, 16 (PNG + SVG),
+  `index.md` (v8 text, DI crop table), `crops.json`. All three PNGs viewed;
+  255 SVG image references resolve; no `upstream` / `ours` / `origin` in any SVG.
+- Docs: `MENU-DRAFT.md` draft 7 (question 17 (a) unchanged, (b) status),
+  `docs/MENU-PROPOSAL.md` v8, `PROVENANCE.md` §C note on the DI crop.
+- Next: an SDI capture (V7: check the CPU's head per hitlag frame); then one
+  development probe for §4.5 U1–U4 and §4.6 V4–V6.
+- No Eden run, no build. Push: docs / mockup / renderer / crop files only,
+  pushed to `origin/review/menu-proposal` under the standing order; confirm
+  with `git status -sb`.
+
 ## Menu proposal v7 — 2026-11-01 (DI / SDI chips from the game's own visual)
 
 - Worker: Claude session `b426fba6-7e69-4490-a135-49457a87f961` under primary
