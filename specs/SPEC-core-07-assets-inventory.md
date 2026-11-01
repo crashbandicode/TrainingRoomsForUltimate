@@ -153,6 +153,7 @@ Never `arc:/` for these thumbnails: it is the vanilla view. Resolve the ARCropol
 | Upstream's `di_state.svg` / `sdi_state.svg` (§4.1) are black glyphs (a comet with speed lines, a jagged arc), not the game's visual, and stay unused | upstream `src/static/img/`; `photos/defensive_settings.png` |
 | The hash-label list has four system effects whose names could fit: `sys_direction` `0x0d4635c187`, `sys_direction2` `0x0e694f9d4f`, `sys_vector` `0x0aff1ac5b6`, `sys_hitstop_spark` `0x11c6e92484`. Nothing ties any of them to DI or SDI; they are names, not findings | `artifacts/enhancements/stage-assets/ParamLabels.csv` (sha256 `ba4a818c75d0ca2c2c180b0af8bddf3a7502ca3faf59fac9d5f63132aa21d7e5`) |
 | No existing capture shows the visual: no recorded run set DI / SDI, and the only hit footage (upstream `photos/mash_trigger_tumble.gif`, 640×360) shows attack effects, not a DI / SDI marker | captures under `artifacts/`; the GIF viewed every 6th frame 0–186 and every frame 144–175 |
+| When it shows: the game draws the blue streak and white arc in Training whenever the fighter that is hit is DI'd; no Training option or modpack setting turns it on. The capture therefore needs only a hit taken while a DI (or SDI) direction is held, by the CPU through the menu or by a player | operator review 2026-11-01 |
 
 **Unknowns (to resolve before the chips are implemented).**
 
