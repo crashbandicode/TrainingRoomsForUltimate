@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">CPU</text>
+<text x="139.8" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Saves</text>
+<text x="244.0" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Recording</text>
+<rect x="387.2" y="40.0" width="253.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="401.2" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages</text>
+<text x="664.5" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Display &amp; Controls</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Practise in the waiting room; the stage rows below decide where.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="62.0" y="120.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Player 1 and CPU  (5)</text>
+<text x="62.0" y="160.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Extras  (5)</text>
+<rect x="48.0" y="178.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="48.0" y="178.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="200.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Stages  (4)</text>
+<text x="62.0" y="240.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Loading  (7)</text>
+<text x="62.0" y="259.2" font-size="14" fill="rgb(210,170,80)" text-anchor="start">advanced - collapsed by default</text>
+<polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Lobby Practice</text>
+<text x="600.7" y="119.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<text x="1220.0" y="120.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
+<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Lobby Stages</text>
+<text x="576.6" y="157.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<rect x="1174.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="1182.0,160.0 1208.0,160.0 1204.0,165.0 1186.0,165.0" fill="rgb(133,53,172)"/>
+<rect x="1188.0" y="150.0" width="14.0" height="2.0" fill="rgb(133,53,172)"/>
+<ellipse cx="1180.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
+<text x="1180.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">3</text>
+<rect x="1128.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="1136.0,160.0 1162.0,160.0 1158.0,165.0 1140.0,165.0" fill="rgb(109,185,65)"/>
+<rect x="1142.0" y="150.0" width="14.0" height="2.0" fill="rgb(109,185,65)"/>
+<ellipse cx="1134.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
+<text x="1134.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">2</text>
+<rect x="1082.0" y="138.0" width="42.0" height="30.0" rx="4" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="1090.0,160.0 1116.0,160.0 1112.0,165.0 1094.0,165.0" fill="rgb(57,178,123)"/>
+<rect x="1096.0" y="150.0" width="14.0" height="2.0" fill="rgb(57,178,123)"/>
+<ellipse cx="1088.0" cy="144.0" rx="5.0" ry="5.0" fill="rgb(232,72,72)"/>
+<text x="1088.0" y="146.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">1</text>
+<text x="1072.0" y="156.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">12 ordered + All  &gt;</text>
+<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Training Stage Rotation</text>
+<text x="709.1" y="195.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<text x="1220.0" y="196.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
+<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Stage Hazards</text>
+<text x="588.6" y="233.2" font-size="14" fill="rgb(168,155,240)" text-anchor="start">upstream</text>
+<text x="1220.0" y="234.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
+</svg>

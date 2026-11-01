@@ -1,33 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
-<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18, 22, 30)"/><stop offset="1" stop-color="rgb(40, 46, 58)"/></linearGradient></defs>
-<rect width="1280" height="720" fill="url(#g)"/><rect y="560" width="1280" height="40" fill="rgb(52,58,72)"/>
-<rect x="28" y="24" width="1224" height="672" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70, 76, 90)"/>
-<rect x="48" y="40" width="254" height="36" fill="rgb(176, 52, 42)"/>
-<text x="62" y="65" font-size="22" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">Fighters &amp; Stages</text>
-<text x="1220" y="65" font-size="16" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="end">TrainingRooms</text>
-<line x1="48" y1="88" x2="1232" y2="88" stroke="rgb(70, 76, 90)"/><line x1="48" y1="628" x2="1232" y2="628" stroke="rgb(70, 76, 90)"/>
-<text x="48" y="116" font-size="20" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">Fighters &amp; Stages &gt; Loading (advanced)  &gt;  Swap groups</text>
-<rect x="58" y="148" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="152" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="162" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Ice Climbers pair bank</text>
-<rect x="58" y="184" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="188" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="198" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Original fighter bank</text>
-<rect x="58" y="220" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="224" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="234" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Solo Popo groups</text>
-<rect x="58" y="256" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="260" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="270" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Ice Climbers pair groups</text>
-<rect x="58" y="292" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="296" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="306" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">PT/Aegis groups</text>
-<rect x="58" y="328" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="332" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="342" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Ice Climbers pair group</text>
-<rect x="58" y="364" width="20" height="20" fill="none" stroke="rgb(236, 236, 232)" stroke-width="2"/>
-<rect x="62" y="368" width="12" height="12" fill="rgb(176, 52, 42)"/>
-<text x="92" y="378" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Mii groups</text>
-<text x="56" y="651" font-size="16" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Which special groups may be prefetched and swapped warm. An entry greys out, with the reason, when a dependency is off.</text>
-<text x="56" y="675" font-size="14" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="253.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Which special groups may be prefetched and swapped warm. An entry greys out, with the reason, when a dependency is off.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages &gt; Loading (advanced)  &gt;  Swap groups</text>
+<rect x="58.0" y="148.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="152.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="162.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Ice Climbers pair bank</text>
+<rect x="58.0" y="184.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="188.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="198.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Original fighter bank</text>
+<rect x="58.0" y="220.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="224.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Solo Popo groups</text>
+<rect x="58.0" y="256.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="260.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="270.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Ice Climbers pair groups</text>
+<rect x="58.0" y="292.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="296.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="306.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">PT/Aegis groups</text>
+<rect x="58.0" y="328.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="332.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="342.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Ice Climbers pair group</text>
+<rect x="58.0" y="364.0" width="20.0" height="20.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="62.0" y="368.0" width="12.0" height="12.0" fill="rgb(176,52,42)"/>
+<text x="92.0" y="378.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii groups</text>
 </svg>

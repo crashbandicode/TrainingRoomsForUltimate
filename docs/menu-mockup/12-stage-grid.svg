@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="253.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">A adds the stage to the rotation order, Y cycles its form (Normal / Omega / Battlefield), L/R pages.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages  &gt;  Stages  &gt;  Lobby Stages</text>
+<text x="1220.0" y="112.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">page 1 / 8   (All + 117 stages)</text>
+<rect x="69.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="161.0" y="146.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="184.0" y="146.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="207.0" y="146.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="230.0" y="146.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="161.0" y="169.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="184.0" y="169.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="207.0" y="169.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<rect x="230.0" y="169.0" width="18.0" height="18.0" fill="rgb(150,156,170)"/>
+<text x="205.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">All (listed order)</text>
+<rect x="359.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="365.0" y="142.0" width="260.0" height="70.0" rx="4" fill="rgb(24,56,48)"/>
+<polygon points="409.3,198.0 580.7,198.0 568.7,208.0 421.3,208.0" fill="rgb(57,178,123)"/>
+<rect x="417.9" y="182.0" width="40.0" height="3.0" fill="rgb(57,178,123)"/>
+<text x="495.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Waiting Room</text>
+<ellipse cx="373.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="373.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">1</text>
+<rect x="591.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="608.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="649.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="655.0" y="142.0" width="260.0" height="70.0" rx="4" fill="rgb(37,58,34)"/>
+<polygon points="723.8,198.0 846.2,198.0 834.2,208.0 735.8,208.0" fill="rgb(109,185,65)"/>
+<rect x="724.2" y="182.0" width="40.0" height="3.0" fill="rgb(109,185,65)"/>
+<text x="785.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Battlefield</text>
+<ellipse cx="663.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="663.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">2</text>
+<rect x="881.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="898.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="939.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(176,52,42)" stroke-width="3"/>
+<rect x="945.0" y="142.0" width="260.0" height="70.0" rx="4" fill="rgb(43,25,61)"/>
+<polygon points="997.5,198.0 1152.5,198.0 1140.5,208.0 1009.5,208.0" fill="rgb(133,53,172)"/>
+<rect x="1003.3" y="182.0" width="40.0" height="3.0" fill="rgb(133,53,172)"/>
+<text x="1075.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Small Battlefield</text>
+<ellipse cx="953.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="953.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">3</text>
+<rect x="1171.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="1188.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="69.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="75.0" y="250.0" width="260.0" height="70.0" rx="4" fill="rgb(40,26,63)"/>
+<polygon points="135.6,306.0 274.4,306.0 262.4,316.0 147.6,316.0" fill="rgb(120,59,180)"/>
+<rect x="138.8" y="290.0" width="40.0" height="3.0" fill="rgb(120,59,180)"/>
+<text x="205.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Big Battlefield</text>
+<rect x="359.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="365.0" y="250.0" width="260.0" height="70.0" rx="4" fill="rgb(44,54,31)"/>
+<polygon points="425.6,306.0 564.4,306.0 552.4,316.0 437.6,316.0" fill="rgb(139,168,52)"/>
+<rect x="428.8" y="290.0" width="40.0" height="3.0" fill="rgb(139,168,52)"/>
+<rect x="475.0" y="284.0" width="40.0" height="3.0" fill="rgb(139,168,52)"/>
+<text x="495.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Final Destination</text>
+<ellipse cx="373.0" cy="258.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="373.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">4</text>
+<rect x="591.0" y="250.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="608.0" y="261.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="649.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="655.0" y="250.0" width="260.0" height="70.0" rx="4" fill="rgb(22,50,57)"/>
+<polygon points="715.6,306.0 854.4,306.0 842.4,316.0 727.6,316.0" fill="rgb(50,152,157)"/>
+<rect x="718.8" y="290.0" width="40.0" height="3.0" fill="rgb(50,152,157)"/>
+<rect x="765.0" y="284.0" width="40.0" height="3.0" fill="rgb(50,152,157)"/>
+<text x="785.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Peach's Castle</text>
+<rect x="939.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="945.0" y="250.0" width="260.0" height="70.0" rx="4" fill="rgb(22,53,53)"/>
+<polygon points="1013.8,306.0 1136.2,306.0 1124.2,316.0 1025.8,316.0" fill="rgb(51,164,143)"/>
+<text x="1075.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Kongo Jungle</text>
+<rect x="69.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="75.0" y="358.0" width="260.0" height="70.0" rx="4" fill="rgb(57,35,37)"/>
+<polygon points="111.2,414.0 298.8,414.0 286.8,424.0 123.2,424.0" fill="rgb(189,93,76)"/>
+<text x="205.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Hyrule Castle</text>
+<ellipse cx="83.0" cy="366.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="83.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">7</text>
+<rect x="301.0" y="358.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="318.0" y="369.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">BF</text>
+<rect x="359.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="365.0" y="358.0" width="260.0" height="70.0" rx="4" fill="rgb(22,53,53)"/>
+<polygon points="433.8,414.0 556.2,414.0 544.2,424.0 445.8,424.0" fill="rgb(51,165,142)"/>
+<rect x="434.2" y="398.0" width="40.0" height="3.0" fill="rgb(51,165,142)"/>
+<rect x="475.0" y="392.0" width="40.0" height="3.0" fill="rgb(51,165,142)"/>
+<text x="495.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Super Happy Tree</text>
+<rect x="649.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="655.0" y="358.0" width="260.0" height="70.0" rx="4" fill="rgb(57,31,40)"/>
+<polygon points="691.2,414.0 878.8,414.0 866.8,424.0 703.2,424.0" fill="rgb(189,78,91)"/>
+<rect x="702.4" y="398.0" width="40.0" height="3.0" fill="rgb(189,78,91)"/>
+<text x="785.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Dream Land</text>
+<ellipse cx="663.0" cy="366.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="663.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">5</text>
+<rect x="881.0" y="358.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="898.0" y="369.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="939.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="945.0" y="358.0" width="260.0" height="70.0" rx="4" fill="rgb(23,54,52)"/>
+<polygon points="1013.8,414.0 1136.2,414.0 1124.2,424.0 1025.8,424.0" fill="rgb(52,168,139)"/>
+<rect x="1014.2" y="398.0" width="40.0" height="3.0" fill="rgb(52,168,139)"/>
+<rect x="1055.0" y="392.0" width="40.0" height="3.0" fill="rgb(52,168,139)"/>
+<text x="1075.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Saffron City</text>
+<rect x="69.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="75.0" y="466.0" width="260.0" height="70.0" rx="4" fill="rgb(23,54,52)"/>
+<polygon points="119.3,522.0 290.7,522.0 278.7,532.0 131.3,532.0" fill="rgb(52,170,136)"/>
+<rect x="127.9" y="506.0" width="40.0" height="3.0" fill="rgb(52,170,136)"/>
+<text x="205.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Mushroom Kingdom</text>
+<rect x="359.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="365.0" y="466.0" width="260.0" height="70.0" rx="4" fill="rgb(26,38,64)"/>
+<polygon points="417.5,522.0 572.5,522.0 560.5,532.0 429.5,532.0" fill="rgb(66,107,185)"/>
+<text x="495.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Princess Peach's Castle</text>
+<rect x="649.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="655.0" y="466.0" width="260.0" height="70.0" rx="4" fill="rgb(57,35,37)"/>
+<polygon points="699.3,522.0 870.7,522.0 858.7,532.0 711.3,532.0" fill="rgb(189,92,77)"/>
+<rect x="707.9" y="506.0" width="40.0" height="3.0" fill="rgb(189,92,77)"/>
+<rect x="765.0" y="500.0" width="40.0" height="3.0" fill="rgb(189,92,77)"/>
+<text x="785.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Rainbow Cruise</text>
+<rect x="939.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="945.0" y="466.0" width="260.0" height="70.0" rx="4" fill="rgb(57,30,41)"/>
+<polygon points="1013.8,522.0 1136.2,522.0 1124.2,532.0 1025.8,532.0" fill="rgb(189,75,94)"/>
+<rect x="1014.2" y="506.0" width="40.0" height="3.0" fill="rgb(189,75,94)"/>
+<rect x="1055.0" y="500.0" width="40.0" height="3.0" fill="rgb(189,75,94)"/>
+<text x="1075.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Kongo Falls</text>
+<ellipse cx="953.0" cy="474.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
+<text x="953.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">6</text>
+<rect x="1171.0" y="466.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="1188.0" y="477.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">Ω</text>
+<text x="69.0" y="581.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)</text>
+</svg>

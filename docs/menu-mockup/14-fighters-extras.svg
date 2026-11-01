@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">CPU</text>
+<text x="139.8" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Saves</text>
+<text x="244.0" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Recording</text>
+<rect x="387.2" y="40.0" width="253.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="401.2" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages</text>
+<text x="664.5" y="64.6" font-size="22" fill="rgb(150,156,170)" text-anchor="start" font-weight="bold">Display &amp; Controls</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Hat order per role on the portrait grid (ZR switches role). Kirby takes the next hat on each hat cycle.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="62.0" y="120.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Player 1 and CPU  (5)</text>
+<rect x="48.0" y="138.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="48.0" y="138.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="160.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Extras  (5)</text>
+<text x="62.0" y="200.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Stages  (4)</text>
+<text x="62.0" y="240.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Loading  (7)</text>
+<text x="62.0" y="259.2" font-size="14" fill="rgb(210,170,80)" text-anchor="start">advanced - collapsed by default</text>
+<polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Kirby Hats</text>
+<text x="552.5" y="119.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<ellipse cx="1193.1" cy="128.7" rx="4.9" ry="3.1" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1206.6" cy="128.7" rx="4.9" ry="3.1" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1199.8" cy="118.9" rx="12.2" ry="12.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1187.6" cy="118.9" rx="3.9" ry="3.9" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1212.1" cy="118.9" rx="3.9" ry="3.9" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1196.7" cy="116.9" rx="1.2" ry="3.2" fill="rgb(236,236,232)"/>
+<ellipse cx="1203.0" cy="116.9" rx="1.2" ry="3.2" fill="rgb(236,236,232)"/>
+<polyline points="1202.8,121.9 1202.7,122.2 1202.5,122.4 1202.3,122.6 1202.1,122.8 1201.9,123.0 1201.6,123.1 1201.3,123.3 1201.0,123.4 1200.7,123.4 1200.3,123.5 1200.0,123.5 1199.7,123.5 1199.3,123.5 1199.0,123.4 1198.7,123.4 1198.4,123.3 1198.1,123.1 1197.8,123.0 1197.6,122.8 1197.3,122.6 1197.1,122.4 1197.0,122.2 1196.8,121.9" fill="none" stroke="rgb(236,236,232)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="1187.8,112.5 1211.8,112.5 1218.8,119.5 1213.3,107.9 1203.5,103.0 1192.5,105.4" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1" stroke-linejoin="round"/>
+<ellipse cx="1219.4" cy="120.1" rx="2.7" ry="2.7" fill="rgb(236,236,232)"/>
+<polygon points="1197.4,105.5 1197.9,106.9 1199.4,107.0 1198.3,107.9 1198.6,109.3 1197.4,108.6 1196.2,109.3 1196.5,107.9 1195.4,107.0 1196.8,106.9" fill="rgb(236,236,232)"/>
+<text x="1176.0" y="118.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">P1 6 / CPU 6 hats  &gt;</text>
+<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Give item</text>
+<text x="540.4" y="157.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<rect x="1185.4" y="137.4" width="33.1" height="33.1" rx="4.32" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<ellipse cx="1206.3" cy="147.9" rx="7.9" ry="4.7" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1"/>
+<polyline points="1214.2,147.5 1218.6,145.4" fill="none" stroke="rgb(236,236,232)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="1199.8" cy="159.0" rx="6.8" ry="6.8" fill="rgb(236,236,232)"/>
+<polyline points="1193.2,149.9 1193.4,149.6 1193.5,149.4 1193.7,149.1 1194.0,148.9 1194.3,148.7 1194.6,148.5 1194.9,148.4 1195.2,148.3 1195.6,148.2 1195.9,148.1 1196.3,148.1 1196.7,148.1 1197.0,148.1 1197.4,148.2 1197.7,148.3 1198.1,148.4 1198.4,148.6 1198.7,148.8 1198.9,149.0 1199.2,149.2 1199.4,149.5" fill="none" stroke="rgb(236,236,232)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="1191.6,146.0 1192.3,147.6 1194.0,147.4 1193.0,148.8 1194.0,150.1 1192.3,150.0 1191.6,151.5 1190.9,150.0 1189.3,150.1 1190.3,148.8 1189.3,147.4 1190.9,147.6" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="1" stroke-linejoin="round"/>
+<text x="1176.0" y="156.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">none  &gt;</text>
+<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Brawler</text>
+<text x="564.5" y="195.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<text x="1220.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
+<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Swordfighter</text>
+<text x="624.8" y="233.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
+<text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mii Gunner</text>
+<text x="552.5" y="271.2" font-size="14" fill="rgb(111,195,154)" text-anchor="start">ours</text>
+<text x="1220.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">role's saved pick  &gt;</text>
+</svg>

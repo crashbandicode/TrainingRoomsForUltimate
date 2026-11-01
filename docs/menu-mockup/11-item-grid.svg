@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="253.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">A gives Player 1 the item now (one at a time). The icons are the game's own item pictures.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages  &gt;  Extras  &gt;  Give item</text>
+<rect x="598.8" y="90.8" width="42.3" height="42.3" rx="5.52" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<ellipse cx="625.5" cy="104.2" rx="10.1" ry="6.0" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="635.6,103.7 641.2,101.0" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="617.2" cy="118.4" rx="8.7" ry="8.7" fill="rgb(236,236,232)"/>
+<polyline points="608.8,106.8 608.9,106.4 609.2,106.1 609.5,105.8 609.8,105.5 610.1,105.2 610.5,105.0 610.9,104.8 611.3,104.7 611.8,104.6 612.3,104.5 612.7,104.5 613.2,104.5 613.7,104.5 614.1,104.6 614.6,104.7 615.0,104.9 615.4,105.1 615.8,105.3 616.1,105.6 616.4,105.9 616.7,106.2" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="606.8,101.8 607.6,103.8 609.8,103.6 608.5,105.3 609.8,107.1 607.6,106.8 606.8,108.8 605.9,106.8 603.7,107.1 605.0,105.3 603.7,103.6 605.9,103.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<text x="1220.0" y="112.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">page 1 / 2   (38 items)</text>
+<rect x="62.0" y="136.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="88.0" cy="163.1" rx="8.2" ry="9.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="84.6" y="148.4" width="6.8" height="6.1" fill="rgb(236,236,232)"/>
+<text x="112.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Grenade Egg</text>
+<text x="112.0" y="169.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Banjo &amp; Kazooie</text>
+<rect x="354.0" y="136.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="380.0" cy="163.4" rx="10.2" ry="6.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<rect x="378.0" y="149.1" width="4.1" height="8.2" fill="rgb(236,236,232)"/>
+<text x="404.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Mechakoopa</text>
+<text x="404.0" y="169.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Bowser Jr.</text>
+<rect x="646.0" y="136.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="163.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="670.6,156.6 664.5,147.8 672.0,155.2" fill="rgb(236,236,232)"/>
+<polygon points="673.4,156.6 679.5,147.8 672.0,155.2" fill="rgb(236,236,232)"/>
+<ellipse cx="669.3" cy="162.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="674.7" cy="162.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="696.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Smile Turnip</text>
+<text x="696.0" y="169.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="938.0" y="136.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="964.0" cy="163.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="962.6,156.6 956.5,147.8 964.0,155.2" fill="rgb(236,236,232)"/>
+<polygon points="965.4,156.6 971.5,147.8 964.0,155.2" fill="rgb(236,236,232)"/>
+<ellipse cx="961.3" cy="162.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="966.7" cy="162.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="988.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Winky Turnip</text>
+<text x="988.0" y="169.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="62.0" y="190.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="88.0" cy="217.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="86.6,210.6 80.5,201.8 88.0,209.2" fill="rgb(236,236,232)"/>
+<polygon points="89.4,210.6 95.5,201.8 88.0,209.2" fill="rgb(236,236,232)"/>
+<ellipse cx="85.3" cy="216.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="90.7" cy="216.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="112.0" y="206.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Dot-Eyes Turnip</text>
+<text x="112.0" y="223.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="354.0" y="190.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="380.0" cy="217.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="378.6,210.6 372.5,201.8 380.0,209.2" fill="rgb(236,236,232)"/>
+<polygon points="381.4,210.6 387.5,201.8 380.0,209.2" fill="rgb(236,236,232)"/>
+<ellipse cx="377.3" cy="216.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="382.7" cy="216.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="404.0" y="206.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Stitch-Face Turnip</text>
+<text x="404.0" y="223.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="646.0" y="190.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="215.7" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="672.0,207.2 672.0,201.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="672.0" cy="201.1" rx="1.4" ry="1.4" fill="rgb(236,236,232)"/>
+<text x="696.0" y="206.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Mr. Saturn</text>
+<text x="696.0" y="223.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="938.0" y="190.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="955.2" y="205.2" width="17.7" height="17.7" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<text x="988.0" y="206.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Bob-omb</text>
+<text x="988.0" y="223.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Daisy</text>
+<rect x="62.0" y="244.0" width="280.0" height="48.0" rx="6" fill="rgb(46,52,66)" stroke="rgb(176,52,42)" stroke-width="3"/>
+<polygon points="77.1,271.4 81.2,261.2 89.7,257.8 98.2,264.6 91.4,267.3 83.9,272.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<text x="112.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Banana Peel</text>
+<text x="112.0" y="277.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Diddy Kong</text>
+<rect x="354.0" y="244.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="380.0" cy="263.2" rx="5.4" ry="5.4" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<ellipse cx="380.0" cy="272.8" rx="6.1" ry="6.1" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<text x="404.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Peanut</text>
+<text x="404.0" y="277.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Diddy Kong</text>
+<rect x="646.0" y="244.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="661.8,275.5 661.8,261.2 667.9,268.0 672.0,257.8 676.1,268.0 682.2,261.2 682.2,275.5" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<text x="696.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Crown</text>
+<text x="696.0" y="277.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">King K. Rool</text>
+<rect x="938.0" y="244.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="964.0" cy="270.7" rx="10.2" ry="10.2" fill="rgb(236,236,232)"/>
+<polyline points="961.3,257.8 961.3,257.3 961.4,256.8 961.6,256.3 961.8,255.9 962.1,255.4 962.4,255.0 962.9,254.6 963.3,254.3 963.8,253.9 964.3,253.7 964.9,253.5 965.5,253.3 966.1,253.1 966.8,253.1 967.4,253.0 968.0,253.1 968.7,253.1 969.3,253.3 969.9,253.5 970.5,253.7 971.0,253.9 971.5,254.3 971.9,254.6 972.4,255.0 972.7,255.4" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="988.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Remote Bomb</text>
+<text x="988.0" y="277.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Link</text>
+<rect x="62.0" y="298.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polyline points="77.8,332.2 95.5,314.5" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="98.2,311.8 90.7,313.8 96.2,319.3" fill="rgb(236,236,232)"/>
+<text x="112.0" y="314.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Arrow</text>
+<text x="112.0" y="331.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Link</text>
+<rect x="354.0" y="298.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="380.0,311.1 383.8,318.2 390.9,322.0 383.8,325.8 380.0,332.9 376.2,325.8 369.1,322.0 376.2,318.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<ellipse cx="380.0" cy="322.0" rx="2.7" ry="2.7" fill="rgb(236,236,232)"/>
+<text x="404.0" y="314.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Metal Blade</text>
+<text x="404.0" y="331.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Mega Man</text>
+<rect x="646.0" y="298.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="324.0" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="672.0,315.2 675.4,309.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="696.0" y="314.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Cherry</text>
+<text x="696.0" y="331.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="938.0" y="298.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="964.0" cy="324.0" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="964.0,315.2 967.4,309.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="988.0" y="314.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Strawberry</text>
+<text x="988.0" y="331.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="62.0" y="352.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="88.0" cy="378.0" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="88.0,369.2 91.4,363.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="112.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Orange</text>
+<text x="112.0" y="385.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="354.0" y="352.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="380.0" cy="378.0" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="380.0,369.2 383.4,363.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="404.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Apple</text>
+<text x="404.0" y="385.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="646.0" y="352.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="378.0" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="672.0,369.2 675.4,363.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="696.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Melon</text>
+<text x="696.0" y="385.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="938.0" y="352.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="964.0,365.8 974.2,382.8 964.0,377.7 953.8,382.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<text x="988.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Galaxian</text>
+<text x="988.0" y="385.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="62.0" y="406.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="79.2,436.1 82.6,426.6 88.0,419.8 93.4,426.6 96.8,436.1" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<ellipse cx="88.0" cy="438.8" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="112.0" y="422.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Bell</text>
+<text x="112.0" y="439.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="354.0" y="406.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="375.9" cy="426.6" rx="5.4" ry="5.4" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="380.0,430.7 390.2,440.2" fill="none" stroke="rgb(236,236,232)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="386.1,436.1 382.7,439.5" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="404.0" y="422.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Key</text>
+<text x="404.0" y="439.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Pac-Man</text>
+<rect x="646.0" y="406.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="433.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="670.6,426.6 664.5,417.8 672.0,425.2" fill="rgb(236,236,232)"/>
+<polygon points="673.4,426.6 679.5,417.8 672.0,425.2" fill="rgb(236,236,232)"/>
+<ellipse cx="669.3" cy="432.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="674.7" cy="432.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="696.0" y="422.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Smile Turnip</text>
+<text x="696.0" y="439.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="938.0" y="406.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="964.0" cy="433.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="962.6,426.6 956.5,417.8 964.0,425.2" fill="rgb(236,236,232)"/>
+<polygon points="965.4,426.6 971.5,417.8 964.0,425.2" fill="rgb(236,236,232)"/>
+<ellipse cx="961.3" cy="432.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="966.7" cy="432.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="988.0" y="422.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Winky Turnip</text>
+<text x="988.0" y="439.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="62.0" y="460.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="88.0" cy="487.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="86.6,480.6 80.5,471.8 88.0,479.2" fill="rgb(236,236,232)"/>
+<polygon points="89.4,480.6 95.5,471.8 88.0,479.2" fill="rgb(236,236,232)"/>
+<ellipse cx="85.3" cy="486.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="90.7" cy="486.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="112.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Dot-Eyes Turnip</text>
+<text x="112.0" y="493.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="354.0" y="460.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="380.0" cy="487.4" rx="8.2" ry="8.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polygon points="378.6,480.6 372.5,471.8 380.0,479.2" fill="rgb(236,236,232)"/>
+<polygon points="381.4,480.6 387.5,471.8 380.0,479.2" fill="rgb(236,236,232)"/>
+<ellipse cx="377.3" cy="486.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<ellipse cx="382.7" cy="486.0" rx="1.2" ry="1.2" fill="rgb(236,236,232)"/>
+<text x="404.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Stitch-Face Turnip</text>
+<text x="404.0" y="493.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="646.0" y="460.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<ellipse cx="672.0" cy="485.7" rx="8.8" ry="8.8" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="672.0,477.2 672.0,471.8" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="672.0" cy="471.1" rx="1.4" ry="1.4" fill="rgb(236,236,232)"/>
+<text x="696.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Mr. Saturn</text>
+<text x="696.0" y="493.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="938.0" y="460.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="955.2" y="475.2" width="17.7" height="17.7" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<text x="988.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Bob-omb</text>
+<text x="988.0" y="493.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Peach</text>
+<rect x="62.0" y="514.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="84.6,527.1 91.4,527.1 91.4,534.6 96.8,548.2 79.2,548.2 84.6,534.6" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<text x="112.0" y="530.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Holy Water</text>
+<text x="112.0" y="547.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Richter</text>
+<rect x="354.0" y="514.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="369.8,534.6 390.2,534.6 380.0,548.2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2" stroke-linejoin="round"/>
+<rect x="378.6" y="526.4" width="2.7" height="8.2" fill="rgb(236,236,232)"/>
+<text x="404.0" y="530.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Gyro</text>
+<text x="404.0" y="547.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">R.O.B.</text>
+<rect x="646.0" y="514.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="663.8" y="527.8" width="16.3" height="20.4" rx="2" fill="rgb(14,16,20)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<polyline points="668.6,527.8 668.6,548.2" fill="none" stroke="rgb(236,236,232)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="696.0" y="530.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Tome</text>
+<text x="696.0" y="547.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Robin</text>
+<rect x="938.0" y="514.0" width="280.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<polygon points="955.2,546.8 970.8,528.5 973.5,531.2 957.9,549.6" fill="rgb(236,236,232)"/>
+<polyline points="953.8,542.1 959.9,548.2" fill="none" stroke="rgb(236,236,232)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="988.0" y="530.6" font-size="12" fill="rgb(236,236,232)" text-anchor="start">Levin Sword</text>
+<text x="988.0" y="547.0" font-size="10" fill="rgb(150,156,170)" text-anchor="start">Robin</text>
+</svg>

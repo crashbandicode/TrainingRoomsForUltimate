@@ -1,24 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
-<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18, 22, 30)"/><stop offset="1" stop-color="rgb(40, 46, 58)"/></linearGradient></defs>
-<rect width="1280" height="720" fill="url(#g)"/><rect y="560" width="1280" height="40" fill="rgb(52,58,72)"/>
-<rect x="28" y="24" width="1224" height="672" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70, 76, 90)"/>
-<rect x="48" y="40" width="267" height="36" fill="rgb(176, 52, 42)"/>
-<text x="62" y="65" font-size="22" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">Display &amp; Controls</text>
-<text x="1220" y="65" font-size="16" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="end">TrainingRooms</text>
-<line x1="48" y1="88" x2="1232" y2="88" stroke="rgb(70, 76, 90)"/><line x1="48" y1="628" x2="1232" y2="628" stroke="rgb(70, 76, 90)"/>
-<text x="48" y="116" font-size="20" fill="rgb(236, 236, 232)" font-weight="bold" text-anchor="start">Display &amp; Controls &gt; Controls  &gt;  Button chords</text>
-<text x="58" y="162" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Save State Save</text>
-<text x="1220" y="162" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZL + D-pad Down ]   press A to re-bind</text>
-<text x="58" y="202" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Save State Load</text>
-<text x="1220" y="202" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZL + D-pad Up ]   press A to re-bind</text>
-<text x="58" y="242" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Input Record</text>
-<text x="1220" y="242" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZR + D-pad Down ]   press A to re-bind</text>
-<text x="58" y="282" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Input Playback</text>
-<text x="1220" y="282" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZR + D-pad Up ]   press A to re-bind</text>
-<text x="58" y="322" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Cycle Player Character</text>
-<text x="1220" y="322" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZL + D-pad Right ]   press A to re-bind</text>
-<text x="58" y="362" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Cycle CPU Character</text>
-<text x="1220" y="362" font-size="20" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="end">[ ZL + D-pad Left ]   press A to re-bind</text>
-<text x="56" y="651" font-size="16" fill="rgb(236, 236, 232)" font-weight="normal" text-anchor="start">Hold one button and press the others to set a chord (16 buttons). A chord of one button is allowed.</text>
-<text x="56" y="675" font-size="14" fill="rgb(150, 156, 170)" font-weight="normal" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="266.5" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Display &amp; Controls</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Hold one button and press the others to set a chord (16 buttons). A chord of one button is allowed.</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Display &amp; Controls &gt; Controls  &gt;  Button chords</text>
+<text x="58.0" y="162.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Save State Save</text>
+<text x="1220.0" y="162.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZL + D-pad Down ]   press A to re-bind</text>
+<text x="58.0" y="202.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Save State Load</text>
+<text x="1220.0" y="202.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZL + D-pad Up ]   press A to re-bind</text>
+<text x="58.0" y="242.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Record</text>
+<text x="1220.0" y="242.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZR + D-pad Down ]   press A to re-bind</text>
+<text x="58.0" y="282.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Playback</text>
+<text x="1220.0" y="282.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZR + D-pad Up ]   press A to re-bind</text>
+<text x="58.0" y="322.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Cycle Player Character</text>
+<text x="1220.0" y="322.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZL + D-pad Right ]   press A to re-bind</text>
+<text x="58.0" y="362.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Cycle CPU Character</text>
+<text x="1220.0" y="362.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">[ ZL + D-pad Left ]   press A to re-bind</text>
 </svg>

@@ -1,8 +1,12 @@
 # MENU-DRAFT — the clean-room menu, for the operator's green light
 
-Draft 2, 2026-11-01, project lead. Supersedes `docs/menu-redesign.md` (draft 1,
-which keeps the ASCII wireframe and the control definitions). Nothing here is
-built; the menu is implemented only after the operator approves this page.
+Draft 3, 2026-11-01, project lead (draft 2 the same day; draft 3 is the
+operator's redraft: the fork's grid, item and stage visuals where they fit, a
+direction grid for DI / SDI / Airdodge / Shield Tilt, pictogram chips for Kirby
+Hats, Solo Popo and character items). Supersedes `docs/menu-redesign.md`
+(draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
+here is built; the menu is implemented only after the operator approves this
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (v3).
 
 Sources for §1: the fork's menu definition as shipped in C116.1
 (`training_mod_consts/src/lib.rs`, `options.rs`, `cycle_preload_config.rs`,
@@ -28,6 +32,11 @@ Control vocabulary used in both tables:
 | `multi-select` | **new**: a set, edited in a popup checklist (A toggles, ZL all/none) |
 | `editor` | **new name** for `action`: opens a sub-screen (grid, list, chord editor, override editor) |
 | `info` | read-only row |
+| `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction line; A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots |
+| `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): stock portraits from the player's game files, red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
+| `item grid` | the fork's paged 4×8 item grid with the game's item pictures (`training_mod_consts/src/character_items.rs`, 38 items) |
+| `stage grid` | the fork's paged 4×4 stage thumbnails, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`) |
+| `chip` | a pictogram at the row's right edge (Kirby Hats, Solo Popo, character items); new vector art, MIT with the repo |
 
 ## 1. Inventory: the menu as the fork ships it (C116.1)
 
@@ -130,7 +139,7 @@ outside the menu.
 | Characters | — | Character Cycles | grid (ordered, two roles) | fighters; red P1 order, blue CPU order, ZR switches role, Y Solo Popo on Ice Climbers | P1: G&W, Palutena, Pikachu; CPU: Pikachu, Kirby, Bowser, Bayonetta | ours | |
 | Character Extras | — | Solo Popo | single | On, Off | Off | ours | P1's original Ice Climbers |
 | Character Extras | — | Kirby Hats | grid (ordered, two roles) | hat orders per role | fork default list | ours | |
-| Character Extras | — | Character Item (give) | grid | 45 items incl. turnip faces | none | ours | gives P1 an item now |
+| Character Extras | — | Character Item (give) | grid | 38 items (`ITEM_NAMES`), turnip faces included | none | ours | gives P1 an item now; draft 2 said 45 (corrected) |
 | Character Extras | — | Mii Brawler | list | saved Miis, replay Miis, Add New | role's saved pick | ours | |
 | Character Extras | — | Mii Swordfighter | list | same | same | ours | |
 | Character Extras | — | Mii Gunner | list | same | same | ours | |
@@ -168,9 +177,9 @@ change, so existing `training_modpack.json` files load as they are.
 | CPU | Reactions | Followup | multi-select | 13 actions | none | upstream | |
 | CPU | Reactions | Mash Triggers | multi-select | 17 situations | upstream default set | upstream | |
 | CPU | Reactions | Situation overrides | editor | sub-screen: dropdown of 13 situations + multi-select of 13 actions; row shows "n of 13 set" | none | upstream | replaces the 13-row Override tab |
-| CPU | Defence | Airdodge Direction | multi-select | 11 directions | none | upstream | |
-| CPU | Defence | DI Direction | multi-select | 11 directions | none | upstream | |
-| CPU | Defence | SDI Direction | multi-select | 11 directions | none | upstream | |
+| CPU | Defence | Airdodge Direction | direction grid | 9 relative chips + Left / Right, weighted | none | upstream | draft 3: chips instead of an 11-row checklist |
+| CPU | Defence | DI Direction | direction grid | same | none | upstream | draft 3 |
+| CPU | Defence | SDI Direction | direction grid | same | none | upstream | draft 3 |
 | CPU | Defence | SDI Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Clatter Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Dodge Staling | toggle | On, Off | On | upstream | |
@@ -180,7 +189,7 @@ change, so existing `training_modpack.json` files load as they are.
 | CPU | Ledge & Tech | Mistech Options | multi-select | 4 | all | upstream | |
 | CPU | Ledge & Tech | Hide Tech Animations | toggle | On, Off | Off | upstream | |
 | CPU | Shield | Shield | dropdown | None, Infinite, Hold, Constant | None | upstream | was "Shield Toggles", single |
-| CPU | Shield | Shield Tilt | dropdown | 11 directions | Neutral | upstream | was single |
+| CPU | Shield | Shield Tilt | direction grid (single) | one of the 11 chips | Neutral | upstream | was single; draft 2 had a dropdown |
 | CPU | Shield | OoS Offset | multi-select | 0–30 hits | none | upstream | |
 | CPU | Shield | Reaction Time | multi-select | 0–30 frames | none | upstream | |
 | CPU | Attacks & Movement | Attack Angle | multi-select | Neutral, Up, Down | none | upstream | |
@@ -225,17 +234,17 @@ change, so existing `training_modpack.json` files load as they are.
 | Recording | Named macros | Replay window | editor | | — | ours | |
 | Recording | Named macros | Replay capture | toggle | On, Off | On | ours | **new in menu**: writes `replay_capture.ini`; Deluxe page toggle stays in sync; see open question 7 |
 | Fighters & Stages | Player 1 and CPU | Player Swapping | toggle | On, Off | Off | ours | |
-| Fighters & Stages | Player 1 and CPU | Player Character | editor (grid) | all fighters | Mr. Game & Watch | ours | |
-| Fighters & Stages | Player 1 and CPU | CPU Character | editor (grid) | all fighters | Pikachu | ours | |
-| Fighters & Stages | Player 1 and CPU | Character Cycles | editor (grid) | two-role ordered grid | as today | ours | hidden CPU order and Solo Popo marks edited here |
-| Fighters & Stages | Player 1 and CPU | Solo Popo (original Ice Climbers) | toggle | On, Off | Off | ours | |
-| Fighters & Stages | Extras | Kirby Hats | editor (grid) | two-role hat order | as today | ours | |
-| Fighters & Stages | Extras | Give item | editor (grid) | 45 items | none | ours | |
+| Fighters & Stages | Player 1 and CPU | Player Character | editor (portrait grid) | all fighters | Mr. Game & Watch | ours | row shows the chosen portrait |
+| Fighters & Stages | Player 1 and CPU | CPU Character | editor (portrait grid) | all fighters | Pikachu | ours | row shows the chosen portrait |
+| Fighters & Stages | Player 1 and CPU | Character Cycles | editor (portrait grid, two roles) | ordered P1 (red) and CPU (blue) picks | as today | ours | row previews both orders with badges; hidden CPU order and Solo Popo marks edited here |
+| Fighters & Stages | Player 1 and CPU | Solo Popo (original Ice Climbers) | toggle + chip | On, Off | Off | ours | chip: Popo raising the hammer, a dotted trail |
+| Fighters & Stages | Extras | Kirby Hats | editor (portrait grid, two roles) + chip | hat order per role | as today | ours | chip: Kirby in a star nightcap, hat silhouettes above |
+| Fighters & Stages | Extras | Give item | editor (item grid) + chip | 38 items, 4×8 per page | none | ours | chip: a hand drops a lit bomb over small items |
 | Fighters & Stages | Extras | Mii Brawler | dropdown (list) | saved Miis, replay Miis, Add New… | role's saved pick | ours | ZR switches role inside the list |
 | Fighters & Stages | Extras | Mii Swordfighter | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Extras | Mii Gunner | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Stages | Lobby Practice | toggle | On, Off | Off | ours | from Misc |
-| Fighters & Stages | Stages | Lobby Stages | editor (grid) | ordered legal stages + All; Y cycles form | as today | ours | from Misc |
+| Fighters & Stages | Stages | Lobby Stages | editor (stage grid) | ordered legal stages + All, 4×4 per page; Y cycles form | as today | ours | from Misc; row previews the first ordered stages |
 | Fighters & Stages | Stages | Training Stage Rotation | toggle | On, Off | Off | ours | from Misc |
 | Fighters & Stages | Stages | Stage Hazards | toggle | On, Off | Off | upstream | from Misc; grouped with the stage rows (mockup v1's placement, adopted) |
 | Fighters & Stages | Loading *(advanced)* | Cycle Preload | dropdown | Off, 1–5 | built-in max | ours | was single |
@@ -260,8 +269,9 @@ change, so existing `training_modpack.json` files load as they are.
 Counts: pages 9 → 5; visible rows 103 → 76 with the standalone pilot installed
 (13 override rows → 1 editor, 6 chord rows → 1 editor, 7 group toggles → 1
 multi-select, 2 P1 CPU rows → 1 info row, +1 Replay capture, +3 info rows), 77
-when the pilot is absent and the two fallback rows show; dropdowns 0 → 23 (24
-with the fallback); sub-screens (editors) 11 → 14.
+when the pilot is absent and the two fallback rows show; dropdowns 0 → 22 (23
+with the fallback; Shield Tilt is a direction grid in draft 3, not a dropdown);
+direction grids 4; sub-screens 11 → 18 (14 editors + 4 direction grids).
 
 ## 3. Rationale per page, and what is dropped or merged
 
@@ -310,6 +320,10 @@ Questions 1–11 below remain open.
 9. **Menu shortcuts**: shown read-only from the INI (as drawn), or editable in the menu with the INI as the file of record?
 10. **Help text position and length**: one line at the bottom as today, or a two-line panel so the longer fork help texts (group rows) do not need shortening?
 11. **P1 CPU fallback** (the standalone pilot now owns P1): when the pilot is absent, show the two fallback rows on the CPU page (as proposed), keep the fallback INI-only, or drop the TM-side control altogether and require the pilot?
+12. **Direction grid weights** (draft 3): show the weight digit on a selected chip (upstream's counts, today's semantics, as drawn) or plain on/off chips with a uniform random pick?
+13. **Portrait source** (draft 3): keep the fork's rule that portraits, stage thumbnails and item pictures are generated from the player's own game files at build time (`scripts/roster-grid`, `scripts/stage-grid`, `scripts/item-icons`) and never enter the repo — needed for the MIT packaging; confirm.
+14. **Grid paging** (draft 3): items 4×8 per page (two pages of 38) and stages 4×4 (eight pages of All + 117) as the fork does, or denser pages so the items fit on one screen?
+15. **Mii rows** (draft 3): lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only? (Saved Miis have no stock portrait, so a portrait grid does not apply.)
 
 ## 5. Reconciliation with the coordinator's mockup v1
 

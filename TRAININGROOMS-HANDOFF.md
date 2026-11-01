@@ -2,6 +2,28 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v3 — 2026-11-01 (redraft on the operator's request)
+
+- Operator feedback on v2: the mockup lacked the fork's grid and item / stage
+  visuals; DI / SDI should be a directional grid of chips; Kirby Hats, Solo Popo
+  and character items get pictogram chips drawn after the operator's sketches
+  (not pasted).
+- Done (this commit, a fork worker of the coordinator session): `MENU-DRAFT.md`
+  is draft 3 (new control types `direction grid`, `portrait grid`, `item grid`,
+  `stage grid`, `chip`; Airdodge / DI / SDI / Shield Tilt rows; grid rows; item
+  count corrected 45 → 38; questions 12–15 added). `docs/MENU-PROPOSAL.md` is
+  v3 with a *Visual sources* section (what carries over from the fork with
+  file:line, and that the 42 upstream icon SVGs incl. `di_state` / `sdi_state`
+  / `air_dodge_dir` / `shield_tilt` / `character_item` are redrawn, never
+  copied). `tools/render_menu_mockup.py` now draws PNG and SVG from one
+  primitive list; screens 01–16 in `docs/menu-mockup/` (new: 09 direction grid,
+  10 character grid, 11 item grid, 12 stage grid, 13 Kirby hats grid, 14 / 15
+  the other Fighters & Stages groups, 16 chip review sheet).
+- Not done / waiting: the push of this commit (operator's order needed); the
+  operator's answers to questions 1–15; `specs/SPEC-cpu-02` and
+  `SPEC-core-03` still describe the direction rows as a multi-select list and
+  must be amended to the direction grid once the operator approves v3.
+
 ## Objective and scope
 
 Clean-room, MIT-licensed reimplementation of the **upstream-origin** features of
