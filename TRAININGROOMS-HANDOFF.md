@@ -2,6 +2,36 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Menu proposal v7 — 2026-11-01 (DI / SDI chips from the game's own visual)
+
+- Worker: Claude session `b426fba6-7e69-4490-a135-49457a87f961` under primary
+  `b81ec740`. Model gate from its own transcript: `claude-opus-5-5` / `high`
+  (all assistant records at the check). No watcher was armed for this
+  single-turn, docs-only task.
+- Request: the DI and SDI direction chips show the game's own DI / SDI
+  direction visual (a blue streak and a white arc), read at run time.
+- Asset: **not identified.** Fork M5i and upstream `077a8e43` request no DI /
+  SDI effect (all `sys_*` hashes in `src/` checked; `directional_influence.rs`
+  and `sdi.rs` only steer the stick). Upstream `di_state.svg` / `sdi_state.svg`
+  are black glyphs, not the visual. Candidate names only, from
+  `artifacts/enhancements/stage-assets/ParamLabels.csv` (sha256 `ba4a818c…`):
+  `sys_direction`, `sys_direction2`, `sys_vector`, `sys_hitstop_spark`.
+- Capture: **none usable.** No recorded run set DI / SDI. The upstream
+  `photos/mash_trigger_tumble.gif` (640×360; every 6th frame 0–186 and
+  every frame 144–175 viewed) shows attack effects only. Per the brief, the screens were **not** changed or
+  re-rendered, and no crops were added. `PROVENANCE.md`, `index.md`, both
+  tools and all PNG/SVG are untouched.
+- Docs: `MENU-DRAFT.md` draft 6 (*Direction chips*, question 17: DI / SDI only,
+  Airdodge and Shield Tilt keep arrows), `docs/MENU-PROPOSAL.md` v7,
+  `specs/SPEC-core-07` §4.6 (rule, findings, V1–V5, test rows E5/E6, Q7),
+  `specs/SPEC-cpu-02` §2 pointer.
+- Next: the primary schedules the three-run Eden capture in SPEC-core-07 §4.6
+  (DI Up; SDI Up High; DI Out, with Hitbox Visualization off). Then crop under
+  `docs/menu-mockup/captures/`, pin it in `index.md`, add a PROVENANCE note and
+  re-render 01, 09 and 16. Optional: an effect-hash probe for V1 (a build).
+- Push: docs-only, pushed to `origin/review/menu-proposal` under the standing
+  order. No Eden run, no build.
+
 ## Menu proposal v6 — 2026-11-01 (origin tags off the screens)
 
 - Worker: Claude session `4156eb7d-f07f-4a1a-83c7-2bf3e9e95661` under primary

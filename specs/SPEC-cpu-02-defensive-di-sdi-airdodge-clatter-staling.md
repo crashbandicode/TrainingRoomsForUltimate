@@ -33,6 +33,8 @@ The `Direction` option list, used by DI, SDI and Airdodge Direction (and Shield 
 | Left | `LEFT` | π, absolute (never mirrored) |
 | Right | `RIGHT` | 0, absolute (never mirrored) |
 
+In the clean-room menu these rows are direction grids (MENU-DRAFT.md draft 3). The DI and SDI chips show the game's own DI / SDI direction visual, read from the game at run time and never baked; Airdodge Direction (and Shield Tilt) keep the clean room's arrows (draft 6). The asset is not yet identified; rule, unknowns and the capture needed are in `SPEC-core-07` §4.6. The behaviour below does not depend on it.
+
 "Out" and "In" are relative to the opponent: an angle `a` is mirrored to `π − a` when the player entry's x position is greater than the CPU's x position (the player stands to the CPU's right) and the direction is not Left/Right. The stick vector is `(cos a, sin a)`. An empty row (nothing selected) means "do not interfere".
 
 | Row (Defensive tab) | Setting key | Type | Values | Default |

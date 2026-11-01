@@ -141,6 +141,29 @@ Never `arc:/` for these thumbnails: it is the vanilla view. Resolve the ARCropol
 - U7 **Timing and cost.** The time to read and decode 16 files on page open on the console, and whether a one-page cache is needed (16 × 20,584 B ≈ 330 KB stock; mods may be larger).
 - U8 **Added stages.** Stage-expansion mods that add entries to `ui_stage_db.prc` are out of scope; the list stays the fork's 115 (+ Waiting Room).
 
+### 4.6 DI / SDI direction chips from the game's own visual at run time (MENU-DRAFT.md draft 6, question 17)
+
+**Rule.** The chips of the DI Direction and SDI Direction grids show the visual the game itself draws for a DI / SDI direction, described in review as a blue streak and a white arc. It is read from the player's game files when the grid opens, through the mod-aware route of §4.5 (U1–U3). Nothing is drawn after it, committed to the repository or baked into the layout archive. If the read fails, the chip shows the clean room's own arrow, never a stored copy of the game's picture. Airdodge Direction and Shield Tilt keep the clean room's arrows (the game's visual belongs to hitlag and launch; MENU-DRAFT.md *Direction chips*). Neutral keeps the ring; Left / Right reuse the In / Out picture with an `abs` mark.
+
+**What is established (2026-11-01).**
+
+| Finding | Source |
+| --- | --- |
+| Neither the fork nor upstream draws, requests or hides any DI / SDI visual: DI writes the two damage-vector stick floats, SDI answers the game's hitlag-command query with a vector (SPEC-cpu-02 §4). Any visual is the game's own reaction | fork M5i `src/training/directional_influence.rs`, `src/training/sdi.rs:31-55`; every `Hash40::new("sys_…")` in fork and upstream `src/` (none DI-related) |
+| Upstream's `di_state.svg` / `sdi_state.svg` (§4.1) are black glyphs (a comet with speed lines, a jagged arc), not the game's visual, and stay unused | upstream `src/static/img/`; `photos/defensive_settings.png` |
+| The hash-label list has four system effects whose names could fit: `sys_direction` `0x0d4635c187`, `sys_direction2` `0x0e694f9d4f`, `sys_vector` `0x0aff1ac5b6`, `sys_hitstop_spark` `0x11c6e92484`. Nothing ties any of them to DI or SDI; they are names, not findings | `artifacts/enhancements/stage-assets/ParamLabels.csv` (sha256 `ba4a818c75d0ca2c2c180b0af8bddf3a7502ca3faf59fac9d5f63132aa21d7e5`) |
+| No existing capture shows the visual: no recorded run set DI / SDI, and the only hit footage (upstream `photos/mash_trigger_tumble.gif`, 640×360) shows attack effects, not a DI / SDI marker | captures under `artifacts/`; the GIF viewed every 6th frame 0–186 and every frame 144–175 |
+
+**Unknowns (to resolve before the chips are implemented).**
+
+- V1 **Which asset.** Effect name and file (an effect emitter in a system effect file, or a UI texture), and whether DI and SDI share one visual.
+- V2 **Shape per direction.** Whether the game draws one shape along the influence vector (one picture, rotated to each angle of SPEC-cpu-02 §2) or a different shape per direction.
+- V3 **Colour.** Effect textures are often greyscale and coloured by emitter parameters; the blue and white may live in the effect's parameters rather than the texture. The chip then has to apply the colour the effect specifies, read from the same file.
+- V4 **Read and bind.** The same route (§4.5 U1–U3) and pane binding (U4) as the stage thumbnails, for a file inside the effect archive.
+- V5 **Cost.** Bytes read per grid open; one picture shared by all chips if V2 allows.
+
+**Capture needed (for the primary to schedule; nothing was run for this section).** Eden, an owned test profile muted (`core.volume=0`), game 13.0.5 with the fork's current validated NRO; Training on Final Destination (dark backdrop for a white arc); fork menu *Hitbox Visualization* **off** (it hides effects); Training speed 1/4 or frame advance; CPU damage about 100 % so the launch is strong. Run A: DI Direction = **Up** only, SDI empty; P1 lands a fully charged forward smash; screenshot every frame from hit through about 20 frames of launch. Run B: DI empty, SDI Direction = **Up**, SDI Strength **High**, the same hit; every frame of hitlag. Run C: Run A with DI = **Out** (or Down), to settle V2. Keep the game frame at a known geometry (1280×720 native, or the 1920×1080 window grab with the frame at (361,181) scaled 1198×674 as the v4 crops). To settle V1 directly: a development probe that logs the effect hashes requested on the CPU during those frames and compares them with the four candidates above (a build; not done here).
+
 
 ## 5. Timing and frame rules
 
@@ -175,6 +198,7 @@ None.
 | Pane-name contract (SPEC-core-03 §4.2) satisfied by the archive | `core07_pane_contract` (parse the built BFLYT names) | `core07-E1` | — |
 | Fork generators reproduce from recorded digests | fork `reproduce.py` checks | — | `scripts/*/assets/sources.json` |
 | Stage grid draws the run-time texture, mods apply, no baked stage picture (§4.5) | `core07_no_stage_pictures` (no `stage_icon_NNN` texture in the built archive; no stage PNG in the repo); `core07_stage_paths` (every catalog row maps to its `replace` / `replace_patch` path) | `core07-E2`: the stage grid on a profile with a stage mod that replaces a stage's UI texture (e.g. the Final Destination mod) shows the mod's picture on that tile and stock pictures elsewhere; `core07-E3`: the same without the mod shows stock; `core07-E4`: a missing or refused file shows the text tile | `docs/EDEN-RESULTS.md` |
+| DI / SDI chips draw the game's own visual at run time, nothing baked, arrow fallback (§4.6) | `core07_no_di_sdi_pictures` (no DI / SDI picture in the repo or the built archive) | `core07-E5`: the DI and SDI grids show the game's visual in each direction; `core07-E6`: an unreadable asset shows the clean room's arrows | `docs/EDEN-RESULTS.md` |
 
 ## 10. Open questions
 
@@ -184,3 +208,4 @@ None.
 4. **Check mark and digits.** Replace the Font Awesome check with an original glyph; the digits `1`–`5` are text rendered as pictures upstream — the clean room could use the game font in a text pane instead of pictures (fewer textures).
 5. **Stage thumbnails at run time (§4.5).** Decided: read at run time, never baked. Open: U1–U8 (load route and its thread/lock rules, `mods:/` semantics, the game-loader entry point, binding a run-time BNTX to a picture pane, the texture slot mods replace, forms, cost, added stages). Recommendation: resolve U5 first from the operator's Final Destination mod's file list, then U1–U3 with one bounded development probe that reads one stock and one modded stage through each candidate route and logs size and sha256.
 6. **Fighter portraits** (MENU-DRAFT.md question 16, open): whether the portrait grid follows the same rule so character and costume mods show. Not decided here.
+7. **DI / SDI chips (§4.6).** Decided: the game's own visual, read at run time, never baked; DI and SDI only. Open: V1–V5. Recommendation: the three-run capture in §4.6 first (it settles V2 and gives the review its real chips), then the effect-hash probe for V1, then V3–V5 together with §4.5 U1–U4.
