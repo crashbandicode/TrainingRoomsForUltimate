@@ -28,7 +28,7 @@ mod more;
 '''
 # Lines that count: fn a() {, let s = ..., let t = 1;, }  -> 4.
 
-ENTRY = '[[budget]]\nscope = "{scope}"\nceiling = {ceiling}\ndate = "{date}"\nreason = "{reason}"\n{extra}\n'
+ENTRY = '[[budget]]\nbasis = "rustfmt-sloc4"\nscope = "{scope}"\nceiling = {ceiling}\ndate = "{date}"\nreason = "{reason}"\n{extra}\n'
 
 
 def budget(*entries):
@@ -68,6 +68,20 @@ class Counting(unittest.TestCase):
         self.assertGreaterEqual(tests, 2 + 4)
 
 
+    def test_layout_normalization_and_script_exclusion(self):
+        compact = {"src/a.rs": "fn f(){let x=1;let y=2;consume(x,y);}"}
+        expanded = {"src/a.rs": "fn f() {\n    let x = 1;\n    let y = 2;\n    consume(x, y);\n}\n"}
+        expected = sloc.measure_normalized(expanded, 0)
+        self.assertEqual(sloc.measure_normalized(compact, 0), expected)
+        self.assertEqual(expected[0]["src/a.rs"], 5)
+        compact["tools/script.rs"] = "fn script() {}"
+        self.assertEqual(sloc.measure_normalized(compact, 0), expected)
+
+    def test_invalid_rust_cannot_receive_a_count(self):
+        with self.assertRaisesRegex(ValueError, "rustfmt failed"):
+            sloc.measure_normalized({"src/bad.rs": "fn {"}, 0)
+
+
 class Budget(unittest.TestCase):
     def check(self, text):
         import tomllib
@@ -93,6 +107,20 @@ class Budget(unittest.TestCase):
         self.assertIn('trailing slash', errors[0])
         _, errors = self.check(budget(approved('src/model', 100)))
         self.assertEqual(errors, ['no "total" ceiling'])
+
+
+    def test_unit_migration_preserves_raw_history_and_needs_approval(self):
+        entries = [
+            dict(scope="total", ceiling=100, date="2026-11-02", reason="old", approved_by="lead"),
+            dict(scope="total", ceiling=130, date="2026-11-02", reason="normalized",
+                 basis=sloc.NORMALIZED_BASIS, approved_by="operator"),
+            dict(scope="total", ceiling=120, date="2026-11-02", reason="cut",
+                 basis=sloc.NORMALIZED_BASIS),
+        ]
+        self.assertEqual(size_gate.check_budget(entries), ({"total": 120}, []))
+        self.assertEqual(size_gate.check_budget(entries, "raw-sloc4"), ({"total": 100}, []))
+        del entries[1]["approved_by"]
+        self.assertIn("the first ceiling needs approved_by", size_gate.check_budget(entries)[1][0])
 
 
 class Gate(unittest.TestCase):

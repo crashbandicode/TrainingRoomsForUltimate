@@ -1,8 +1,11 @@
-"""Implementation code lines in Rust: no blank lines, no comments, no tests (the primary's counter, v4).
+"""Rustfmt-normalized implementation code lines in Rust: no blank lines, no comments, no tests (the primary's counter, v4).
 
 Provenance: the primary's tool /home/intpa/smash-training-lobby/tools/sloc4.py (2026-11-02, sha256
 6dcb208c203b4adcbd8c06c67347726e62c0582bd254723e3a4b6a1dd030fc19), copied 2026-11-02 by the slim stream with its
 counting rules unchanged, so totals stay comparable with the fork's count. It replaces the earlier copy of sloc3.py.
+Normalized measurement provenance: operator tools/sloc-fmt.ps1 SHA256 ace31db0d654530e3e4faf719dadaef557003510bb4edabed59a5fa42fe77898.
+CLI and size_gate format each file via pinned stable rustfmt stdin (edition2021, skip_children=true), then apply
+unchanged measure() rules. Scripts/tools are excluded from normalized implementation totals. No source is modified.
 Changes: vendored code under third_party/ is excluded and reported on its own line; a `tree` mode counts the working
 tree's tracked and untracked-not-ignored files (what tools/size_gate.py gates); depth 0 lists single files; the
 counting is a function (`measure`) that size_gate.py imports.
@@ -188,6 +191,37 @@ def measure(files, depth):
     return impl, sim, tests, vendored
 
 
+# Operator's sloc-fmt.ps1, 2026-11-02: edition 2021 and stable formatter.
+# Format isolated stdin so measurement never edits source or follows module paths.
+# The operator's final comparison excludes scripts (tools/ and scripts/).
+NORMALIZED_BASIS = "rustfmt-sloc4"
+RUSTFMT_VERSION = "rustfmt 1.9.0-stable (48a229ceae 2026-09-01)"
+
+
+def normalized_files(files):
+    rustup = pathlib.Path.home() / ".cargo/bin/rustup"
+    command = [str(rustup), "run", "stable", "rustfmt"]
+    version = subprocess.run(command + ["--version"], capture_output=True, text=True,
+                             check=True, timeout=30).stdout.strip()
+    if version != RUSTFMT_VERSION:
+        raise ValueError(f"normalization requires {RUSTFMT_VERSION}; found {version}")
+    result = {}
+    for name, text in files.items():
+        if in_dirs(name, VENDORED_DIRS) or name.startswith(("tools/", "scripts/")):
+            continue
+        formatted = subprocess.run(
+            command + ["--edition", "2021", "--config", "skip_children=true", "--emit", "stdout"],
+            input=text, capture_output=True, text=True, timeout=30)
+        if formatted.returncode:
+            raise ValueError(f"rustfmt failed for {name}: {formatted.stderr.strip()}")
+        result[name] = formatted.stdout
+    return result
+
+
+def measure_normalized(files, depth):
+    return measure(normalized_files(files), depth)
+
+
 def main(argv):
     mode = argv[1]
     if mode == 'git':
@@ -196,7 +230,8 @@ def main(argv):
         files, rest = files_dir(argv[2]), argv[3:]
     else:
         files, rest = files_tree(argv[2]), argv[3:]
-    impl, sim, tests, vendored = measure(files, int(rest[0]) if rest else 1)
+    impl, sim, tests, vendored = measure_normalized(files, int(rest[0]) if rest else 1)
+    print(f'Basis: {NORMALIZED_BASIS}; {RUSTFMT_VERSION}; edition 2021; scripts excluded')
     for g, n in sorted(impl.items(), key=lambda kv: -kv[1]):
         print(f'{g:40s} {n:8d}')
     print(f'{"TOTAL (implementation, no tests)":40s} {sum(impl.values()):8d}')

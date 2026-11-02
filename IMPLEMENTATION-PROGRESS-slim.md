@@ -1368,3 +1368,49 @@ keyboard/capacity reduction, no workaround. No work-buffer patch applied yet.
 
 ## Slim scratch and approved owner fix23:02Z
 Adopted ext4 TMPDIR=/home/intpa/smash-training-lobby/tmp-slim. Four owned inactive archives/binaries hash-verified then relocated; freed 46952448B, manifest tmp-slim/retired-scratch/move-manifest.json. Live helpers/watchers untouched. Applying only approved two lifecycle OWNER patch32aba4b7; parentSTATE unchanged. StaticWork remains HELD; prepared UNAPPLIED patch /tmp/slim/keyboard-static-work.patch SHA57f66fe9ab95db90843a3b932f1964dfef3d8dac28f1275cf3deea956c3488be preserved for review, not an implementation request until off-hook contract is established. Superseding queued839 host after new owner source freeze; no compileclaim/Eden/profile.
+
+## Slim keyboard hook-bound allocation proof23:07Z
+StaticWork still HELD/unapplied pending lead decision. Distinguish two real consumers:
+native_keyboard::service at native_keyboard.rs261 is the naming UI worker.
+Mii name_keyboard::name_frame is a registered Skyline hook at0x180a570,
+init called by mii_editor_bridge::init at mod.rs764. Fresh839ELF shows
+name_frame184ce0 directly calls Keyboard::open52da4 at184f78 (no worker hop).
+Open52e70 count and52e7c alloc1688. Its owner-thread guard qualifies Session's
+native editor thread, not the tr-menu worker. This is a hook-owned allocation,
+regardless of the separate macro-worker consumer. Applicable contract:
+playbook CHECKLIST.md33 'No heap in hooks'; slim brief27 'every hook allocation
+delta 0'. Work proposal preserves the required work buffer's 0x698/8-byte ABI,
+zeroing and exclusive Lease/Finalize lifetime; moves storage only. Full exactpatch
+SHA57f66fe9ab95db90843a3b932f1964dfef3d8dac28f1275cf3deea956c3488be
+at /tmp/slim/keyboard-static-work.patch; awaiting bounded authorization.
+Approved lifecycle-owner fix now33a9713; carry253+42PASS, fresh frozen1184 target
+was empty, archive5faf7bf26dad60d63ad0fdd2efaac8f9300b03588f761f302bd3f2f6357ac012.
+
+## Slim operator normalized-gate routing 2026-11-02T23:08:46.614203+00:00
+Primary just reiterated explicit operator requirement: change tools/sloc.py/size_gate
+to rustfmt-normalized sloc4, baseline fork131081 and cleanebf136069 excluding scripts;
+next-version111400 target is not RC blocker, L2 hos-lock allows approved.
+Current gate is still RAW103200 and historical pending4318; I will implement explicit
+measurement basis/version provenance, preserving historical entries, no raw/normalized
+comparison. Need lead's current NORMALIZED RC ceiling / pending allowance for initial
+normalized budget entry. Proposed safe initial unit migration: original normalized
+ebf136069 ceiling, then ratchet to measured coherent composition+approved remaining
+pending; this is NOT silently raising raw103200. Please confirm numeric authorized
+normalized ceiling or supply it. New source must not claim gatepass until this is settled.
+Current33a host already running frozen before staticWork approval; next gates batch exact
+approved staticWork and normalized implementation, no repeated abandoned full waves.
+
+## Approved static work and normalized gate checkpoint 2026-11-02T23:12:29.126122+00:00
+33a9713 fresh host PASS: 74 harnesses, counts [11656, 0, 6];
+74 executed binaries hashed,1184 tracked unchanged,89.648s/peak4100202496B,
+log7a22595dfa921cd037d36e54be459ae65d043f89fc174438d5becbf103404e41.
+Yoga claim released23:09 after controller reaped. No own current compiler/Eden/profile.
+Applied exact lead23:06 staticWork patch57f66fe9; carry253PASS.
+Added a test that imports the actual native adapter and supplies only the SDK boundary:
+exclusive sync/inline lease, failed Initialize release, stable aligned zeroed storage,
+poll/cancel, wrong-thread refusal, close/reopen, interruption snapshot, orphan lease.
+This is protocol evidence only; SDK internals/runtime still unverified.
+Operator normalized gate implemented with unchanged sloc4 measure rules, pinnedformatter,
+separate historical raw budget basis. Lead23:11 approved initial136069 normalizedceiling.
+Nine counter/gate tests PASS; currentworking normalized130570<=136069.
+Independent operator-tool parity at33a9713 running; finalfreshCargo gates pending.

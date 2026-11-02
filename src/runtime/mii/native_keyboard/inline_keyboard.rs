@@ -2,6 +2,7 @@
 //! Mii editing and waiting naming share one lease and callback signals. The caller
 //! owns its keyboard on one UI thread and never persists its pointers.
 //! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.
+use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use hos_lock::Mutex;
 
@@ -80,6 +81,22 @@ struct Object { implementation: usize, work: usize }
 #[repr(C, align(8))]
 struct Work([u8; 0x698]);
 
+struct WorkStorage(UnsafeCell<Work>);
+// SAFETY: only the exclusive keyboard Lease can expose or clear this region.
+// The lease stays owned through Finalize/Destruct; an orphan keeps it forever.
+unsafe impl Sync for WorkStorage {}
+static WORK: WorkStorage = WorkStorage(UnsafeCell::new(Work([0; 0x698])));
+
+impl Lease {
+    fn prepare_work(&mut self) -> *mut std::ffi::c_void {
+        let work = WORK.0.get();
+        // SAFETY: acquiring this lease excludes both inline and synchronous
+        // keyboard owners. The previous owner finalized before releasing it.
+        unsafe { work.write(Work([0; 0x698])); }
+        work.cast()
+    }
+}
+
 #[repr(C)]
 struct InputText([u16; 506]);
 
@@ -126,8 +143,6 @@ pub(crate) struct Poll {
 
 pub(crate) struct Keyboard {
     object: Object,
-    // Allocation stays alive and aligned until SDK Finalize has returned.
-    work: Option<Box<Work>>,
     text: Text,
     thread: usize,
     active: bool,
@@ -143,12 +158,12 @@ impl Keyboard {
         if thread != current_thread() || sdk_work_size() != 0x698 {
             return None;
         }
-        let lease = Lease::acquire()?;
+        let mut lease = Lease::acquire()?;
         *SIGNALS.lock() = Signals { limit: text.limit(), ..Signals::default() };
-        let mut work = Box::new(Work([0; 0x698]));
+        let work = lease.prepare_work();
         let mut object = Object { implementation: 0, work: 0 };
         sdk_construct(&mut object);
-        if !sdk_initialize(&mut object, work.0.as_mut_ptr().cast(), true, 1) {
+        if !sdk_initialize(&mut object, work, true, 1) {
             sdk_destruct(&mut object);
             return None;
         }
@@ -170,7 +185,7 @@ impl Keyboard {
             padding1: [0; 7], user_id: [0; 16],
         };
         sdk_appear(&mut object, &appear);
-        Some(Self { object, work: Some(work), text, thread, active: true,
+        Some(Self { object, text, thread, active: true,
                     initialized: false, invalid: false, lease: Some(lease) })
     }
 
@@ -205,7 +220,6 @@ impl Keyboard {
             sdk_destruct(&mut self.object);
             self.active = false;
             *SIGNALS.lock() = Signals::default();
-            self.work = None;
             self.lease = None;
         }
         true
@@ -215,11 +229,10 @@ impl Keyboard {
 impl Drop for Keyboard {
     fn drop(&mut self) {
         if self.active {
-            // A mistaken owner drop must not free SDK-owned storage or finalize
-            // on a different thread. Keep the lease unavailable too: otherwise
+            // A mistaken owner drop must not finalize on a different thread.
+            // Keep the static work region leased and unavailable: otherwise
             // an orphaned callback could corrupt the next keyboard's signals.
             // Normal completion and suspension explicitly close on the owner.
-            if let Some(work) = self.work.take() { std::mem::forget(work); }
             if let Some(lease) = self.lease.take() { std::mem::forget(lease); }
             crate::engine::compat::logging::diagnostic(format_args!(
                 "[NativeKeyboard] keyboard_owner_dropped_before_finalize; lease retained"));

@@ -5,6 +5,9 @@ as "src/runtime/roster"), `ceiling`, `date` (YYYY-MM-DD), `reason` and, where ne
 of a scope is its ceiling. The first entry of a scope, and every entry that raises its scope's ceiling, must name
 the lead's approval in `approved_by`; lowering a ceiling (the ratchet) needs only a reason. Dates never go back.
 
+Entries without basis are historical raw-sloc4. Only rustfmt-sloc4 entries gate the normalized count;
+first ceilings and raises are checked separately for each basis, preserving the old audit history.
+
 Prints the per-module table (depth 3), the host-only simulator and test lines the count leaves out, and each budgeted
 scope. Exit status: 0 within budget, 1 over a ceiling, 2 when the budget file breaks the rules above.
 usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N]"""
@@ -25,9 +28,9 @@ except ImportError:  # Python < 3.11
 DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
 
-def check_budget(entries):
+def check_budget(entries, basis=sloc.NORMALIZED_BASIS):
     """(ceilings by scope, list of rule violations)."""
-    errors, ceilings, last_date = [], {}, {}
+    errors, history, last_date = [], {}, {}
     for number, entry in enumerate(entries, 1):
         where = f'[[budget]] #{number}'
         scope, ceiling = entry.get('scope'), entry.get('ceiling')
@@ -44,13 +47,18 @@ def check_budget(entries):
             errors.append(f'{where} ({scope}): date {date} is before the previous entry\'s {last_date[scope]}')
         if not isinstance(reason, str) or not reason.strip():
             errors.append(f'{where} ({scope}): reason is required')
-        previous = ceilings.get(scope)
+        units = entry.get('basis', 'raw-sloc4')
+        if units not in ('raw-sloc4', sloc.NORMALIZED_BASIS):
+            errors.append(f'{where}: unknown basis {units}')
+        key = (units, scope)
+        previous = history.get(key)
         if (previous is None or ceiling > previous) and not (isinstance(approved, str) and approved.strip()):
             what = 'the first ceiling' if previous is None else f'a raise from {previous} to {ceiling}'
             errors.append(f'{where} ({scope}): {what} needs approved_by (the lead\'s approval)')
-        ceilings[scope] = ceiling
+        history[key] = ceiling
         if isinstance(date, str) and DATE.match(date):
             last_date[scope] = date
+    ceilings = {scope: value for (units, scope), value in history.items() if units == basis}
     if 'total' not in ceilings:
         errors.append('no "total" ceiling')
     return ceilings, errors
@@ -73,12 +81,17 @@ def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
         return 2
     ceilings, errors = check_budget(entries)
     files = sloc.files_git(repo, rev) if rev else sloc.files_tree(repo)
-    per_file, sim, tests, vendored = sloc.measure(files, 0)
+    try:
+        per_file, sim, tests, vendored = sloc.measure_normalized(files, 0)
+    except (OSError, ValueError, sloc.subprocess.SubprocessError) as error:
+        print(f'size_gate: normalization failed: {error}', file=out)
+        return 2
     modules = collections.Counter()
     for name, n in per_file.items():
         modules[sloc.group(name, depth)] += n
     total = sum(per_file.values())
-    print(f'Implementation lines (tools/sloc.py, sloc4 rules) at {rev or "the working tree"}, depth {depth}:', file=out)
+    print(f'Implementation lines (rustfmt-normalized sloc4, scripts excluded) at {rev or "the working tree"}, depth {depth}:', file=out)
+    print(f'  Formatter: {sloc.RUSTFMT_VERSION}; edition 2021', file=out)
     for name, n in sorted(modules.items(), key=lambda kv: -kv[1]):
         print(f'  {name:44s} {n:8d}  {100 * n / max(total, 1):5.1f}%', file=out)
     print(f'  {"TOTAL":44s} {total:8d}', file=out)

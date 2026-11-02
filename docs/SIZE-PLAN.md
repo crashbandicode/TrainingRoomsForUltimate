@@ -313,3 +313,23 @@ hos_lock storage for keyboard Signals. Raw98879 (+2vs78), normalized126463
 excludingtools (-7vs78), rustfmt0failures. Combined cost vs gateda6 is +14raw/
 +11normalized; pending4318 yields103197 within unchanged103200 ceiling.
 Compiled/native acceptance is tracked separately; no line-budget increase.
+
+### Normalized gate migration (operator/lead23:11, 2026-11-02)
+
+tools/sloc.py CLI and tools/size_gate.py now measure rustfmt-normalized sloc4.
+The pinned formatter is rustfmt1.9.0-stable48a229ceae, edition2021, matching the
+operator's sloc-fmt.ps1. Each file is formatted through isolated stdin with
+skip_children=true, so source files and module children are never edited.
+Formatting errors or a different formatter version fail the gate; no raw fallback.
+The unchanged measure() function remains available for historical raw evidence.
+Scripts/tools, tests, simulator-only code and vendored code do not enter the total.
+
+The historical raw budget remains an audit record. The explicit rustfmt-sloc4
+budget starts at the authorized ebfcb98 normalized136069 ceiling; fork M5q131081
+is the comparator. About111400 (15% under fork) is a next-version target, not an
+RC condition. Neither raw103200 nor its outdated raw4318 pending estimate is
+treated as normalized units. The lead will ratchet after coherent Setup/UI/F9
+composition; no additional normalized pending allowance has been invented.
+Operator-approved L2 retains the two hos-lock declare_interior_mutable_const
+allows. The current slim working candidate measures130570 (src127132+crates3438);
+exact-source final measurement and gates remain required.

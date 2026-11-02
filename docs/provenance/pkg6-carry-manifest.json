@@ -3305,7 +3305,7 @@
    "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "aad883d18dbbdd14998649ebd3182afabf3c5498804f17d49767f275c1a7ec37",
+   "dest_sha256": "b33d6899222556fafe0acf70162bc4b56ff63e7dd3e6f39527897507732b5300",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -3396,6 +3396,48 @@
      "new": "SIGNALS.lock()",
      "count": 9,
      "reason": "Lead21:59 authorizes exact Signals lock root: const hos_lock storage removes proven cold OnceBox allocation; same guards, lease and SDK ordering."
+    },
+    {
+     "old": "//! Mii editing and waiting naming share one lease and callback signals. The caller\n//! owns its keyboard on one UI thread and never persists its pointers.\n//! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.\nuse std::sync::atomic::{AtomicBool, Ordering};\nuse hos_lock::Mutex;\n\n",
+     "new": "//! Mii editing and waiting naming share one lease and callback signals. The caller\n//! owns its keyboard on one UI thread and never persists its pointers.\n//! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.\nuse std::cell::UnsafeCell;\nuse std::sync::atomic::{AtomicBool, Ordering};\nuse hos_lock::Mutex;\n\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "\n#[repr(C, align(8))]\nstruct Work([u8; 0x698]);\n\n#[repr(C)]\nstruct InputText([u16; 506]);\n",
+     "new": "\n#[repr(C, align(8))]\nstruct Work([u8; 0x698]);\n\nstruct WorkStorage(UnsafeCell<Work>);\n// SAFETY: only the exclusive keyboard Lease can expose or clear this region.\n// The lease stays owned through Finalize/Destruct; an orphan keeps it forever.\nunsafe impl Sync for WorkStorage {}\nstatic WORK: WorkStorage = WorkStorage(UnsafeCell::new(Work([0; 0x698])));\n\nimpl Lease {\n    fn prepare_work(&mut self) -> *mut std::ffi::c_void {\n        let work = WORK.0.get();\n        // SAFETY: acquiring this lease excludes both inline and synchronous\n        // keyboard owners. The previous owner finalized before releasing it.\n        unsafe { work.write(Work([0; 0x698])); }\n        work.cast()\n    }\n}\n\n#[repr(C)]\nstruct InputText([u16; 506]);\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "\npub(crate) struct Keyboard {\n    object: Object,\n    // Allocation stays alive and aligned until SDK Finalize has returned.\n    work: Option<Box<Work>>,\n    text: Text,\n    thread: usize,\n    active: bool,\n",
+     "new": "\npub(crate) struct Keyboard {\n    object: Object,\n    text: Text,\n    thread: usize,\n    active: bool,\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "        if thread != current_thread() || sdk_work_size() != 0x698 {\n            return None;\n        }\n        let lease = Lease::acquire()?;\n        *SIGNALS.lock() = Signals { limit: text.limit(), ..Signals::default() };\n        let mut work = Box::new(Work([0; 0x698]));\n        let mut object = Object { implementation: 0, work: 0 };\n        sdk_construct(&mut object);\n        if !sdk_initialize(&mut object, work.0.as_mut_ptr().cast(), true, 1) {\n            sdk_destruct(&mut object);\n            return None;\n        }\n",
+     "new": "        if thread != current_thread() || sdk_work_size() != 0x698 {\n            return None;\n        }\n        let mut lease = Lease::acquire()?;\n        *SIGNALS.lock() = Signals { limit: text.limit(), ..Signals::default() };\n        let work = lease.prepare_work();\n        let mut object = Object { implementation: 0, work: 0 };\n        sdk_construct(&mut object);\n        if !sdk_initialize(&mut object, work, true, 1) {\n            sdk_destruct(&mut object);\n            return None;\n        }\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "            padding1: [0; 7], user_id: [0; 16],\n        };\n        sdk_appear(&mut object, &appear);\n        Some(Self { object, work: Some(work), text, thread, active: true,\n                    initialized: false, invalid: false, lease: Some(lease) })\n    }\n\n",
+     "new": "            padding1: [0; 7], user_id: [0; 16],\n        };\n        sdk_appear(&mut object, &appear);\n        Some(Self { object, text, thread, active: true,\n                    initialized: false, invalid: false, lease: Some(lease) })\n    }\n\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "            sdk_destruct(&mut self.object);\n            self.active = false;\n            *SIGNALS.lock() = Signals::default();\n            self.work = None;\n            self.lease = None;\n        }\n        true\n",
+     "new": "            sdk_destruct(&mut self.object);\n            self.active = false;\n            *SIGNALS.lock() = Signals::default();\n            self.lease = None;\n        }\n        true\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
+    },
+    {
+     "old": "impl Drop for Keyboard {\n    fn drop(&mut self) {\n        if self.active {\n            // A mistaken owner drop must not free SDK-owned storage or finalize\n            // on a different thread. Keep the lease unavailable too: otherwise\n            // an orphaned callback could corrupt the next keyboard's signals.\n            // Normal completion and suspension explicitly close on the owner.\n            if let Some(work) = self.work.take() { std::mem::forget(work); }\n            if let Some(lease) = self.lease.take() { std::mem::forget(lease); }\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[NativeKeyboard] keyboard_owner_dropped_before_finalize; lease retained\"));\n",
+     "new": "impl Drop for Keyboard {\n    fn drop(&mut self) {\n        if self.active {\n            // A mistaken owner drop must not finalize on a different thread.\n            // Keep the static work region leased and unavailable: otherwise\n            // an orphaned callback could corrupt the next keyboard's signals.\n            // Normal completion and suspension explicitly close on the owner.\n            if let Some(lease) = self.lease.take() { std::mem::forget(lease); }\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[NativeKeyboard] keyboard_owner_dropped_before_finalize; lease retained\"));\n",
+     "count": 1,
+     "reason": "Lead23:06 approved real name_frame hook allocation root: lease-owned aligned static SDK work region preserves ABI, exclusive acquisition, zeroing, Finalize/Destruct order and orphan lease retention."
     }
    ]
   },
