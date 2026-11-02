@@ -3130,7 +3130,7 @@
    "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "0dcd86c939a45fe4034e484088904506dfb3d053e92fed4655c08933c5c19557",
+   "dest_sha256": "aad883d18dbbdd14998649ebd3182afabf3c5498804f17d49767f275c1a7ec37",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -3209,6 +3209,18 @@
      "new": "",
      "count": 1,
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};",
+     "new": "use std::sync::atomic::{AtomicBool, Ordering};\nuse hos_lock::Mutex;",
+     "count": 1,
+     "reason": "Lead21:59 authorizes exact Signals lock root: const hos_lock storage removes proven cold OnceBox allocation; same guards, lease and SDK ordering."
+    },
+    {
+     "old": "SIGNALS.lock().unwrap()",
+     "new": "SIGNALS.lock()",
+     "count": 9,
+     "reason": "Lead21:59 authorizes exact Signals lock root: const hos_lock storage removes proven cold OnceBox allocation; same guards, lease and SDK ordering."
     }
    ]
   },

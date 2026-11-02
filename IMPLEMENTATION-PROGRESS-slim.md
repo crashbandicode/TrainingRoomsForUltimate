@@ -1120,3 +1120,15 @@ SMDcratePASS; hos-lockcratecurrentlyownedYoga. NoEden/profile; continuing.
 
 
 78f440d crate gate receipts: SMD cargo0 4.423s, raw40c71e96adc38d1acb23e6d0a3ffaf56f410a1d83d3eae8c93aeb12f29db645c; hos-lock cargo0 0.481s, rawb787c60a11f9622c0cb78f77e67aa6a8086c5d58906d5bd5556970087c288f3a. Both1112sourcehashesunchanged, allclaimsreleased21:58.
+
+## Signals lock root authorized and applied — 2026-11-02T22:02:25.452368+00:00
+Lead21:59 read exact3684a52f patch and authorized onlySignals lock root. Applied
+with exact carry edits,253verified, ledger regenerated. Callback/Calc/Finalize
+order, guards, lease and SDK ABI untouched. Native first-use and callback
+reachability remain open until exact compiled/integrated evidence.
+b4c8b56 freezes earlier missingReadycfg correction; staged1112files/nojob, target
+moved from78 then oldhostdebug retired1735785219B with fullSHAmanifest and saved
+keyboardbinary. Fresh global56571381361B. Next freeze combinedfix, reuse idle
+target, first extraeditor matrix then host/native gates and compiledcoldlock.
+SMD24passed/0failed/0ignored; hos-lock20/0/0 on78; crate sources unchanged.
+Allclaimsreleased21:58; noEden/profile. Futureleadrequests appended at END.

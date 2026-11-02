@@ -417,3 +417,5 @@ It is a regression baseline, not a completed fix or runtime acceptance.
 Keyboard root follow-up: pure value carry transforms now use checked u8 metadata and allocation-free UTF-16 encoding/validation. The ten-unit raw Mii contract, 48-scalar Macro contract and cursor boundaries are preserved by original exported-code probes. Only the superseded keyboard large-enum lint row is removed.
 
 Editor-only matrix correction: mii_ordinary_cpu_native original-kind match now applies the same existing coexistence/test cfg as Helper::Ready. This repairs a missing arm condition from the earlier slim feature-scope cleanup; full-feature behavior is unchanged. Actual failed E0599 and corrected carry253 verification retained.
+
+Lead21:59 authorized exact native keyboard Signals mutex replacement with hos_lock const storage; native cold OnceBox allocation proved in78f440d ELF. Only import and guard unwrap transformations; SDK/lease/guard extents unchanged.

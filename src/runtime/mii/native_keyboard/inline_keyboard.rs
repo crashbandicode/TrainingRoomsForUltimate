@@ -2,7 +2,8 @@
 //! Mii editing and waiting naming share one lease and callback signals. The caller
 //! owns its keyboard on one UI thread and never persists its pointers.
 //! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.
-use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use hos_lock::Mutex;
 
 use crate::engine::mii::inline_keyboard::{Limit, Signals};
 pub(crate) use crate::engine::mii::inline_keyboard::{Decision, Text};
@@ -55,23 +56,23 @@ struct Entered {
 
 unsafe extern "C" fn changed(arg: *const Changed) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);
+    SIGNALS.lock().change(&arg.text, arg.len, arg.cursor);
 }
 
 unsafe extern "C" fn moved(arg: *const Moved) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);
+    SIGNALS.lock().change(&arg.text, arg.len, arg.cursor);
 }
 
 unsafe extern "C" fn entered(arg: *const Entered) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().unwrap().enter(&arg.text, arg.len);
+    SIGNALS.lock().enter(&arg.text, arg.len);
 }
 
-unsafe extern "C" fn cancelled() { SIGNALS.lock().unwrap().cancel(); }
+unsafe extern "C" fn cancelled() { SIGNALS.lock().cancel(); }
 
-unsafe extern "C" fn initialized() { SIGNALS.lock().unwrap().initialized = true; }
-unsafe extern "C" fn finished() { SIGNALS.lock().unwrap().finished = true; }
+unsafe extern "C" fn initialized() { SIGNALS.lock().initialized = true; }
+unsafe extern "C" fn finished() { SIGNALS.lock().finished = true; }
 
 #[repr(C)]
 struct Object { implementation: usize, work: usize }
@@ -143,7 +144,7 @@ impl Keyboard {
             return None;
         }
         let lease = Lease::acquire()?;
-        *SIGNALS.lock().unwrap() = Signals { limit: text.limit(), ..Signals::default() };
+        *SIGNALS.lock() = Signals { limit: text.limit(), ..Signals::default() };
         let mut work = Box::new(Work([0; 0x698]));
         let mut object = Object { implementation: 0, work: 0 };
         sdk_construct(&mut object);
@@ -181,7 +182,7 @@ impl Keyboard {
         let state = sdk_calc(&mut self.object);
         #[cfg(not(feature = "mii-editor-alpha"))]
         sdk_calc(&mut self.object);
-        let signals = std::mem::replace(&mut *SIGNALS.lock().unwrap(),
+        let signals = std::mem::replace(&mut *SIGNALS.lock(),
             Signals { limit: self.text.limit(), ..Signals::default() });
         if let Some(text) = signals.text { self.text = text; }
         self.initialized |= signals.initialized;
@@ -203,7 +204,7 @@ impl Keyboard {
             sdk_finalize(&mut self.object);
             sdk_destruct(&mut self.object);
             self.active = false;
-            *SIGNALS.lock().unwrap() = Signals::default();
+            *SIGNALS.lock() = Signals::default();
             self.work = None;
             self.lease = None;
         }
