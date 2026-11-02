@@ -1,32 +1,5 @@
 //! Library-test-only regression for allocations observed on s6-09 planning ticks.
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::cell::Cell;
-
-thread_local! {
-    static TRACK: Cell<bool> = const { Cell::new(false) };
-    static COUNT: Cell<usize> = const { Cell::new(0) };
-}
-struct CountAlloc;
-fn allocation() {
-    let _ = TRACK.try_with(|track| {
-        if track.get() { let _ = COUNT.try_with(|count| count.set(count.get() + 1)); }
-    });
-}
-unsafe impl GlobalAlloc for CountAlloc {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        allocation();
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-        allocation();
-        unsafe { System.realloc(ptr, layout, size) }
-    }
-}
-#[global_allocator]
-static ALLOCATOR: CountAlloc = CountAlloc;
+use crate::engine::swap::mii_cycle::compact_regressions::AllocationCount;
 
 #[path = "../../src/runtime/roster/observe.rs"]
 mod observed_map;
@@ -38,8 +11,7 @@ fn const_owner_lock_first_use_and_refusal_do_not_allocate() {
     // separate. No setup lock or warm-up before the measured first acquisition.
     static OWNER: hos_lock::Mutex<Option<[u64; 4]>> = hos_lock::Mutex::new(None);
     std::thread::spawn(|| {
-        COUNT.with(|count| count.set(0));
-        TRACK.with(|track| track.set(true));
+        let measurement = AllocationCount::start();
         let mut owner = OWNER.lock();
         let first = *owner;
         *owner = Some([17, 23, 42, 99]);
@@ -47,8 +19,8 @@ fn const_owner_lock_first_use_and_refusal_do_not_allocate() {
         drop(owner);
         let settled = *OWNER.try_lock().unwrap();
         for _ in 0..128 { assert_eq!(*OWNER.lock(), settled); }
-        TRACK.with(|track| track.set(false));
-        assert_eq!(COUNT.with(Cell::get), 0);
+        let allocations = measurement.finish();
+        assert_eq!(allocations, 0);
         assert_eq!(first, None);
         assert_eq!(settled, Some([17, 23, 42, 99]));
         assert!(refused);
@@ -68,11 +40,10 @@ fn native_release_recipes_use_key_mask_bound_without_allocations() {
                     ReleaseRecipe::OwnedPerKind, batch, &NoConsumers, Role::Player).unwrap();
                 let expected: Vec<_> = orphan_keys(kind, flags).iter(kind)
                     .map(NativeCall::ReleaseKey).chain(std::iter::once(NativeCall::ReleaseKind { kind })).collect();
-                COUNT.with(|count| count.set(0));
-                TRACK.with(|track| track.set(true));
+                let measurement = AllocationCount::start();
                 let calls = ledger.release_fixed(token, &NoConsumers, Role::Player).unwrap();
-                TRACK.with(|track| track.set(false));
-                assert_eq!(COUNT.with(Cell::get), 0);
+                let allocations = measurement.finish();
+                assert_eq!(allocations, 0);
                 assert_eq!(&*calls, expected.as_slice());
                 assert!(ledger.tokens().is_empty());
             }
@@ -95,12 +66,11 @@ fn native_map_walk_preserves_bounds_and_uses_no_heap() {
     owner[2] = base + 63 * std::mem::size_of::<Node>();
     owner[3] = 64;
     let r = owner.as_mut_ptr() as usize;
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     let walked = unsafe { observed_map::walk_map(r) }.expect("64 native nodes");
     let flags = unsafe { observed_map::owner_flags(r) };
-    TRACK.with(|track| track.set(false));
-    assert_eq!(COUNT.with(Cell::get), 0);
+    let allocations = measurement.finish();
+    assert_eq!(allocations, 0);
     assert_eq!(flags, crate::engine::swap::swap_model::ledger::RFlags::TRAINING);
     assert_eq!(walked.len(), 64);
     assert!(walked.iter().enumerate().all(|(i, node)| node.key == i as u32 && node.refs == 1));
@@ -143,14 +113,13 @@ fn reconciliation_streams_counts_and_preserves_duplicate_and_missing_order() {
             if !map.contains_key(key) { expected.missing.push((*key, *refs)); }
         }
         assert_eq!(ledger.reconcile(&actual), expected);
-        COUNT.with(|count| count.set(0));
-        TRACK.with(|track| track.set(true));
+        let measurement = AllocationCount::start();
         assert!(ledger.predicted_iter().eq(predicted.iter().map(|(k, v)| (*k, *v))));
         assert!(ledger.residual_iter(actual.into_iter()).eq(expected.residual.iter().copied()));
         assert!(ledger.missing_iter(actual.into_iter()).eq(expected.missing.iter().copied()));
         assert_eq!(ledger.predicted_map_nodes(), predicted.len());
-        TRACK.with(|track| track.set(false));
-        assert_eq!(COUNT.with(Cell::get), 0);
+        let allocations = measurement.finish();
+        assert_eq!(allocations, 0);
     }
 }
 
@@ -164,17 +133,16 @@ fn native_request_receipts_and_diagnostic_iterators_allocate_nothing() {
         fn write_str(&mut self, text: &str) -> std::fmt::Result { self.0 += text.len(); Ok(()) }
     }
     let mut sink = Sink(0);
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     let mut formatted = true;
     for primary in 0..=0x75 {
         let requests = native_window_requests_fixed([primary, 0x25, 0x26], RFlags::TRAINING);
         formatted &= write!(sink, "{:x?}", DebugIter(requests.iter().map(|r| r.kind))).is_ok();
         std::hint::black_box(requests);
     }
-    TRACK.with(|track| track.set(false));
+    let allocations = measurement.finish();
     assert!(formatted && sink.0 > 0);
-    assert_eq!(COUNT.with(Cell::get), 0);
+    assert_eq!(allocations, 0);
     assert_eq!(native_window_requests_fixed([0x24, 0x25, 0x26], RFlags::TRAINING).iter()
         .map(|r| r.kind).collect::<Vec<_>>(), [0x24, 0x72, 0x25, 0x26]);
     assert_eq!(format!("{:x?}", DebugIter([10, 15].into_iter())), "[a, f]");
@@ -210,14 +178,13 @@ fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
         assert_eq!(borrowed.skipped().collect::<Vec<_>>(), expected.skipped, "mask {mask}");
         assert_eq!(borrowed.kirby_counts(), [expected.kirby_cells, expected.kirby_misplaced, expected.kirby_branch_mismatch]);
         assert_eq!(borrowed.keys().collect::<Vec<_>>(), [7, 8, 9]);
-        COUNT.with(|count| count.set(0));
-        TRACK.with(|track| track.set(true));
+        let measurement = AllocationCount::start();
         for step in borrowed.steps() { std::hint::black_box(step); }
         for key in borrowed.keys() { std::hint::black_box(key); }
         for skipped in borrowed.skipped() { std::hint::black_box(skipped); }
         std::hint::black_box(borrowed.kirby_counts());
-        TRACK.with(|track| track.set(false));
-        assert_eq!(COUNT.with(Cell::get), 0, "mask {mask}");
+        let allocations = measurement.finish();
+        assert_eq!(allocations, 0, "mask {mask}");
     }
 }
 
@@ -239,12 +206,11 @@ fn attached_teardown_keeps_alias_validation_and_route_order_without_allocations(
             controller: if i == 0 { 11 } else if i == 1 { 33 } else { 22 } })),
         nana_owner_plus_8: Some(22),
     };
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     let mut plan = attached_plan(0, &cells, &contexts, &consumers);
     for _ in 0..32 { plan = std::hint::black_box(attached_plan(0, &cells, &contexts, &consumers)); }
-    TRACK.with(|track| track.set(false));
-    assert_eq!(COUNT.with(Cell::get), 0);
+    let allocations = measurement.finish();
+    assert_eq!(allocations, 0);
     assert_eq!(plan.routes.iter().map(|r| r.slot).collect::<Vec<_>>(), (2..16).collect::<Vec<u8>>());
     assert_eq!((plan.kirby_cells, plan.kirby_misplaced, plan.kirby_branch_mismatch), (1, 1, 1));
     let generic = destroy_plan_many(&[Bundle::Attached(AttachedGroup { owner: 0,
@@ -273,8 +239,7 @@ fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
     assert!(!held.is_empty());
     let expected_keys: Vec<_> = packages::referenced(&held).into_keys().collect();
     assert_eq!(packages::referenced_keys(held.iter().copied()).collect::<Vec<_>>(), expected_keys);
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     let mut changed = false;
     for _ in 0..32 {
         let plan = packages::sync_iter(held.iter().copied(), wanted());
@@ -282,9 +247,9 @@ fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
         for key in packages::referenced_keys(held.iter().copied()) { std::hint::black_box(key); }
         std::hint::black_box(plan);
     }
-    TRACK.with(|track| track.set(false));
+    let allocations = measurement.finish();
     assert!(!changed);
-    assert_eq!(COUNT.with(Cell::get), 0);
+    assert_eq!(allocations, 0);
     // Removing one duplicate must release exactly its occurrences, keeping the
     // earlier identical holdings and descending removal order.
     let one = packages::acquisitions(&roster, 0, sets[0], 2, 1);
@@ -311,8 +276,7 @@ fn changed_copy_holdings_preserve_reference_order_without_allocations() {
                 member: ((i + generation) % 3) as u32, costume: 2 }));
         }
         let expected = packages::sync(&held, &wanted);
-        COUNT.with(|count| count.set(0));
-        TRACK.with(|track| track.set(true));
+        let measurement = AllocationCount::start();
         let plan = packages::sync_bounded(&held, &wanted);
         let mut released = packages::empty_holdings();
         for index in plan.release.iter() { assert!(released.push(held.remove(*index))); }
@@ -320,8 +284,8 @@ fn changed_copy_holdings_preserve_reference_order_without_allocations() {
         for acquisition in released.iter().chain(plan.acquire.iter()) {
             std::hint::black_box(packages::roster_bytes(&acquisition.roster));
         }
-        TRACK.with(|track| track.set(false));
-        assert_eq!(COUNT.with(Cell::get), 0);
+        let allocations = measurement.finish();
+        assert_eq!(allocations, 0);
         assert_eq!(&*plan.acquire, expected.acquire.as_slice());
         assert_eq!(&*plan.release, expected.release.as_slice());
         let settled = packages::sync(&held, &wanted);
@@ -333,15 +297,14 @@ fn changed_copy_holdings_preserve_reference_order_without_allocations() {
 #[test]
 fn activation_history_tracks_replacement_without_growing() {
     let mut history = crate::model::body_activation::History::<(usize, u32), 12>::new();
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     for generation in 1..1000 {
         let live = std::array::from_fn(|slot| (generation * 16 + slot, slot as u32));
         history.observe(live, live[generation % live.len()]);
         std::hint::black_box(&history);
     }
-    TRACK.with(|track| track.set(false));
-    assert_eq!(COUNT.with(Cell::get), 0);
+    let allocations = measurement.finish();
+    assert_eq!(allocations, 0);
     assert!(history.contains(&(999 * 16 + 3, 3)));
     assert!(!history.contains(&(998 * 16 + 2, 2)));
 }
@@ -357,8 +320,7 @@ fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
     let budget = GroupBudget { ready_fighters: 20, hats_wanted: 2, pool_free: 20, special: SpecialPolicy::MII };
     let hats = [[Some(10), None, Some(11), None, None], [Some(20), None, None, None, None],
         [Some(30), None, None, None, None], [Some(40), Some(41), None, None, None]];
-    COUNT.with(|count| count.set(0));
-    TRACK.with(|track| track.set(true));
+    let measurement = AllocationCount::start();
     let mut last = [[None; MAX_EXTRA_GROUPS]; 2];
     let mut hat_plan = [None; 5];
     for _ in 0..32 {
@@ -366,8 +328,8 @@ fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
         last = std::hint::black_box(plan_extra_groups([Some(window); 2], [&[]; 2], [&lane; 2], [None; 2], budget));
         std::hint::black_box(count_extra_groups_iter(last[0].iter().flatten().copied().map(|group| (group, GroupState::Planned))));
     }
-    TRACK.with(|track| track.set(false));
-    assert_eq!(COUNT.with(Cell::get), 0);
+    let allocations = measurement.finish();
+    assert_eq!(allocations, 0);
     assert_eq!(hat_plan, [Some(10), Some(20), Some(30), Some(11), Some(40)]);
     for groups in last {
         assert_eq!(groups, [Members::native_group(0x24), Members::native_group(0x5a), Members::mii_group(0x48)]);

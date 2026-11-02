@@ -347,7 +347,7 @@ fn next_qualified<T>(
 
 #[cfg(all(test, not(target_os = "switch")))]
 #[path = "../../../tests/support/mii_cycle_compact.rs"]
-mod compact_regressions;
+pub(crate) mod compact_regressions;
 
 #[cfg(all(test, feature = "mii-saved-alpha"))]
 mod tests {
