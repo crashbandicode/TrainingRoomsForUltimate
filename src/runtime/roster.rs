@@ -170,8 +170,8 @@ extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
     unsafe { turnip_identity::on_load(info) };
 }
 
-/// Start the cycle, in the order the fork's `main` did: the preload cache first (the INI is read once, before anything asks for a
-/// snapshot), the trace recorder, the native patches (unlink guard, Lua GC guard), the lifecycle observations and last the roster
+/// Start the cycle: sync the preload cache from the already published settings.json before anything asks for a snapshot,
+/// then the trace recorder, native patches (unlink guard, Lua GC guard), lifecycle observations and last the roster
 /// itself, whose `init` installs the service callback, the sources, the body bank and the Mii gates. Each file checks its own seam
 /// rows through `seams::seam_install::gate` and installs nothing when they are refused. Called once from boot, before the install
 /// line.
