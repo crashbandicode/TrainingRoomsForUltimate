@@ -35,7 +35,8 @@ same card and a downgrade loses nothing.
   next boot (documented in the README). There is no menu row for it (S1 item 5,
   decided 2026-11-01).
 - **Draft 9 additions (decided 2026-11-01).** The import also (a) copies the
-  fork's `training_modpack.json` under the new name `settings.json` (S1 item 1);
+  fork's `training_modpack_menu.conf` (its settings file, JSON content) under the
+  new name `settings.json` (S1 item 1; corrected 2026-11-02);
   (b) copies `button_config.ini` and `replay_capture.ini` (S1 item 2);
   (c) copies `replay_captures/` **in full, with no size cap** (S1 item 3, N8),
   because it holds the companions the Replay Window crops macros from; it does
@@ -62,7 +63,7 @@ Imported (copied; the operator's list, 2026-11-01):
 
 | Source (`sd:/ultimate/TrainingModpack/`) | Destination (`sd:/ultimate/TrainingRooms/`) | What it holds | Rule |
 | --- | --- | --- | --- |
-| `training_modpack.json` | `settings.json` (S1 item 1, decided 2026-11-01; the loader also accepts the old name once) | menu settings and saved defaults (fork JSON envelope, SPEC-core-04); retired keys `update_policy`, `menu_open_start_press`, `character_item` ignored on load | copy if destination absent |
+| `training_modpack_menu.conf` | `settings.json` (S1 item 1, decided 2026-11-01; source name corrected 2026-11-02; the loader also accepts the old name once) | menu settings and saved defaults (fork JSON envelope, SPEC-core-04); retired keys `update_policy`, `menu_open_start_press`, `character_item` ignored on load | copy if destination absent |
 | `button_config.ini` | `button_config.ini` (S1 item 2, decided 2026-11-01) | the menu shortcuts (SPEC-input-04 §7); the file of record that the menu now edits | copy if destination absent |
 | `replay_capture.ini` | `replay_capture.ini` (S1 item 2) | the replay-capture on/off choice (`enabled=on/off`) | copy if destination absent |
 | `replay_captures/` (every file) | `replay_captures/` (S1 item 3, N8; decided 2026-11-01) | the match captures (`.smd`) the Replay Window crops macros from, in full, no size cap | copy each file if absent; **background, non-blocking** (§5); the originals stay |
@@ -75,8 +76,8 @@ Not migrated (and why):
 
 | Source | Why not |
 | --- | --- |
-| `training_modpack_menu.conf`, `training_modpack_menu_defaults.conf`, `training_modpack_menu.json`, `*.toml` | legacy formats of upstream and of the fork before its JSON port; the fork's `tools/port_save_states.py` converted them at the C116 upgrade; a card that has only these never ran the JSON fork (open question 4) |
-| `cycle_preload.ini` | a cache of menu choices the fork rewrites at boot; the imported settings file is authoritative and the plugin regenerates it |
+| `training_modpack.json` | the fork's updater record (`{"update":{"last_update_version":…}}`, 72 B on the card), not settings; the clean room has no updater (SPEC-core-04 Q4). Corrected 2026-11-02: an earlier draft named this file as the settings source |
+| `training_modpack_menu_defaults.conf`, `training_modpack_menu.json`, `*.toml` | legacy formats of upstream and of the fork before its JSON port; the fork's `tools/port_save_states.py` converted them at the C116 upgrade; a card that has only these never ran the JSON fork (open question 4). (`training_modpack_menu.conf` is not in this row: it is the settings file imported above.) || `cycle_preload.ini` | a cache of menu choices the fork rewrites at boot; the imported settings file is authoritative and the plugin regenerates it |
 | `practice-diagnostics.log`, `practice-diagnostics.previous.log`, `version.txt` | fork diagnostics and version stamp |
 | `dev.json`, `layout.arc` | development-only inputs of the fork (`dev_config`, `layout_arc_from_file`) |
 | the legacy root `sd:/TrainingModpack/` | upstream moved off it years ago; the fork migrated it into `sd:/ultimate/TrainingModpack/` already; not read |
@@ -200,8 +201,8 @@ else is the owning spec's file, now under the new root.
 ## 10. Open questions
 
 1. **File name of the settings file** under the new root: keep the fork's
-   `training_modpack.json` (zero change to the carried-over JSON code and the
-   fork's `port_save_states.py`) or rename it to `settings.json` at import
+   `training_modpack_menu.conf` (corrected 2026-11-02; an earlier draft said
+   `training_modpack.json`, which is the updater record) or rename it to `settings.json` at import
    (cleaner; one rename in the loader). Recommendation: rename; the loader
    also accepts the old name once. **Decided 2026-11-01 (S1 item 1): as recommended;** rename (the file is copied under the name `settings.json`).
 2. **Import `button_config.ini` and `replay_capture.ini`** as well? They are

@@ -194,7 +194,7 @@ While either record of the selected slot is KillPlayer or WaitForAlive the plugi
 
 ### 7.1 Files
 
-Upstream wrote TOML to `sd:/ultimate/TrainingModpack/save_states.toml`. The fork's carried-over layer writes pretty JSON to `sd:/ultimate/TrainingModpack/save_states.json` (menu settings in `training_modpack.json` beside it) and ships `tools/port_save_states.py` to convert old TOML. This project's root is `sd:/ultimate/TrainingRooms/`; the file name `save_states.json` is the carried-over contract and the settings file is `settings.json` (SPEC-core-08; open question 9 on the root, decided).
+Upstream wrote TOML to `sd:/ultimate/TrainingModpack/save_states.toml`. The fork's carried-over layer writes pretty JSON to `sd:/ultimate/TrainingModpack/save_states.json` (menu settings in `training_modpack_menu.conf` beside it; corrected 2026-11-02, `training_modpack.json` is the updater record) and ships `tools/port_save_states.py` to convert old TOML. This project's root is `sd:/ultimate/TrainingRooms/`; the file name `save_states.json` is the carried-over contract and the settings file is `settings.json` (SPEC-core-08; open question 9 on the root, decided).
 
 The file is read once, lazily, on first use of the slots (upstream notes that reading it eagerly at plugin start crashed), and written whenever both fighters finish a Save, from the game thread.
 
