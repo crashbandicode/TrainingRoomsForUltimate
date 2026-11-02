@@ -66,6 +66,29 @@ OFFSETS = [
     ("state_no_star_ko", 0x2610A40, "replace", "The stage's can-star-KO query (the fork's can_futtobi_back): false in Training, so a death is followed by the respawn at once."),
 ]
 
+# Milestone 2: charges (SPEC-state-02) and buffs (SPEC-state-03). (feature, name, symbol or offset, note)
+CALLED_M2 = [
+    ("StateCharge", "state_effect_req_common", "_ZN3app8lua_bind29EffectModule__req_common_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40Ef", "EffectModule::req_common: the generic charge_max flash of a full charge."),
+    ("StateCharge", "state_face_motion", "_ZN3app11FighterUtil27set_face_motion_by_priorityERNS_26BattleObjectModuleAccessorENS_13FighterFacialEN3phx6Hash40E", "FighterUtil::set_face_motion_by_priority: Donkey Kong's full-charge face."),
+    ("StateCharge", "state_article_generate_enable", "_ZN3app8lua_bind43ArticleModule__generate_article_enable_implEPNS_26BattleObjectModuleAccessorEibi", "ArticleModule::generate_article_enable: Sheik's needles."),
+    ("StateCharge", "state_article_set_visibility", "_ZN3app8lua_bind34ArticleModule__set_visibility_implEPNS_26BattleObjectModuleAccessorEiN3phx6Hash40ES4_NS_22ArticleOperationTargetE", "ArticleModule::set_visibility: Sheik's needle count."),
+    ("StateBuff", "state_motion_set_rate", "_ZN3app8lua_bind27MotionModule__set_rate_implEPNS_26BattleObjectModuleAccessorEf", "MotionModule::set_rate: Hero, Shulk and Wii Fit play their activation fast."),
+    ("StateBuff", "state_jack_add_rebel", "_ZN3app23FighterSpecializer_Jack15add_rebel_gaugeERNS_26BattleObjectModuleAccessorENS_14FighterEntryIDEf", "FighterSpecializer_Jack::add_rebel_gauge: Joker's Arsene."),
+    ("StateBuff", "state_visibility_set_status_default", "_ZN3app8lua_bind41VisibilityModule__set_status_default_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_", "VisibilityModule::set_status_default: Min Min's dragon arm."),
+    ("StateBuff", "state_visibility_set", "_ZN3app8lua_bind26VisibilityModule__set_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_", "VisibilityModule::set: Min Min's dragon arm."),
+    ("StateBuff", "state_effect_kill", "_ZN3app8lua_bind23EffectModule__kill_implEPNS_26BattleObjectModuleAccessorEjbb", "EffectModule::kill: Min Min's old arm effect."),
+    ("StateBuff", "state_effect_set_scale", "_ZN3app8lua_bind28EffectModule__set_scale_implEPNS_26BattleObjectModuleAccessorEjRKN3phx8Vector3fE", "EffectModule::set_scale: Min Min's arm effect."),
+    ("StateBuff", "state_motion_add_partial", "_ZN3app8lua_bind37MotionModule__add_motion_partial_implEPNS_26BattleObjectModuleAccessorEiN3phx6Hash40Effbbfbbb", "MotionModule::add_motion_partial: Min Min's dragon arm motion."),
+]
+OFFSETS_M2 = [
+    ("StateBuff", "state_cloud_add_limit", 0x8DC160, "SeamKind::Called", "The game's add-limit routine (f32 limit, Fighter*, int): called to give Cloud his Limit; never hooked here."),
+    ("StateBuff", "state_joker_summon", 0xB308D0, "REPLACE", "FighterSpecializer_Jack::check_doyle_summon_dispatch: no summon cutscene while buffing (returns 0xFFFFFFFF)."),
+    ("StateBuff", "state_mac_meter", 0x68CDA0, "REPLACE", "The shared UI-update routine (entry data pointer, int value): Little Mac's KO meter reads 100 while a load with KO runs."),
+    ("StateBuff", "state_wiifit_heal", 0x3FF9C0, "REPLACE", "The damage module's add-damage routine (module pointer, f32 amount, int kind): Wii Fit does not heal while buffing."),
+    ("StateBuff", "state_req_screen", 0x2017BB0, "REPLACE", "EffectModule::req_screen: Sephiroth's wing background is replaced by bg while buffing."),
+    ("StateBuff", "state_fighter_play_se", 0x4CF6C0, "REPLACE", "The fighter sound module's play_se: every sound is se_silent while a record is buffing."),
+]
+
 # The ItemManager singleton pointer is read through this guarded instruction pair (adrp + ldr of the
 # singleton's slot, 0x52c4070).
 RELIED = [
@@ -115,6 +138,11 @@ def main():
         emit(name, "StateCore", "SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }", table[symbol], note)
     for name, offset, kind, note in OFFSETS:
         emit(name, "StateCore", "SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }", offset, note)
+    for feature, name, symbol, note in CALLED_M2:
+        emit(name, feature, "SeamKind::Called", table[symbol], note)
+    replace = "SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }"
+    for feature, name, offset, kind, note in OFFSETS_M2:
+        emit(name, feature, replace if kind == "REPLACE" else kind, offset, note)
     for name, offset, note in RELIED:
         emit(name, "StateCore", "SeamKind::Relied", offset, note)
     body = out[body_start:]

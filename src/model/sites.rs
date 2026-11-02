@@ -40,6 +40,10 @@ pub enum Feature {
     CpuShield,
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
     StateCore,
+    /// Package 3: the charge writes and visuals (SPEC-state-02).
+    StateCharge,
+    /// Package 3: the buffs and their five hooks (SPEC-state-03).
+    StateBuff,
 }
 
 impl Feature {
@@ -56,6 +60,8 @@ impl Feature {
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
             Feature::StateCore => "state_core",
+            Feature::StateCharge => "state_charge",
+            Feature::StateBuff => "state_buff",
         }
     }
 }

@@ -38,6 +38,11 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
     skyline::install_hook!(states::state_effect_req_hook);
     skyline::install_hook!(states::state_effect_req_follow_hook);
     skyline::install_hook!(states::state_no_star_ko_hook);
+    skyline::install_hook!(states::state_joker_summon_hook);
+    skyline::install_hook!(states::state_mac_meter_hook);
+    skyline::install_hook!(states::state_wiifit_heal_hook);
+    skyline::install_hook!(states::state_req_screen_hook);
+    skyline::install_hook!(states::state_fighter_play_se_hook);
     for name in [
         "state_get_param_int",
         "state_set_dead_rumble",
@@ -46,6 +51,11 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
         "state_effect_req",
         "state_effect_req_follow",
         "state_no_star_ko",
+        "state_joker_summon",
+        "state_mac_meter",
+        "state_wiifit_heal",
+        "state_req_screen",
+        "state_fighter_play_se",
     ] {
         if let Some(i) = STATE_SITES.iter().position(|s| s.name == name) {
             written[i] = Written::Far;

@@ -2,6 +2,10 @@
 //! machine, the placement rules, the settings the per-frame code reads, the portable setup library.
 //! Nothing here touches the game; `runtime::features::save_states` applies the machine's answers.
 
+#[path = "buff.rs"]
+pub mod buff;
+#[path = "charge.rs"]
+pub mod charge;
 #[path = "convert.rs"]
 pub mod convert;
 #[path = "file.rs"]

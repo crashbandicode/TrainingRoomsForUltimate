@@ -28,7 +28,7 @@ fn state_sites_are_the_elfs_bytes_at_unique_names() {
     assert_eq!(names.len(), STATE_SITES.len(), "unique names");
     for site in &STATE_SITES {
         assert_eq!(owned.window(site.offset), site.guard, "{} at {:#x}", site.name, site.offset);
-        assert_eq!(site.feature, Feature::StateCore);
+        assert!(matches!(site.feature, Feature::StateCore | Feature::StateCharge | Feature::StateBuff));
         assert!(sites::find(site.name).is_none(), "{} must not be a row of the main table", site.name);
     }
 }
@@ -57,7 +57,7 @@ fn state_sites_every_replace_hook_fits_the_far_jump() {
         .iter()
         .filter(|s| matches!(s.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }))
         .collect();
-    assert_eq!(hooks.len(), 7);
+    assert_eq!(hooks.len(), 12);
     for site in hooks {
         assert!(!site.note.is_empty(), "{}: an entry hook needs its justification", site.name);
         assert_eq!(site.offset % 16, 0, "{}", site.name);

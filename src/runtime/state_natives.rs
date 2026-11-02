@@ -167,3 +167,87 @@ pub unsafe fn stage_id() -> i32 {
 pub unsafe fn item_manager() -> usize {
     ((text_base() + crate::model::state::ITEM_MANAGER_SLOT_OFFSET) as *const usize).read_volatile()
 }
+
+// ---- milestone 2: charges and buffs ----------------------------------------------------------------
+
+/// `EffectModule::req_common(accessor, effect, 0.0)`: the generic `charge_max` flash.
+pub unsafe fn effect_req_common(accessor: usize, effect: u64) {
+    at::<extern "C" fn(usize, u64, f32) -> u64>(s::STATE_EFFECT_REQ_COMMON_OFFSET)(accessor, effect, 0.0);
+}
+
+/// `EffectModule::req_follow(accessor, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0, 0,
+/// false, false)`: the handle of the effect (through the save states' own hook: a pass-through for
+/// everything but `sys_score_aura`).
+pub unsafe fn effect_req_follow(accessor: usize, effect: u64, joint: u64, pos: &Vector3f, rot: &Vector3f, attribute: u32, lifetime: i32) -> u64 {
+    type ReqFollow = extern "C" fn(usize, u64, u64, *const Vector3f, *const Vector3f, f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u64;
+    at::<ReqFollow>(s::STATE_EFFECT_REQ_FOLLOW_OFFSET)(accessor, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0, 0, false, false)
+}
+
+/// `EffectModule::req(accessor, effect, pos, rot, 1.0, 0, -1, false, 0)`: Min Min's arm effect.
+pub unsafe fn effect_req(accessor: usize, effect: u64) -> u64 {
+    type Req = extern "C" fn(usize, u64, *const Vector3f, *const Vector3f, f32, u32, i32, bool, i32) -> u64;
+    let zero = Vector3f { x: 0.0, y: 0.0, z: 0.0 };
+    at::<Req>(s::STATE_EFFECT_REQ_OFFSET)(accessor, effect, &zero, &zero, 1.0, 0, -1, false, 0)
+}
+
+pub unsafe fn effect_kill(accessor: usize, handle: u32) {
+    at::<extern "C" fn(usize, u32, bool, bool)>(s::STATE_EFFECT_KILL_OFFSET)(accessor, handle, false, true)
+}
+
+pub unsafe fn effect_set_scale_one(accessor: usize, handle: u32) {
+    let one = Vector3f { x: 1.0, y: 1.0, z: 1.0 };
+    at::<extern "C" fn(usize, u32, *const Vector3f)>(s::STATE_EFFECT_SET_SCALE_OFFSET)(accessor, handle, &one)
+}
+
+/// `FighterUtil::set_face_motion_by_priority(accessor, facial, motion)`.
+pub unsafe fn face_motion(accessor: usize, facial: i32, motion: u64) {
+    at::<extern "C" fn(usize, i32, u64)>(s::STATE_FACE_MOTION_OFFSET)(accessor, facial, motion)
+}
+
+pub unsafe fn article_generate_enable(accessor: usize, article: i32) {
+    at::<extern "C" fn(usize, i32, bool, i32)>(s::STATE_ARTICLE_GENERATE_ENABLE_OFFSET)(accessor, article, false, -1)
+}
+
+pub unsafe fn article_set_visibility(accessor: usize, article: i32, name: u64, group: u64) {
+    at::<extern "C" fn(usize, i32, u64, u64, i32)>(s::STATE_ARTICLE_SET_VISIBILITY_OFFSET)(accessor, article, name, group, 0)
+}
+
+pub unsafe fn motion_set_rate(accessor: usize, rate: f32) {
+    at::<extern "C" fn(usize, f32)>(s::STATE_MOTION_SET_RATE_OFFSET)(accessor, rate)
+}
+
+/// `FighterSpecializer_Jack::add_rebel_gauge(accessor, FighterEntryID(entry), amount)`.
+pub unsafe fn jack_add_rebel(accessor: usize, entry: i32, amount: f32) {
+    at::<extern "C" fn(usize, i32, f32)>(s::STATE_JACK_ADD_REBEL_OFFSET)(accessor, entry, amount)
+}
+
+/// The game's add-limit routine `(limit, fighter object, 0)`.
+pub unsafe fn cloud_add_limit(fighter: usize, limit: f32) {
+    at::<extern "C" fn(f32, usize, i32)>(s::STATE_CLOUD_ADD_LIMIT_OFFSET)(limit, fighter, 0)
+}
+
+pub unsafe fn visibility_set_status_default(accessor: usize, a: u64, b: u64) {
+    at::<extern "C" fn(usize, u64, u64)>(s::STATE_VISIBILITY_SET_STATUS_DEFAULT_OFFSET)(accessor, a, b)
+}
+
+pub unsafe fn visibility_set(accessor: usize, a: u64, b: u64) {
+    at::<extern "C" fn(usize, u64, u64)>(s::STATE_VISIBILITY_SET_OFFSET)(accessor, a, b)
+}
+
+/// `MotionModule::add_motion_partial(DRAGON, motion, 0.0, 1.0, false, false, 0.0, true, true, false)`.
+pub unsafe fn motion_add_partial_dragon(accessor: usize, part: i32, motion: u64) {
+    type Partial = extern "C" fn(usize, i32, u64, f32, f32, bool, bool, f32, bool, bool, bool);
+    at::<Partial>(s::STATE_MOTION_ADD_PARTIAL_OFFSET)(accessor, part, motion, 0.0, 1.0, false, false, 0.0, true, true, false)
+}
+
+/// `StatusModule::change_status_force(accessor, status, block)` (the CPU core's native always passes
+/// `true`; the buffs need `false` for Wii Fit).
+pub unsafe fn status_force(accessor: usize, status: i32, block: bool) {
+    at::<extern "C" fn(usize, i32, bool)>(crate::model::sites::CHANGE_STATUS_FORCE_OFFSET)(accessor, status, block)
+}
+
+/// `WorkModule::get_param_int(accessor, kind, name)` through the save states' hook (a pass-through for
+/// anything but a death parameter).
+pub unsafe fn get_param_int(accessor: usize, kind: u64, name: u64) -> i32 {
+    at::<extern "C" fn(usize, u64, u64) -> i32>(s::STATE_GET_PARAM_INT_OFFSET)(accessor, kind, name)
+}

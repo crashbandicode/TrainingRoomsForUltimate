@@ -180,6 +180,9 @@ pub struct Out {
     /// The Save chord set both records (the slot the notification names).
     pub saved_notice: Option<usize>,
     pub trigger: Option<Trigger>,
+    /// The fighter's record waits on a feature (`ApplyBuff`, `WaitForPokemonSwitch`,
+    /// `WaitForCopyAbility`): the runtime runs that feature's step this frame.
+    pub wait: Option<Marker>,
     /// Both records of the load are done: `Some(saved_on_ledge)`, once per restore (the recorder's
     /// `on_state_restored`).
     pub restored: Option<bool>,
@@ -257,6 +260,13 @@ impl Machine {
                 .iter()
                 .any(|role| matches!(self.marker(*role, slot), Marker::KillPlayer | Marker::WaitForAlive))
         })
+    }
+
+    /// A feature's wait is over: the load's record for `role` goes back to `NoAction`.
+    pub fn finish_wait(&mut self, role: Role) {
+        if let Some(slot) = self.active {
+            self.set_marker(role, slot, Marker::NoAction);
+        }
     }
 
     /// Cancel every load in progress: all markers back to `NoAction` (Enable turned Off, scene
@@ -338,6 +348,8 @@ impl Machine {
             }
             Marker::PosMove if !input.nana => self.place(role, slot, input, settings, rng, &mut out),
             Marker::NanaPosMove if input.nana && !input.standby => self.place(role, slot, input, settings, rng, &mut out),
+            // The waits of the features: the runtime steps them and calls `finish_wait` when done.
+            Marker::ApplyBuff | Marker::WaitForPokemonSwitch | Marker::WaitForCopyAbility if !input.nana => out.wait = Some(marker),
             _ => {}
         }
 

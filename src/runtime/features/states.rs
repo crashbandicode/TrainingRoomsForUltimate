@@ -17,7 +17,7 @@
 //! NOT YET SWITCH-RUN: compiled for the Switch, not run on Eden or the console.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
 
@@ -26,6 +26,8 @@ use crate::model::cpu::rng::Rng;
 use crate::model::input_delay::Clear;
 use crate::model::lra_reset;
 use crate::model::sites_pkg3 as s;
+use crate::model::state::buff::{BuffFacts, BuffKind, BuffState};
+use crate::model::state::charge;
 use crate::model::state::file::SaveFile;
 use crate::model::state::hooks::{self, DeathParam};
 use crate::model::state::ids::{self, Table, C, UNRESOLVED};
@@ -36,7 +38,7 @@ use crate::model::state::settings::StateSettings;
 use crate::model::storage::{self, FixedPath};
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{reset_hub, state_recorder};
+use crate::runtime::features::{reset_hub, state_effects, state_recorder};
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives as n;
 use crate::runtime::hub;
@@ -47,6 +49,8 @@ struct State {
     settings: StateSettings,
     rng: Rng,
     ids: Table,
+    /// One buff bookkeeping per record (SPEC-state-03 OQ 5): player, CPU.
+    buff: [BuffState; 2],
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -71,6 +75,14 @@ static QUAKE_NONE: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static QUAKE_MAX: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static JOSTLE_ID: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static SHULK_FLASH_ID: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// The accessor of the fighter each record is buffing right now (0 when none), and whether it is Wii Fit:
+/// the effect, sound, heal and wing hooks read these without the lock.
+static BUFF_ACC: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
+static BUFF_WIIFIT: [AtomicBool; 2] = [const { AtomicBool::new(false) }; 2];
+/// A Little Mac is in the match, and KO Punch is selected (the meter hook).
+static MAC_PRESENT: AtomicBool = AtomicBool::new(false);
+static KO_SELECTED: AtomicBool = AtomicBool::new(false);
+static JOKER_SUMMON: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of the names the hooks compare (set once at `init`).
 static HASHES: [AtomicU64; 10] = [const { AtomicU64::new(0) }; 10];
 const H_COMMON: usize = 0;
@@ -167,7 +179,7 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
 /// generator seed.
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
-    *STATE.lock() = Some(State { machine: Machine::new(file), settings, rng: Rng::new(seed), ids: Table::unresolved() });
+    *STATE.lock() = Some(State { machine: Machine::new(file), settings, rng: Rng::new(seed), ids: Table::unresolved(), buff: [BuffState::new(); 2] });
     set_flags(&settings);
     for (slot, name) in HASHES.iter().zip([
         "common",
@@ -190,6 +202,15 @@ fn set_flags(settings: &StateSettings) {
     ENABLE.store(settings.enable, Ordering::Release);
     AUTOLOAD.store(settings.autoload, Ordering::Release);
     RESPAWN_INVINCIBILITY.store(settings.respawn_invincibility, Ordering::Release);
+    KO_SELECTED.store(settings.buffs.has(crate::model::state::settings::Buffs::KO), Ordering::Release);
+}
+
+fn any_buffing() -> bool {
+    BUFF_ACC.iter().any(|a| a.load(Ordering::Acquire) != 0)
+}
+
+fn fighter_buffing(accessor: usize) -> bool {
+    accessor != 0 && BUFF_ACC.iter().any(|a| a.load(Ordering::Acquire) == accessor)
 }
 
 /// A menu commit or the first publish. Turning Enable Save States Off cancels every load in progress
@@ -217,9 +238,16 @@ pub fn request_load() {
 
 /// Cancel every pending load (scene departure, hot swap: SPEC-state-01 §6.11).
 pub fn cancel_pending() {
-    with(|state| state.machine.cancel_all());
+    with(|state| {
+        state.machine.cancel_all();
+        state.buff.iter_mut().for_each(BuffState::clear);
+    });
     LOADING.store(false, Ordering::Release);
     KILLING.store(false, Ordering::Release);
+    MAC_PRESENT.store(false, Ordering::Release);
+    for slot in &BUFF_ACC {
+        slot.store(0, Ordering::Release);
+    }
 }
 
 pub fn is_loading() -> bool {
@@ -259,6 +287,7 @@ fn ensure_consts() -> bool {
     QUAKE_MAX.store(table.get(C::QuakeKindMax), Ordering::Release);
     JOSTLE_ID.store(table.get(C::WorkIntJostle), Ordering::Release);
     SHULK_FLASH_ID.store(table.get(C::WorkIntShulkFlash), Ordering::Release);
+    JOKER_SUMMON.store(table.get(C::JokerStatusSummon), Ordering::Release);
     if missing > 0 {
         let mut names = FixedPath::<400>::new();
         for name in table.missing().take(8) {
@@ -281,6 +310,7 @@ struct Raw {
     status: i32,
     prev_status: i32,
     situation: i32,
+    fighter: usize,
 }
 
 /// Run the save-state step for one fighter (the object the game just ran a frame of). Called by the
@@ -319,13 +349,18 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         status: natives::status_kind(accessor),
         prev_status: natives::prev_status_kind(accessor, 0),
         situation: natives::situation_kind(accessor),
+        fighter,
     };
+
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     let stage_id = n::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
+        if ids.is(C::KindLittleMac, raw.kind) {
+            MAC_PRESENT.store(true, Ordering::Release);
+        }
         let dead = ids.is(C::StatusDead, raw.status) || ids.is(C::StatusStandby, raw.status);
         let input = FrameIn {
             entry: raw.entry,
@@ -369,6 +404,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
 unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     let accessor = raw.accessor;
     if out.stop_playback {
+        // A new load: no buff carries over.
+        with(|state| state.buff.iter_mut().for_each(BuffState::clear));
         state_recorder::stop();
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
@@ -390,7 +427,10 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         }
     }
     if let Some(done) = out.done {
-        finish(accessor, &done);
+        finish(raw, &done);
+    }
+    if let Some(marker) = out.wait {
+        run_wait(raw, marker);
     }
     if let Some(slot) = out.capture {
         capture(raw, nana, slot);
@@ -486,13 +526,21 @@ unsafe fn place(accessor: usize, placing: &Placing) {
 
 /// A fighter has just been placed (§5.3 step 8): the damage, then what the milestones add (charges,
 /// buffs, the item snapshot, the fighter-specific restores).
-unsafe fn finish(accessor: usize, done: &Done) {
+unsafe fn finish(raw: &Raw, done: &Done) {
+    let accessor = raw.accessor;
     if let Some(target) = done.damage {
         n::heal(accessor, -natives::damage(accessor, 0));
         n::add_damage(accessor, target);
     }
     if done.reset_sound {
         n::play_se_no3d(accessor, hash40("se_system_position_reset"));
+    }
+    // Charges (SPEC-state-02): only when the saved kind equals the current kind (the machine checked).
+    if let Some(saved) = &done.charge {
+        if let Some(ids) = with(|s| s.ids.clone()) {
+            let plan = charge::plan_write(&ids, raw.kind, saved);
+            state_effects::run_charge(accessor, &ids, &plan);
+        }
     }
     state_diag!(
         "[TrainingRooms] state done damage={:?} item={} charge={} steve={} next={}",
@@ -502,6 +550,69 @@ unsafe fn finish(accessor: usize, done: &Done) {
         done.steve.is_some(),
         done.next.name()
     );
+}
+
+/// `WorkModule` reads for the charge table.
+struct Fields(usize);
+
+impl charge::Work for Fields {
+    fn get_int(&self, id: i32) -> i32 {
+        // SAFETY: only used from the frame step with a live fighter's accessor.
+        unsafe { n::work_get_int(self.0, id) }
+    }
+    fn get_float(&self, id: i32) -> f32 {
+        unsafe { natives::get_float(self.0, id) }
+    }
+    fn get_flag(&self, id: i32) -> bool {
+        unsafe { natives::is_flag(self.0, id) }
+    }
+}
+
+/// A feature's wait (SPEC-state-01 §5.4): `ApplyBuff` runs the buff step; the Pokemon switch and the
+/// Kirby copy are stepped by `state_restore` (milestone 3) and end at once until then.
+unsafe fn run_wait(raw: &Raw, marker: Marker) {
+    let Some(role) = Role::of_entry(raw.entry) else { return };
+    match marker {
+        Marker::ApplyBuff => apply_buff(raw, role),
+        _ => {
+            with(|s| s.machine.finish_wait(role));
+        }
+    }
+}
+
+/// One `ApplyBuff` frame for the fighter of `raw` (SPEC-state-03 §5).
+unsafe fn apply_buff(raw: &Raw, role: Role) {
+    let accessor = raw.accessor;
+    // Facts first, with no lock held.
+    let ids = with(|s| s.ids.clone());
+    let Some(ids) = ids else { return };
+    let Some(kind) = state_effects::buff_kind(&ids, raw.kind) else {
+        with(|s| s.machine.finish_wait(role));
+        return;
+    };
+    let is = |c: C, status: i32| ids.is(c, status);
+    let facts = BuffFacts {
+        hero_cast_now: is(C::HeroStatusSpecialLwStart, raw.status),
+        hero_cast_before: is(C::HeroStatusSpecialLwStart, raw.prev_status),
+        shulk_action_now: is(C::ShulkStatusAction, raw.status),
+        shulk_action_before: is(C::ShulkStatusAction, raw.prev_status),
+        wii_success_now: is(C::WiiFitStatusSuccess, raw.status),
+        wii_success_before: is(C::WiiFitStatusSuccess, raw.prev_status),
+        wing_activated: ids.resolved(C::SephirothOneWinged) && natives::is_flag(accessor, ids.get(C::SephirothOneWinged)),
+    };
+    let out = with(|s| {
+        let buffs = s.settings.buffs;
+        s.buff[role.index()].step(kind, buffs, &facts, &mut s.rng)
+    });
+    let Some(out) = out else { return };
+    let slot = role.index();
+    BUFF_ACC[slot].store(if out.buffing { accessor } else { 0 }, Ordering::Release);
+    BUFF_WIIFIT[slot].store(out.buffing && kind == BuffKind::WiiFit, Ordering::Release);
+    state_effects::run_buff(accessor, raw.fighter, raw.entry, &ids, &out);
+    if out.done {
+        with(|s| s.machine.finish_wait(role));
+        state_diag!("[TrainingRooms] state buff_done entry={} kind={:?}", raw.entry, kind);
+    }
 }
 
 /// The Save step (§5.5 step 2): read the values, store them, write the file when both are done.
@@ -519,7 +630,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
-        charge: Default::default(),
+        charge: with(|s| s.ids.clone()).map(|ids| charge::read(&ids, raw.kind, &Fields(accessor))).unwrap_or_default(),
         steve: None,
         held_item: None,
         saved_stage: Some(n::stage_id()),
@@ -645,8 +756,8 @@ pub unsafe fn state_effect_req_hook(
 ) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::EFFECT);
-    // Buffing fighters (package 3 milestone 2) keep their visuals; none is recorded yet.
-    if hooks::effect_hidden(LOADING.load(Ordering::Acquire), false) && game::is_training_mode() {
+    // A buffing fighter keeps its visuals (SPEC-state-03 §5.2).
+    if hooks::effect_hidden(LOADING.load(Ordering::Acquire), fighter_buffing(accessor)) && game::is_training_mode() {
         return call_original!(accessor, effect, pos, rot, 0.0, a, b, c, d);
     }
     call_original!(accessor, effect, pos, rot, size, a, b, c, d)
@@ -689,6 +800,67 @@ pub unsafe fn state_no_star_ko_hook(a0: usize, a1: usize, a2: usize, a3: usize, 
     call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
 }
 
+// ---- the buff hooks (SPEC-state-03 §4) --------------------------------------------------------------
+
+/// `FighterSpecializer_Jack::check_doyle_summon_dispatch`: no summon cutscene while buffing.
+#[skyline::hook(offset = s::STATE_JOKER_SUMMON_OFFSET)]
+pub unsafe fn state_joker_summon_hook(accessor: usize, a: bool, b: bool) -> u32 {
+    let _scope = HookScope::enter();
+    let result = call_original!(accessor, a, b);
+    let summon = JOKER_SUMMON.load(Ordering::Acquire);
+    if summon != UNRESOLVED && result == summon as u32 && fighter_buffing(accessor) && game::is_training_mode() {
+        return 0xFFFF_FFFF;
+    }
+    result
+}
+
+/// The shared UI-update routine (entry data, value): Little Mac's KO meter reads 100 while a load with
+/// KO Punch runs (whichever Little Mac is in the match).
+#[skyline::hook(offset = s::STATE_MAC_METER_OFFSET)]
+pub unsafe fn state_mac_meter_hook(entry: usize, value: i32) -> u64 {
+    let _scope = HookScope::enter();
+    if LOADING.load(Ordering::Acquire) && KO_SELECTED.load(Ordering::Acquire) && MAC_PRESENT.load(Ordering::Acquire) && game::is_training_mode() {
+        return call_original!(entry, 100);
+    }
+    call_original!(entry, value)
+}
+
+/// The damage module's add-damage routine (module, amount, kind): Wii Fit does not heal while buffing.
+#[skyline::hook(offset = s::STATE_WIIFIT_HEAL_OFFSET)]
+pub unsafe fn state_wiifit_heal_hook(module: usize, amount: f32, kind: i32) -> u64 {
+    let _scope = HookScope::enter();
+    if module != 0 && BUFF_WIIFIT.iter().any(|w| w.load(Ordering::Acquire)) {
+        let accessor = ((module + 8) as *const usize).read();
+        let wii_buffing = BUFF_ACC.iter().zip(BUFF_WIIFIT.iter()).any(|(a, w)| w.load(Ordering::Acquire) && a.load(Ordering::Acquire) == accessor);
+        if wii_buffing && game::is_training_mode() {
+            return call_original!(module, 0.0, kind);
+        }
+    }
+    call_original!(module, amount, kind)
+}
+
+/// `EffectModule::req_screen`: Sephiroth's wing background is replaced by `bg` while he is buffed.
+#[skyline::hook(offset = s::STATE_REQ_SCREEN_OFFSET)]
+pub unsafe fn state_req_screen_hook(accessor: usize, hash: u64, a: bool, b: bool, c: bool) -> u64 {
+    let _scope = HookScope::enter();
+    const WING_BACKGROUND: u64 = 0x10DCB5700E;
+    if hash == WING_BACKGROUND && fighter_buffing(accessor) && game::is_training_mode() {
+        return call_original!(accessor, hash40("bg"), a, b, c);
+    }
+    call_original!(accessor, hash, a, b, c)
+}
+
+/// The fighter sound module's `play_se`: every sound is `se_silent` while a record is buffing. The hash is
+/// the first argument after the module (the register order of the `lua_bind` thunk this one sits under).
+#[skyline::hook(offset = s::STATE_FIGHTER_PLAY_SE_OFFSET)]
+pub unsafe fn state_fighter_play_se_hook(a0: usize, a1: u64, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> u64 {
+    let _scope = HookScope::enter();
+    bump(counts_index::SOUND);
+    if any_buffing() && game::is_training_mode() {
+        return call_original!(a0, HASHES[H_SE_SILENT].load(Ordering::Acquire), a2, a3, a4, a5, a6, a7);
+    }
+    call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
+}
 // ---- the slot file ----------------------------------------------------------------------------------
 
 fn save_path() -> Option<FixedPath<128>> {
