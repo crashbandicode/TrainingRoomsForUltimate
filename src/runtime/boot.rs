@@ -233,7 +233,7 @@ pub fn run() {
         ui::install(&loaded, input_delay_on)
     } else {
         diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
-        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false }
+        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found }
     };
     // Package 4's notices and input log draw from the layout tick package 5 just installed.
     if !ui::hud::register(hud_draw::draw) {
