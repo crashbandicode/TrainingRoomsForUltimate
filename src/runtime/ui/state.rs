@@ -3,7 +3,6 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use hos_lock::Mutex;
 
 use crate::model::frame::Frame;
 
@@ -16,13 +15,16 @@ pub static CLOSING: AtomicBool = AtomicBool::new(false);
 pub static CLOSE_COUNT: AtomicU32 = AtomicU32::new(0);
 /// The menu is on screen this frame (the HUD layouts hide while it is, SPEC-core-05 §2).
 pub static MENU_SHOWN: AtomicBool = AtomicBool::new(false);
+/// A panel the menu does not own is on screen with the menu closed (the replay window's clip editor): the tick draws the frame.
+pub static EXT_SHOWN: AtomicBool = AtomicBool::new(false);
 /// The standalone CPU pilot plugin is on the card (Q11): found by its exported state symbol at boot.
 pub static PILOT_PRESENT: AtomicBool = AtomicBool::new(false);
 /// The game's own pause menu is open (`L_staying_help` left its rest position), SPEC-core-03 §2.4.
 pub static PAUSE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// The frame the worker last built, and its sequence number (the tick draws when it changed).
-pub static FRAME: Mutex<Frame> = Mutex::new(Frame::new());
+/// The frame the worker last built, and its sequence number (the tick draws when it changed). A wait-free triple buffer (stream/sync):
+/// the worker is its one writer and the UI tick its one reader, so neither waits on the other.
+pub static FRAME: hos_lock::TripleBuffer<Frame> = hos_lock::TripleBuffer::new(Frame::new());
 pub static FRAME_SEQ: AtomicU32 = AtomicU32::new(0);
 
 /// The UI anchors and the menu worker are installed (the guards passed): set once at boot (review R2-2).

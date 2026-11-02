@@ -121,6 +121,8 @@ pub enum View {
     Delay,
     /// The situation overrides screen (mockup 06): the situation line over two columns of action boxes.
     Overrides,
+    /// The replay window's clip editor: its text lines over a timeline (the crop window and the playhead).
+    Clip,
 }
 
 /// The delay popup's range control: two handles on a bar over the row's value set.
@@ -139,6 +141,17 @@ pub struct RangeView {
     pub editing: bool,
 }
 
+/// The clip editor's timeline (frames of the capture: the whole length, the crop window and the playhead).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ClipBar {
+    pub total: u32,
+    pub start: u32,
+    pub end: u32,
+    pub cursor: u32,
+    /// Which handle the Left / Right keys move: 0 the playhead, 1 the start, 2 the end.
+    pub handle: u8,
+    pub playing: bool,
+}
 
 /// One frame of the menu.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -163,6 +176,7 @@ pub struct Frame {
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
     pub range: RangeView,
+    pub clip: ClipBar,
     pub title: Text<40>,
     pub tabs: [Text<40>; TABS],
     pub tab_count: u8,
@@ -202,6 +216,7 @@ impl Frame {
             tile_sig: 0,
             tile_state: [0; super::panes::TILES],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
+            clip: ClipBar { total: 0, start: 0, end: 0, cursor: 0, handle: 0, playing: false },
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,

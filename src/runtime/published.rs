@@ -61,7 +61,12 @@ pub(crate) fn take_rerolls() -> u8 {
 /// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
 /// B11); the first publish at boot has none. Runs where a thread may wait (boot, the menu worker, the diag reload), never in a
 /// hook, and takes no lock a hook takes: hooks get the values through [`Live`], the flags below are atomics.
+/// One publish at a time (boot, the menu worker, the diag reload: never a game thread): the publishing path is the one reader of the
+/// typed menu's edit handoff (`compat::menu`).
+pub(crate) static PUBLISHING: hos_lock::Mutex<()> = hos_lock::Mutex::new(());
+
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
+    let _turn = PUBLISHING.lock();
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::remember(snapshot);
     let published_menu = crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot);

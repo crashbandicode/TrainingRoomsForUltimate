@@ -124,3 +124,68 @@ crc32/hash40 and one constant table; rebased onto `566780a` at the lead's reques
   false `ui_wired=true` are pkg6's; the rest of docs/SIZE-PLAN.md §2 (roster/Mii slices after pkg6's fixes merge).
 - **Watcher:** the model/effort watcher (`/tmp/slim-model-watcher.ps1`) is stopped with this handover; last check
   claude-opus-5-5 / high.
+
+## Astra continuation — 2026-11-02
+
+Thread 01a19c9f-18c1-7832-9236-a14dcebafa3b; live rollout confirms gpt-6-astra / medium.
+No subdelegation (worker brief forbids it). Owner-bound watcher PID 2608818, owner Codex PID 2589455,
+script /tmp/slim-watch-01a19c9f-18c1-7832-9236-a14dcebafa3b.py; model/effort only.
+Playbook followed: ae87443cbb801472e474b3f0c20b5f9c3f5f1f77 (ff-only pull already current).
+Read README, all seven docs files, tools/PROVENANCE.md personally; tool reads recorded as used.
+Starting HEAD 2e09317ab57a0488785bbabea5d524e97067fa63, stream/slim, this worktree.
+Authorized one-time merge of ebfcb9800fba1f82b2730b19ed26e231c810a2d6:
+only conflict was generated pkg4 ledger; regenerated using merged manifest.
+tools/carry_pkg4.py verify --dest-only: 42 verified. No source conflict resolution.
+No claims, builds, Eden runs, profile changes, targets, pushes or card writes in this continuation yet.
+Next: finish relevant spec reads, host admission, golden blessing + inspect + unblessed repeat,
+full host gates, Switch release/diag, then approved probe retirement and follow-up gates.
+Roster/Mii refactors require pkg6 baselines and integrated fixes first; empty KNOWN still required.
+
+### Current M/C acceptance checklist
+
+Every mandatory and conditional bullet from the followed playbook is listed below.
+Unverified is an explicit pending state; before READY each must have the prescribed final result and evidence.
+
+| Requirement | Tag | Result | Evidence |
+| --- | --- | --- | --- |
+| `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | unverified | Acceptance pending; no pass claimed. |
+| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | unverified | Acceptance pending; no pass claimed. |
+| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | unverified | Acceptance pending; no pass claimed. |
+| Gates pass, one cargo call each: `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`, `cargo skyline build --release`, and the diag build on its own. Evidence: the outputs. | M | unverified | Acceptance pending; no pass claimed. |
+| No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | unverified | Acceptance pending; no pass claimed. |
+| Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
+| Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
+| Version guard: the game reads `13.0.5` or nothing is installed and the log says `result=unsupported_version`. | M | unverified | Acceptance pending; no pass claimed. |
+| 64-byte guard on every hooked site, every called function and every relied-on instruction; a mismatch leaves that site alone and the log names it. | M | unverified | Acceptance pending; no pass claimed. |
+| Card scan before the site is chosen: `tools/build/scan-offsets.py` over the card copy, for the site and, for a virtual function, its vtable slot. Evidence: the scan's output and the copy's date. | M | unverified | Acceptance pending; no pass claimed. |
+| (another plugin hooks or may hook the site) Sharing v1 or the chain rules ([HOOK-SHARING](HOOK-SHARING.md)); the owner election runs before the byte guard; both stand-in modes (`foreign=inline`, `foreign=far`) and both load orders tested in Eden. N/A only when the scan showed nobody at the site, with the scan cited. | C | unverified | Acceptance pending; no pass claimed. |
+| Hook after the prologue, or call the game function instead of hooking it; hook the most specific instruction. | M | unverified | Acceptance pending; no pass claimed. |
+| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | unverified | Acceptance pending; no pass claimed. |
+| The shipped NRO writes its install line and nothing per frame. **C** (a logging plugin whose product is the log) its data files too, but no per-frame diagnostics. | M | unverified | Acceptance pending; no pass claimed. |
+| Read-only rules reviewed in the code, hook by hook: no checked random number drawn, no native code that draws one skipped or reordered, no simulated state written (ssbu-desync-detector `docs/WHAT-IS-CHECKED.md`). Evidence: the review in the evidence doc. | C | unverified | Acceptance pending; no pass claimed. |
+| Replay A/B with the desync detector: the same replay with and without the plugin, identical check values and positions. | C | unverified | Acceptance pending; no pass claimed. |
+| Online-only paths: two consoles, the detector on both, the changed path played to its end so the session after it is checked; `desync_seen=0` at the same `frame=` on both. | C | unverified | Acceptance pending; no pass claimed. |
+| Claim written before `Up` and released after `Down`, also after a failed run. Evidence: the coordination file's lines. | M | unverified | Acceptance pending; no pass claimed. |
+| One Eden per host, MemAvailable at least 10 GiB, never profile `a`, display `:61` or another agent's runs. | M | unverified | Acceptance pending; no pass claimed. |
+| The profile is a copy with the game content hard-linked (`gv.py prep`, or `cp -al`); a full copy per profile fills the filesystem. Only the copy is changed. Byte-identical files are links, and files that differ or that the run writes in place (saves, rewritten INI/config, shader caches, logs) are real copies ([EDEN](EDEN.md), "Link what is identical, copy what is not"). Evidence: `du -sh` against `du -sh --apparent-size` on the copy. | M | unverified | Acceptance pending; no pass claimed. |
+| One `CARGO_TARGET_DIR` per source copy, never shared between copies of the same workspace, and the cargo home shared per host and toolchain; sources refreshed with new file times; `df -h /` checked before every build or Eden launch, stopping below 40 GB free; finished work's build products deleted, with a manifest, while NROs, receipts and logs are kept ([WORKFLOW](WORKFLOW.md), "Build caches and disk"). | M | unverified | Acceptance pending; no pass claimed. |
+| Every wait gated on a log line or a screenshot check, between macro segments too ([MACROS](MACROS.md), "Hybrid"); a fixed sleep only where neither exists, and then rounded up. | M | unverified | Acceptance pending; no pass claimed. |
+| A run whose precondition line never comes is aborted and retried under the next label ([EDEN](EDEN.md), "Queue runs"). | M | unverified | Acceptance pending; no pass claimed. |
+| The ruleset is the shortest that covers the path under test: 1 stock, a 1:00 limit, items, hazards and FS meter off ([EDEN](EDEN.md), "Keep matches short"). A longer match only when the test needs it, with the reason in the handoff. Evidence: the ruleset screenshot or the match length in the log. | M | unverified | Acceptance pending; no pass claimed. |
+| Profile restored after the run: set-aside NROs back, saves and replays back, temp files removed, the host released. | M | unverified | Acceptance pending; no pass claimed. |
+| `console.log` searched for `panic`, `abort`, `crash` and `Unmapped`; an `Unmapped Read`/`Unmapped Write` below `0x1000` or inside the plugin's activity window fails the lane, because Eden tolerates the null read the console faults on ([EDEN](EDEN.md), "Read the results"). `run.json` and `memory.peak` kept with the run. | M | unverified | Acceptance pending; no pass claimed. |
+| Every local command under the memory and time guard; anything with `${var}` in a script file. | M | unverified | Acceptance pending; no pass claimed. |
+| Each run's outputs kept under its label. | M | unverified | Acceptance pending; no pass claimed. |
+| README: one paragraph, a full-screen GIF (1280 wide, under 10 s, caption with date and build), the install path, the build commands, a license line and the AI-assistance disclaimer. | M | unverified | Acceptance pending; no pass claimed. |
+| A dated evidence doc: run labels, the build (commit or NRO sha256), what was done, what the log showed. | M | unverified | Acceptance pending; no pass claimed. |
+| (the evidence cites numbers computed from logs) every such number comes from a committed script over the logged files, with host tests, and the command is named next to the numbers. | C | unverified | Acceptance pending; no pass claimed. |
+| No operator quotes, no claims beyond the tests. | M | unverified | Acceptance pending; no pass claimed. |
+| The handoff file current at each checkpoint: branch, commit, evidence, live state, next commands; no secrets. | M | unverified | Acceptance pending; no pass claimed. |
+| Minor version bumped, annotated tag, Forgejo release with the NRO, `manifest.json` and `SHA256SUMS.txt`; every asset verified by anonymous download. | C | unverified | Acceptance pending; no pass claimed. |
+| A rebuild of the tagged commit is byte-identical to the released NRO. | C | unverified | Acceptance pending; no pass claimed. |
+| Install over DBI MTP (or the mounted card with `upgrade2-ums.py`; a swap of one plugin for another with `swap-ums.py`; Skyline's `exefs/subsdk9` with `replace-exefs.py`): preflight (card listing, local copies, `old` sha256 matches), a rollback copy on the card, readback of the new NRO, every other plugin and the protected files; receipts kept; a phase with an existing receipt is not re-run. | C | unverified | Acceptance pending; no pass claimed. |
+| The user connects and disconnects the Switch. The agent never mounted, unmounted, ejected or remounted the card and never started or stopped DBI or hekate UMS; it read and wrote the SD only through what the user exposed (MTP, or the mount point), and its report told the user when the card could be disconnected. `compliance.py` fails scripts that carry a mount, unmount, eject or power-off command. | M | unverified | Acceptance pending; no pass claimed. |
+| Without the order: nothing pushed, tagged or written to the card, and the report says so. | M | unverified | Acceptance pending; no pass claimed. |
+| Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | unverified | Acceptance pending; no pass claimed. |
+| The model and effort gate and the per-thread watcher follow the routing authority (`/home/intpa/.codex/DELEGATION_ROUTING.md`); they are not restated here. | M | unverified | Acceptance pending; no pass claimed. |
+| Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | unverified | Acceptance pending; no pass claimed. |

@@ -10,3 +10,7 @@ pub fn reserve() {
 pub fn tick() {
     let _motion = lock_read(&MOTION);
 }
+/// Must not be reported: the worker's `store(..)` is its own local function.
+pub fn store() {
+    let _motion = lock_write(&MOTION);
+}

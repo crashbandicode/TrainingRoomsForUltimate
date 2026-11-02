@@ -323,11 +323,51 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     };
     let _ = write!(frame.crumb, "  >  {title}   page {} of {}", page + 1, layout.pages());
     let _ = frame.help[0].write_str(match layout.kind {
-        GridKind::Items => "Pick the item the CPU or you carry on load.",
+        GridKind::Items => "A gives Player 1 this item now.",
         GridKind::Stages => "Stages the lobby cycles through; All takes every stage.",
     });
     let _ = frame.hint.write_str("D-pad move   L/R page   B back");
 }
+/// Cells of a panel of the named-macro / replay layer: 4 columns by 8 rows (the layer's own page, `NX_SUBMENU_*`).
+pub const PANEL_COLS: usize = 4;
+pub const PANEL_ROWS: usize = 8;
+pub const PANEL_CELLS: usize = PANEL_COLS * PANEL_ROWS;
+
+/// `tile_state` of a cell that draws nothing (an empty label of the layer's page).
+pub const TILE_HIDDEN: u8 = 255;
+
+const HINT_PANEL: &str = "D-pad move   A confirm   Y delete or other   B back";
+
+/// A panel of the named-macro / replay layer (package 4): its title, the labels of its 4 x 8 page (an empty one draws nothing),
+/// the focused cell and a footer of at most two lines. Drawn in the tile panes, the same ones the item grid uses, under the
+/// page's tabs; the footer is the two-line help panel.
+pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels: &[S], selected: usize, frame: &mut Frame) {
+    page_frame(menu, frame);
+    frame.group_count = 0;
+    frame.rows = Frame::new().rows;
+    frame.row_count = 0;
+    frame.focus = None;
+    frame.help = [Text::new(); 2];
+    frame.hint.clear();
+    let _ = write!(frame.crumb, "{}  >  {}", menu.page().title(), title);
+    frame.view = View::Tiles;
+    frame.tile_cols = PANEL_COLS as u8;
+    frame.tile_rows = PANEL_ROWS as u8;
+    let count = labels.len().min(PANEL_CELLS);
+    frame.tile_count = count as u8;
+    for (i, label) in labels.iter().take(count).enumerate() {
+        let _ = frame.tiles[i].write_str(label.as_ref());
+        if label.as_ref().is_empty() {
+            frame.tile_state[i] = TILE_HIDDEN;
+        }
+    }
+    frame.tile_focus = selected.min(count.saturating_sub(1)) as u8;
+    for (line, text) in footer.split('\n').take(2).enumerate() {
+        let _ = frame.help[line].write_str(text);
+    }
+    let _ = frame.hint.write_str(HINT_PANEL);
+}
+
 fn swap_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
     lines_window(frame, cursor, SWAP_GROUPS.len(), |i, line| {
@@ -608,6 +648,28 @@ mod tests {
     }
 
     #[test]
+    fn a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing() {
+        use crate::model::menu::grid::ConsoleMode;
+        let mut m = open_grid(ConsoleMode::Docked, "Give item");
+        m.press(Button::Right);
+        m.press(Button::Right);
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(2));
+        assert_eq!(m.take_give_item(), None, "taken once");
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(2), "the already-chosen item is asked for again");
+        // Handheld: the third page starts at item 32.
+        let mut m = open_grid(ConsoleMode::Handheld, "Give item");
+        m.press(Button::R);
+        m.press(Button::R);
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(32));
+        let mut m = open_grid(ConsoleMode::Docked, "Lobby Stages");
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), None);
+    }
+
+    #[test]
     fn a_docked_label_that_is_cut_ends_in_two_dots_and_names_with_one_first_word_stay_apart() {
         let mut a = Text::<28>::new();
         let mut b = Text::<28>::new();
@@ -657,6 +719,29 @@ mod tests {
         let pages = crate::model::menu::grid::STAGE_TILES.div_ceil(16);
         assert!(frame(&m).crumb.string_lossy().contains(&format!("page 1 of {pages}")));
     }
+    #[test]
+    fn a_panel_of_the_macro_layer_is_a_4_by_8_tile_page_with_a_two_line_footer() {
+        let m = menu();
+        let mut labels = vec![String::new(); PANEL_CELLS];
+        labels[0] = "Jab string · Mario".into();
+        labels[1] = "Ledge trap · Pikachu".into();
+        let mut f = Frame::new();
+        panel_frame(&m, "Named Library", "Ledge trap · Pikachu\npage 1/1  skipped 0    A loads, B closes.", &labels, 1, &mut f);
+        assert_eq!((f.view, f.tile_cols, f.tile_rows, f.tile_count), (View::Tiles, 4, 8, 32));
+        assert_eq!(f.tiles[0].string_lossy(), "Jab string · Mario");
+        assert_eq!((f.tile_state[0], f.tile_state[2], f.tile_state[31]), (0, TILE_HIDDEN, TILE_HIDDEN));
+        assert_eq!(f.tile_focus, 1);
+        assert_eq!(f.crumb.string_lossy(), "CPU  >  Named Library");
+        assert_eq!(f.help[0].string_lossy(), "Ledge trap · Pikachu");
+        assert!(f.help[1].string_lossy().starts_with("page 1/1"));
+        assert_eq!(f.group_count, 0);
+        assert_eq!(f.row_count, 0);
+        // A one-label panel (the system keyboard's "Name and save") and a focus past the labels are clamped.
+        let mut f = Frame::new();
+        panel_frame(&m, "Name macro", "Recording · 12f · 0.20s\nA: system keyboard   B: return", &["Name and save"], 9, &mut f);
+        assert_eq!((f.tile_count, f.tile_focus), (1, 0));
+    }
+
     #[test]
     fn every_sub_screen_of_every_row_draws_within_the_budget() {
         // Open the screen of every row that has one and check the frame stays inside the layout's lines.
