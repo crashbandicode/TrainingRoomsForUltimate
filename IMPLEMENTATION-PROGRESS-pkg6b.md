@@ -52,3 +52,16 @@ manifest: `widen` on `lobby_stage_cycle` / `practice_stage_request_policy`; `Fig
 ## D10 re-sync and first Switch compile of the bridge (2026-11-02)
 - Re-synced to stage m5q (54eabdd): three carried files changed (none in B's area), recorded edits re-applied, host tests 5,638 pass (only the wire stream's known failure). No Eden claim was open on either host (queue file and process list checked) when the scratch tree was built.
 - Scratch tree (	mp/pkg6b-scratch, last commit after c87cf1): the editor bridge (25 files incl. Lua helpers), mii_native_access, the lobby half and the automation observer compile for the Switch, release and `--features diag,automation-results-observer`. Release NRO of that tree  b390ad2 (9d4ee8d1...), resident 1,003,520 B (980 KiB; whole tree incl. the merged wire and A's seam table, pkg6b's share not separated). Stubs still needed: untime::roster::character_roster (A) and compat::menu_app (pkg5: QUICK_MENU_APP, AppPage, mounting an owned Mii catalog into the open Mii list; the manifest maps 	raining_mod_tui::{App,AppPage}, common::menu::{QUICK_MENU_APP,MENU_RECEIVED_INPUT} and lock_write/ssign to it).
+
+## Wire merge and scratch removal (2026-11-02, after work/implementation a44b7ce)
+- Merged work/implementation into stream/pkg6b (d3ae66; conflicts in install_line.rs, oot.rs, core01.rs resolved by keeping both the seam fields and the developer gate). Scratch work moved in 6a1908a (everything valid; the stubs oster/, menu_app.rs, pending.rs and the cycle-dependent declarations stay out; copies in /tmp/pkg6b-scratch/stubs/), 	mp/pkg6b-scratch branch and worktree deleted.
+- Gates at 6a1908a (+ clippy fix): host cargo test 6,117 pass, 0 fail; clippy -D warnings 0 (the automation helper's five 
+ew_without_default lints fixed by recorded Default impls, no llow); --no-default-features builds; Switch release 2b0ad730 resident 933,888 B (912 KiB); diag 7100e69d 1,085,440 B. Hosts had no Eden process at build time.
+- Declared and Switch-compiled now: game_mode, 	raining_stage_rotation, 
+ative_keyboard, mii_identity_binding, compat::{common,consts,menu,replay_preview,sync}. Carried, not declared: the editor bridge, mii_native_access, the lobby half, utomation_helper, compat::{filesystem,hazard_manager}, the lobby 	raining facade (	ry_get_module_accessor joins with it). They compiled for the Switch against the stubs (release and diag + utomation-results-observer) before the stubs were dropped.
+- Allocation fixes done: editor bridge (above); the Mii ordinary player/CPU 
+ote(&format!(..)) diagnostic lines become 
+ote(format_args!(..)) (4 sites, recorded edits). Not changed: 
+ative_keyboard::request* (no caller in the tree: the callers are pkg4's macro naming UI on the UI thread and the cycle, so no hook-scope allocation exists today; a fixed text buffer goes in with the first hook-scope caller); the 
+otify(role, String) calls of the ordinary player/CPU (.into() of static text) and mii_catalog_request::apply's Arc::new need 
+otify(role, Cow<'static, str>) in worker A's character_roster and the worker building the Arc; the two ormat! notices (Player/CPU {:?} choice skipped) need a fixed buffer there. The diag R5 row needs the cycle. Next: re-run the same gates after these edits, then wait for A's cycle (declaration commit).

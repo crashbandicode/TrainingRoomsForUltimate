@@ -110,7 +110,7 @@ impl State {
 }
 fn base()->usize { BASE.load(Ordering::Acquire) }
 fn epoch()->u64 { mii_saved_alpha::current_generation(1) }
-fn note(reason:&str) { trace!("[MiiOrdinaryCpu] {reason}"); }
+fn note(reason:impl std::fmt::Display) { trace!("[MiiOrdinaryCpu] {reason}"); }
 /// lobby-preload A: the CPU's visible exact Mii for extra-capacity creation. Only the authority
 /// this adapter committed for the CPU owner (1 Training, 4 waiting), rederived now under G with
 /// the CPU's original row kind, proves it. Reads only.
@@ -979,7 +979,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                     // before any group mutation; otherwise canonical.
                     && match super::body_bank::mii_setup_admitted(current.binding.entry,current.binding.owner,descriptor_kind(&descriptor)) {
                         Ok(())=>true,
-                        Err(reason)=>{note(&format!("[MiiOrdinaryCpu] Mii group canonical before mutation: {}",reason));false}
+                        Err(reason)=>{note(format_args!("[MiiOrdinaryCpu] Mii group canonical before mutation: {}",reason));false}
                     } =>
                     Some(Live::Numbered {identity:Identity::Saved(c.canonical()),cursor:destination.cursor}),
                 _=>None,

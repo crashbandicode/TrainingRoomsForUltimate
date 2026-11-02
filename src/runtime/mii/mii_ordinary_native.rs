@@ -848,7 +848,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
     if !same_owned(&comparable,before)
         || (regrouped && !super::super::body_bank::group_rebaseline(before.binding.entry,0,
             before.binding.epoch,&before.descriptor,&now.descriptor)) {
-        super::note(&format!("[MiiOrdinaryPlayer] bank settle diverged owner_before={:?} owner_now={:?} control_before={:?} control_now={:?} index_before={} index_now={}",
+        super::note(format_args!("[MiiOrdinaryPlayer] bank settle diverged owner_before={:?} owner_now={:?} control_before={:?} control_now={:?} index_before={} index_now={}",
             before.owners[0],now.owners[0],before.control,now.control,before.binding.record_index,now.binding.record_index));
         drop(lock);return Err(BankRefusal::Diverged("bank ready owned state changed"));
     }

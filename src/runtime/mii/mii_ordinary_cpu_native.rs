@@ -430,7 +430,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
     if !same_owned(&comparable,before,bank.retained)
         || (regrouped && !super::super::body_bank::group_rebaseline(before.binding.entry,before.binding.owner,
             before.binding.epoch,&before.descriptor,&now.descriptor)) {
-        super::note(&format!("[MiiOrdinaryCpu] bank settle diverged owner_before={:?} owner_now={:?} control_before={:?} control_now={:?} index_before={} index_now={} map_same={}",
+        super::note(format_args!("[MiiOrdinaryCpu] bank settle diverged owner_before={:?} owner_now={:?} control_before={:?} control_now={:?} index_before={} index_now={} map_same={}",
             before.owners[owner_slot],now.owners[owner_slot],before.control,now.control,before.index,now.index,same_map(&comparable,before)));
         drop(lock);return Err(BankRefusal::Diverged("CPU bank ready owned state changed"));
     }

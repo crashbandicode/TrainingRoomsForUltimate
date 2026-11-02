@@ -1310,14 +1310,33 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "1872cf7f529b29f04c5b85f31737d0c10b32e4c69e206c3259d569fe633cc989"
+   "dest_sha256": "af9976715065557aac1cd4b7aa5e05a79497d58697632be515061c2485758d9f",
+   "edits": [
+    {
+     "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
+     "new": "fn note(reason:impl std::fmt::Display) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "note(&format!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
+     "new": "note(format_args!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_cpu_native.rs",
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "ccc4800cba21ea9760e6676a9471578f5b6bad34d390254bc3cf888ee5091077"
+   "dest_sha256": "0fcfff1f44cfc25141b48cb598257292f5e923a12356b1600c07279eb74de998",
+   "edits": [
+    {
+     "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
+     "new": "super::note(format_args!(\"[MiiOrdinaryCpu] bank settle diverged",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_gate.rs",
@@ -1331,14 +1350,33 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "887581118fcc935809797b564a98b1cf11221af545aefc0a147a6d622638c8d8"
+   "dest_sha256": "1cff1553d441afb726659d8c7b05fedae1dd7916039e2e68fda92c45c21fa0b5",
+   "edits": [
+    {
+     "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
+     "new": "super::note(format_args!(\"[MiiOrdinaryPlayer] bank settle diverged",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_player.rs",
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "c987cdba7a7ca8fd00233166183a543c797a2a2baea9fa769f51f32d27789a0c"
+   "dest_sha256": "dfac01d7eb379daef69450344b9d226de387842a8c776da7fb7d98ab80404749",
+   "edits": [
+    {
+     "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
+     "new": "fn note(reason:impl std::fmt::Display) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "note(&format!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
+     "new": "note(format_args!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
   },
   {
    "src": "src/mii_replay.rs",

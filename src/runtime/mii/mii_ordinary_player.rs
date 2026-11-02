@@ -108,7 +108,7 @@ pub(super) unsafe fn visible_exact(current:*const u8,kind:u32)->Result<native::V
     let original=original_kind(Role::Player).ok_or("Player original absent")?;
     native::visible_exact(current as usize,epoch(),original,kind)
 }
-fn note(reason:&str) { trace!("[MiiOrdinaryPlayer] {reason}"); }
+fn note(reason:impl std::fmt::Display) { trace!("[MiiOrdinaryPlayer] {reason}"); }
 
 pub(super) fn preload_pending()->bool {
     let s=STATE.lock().unwrap(); s.capture || s.request.is_some() || s.busy()
@@ -802,7 +802,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                 // any group mutation; otherwise this target stays on the canonical path.
                 && match super::body_bank::mii_setup_admitted(current.binding.entry,0,descriptor_kind(&descriptor)) {
                     Ok(())=>true,
-                    Err(reason)=>{note(&format!("[MiiOrdinaryPlayer] Mii group canonical before mutation: {}",reason));false}
+                    Err(reason)=>{note(format_args!("[MiiOrdinaryPlayer] Mii group canonical before mutation: {}",reason));false}
                 } =>
                 Some(Live::Numbered {identity:Identity::Saved(choice.canonical),cursor:destination.cursor}),
             _=>None,
