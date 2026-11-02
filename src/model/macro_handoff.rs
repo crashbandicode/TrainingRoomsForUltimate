@@ -1,0 +1,414 @@
+//! Design C of the named-macro layer (SPEC-core-01 §4.3, lead ruling 2026-11-02): the panel model has one owner, the menu worker, and
+//! the game-thread hooks never take its locks. What crosses between the two lives here, pure and host-tested:
+//!
+//! * `MacroQueries`: the `Copy` answers the hooks consult every frame (Macro Source, capture/playback state, panel visibility …),
+//!   published by the worker after every model change and read wait-free by the hooks.
+//! * `PlayBuffers<T>`: two frame buffers for named playback. The worker fills the one the hooks are not reading and publishes it; a
+//!   hook reads one frame by value per call and never waits. The worker, which may sleep, waits for the readers of the old buffer to
+//!   leave before it writes that buffer again.
+//! * `CaptureBuffer<T>`: one frame buffer the hook owns between the start of a named capture and its end, and the worker owns
+//!   otherwise (it prepares it before a capture and reads the frames after one). Ownership moves through one atomic; neither side waits.
+//! * `LayerEvent`: what a game thread tells the worker (posted to a mailbox, drained by the worker in order).
+//!
+//! The buffers allocate only on the worker (`prepare`, `fill`); a hook's `push`/`frame_at` stay within the prepared capacity.
+
+use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
+
+/// The hook-side answers of the named layer (one snapshot, written by the worker after each model change).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MacroQueries {
+    /// Macro Source is Named Library.
+    pub source_is_named: bool,
+    /// A named macro is loaded and its fighter is ready (the playback chord may start it).
+    pub playback_allowed: bool,
+    /// The loaded macro plays on the current CPU whatever its fighter (no recorded-identity gate).
+    pub plays_current: bool,
+    /// The loaded macro's recorded fighter kind (-1: none), for the restore's identity gate.
+    pub loaded_kind: i32,
+    /// The loaded macro was recorded in the air (its restore starts in Fall).
+    pub restore_in_air: bool,
+    /// Any panel of the layer is up (library, naming, clip editor, capture browser).
+    pub panel_visible: bool,
+    /// The clip editor is in the foreground (P1's controls are the editor's).
+    pub clip_foreground: bool,
+    /// A keyboard request is open or pending.
+    pub naming_pending: bool,
+    /// The layer is suspended (a waiting-room scene left with a draft).
+    pub suspended: bool,
+    /// The placement editor's cross marker, if it shows one (x, y).
+    pub marker: Option<(i32, i32)>,
+}
+
+impl MacroQueries {
+    /// Nothing loaded, nothing visible: what the hooks see before the worker's first publish.
+    pub const IDLE: MacroQueries = MacroQueries {
+        source_is_named: false,
+        playback_allowed: false,
+        plays_current: false,
+        loaded_kind: -1,
+        restore_in_air: false,
+        panel_visible: false,
+        clip_foreground: false,
+        naming_pending: false,
+        suspended: false,
+        marker: None,
+    };
+}
+
+/// One message from a game thread to the worker. `Copy` and small, so posting allocates nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayerEvent {
+    /// The named capture ended with `len` frames in the capture buffer (`crop`: Recording Crop was on).
+    CaptureFinished { len: u32, crop: bool },
+    /// A named playback or a clip preview ended.
+    PlaybackEnded,
+    /// The playback chord asked for the loaded named macro (the worker requests the restore).
+    RequestPlayback,
+    /// A save-state restore finished and the layer's follow-up ran on the game thread (the worker refreshes its view).
+    RestoreDone,
+    /// The session ended (leaving Training, a hot swap, a lobby change): close transient panels.
+    SessionCleared,
+    /// One game frame passed with a practice CPU on stage (the worker's character and keyboard services may run).
+    FrameTick,
+}
+
+/// Two frame buffers for playback: the hooks read the published one, the worker fills the other.
+pub struct PlayBuffers<T> {
+    slots: [UnsafeCell<Vec<T>>; 2],
+    /// The published buffer (0 or 1); `NONE` before the first publish.
+    active: AtomicU8,
+    /// Its length (frames).
+    len: AtomicUsize,
+    /// Hooks reading each buffer right now.
+    readers: [AtomicU32; 2],
+    /// Bumped twice on every publish, odd while it switches (a hook can tell that a new macro replaced the one it started).
+    generation: AtomicU32,
+}
+
+const NONE: u8 = u8::MAX;
+
+// SAFETY: a slot is written only by the single worker while it is unpublished and has no reader (see `fill`); hooks only read.
+unsafe impl<T: Send> Sync for PlayBuffers<T> {}
+
+impl<T: Copy> PlayBuffers<T> {
+    pub const fn new() -> Self {
+        Self {
+            slots: [UnsafeCell::new(Vec::new()), UnsafeCell::new(Vec::new())],
+            active: AtomicU8::new(NONE),
+            len: AtomicUsize::new(0),
+            readers: [AtomicU32::new(0), AtomicU32::new(0)],
+            generation: AtomicU32::new(0),
+        }
+    }
+
+    /// Worker: reserve `capacity` frames in both buffers (boot or a menu commit; the worker may allocate).
+    ///
+    /// # Safety
+    /// Only the worker calls `prepare`, `fill` and `retract` (one writer).
+    pub unsafe fn prepare(&self, capacity: usize) {
+        for index in 0..2u8 {
+            if self.active.load(SeqCst) == index {
+                continue;
+            }
+            self.wait_unread(index);
+            let slot = &mut *self.slots[usize::from(index)].get();
+            if slot.capacity() < capacity {
+                slot.reserve_exact(capacity - slot.len());
+            }
+        }
+    }
+
+    /// Worker: copy `frames` into the unpublished buffer and publish it. Returns the new generation.
+    ///
+    /// # Safety
+    /// As `prepare`.
+    pub unsafe fn fill(&self, frames: &[T]) -> u32 {
+        let current = self.active.load(SeqCst);
+        let next = if current == 0 { 1 } else { 0 };
+        self.wait_unread(next);
+        let slot = &mut *self.slots[usize::from(next)].get();
+        slot.clear();
+        slot.extend_from_slice(frames);
+        // The generation is odd while the published buffer switches (a reader comparing two generations sees the switch).
+        self.generation.fetch_add(1, SeqCst);
+        self.len.store(0, SeqCst);
+        self.active.store(next, SeqCst);
+        self.len.store(frames.len(), SeqCst);
+        self.generation.fetch_add(1, SeqCst) + 1
+    }
+
+    /// Worker: nothing is published any more (the macro was unloaded).
+    ///
+    /// # Safety
+    /// As `prepare`.
+    pub unsafe fn retract(&self) {
+        self.generation.fetch_add(1, SeqCst);
+        self.active.store(NONE, SeqCst);
+        self.len.store(0, SeqCst);
+        self.generation.fetch_add(1, SeqCst);
+    }
+
+    /// The worker's wait (it may sleep): no hook is reading buffer `index`.
+    fn wait_unread(&self, index: u8) {
+        while self.readers[usize::from(index)].load(SeqCst) != 0 {
+            std::thread::yield_now();
+        }
+    }
+
+    /// Hook: the published macro's length (0 when none).
+    pub fn len(&self) -> usize {
+        if self.active.load(SeqCst) == NONE {
+            0
+        } else {
+            self.len.load(SeqCst)
+        }
+    }
+
+    /// Hook: no macro is published.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Hook: the publish counter.
+    pub fn generation(&self) -> u32 {
+        self.generation.load(SeqCst)
+    }
+
+    /// Hook: frame `index` of the published macro, by value. Never waits: a publish that races the read is seen on the retry, and the
+    /// worker does not write a buffer while this reader is counted on it.
+    pub fn frame_at(&self, index: usize) -> Option<T> {
+        for _ in 0..2 {
+            let active = self.active.load(SeqCst);
+            if active == NONE {
+                return None;
+            }
+            let readers = &self.readers[usize::from(active)];
+            readers.fetch_add(1, SeqCst);
+            if self.active.load(SeqCst) != active {
+                // The worker published the other buffer in between: it may write this one once we leave.
+                readers.fetch_sub(1, SeqCst);
+                continue;
+            }
+            // SAFETY: `active` is published and counted as read, so the worker does not write it (`fill` writes the other one and waits
+            // for this count before it would write this one).
+            let frame = unsafe { (&*self.slots[usize::from(active)].get()).get(index).copied() };
+            readers.fetch_sub(1, SeqCst);
+            return frame;
+        }
+        None
+    }
+}
+
+impl<T: Copy> Default for PlayBuffers<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Who owns the capture buffer.
+const WORKER_READY: u8 = 0;
+const HOOK: u8 = 1;
+const WORKER_FULL: u8 = 2;
+const WORKER_BUSY: u8 = 3;
+
+/// The named capture's frame buffer: the hook's from `begin` to `finish`, the worker's otherwise.
+pub struct CaptureBuffer<T> {
+    frames: UnsafeCell<Vec<T>>,
+    owner: AtomicU8,
+    /// Frames stored by the hook (published at `finish`).
+    len: AtomicUsize,
+}
+
+// SAFETY: exactly one side touches `frames` at a time, decided by `owner` (compare-exchange hand-offs).
+unsafe impl<T: Send> Sync for CaptureBuffer<T> {}
+
+impl<T: Copy + Default> CaptureBuffer<T> {
+    pub const fn new() -> Self {
+        Self { frames: UnsafeCell::new(Vec::new()), owner: AtomicU8::new(WORKER_READY), len: AtomicUsize::new(0) }
+    }
+
+    /// Worker: reserve `capacity` frames (only while the worker owns an empty buffer). False when the hook or a pending result holds it.
+    pub fn prepare(&self, capacity: usize) -> bool {
+        if self.owner.compare_exchange(WORKER_READY, WORKER_BUSY, SeqCst, SeqCst).is_err() {
+            return false;
+        }
+        // SAFETY: WORKER_BUSY: only this worker call touches the buffer.
+        let frames = unsafe { &mut *self.frames.get() };
+        if frames.capacity() < capacity {
+            frames.reserve_exact(capacity - frames.len());
+        }
+        self.owner.store(WORKER_READY, SeqCst);
+        true
+    }
+
+    /// Hook: take the buffer for a capture (empty, prepared). False when the worker has not taken the last result yet.
+    pub fn begin(&self) -> bool {
+        if self.owner.compare_exchange(WORKER_READY, HOOK, SeqCst, SeqCst).is_err() {
+            return false;
+        }
+        // SAFETY: HOOK: only the capturing hook touches the buffer until `finish`.
+        unsafe { (*self.frames.get()).clear() };
+        self.len.store(0, SeqCst);
+        true
+    }
+
+    /// Hook: the capture is running.
+    pub fn capturing(&self) -> bool {
+        self.owner.load(SeqCst) == HOOK
+    }
+
+    /// Hook: store frame `index` (frames in between are default-filled). False when not capturing or past the prepared capacity
+    /// (the hook never grows the buffer).
+    pub fn store(&self, index: usize, frame: T) -> bool {
+        if self.owner.load(SeqCst) != HOOK {
+            return false;
+        }
+        // SAFETY: HOOK: this hook owns the buffer.
+        let frames = unsafe { &mut *self.frames.get() };
+        if index >= frames.capacity() {
+            return false;
+        }
+        if frames.len() <= index {
+            frames.resize(index + 1, T::default());
+        }
+        frames[index] = frame;
+        self.len.store(frames.len(), SeqCst);
+        true
+    }
+
+    /// Hook: frame `index` was stored.
+    pub fn has_frame(&self, index: usize) -> bool {
+        self.owner.load(SeqCst) == HOOK && index < self.len.load(SeqCst)
+    }
+
+    /// Hook: frame `index` of the running capture.
+    pub fn frame_at(&self, index: usize) -> Option<T> {
+        if self.owner.load(SeqCst) != HOOK {
+            return None;
+        }
+        // SAFETY: HOOK: this hook owns the buffer.
+        unsafe { (&*self.frames.get()).get(index).copied() }
+    }
+
+    /// Hook: the capture ended; the buffer goes to the worker with its frames. Returns the frame count (None: not capturing).
+    pub fn finish(&self) -> Option<usize> {
+        let len = self.len.load(SeqCst);
+        self.owner.compare_exchange(HOOK, WORKER_FULL, SeqCst, SeqCst).ok().map(|_| len)
+    }
+
+    /// Hook: the capture was cancelled (a load request, a stop): the buffer goes back to the worker empty.
+    pub fn cancel(&self) {
+        if self.owner.compare_exchange(HOOK, WORKER_BUSY, SeqCst, SeqCst).is_ok() {
+            self.len.store(0, SeqCst);
+            self.owner.store(WORKER_READY, SeqCst);
+        }
+    }
+
+    /// Worker: read the finished capture's frames, then the buffer is ready for the next capture. None when no result is waiting.
+    pub fn take<R>(&self, read: impl FnOnce(&[T]) -> R) -> Option<R> {
+        if self.owner.compare_exchange(WORKER_FULL, WORKER_BUSY, SeqCst, SeqCst).is_err() {
+            return None;
+        }
+        // SAFETY: WORKER_BUSY: only this worker call touches the buffer.
+        let frames = unsafe { &mut *self.frames.get() };
+        let out = read(&frames[..self.len.load(SeqCst).min(frames.len())]);
+        frames.clear();
+        self.len.store(0, SeqCst);
+        self.owner.store(WORKER_READY, SeqCst);
+        Some(out)
+    }
+}
+
+impl<T: Copy + Default> Default for CaptureBuffer<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CaptureBuffer, MacroQueries, PlayBuffers};
+
+    #[test]
+    fn the_idle_snapshot_has_nothing_loaded_or_visible() {
+        let idle = MacroQueries::IDLE;
+        assert!(!idle.source_is_named && !idle.playback_allowed && !idle.panel_visible && idle.loaded_kind == -1);
+    }
+
+    #[test]
+    fn a_published_macro_is_read_by_value_and_a_new_one_replaces_it() {
+        let buffers = PlayBuffers::<u32>::new();
+        assert_eq!((buffers.len(), buffers.frame_at(0)), (0, None));
+        // SAFETY: this test is the only writer.
+        unsafe {
+            buffers.prepare(8);
+            let g1 = buffers.fill(&[1, 2, 3]);
+            assert_eq!((buffers.len(), buffers.frame_at(2), buffers.frame_at(3)), (3, Some(3), None));
+            let g2 = buffers.fill(&[9; 5]);
+            assert!(g2 > g1);
+            assert_eq!((buffers.len(), buffers.frame_at(4)), (5, Some(9)));
+            buffers.retract();
+        }
+        assert_eq!((buffers.len(), buffers.frame_at(0)), (0, None));
+    }
+
+    #[test]
+    fn readers_never_see_a_torn_buffer_while_the_worker_republishes() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        let buffers = Arc::new(PlayBuffers::<u64>::new());
+        let stop = Arc::new(AtomicBool::new(false));
+        // SAFETY: the main thread is the only writer.
+        unsafe { buffers.prepare(256) };
+        let readers: Vec<_> = (0..3)
+            .map(|_| {
+                let (buffers, stop) = (buffers.clone(), stop.clone());
+                std::thread::spawn(move || {
+                    let mut seen = 0u64;
+                    while !stop.load(Ordering::Relaxed) {
+                        // Every buffer the worker publishes holds one value in every frame: two reads of one macro agree.
+                        let generation = buffers.generation();
+                        if generation % 2 == 1 {
+                            continue;
+                        }
+                        if let (Some(a), Some(b)) = (buffers.frame_at(0), buffers.frame_at(255)) {
+                            if buffers.generation() == generation {
+                                assert_eq!(a, b, "a frame of an older fill leaked into the published buffer");
+                            }
+                            seen += 1;
+                        }
+                    }
+                    seen
+                })
+            })
+            .collect();
+        for value in 0..2000u64 {
+            // SAFETY: the only writer.
+            unsafe { buffers.fill(&[value; 256]) };
+        }
+        stop.store(true, Ordering::Relaxed);
+        let seen: u64 = readers.into_iter().map(|r| r.join().unwrap()).sum();
+        assert!(seen > 0);
+    }
+
+    #[test]
+    fn the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook() {
+        let capture = CaptureBuffer::<u16>::new();
+        assert!(!capture.store(0, 1), "not capturing yet");
+        assert!(capture.prepare(4));
+        assert!(capture.begin());
+        assert!(!capture.prepare(8), "the hook owns it");
+        assert!(capture.store(0, 5) && capture.store(2, 7));
+        assert!(!capture.store(4, 9), "past the prepared capacity: refused, never grown in the hook");
+        assert_eq!((capture.has_frame(1), capture.frame_at(1), capture.frame_at(2)), (true, Some(0), Some(7)));
+        assert_eq!(capture.finish(), Some(3));
+        assert!(!capture.begin(), "the worker has not taken the result");
+        assert_eq!(capture.take(<[u16]>::to_vec), Some(vec![5, 0, 7]));
+        assert_eq!(capture.take(<[u16]>::to_vec), None);
+        assert!(capture.begin());
+        capture.cancel();
+        assert_eq!(capture.finish(), None);
+        assert!(capture.begin(), "a cancelled capture returns the buffer ready");
+    }
+}
