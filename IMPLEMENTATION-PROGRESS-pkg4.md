@@ -87,3 +87,51 @@ host `cargo test` 60 binaries, 7,377+ pass; clippy `--all-targets -D warnings` 0
 - Package 3: the preview restore (`port::save_states::request_preview_restore`); package 6A: the roster cycle behind `port::roster`.
 - Size: +596 KiB resident over the merged tree; per-module pass and proposals in the lead report (smash-match-data 260 KiB, layer 105 KiB, macros model 73 KiB; `opt-level = "z"` for smash-match-data saves 72 KiB).
 - Not run: live capture written after a real match (needs a match and the native replay save).
+
+## S4-4 playbook record (operator order, 2026-11-02)
+
+Playbook followed: `ae87443` (pulled 11:4xZ, already current; README, every docs/ file and tools/PROVENANCE.md read completely this session). Model:
+claude-sonnet-5-5/high until the 10:17Z restart, claude-opus-5-5/high since (operator's choice, lead 10:4xZ); hidden watcher re-armed for the new pair.
+
+Checklist (docs/CHECKLIST.md), S4-4 scope. M = mandatory, C = conditional.
+| Item | Tag | Status | Evidence |
+| --- | --- | --- | --- |
+| cdylib only | M | pass | Cargo.toml `crate-type = ["cdylib"]`; compliance.py |
+| release profile s/lto/cgu1/abort, skyline =0.6.0, toolchain 1.98.1 | M | pass | Cargo.toml, rust-toolchain.toml |
+| pure logic in model with host tests; runtime Switch only | M | pass | engine::macros / macro_ui / model::recording host-tested; src/runtime/macros Switch only |
+| gates: test, clippy -D warnings, no-default-features, release, diag (one cargo call each) | M | pass at d124246 / 8d0fccf | 61 binaries 7,645 pass; clippy 0; --no-default-features; Switch release 68c97386, diag 1befcc2e |
+| no heap in hooks (counter, heap_allocations=0) | M | pass (steady state) | install `heap_allocations=0`; `hook_stats delta=0` through recording, listing, browser (s4-04/05); events counted per_load |
+| fixed buffers, writer thread, stack-built paths | M | pass | library writes through model::store; captures on replay_store's writer thread; diag request on its own thread |
+| root-cause fixes only, workarounds to the operator | M | pass | compat::menu::apply_snapshot (root), install line on the heap (root); no guard/allow added; hang handed to ui-screens (parking_lot parker) |
+| version guard | M | pass | boot (package 1), unchanged |
+| 64-byte guard on every hooked/called/relied site | M | pass | 12 new named_macros rows from the ELF (tests/input_sites.rs), seam rows for live_replay, tests/pkg6_smash_calls.rs COVERED; layer off if a row is rejected |
+| card scan before choosing a site | M | open | no new hooked site of mine; called rows only; scan of the 12 called offsets over the card copy not run yet |
+| sharing/chaining (another plugin hooks the site) | C | N/A for the 12 called rows (called, not hooked); live_replay write_record uses the seam table's entry_or_body (smash_replay_to_mp4 sharing) carried from the fork, both forms tested by package 6's seam tests, not in Eden here |
+| hook after prologue / call instead of hook | M | pass | the layer adds no new hook; live capture hooks are the fork's seam rows |
+| no diag code in the shipped NRO | M | pass | compliance.py "no diag strings" on release 0d030440 |
+| shipped NRO writes only its install line | M | pass | `[ReplayCapture]` record/save lines are rare events kept in the shipped ring (lead-noted tag); no per-frame line |
+| online read-only rules reviewed | C | pass (review) | docs/test-provenance/package-4.md S4-4: observers only, Training-only layer |
+| online replay A/B, two consoles | C | open | live capture hooks run during matches when capture is on: not run (needs the desync detector pair) |
+| Eden claim/release, one per host, MemAvailable, never profile a / :61 | M | pass | Yoga ledger lines s4-03..s4-07, display :94, profile t4 |
+| profile copy hard-linked, only the copy changed | M | pass | tr_eden4.py prep (hard-linked content), restore after each run |
+| one target dir per copy, df checked | M | pass | cargo-targets/trainingrooms-pkg4, -pkg4-sw; df 213/265 GB free |
+| waits gated on a log line or screenshot | M | pass | route4.py gates, rows_s44.py line/file gates |
+| failed precondition aborted and retried under the next label | M | pass | s4-03 → s4-04 → s4-05 → s4-07 → s4-08 |
+| ruleset shortest | M | N/A | Training only, no match played |
+| profile restored, host released | M | pass | `tr_eden4.py restore`, RELEASED lines |
+| console.log searched; run.json, memory.peak kept | M | pass | scan per run; memory.peak 6.05–6.67 GB |
+| every local command under memory/time guard | M | pass | cg.ps1 / sw.ps1 / clippy.ps1 under systemd-run MemoryMax=6G timeout 1800 |
+| outputs kept under the label | M | pass | eden/runs/s4-0N (gitignored), Yoga runs/s4-0N |
+| README GIF, evidence doc dated, numbers from scripts | M/C | README/GIF: project-level (lead); evidence: eden/EDEN-PACKAGE-4.md S4-4 (dated) |
+| handoff current | M | pass | this file |
+| release/card | C | N/A | not ordered |
+| nothing pushed/tagged/written to card | M | pass | none |
+| model/effort gate and watcher | M | pass | see above |
+| compliance.py before READY | M | open | to run on the final release NRO |
+
+Own tools (playbook coverage):
+- `tools/carry_pkg4.py`: kept (carry tool; not a playbook topic; same mechanism as pkg6's).
+- `eden/tr_eden4.py`: kept — it is the predecessor's adaptation of the playbook's `tools/eden-solo/gv.py` + `solo.ps1` (same steps: claim, prep with hard links, launch, muted, down, scan, restore) for this stream's own profile `t4`, display :94 and owner, plus `--settings` and `--seed` (data folder seeding), which solo.ps1 does not have. Its ledger parser now reads per host (`on the Ally`).
+- `eden/route4.py`: kept — the playbook's hybrid route (MACROS "Hybrid": recorded segment macro, gated by screenshot distance, tile cursor steps with `settled ... at=` checks, TILE-CURSOR).
+- `eden/rows_s44.py`: kept — the rows themselves (diag request file and line gates); the playbook has no generic row runner.
+- `/tmp/pkg4s44/{cg,sw,clippy}.ps1`: one-call cargo wrappers under the guard (playbook WORKFLOW §4 commands); `open_claims.py` / `wait_*.py`: per-host ledger parser and queue waiter (EDEN "Queue runs" pattern).
