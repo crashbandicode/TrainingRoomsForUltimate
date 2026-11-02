@@ -2228,7 +2228,7 @@
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "555f1a4673997f07fef352d6ea7726b841ce1ffad3d4b1f22f5b065252d13d77",
+   "dest_sha256": "8cccf584eb6994ad5a65bbe10bf56660af84c79a754ee925c41d6a2d3595eefa",
    "edits": [
     {
      "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -2254,6 +2254,11 @@
      "old": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        super::clear_session_state();\n",
      "new": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state();\n",
      "reason": "package 2's CPU role scene and the shared scene wrapper follow the lobby's activation (`cpu::set_lobby`, PACKAGE-6-PLAN section 6); the fork had no such coupling"
+    },
+    {
+     "old": "pub fn permits_entry(entry: i32) -> bool {\n    !is_waiting_scene() || matches!(entry, 0 | 4)\n}\n\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (permits_entry)"
     }
    ]
   },
@@ -2262,12 +2267,42 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "a5e2509155d7c8ce34329b5af3fce14496c6fdd15ce5b912f6c7a0de7ac485bd",
+   "dest_sha256": "14744ab2519f8b69ad8857c73a6f7ae9f942f640f90652da830830c897c381bf",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
      "new": "    common::try_get_object_accessor(owner).is_some_and(|module|\n        module.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
      "reason": "the fork's `try_get_battle_object` returned its `BattleObject` struct only for the `module_accessor` field; the clean room resolves the accessor of an object id directly (guarded `sv_battle_object::module_accessor` row)"
+    },
+    {
+     "old": "pub fn waiting() -> bool { context() == Some(Context::Waiting) }\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (pub fn waiting)"
+    },
+    {
+     "delete_from": "/// Native Training panels also hold extra CPUs.",
+     "delete_to": "unsafe fn native_entry(",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (panel_entry)"
+    },
+    {
+     "delete_from": "pub unsafe fn acquire() -> bool {",
+     "delete_to": "/// Invoked before consumer callbacks",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (acquire, forget)"
+    },
+    {
+     "delete_from": "pub unsafe fn visualizes(",
+     "delete_to": "pub fn entry_departed",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (visualizes)"
+    },
+    {
+     "delete_from": "pub unsafe fn primary_cpu(",
+     "delete_to": "/// The controller mapping that operates the Training CPU",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (primary_cpu; `role` stays: the preload planner reads it)"
+    },
+    {
+     "old": "/// FE+0x4178 is the native controller owner used by the existing CPU pilot's\n/// verified 13.0.5 entry adapter. Do not confuse its controller slot with entry 4.\npub unsafe fn owns_cpu_controls(controls: usize) -> bool {\n    entry(1).and_then(|entry| native_fields::child(entry, 0x4178)) == Some(controls)\n}\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (owns_cpu_controls)"
     }
    ]
   },

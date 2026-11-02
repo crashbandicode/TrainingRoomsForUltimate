@@ -247,6 +247,26 @@ def main():
         print(f"verified {len(manifest['files'])} files" + (" (dest only)" if a.dest_only else f" against stage {stage_name}"))
 
 
+DELETED_SECTION = """
+## Deleted fork functions (lead ruling 2026-11-02: single owner)
+
+The fork called these from its mixed upstream code (hooks whose sites are not ours-new files). The clean room's packages 2-4 own the behaviour, so
+the carried functions are deleted by recorded manifest edits of `training/practice.rs` and `training/lobby.rs`. "Proof" names the Eden row of the
+package-6 lobby-practice set that shows the parity (rows are in `eden/EDEN-PACKAGE-6.md`).
+
+| Fork function | Clean-room owner | Behaviour difference / status | Proof |
+| --- | --- | --- | --- |
+| `lobby::permits_entry(entry)` (waiting room serves only entries 0 and 4) | `model::cpu::role::is_cpu_role` / `Scene::Lobby` with `LOBBY_CPU_ENTRY = 4` (pkg2: "only entries 0 and 4 are serviced, entry 0 is never a CPU") | none known | CPU behaviours act on entry 4 and on no other waiting-room entry |
+| `practice::waiting()` | `runtime::scene::current() == Some(Scene::Lobby)` (`model::scene`) | none known (both need Lobby Practice on and the practice UI ready) | lobby-practice row: scene reads Lobby only with the UI up |
+| `practice::role(module)` (0 Player, 1 CPU, by entry) | **kept**: `cycle_preload::on_frame` (the preload planner, carried) reads it; pkg2 has `role::is_cpu_role(scene, entry)` and `RoleTable::accessor_of` for the CPU behaviours | not deleted: a live consumer exists | preload row on Player 1 in Training and in the waiting room |
+| `practice::primary_cpu(module)` | `features::cpu::primary_entry(lobby)` and the per-body `FighterKey` (the second body, Nana, is a distinct key) | none known | CPU row with Ice Climbers as the CPU |
+| `practice::visualizes(module)` (effects and HUD for a practice body, and for a weapon its owner role owns) | `scene::is_training()` (native Training or an active lobby, not busy) keys pkg4's input display and the notice HUD; pkg2/3 effect hooks key on the accessor | **unverified for weapon articles owned by a lobby role**: the fork showed effects for them explicitly | visualization row (a lobby CPU article effect) |
+| `practice::panel_entry(module)` (extra CPUs of the native Training panels: entry receipts that release the stop) | no clean-room consumer: pkg3's load machine does not stop extra CPUs | **no owner found; deleted with the unused code, reported to the lead** | native Training with extra CPUs: save/load leaves them unfrozen |
+| `practice::acquire()` / `forget()` (the practice entry lease the save/record slots belong to) | pkg3 owns slots by entry (`fighter_manager_get_entry`), pkg4 by `RecordOwner`; `published::HOT_SWAP_IN_PROGRESS` gates a replaced body; `refresh/retire/entry_departed` stay and still clear the session when a replay or a recording is active | the lease no longer retires the session when a hot swap replaces an entry (nothing acquires it) | hot swap during a recording / with a saved state |
+| `practice::owns_cpu_controls(controls)` (FE+0x4178 controller owner of the CPU entry) | the input stage hands slot 1's record to `roster::handle_operator_input` (`practice::cpu_operator`); pkg2's `cpu_operated` | no controls-object ownership test: the slot index identifies the operator | controls-ownership row: Behavior = Control operator cycles the CPU |
+"""
+
+
 def write_ledger(root, manifest):
     """The carried-file table of CARRY-OVER.md (stage, path, sha256, clean-room changes), generated from the manifest."""
     path = os.path.join(root, "docs/provenance/pkg6-carry-ledger.md")
@@ -263,6 +283,7 @@ def write_ledger(root, manifest):
                 parts.insert(0, "`pub(super)` widened to `pub(crate)` (the fork's parent was the crate root)")
             edits = "; ".join(parts) or "path rewrite only"
             f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16]}` | {edits} |\n")
+        f.write(DELETED_SECTION)
 
 
 main()
