@@ -318,3 +318,25 @@ All other pending lint rows still need root closure. Approved probes and validat
 Read operator sloc-fmt.ps1 fully; scratch normalized measurement of98f9ab0 running session68371.
 
 Normalized98f9ab0 result:133508 implementation incl.tools167,133341 excluding scripts; simulator2102 excluded; test44925 excluded. rustfmt1.9.0-stable,0 failures. Primary same-basis ebfcb98=136069; delta=-2728. Fork131081, current+2260. Raw104350 remains reported separately.
+
+Golden unblessed repeat passed in a fresh process using the exact test binary from98f9ab0:
+SHA25672af4a1b58be44ed870a648e0324ba89e3d73d6912d24e3c4f0e6e43b41e7910.
+SMD_GOLDEN_BLESS absent;1 passed,0 failed,1166 filtered; fixture hashes unchanged.
+Log /tmp/slim/astra-golden-unblessed.log. No compiler invoked/claim needed.
+Changed own queued job in place to clippy atd1e5392; no queue priority change.
+
+### Parallel-host build preparation
+Frozen d1e5392 git archive staged on Yoga at /home/intpa/trainingrooms-build-slim-astra/d1e5392/src;
+tar SHA256 047104c96cfcd73910eb1aa81a732a8ff2c2319d72ac305e7e3c822d382384d5.
+Own target beneath that frozen root; build wrapper adapted from Yoga trainingrooms-build/build.ps1,
+read fully. It preserves complete logs, propagates cargo failure and copies only a successful NRO.
+No compiler started or claim taken. Yoga release job appended after preceding rows; Surface clippy stays queued.
+Read shared harness docs/HARNESS.md, solo.ps1 and gv.py completely; reused read-only, no merge.
+Read playbook tools/build/nro_size.py fully. Existing watcher remains live.
+
+Additional existing-binary check: the ignored
+engine::macros::ui_anchor::tests::elf_pins_match_owned_13_0_5_dump passed against the owned ELF;
+1 passed, 0 failed, 1166 filtered, log /tmp/slim/astra-anchor-elf.log.
+This is separate from the 9259 suite total and does not turn its six ignored rows into six passes.
+Yoga archive hash matches local; 241G free. No held claim or active owned compiler/Eden.
+Both next jobs queued: Surface clippy d1e5392; Yoga Switch release d1e5392.
