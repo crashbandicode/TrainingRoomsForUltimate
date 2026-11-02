@@ -238,17 +238,18 @@ struct FighterScreen {
     prior: Option<Box<LibraryPage>>,
 }
 
-// NameDraft is already boxed and only one draft is active. Keep the exact Mii
-// value inline rather than adding a second allocation to every macro name edit.
-#[allow(clippy::large_enum_variant)]
+// One allocation owns the large macro payload; the small name/caret state stays
+// inline, including while parked. External naming needs no payload allocation.
+struct MacroNameBody {
+    frames: Vec<InputFrame>,
+    start: StartState,
+    placement: Placement,
+    version: String,
+    mii: Option<crate::engine::mii::lifetime::Configuration>,
+}
+
 enum NameBody {
-    Macro {
-        frames: Vec<InputFrame>,
-        start: StartState,
-        placement: Placement,
-        version: String,
-        mii: Option<crate::engine::mii::lifetime::Configuration>,
-    },
+    Macro(Box<MacroNameBody>),
     /// Name and caret only. The setup or other draft stays with the caller.
     External { token: u64, summary: String, title: &'static str },
 }
@@ -284,7 +285,7 @@ struct LibraryPage {
 
 enum Screen {
     Closed,
-    Save(Box<NameDraft>),
+    Save(NameDraft),
     Place(Box<PlaceDraft>),
     Library(Box<LibraryPage>),
     Fighter(Box<FighterScreen>),
@@ -300,7 +301,7 @@ pub struct MacroUi {
     /// runtime has remembered it.
     prompt_commit: Option<(String, String)>,
     /// Name dialog parked while its placement page is open.
-    held_save: Option<Box<NameDraft>>,
+    held_save: Option<NameDraft>,
     /// CPU position from the latest save-state restore, before the offset.
     anchor: Option<(f32, f32)>,
     anchor_generation: Option<u64>,
@@ -410,7 +411,7 @@ impl MacroUi {
         match &self.screen {
             Screen::Save(draft) => match draft.body {
                 NameBody::External { token, .. } => Some(token),
-                NameBody::Macro { .. } => None,
+                NameBody::Macro(_) => None,
             },
             _ => None,
         }
@@ -436,9 +437,9 @@ impl MacroUi {
     pub fn native_name_view(&self) -> Option<View> {
         let Screen::Save(draft) = &self.screen else { return None };
         let footer = match &draft.body {
-            NameBody::Macro { frames, .. } => format!(
+            NameBody::Macro(body) => format!(
                 "{} · {}f · {:.2}s\nA: system keyboard   Y: placement   B: return",
-                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),
+                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),
             NameBody::External { summary, .. } => format!(
                 "{} · {summary}\nA: system keyboard   B: return",
                 shown_name(&draft.name)),
@@ -465,9 +466,9 @@ impl MacroUi {
             Screen::Save(draft) => {
                 fill_keys(&mut labels, name_keys(draft.page));
                 let detail = match &draft.body {
-                    NameBody::Macro { frames, start, .. } => format!(
+                    NameBody::Macro(body) => format!(
                         "Fighter {} · {}f · {:.2}s. A confirms, B cancels, Y deletes.",
-                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),
+                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),
                     NameBody::External { summary, .. } => format!(
                         "{summary}. A confirms, B cancels, Y deletes."),
                 };
@@ -570,13 +571,13 @@ impl MacroUi {
             native_cursor: "Recording".encode_utf16().count(),
             page: 0,
             cursor: 31,
-            body: NameBody::Macro {
+            body: NameBody::Macro(Box::new(MacroNameBody {
                 frames,
                 start,
                 placement: Placement::default(),
                 version: clip_version(version),
                 mii,
-            },
+            })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         });
         Effect::None
@@ -608,7 +609,7 @@ impl MacroUi {
     fn open_name(&mut self, draft: NameDraft) {
         self.playback_on = false;
         self.held_save = None;
-        self.screen = Screen::Save(Box::new(draft));
+        self.screen = Screen::Save(draft);
     }
 
     pub fn open_library(&mut self, rows: Vec<LibraryRow>, skipped: usize) {
@@ -875,20 +876,20 @@ impl MacroUi {
 
     /// Put an unsaved recording back on screen after the disk write failed.
     pub fn restore_draft(&mut self, recording: MacroRecording) {
-        self.screen = Screen::Save(Box::new(NameDraft {
+        self.screen = Screen::Save(NameDraft {
             name: recording.name.clone(),
             native_cursor: recording.name.encode_utf16().count(),
             page: 0,
             cursor: 31,
-            body: NameBody::Macro {
+            body: NameBody::Macro(Box::new(MacroNameBody {
                 frames: recording.frames.clone(),
                 start: recording.start,
                 placement: recording.placement,
                 version: recording.game_version.clone(),
                 mii: recording.mii,
-            },
+            })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
-        }));
+        });
         self.playback_on = false;
     }
 
@@ -1268,8 +1269,8 @@ impl MacroUi {
 
     fn toggle_draft_momentum(&mut self) {
         if let Screen::Save(draft) = &mut self.screen {
-            if let NameBody::Macro { placement, .. } = &mut draft.body {
-                placement.momentum = flip(placement.momentum);
+            if let NameBody::Macro(body) = &mut draft.body {
+                body.placement.momentum = flip(body.placement.momentum);
             }
         }
     }
@@ -1286,11 +1287,11 @@ impl MacroUi {
             self.screen = screen;
             return Effect::None;
         };
-        let NameBody::Macro { placement, .. } = &draft.body else {
+        let NameBody::Macro(body) = &draft.body else {
             self.screen = Screen::Save(draft);
             return Effect::None;
         };
-        let working = *placement;
+        let working = body.placement;
         self.held_save = Some(draft);
         self.screen = Screen::Place(Box::new(PlaceDraft {
             working,
@@ -1304,7 +1305,7 @@ impl MacroUi {
         let external = match &self.screen {
             Screen::Save(draft) => match draft.body {
                 NameBody::External { token, title, .. } => Some((token, title, draft.name.clone())),
-                NameBody::Macro { .. } => None,
+                NameBody::Macro(_) => None,
             },
             _ => return Effect::None,
         };
@@ -1319,13 +1320,13 @@ impl MacroUi {
         }
         let (name, version, start, frames, placement, mii) = match &self.screen {
             Screen::Save(draft) => match &draft.body {
-                NameBody::Macro { frames, start, placement, version, mii } => (
+                NameBody::Macro(body) => (
                     draft.name.clone(),
-                    version.clone(),
-                    *start,
-                    frames.clone(),
-                    *placement,
-                    *mii,
+                    body.version.clone(),
+                    body.start,
+                    body.frames.clone(),
+                    body.placement,
+                    body.mii,
                 ),
                 NameBody::External { .. } => return Effect::None,
             },
@@ -1395,17 +1396,17 @@ impl MacroUi {
             native_cursor: source.recording.name.encode_utf16().count(),
             page: 0,
             cursor: 31,
-            body: NameBody::Macro {
+            body: NameBody::Macro(Box::new(MacroNameBody {
                 frames: source.recording.frames.clone(),
                 start: source.recording.start,
                 placement,
                 version: source.recording.game_version.clone(),
                 mii: source.recording.mii,
-            },
+            })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         };
         self.held_save = None;
-        self.screen = Screen::Save(Box::new(draft));
+        self.screen = Screen::Save(draft);
         Effect::None
     }
 
@@ -1429,8 +1430,8 @@ impl MacroUi {
             self.screen = Screen::Closed;
             return Effect::None;
         };
-        if let NameBody::Macro { placement: saved, .. } = &mut held.body {
-            *saved = placement;
+        if let NameBody::Macro(body) = &mut held.body {
+            body.placement = placement;
         }
         self.screen = Screen::Save(held);
         Effect::None

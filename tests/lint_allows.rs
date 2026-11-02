@@ -15,7 +15,6 @@ use std::path::Path;
 /// (file, lint, count, status).
 const KNOWN: &[(&str, &str, usize, &str)] = &[
     ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "approved: operator 2026-11-02 14:2xZ, L2; lock_api RawMutex/RawRwLock require const INIT"),
-    ("src/model/macro_ui/macro_panel.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg4 manifest), D9"),
     ("src/runtime/mii/mii_editor_bridge/draft.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/mii/mii_hud_portrait.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/mii/native_keyboard/inline_keyboard.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),

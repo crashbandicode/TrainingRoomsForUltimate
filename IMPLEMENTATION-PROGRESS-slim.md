@@ -252,6 +252,15 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
 
+- Exact independent macro lint slice notice: src/model/macro_ui/macro_panel.rs, tests/lint_allows.rs, pkg4 carry manifest/ledger and CARRY-OVER.md. Current blob97c727ce is identical in slim10a8232 and current stream/pkg4; last pkg4 change1f9d5ba at03:57, so no active divergent model edit found. Root: move the existing Box ownership from NameDraft to its large Macro payload; keep ordinary naming metadata inline, preserve one macro-draft allocation (external drafts need fewer), retain all Mii configuration values and parked-draft behavior. No runtime/Mii/roster ownership change. This is independent pure-model lint work under stream scope; compilation/stack/carry gates will follow, no acceptance implied. Baseline-gated native Text proposal remains unapplied.
+
+
+- Integration preparation (read-only): compared exact lead80c10561 with slim10a8232 from ebfcb98. Only source-file overlap is character_roster.rs and kirby_hats.rs; zero shared changed base-line spans (lead preload-list hunks versus slim probe retirement). The carry manifest/ledger also overlap; merge must compose both transform histories and regenerate ledger, never choose one whole file. Scratch hunk report /tmp/slim/integration-80c10561-hunk-overlap.json. No merge/rebase/cherry-pick performed or inferred authorized.
+
+
+- 19:30Z concrete keyboard proposal PREPARED ONLY: /tmp/slim/keyboard-bounded-indices.patch SHA37baf768b00f48d4e375969575a213fe3593f9f6cdb9ddeb60b495e67c36692c; gitapply--checkPASS againstcode10a8232/docs75ae6ef. Twofiles: runtimeinline_keyboard Text len/cursor usize->checkedu8, widenaccessors, removeDecisionallow andKNOWNrow. NativeChanged/Moved/Entered/InputText/Appear ABI buffers unchanged; frozenEnterpayload retained; noheap/newallow/wrapper. Length/caret alreadyvalidated<=96/10 beforeconversion; checkedtry_from avoidsfuturetruncation. Adds96unit/256cursor/compactvalue regression toexistinglocalcfg(test), which currenthostharness DOESNOTexecute; no testpassclaimed. Exactmanifest transforms prepared separately keyboard-bounded-indices-edits.json, notapplied/regeneratedyet. Pleaseauthorize thisrepresentation-only independentroot orprovidebaseline route; no productsourceedit made.
+
+
 - 19:27Z sl-02 final10a8232 runtime: seam/install379 stock374 missing[] external[] heap0 PASS; route nativeTraininglayoutfreshsession+actualshot PASS (Steve/LucarioKongoJungle). Fullconsole11934lines0Unmapped/0panic-abort-crash. HookstatsFAIL11rows,7nonzerodeltas, final818/delta100; lastallocs inputnote27/apply1/cpu192/live1/preload594/named2/draw1. Rawfirst/finalscope lines184/256 in slim/sl-02/diagnostics-final-all.log, archivedparserverdicts. Thispre-R5source remainsFAIL, no exemption ornewrootattribution. Stopped/restored/source1244hashesverified/privateprofileabsent/SurfaceRELEASED19:26, noownqueue/job. AllcompilegatesPASS already; awaiting exactgatedintegration andfiveenum closure, not declaringREADY.
 
 
@@ -638,3 +647,16 @@ YogaEden requestWITHDRAWNunrun whilebuildscontinue; Surfacefree/noqueuedbuild. P
 
 ### ACTIVE sl-02 Surface19:23Z
 CLAIMED19:23 beforeprivateprep; Upcompleted19:23:34. OwnedEdenPID4030437/display109 at trainingrooms-eden-slim-surface/runs/sl-02. Appd483c082/runtimeee3c2e95; plugin/pilot/tilePREPhashesverified. Mute set/save/get canonical0 BEFOREgame.load. Sourceg1244hashes retained; privateprofilecreated, sourceuntouched. Routeexec17104 runs existingroute.py --transport local --training-gate diag:[Ui]layout=info_training resolved (actualargv retains spaces), orderedroute-sl-02.log/receipt. Nextinspectroute/session/install/hookstats, collectthenDownRestore andfullidentityrestoration, releasequeue. DoNOTcompileonSurfacewhileclaimactive.
+
+### 2026-11-02 19:41Z — macro payload root applied, gates pending
+Own model gate after compaction: exact thread gpt-6-astra/medium; existing hidden
+watcher2674699 alive/no alert. No subdelegation.
+Applied the announced pure-model macro_panel change: NameBody::Macro owns one
+Box<MacroNameBody>; Screen::Save and held_save hold NameDraft inline. This relocates
+the existing allocation rather than adding a second box; external naming drops
+its outer allocation. Exact payload data and existing transitions are preserved.
+18 exact carry transforms recorded; pkg4 full verify --stage m5q PASS42 and ledger
+regenerated. Removed only macro_panel's KNOWN row. Four unapproved enum rows remain.
+Existing tests cover native edit validation, placement parking, interruption,
+failed-save restoration, and exact Mii naming/save-as; compilation/layout checks
+still pending, no acceptance inferred. No runtime/profile/claim currently owned.

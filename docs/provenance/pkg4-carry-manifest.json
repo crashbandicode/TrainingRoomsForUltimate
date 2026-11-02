@@ -335,12 +335,120 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "f25302dd66b9d091091f63272a3f5f86bba0cccf008f645a860bc54f9c685fe6",
+   "dest_sha256": "f5175b9b09f40631de9c2d2f6270e9258968ddb7bdbc4df208f7503cd0109876",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
      "new": "    /// `copy_playback` into a caller-owned buffer (cleared, then filled; no allocation when its capacity suffices).\n    pub fn copy_playback_into(&self, out: &mut Vec<InputFrame>) -> Option<(f32, i32)> {\n        if !self.playback_allowed() {\n            return None;\n        }\n        let recording = &self.loaded.as_ref()?.recording;\n        if recording.frames.is_empty() {\n            return None;\n        }\n        out.clear();\n        out.extend_from_slice(&recording.frames);\n        Some((recording.start.facing, recording.start.status))\n    }\n\n    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
      "reason": "playback start without a clone (hot-path allocation contract); the original function stays"
+    },
+    {
+     "old": "// NameDraft is already boxed and only one draft is active. Keep the exact Mii\n// value inline rather than adding a second allocation to every macro name edit.\n#[allow(clippy::large_enum_variant)]\nenum NameBody {\n    Macro {\n        frames: Vec<InputFrame>,\n        start: StartState,\n        placement: Placement,\n        version: String,\n        mii: Option<crate::engine::mii::lifetime::Configuration>,\n    },",
+     "new": "// One allocation owns the large macro payload; the small name/caret state stays\n// inline, including while parked. External naming needs no payload allocation.\nstruct MacroNameBody {\n    frames: Vec<InputFrame>,\n    start: StartState,\n    placement: Placement,\n    version: String,\n    mii: Option<crate::engine::mii::lifetime::Configuration>,\n}\n\nenum NameBody {\n    Macro(Box<MacroNameBody>),",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "Save(Box<NameDraft>)",
+     "new": "Save(NameDraft)",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "held_save: Option<Box<NameDraft>>",
+     "new": "held_save: Option<NameDraft>",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "Screen::Save(Box::new(draft))",
+     "new": "Screen::Save(draft)",
+     "count": 2,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "NameBody::Macro { .. } => None",
+     "new": "NameBody::Macro(_) => None",
+     "count": 2,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "NameBody::Macro { frames, .. } => format!(",
+     "new": "NameBody::Macro(body) => format!(",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0)",
+     "new": "shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0)",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "NameBody::Macro { frames, start, .. } => format!(",
+     "new": "NameBody::Macro(body) => format!(",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "start.fighter_kind, frames.len(), frames.len() as f32 / 60.0)",
+     "new": "body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0)",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "body: NameBody::Macro {",
+     "new": "body: NameBody::Macro(Box::new(MacroNameBody {",
+     "count": 3,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "            },\n            keyboard_title: MACRO_KEYBOARD_TITLE,",
+     "new": "            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,",
+     "count": 3,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "self.screen = Screen::Save(Box::new(NameDraft {",
+     "new": "self.screen = Screen::Save(NameDraft {",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }));",
+     "new": "            keyboard_title: MACRO_KEYBOARD_TITLE,\n        });",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "if let NameBody::Macro { placement, .. } = &mut draft.body {\n                placement.momentum = flip(placement.momentum);",
+     "new": "if let NameBody::Macro(body) = &mut draft.body {\n                body.placement.momentum = flip(body.placement.momentum);",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "let NameBody::Macro { placement, .. } = &draft.body else {",
+     "new": "let NameBody::Macro(body) = &draft.body else {",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "let working = *placement;",
+     "new": "let working = body.placement;",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "NameBody::Macro { frames, start, placement, version, mii } => (\n                    draft.name.clone(),\n                    version.clone(),\n                    *start,\n                    frames.clone(),\n                    *placement,\n                    *mii,\n                ),",
+     "new": "NameBody::Macro(body) => (\n                    draft.name.clone(),\n                    body.version.clone(),\n                    body.start,\n                    body.frames.clone(),\n                    body.placement,\n                    body.mii,\n                ),",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
+    },
+    {
+     "old": "if let NameBody::Macro { placement: saved, .. } = &mut held.body {\n            *saved = placement;",
+     "new": "if let NameBody::Macro(body) = &mut held.body {\n            body.placement = placement;",
+     "count": 1,
+     "reason": "Move the existing draft allocation to the large macro payload; retain exact Mii data without a second allocation or lint suppression."
     }
    ]
   },

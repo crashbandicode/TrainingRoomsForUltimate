@@ -386,3 +386,13 @@ The shipped stage services are renamed lobby_stage_probe.rs -> lobby_stage.rs an
 
 ### Slim helper feature scope (2026-11-02)
 The broad dead_code allowance on mii_ordinary_native::helpers is removed through pkg6 manifest edits. Helper::Ready, its token/key imports, accepts arm and parked argument compile with mii-managed-source-coexist-alpha or tests, exactly where Ready constructors exist. Native helper_kind uses the same predicate for the managed/parked calculation and argument. Enabled product and test decision bodies are preserved; disabled coexistence no longer compiles an unconstructible variant. This changes no native ownership or transaction rule.
+
+### Slim macro name payload ownership (2026-11-02)
+
+The pkg4 macro panel now boxes the large macro-only payload instead of the whole
+name draft. Name, caret and grid state remain inline, including when parked for
+placement; the exact Mii configuration remains owned by the macro payload.
+A macro draft still has one payload allocation, while external naming no longer
+allocates an outer draft. No validation, confirmation, placement or retry behavior
+is removed. The large-enum suppression and its KNOWN row are removed; all 18
+transforms are recorded in the pkg4 manifest and the ledger is regenerated.
