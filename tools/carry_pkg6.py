@@ -153,6 +153,10 @@ def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict)
         text = rewrite_source(text, entry["crate"], modules, entry["src"])
         text = rewrite_includes(text, entry, dest_by_src)
         text = rewrite_paths(text, entry, dest_by_src)
+        if entry.get("widen"):
+            # the fork's file sat directly under the crate root (or was the #[path] child of a root file), so `pub(super)` meant "the
+            # whole crate"; in the engine tree it would stop at the area, so it becomes `pub(crate)` (an entry flag, a ledger row)
+            text = re.sub(r"\bpub\(super\)", "pub(crate)", text)
         if entry.get("prepend"):
             # after the file's leading inner doc comments (`//!`), which must stay first
             lines = text.split("\n")
@@ -254,7 +258,10 @@ def write_ledger(root, manifest):
         f.write("file in this repository.\n\n")
         f.write("| Here | Fork path (stage) | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
-            edits = "; ".join(x["reason"] for x in e.get("edits", [])) or "path rewrite only"
+            parts = [x["reason"] for x in e.get("edits", [])]
+            if e.get("widen"):
+                parts.insert(0, "`pub(super)` widened to `pub(crate)` (the fork's parent was the crate root)")
+            edits = "; ".join(parts) or "path rewrite only"
             f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16]}` | {edits} |\n")
 
 
