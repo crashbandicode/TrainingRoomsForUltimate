@@ -55,7 +55,6 @@
    "character_sources": "crate::runtime::roster::character_sources",
    "native_body_bank": "crate::runtime::roster::native_body_bank",
    "native_source_capacity": "crate::runtime::roster::native_source_capacity",
-   "effect_hook_chain": "crate::runtime::roster::effect_hook_chain",
    "practice_trace": "crate::runtime::roster::practice_trace",
    "practice_trace_core": "crate::runtime::roster::practice_trace_core",
    "hang_trace": "crate::runtime::roster::hang_trace",
@@ -1602,13 +1601,6 @@
    ]
   },
   {
-   "src": "src/effect_hook_chain.rs",
-   "dest": "src/runtime/roster/effect_hook_chain.rs",
-   "crate": "root",
-   "src_sha256": "100929d53a938c4e98a87a5294c1cdb61d112d94ff23058d53ee7a4a186944b9",
-   "dest_sha256": "9d2312aa6a1672c73d8c42ed70f58462f6aa72a73fac398533cb85e3a5f87b7d"
-  },
-  {
    "src": "src/native_service.S",
    "dest": "src/runtime/roster/native_service.S",
    "crate": "root",
@@ -2662,25 +2654,11 @@
    "dest_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29"
   },
   {
-   "src": "src/automation_helper/native.rs",
-   "dest": "src/runtime/lobby/automation_helper/native.rs",
-   "crate": "root",
-   "src_sha256": "62851fc8c4e245ae4d8f73105d732b218ed1de57dece5dd93736afb74a144eb7",
-   "dest_sha256": "62b85bef9d9a32fe862ec67c4ae39efb28970c68508daccadb01d02e90c04362"
-  },
-  {
    "src": "src/automation_helper/observer.rs",
    "dest": "src/runtime/lobby/automation_helper/observer.rs",
    "crate": "root",
    "src_sha256": "dfb1910269e9a9b6d67dd7ad5f56580fbaed1ccdf60869b009c166a3e386f21a",
    "dest_sha256": "ca08264f8cf1cf94e1d02f6787764f2fc656a19d05867df2ab71893bdd120db8"
-  },
-  {
-   "src": "src/automation_helper/plugin.rs",
-   "dest": "src/runtime/lobby/automation_helper/plugin.rs",
-   "crate": "root",
-   "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
-   "dest_sha256": "cf5ce60065242626647bc8e5a950490b0672fc8e8dba0e1b268bdb0956d3f1a9"
   },
   {
    "src": "src/body_bank_probe.rs",
@@ -2806,6 +2784,26 @@
    "crate": "root",
    "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
    "dest_sha256": "48cdfd978e3f3762170edc972e9d2b9c6dd91fb4e5779251207e4a450f07c10b"
+  }
+ ],
+ "not_carried": [
+  {
+   "src": "src/effect_hook_chain.rs",
+   "src_sha256": "100929d53a938c4e98a87a5294c1cdb61d112d94ff23058d53ee7a4a186944b9",
+   "dest": "src/runtime/roster/effect_hook_chain.rs",
+   "reason": "not carried: no module reaches it (no `mod` line or `#[path]` declares it, so it was never compiled); deleted 2026-11-02, slim stream, lead ruling"
+  },
+  {
+   "src": "src/automation_helper/native.rs",
+   "src_sha256": "62851fc8c4e245ae4d8f73105d732b218ed1de57dece5dd93736afb74a144eb7",
+   "dest": "src/runtime/lobby/automation_helper/native.rs",
+   "reason": "not carried: no module reaches it (no `mod` line or `#[path]` declares it, so it was never compiled); deleted 2026-11-02, slim stream, lead ruling"
+  },
+  {
+   "src": "src/automation_helper/plugin.rs",
+   "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
+   "dest": "src/runtime/lobby/automation_helper/plugin.rs",
+   "reason": "not carried: no module reaches it (no `mod` line or `#[path]` declares it, so it was never compiled); deleted 2026-11-02, slim stream, lead ruling"
   }
  ]
 }

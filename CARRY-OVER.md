@@ -313,3 +313,20 @@ Nothing carried from the fork or from any frozen stage. Everything under `src/mo
 ## stream/sync (2026-11-02)
 
 Nothing new carried. Recorded edits to carried files (manifest + regenerated ledger): `src/runtime/mii/native_keyboard.rs` (pkg6: `use parking_lot::Mutex` -> `use hos_lock::Mutex`). `crates/hos-lock` is new code of this repository (MIT), not carried. `parking_lot` and `parking_lot_core` left the build (`tests/no_spin_locks.rs`).
+
+## slim (code size), 2026-11-02
+
+Not carried: no module reaches it (no `mod` line or `#[path]` declared these files, so they were never compiled; lead ruling
+2026-11-02). Deleted from `src/` and moved from the pkg6 manifest's `files` to its `not_carried` list (the ledger rows removed
+with them); stream/pkg6 confirmed its WIP does not reach them.
+
+| Was here | Fork path (stage m5o) | src sha256 | Lines (`tools/sloc.py`) |
+| --- | --- | --- | --- |
+| `src/runtime/lobby/automation_helper/native.rs` | `src/automation_helper/native.rs` | `62851fc8c4e245ae` | 425 |
+| `src/runtime/lobby/automation_helper/plugin.rs` | `src/automation_helper/plugin.rs` | `cf5371be7299d337` | 58 |
+| `src/runtime/roster/effect_hook_chain.rs` | `src/effect_hook_chain.rs` | `100929d53a938c4e` | 73 |
+
+`mii_native_adapter.rs`, `mii_cpu_adapter.rs` and `mii_closed_ack.rs` stay: stream/pkg6's `mii_fullconfig_probe` reaches them
+through `#[path]`. `runtime/macros/capture_plugin.rs` is stream/deluxe's (deleted there with its carry record). The comment at
+`src/runtime/roster.rs:13` still names `effect_hook_chain` as carried and not declared; it changes after stream/f6's mod lines
+next to it are merged.
