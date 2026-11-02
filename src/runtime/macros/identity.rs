@@ -85,7 +85,7 @@ pub fn service() {
         }
     });
     REQUEST.drain(|key| {
-        let kind = crate::runtime::features::recorder::cpu_kind();
+        let kind = crate::runtime::ui::facts::fact_cpu_kind();
         let current = key.session == named_macros::session_revision();
         let mut facts = Facts { key, kind, configuration: None, named_ready: false, clip_ready: false,
             named_refusal: None, clip_refusal: None };

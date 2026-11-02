@@ -4,6 +4,12 @@
 
 ## QUESTIONS
 
+- **Lead turn inactive at19:38 closure (observed19:45Z):** checkpoint confirms lead endedboundedturn, no successor; queued provider/core/F11/static-table decisions above awaitnext primary/leadturn. This is coordinationdependency, notoperator-levelblocker orpermissiontobypassownership. I remainactive andfinish latest7f fullhost/release/diag receipts while awaitingfixedcomposition. Please resume leaddecision path; no directworkerdispatch/subdelegation.
+
+
+- **Coherent composition ready19:43Z:** owned HEAD7f845af, independent designC/stack roots implemented and gated as below. Ticket patch still apply-checks cleanly; F11 patch remains prepared. Please provide exact fixed provider+UI consumer integration route and preview restore core slice. Nativehelper acceptance remains held under19:27; no claim/boot will bypass it. Shared metadata-only patch /tmp/pkg4-thread-static999.patch awaits authorization. No operator blocker; continuing owned acceptance preparation.
+
+
 - **999f8ba compiled stack roots PASS margin / table reconciliation needed19:36Z:** exact diag build0/42.94s; NRO7e6f8972b23bea430ee9f7bb2c2766ce0a545351e5a65377cfcb0b05ffe30ba5 ELF b90415890987e114d14d50c028d51a98aeeb29bf3b54de9cb1b31a8fc918a887. Menu static32544, required57344 == existing57344; archive/editor phase removed old61440 requirement. Fiber ui_pass_calculate7936/16384, ALL134callbacks0over. Raw eden/runs/build-999f8ba/{stack-table,hook-budget,menu-stack-path}.txt. Table stillFAIL4 solely understated static fields: heartbeat4272->4720, Menu31472->32544, replay-capture-save31616->32448, mii-catalog5856->5920; each existing stacksize covers computedrequired. Please authorize exact four static metadata updates (no stackallocation/budget changes), or owner composition. RetainFAIL until source table gate reconciles; compiled margins alone are not runtime acceptance. Fullhost999 LIVE controller54854 Yoga6G1800 remote run-p1490662-i9878233.scope.
 
 
@@ -132,8 +138,8 @@
 - Thread `01a19c9f-04ad-7f72-8d2f-440ee0a6a04f`: exact-thread SQLite and latest rollout turn verify `gpt-6-astra / medium`.
 - Playbook followed: `ae87443cbb801472e474b3f0c20b5f9c3f5f1f77`; ff-only pull current. README, all seven docs and tools/PROVENANCE read completely (truncated outputs re-read in bounded chunks).
 - Branch `stream/pkg4`, existing worktree only. Starting HEAD `2d25cdf`; authorized merge of fixed `ebfcb9800fba1f82b2730b19ed26e231c810a2d6` committed as `c111b81`, no conflicts. No moving-branch merge.
-- Live state: no build/Eden claims acquired, no profiles changed, no compiler started. No upstream/non-ours-new fork sources opened. No subdelegation (stream prohibition).
-- Next: audit hook/worker calls; replace shared recorder/layer state with published queries, indexed buffers and event mailboxes; request pkg6 F11 integration SHA through lead. Keep ui-screens editor implementations intact and preserve slim oracle move when integrated.
+- Live state19:41Z: HEAD7f845af, all owned compilers ended/claims released/queue empty; no Eden/profile mutations. No upstream/non-ours-new fork sources opened. No subdelegation (stream prohibition).
+- Next: exact shared provider/UI consumer composition + F11 + preview-core authorization from lead; prepared own Ticket/F11 patches remain unapplied. Fourfield static-table patch awaits ownerauthority. Then final fullhost/clippy/nodefault/Switchrelease+diag, compiledstatic gates, one batched Yoga s4-09 Training+native match/save+PT rows, restore/zeroalloc+Unmapped/compliance. Do not boot helper-path acceptance while lead19:27 fault hold remains.
 - Bootstrap command guard disclosure: initial document reads, status, playbook pull and watcher launch used bounded tool calls but lacked systemd memory scopes. Subsequent local reads use MemoryMax=512M and timeout 30; builds will use the mandated admitted scopes.
 
 ### Current-session M/C checklist
@@ -145,7 +151,7 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 | cdylib only and resident measurement | M | open: final Cargo.toml and NRO check |
 | release profile, Skyline and toolchain pin | M | open: final manifest check |
 | host model / Switch runtime split | M | open: implementation review |
-| host test, clippy zero, no-default, release, diag | M | open: queued gates on final source |
+| host test, clippy zero, no-default, release, diag | M | partial:999 fullhost9848/0/6 + SwitchdiagPASS;7f clippy0warnings/no-defaultPASS; final composition/release gates OPEN |
 | no heap in hooks, counting allocator | M | open: s4-09 all deltas zero |
 | fixed buffers, static-stack writer, bounded paths | M | open: design C review |
 | root cause fixes; approved workarounds recorded | M | open: final review; no new workaround proposed |
@@ -771,3 +777,29 @@ Fullhost999 exact receipt: {"suites": 68, "totals": [9848, 0, 6, 0, 0], "cargo_e
 LIVE19:37Z Clippy999 Yoga controller76256 remote run-p1505913-i9889337.scope, ownclaim6G1800 incremental0; gate1113posthashunchanged. NoEden/profile. Release immediatelyonend, then separatelyqueue no-default.
 
 Clippy999 ENDED controller76256 FAILcargo101/wrapper1: mem_replace_with_default at src/model/macros/handoff.rs33. YogaRELEASED/ownline removed; no oldsource no-default queued. Fix owned archive handoff to equivalent mem::take without lint suppression, then re-freeze/re-gate. Noownliveclaim/profile.
+
+Prepared exact fourfield static-table patch /tmp/pkg4-thread-static999.patch (durable eden/runs/pkg4-prepared), SHAd95e8d2154313b87b14c862a1649d1d5bce11af63aaee8d9463a916fea1bdf31, UNAPPLIED pendinglead/sharedowner authority. No measured/budget/size fields touched. Current7f845af onlyequivalent memtake +unusedimportremoval since999; clippyretry LIVE43356 Yoga run-p1508238-i9912679.scope6G1800. Bothsrc/gate1113 refreshed/hashverified archiveb6a2319338027beecf3fed6dd6e10dd4151773e3a3162c3a7f14073dae7a20a7.
+
+Clippy7f845af PASS0/18.30s zero warnings controller43356 ENDED/RELEASED; ownline removed, no-default7f queuedEND. Noownliveclaim/profile.
+
+No-default7f845af PASS0/5.28s controller48243 ENDED/RELEASED; ownline removed. Clippy7f PASS0warnings, prior999 fullhost9848/0/6 + Switchmargin proof retained; finalsource/provider composition gates stillopen. Noownliveclaim/profile/queue.
+
+7f gate receipts {"clippy": {"exit": "0", "sha256": "5a49bd1ae9be9615581b25ed2ca862d0fc5159f315ccfa0b75870ad18ee1b5f8", "warnings": 0}, "nodefault": {"exit": "0", "sha256": "467dc0360c92c944ff7efd76ac979517384b3f1a590409fc6caea8dd86e901a9", "warnings": 0}}; bothYoga source copies1113 posthashunchanged. PreparedTicket gitapply--check stillPASS against7f (notapplied). Noownclaim/queue/Eden/profile.
+
+
+### Remaining runtime batch preparation19:43Z
+Confirmed own live_scene explicitly excludes nativeTraining; existing Training-only rows cannot prove native capture/save. In the SAME claimed boot: Off install/guards -> Training library/record/play/copy/placement/crop/real keyboard/roster/PT rows -> existingwriter On receipt+persistedINI+armedready -> return through observed game menus to shortest nativeVS ruleset -> play/end and use native SaveReplay -> require NEW `[ReplayCapture] persisted id=...` afterarming (reject already_present/persistence_failed), retain matching new .tmrc, load through existing archive and verify nonempty complete tracks/nativeidentity. Then final full retained hook_stats/drops/Unmapped/threadpaint scans and restore. Do not invent VS button sequence without observed screen gates; adapter refs currentlycoverTraining only. No synthetic replay-save diagnostic stands in fornative save. Helper-pathhold and preview/F11 dependencies stillprevent this acceptanceboot.
+
+LIVE 2026-11-02T19:45:38.780387+00:00: latest7f fullhost controller5198 Yoga run-p1519542-i9906205.scope6G1800, admittedsecondslot alongsideSlim withfresh20.4GiBavailable/noEden. Releasewrapper7f prepared(notqueued/running) usingsoleSwitchtarget/one cargo skyline build --release. No profile mutation.
+
+Latest7f fullhost controller5198 ENDED wrapper0/YogaRELEASED; ownline removed/release7f appendedEND. Exactcounts/sourcehash next; no ownliveclaim/profile.
+
+Latest7f fullhost exactreceipt {"suites": 68, "totals": [9848, 0, 6, 0, 0], "cargo_exit": "0", "log_sha256": "ebca91b010e213b2fe7f58737fc6880b23ea403bb3dc189495df472dd9a4470a", "warnings": 0, "skipped": 0}; bothsrc/gate1113 posthashunchanged. Release7freadyqueuedbehindUI no-default, noownclaim.
+
+Queue checkpoint 2026-11-02T19:49:53.139049+00:00: release7fready; Yoga fullledgerclear but ui-screens no-default actualqueuehead remains. Ownadvice refuseshead, no claim/mutation/bypass. Leadclosed19:38; neednormalqueueownerpickup andexactcomposition decisions, notoldfairnesswait. Alllatest7fhost gatesPASS/rawreceiptsretained; noEden/profile.
+
+LIVE 2026-11-02T19:50:43.773944+00:00: release7f CLAIMEDYoga/controller62632 remote run-p1548556-i9934696.scope6G1800 incremental0, actualhead/fullledger secondslotafterSlimfresh21.9GiB noEden. Priorqueuecheckpoint superseded: UIcompleted/released. Nro_size.py fullyread fromplaybooktools/build, compliance.py reusedpreviousfullread; archive/releasechecks next. No profile mutation.
+
+Release7f FAILactualcargo101/wrapper1 E0425 identity.rs88 productionpublishercalls recorder::cpu_kind configuredout bydiag atrecorder.rs648. Controller62632 ENDED/YogaRELEASED/ownline removed, rawlog retained. Rootinspect owned recorder query featuregate next; no releaseNRO/compliance claimed. Noownliveclaim/profile.
+
+Release feature root: identity::service nowreads existing production ui::facts::fact_cpu_kind AtomicI32Acquire directly (samevalue its worker retirement filter alreadyuses), ratherthan diag-only recorder facade. No newprovider/native read/featureexpansion; recorderdiagwrapper remainsdiagonly. Ownidentity.rs isnotcarried; no manifest change needed. Freshrelease isnecessary verification.
