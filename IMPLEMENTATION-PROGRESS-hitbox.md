@@ -33,3 +33,26 @@ under lead `0caa72b8` (spawned by the lead's `MEMENTO-DELEGATE-FROM: 0caa72b8-b7
 ## Gates
 
 See the last section of this file (updated at each gate).
+
+## Hurtbox groundwork (decision HB1 waits for the operator; no code), 2026-11-02 ~10:50Z
+
+Question: if the operator wants hurtboxes drawn too (the approved proposal and the old help text show them, `SPEC-core-06` does not), where does
+the game keep their shapes and what would drawing them cost? Read from the owned ELF only (`llvm-objdump`, the relocation table as in
+`tools/re_hitbox_layout.py`; scratch scripts not committed).
+
+- **Confirmed:** hurtboxes are `HitModule`, the module at accessor `+0xb0` (every `app::lua_bind::HitModule__*_impl` thunk, `main+0x203daa0..0x203dc60`,
+  loads `ldr x0,[x0,#0xb0]` and jumps through the module vtable). The public surface: `get_part_size(accessor, part)` (vtable slot 0x170),
+  `get_center_pos(accessor, part, int)` (slot 0x200), `get_status(accessor, part, int)` (0x148), `get_total_status` (0x150), `set_status_joint`
+  (0xb8), `set_whole` / `get_whole` (0xd0 / 0xd8), `set_xlu_global`, `set_invincible_frame_global`. There is no lua_bind getter for a part's bone or
+  its two capsule centres: drawing a hurtbox as a shape needs the module's part table, as the visualizer reads `AttackData` today.
+- **Not yet confirmed:** which relocated vtable is `HitModule`'s. The candidate that matches the thunks' slot set best is `main+0x4f6af00`
+  (implementations at `0x3eaxxx..0x3ebxxx`, next to `AttackModule`'s `0x3dcxxx..0x3ddxxx`): a part table at module `+0x28`, 0x150 bytes per part,
+  slot 0x170 returning `&part[+0x40]` (a vector, plausibly the part's size), a part count at `+0x48` walked by slot 0x200. Its slot 0xb8 and 0x148
+  bodies do not fit the thunk signatures cleanly, so this is a lead, not a fact. Confirming it is one diag-only probe in Eden (read
+  `get_part_size` and `get_center_pos` of P1 for each part through the guarded natives, log them beside the fighter's position) plus the same
+  instruction checks `tests/core06_hitbox.rs` makes for `AttackData`.
+- **Cost if drawn the visualizer's way:** about 10-20 hurtbox parts per fighter, each a capsule; at the visualizer's spacing a capsule is 2-16
+  spheres, so 20-320 `req_follow` + 2 setter calls per fighter per frame, on top of the hitboxes, all respawned every frame. That is the effect-pool
+  risk of Q3 multiplied; a hurtbox view would need its own budget (e.g. 2-3 spheres per part, or one stretched effect per part, or redrawing only on a
+  part change), which is a design decision, not only a toggle.
+- Until HB1 is answered the help text says only what is built: "On: hitboxes and grab boxes are drawn." (`src/model/menu/table.rs`).
