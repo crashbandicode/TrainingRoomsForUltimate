@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use parking_lot::Mutex;
 use skyline::hooks::InlineCtx;
 
-use crate::model::notify::{Body, Draw, Queue, TickOut, DEFAULT_COLOR};
+use crate::model::notify::{Draw, Queue, TickOut, DEFAULT_COLOR};
 use crate::model::recording::{Phase, NOTICE_HEADER};
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
@@ -67,11 +67,6 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
     QUEUE.lock().post_static(header, body, length, color);
-}
-
-/// Post a notice with a body copied into the entry.
-pub fn post_copied(header: &'static str, text: &str, length: u16, color: [u8; 4]) {
-    QUEUE.lock().post(header, Body::copied(text), length, color);
 }
 
 /// A refusal text, shown for two seconds in the default colour.

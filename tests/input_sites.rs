@@ -72,7 +72,7 @@ fn the_ai_epilogue_follows_the_controller_write() {
     // restored only by the `ldp x20, x19` after it, so the hook sees the AI object in x19.
     assert_eq!(word(pkg4::AI_EPILOGUE_OFFSET), 0x6d51_23e9);
     assert_eq!(word(0x2dbc4c), 0xa956_4ff4, "ldp x20, x19, [sp, #0x160]");
-    assert_eq!(word(0x2dbc64 - 0x0), 0xd65f_03c0 | 0, "ret");
+    assert_eq!(word(0x2dbc64), 0xd65f_03c0, "ret");
     // The function's entry word is the pilot's hook site; this hook is far from it.
     let entry = 0x2da180usize;
     assert!(pkg4::AI_EPILOGUE_OFFSET > entry + GUARD_BYTES);

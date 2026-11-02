@@ -16,9 +16,9 @@ use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
 use crate::model::ini_files;
 use crate::model::input_delay::Owners;
 use crate::model::menu::chord::Chord;
-use crate::model::menu_shortcuts::{self, MenuShortcuts};
+use crate::model::menu_shortcuts;
 use crate::model::settings::Snapshot;
-use crate::model::storage::{self, FixedPath};
+use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published;
 
@@ -53,8 +53,9 @@ pub unsafe fn on_poll(controller: usize) {
         let mut state = STATE.lock();
         state.style = style;
         let block = blocked();
-        state.detector.poll(&state.chords, sample, block);
-        !block && chords::plus_shortcut_accepted(&state.chords, sample)
+        let State { chords: set, detector, .. } = &mut *state;
+        detector.poll(set, sample, block);
+        !block && chords::plus_shortcut_accepted(set, sample)
     };
     if chords::clear_plus_bits(modal, accepted) {
         for offset in [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE] {
@@ -69,23 +70,9 @@ pub fn consume(request: Request) -> bool {
     STATE.lock().detector.consume(request)
 }
 
-pub fn is_pending(request: Request) -> bool {
-    STATE.lock().detector.is_pending(request)
-}
-
-pub fn has_pending_request() -> bool {
-    STATE.lock().detector.has_pending_request()
-}
-
 /// Session clear: all pending requests go.
 pub fn session_clear() {
     STATE.lock().detector.clear_session();
-}
-
-/// The cycle chord on another controller (the native CPU-control operator), without touching P1's
-/// flags (SPEC-input-04 §9).
-pub fn operator_cpu_cycle_passes(style: u32, current: u32, just_down: u32) -> bool {
-    chords::passes(STATE.lock().chords.cpu_cycle, Sample::of(style, current, just_down))
 }
 
 /// A menu commit or the first publish: the six chord rows replace the old ones as a whole; the
@@ -126,10 +113,3 @@ pub fn commit_shortcut(slot: usize, chord: Chord) -> Result<(), ini_files::EditR
     }
     Ok(())
 }
-
-/// The shortcuts now in force.
-pub fn shortcuts() -> MenuShortcuts {
-    STATE.lock().chords.shortcuts
-}
-
-const _: &str = storage::ROOT;

@@ -163,10 +163,10 @@ impl MenuShortcuts {
         let mut wrote = [false; 2];
         let value = |slot: usize| ini_name(self.additional[slot]);
         let flush_missing = |out: &mut String, wrote: &mut [bool; 2]| {
-            for slot in 0..2 {
-                if !wrote[slot] {
+            for (slot, done) in wrote.iter_mut().enumerate() {
+                if !*done {
                     out.push_str(&format!("shortcut_{}={}\n", slot + 1, value(slot)));
-                    wrote[slot] = true;
+                    *done = true;
                 }
             }
         };

@@ -519,9 +519,3 @@ pub fn session_clear() {
     chords::session_clear();
     notices::session_clear();
 }
-
-/// Mash Interrupt (the mash spec's `StopPlayback` answer).
-pub fn interrupt_on_mash() -> bool {
-    let settings = *SETTINGS.lock();
-    REC.lock().interrupt_on_mash(&settings)
-}
