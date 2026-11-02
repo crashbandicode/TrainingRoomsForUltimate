@@ -21,10 +21,15 @@ use ssbu_cpu_pilot_core::{level as core_level, pad as core_pad};
 
 use crate::runtime::p1::compat::common::input::MappedInputs;
 
-use crate::engine::p1 as pilot_core;
+#[path = "../../model/p1/mod.rs"]
+// Retain the reviewed host-test API/helpers without changing frozen core files.
+#[allow(dead_code)]
+mod pilot_core;
 use self::pilot_core::move_observer::{MoveObserver, Observation};
-use crate::engine::p1_menu_session as menu_session;
-use crate::engine::p1_stage_session as stage_session;
+#[path = "../../model/p1/menu_session.rs"]
+mod menu_session;
+#[path = "../../model/p1/stage_session.rs"]
+mod stage_session;
 
 // Publication is lock-free: menu commits may hold the App lock while on_frame
 // holds STATE and asks whether the menu captures input. Never acquire STATE here.
@@ -579,6 +584,11 @@ fn menu_busy() -> bool {
 
 pub(crate) fn thinking() -> bool {
     THINKING.load(Ordering::Acquire)
+}
+
+/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).
+pub(crate) fn installed() -> bool {
+    BASE.load(Ordering::Acquire) != 0
 }
 
 fn clear_output() {

@@ -6,7 +6,8 @@
 //! The site table (`native_seams`) is unconditional: the runtime seam installer reads it at boot. The field and unlink guards have
 //! no runtime consumer yet (their callers are the roster cycle and the unlink installer) and stay test-only until those land.
 
-#[cfg(test)]
+// Its consumers are the Switch-only runtime (untime::p1::cpu_pilot, later the roster cycle); on the host only the tests use it.
+#[cfg(any(test, target_os = "switch"))]
 pub mod native_fields;
 #[cfg(test)]
 pub mod native_unlink_core;

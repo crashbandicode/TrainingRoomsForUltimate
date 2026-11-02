@@ -15,6 +15,7 @@ mod game;
 mod hub;
 mod import;
 mod install;
+mod p1;
 mod published;
 mod ui;
 

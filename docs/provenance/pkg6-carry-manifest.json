@@ -1186,22 +1186,27 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "8a833b644132657270e5bc8c49035bcf26f9351fc79ee7b02b8d69cb56239882",
+   "dest_sha256": "386f847bf1011707201b715e9ef2176bdf88bcf63af9c623d89962f00028db6f",
    "edits": [
     {
-     "old": "#[path = \"cpu_pilot/pilot.rs\"]\n// Retain the reviewed host-test API/helpers without changing frozen core files.\n#[allow(dead_code)]\nmod pilot_core;\n",
-     "new": "use crate::engine::p1 as pilot_core;\n",
-     "reason": "the fork loads its self-contained pilot core module by `#[path]` from `cpu_pilot/`; here it is the carried `engine::p1` (the files are carried unedited), so the approved `allow(dead_code)` on that declaration is not needed"
+     "old": "#[path = \"cpu_pilot/pilot.rs\"]\n",
+     "new": "#[path = \"../../model/p1/mod.rs\"]\n",
+     "reason": "the fork loads this file as a child module of `cpu_pilot` by `#[path]` (its `pub(super)` items are visible to `cpu_pilot.rs` only that way); the path now points at the carried file under src/model/p1/, everything else is the fork's text (the pilot core)"
     },
     {
-     "old": "#[path = \"cpu_pilot/menu_session.rs\"]\nmod menu_session;\n",
-     "new": "use crate::engine::p1_menu_session as menu_session;\n",
-     "reason": "`#[path]` module of the fork replaced by the carried `engine::p1_menu_session`"
+     "old": "#[path = \"cpu_pilot/menu_session.rs\"]\n",
+     "new": "#[path = \"../../model/p1/menu_session.rs\"]\n",
+     "reason": "the fork loads this file as a child module of `cpu_pilot` by `#[path]` (its `pub(super)` items are visible to `cpu_pilot.rs` only that way); the path now points at the carried file under src/model/p1/, everything else is the fork's text (menu session)"
     },
     {
-     "old": "#[path = \"cpu_pilot/stage_session.rs\"]\nmod stage_session;\n",
-     "new": "use crate::engine::p1_stage_session as stage_session;\n",
-     "reason": "`#[path]` module of the fork replaced by the carried `engine::p1_stage_session`"
+     "old": "#[path = \"cpu_pilot/stage_session.rs\"]\n",
+     "new": "#[path = \"../../model/p1/stage_session.rs\"]\n",
+     "reason": "the fork loads this file as a child module of `cpu_pilot` by `#[path]` (its `pub(super)` items are visible to `cpu_pilot.rs` only that way); the path now points at the carried file under src/model/p1/, everything else is the fork's text (stage session)"
+    },
+    {
+     "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
+     "new": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n    BASE.load(Ordering::Acquire) != 0\n}\n",
+     "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
     }
    ]
   }
