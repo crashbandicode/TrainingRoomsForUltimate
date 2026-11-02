@@ -19,6 +19,7 @@ pub mod probe;
 pub mod registry;
 pub mod state;
 pub mod texture;
+pub mod thumbs;
 #[cfg(feature = "diag")]
 pub mod texture_probe;
 pub mod tick;
@@ -36,11 +37,18 @@ pub struct UiInstall {
     pub found: [GuardOutcome; UI_SITES.len()],
     pub archive_hook: bool,
     pub anchors: bool,
+    /// The u4 texture helper's guards (`sites_u4::SITES`).
+    pub texture_found: [GuardOutcome; crate::model::sites_u4::SITES.len()],
 }
 
 /// The install-line rows of the package's sites.
 pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteReport> {
     use crate::model::install_line::{SiteReport, Written};
+    let texture = crate::model::sites_u4::SITES.iter().enumerate().map(|(i, site)| SiteReport {
+        site: site.name,
+        found: install.texture_found[i],
+        written: if install.texture_found[i].usable() { Written::Checked } else { Written::Skipped },
+    });
     UI_SITES
         .iter()
         .enumerate()
@@ -54,6 +62,7 @@ pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteRepor
                 _ => Written::Skipped,
             },
         })
+        .chain(texture)
         .collect()
 }
 
@@ -134,5 +143,7 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
             slot.is_some()
         ));
     }
-    UiInstall { found, archive_hook, anchors }
+    // The game-file texture helper (u4): the stage grid's thumbnails ride on it; without it the tiles keep their text.
+    let texture_found = texture::install();
+    UiInstall { found, archive_hook, anchors, texture_found }
 }

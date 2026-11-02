@@ -305,9 +305,12 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     for i in 0..len {
         if let Some(n) = layout.tile(page, i) {
             tile_label(layout.kind, n, layout.short_names, stage, &mut frame.tiles[i]);
+            frame.tile_n[i] = n as u16;
         }
     }
     frame.tile_count = len as u8;
+    frame.tile_stage_grid = layout.kind == GridKind::Stages;
+    frame.tile_sig = ((page as u32) << 8) | u32::from(layout.cols) | (u32::from(layout.rows) << 4);
     frame.tile_focus = cell as u8;
     let title = match layout.kind {
         GridKind::Items => "Give item",

@@ -14,6 +14,7 @@ use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
+use crate::runtime::ui::thumbs;
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
@@ -120,14 +121,21 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if visible && (seq != *drawn_seq || !was_shown) {
         if let Some(frame) = FRAME.try_lock() {
             panes.draw(&frame);
+            thumbs::note_frame(&frame);
             *drawn_seq = seq;
             if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
                 log(format_args!("[Ui] first draw seq={seq}"));
             }
         }
     }
-    #[cfg(feature = "diag")]
-    crate::runtime::ui::texture_probe::tick(panes);
+    // The stage grid's thumbnails (SPEC-core-07 section 4.5): requested when a stage page shows, released when it changes or
+    // the menu closes; `thumbs::run` also lets the helper retire released textures, once per UI frame.
+    if !visible {
+        thumbs::hide();
+    }
+    if thumbs::run(panes) {
+        FRAME_SEQ.fetch_add(1, Ordering::Release);
+    }
 }
 
 /// A log line from the tick. The tick runs inside the UI hooks; its lines are the once-per-registration kind (layout
@@ -138,6 +146,8 @@ fn log(args: core::fmt::Arguments<'_>) {
 
 /// The layout cannot draw the menu now: drop the readiness and, if the menu owns Player 1's input, give it back.
 fn renderer_lost(reason: &str) {
+    // SAFETY: on the UI job thread; the textures are released without touching a pane.
+    unsafe { thumbs::lose_layout() };
     let was_ready = LAYOUT_READY.swap(false, Ordering::AcqRel);
     if state::readiness_facts(0).owns_input {
         state::release_menu();
@@ -148,6 +158,8 @@ fn renderer_lost(reason: &str) {
 }
 
 unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
+    // The panes the thumbnails were bound to are about to be replaced: drop the textures first.
+    thumbs::lose_layout();
     r.layout = layout as usize;
     r.panes = None;
     r.status_r = core::ptr::null_mut();
