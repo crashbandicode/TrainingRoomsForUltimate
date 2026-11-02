@@ -135,6 +135,50 @@ def main():
     ln = line_after(m, "Saved evtest", 4)
     row("saved notice posted", ln is not None or ok, ln or "no notice line (the file is the evidence)")
 
+    # the release path: the real software keyboard applet, answered through Eden's control API (ui.tree / ui.set / ui.click)
+    r.remote(f"Set-Content -Path {SD}/diag-keyboard.on -Value 'on'", 30)
+    time.sleep(1)
+    cmd("save_slot 0 ignored")
+    dialog = None
+    for _ in range(20):
+        time.sleep(1.5)
+        try:
+            tree = r.call(LABEL, "ui.tree", {})
+        except Exception as error:  # noqa: BLE001
+            print(f"ui.tree: {error}", flush=True)
+            continue
+        found = {}
+
+        def walk(node):
+            if isinstance(node, dict):
+                name = node.get("name") or node.get("object_name") or ""
+                if node.get("id") and name in ("line_edit_osk", "button_ok"):
+                    found[name] = node["id"]
+                for key, value in node.items():
+                    if key != "properties":
+                        walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        walk(tree)
+        if "line_edit_osk" in found and "button_ok" in found:
+            dialog = found
+            break
+    ok = False
+    detail = "keyboard dialog not found in ui.tree"
+    if dialog:
+        r.call(LABEL, "ui.set", {"target": dialog["line_edit_osk"], "property": "text", "value": "kbtest"})
+        time.sleep(0.8)
+        r.call(LABEL, "ui.click", {"target": dialog["button_ok"]})
+        time.sleep(3.0)
+        body = read_file(f"{SD}/macros/kbtest.json")
+        ok = bool(body.strip())
+        detail = f"typed kbtest through the applet; macros/kbtest.json {'present' if ok else 'missing'}"
+    row("Keyboard applet (release path): a name typed through the real applet saves the macro", ok, detail)
+    shot("after-keyboard")
+    r.remote(f"Remove-Item -Force {SD}/diag-keyboard.on", 30)
+
     # list and load from the library
     m = cmd("open_library 0")
     time.sleep(1.0)
@@ -222,6 +266,11 @@ def main():
     row("Replay Window browser opens and lists the capture", bool(line) and "none" not in (line or "none")[:60], (line or "no view")[:300])
     shot("replay-browser")
     m = cmd("pad confirm")
+    time.sleep(3.0)
+    line = view()
+    (OUT / "mismatch-view.txt").write_text(line or "")
+    if line and "Fighter Mismatch" in line:
+        cmd("pad confirm")  # Keep current fighter (the roster cycle is behind the port)
     time.sleep(6.0)
     st = cmd("status")
     ln = line_after(st, "[NamedMacroDiag] status", 6)

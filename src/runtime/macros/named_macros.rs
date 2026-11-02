@@ -399,10 +399,10 @@ pub fn clip_foreground() -> bool {
 pub fn naming_pending() -> bool { NAME_JOB.lock().unwrap().is_some() }
 
 fn request_native_name() {
-    // Diag build: the software keyboard is a modal library applet that freezes a headless Eden run; the rows confirm the name with
-    // `diag_confirm_name` (the keyboard's confirmed path) instead.
+    // Diag build: the software keyboard is a modal library applet; a headless Eden run opens it only when `diag-keyboard.on` exists in the data
+    // folder (the keyboard row answers it through Eden's control API); otherwise the rows confirm the name with `diag_confirm_name`.
     #[cfg(feature = "diag")]
-    if true {
+    if !std::path::Path::new("sd:/ultimate/TrainingRooms/diag-keyboard.on").exists() {
         return;
     }
     if suspended() || crate::runtime::mii::native_keyboard::busy() || naming_pending() { return; }

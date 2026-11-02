@@ -11,7 +11,7 @@ use parking_lot::RwLock;
 use crate::engine::compat::menu::{TrainingModpackMenu, BASE_MENU};
 use crate::engine::mii::selection::Preferences as MiiPreferences;
 use crate::engine::stages::stage_menu::Preferences as StagePreferences;
-use crate::model::settings::Settings;
+use crate::model::settings::{Settings, Snapshot};
 use crate::runtime::compat::sync::Readable;
 
 struct Current {
@@ -47,6 +47,15 @@ pub fn apply(settings: &Settings) {
         mii: kept(settings, "mii_preferences"),
     };
     *CURRENT.write() = Some(next);
+}
+
+/// The typed menu view of a published snapshot (published::publish, boot and every commit): the kept stage and Mii preferences stay as
+/// they were. The settings rows the carried code reads (Macro Source, Ask before switching fighter, the Solo Popo and preload rows) reach
+/// MENU through this call; pply (a whole Settings) also refreshes the two kept keys.
+pub fn apply_snapshot(menu: &Snapshot) {
+    let mut current = CURRENT.write();
+    let (stage, mii) = current.take().map_or_else(|| (StagePreferences::default(), MiiPreferences::default()), |c| (c.stage, c.mii));
+    *current = Some(Current { menu: TrainingModpackMenu::from_snapshot(menu), stage, mii });
 }
 
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
