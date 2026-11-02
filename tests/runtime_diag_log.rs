@@ -12,9 +12,15 @@ mod model;
 #[path = "../src/runtime/clock.rs"]
 pub mod clock;
 
-// `diag_log` names the clock as `crate::runtime::clock`.
+// The drain thread starts through `runtime::threads::spawn` (stream/stack); plain std without the diag feature.
+#[path = "../src/runtime/threads.rs"]
+#[allow(dead_code)]
+pub mod threads;
+
+// `diag_log` names the clock as `crate::runtime::clock` and the spawn as `crate::runtime::threads`.
 mod runtime {
     pub use super::clock;
+    pub use super::threads;
 }
 
 #[path = "../src/runtime/diag_log.rs"]
