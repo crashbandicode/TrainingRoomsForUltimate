@@ -188,6 +188,7 @@ use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
 use crate::runtime::roster::special_articles as articles;
+use crate::runtime::roster::build_split as split;
 
 macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
@@ -246,6 +247,12 @@ const TASK_WAIT: usize = 0x354ccd0;
 const TASK_QUEUES: usize = 0x5333f58;
 const CONSTRUCT_FUNCTOR_VTABLE: usize = 0x4f69bb8;
 const CONSTRUCT_FUNCTOR: usize = 0x3cb2a0;
+/// F6: native loader state 8's control-init task (`native_entry_dispatch_6556b0.c` case 8): the functor vtable `0x4f81510`, whose
+/// `+0x30` slot `0x6574e0` runs `0x64f820(*task)` (`ldr x8, [x0, #8]; ldr x0, [x8]; b 0x64f820`), queued with the callback
+/// `0x655f30` (the same eight words as `0x3cb190`) and the scheduler arguments `(2, 1)`.
+const CONTROL_FUNCTOR_VTABLE: usize = 0x4f81510;
+const CONTROL_FUNCTOR: usize = 0x6574e0;
+const CONTROL_CALLBACK: usize = 0x655f30;
 const RELEASE_KIND: usize = 0x17e8610;
 const ACQUIRE_KIND: usize = 0x17e64d0;
 /// Per-key release of the resource owner's map, the primitive `0x17e8610` runs
@@ -1721,6 +1728,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     bank.phase = Phase::Changing; bank.observed = None; bank.from = from; bank.target = target;
     bank.acknowledged = false; bank.failed = false; bank.swap = swap;
     bank.tick = TickGap::arm(now_us());
+    split::arm(role, now_us());
     fields::write_unchecked(entry as usize, 0x5932, 0u8);
     fields::write_unchecked(entry as usize, 0x591a, target);
     match swap {
@@ -1748,6 +1756,7 @@ enum Action { None, Swap, Lifecycle, Construct }
 pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     let Some(role) = role(owner) else { return; };
     let observed = snapshot(entry);
+    split::tick_any(role, owner, now_us(), &observed);
     if GROUPS_ENABLED.load(Ordering::Acquire) {
         sample_pool();
         // A Reload begins at loader state 0 right after this pre-dispatch (§4.2):
@@ -1776,6 +1785,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
     }
     // P3-0: one tick of this entry's pre-service; the meter is armed by a request and read at Ready.
     bank.tick.observe(now_us());
+    split::observe(role, now_us());
     // A former Ready receipt must not survive a callback observing an unfinished
     // native reset/replacement. Publish it again only after today's full proof.
     bank.observed = None;
@@ -1872,6 +1882,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 trace!("[GroupSwap] swap owner={} kind={:#x} request_to_ready_us={} bodies={:?} max_tick_gap_us={} ticks={}",
                     owner, kind, now_us().saturating_sub(requested), now, bank.tick.max_gap_us, bank.tick.ticks);
                 bank.tick.disarm();
+                split::report_gaps(role, owner, kind);
             }
             let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none()
                 && (bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned));
@@ -2163,9 +2174,11 @@ impl RegistryOps for NativeRegistry {
     fn unregister(&mut self, members: Members) {
         unsafe {
             let unprepare: unsafe extern "C" fn(*mut u8, u32, u32, u32) = std::mem::transmute(self.base + UNPREPARE);
+            split::mark(split::Step::Plugin);
             for (sub, kind) in members.kinds().iter().enumerate().take(members.count()) {
                 unprepare(self.g68 as *mut u8, *kind, self.owner, sub as u32);
             }
+            split::mark(split::Step::Unprepare);
         }
     }
 
@@ -2176,7 +2189,9 @@ impl RegistryOps for NativeRegistry {
     fn refresh_roster(&mut self) {
         unsafe {
             let refresh: unsafe extern "C" fn(*mut u8) = std::mem::transmute(self.base + ROSTER_REFRESH);
+            split::mark(split::Step::Plugin);
             refresh(self.r as *mut u8);
+            split::mark(split::Step::Roster);
         }
     }
 
@@ -2186,9 +2201,11 @@ impl RegistryOps for NativeRegistry {
             let header = self.header();
             let costume = copy_registry::registry_costume(header[0], fields::read_unchecked::<u32>(self.r, 0x64),
                 fields::read_unchecked::<u32>(self.base, REGION_WORD));
+            split::mark(split::Step::Plugin);
             for (sub, kind) in header.iter().enumerate().take(members.count()) {
                 prepare(self.g68 as *mut u8, (self.r + 0xb0) as *mut u8, *kind, costume, self.owner, sub as u32);
             }
+            split::mark(split::Step::Prepare);
         }
     }
 }
@@ -2460,6 +2477,9 @@ struct Construction {
     group: usize,
     count: usize,
     tasks: [usize; NATIVE_MEMBERS],
+    /// F6: state 8's control-init task until it settled (state 9); then 0 and the bodies are queued (state 10).
+    control: usize,
+    members: Members,
     setup_us: u64,
     queued_us: u64,
     settled_us: [u64; NATIVE_MEMBERS],
@@ -2493,61 +2513,93 @@ unsafe fn free_tasks(base: usize, tasks: &[usize]) {
     }
 }
 
-/// Phase B′ start: `0x658af0`'s entry-level third in its order (`0x658b14-0x658b24`), then per kind the
-/// allocation and the queued construction of loader state 10 (`6556b0.c:215-250`), byte for byte the
-/// task object it builds. Returns the task objects and the time the setup ended, or the number of
-/// bodies already allocated when a native allocation returned null: those are installed into the
-/// cells so the ordinary verification fails and its rollback destroys them.
-unsafe fn start_async_construction(base: usize, entry: *mut u8, owner: u32, members: Members) -> Result<([usize; NATIVE_MEMBERS], u64), usize> {
-    use construction_task as task;
-    let e = entry as usize;
+/// Phase B′ start, in native loader state 8's order (`native_entry_dispatch_6556b0.c` case 8, `0x6558bc-0x655a18`): `0x654dc0`
+/// (dispatcher arrays) and `0x655320` (control contexts) on the game thread, then the control init `0x64f820` queued as a task on the
+/// worker (`queue_task` with the functor `0x4f81510`, whose `+0x30` slot runs `0x64f820(*task)`, and the callback `0x655f30`).
+/// State 9's wait for it is `settle_construction`'s, state 10's allocation `queue_bodies`. F6: the carried version ran `0x64f820` on
+/// the game thread here (the synchronous `0x658af0` order, whose only caller is the respawn `0x65be14`); native runs it on the task
+/// worker. Returns the control task and the time the game-thread setup ended, or `Err(0)` when the task object could not be
+/// allocated: no body is allocated, so the ordinary verification fails and its rollback restores the window.
+unsafe fn start_async_construction(base: usize, entry: *mut u8) -> Result<(usize, u64), usize> {
     let models: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + MODELS_SETUP);
     let contexts: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + COUNT_SETUP);
-    let control: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + CONTROL_INIT);
+    split::mark(split::Step::Plugin);
     models(entry);
+    split::mark(split::Step::Models);
     contexts(entry);
-    control(entry);
+    split::mark(split::Step::Contexts);
+    let control = queue_task(base, entry as usize, CONTROL_FUNCTOR_VTABLE, CONTROL_CALLBACK);
+    split::mark(split::Step::Control);
     let setup_done = now_us();
-    let allocate: unsafe extern "C" fn(u8, u32, u32) -> usize = std::mem::transmute(base + BODY_ALLOC);
+    if control == 0 {
+        install_cells(entry as usize, &[]);
+        return Err(0);
+    }
+    Ok((control, setup_done))
+}
+
+/// One task object as loader states 8 and 10 build it (`6556b0.c` cases 8 and 10, `0x655ae8-0x655b1c`): the 0x90-byte object
+/// `0x392e290(0x10, 0x90)`, zeroed, `object` at `+0` (the entry for state 8's control init, the body for state 10's construction),
+/// queue id 1 at `+0x24`; the functor `{vtable, task, _, _, self}` built on the stack and swapped into `task+0x50` by `0x3cb050`, the
+/// emptied local destroyed as native does; then `0x3549720(task+0x10, callback, 2, 1)`. Returns the task, or 0 (nothing queued)
+/// when the heap returned null.
+unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize) -> usize {
+    use construction_task as task;
     let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
     let functor_swap: unsafe extern "C" fn(*mut [usize; 5], usize) = std::mem::transmute(base + FUNCTOR_COPY);
     let schedule: unsafe extern "C" fn(usize, usize, u32, u32) = std::mem::transmute(base + TASK_SCHEDULE);
+    split::mark(split::Step::Plugin);
+    let t = heap_alloc(task::ALIGN, task::SIZE);
+    split::mark(split::Step::TaskAlloc);
+    if t == 0 {
+        return 0;
+    }
+    std::ptr::write_bytes(t as *mut u8, 0, task::SIZE);
+    fields::write_unchecked(t, task::BODY, object);
+    fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
+    let mut functor = [base + vtable, t, 0, 0, 0];
+    functor[4] = functor.as_ptr() as usize;
+    functor_swap(&mut functor, t + task::FUNCTOR);
+    let holder = functor[4];
+    if holder != 0 {
+        let slot = if holder == functor.as_ptr() as usize { 0x20 } else { 0x28 };
+        if let Some(destroy) = fields::child(holder, 0).and_then(|vtable| fields::read::<usize>(vtable, slot)) {
+            let destroy: unsafe extern "C" fn(usize) = std::mem::transmute(destroy);
+            destroy(holder);
+        }
+    }
+    split::mark(split::Step::Functor);
+    schedule(t + task::HANDLE, base + callback, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);
+    split::mark(split::Step::Schedule);
+    t
+}
+
+/// Phase B′, loader state 10 (`6556b0.c:215-250`), once the control init settled: per kind `0x3ae5f0(0, kind, owner)` pops the
+/// pool slot and runs the base constructor on the game thread, and the body's init and construct are queued on the task worker
+/// (`queue_task` with the functor `0x4f69bb8` and the callback `0x3cb190`). Returns the task objects, or the number of bodies
+/// already allocated when a native allocation returned null: those are installed into the cells so the ordinary verification
+/// fails and its rollback destroys them.
+unsafe fn queue_bodies(base: usize, entry: usize, owner: u32, members: Members) -> Result<[usize; NATIVE_MEMBERS], usize> {
+    let allocate: unsafe extern "C" fn(u8, u32, u32) -> usize = std::mem::transmute(base + BODY_ALLOC);
     let mut tasks = [0usize; NATIVE_MEMBERS];
     let mut bodies = [0usize; NATIVE_MEMBERS];
     for (i, kind) in members.kinds().iter().copied().enumerate().take(members.count()) {
+        split::mark(split::Step::Plugin);
         let body = allocate(0, kind, owner);
+        split::mark(split::Step::Allocate);
         if body == 0 {
-            install_cells(e, &bodies[..i]);
+            install_cells(entry, &bodies[..i]);
             return Err(i);
         }
         bodies[i] = body;
-        let t = heap_alloc(task::ALIGN, task::SIZE);
+        let t = queue_task(base, body, CONSTRUCT_FUNCTOR_VTABLE, TASK_CALLBACK);
         if t == 0 {
-            install_cells(e, &bodies[..=i]);
+            install_cells(entry, &bodies[..=i]);
             return Err(i + 1);
         }
-        // State 10's stores (`0x655ae8-0x655b1c`): the body, zeroed handle/pending/functor/cancel
-        // fields, queue id 1; the bytes it leaves alone are zeroed too.
-        std::ptr::write_bytes(t as *mut u8, 0, task::SIZE);
-        fields::write_unchecked(t, task::BODY, body);
-        fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
-        // The functor as state 10 builds it on its stack, `{vtable, task, _, _, self}` (held in
-        // place), swapped into `task+0x50` by `0x3cb050`; the emptied local is destroyed as it does.
-        let mut functor = [base + CONSTRUCT_FUNCTOR_VTABLE, t, 0, 0, 0];
-        functor[4] = functor.as_ptr() as usize;
-        functor_swap(&mut functor, t + task::FUNCTOR);
-        let holder = functor[4];
-        if holder != 0 {
-            let slot = if holder == functor.as_ptr() as usize { 0x20 } else { 0x28 };
-            if let Some(destroy) = fields::child(holder, 0).and_then(|vtable| fields::read::<usize>(vtable, slot)) {
-                let destroy: unsafe extern "C" fn(usize) = std::mem::transmute(destroy);
-                destroy(holder);
-            }
-        }
-        schedule(t + task::HANDLE, base + TASK_CALLBACK, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);
         tasks[i] = t;
     }
-    Ok((tasks, setup_done))
+    Ok(tasks)
 }
 
 /// Phase B′ settlement on the entry tick (state 0xb's rule): once every task's pending count is 0,
@@ -2558,6 +2610,66 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
     use construction_task as task;
     let base = BASE.load(Ordering::Acquire);
     let now = now_us();
+    // State 9 (F6): the control init queued at the exchange runs on the task worker. Once its pending count is 0, state 10 frees
+    // the task and, outside the bank lock, allocates the bodies and queues their construction; they settle on later ticks.
+    let control = {
+        let mut state = BANKS[role].lock().unwrap();
+        let Some(bank) = state.as_mut() else { return; };
+        let Some(c) = bank.construction.as_mut() else { return; };
+        if c.control == 0 {
+            None
+        } else {
+            c.ticks = c.ticks.saturating_add(1);
+            let pending = fields::read::<i32>(c.control, task::PENDING).unwrap_or(i32::MAX);
+            if pending > 0 {
+                if now.saturating_sub(c.waited_logged_us) >= 5_000_000 {
+                    c.waited_logged_us = now;
+                    trace!("[GroupSwap] control init pending owner={} group={} pending={} us={} ticks={}",
+                        owner, c.group, pending, now.saturating_sub(c.queued_us), c.ticks);
+                }
+                return;
+            }
+            let control = c.control;
+            c.control = 0;
+            Some((control, c.members, c.group, now.saturating_sub(c.queued_us)))
+        }
+    };
+    if let Some((control, members, group, control_us)) = control {
+        split::start_queue(role);
+        free_tasks(base, &[control]);
+        split::mark(split::Step::FreeTasks);
+        let queued = queue_bodies(base, entry as usize, owner, members);
+        let mut state = BANKS[role].lock().unwrap();
+        match queued {
+            Ok(tasks) => {
+                match state.as_mut().and_then(|bank| bank.construction.as_mut()) {
+                    Some(c) => {
+                        c.tasks = tasks;
+                        c.queued_us = now_us();
+                        trace!("[GroupSwap] bodies queued owner={} group={} tasks={:x?} control_us={} us={}; frames run until the tasks settle",
+                            owner, group, &tasks[..members.count()], control_us, c.queued_us.saturating_sub(c.tail.started));
+                    }
+                    None => trace!("[GroupSwap] bodies queued owner={} group={} UNEXPECTED: construction gone; tasks {:x?} leak (reported)",
+                        owner, group, &tasks[..members.count()]),
+                }
+                drop(state);
+                split::report_queue(owner, group);
+            }
+            Err(installed) => {
+                let construction = state.as_mut().and_then(|bank| bank.construction.take());
+                drop(state);
+                trace!("[GroupSwap] bodies queued owner={} group={} UNEXPECTED: a native allocation returned null after {} of {} bodies; the verification rolls back",
+                    owner, group, installed, members.count());
+                if let Some(construction) = construction {
+                    let mut tail = construction.tail;
+                    tail.asynchronous = Some(AsyncReport { setup_us: construction.setup_us,
+                        queued_us: construction.queued_us.saturating_sub(tail.started), settled_us: construction.settled_us, ticks: construction.ticks });
+                    complete_exchange(base, entry, owner, role, tail);
+                }
+            }
+        }
+        return;
+    }
     let construction = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
@@ -2579,16 +2691,20 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
         }
         bank.construction.take().unwrap()
     };
+    split::start_settle(role);
     let mut bodies = [0usize; NATIVE_MEMBERS];
     for (i, task_object) in construction.tasks.iter().enumerate().take(construction.count) {
         bodies[i] = fields::read::<usize>(*task_object, task::BODY).unwrap_or(0);
     }
     install_cells(entry as usize, &bodies[..construction.count]);
+    split::mark(split::Step::Install);
     free_tasks(base, &construction.tasks[..construction.count]);
+    split::mark(split::Step::FreeTasks);
     let mut tail = construction.tail;
     tail.asynchronous = Some(AsyncReport { setup_us: construction.setup_us,
         queued_us: construction.queued_us.saturating_sub(tail.started), settled_us: construction.settled_us, ticks: construction.ticks });
     complete_exchange(base, entry, owner, role, tail);
+    split::report_settle(owner, construction.group);
 }
 
 /// A destroyer (finalize, reload, scene end) while a Phase B′ construction is in flight: wait for
@@ -2609,7 +2725,30 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
     let wait: unsafe extern "C" fn(u32, usize) = std::mem::transmute(base + TASK_WAIT);
     let mut bodies = [0usize; NATIVE_MEMBERS];
     let mut waited = 0usize;
-    for (i, &t) in construction.tasks.iter().enumerate().take(construction.count) {
+    let mut construction = construction;
+    // State 9 at a destroyer (F6): wait for the control init as native waits for its tasks, then run state 10 (allocate and queue
+    // the bodies), so the wait below finishes the construction and the destroyer finds the shape it finds for every drained build.
+    let mut partial = None;
+    if construction.control != 0 {
+        let control = std::mem::replace(&mut construction.control, 0);
+        if fields::read::<i32>(control, task::PENDING).unwrap_or(0) > 0 {
+            let queue = fields::read::<u32>(control, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
+            if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
+                wait(handle, control + task::PENDING);
+                waited += 1;
+            }
+        }
+        free_tasks(base, &[control]);
+        match queue_bodies(base, entry as usize, owner, construction.members) {
+            Ok(tasks) => construction.tasks = tasks,
+            Err(installed) => {
+                trace!("[GroupSwap] construction drained owner={} group={} UNEXPECTED: a native allocation returned null after {} of {} bodies (installed as allocated)",
+                    owner, construction.group, installed, construction.count);
+                partial = Some(installed);
+            }
+        }
+    }
+    for (i, &t) in construction.tasks.iter().enumerate().take(if partial.is_some() { 0 } else { construction.count }) {
         if fields::read::<i32>(t, task::PENDING).unwrap_or(0) > 0 {
             let queue = fields::read::<u32>(t, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
             if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
@@ -2619,8 +2758,10 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
         }
         bodies[i] = fields::read::<usize>(t, task::BODY).unwrap_or(0);
     }
-    install_cells(entry as usize, &bodies[..construction.count]);
-    free_tasks(base, &construction.tasks[..construction.count]);
+    if partial.is_none() {
+        install_cells(entry as usize, &bodies[..construction.count]);
+        free_tasks(base, &construction.tasks[..construction.count]);
+    }
     let alias = construction.tail.alias;
     if let Prepared::Build { group, lease, members, .. } = construction.tail.prepared {
         let alias_ok = alias != 0 && resource(base, owner) == Some(alias);
@@ -2629,7 +2770,10 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
             trace!("[RequestBit] end owner={} group={} how={:?} before={:#x} built={:#x} after={:#x} reason=drained",
                 owner, group, how, lease.before, now, after);
             // Every body ran its construction tail (the waits returned): their tokens settle as a built group's.
-            r_handle::construction_settled(ledger_role(role), group, &members.kinds()[..members.count()]);
+            // (F6: not when state 10 failed to allocate at the destroyer: those members never constructed and keep their keys.)
+            if partial.is_none() {
+                r_handle::construction_settled(ledger_role(role), group, &members.kinds()[..members.count()]);
+            }
         }
         trace!("[GroupSwap] construction drained owner={} group={} reason={} bodies={:x?} waited={} us={} alias_ok={}",
             owner, group, reason, &bodies[..construction.count], waited, now_us().saturating_sub(started), alias_ok);
@@ -2855,6 +2999,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         (prepared, before.unwrap(), alias)
     };
     let started = now_us();
+    split::start(role, started);
     // U18: the outgoing window leaves the copy registry and the entry's header and roster become
     // the incoming group's before native runs for it, as a Reload into that group would leave
     // them; a warm attach then registers the group as its inits did (`swap_model::copy_registry`).
@@ -2864,12 +3009,16 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     let registry_ok = match (prepared, NativeRegistry::new(base, alias, owner)) {
         (Prepared::Warm { outgoing, members, .. }, Some(mut registry)) => {
             copy_registry::attach(&mut registry, outgoing, members);
+            split::mark(split::Step::Plugin);
             registry.trace("attach", outgoing, members);
+            split::mark(split::Step::Log);
             true
         }
         (Prepared::Build { outgoing, members, .. }, Some(mut registry)) => {
             copy_registry::build(&mut registry, outgoing, members);
+            split::mark(split::Step::Plugin);
             registry.trace("build", outgoing, members);
+            split::mark(split::Step::Log);
             true
         }
         (_, None) => {
@@ -2887,33 +3036,38 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             Some(crate::runtime::roster::mii_setup::prepare_mii_group(base, entry as usize, owner, alias, identity, c)),
         _ => None,
     };
+    split::mark(split::Step::MiiSetup);
     let setup_ok = registry_ok && !matches!(setup, Some(crate::engine::mii::mii_setup::Outcome::Refused(_)
         | crate::engine::mii::mii_setup::Outcome::Failed(_)));
     // GS-PANIC: the build's own charge (the bodies and their article models, `0x6081f8 → … → 0x392e290`).
+    split::mark(split::Step::Plugin);
     let construct_committed = matches!(prepared, Prepared::Build { .. }).then(|| MemorySample::capture().committed.get()).flatten();
+    split::mark(split::Step::Memory);
     exchange_articles(base, role, entry as usize, owner, prepared, registry_ok);
+    split::mark(split::Step::Articles);
     match prepared {
         Prepared::Warm { .. } if registry_ok => select_control(base, entry),
         Prepared::Warm { .. } => {}
         Prepared::Build { asynchronous: true, members, group, .. } if setup_ok => {
             // Phase B′: queue the construction and return; `settle_construction` verifies and
             // acknowledges on the tick the tasks settle. Frames run meanwhile.
-            match start_async_construction(base, entry, owner, members) {
-                Ok((tasks, setup_done)) => {
+            match start_async_construction(base, entry) {
+                Ok((control, setup_done)) => {
                     let queued_us = now_us();
                     let mut state = BANKS[role].lock();
                     match state.as_mut() {
                         Some(bank) => {
                             bank.construction = Some(Construction {
                                 tail: ExchangeTail { prepared, before, alias, setup, setup_ok, construct_committed, started, asynchronous: None },
-                                group, count: members.count(), tasks, setup_us: setup_done.saturating_sub(started), queued_us,
+                                group, count: members.count(), tasks: [0; NATIVE_MEMBERS], control, members,
+                                setup_us: setup_done.saturating_sub(started), queued_us,
                                 settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: queued_us });
-                            trace!("[GroupSwap] build owner={} group={} mode=async queued={} tasks={:x?} setup_us={} us={}; frames run until the tasks settle",
-                                owner, group, members.count(), &tasks[..members.count()], setup_done.saturating_sub(started),
-                                queued_us.saturating_sub(started));
+                            trace!("[GroupSwap] build owner={} group={} mode=async queued={} control={:#x} setup_us={} us={}; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+                                owner, group, members.count(), control, setup_done.saturating_sub(started), queued_us.saturating_sub(started));
+                            split::report_setup(owner, group, &members.kinds()[..members.count()], setup_done.saturating_sub(started));
                         }
-                        None => trace!("[GroupSwap] build owner={} group={} mode=async UNEXPECTED: bank gone after queuing; tasks {:x?} leak (reported)",
-                            owner, group, &tasks[..members.count()]),
+                        None => trace!("[GroupSwap] build owner={} group={} mode=async UNEXPECTED: bank gone after queuing; control task {:#x} leaks (reported)",
+                            owner, group, control),
                     }
                     return;
                 }
@@ -2937,6 +3091,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             log_memory(owner, group, kinds, "build", construct_committed, MemorySample::capture(), memory::group_cost(kinds).build);
         }
     }
+    split::mark(split::Step::Memory);
     // U19: the construction is over (each body's tail ran inside `0x658af0`), so the request bit
     // the build set goes back, as the reset would hand it back if the last tail had emptied the
     // map. Other batches' keys keep the map non-empty here; a bit left set would let a later load
@@ -2951,6 +3106,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             trace!("[RequestBit] UNEXPECTED owner={} group={}: R+0x4c changed during the construction ({:#x} -> {:#x}); left as found", owner, group, lease.before, now);
         }
     }
+    split::mark(split::Step::Request);
     let elapsed = now_us().saturating_sub(started);
     // Verify under the lock; roll back on any failure.
     let rollback = {
@@ -3030,6 +3186,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         }
     };
     let (rollback, post_release) = rollback;
+    split::mark(split::Step::Verify);
     // Diag only: who listens to the body event the activation posts for this exchange.
     #[cfg(feature = "diag")]
     if rollback.is_none() { super::trace_event_listeners("[GroupSwap] body-event listeners at acknowledgement", 0x1e); }
@@ -3058,6 +3215,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         // `r_handle::reconcile` supersedes WP2's mirror-based `observe::reconcile`).
         if alias != 0 && resource(base, owner) == Some(alias) { r_handle::reconcile(lrole, "build"); }
     }
+    split::mark(split::Step::Ledger);
     let Some((group, via)) = rollback else { return; };
     // PT-TRAINER-PARK: a failed warm attach rebuilt its pool; it goes before the previous window returns.
     if matches!(prepared, Prepared::Warm { .. }) {
@@ -3969,7 +4127,7 @@ const GROUP_SWAP_SEAMS: &[&str] = &["group_swap.dispatcher_destroy", "group_swap
 /// `body_bank.prepare_models` in `BANK_SEAMS`).
 const ASYNC_BUILD_SEAMS: &[&str] = &["group_swap.body_alloc", "group_swap.heap_alloc", "group_swap.functor_copy",
     "group_swap.task_schedule", "group_swap.task_callback", "group_swap.task_wait", "group_swap.control_init",
-    "group_swap.construct_functor", "capacity.load_655320"];
+    "group_swap.construct_functor", "group_swap.control_callback", "group_swap.control_functor", "capacity.load_655320"];
 const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", "ic_pair.activate_entry",
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
@@ -4047,7 +4205,7 @@ pub(super) unsafe fn install(base: usize) {
     // words, all or nothing. The functor vtable is relocated data (no static bytes to guard): its `+0x30`
     // slot must be the functor the callback runs (checked live, as the deactivate slot is). A mismatch
     // keeps every build synchronous.
-    let asynchronous: [(usize, &[u32]); 8] = [
+    let asynchronous: [(usize, &[u32]); 10] = [
         (BODY_ALLOC, &[0xf81b0ff9, 0xa9015ff8, 0xa90257f6, 0xa9034ff4, 0xa9047bfd, 0x910103fd, 0x12001c08, 0x7100111f]),
         (HEAP_ALLOC, &[0xd10203ff, 0xa9077bfd, 0x9101c3fd, 0xf81f83a0, 0xf81f03a1, 0x14000001, 0x14000001, 0x9100c3e0]),
         (FUNCTOR_COPY, &[0xd10103ff, 0xa9024ff4, 0xa9037bfd, 0x9100c3fd, 0xeb00003f, 0x540008a0, 0xaa0003f4, 0xf9401000]),
@@ -4056,16 +4214,21 @@ pub(super) unsafe fn install(base: usize) {
         (TASK_WAIT, &[0xd10183ff, 0xa90167fa, 0xa9025ff8, 0xa90357f6, 0xa9044ff4, 0xa9057bfd, 0x910143fd, 0xaa0103f4]),
         (COUNT_SETUP, &[0xd101c3ff, 0xa9016ffc, 0xa90267fa, 0xa9035ff8, 0xa90457f6, 0xa9054ff4, 0xa9067bfd, 0x910183fd]),
         (CONTROL_INIT, &[0xf81b0ff9, 0xa9015ff8, 0xa90257f6, 0xa9034ff4, 0xa9047bfd, 0x910103fd, 0x528b23e8, 0x38686808]),
+        (CONTROL_CALLBACK, &[0x3941c008, 0x34000048, 0xd65f03c0, 0xf9403000, 0xb4000080, 0xf9400008, 0xf9401901, 0xd61f0020]),
+        (CONTROL_FUNCTOR, &[0xf9400408, 0xf9400100, 0x17ffe0ce]),
     ];
     let functor_slot = fields::read_unchecked::<usize>(base, CONSTRUCT_FUNCTOR_VTABLE + 0x30);
-    let slot_ok = functor_slot == base + CONSTRUCT_FUNCTOR;
+    // F6: state 8's functor vtable is relocated data too; its `+0x30` slot must be the control-init functor.
+    let control_slot = fields::read_unchecked::<usize>(base, CONTROL_FUNCTOR_VTABLE + 0x30);
+    let slot_ok = functor_slot == base + CONSTRUCT_FUNCTOR && control_slot == base + CONTROL_FUNCTOR;
     let async_ok = gate(SEAM_GROUP, ASYNC_BUILD_SEAMS, groups_ok && slot_ok
         && fingerprint(base, CONSTRUCT_FUNCTOR, &[0xf81e0ff3, 0xa9017bfd, 0x910043fd, 0xf9400413, 0xf9400260, 0xf9400008, 0x29410801, 0xb9401003], "GroupSwap")
         && asynchronous.iter().all(|(offset, words)| fingerprint(base, *offset, words, "GroupSwap")))
         && groups_ok && slot_ok;
     ASYNC_ENABLED.store(async_ok, Ordering::Release);
-    trace!("[GroupSwap] async build {} functor_slot={:#x} expected={:#x}",
-        if async_ok { "enabled" } else { "disabled by fingerprint; synchronous build" }, functor_slot, base + CONSTRUCT_FUNCTOR);
+    trace!("[GroupSwap] async build {} functor_slot={:#x} expected={:#x} control_slot={:#x} expected={:#x}",
+        if async_ok { "enabled" } else { "disabled by fingerprint; synchronous build" }, functor_slot, base + CONSTRUCT_FUNCTOR,
+        control_slot, base + CONTROL_FUNCTOR);
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.
