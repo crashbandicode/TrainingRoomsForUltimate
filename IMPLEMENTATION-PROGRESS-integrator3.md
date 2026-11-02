@@ -32,6 +32,14 @@ Each cargo call: `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 18
 builds with the campaign rustup home (docs/BUILD.md). Logs kept under `/tmp/integrator3/` (test.log, test2.log, clippy*.log,
 nodef*.log, sw-*.log). Surface claims and releases: ledger lines 10:53/10:55Z, 10:59/11:01Z, 11:18/11:22Z, 11:28/11:30Z.
 
+## Merged-tree Eden boot s6-05 (run by pkg6 A on the 566780a diag NRO `3d7a9215`, Surface 12:30-12:37Z)
+Logs and shots: stream/pkg6 `eden/runs/s6-05`. Pass: cold boot (install line ~23 s after game.load, main menu ~40 s after, no
+plugin-silent stall); install line 9,207 chars ending `result=installed heap_allocations=0`; roster started; diag settings reload
+with periodic lines continuing; `[CyclePreload] applied` through `before_publish`; P1 hot swap (Kirby); record (50 frames) and
+playback; menu open/close x3 with the game running; console.log 12,414 lines, 0 panic/abort/crash/Unmapped.
+**Fail (R5):** hook_stats allocations rise ~180-210 per 10 s without a swap (2,302 at the end), as f6 saw on a pre-sync tree:
+the "no heap in hooks" item stays **open** until the allocating hook is found (pkg6's attribution scopes) and fixed at its root.
+
 ## Checklist (docs/CHECKLIST.md) for the integrated tree
 
 `compliance.py <work tree> --nro <release NRO of bf836c8>`: machine rows below; the four failing rows are named exactly.
@@ -43,7 +51,7 @@ nodef*.log, sw-*.log). Surface claims and releases: ledger lines 10:53/10:55Z, 1
 | release profile s/lto/cgu 1/abort; skyline =0.6.0; toolchain 1.98.1 | M | pass | compliance rows (three) |
 | pure logic in model with host tests; runtime only under cfg(switch) | M | pass | compliance: `src/lib.rs`; 7,826 host tests |
 | gates, one cargo call each | M | pass for `bf836c8`; open for `73831b8` | table above |
-| no heap in hooks: counting allocator, `heap_allocations=0` in the install line | M | machine half pass; runtime half open | compliance allocator row; `tests/hook_alloc.rs`; no Eden boot of the integrated NRO yet (the line must read `heap_allocations=0`) |
+| no heap in hooks: counting allocator, `heap_allocations=0` in the install line | M | **fail at run time** (s6-05: hook_stats +180-210 per 10 s); install line `heap_allocations=0` at boot | compliance allocator row; `tests/hook_alloc.rs`; no Eden boot of the integrated NRO yet (the line must read `heap_allocations=0`) |
 | fixed buffers, writer thread on a static stack, stack-built paths | M | open → integrator-3 after sync (lead ruling: static buffer sized by a const from the site tables, host worst-case test, `result=line_overflow` never silent) | hooks: fixed buffers (`tests/hook_alloc.rs`); the install line is rendered into a `String` on the boot thread, outside hook scope (`install_line::render`, lead's direction, = ui-screens `8658812`) because a fixed buffer cut it twice (2,048 B, 8,192 B); the RC decides whether that counts as the fixed-buffer rule |
 | root cause or operator-approved workaround, listed with date; shared causes checked for one abstraction | M | open (list) | this integrator added no workaround; shared-cause abstraction applied: one wrapper per native (`2bd47c2`), one native-call grant layer (R2-1). The operator-approved workaround list across streams is the lead's to compile |
 
