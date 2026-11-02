@@ -42,7 +42,6 @@ pub(crate) fn menu_settings_changed(enabled: bool, selected: Option<u8>) {
 const ROOT: &str = "sd:/ultimate/TrainingRooms/cpu_pilot";
 const REQUEST: &str = "sd:/ultimate/TrainingRooms/cpu_pilot/request.json";
 static BASE: AtomicUsize = AtomicUsize::new(0);
-static THINKING: AtomicBool = AtomicBool::new(false);
 static EMITTING: AtomicBool = AtomicBool::new(false);
 static PENDING: AtomicU64 = AtomicU64::new(0);
 // FIM observes owned slots only; it never advances the simulation clock.
@@ -580,10 +579,6 @@ fn menu_busy() -> bool {
         || crate::runtime::lobby::training::recording_or_playback()
 }
 
-pub(crate) fn thinking() -> bool {
-    THINKING.load(Ordering::Acquire)
-}
-
 /// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).
 pub(crate) fn installed() -> bool {
     BASE.load(Ordering::Acquire) != 0
@@ -1117,10 +1112,8 @@ unsafe fn sample_flags(run: &mut Run, n: Native) {
 unsafe fn think(run: &mut Run, n: Native) -> u64 {
     // One AI decision on the run's private stream. The core call preserves all
     // mutable controller input fields (including clamped rumble) and the shared
-    // stream; THINKING brackets it for the input recorder.
-    THINKING.store(true, Ordering::Release);
+    // stream.
     let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);
-    THINKING.store(false, Ordering::Release);
     core_pad::pack(decision)
 }
 

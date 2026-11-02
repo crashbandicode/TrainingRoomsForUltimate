@@ -11,8 +11,8 @@
 pub(crate) mod character_items;
 pub(crate) mod character_lifecycle;
 // Carried, not declared (no clean-room consumer, single owner): `effect_hook_chain` (the fork's chaining of the shared EffectModule
-// entries: packages 2-4 hook those themselves), `heap_metrics` and `heap_fields` (the fork's counting allocator and its install-line
-// fields: package 1's `runtime::alloc` is the allocator and counts the allocations of hook scopes, `hook_stats` reports them).
+// entries: packages 2-4 hook those themselves). `heap_fields` (the fork's install-line field) is not carried: package 1's install
+// line owns `heap_allocations=`. `heap_metrics` is the diag meter's reader (the byte meter of package 1's allocator).
 pub(crate) mod character_roster;
 pub(crate) mod cycle_preload;
 pub(crate) mod cycle_preload_config;
@@ -34,6 +34,8 @@ pub(crate) mod hang_trace {
     pub static RELOAD: Probe = Probe;
     pub static DESTROY: Probe = Probe;
 }
+#[cfg(feature = "plugin-heap-meter")]
+pub(crate) mod heap_metrics;
 pub(crate) mod kirby_hats;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
@@ -118,6 +120,15 @@ pub(crate) unsafe fn handle_operator_input(out: *mut crate::model::input_delay::
     *out = record.into();
 }
 
+/// The cycle started (every game function it calls passed its guard and boot called `init`): the owners of moments the cycle's
+/// engines serve (package 3's save-state load hands Kirby's hat to the hat engine) check it before they ask.
+static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the roster cycle is running.
+pub(crate) fn running() -> bool {
+    STARTED.load(std::sync::atomic::Ordering::Acquire)
+}
+
 /// The nro-load provider's registration function (`libnro_hook`, docs/HOOK-SHARING.md): one pointer-sized argument, the callback.
 type AddNroLoadHook = extern "C" fn(usize);
 
@@ -147,6 +158,7 @@ extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
 /// rows through `seams::seam_install::gate` and installs nothing when they are refused. Called once from boot, before the install
 /// line.
 pub(crate) fn init() {
+    STARTED.store(true, std::sync::atomic::Ordering::Release);
     register_nro_load();
     cycle_preload_config::init();
     practice_trace::init();

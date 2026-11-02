@@ -158,15 +158,28 @@ pub fn apply_kept(settings: &Settings) {
 /// the published one (a changed roster, hat order, pick or Solo Popo row re-plans the cycle and may queue a swap; an unrelated change
 /// does nothing). The first publish of a run (boot) has nothing to compare with and queues nothing.
 pub fn apply_snapshot(menu: &Snapshot) {
+    let published = TrainingModpackMenu::from_snapshot(menu);
+    let mut next = published;
+    // A normal menu apply (a menu was live: the first publish is the boot, which `cycle_preload_config::init` reconciles with the INI)
+    // goes through the preload engine first (decision D1, `preload::apply`): it persists the 13 `cycle_preload_*` rows in its INI
+    // boot cache (D7), caches them, re-plans its requests and canonicalises the rows (a choice it cannot store stays as it was).
+    // Outside the typed view's lock: the engine reads the typed menu and writes a file.
+    if crate::runtime::roster::running() && CURRENT.read().is_some() {
+        crate::runtime::roster::cycle_preload_config::publish_applied(&mut next);
+    }
     let (previous, next) = {
         let mut current = CURRENT.write();
         let previous = current.as_ref().map(|c| c.menu);
         let (defaults, stage, mii) =
             current.take().map_or_else(|| (BASE_MENU, StagePreferences::default(), MiiPreferences::default()), |c| (c.defaults, c.stage, c.mii));
-        let next = TrainingModpackMenu::from_snapshot(menu);
         *current = Some(Current { menu: next, defaults, stage, mii });
         (previous, next)
     };
+    if next != published {
+        // The engine changed rows (the stored choice won): the settings the menu opens on take them too.
+        PENDING.lock()[0] = Some(next);
+        crate::runtime::ui::worker::request_writeback();
+    }
     if let Some(previous) = previous.filter(|previous| *previous != next) {
         crate::runtime::roster::character_roster::settings_changed(&previous, None);
     }

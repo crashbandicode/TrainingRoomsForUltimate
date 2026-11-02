@@ -662,7 +662,14 @@
    "dest": "src/model/swap/swap_model/scope.rs",
    "crate": "consts",
    "src_sha256": "45d14a9c5d825e1622e369d16f6af119955d609ddec5dd0fe7f06a45d144d4e7",
-   "dest_sha256": "4b81e13b0bfbc4990159cf62f54a7186cb412489e1ba67e4a3295385a1d34dae"
+   "dest_sha256": "b62a869b7cf29949941c7854e24ba252adc1dffb55c00a34809c49234496d5fe",
+   "edits": [
+    {
+     "delete_from": "    CallbackContract {\n        name: \"cpu_pilot::thinking\",",
+     "delete_to": "    // ---- M4 declarations (U14)",
+     "reason": "the contract row of `cpu_pilot::thinking`, removed with the function (see the `cpu_pilot.rs` edit: no clean-room caller; the clean-room recorder reads the mapped poll record, not the pilot's decision)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/special_articles.rs",
@@ -1273,12 +1280,27 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "771bd6208e48f047353002ec316f75e910ae0ecb4994c343e9adc3b752d1f573",
+   "dest_sha256": "36af83e1cd6bfceaffa875a8589b90fd03295db6172bfdc7754179a907e81f33",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
      "new": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n    BASE.load(Ordering::Acquire) != 0\n}\n",
      "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
+    },
+    {
+     "delete_from": "pub(crate) fn thinking() -> bool {",
+     "delete_to": "/// Whether `init` installed the pilot's hook",
+     "reason": "`thinking()` removed (lead ruling 2026-11-02: no silent dead code): the fork's input recorder asked it while the AI's decision ran so that the decision's controller writes were not taken for a player's input. The clean room's recorder (package 4) records from the input stage's mapped poll record before the delay, and the pilot writes its pad into the record after the delay (`p1::input`), so the two never meet; a recording while an AI drives P1 is refused by the recorder (SPEC-input-01 B4, `RecordRefusal::P1DrivenByAi`, `is_operation_cpu(0)`). Mapping in docs/provenance/pkg6-carry-ledger.md, \"Deleted fork functions\""
+    },
+    {
+     "old": "static THINKING: AtomicBool = AtomicBool::new(false);\n",
+     "new": "",
+     "reason": "the flag `thinking()` read (see the previous edit)"
+    },
+    {
+     "old": "    // stream; THINKING brackets it for the input recorder.\n    THINKING.store(true, Ordering::Release);\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n    THINKING.store(false, Ordering::Release);\n",
+     "new": "    // stream.\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n",
+     "reason": "the bracket's only reader is removed (see the first edit)"
     }
    ]
   },
@@ -1288,13 +1310,6 @@
    "crate": "root",
    "src_sha256": "eafd06fcb6a9017204ddafca7f7a0e922c810366a11682b38e5ed187f06bd7cc",
    "dest_sha256": "6ce81bfbc43c6158a18839e9052e236f9432bb84126ea96da8033da2da626f97"
-  },
-  {
-   "src": "src/swap_native/heap_fields.rs",
-   "dest": "src/runtime/roster/heap_fields.rs",
-   "crate": "root",
-   "src_sha256": "8d83c43a3a140b19b9fc297e6f82af469117a8c1b98738542cfb178fbbabea79",
-   "dest_sha256": "8bf4165c1a10d34ca78e8111ff5ed3e3c16f8d2591667c73fb62b0ffe8dee53d"
   },
   {
    "src": "src/swap_native/r_handle.rs",
@@ -1502,7 +1517,14 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "ede465f0f576ea58431905abf9b4f9508a5689017de87e3569d1300b6fa3e51e"
+   "dest_sha256": "0f06b4e1cb4a84f4cba4e38ed797030feac22cea7afe3afeecf9ddf373fcd4f9",
+   "edits": [
+    {
+     "delete_from": "/// Skip plugin automations for an owned helper body.",
+     "delete_to": "/// Finish a load this entry already owns.",
+     "reason": "`reserved(body)` removed (lead ruling 2026-11-02: no silent dead code): the fork's per-fighter automation callbacks (mixed code) asked it to skip the helper bodies the cycle owns (entries 2, 3, 5, 6). The clean room's automations are keyed by role, never by 'every fighter': package 2's role table (`model::cpu::role`: entry 0, 1 and the lobby's 4 are roles, `Role::of_entry` / `is_cpu_role` / `FighterKey`), package 3's `Role::of_entry` and package 4's `cpu_body()` ignore every other entry, so an owned helper is skipped by construction. Mapping in docs/provenance/pkg6-carry-ledger.md, \"Deleted fork functions\""
+    }
+   ]
   },
   {
    "src": "src/native_body_bank.rs",
@@ -1537,7 +1559,39 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "654eced63ee07314761d4d4d368c538179788a89eb66f354e45b22bea928505c"
+   "dest_sha256": "b8c285449ce80b127cc9f7e228aabffc9dce1576fb0fccad12a0a67a836471c9",
+   "edits": [
+    {
+     "old": "use std::alloc::{GlobalAlloc, Layout, System};",
+     "new": "use crate::model::hook_stats::{heap_bytes, CountingAllocator};\n    use std::alloc::{GlobalAlloc, Layout};",
+     "reason": "the recorder's allocator forwards to the plugin's one counting allocator (package 1, `model::hook_stats`) instead of `System`, and its metadata reads that allocator's byte meter: a crate has one `#[global_allocator]` (lead ruling 2026-11-02, one global allocator)"
+    },
+    {
+     "delete_from": "    static LIVE: AtomicU64 = AtomicU64::new(0);\n    static PEAK: AtomicU64 = AtomicU64::new(0);\n",
+     "delete_to": "    static QUEUE: Queue = Queue::new();",
+     "reason": "the recorder's own live/peak counters are package 1's byte meter now (`hook_stats::heap_bytes`, read by `metadata`): one meter, one allocator"
+    },
+    {
+     "old": "live: LIVE.load(Ordering::Relaxed),\n            peak: PEAK.load(Ordering::Relaxed),",
+     "new": "live: heap_bytes().live.max(0) as u64,\n            peak: heap_bytes().peak.max(0) as u64,",
+     "reason": "the metadata's live and peak bytes come from the one counting allocator's byte meter"
+    },
+    {
+     "delete_from": "    struct TraceAllocator;\n    #[global_allocator]",
+     "delete_to": "    // Existing pinned observation sites only.",
+     "reason": "the fork's `#[global_allocator] TraceAllocator` over `System` (with its own LIVE/PEAK accounting) is replaced by the public `TraceAllocator` below, which `runtime::alloc` installs as the global allocator when `console-practice-trace` is on and which forwards to `CountingAllocator` (lead ruling 2026-11-02: one global allocator)"
+    },
+    {
+     "old": "    // Existing pinned observation sites only.",
+     "new": "    /// The recorder's allocator: the plugin's one global allocator when `console-practice-trace` is on (`runtime::alloc`). It records\n    /// each allocation call as a trace event (100-104) and forwards to `CountingAllocator`, which counts the hook allocations and\n    /// the live/peak bytes the recorder's metadata reads (`hook_stats::heap_bytes`). Recorded clean-room change: the fork declared\n    /// this as its own `#[global_allocator]` over `System`, which clashes with the plugin's counting allocator.\n    pub struct TraceAllocator;\n    // Only this NRO's Rust allocator, never game/other-plugin heaps. Events have opaque pointer values; callbacks never dereference\n    // them.\n    unsafe impl GlobalAlloc for TraceAllocator {\n        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {\n            let result = CountingAllocator.alloc(layout);\n            allocation_event(100, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            result\n        }\n        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {\n            let result = CountingAllocator.alloc_zeroed(layout);\n            allocation_event(101, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            result\n        }\n        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {\n            allocation_event(102, [pointer as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            CountingAllocator.dealloc(pointer, layout);\n        }\n        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {\n            allocation_event(103, [pointer as u64, layout.size() as u64, layout.align() as u64, size as u64, 0]);\n            let result = CountingAllocator.realloc(pointer, layout, size);\n            allocation_event(104, [pointer as u64, result as u64, layout.size() as u64, size as u64, 0]);\n            result\n        }\n    }\n\n    // Existing pinned observation sites only.",
+     "reason": "the recorder's allocator, forwarding to the plugin's `CountingAllocator` (same trace events 100-104 as the fork's, same order); see the previous edit"
+    },
+    {
+     "old": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init};",
+     "new": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init, TraceAllocator};",
+     "reason": "`TraceAllocator` is the global allocator `runtime::alloc` installs under this feature"
+    }
+   ]
   },
   {
    "src": "src/practice_trace_core.rs",
@@ -1579,7 +1633,29 @@
    "dest": "src/runtime/roster/heap_metrics.rs",
    "crate": "root",
    "src_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33",
-   "dest_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33"
+   "dest_sha256": "f8de31c77629bf8fea50a37b61ce96c092dc529d500af3d30721ec2039d6c8ad",
+   "edits": [
+    {
+     "old": "//! The playbook's whole-plugin `heap_allocations=0` does not apply to this product (menus,\n//! saved files, the Lua VM and Mii data allocate by design); the install line reports the\n//! call count (`heap_allocations=<calls>`) so one build can be compared with the one before\n//! it. WP-H's per-hook accounting (`in_hook=`) was never wired to a callback and the operator\n//! ruled the no-heap rule N/A for this plugin (2026-10-31), so the meter keeps no hook depth.\n",
+     "new": "//! The meter is the byte meter of the plugin's one counting allocator (`model::hook_stats`, package 1): the diag build reports\n//! it in a `[HeapMeter]` line at every `heap_profile` mark of the preload metrics and, sparsely, next to the `hook_stats` line\n//! (`runtime::diag_log`). The install line's `heap_allocations=` is package 1's hook-allocation count, not this meter's call count\n//! (the fork's `HeapFields` wrote the call count under that name; it is not carried).\n",
+     "reason": "the paragraph described the fork's own install-line field and meter state; the clean room's install line is package 1's and the meter reads package 1's allocator (see the next edit)"
+    },
+    {
+     "old": "use std::alloc::{GlobalAlloc, Layout, System};\nuse std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering::Relaxed};\n",
+     "new": "/// What the meter reads: package 1's counting allocator's byte meter (`model::hook_stats`, enabled by this feature): live, peak and\n/// total requested bytes, the call count and the largest request.\npub use crate::model::hook_stats::HeapBytes as Heap;\n\n/// The counters now.\npub fn snapshot() -> Heap {\n    crate::model::hook_stats::heap_bytes()\n}\n",
+     "reason": "the fork's `Meter` was a second `#[global_allocator]` (`plugin-heap-meter`), which cannot coexist with the plugin's counting allocator; the same counters are the byte meter of `hook_stats::CountingAllocator` (lead ruling 2026-11-02, one global allocator) and this module reads them"
+    },
+    {
+     "delete_from": "pub struct Meter;",
+     "delete_to": "// Host tests run from",
+     "reason": "`Meter`, its statics, its `GlobalAlloc` impl and its `#[global_allocator]` are `hook_stats`' byte meter now; `Heap`/`snapshot` are re-stated above, and the `heap_allocations=<calls>` Display (a field of the fork's own install line) has no clean-room caller: package 1's install line owns the name `heap_allocations` (hook allocations)"
+    },
+    {
+     "delete_from": "// Host tests run from",
+     "delete_to_last": "\n",
+     "reason": "the carried tests exercised `Meter` directly; the byte meter's host test is `tests/hook_alloc.rs::the_byte_meter_counts_what_the_one_global_allocator_serves`"
+    }
+   ]
   },
   {
    "src": "src/common/game_mode.rs",

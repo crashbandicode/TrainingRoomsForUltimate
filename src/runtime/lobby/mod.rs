@@ -72,6 +72,11 @@ pub(crate) unsafe fn frame(fighter: usize) {
             let body = accessor as *mut BattleObjectModuleAccessor;
             crate::runtime::roster::character_roster::sources::on_frame(body);
             crate::runtime::roster::kirby_hats::on_frame(body);
+            // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).
+            #[cfg(feature = "diag")]
+            if let Some(choice) = crate::runtime::diag_reload::take_item_request() {
+                crate::runtime::roster::character_items::request(choice);
+            }
             crate::runtime::roster::character_items::on_frame(body);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
         }

@@ -582,7 +582,9 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
 }
 
 /// P1's next `frames` polls read as neutral (see `SWALLOW`).
-/// The recorder's phase (diag lines).
+/// The recorder's phase (diag lines: its one caller is the diag build's named-layer harness, `macros::diag`, so the function is not in
+/// the shipped NRO).
+#[cfg(feature = "diag")]
 pub fn phase() -> Phase {
     REC.lock().phase()
 }

@@ -257,12 +257,12 @@ pub unsafe fn get_param_int(accessor: usize, kind: u64, name: u64) -> i32 {
     at::<extern "C" fn(usize, u64, u64) -> i32>(s::STATE_GET_PARAM_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, kind, name))
 }
 
-// ---- milestone 3: items and the fighter-specific restores ------------------------------------------
-
-/// `ItemModule::have_item(accessor, kind, variation, 0, false, false)`.
-pub unsafe fn have_item(accessor: usize, kind: i32, variation: i32) {
-    at::<extern "C" fn(usize, i32, i32, i32, bool, bool)>(s::STATE_HAVE_ITEM_OFFSET).map_or_else(Default::default, |f| f(accessor, kind, variation, 0, false, false))
-}
+// ---- milestone 3: the fighter-specific restores ------------------------------------------------------
+// The held item is package 6's item engine (`roster::character_items`, reached through `features::item_bridge`): its `ItemModule`
+// natives (`have_item`, `is_have_item`, `get_have_item_id`, `remove_item`, `set_have_item_action`, `utility::get_category`, the turnip
+// power getters) are called there, behind the rows `state_*` / `utility_get_category` that `roster::CALLED_ROWS` lists; the
+// duplicates this module held for a save-state item restore of its own were removed (docs/provenance/pkg6-carry-ledger.md, "Deleted
+// clean-room natives").
 
 pub unsafe fn article_generate(accessor: usize, article: i32, arg: i32) {
     at::<extern "C" fn(usize, i32, bool, i32)>(s::STATE_ARTICLE_GENERATE_OFFSET).map_or_else(Default::default, |f| f(accessor, article, false, arg))
@@ -297,36 +297,9 @@ pub unsafe fn sora_change_magic(fighter: usize) {
     at::<extern "C" fn(usize)>(s::STATE_SORA_CHANGE_MAGIC_OFFSET).map_or_else(Default::default, |f| f(fighter))
 }
 
-pub unsafe fn is_have_item(accessor: usize) -> bool {
-    at::<extern "C" fn(usize, i32) -> bool>(s::STATE_IS_HAVE_ITEM_OFFSET).map_or_else(Default::default, |f| f(accessor, 0))
-}
-
-pub unsafe fn get_have_item_id(accessor: usize) -> i32 {
-    at::<extern "C" fn(usize, i32) -> i32>(s::STATE_GET_HAVE_ITEM_ID_OFFSET).map_or_else(Default::default, |f| f(accessor, 0))
-}
-
-pub unsafe fn remove_item(accessor: usize) {
-    at::<extern "C" fn(usize, i32)>(s::STATE_REMOVE_ITEM_OFFSET).map_or_else(Default::default, |f| f(accessor, 0))
-}
-
-pub unsafe fn set_have_item_action(accessor: usize, action: i32, power: f32) {
-    at::<extern "C" fn(usize, i32, f32, i32)>(s::STATE_SET_HAVE_ITEM_ACTION_OFFSET).map_or_else(Default::default, |f| f(accessor, action, power, 0))
-}
-
-/// `utility::get_category(object id)`.
-pub unsafe fn object_category(object_id: u32) -> i32 {
-    at::<extern "C" fn(u32) -> i32>(s::STATE_OBJECT_CATEGORY_OFFSET).map_or_else(Default::default, |f| f(object_id))
-}
-
 /// `utility::get_kind(accessor)`: the kind of the fighter or item behind an accessor.
 pub unsafe fn object_kind(accessor: usize) -> i32 {
     at::<extern "C" fn(usize) -> i32>(s::STATE_OBJECT_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
-}
-
-/// A turnip's power getter: `peach` or `daisy`, face `n` in 1..=8.
-pub unsafe fn turnip_power(peach: bool, n: u8) -> f32 {
-    let first = if peach { 0x1668D90 } else { 0x165BF40 };
-    at::<extern "C" fn() -> f32>(first + 0x20 * (usize::from(n) - 1)).map_or_else(Default::default, |f| f())
 }
 
 // ---- Pokemon Trainer and Kirby ----------------------------------------------------------------------

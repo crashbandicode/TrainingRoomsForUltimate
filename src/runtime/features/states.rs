@@ -341,6 +341,10 @@ pub fn cancel_pending() {
     for slot in &BUFF_ACC {
         slot.store(0, Ordering::Release);
     }
+    // A hat restore the hat engine queued for the load that was cancelled does not apply later (SPEC-state-05 §5.2 step 6).
+    if crate::runtime::roster::running() {
+        crate::runtime::roster::kirby_hats::cancel_pending();
+    }
 }
 
 /// A save-state load is in progress: the load machine's own flag, published each fighter frame. The one source
@@ -581,7 +585,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         let input = FrameIn {
             entry: raw.entry,
             nana,
-            popo: ids.is(C::KindPopo, raw.kind),
+            popo: ids.is(C::KindPopo, raw.kind) && !nana_removed(raw.entry),
             kind: raw.kind,
             dead,
             status: if ids.is(C::StatusWait, raw.status) {
@@ -614,6 +618,13 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     }
     #[cfg(feature = "diag")]
     counts::report_if_due();
+}
+
+/// Solo Popo (the roster cycle's feature) has removed Nana from this role: there is no second body to hand the record to, so a load
+/// must not wait for her (SPEC-state-01 §5.3 step 9: the fork skips the hand-off then; `character_roster::solo_popo_active` is the
+/// fact it published for exactly this). Lock-free reads, safe inside the machine's lock.
+fn nana_removed(entry: i32) -> bool {
+    crate::runtime::roster::running() && crate::runtime::roster::character_roster::solo_popo_active(entry != 0)
 }
 
 /// Do what the frame asked, with no lock held.
@@ -866,8 +877,14 @@ unsafe fn pt_wait(raw: &Raw, role: Role) {
 }
 
 /// Kirby's hat (SPEC-state-05 §5.2 step 2): give the copy routine the opponent's entry id and the saved kind
-/// when the opponent is the fighter the hat came from, or in its family.
+/// when the opponent is the fighter the hat came from, or in its family. While the roster cycle runs, the hat engine takes the
+/// restore instead (step 6: it services the hat asynchronously from its own sources, does not need the opponent in the match and
+/// waits for this load to finish, `kirby_hats::on_frame`).
 unsafe fn kirby_copy(accessor: usize, role: Role, copied: i32) {
+    if let Some(kind) = u32::try_from(copied).ok().filter(|_| crate::runtime::roster::running()) {
+        crate::runtime::roster::kirby_hats::restore(accessor as *mut smash::app::BattleObjectModuleAccessor, kind);
+        return;
+    }
     let opponent = 1 - role.index();
     let opponent_accessor = FIGHTER_ACC[opponent].load(Ordering::Acquire);
     if opponent_accessor == 0 {
