@@ -309,7 +309,7 @@ def write_ledger(root, manifest):
         f.write("file in this repository.\n\n")
         f.write("| Here | Fork path (stage) | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
-            parts = [x["reason"] for x in e.get("edits", [])]
+            parts = list(dict.fromkeys(x["reason"] for x in e.get("edits", [])))  # a reason shared by many edits once
             if e.get("widen"):
                 parts.insert(0, "`pub(super)` widened to `pub(crate)` (the fork's parent was the crate root)")
             edits = "; ".join(parts) or "path rewrite only"

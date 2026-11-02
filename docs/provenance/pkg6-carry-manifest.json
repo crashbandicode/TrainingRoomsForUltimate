@@ -239,35 +239,270 @@
    "dest": "src/model/seams/native_seams/rows_a1.rs",
    "crate": "consts",
    "src_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d",
-   "dest_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d"
+   "dest_sha256": "3fe219f238db89c33bb420ed5a4c9333c61feed8468b6a7511792eb8c3d92b4d",
+   "edits": [
+    {
+     "delete_from": "    // kirby_resource_probe:hook/inline:exact=16\n    Seam { label: \"kirby_probe.cache\", group: \"kirby_resource_probe\", offset: 0xba4520,",
+     "delete_to": "    // kirby_resource_probe:hook/inline:exact=16\n    Seam { label: \"kirby_probe.prepare\", group: \"kirby_resource_probe\", offset: 0x17f1a60,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a2.rs",
    "dest": "src/model/seams/native_seams/rows_a2.rs",
    "crate": "consts",
    "src_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace",
-   "dest_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace"
+   "dest_sha256": "c6f4e073d349166afa7ad0f07933609081fab4b467c2ad1ebb47ce073c52c3a0",
+   "edits": [
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.state5_entry\", group: \"mii_quit_observer\", offset: 0x13e5110,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.state8_entry\", group: \"mii_quit_observer\", offset: 0x13e6010,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.state8_entry\", group: \"mii_quit_observer\", offset: 0x13e6010,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.called_13e6cb0\", group: \"mii_editor_bridge\", offset: 0x13e6cb0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.after_state\", group: \"mii_quit_observer\", offset: 0x13e8d08,",
+     "delete_to": "    Seam { label: \"mii_hud_portrait.relied_1419ff0\", group: \"mii_hud_portrait\", offset: 0x1419ff0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.called_17c81d0\", group: \"mii_preview_observer\", offset: 0x17c81d0,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.called_17c84f0\", group: \"mii_editor_bridge\", offset: 0x17c84f0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.completion\", group: \"mii_preview_observer\", offset: 0x1809f1c,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.called_1809f70\", group: \"mii_editor_bridge\", offset: 0x1809f70,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.menu_result\", group: \"mii_preview_observer\", offset: 0x180a05c,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.relied_180a194\", group: \"mii_editor_bridge\", offset: 0x180a194,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.test_return\", group: \"mii_preview_observer\", offset: 0x180cb24,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.called_180cb80\", group: \"mii_editor_bridge\", offset: 0x180cb80,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.destructor_returned\", group: \"mii_preview_observer\", offset: 0x180ea70,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.edit_frame\", group: \"mii_editor_bridge\", offset: 0x180ea90,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.called_180fbbc\", group: \"mii_preview_observer\", offset: 0x180fbbc,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.relied_180fc3c\", group: \"mii_editor_bridge\", offset: 0x180fc3c,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.relied_1bb7bd0\", group: \"mii_quit_observer\", offset: 0x1bb7bd0,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.relied_22d5dc0\", group: \"mii_editor_bridge\", offset: 0x22d5dc0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.parent_resumed\", group: \"mii_preview_observer\", offset: 0x22f9740,",
+     "delete_to": "    Seam { label: \"mii_preview_observer.request\", group: \"mii_preview_observer\", offset: 0x22f98b0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.request\", group: \"mii_preview_observer\", offset: 0x22f98b0,",
+     "delete_to": "    Seam { label: \"mii_preview_observer.called_22f9a90\", group: \"mii_preview_observer\", offset: 0x22f9a90,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.called_22f9a90\", group: \"mii_preview_observer\", offset: 0x22f9a90,",
+     "delete_to": "    Seam { label: \"mii_preview_observer.relied_22fa0cc\", group: \"mii_preview_observer\", offset: 0x22fa0cc,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.relied_22fa0cc\", group: \"mii_preview_observer\", offset: 0x22fa0cc,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.editor_release\", group: \"mii_editor_bridge\", offset: 0x22fa450,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_preview_observer.after_state\", group: \"mii_preview_observer\", offset: 0x22fa71c,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.waiting_owner\", group: \"mii_editor_bridge\", offset: 0x2310570,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.training_drained\", group: \"mii_quit_observer\", offset: 0x23ebc44,",
+     "delete_to": "    Seam { label: \"mii_editor_bridge.called_23ecdc0\", group: \"mii_editor_bridge\", offset: 0x23ecdc0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.update_entry\", group: \"mii_quit_observer\", offset: 0x376bce0,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.direct_action\", group: \"mii_quit_observer\", offset: 0x376c32c,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.direct_action\", group: \"mii_quit_observer\", offset: 0x376c32c,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.registered_store\", group: \"mii_quit_observer\", offset: 0x376c6f0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.registered_store\", group: \"mii_quit_observer\", offset: 0x376c6f0,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.update_return\", group: \"mii_quit_observer\", offset: 0x376cc3c,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.update_return\", group: \"mii_quit_observer\", offset: 0x376cc3c,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.called_376d5d0\", group: \"mii_quit_observer\", offset: 0x376d5d0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.called_376d5d0\", group: \"mii_quit_observer\", offset: 0x376d5d0,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.predicate_return\", group: \"mii_quit_observer\", offset: 0x376d6dc,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.predicate_return\", group: \"mii_quit_observer\", offset: 0x376d6dc,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.called_376d860\", group: \"mii_quit_observer\", offset: 0x376d860,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.called_376d860\", group: \"mii_quit_observer\", offset: 0x376d860,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.called_376ded0\", group: \"mii_quit_observer\", offset: 0x376ded0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.called_376ded0\", group: \"mii_quit_observer\", offset: 0x376ded0,",
+     "delete_to": "    Seam { label: \"mii_quit_observer.registered_action\", group: \"mii_quit_observer\", offset: 0x376e044,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"mii_quit_observer.registered_action\", group: \"mii_quit_observer\", offset: 0x376e044,",
+     "delete_to": "    Seam { label: \"mii_hud_portrait.relied_377aef0\", group: \"mii_hud_portrait\", offset: 0x377aef0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a3.rs",
    "dest": "src/model/seams/native_seams/rows_a3.rs",
    "crate": "consts",
    "src_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925",
-   "dest_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925"
+   "dest_sha256": "37fe7cff773e63b666fa292e735ae3b8c5a68fc18a86befc50cba132e5d672d8",
+   "edits": [
+    {
+     "delete_from": "    Seam { label: \"needle.stale_menu\", group: \"training\", offset: 0x13e88c0,",
+     "delete_to": "    Seam { label: \"training.handle_se\", group: \"training\", offset: 0x2081940,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"training.handle_article_get_int\", group: \"training\", offset: 0x2092d40,",
+     "delete_to": "    Seam { label: \"needle.fim\", group: \"training\", offset: 0x1750dd0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"needle.sss_training\", group: \"training\", offset: 0x184dcc8,",
+     "delete_to": "    Seam { label: \"training.vtable_on_init_slot\", group: \"training\", offset: 0x4f80240,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"needle.opcf\", group: \"training\", offset: 0x6b7ffc,",
+     "delete_to": "    Seam { label: \"training.check_hit_stop_delay_command\", group: \"training\", offset: 0x20aeda0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"training.handle_set_int_64\", group: \"training\", offset: 0x208dbf0,",
+     "delete_to": "    Seam { label: \"training.handle_set_float\", group: \"training\", offset: 0x208db60,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"needle.is_visible_backshield\", group: \"training\", offset: 0x1655610,",
+     "delete_to": "    Seam { label: \"needle.copy_setup\", group: \"training\", offset: 0xba0e80,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    Seam { label: \"needle.get_battle_object_from_id\", group: \"training\", offset: 0x3ac560,",
+     "delete_to": "    Seam { label: \"needle.ui_pass_calculate\", group: \"training\", offset: 0x375efa8,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a4.rs",
    "dest": "src/model/seams/native_seams/rows_a4.rs",
    "crate": "consts",
    "src_sha256": "f22b743ebc91cb8d97fcc4d15acd3184dfa4521b5564bf4508fd04ab7b92d525",
-   "dest_sha256": "f22b743ebc91cb8d97fcc4d15acd3184dfa4521b5564bf4508fd04ab7b92d525"
+   "dest_sha256": "3193f26af57243f5d7586a9cb90dd767ba2a13ad486b86dc0bd7a043c0b96165",
+   "edits": [
+    {
+     "delete_from": "    // automation_native:hook/inline:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.popup_open\", group: \"automation_helper_native\", offset: 0x32f1bb0,",
+     "delete_to": "    // automation_native:hook/inline:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.popup_tick\", group: \"automation_helper_native\", offset: 0x32f3c60,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:hook/inline:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.popup_tick\", group: \"automation_helper_native\", offset: 0x32f3c60,",
+     "delete_to": "    // automation_native:hook/inline:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.result_cards\", group: \"automation_helper_native\", offset: 0x1d59540,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:hook/inline:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.result_cards\", group: \"automation_helper_native\", offset: 0x1d59540,",
+     "delete_to": "    // automation_native:contract/fnv:exact=64:extent=276/0xeb46d56189445d99\n    Seam { label: \"automation.save_input\", group: \"automation_helper_native\", offset: 0x1d59da8,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=64:extent=276/0xeb46d56189445d99\n    Seam { label: \"automation.save_input\", group: \"automation_helper_native\", offset: 0x1d59da8,",
+     "delete_to": "    // automation_native:hook/replace:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.ui_records\", group: \"automation_helper_native\", offset: 0x3762ec0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:hook/replace:exact=16 automation_native:contract/fnv:exact=20\n    Seam { label: \"automation.ui_records\", group: \"automation_helper_native\", offset: 0x3762ec0,",
+     "delete_to": "    // automation_native:hook/inline:exact=16 automation_observer:hook/inline:exact=16 automation_native:contract/fnv:exact=64:extent=992/0x774bf6a587bf3495 automation_observer:contract/fnv:exact=64:extent=992/0x774bf6a587bf3495\n    Seam { label: \"automation.result_tick\", group: \"automation_helper_native\", offset: 0x150e5f0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=64:extent=152/0xd7a63bcf755ccd55\n    Seam { label: \"automation.contract_1d5b590\", group: \"automation_helper_native\", offset: 0x1d5b590,",
+     "delete_to": "    // automation_native:contract/fnv:exact=52\n    Seam { label: \"automation.contract_32f1900\", group: \"automation_helper_native\", offset: 0x32f1900,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=52\n    Seam { label: \"automation.contract_32f1900\", group: \"automation_helper_native\", offset: 0x32f1900,",
+     "delete_to": "    // automation_native:contract/fnv:exact=64:extent=144/0x3cd5c89b211f54e0\n    Seam { label: \"automation.contract_1d5a540\", group: \"automation_helper_native\", offset: 0x1d5a540,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=64:extent=144/0x3cd5c89b211f54e0\n    Seam { label: \"automation.contract_1d5a540\", group: \"automation_helper_native\", offset: 0x1d5a540,",
+     "delete_to": "    // automation_native:contract/fnv:exact=64:extent=316/0x70f47f6bc9a56d18\n    Seam { label: \"automation.save_success_popup\", group: \"automation_helper_native\", offset: 0x1d5a7e0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=64:extent=316/0x70f47f6bc9a56d18\n    Seam { label: \"automation.save_success_popup\", group: \"automation_helper_native\", offset: 0x1d5a7e0,",
+     "delete_to": "    // automation_native:contract/fnv:exact=64:extent=556/0x108f1484300f02f\n    Seam { label: \"automation.caller_147f960\", group: \"automation_helper_native\", offset: 0x147f960,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=64:extent=556/0x108f1484300f02f\n    Seam { label: \"automation.caller_147f960\", group: \"automation_helper_native\", offset: 0x147f960,",
+     "delete_to": "    // automation_native:contract/fnv:exact=40\n    Seam { label: \"automation.caller_147faa0\", group: \"automation_helper_native\", offset: 0x147faa0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    // automation_native:contract/fnv:exact=40\n    Seam { label: \"automation.caller_147faa0\", group: \"automation_helper_native\", offset: 0x147faa0,",
+     "delete_to": "    // automation_native:contract/fnv:exact=64:extent=104/0x4b015ae25ac7fd21 automation_observer:contract/fnv:exact=8\n    Seam { label: \"automation.caller_1d5b628\", group: \"automation_helper_native\", offset: 0x1d5b628,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a5.rs",
    "dest": "src/model/seams/native_seams/rows_a5.rs",
    "crate": "consts",
    "src_sha256": "840976a5e6ed534d82850aba0c5fd891d34339c1474e02fced838276bd432a33",
-   "dest_sha256": "840976a5e6ed534d82850aba0c5fd891d34339c1474e02fced838276bd432a33"
+   "dest_sha256": "62ad2d81ec66a5082139fd7eb8faf3da013ca558bedac9b6bcd4a320558c1334",
+   "edits": [
+    {
+     "delete_from": "    // console_map:hook/raw_inline:exact=20\n    Seam { label: \"console_map.free_pages_result\", group: \"console_map_probe\", offset: 0x37cae24,",
+     "delete_to": "    // turnip:relied/code:exact=64\n    Seam { label: \"turnip.lua_module_public\", group: \"turnip_identity\", offset: 0x2056ab0,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_identity.rs",
@@ -281,7 +516,194 @@
    "dest": "src/model/seams/native_seams/images.rs",
    "crate": "consts",
    "src_sha256": "70f9408efdb4aa1cb2321aeacdf163a4135ebd05689b46d267f7d06522d06632",
-   "dest_sha256": "70f9408efdb4aa1cb2321aeacdf163a4135ebd05689b46d267f7d06522d06632"
+   "dest_sha256": "ec1b4860927fac418965e4502190777fb4d8afc28b4b7994f076bd202db0a8de",
+   "edits": [
+    {
+     "delete_from": "    ImageSeam { label: \"training.handle_sub_guard_cont\", group: \"training\", image: Image::CommonNro,",
+     "delete_to": "    ImageSeam { label: \"training.handle_correct_damage_vector_common\", group: \"training\", image: Image::CommonNro,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"training.handle_correct_damage_vector_common\", group: \"training\", image: Image::CommonNro,",
+     "delete_to": "    ImageSeam { label: \"training.handle_change_status\", group: \"training\", image: Image::CommonNro,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"training.handle_change_status\", group: \"training\", image: Image::CommonNro,",
+     "delete_to": "    ImageSeam { label: \"turnip.item_peach_agent\", group: \"turnip_identity\", image: Image::Nro(\"item\"),",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.attribute_fn\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_map.attribute_fn+0x40\", group: \"console_map_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.attribute_fn+0x40\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_map.attribute_fn+0x80\", group: \"console_map_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.attribute_fn+0x80\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_map.attribute_fn+0xc0\", group: \"console_map_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.attribute_fn+0xc0\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_map.attribute_result\", group: \"console_map_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.attribute_result\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_map.svc_return\", group: \"console_map_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_map.svc_return\", group: \"console_map_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.load_entry\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.load_entry\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347220\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347220\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347220+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347220+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347220+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347220+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347220+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347220+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347370\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347370\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347370+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347370+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347370+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347370+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347370+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347370+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0xc0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x100\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x100\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x140\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x140\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x180\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x180\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x1c0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x1c0\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x200\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x200\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_347470+0x240\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_347470+0x240\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_330a90\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_330a90\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_330a90+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_330a90+0x40\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_330a90+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_330a90+0x80\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.pins_330b20\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.pins_330b20\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.item_pre\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.item_pre\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.item_post\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.item_post\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.nrr_pre\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.nrr_pre\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.nrr_post\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.nrr_post\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "    ImageSeam { label: \"console_load.nrr_unregister\", group: \"console_load_probe\", image: Image::Sdk,",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    },
+    {
+     "delete_from": "    ImageSeam { label: \"console_load.nrr_unregister\", group: \"console_load_probe\", image: Image::Sdk,",
+     "delete_to": "];",
+     "reason": "not carried: no consumer (lead override of D6, 2026-11-02): no code installs, checks, names or reports this row beyond the census count (slim stream census, docs/SIZE-PLAN.md \"Seam rows\")"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/report.rs",

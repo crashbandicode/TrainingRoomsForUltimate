@@ -208,6 +208,30 @@ every addition above the budget needs a recorded raise.
 Done so far (as measured): `7bb86fd` 106,983 → stream head 106,785 on `566780a` (107,470): the lint-allow roots and
 one-implementation wins (129) and three never-compiled files (556).
 
+## Seam rows (Phase B slice 1, lead override of D6, 2026-11-02)
+
+`python3 -I tools/seam_census.py <tree>` lists, per group, the rows with a consumer: a Rust file outside the row files and
+outside test code holding the row's label as a literal, its offset as a hex literal, the `SITE_<NAME>` constant of a
+needle row, or another row naming it (`OwnHook`/`EntryOrBody`). An offset match is counted as a consumer even when it is a
+coincidence (another table guarding the same function), so the deleted set is the provable one, not the largest.
+Before the slice, on stream/slim at `7a9bd4a` (693 rows), the groups with unconsumed rows:
+
+| Group | Rows | Consumed | Deleted |
+| --- | ---: | ---: | ---: |
+| `console_load_probe` (images) | 28 | 0 | 28 |
+| `console_map_probe` (images + rows_a5) | 7 | 0 | 7 |
+| `hitbox_visualizer` | 3 | 0 here, read on stream/hitbox | 0 |
+| `automation_helper_native` | 18 | 7 | 11 (read only by the deleted, never-compiled `automation_helper/native.rs`) |
+| `kirby_resource_probe` | 10 | 9 | 1 |
+| `mii_preview_observer` | 15 | 4 | 11 |
+| `mii_quit_observer` | 19 | 5 | 14 |
+| `training` (rows_a3 + images) | 82 | 72 | 10 |
+
+The same census over the work, pkg6, pkg4, ui-screens, hitbox, deluxe and f6 trees found no consumer for the 71 rows
+outside `automation_helper_native`. After the slice the census shows unconsumed rows only in `hitbox_visualizer`. Count:
+109,812 → 109,108 (−704). Eden: one boot row checks the install line (`seams=`/`seams_unchecked=` updated,
+`result=installed`, nothing named missing).
+
 ## 6. Phase B order (after stream/sync and stream/stack are merged)
 
 1. Never-compiled files and the uncompilable probe code (no Eden: the NRO does not change; carry-manifest edits).

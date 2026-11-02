@@ -330,3 +330,18 @@ with them); stream/pkg6 confirmed its WIP does not reach them.
 through `#[path]`. `runtime/macros/capture_plugin.rs` is stream/deluxe's (deleted there with its carry record). The comment at
 `src/runtime/roster.rs:13` still names `effect_hook_chain` as carried and not declared; it changes after stream/f6's mod lines
 next to it are merged.
+
+### Seam table: rows not carried (lead override of D6, 2026-11-02)
+
+Not carried: no consumer (lead override of D6, 2026-11-02). 82 rows that no code installs, checks, names or reports beyond
+the census count, deleted by recorded edits of the pkg6 manifest (one `delete_from`/`delete_to` per row, from the row's own
+generator comment to the next row's), so `carry_pkg6.py verify` still re-derives every file from stage m5q: `images.rs` 37
+(`console_load_probe` 28, `console_map_probe` 6, `training` 3), `rows_a2.rs` 25 (`mii_quit_observer` 14,
+`mii_preview_observer` 11), `rows_a4.rs` 11 (`automation_helper_native`), `rows_a3.rs` 7 (`training`), `rows_a1.rs` 1
+(`kirby_resource_probe`), `rows_a5.rs` 1 (`console_map_probe`). Proof: `python3 -I tools/seam_census.py <tree>` in the slim,
+work, pkg6, pkg4, ui-screens, hitbox, deluxe and f6 trees (2026-11-02): each deleted row has no consumer in any of them
+(label literal, offset literal, `SITE_<NAME>` constant, or another row naming it), apart from the 11
+`automation_helper_native` rows, whose only reader was the never-compiled `automation_helper/native.rs`.
+
+Also recorded: `src/model/seams/native_seams/mod.rs` re-exports `model::guard`'s rule set instead of its copy (five edits).
+`tools/carry_pkg6.py ledger` lists a reason shared by many edits of one file once.
