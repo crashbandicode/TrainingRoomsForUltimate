@@ -2,7 +2,7 @@
 
 `Requirement | spec § | host test | Eden row | status`. Host tests run with `cargo test` (`tests/state01_json.rs`,
 `state01_machine.rs`, `state01_setup.rs`, `state02_charges.rs`, `state03_buffs.rs`, `state04_convert.rs`,
-`state04_items.rs`, `state_sites.rs`, `migration_run.rs`; each by-path binary also runs the model's unit tests, so
+`state04_items.rs`, `state05_restore.rs`, `state_sites.rs`, `migration_run.rs`; each by-path binary also runs the model's unit tests, so
 per-binary counts overlap). Eden labels `s3-NN` (results in `eden/EDEN-PACKAGE-3.md`). Status: **host pass**,
 **Eden pass**, **runtime, unrun** (written and Switch-compiled, no Eden row yet), **not built** (reported).
 
@@ -46,7 +46,14 @@ per-binary counts overlap). Eden labels `s3-NN` (results in `eden/EDEN-PACKAGE-3
 | N6 conversion of the retired `character_item` (all values, never overwrites, no entry leaves absent) | `tests/state04_convert.rs` (7), `migration_item_on_load_*` | s3-04 (import copy) | host pass |
 | Steve materials and tools restored, bar refreshed | `steve` layout in the model (round trip) and the fixture | s3-01: slot 3 fixture, wood 77 / sword 11.5 etc. read back exactly | Eden pass |
 | Keep-list, Pikmin autonomy gate | `Table::keeps_article`; the gate is a hook | - | runtime, unrun |
-| Pokemon Trainer pre-death / decide hook / waits / effects, Kirby copy and copied charge | - | - | **not built** (reported) |
+| Pokemon Trainer decide mapping (rotation, descriptor validation, non-Pokemon untouched) | `state05_pt_decide_mapping` | s3-03 PT row (fixture `s3-pt-states.json`: saved Ivysaur, Squirtle out) | host pass; runtime, unrun |
+| Trainer wait: 5 frames, rate 1.0 in RUN, airborne trainer grounded, per-role counter | `state05_pt_wait_sequence` | s3-03 PT row | host pass; runtime, unrun |
+| Pokemon dead test (switching frame) and switch effect / sound suppressions | `state05_pt_dead_test`, `state05_pt_suppressions` | s3-03 PT row (no plate, no switch sound) | host pass; runtime, unrun |
+| Pre-death rule (flag off, rates 1000, ball hidden) | `state05_pt_predeath` (in `state01_machine.rs`: the flag, the raise and the wait marker); the calls are runtime | s3-03 PT row | host pass; runtime, unrun |
+| Kirby acceptance rule (equal, Pokemon family, Pyra/Mythra) | `state05_kirby_accept_rule` | s3-03 Kirby row (`diag-copy.req`, then Save, Load) | host pass; runtime, unrun |
+| Kirby copied charge table, copy flag and kind saved | `state05_kirby_charge_table` | s3-03 Kirby row (dump line: copy flag, chara, module kind) | host pass; runtime, unrun |
+| Kirby copy sound and Sora jingle silences by status | `state05_sfx_status_rules` | s3-03 | host pass; runtime, unrun |
+| Kirby copy-setup with the opponent's real entry id; copy hook writes charge and ends the wait | runtime only (`states::kirby_copy`, `state_kirby_opff_hook`) | s3-03 Kirby row | runtime, unrun |
 
 ## SPEC-core-08 first-boot import (S3-5)
 

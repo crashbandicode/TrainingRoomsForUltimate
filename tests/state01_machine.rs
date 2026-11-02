@@ -82,6 +82,33 @@ fn run_ground_load(machine: &mut Machine, settings: &StateSettings, rng: &mut Rn
     (player, cpu)
 }
 
+/// SPEC-state-05 §5.1 step 1: the Pokemon Trainer pre-death rule is asked on KillPlayer and on every
+/// WaitForAlive frame for a Pokemon only, and the trainer's switch flag is raised once it is placed.
+#[test]
+fn state05_pt_predeath() {
+    let mut machine = Machine::default();
+    let mut rng = rng();
+    let pokemon = |entry: i32| FrameIn { pokemon: true, ..input(entry) };
+    request(&mut machine, &settings(), &mut rng);
+    let kill = machine.frame(&pokemon(0), &settings(), &mut rng);
+    assert!(kill.pokemon_predeath && kill.force_dead);
+    // Still dead: WaitForAlive repeats the rule.
+    let waiting = machine.frame(&FrameIn { dead: true, ..pokemon(0) }, &settings(), &mut rng);
+    assert!(waiting.pokemon_predeath && !waiting.cleanup);
+    // A non-Pokemon never gets it.
+    let other = machine.frame(&input(1), &settings(), &mut rng);
+    assert!(!other.pokemon_predeath);
+    // Respawned and in WAIT: placed, the trainer may switch, and the record waits for the switch.
+    let respawned = machine.frame(&pokemon(0), &settings(), &mut rng);
+    assert!(respawned.cleanup);
+    let placed = machine.frame(&FrameIn { status: StatusNow::Wait, ..pokemon(0) }, &settings(), &mut rng);
+    let done = placed.done.expect("placed");
+    assert!(done.pokemon_switch);
+    assert_eq!(done.next, Marker::WaitForPokemonSwitch);
+    let wait = machine.frame(&FrameIn { status: StatusNow::Wait, ..pokemon(0) }, &settings(), &mut rng);
+    assert_eq!(wait.wait, Some(Marker::WaitForPokemonSwitch));
+}
+
 #[test]
 fn state01_load_request_marks_both() {
     let mut machine = Machine::default();
