@@ -254,7 +254,7 @@ fn tile_label(kind: GridKind, n: usize, short: bool, out: &mut Text<28>) {
     let name: &str = match kind {
         GridKind::Items => ITEMS.get(n).copied().unwrap_or("-"),
         GridKind::Stages if n == 0 => "All",
-        GridKind::Stages => STAGES.get(n - 1).copied().unwrap_or("Stage"),
+        GridKind::Stages => STAGES.get(n - 1).copied().unwrap_or("-"),
     };
     if short {
         // Docked tiles are narrow: the first 14 characters, cut at a space where there is one.
@@ -534,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn the_stage_grid_pages_are_40_40_38_docked_and_eight_handheld() {
+    fn the_stage_grid_pages_follow_the_catalog_docked_and_handheld() {
         use crate::model::menu::grid::ConsoleMode;
         let mut m = open_grid(ConsoleMode::Docked, "Lobby Stages");
         let mut counts = Vec::new();
@@ -542,10 +542,11 @@ mod tests {
             counts.push(frame(&m).tile_count);
             m.press(Button::R);
         }
-        assert_eq!(counts, [40, 40, 38]);
+        assert_eq!(counts, [40, 40, (crate::model::menu::grid::STAGE_TILES - 80) as u8]);
         assert_eq!(frame(&m).tiles[0].to_string_lossy(), "All");
         let m = open_grid(ConsoleMode::Handheld, "Lobby Stages");
-        assert!(frame(&m).crumb.to_string_lossy().contains("page 1 of 8"));
+        let pages = crate::model::menu::grid::STAGE_TILES.div_ceil(16);
+        assert!(frame(&m).crumb.to_string_lossy().contains(&format!("page 1 of {pages}")));
     }
     #[test]
     fn every_sub_screen_of_every_row_draws_within_the_budget() {

@@ -6,7 +6,7 @@
 use core::mem::offset_of;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use skyline::nn::ui2d::{Pane, PaneFlag, PaneNode, Picture, TextBox, TextBoxFlag};
+use skyline::nn::ui2d::{Pane, PaneFlag, PaneNode, Picture, TextBox};
 
 /// The most panes a walk visits (a guard against a corrupted list).
 const WALK_LIMIT: usize = 4096;
@@ -79,21 +79,8 @@ pub unsafe fn set_visible(pane: *mut Pane, visible: bool) {
     (*pane).set_visible(visible);
 }
 
-pub unsafe fn visible(pane: *const Pane) -> bool {
-    (*pane).flags & (1 << PaneFlag::Visible as u8) != 0
-}
-
 pub unsafe fn set_alpha(pane: *mut Pane, alpha: u8) {
     (*pane).alpha = alpha;
-}
-
-pub unsafe fn set_influenced_alpha(pane: *mut Pane, on: bool) {
-    let bit = 1 << PaneFlag::InfluencedAlpha as u8;
-    if on {
-        (*pane).flags |= bit;
-    } else {
-        (*pane).flags &= !bit;
-    }
 }
 
 /// Move a pane (centre, relative to its parent) and mark its matrix stale.

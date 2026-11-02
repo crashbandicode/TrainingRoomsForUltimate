@@ -14,6 +14,8 @@ pub const UI_REGISTER_CALCULATE_OFFSET: usize = 0x378_4ad4;
 pub const UI_MANAGER_GLOBAL_OFFSET: usize = 0x375_e280;
 /// The game's pane text setter (pane, text, units, flags).
 pub const UI_SET_TEXT_OFFSET: usize = 0x37a_2270;
+/// The game's pp::fighter::is_ready_go().
+pub const UI_IS_READY_GO_OFFSET: usize = 0x15c_e620;
 
 /// The five words the two anchors pin (SPEC-core-05 §4.1): the instructions the hook sits on and the
 /// four after it, up to the holder layout's virtual Calculate (`blr x8`).
@@ -25,7 +27,7 @@ pub const UI_MANAGER_SLOT_OFFSET: usize = 0x593_ba90;
 /// `ui_manager_global`'s two words.
 pub const UI_MANAGER_ADRP_LDR: [u32; 2] = [0xb001_0efc, 0xf945_4b88];
 
-pub static UI_SITES: [Site; 5] = [    Site {
+pub static UI_SITES: [Site; 6] = [    Site {
         name: "ui_archive_alloc",
         feature: Feature::Ui,
         offset: 0x3774704,
@@ -90,6 +92,19 @@ pub static UI_SITES: [Site; 5] = [    Site {
         ],
         note: "The game's pane text setter `(pane, text, units, flags)`, called never hooked (other plugins' hooks anywhere in its bytes are fine): it grows the text box's buffer to fit, then sets the text, so the plugin never sizes a game buffer itself. The same function the CPU pilot and gsp-visualizer call.",
     },
+    Site {
+        name: "ui_is_ready_go",
+        feature: Feature::Ui,
+        offset: 0x15ce620,
+        kind: SeamKind::Called,
+        guard: [
+            0x48, 0xe7, 0x01, 0xf0, 0x08, 0x7d, 0x42, 0xf9, 0x08, 0x01, 0x40, 0xf9, 0x00, 0x49, 0x43, 0x39,
+            0xc0, 0x03, 0x5f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xe8, 0xea, 0x01, 0x90, 0x08, 0xed, 0x44, 0xf9, 0x08, 0x01, 0x40, 0xf9, 0x00, 0xa1, 0x04, 0x91,
+            0x08, 0x95, 0x40, 0xf9, 0x01, 0x01, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00,
+        ],
+        note: "The game's `app::fighter::is_ready_go()` (no arguments, returns bool): the match is running (not the entry animation). Called, never hooked: the HUD rule of SPEC-core-05 §4.1 applies only then.",
+    },
 ];
 
 /// The absolute address an `adrp xN, page` followed by `ldr xM, [xN, #off]` (64-bit, unsigned offset)
@@ -140,6 +155,6 @@ mod tests {
             assert_eq!(site.feature, Feature::Ui);
         }
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).count(), 3);
-        assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 1);
+        assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 2);
     }
 }

@@ -45,16 +45,18 @@ pub(super) unsafe fn hud_rule(layout: *mut Layout, name: &[u8]) {
         return;
     }
     let bit = 1usize << index;
-    let menu = super::state::MENU_SHOWN.load(Ordering::Acquire);
     let hidden = HIDDEN_BY_MENU.load(Ordering::Acquire) & bit != 0;
-    if menu && !hidden {
+    // Hidden while the menu shows, and (HUD Off) while a Training match is running; never outside Training.
+    let want_hidden = crate::runtime::game::is_training_mode()
+        && (super::state::MENU_SHOWN.load(Ordering::Acquire)
+            || (!crate::runtime::published::hud() && crate::runtime::game::is_ready_go()));
+    if want_hidden {
         super::pane::set_visible(root, false);
-        HIDDEN_BY_MENU.fetch_or(bit, Ordering::AcqRel);
-    } else if !menu && hidden {
+        if !hidden {
+            HIDDEN_BY_MENU.fetch_or(bit, Ordering::AcqRel);
+        }
+    } else if hidden {
         super::pane::set_visible(root, true);
         HIDDEN_BY_MENU.fetch_and(!bit, Ordering::AcqRel);
-    } else if menu {
-        // Another writer (the game's own HUD rules) may show it again while the menu is up.
-        super::pane::set_visible(root, false);
     }
 }

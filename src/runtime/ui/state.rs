@@ -24,6 +24,3 @@ pub static PAUSE_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// The frame the worker last built, and its sequence number (the tick draws when it changed).
 pub static FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 pub static FRAME_SEQ: AtomicU32 = AtomicU32::new(0);
-
-/// Frames of discarded input and fade after a close.
-pub const CLOSE_FRAMES: u32 = 15;

@@ -201,3 +201,19 @@ pub fn is_training_mode() -> bool {
         unsafe { std::mem::transmute(text_base() + sites::IS_TRAINING_MODE_OFFSET) };
     predicate()
 }
+
+/// The game's `app::fighter::is_ready_go()`; false when its guard did not pass.
+pub fn is_ready_go() -> bool {
+    if !READY_GO_USABLE.load(Ordering::Acquire) {
+        return false;
+    }
+    // SAFETY: the site was guarded against the 13.0.5 bytes; the function takes no arguments and returns a bool.
+    let predicate: extern "C" fn() -> bool = unsafe { std::mem::transmute(text_base() + crate::model::sites_ui::UI_IS_READY_GO_OFFSET) };
+    predicate()
+}
+
+pub fn allow_ready_go() {
+    READY_GO_USABLE.store(true, Ordering::Release);
+}
+
+static READY_GO_USABLE: AtomicBool = AtomicBool::new(false);

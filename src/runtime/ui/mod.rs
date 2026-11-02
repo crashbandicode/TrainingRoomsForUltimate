@@ -71,6 +71,9 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     if usable("ui_set_text") {
         pane::set_text_setter(game::text_base() + sites_ui::UI_SET_TEXT_OFFSET);
     }
+    if usable("ui_is_ready_go") {
+        game::allow_ready_go();
+    }
     let archive_hook = usable("ui_archive_alloc");
     if archive_hook {
         archive::install();

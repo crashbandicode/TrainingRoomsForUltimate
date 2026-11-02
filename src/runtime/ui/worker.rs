@@ -160,6 +160,14 @@ fn close(menu: &mut Menu) {
     if outbox.changed {
         write_settings(&json);
     }
+    // The INI files the menu edits are written by the input package's chord code (N7: chords::commit_shortcut;
+    // Q7: the replay capture file); until that lands the requests are only recorded.
+    if let Some(chords) = outbox.button_config {
+        diagnostic(format_args!("[Ui] outbox button_config shortcut1={} shortcut2={} (write pending the input package)", chords[0], chords[1]));
+    }
+    if let Some(on) = outbox.replay_capture {
+        diagnostic(format_args!("[Ui] outbox replay_capture={on} (write pending the input package)"));
+    }
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);

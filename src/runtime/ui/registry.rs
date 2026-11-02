@@ -58,8 +58,3 @@ pub unsafe fn layout_name<'a>(layout: *mut Layout) -> Option<&'a [u8]> {
     let name = (*layout).layout_name;
     (!name.is_null()).then(|| CStr::from_ptr(name).to_bytes())
 }
-
-/// The first live layout named `name`, in the manager's priority order.
-pub unsafe fn find(name: &[u8]) -> Option<*mut Layout> {
-    holders().iter().filter_map(|holder| layout_of(*holder)).find(|layout| layout_name(*layout) == Some(name))
-}

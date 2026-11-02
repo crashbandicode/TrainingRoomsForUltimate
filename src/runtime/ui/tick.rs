@@ -135,7 +135,8 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     }
     let capacity = if all[p::row_label_index(0)].is_null() { 0 } else { pane::text_capacity(all[p::row_label_index(0)]) };
     diagnostic(format_args!(
-        "[Ui] layout=info_training resolved total={total} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
+        "[Ui] layout=info_training resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
+        registry::holders().len(),
         p::COUNT,
         !r.help.is_null(),
         !r.status_r.is_null()
