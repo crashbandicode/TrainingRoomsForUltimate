@@ -73,6 +73,10 @@ pub mod settings;
 pub mod settings_file;
 #[path = "model/sha256.rs"]
 pub mod sha256;
+#[path = "model/hitbox.rs"]
+pub mod hitbox;
+#[path = "model/sites_hitbox.rs"]
+pub mod sites_hitbox;
 #[path = "model/sites_u4.rs"]
 pub mod sites_u4;
 #[path = "model/sites_u4b.rs"]

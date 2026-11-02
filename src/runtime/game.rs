@@ -432,6 +432,72 @@ pub mod natives {
         }
         at::<extern "C" fn(usize) -> bool>(sites::IS_OPERATION_CPU_OFFSET).map_or_else(Default::default, |f| f(information))
     }
+
+    // ---- the hitbox visualizer's natives (SPEC-core-06 section 4; rows of `sites_hitbox`) -------------------------------
+    //
+    // Each answers nothing (0, false) until its row was granted, like the rest of this layer.
+
+    /// `app::sv_system::battle_object_module_accessor(lua_State*)`: the accessor of the object running an animation command, or 0.
+    pub unsafe fn lua_accessor(lua_state: usize) -> usize {
+        at::<extern "C" fn(usize) -> usize>(crate::model::sites_hitbox::HITBOX_ACCESSOR_OFFSET).map_or_else(Default::default, |f| f(lua_state))
+    }
+
+    /// `AttackModule::is_attack(accessor, slot, false)`.
+    pub unsafe fn attack_is_attack(accessor: usize, slot: i32) -> bool {
+        at::<extern "C" fn(usize, i32, bool) -> bool>(crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
+    }
+
+    /// `AttackModule::attack_data(accessor, slot, false)`: the slot's `AttackData` (layout in `model::hitbox::layout`), or 0.
+    pub unsafe fn attack_data(accessor: usize, slot: i32) -> usize {
+        at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
+    }
+
+    /// `EffectModule::req_follow(accessor, effect, joint, pos, rot, scale, tail.0, ..., tail.7)`: `tail` is the native's last eight
+    /// arguments in the symbol's order (`bool, u32, i32, i32, i32, i32, bool, bool`; the second is the effect attribute, the fourth the
+    /// lifetime). The effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none or the
+    /// row was not granted. The one wrapper of this native (tests/native_wrappers.rs): the hitbox spheres pass
+    /// `(true, attribute, 0, 0, 0, 0, true, true)` at their scale, the save states' charge effects `(false, attribute, 0, lifetime, 0,
+    /// 0, false, false)` at scale 1.0. The save states' own hook of this native sees both (a pass-through for all but `sys_score_aura`).
+    pub unsafe fn effect_req_follow(
+        accessor: usize,
+        effect: u64,
+        joint: u64,
+        pos: &[f32; 3],
+        rot: &[f32; 3],
+        scale: f32,
+        tail: (bool, u32, i32, i32, i32, i32, bool, bool),
+    ) -> u32 {
+        type ReqFollow = extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u32;
+        at::<ReqFollow>(crate::model::sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET).map_or_else(Default::default, |f| {
+            f(accessor, effect, joint, pos, rot, scale, tail.0, tail.1, tail.2, tail.3, tail.4, tail.5, tail.6, tail.7)
+        })
+    }
+
+    /// `EffectModule::kill(accessor, handle, false, true)`: ends one effect by its handle (never by kind). The one wrapper of this
+    /// native: the hitbox spheres and Min Min's arm effect in the save states.
+    pub unsafe fn effect_kill(accessor: usize, handle: u32) {
+        at::<extern "C" fn(usize, u32, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
+    }
+
+    /// `EffectModule::is_exist_effect(accessor, handle)`: whether the effect still exists (false when the call was not granted).
+    pub unsafe fn sphere_is_exist(accessor: usize, handle: u32) -> bool {
+        at::<extern "C" fn(usize, u32) -> bool>(crate::model::sites_hitbox::HITBOX_IS_EXIST_OFFSET).map_or_else(Default::default, |f| f(accessor, handle))
+    }
+
+    /// `EffectModule::set_rgb_partial_last(accessor, r, g, b)`: tints the effect just requested.
+    pub unsafe fn sphere_set_rgb(accessor: usize, rgb: [f32; 3]) {
+        at::<extern "C" fn(usize, f32, f32, f32)>(crate::model::sites_hitbox::HITBOX_RGB_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rgb[0], rgb[1], rgb[2]))
+    }
+
+    /// `EffectModule::set_rate_last(accessor, rate)`.
+    pub unsafe fn sphere_set_rate(accessor: usize, rate: f32) {
+        at::<extern "C" fn(usize, f32)>(crate::model::sites_hitbox::HITBOX_RATE_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rate))
+    }
+
+    /// `MotionAnimcmdModule::set_sleep_effect(accessor, sleep)`.
+    pub unsafe fn set_sleep_effect(accessor: usize, sleep: bool) {
+        at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
+    }
 }
 
 /// The game's `app::smashball::is_training_mode()`; false when its guard did not pass.

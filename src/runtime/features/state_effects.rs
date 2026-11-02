@@ -15,9 +15,7 @@ fn id(ids: &Table, c: C) -> Option<i32> {
 }
 
 unsafe fn follow(accessor: usize, ids: &Table, effect: &str, joint: u64, pos: [f32; 3], rot: [f32; 3], attribute: u32, lifetime: i32, handle: Option<C>) {
-    let pos = n::Vector3f { x: pos[0], y: pos[1], z: pos[2] };
-    let rot = n::Vector3f { x: rot[0], y: rot[1], z: rot[2] };
-    let made = n::effect_req_follow(accessor, hash40(effect), joint, &pos, &rot, attribute, lifetime);
+    let made = natives::effect_req_follow(accessor, hash40(effect), joint, &pos, &rot, 1.0, (false, attribute, 0, lifetime, 0, 0, false, false));
     if let Some(slot) = handle.and_then(|c| id(ids, c)) {
         natives::set_int(accessor, made as i32, slot);
     }
@@ -60,8 +58,7 @@ pub unsafe fn run_charge(accessor: usize, fighter: usize, ids: &Table, plan: &Pl
                 follow(accessor, ids, effect, joint, pos, rot, attribute, lifetime, handle);
             }
             Step::Visual(Op::FollowRaw { effect, joint, lifetime, handle }) => {
-                let zero = n::Vector3f { x: 0.0, y: 0.0, z: 0.0 };
-                let made = n::effect_req_follow(accessor, effect, joint, &zero, &zero, 0, lifetime);
+                let made = natives::effect_req_follow(accessor, effect, joint, &[0.0; 3], &[0.0; 3], 1.0, (false, 0, 0, lifetime, 0, 0, false, false));
                 if let Some(slot) = handle.and_then(|c| id(ids, c)) {
                     natives::set_int(accessor, made as i32, slot);
                 }
@@ -216,7 +213,7 @@ unsafe fn min_min_dragon(accessor: usize, ids: &Table) {
         n::work_on_flag(accessor, flag);
         let old = natives::get_int(accessor, handle_slot);
         if old != 0 {
-            n::effect_kill(accessor, old as u32);
+            natives::effect_kill(accessor, old as u32);
         }
         let handle = natives::effect_req(accessor, 0x12600df9d4, &[0.0; 3], &[0.0; 3], 1.0, (0, -1, false, 0));
         n::effect_set_scale_one(accessor, handle as u32);

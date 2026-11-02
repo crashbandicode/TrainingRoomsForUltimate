@@ -329,3 +329,24 @@ fn nested_scopes_count_until_the_outermost_ends() {
     std::hint::black_box(&v);
     assert_eq!(hook_allocations(), after);
 }
+
+/// The allocations are charged to the innermost hook (`allocs=`), so a nonzero delta names its owner: a nested hook's
+/// allocation goes to the nested hook, the outer one's to the outer one, and the line says which.
+#[test]
+fn an_allocation_is_charged_to_the_innermost_hook() {
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let before = snapshot();
+    {
+        let _outer = HookScope::enter_hook(HookId::CpuFrame);
+        assert_eq!(allocating_hook(HookId::HitboxFrame, 64), 64);
+        let v = vec![0u8; 32];
+        std::hint::black_box(&v);
+    }
+    let after = snapshot();
+    let by = |id: HookId| after.allocs[id as usize] - before.allocs[id as usize];
+    assert!(by(HookId::HitboxFrame) >= 1, "the nested hook's allocation");
+    assert!(by(HookId::CpuFrame) >= 1, "the outer hook's own allocation after the nested one returned");
+    let mut observer = Observer::new();
+    let line = observer.observe(after).expect("a line").to_string();
+    assert!(line.contains(" allocs=") && line.contains("hitbox_frame:") && line.contains("cpu_frame:"), "{line}");
+}

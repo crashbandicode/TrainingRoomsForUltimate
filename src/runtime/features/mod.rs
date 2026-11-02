@@ -3,6 +3,7 @@
 pub mod chords;
 pub mod cpu;
 pub mod cpu_common;
+pub mod hitbox;
 pub mod hud_draw;
 pub mod input_delay;
 pub mod input_display;

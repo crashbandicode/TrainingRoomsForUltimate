@@ -88,6 +88,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu);
     // P1 CPU control: the pilot takes it through an atomic (cpu_pilot::menu_settings_changed), no lock.
     crate::runtime::p1::publish(snapshot);
+    crate::runtime::features::hitbox::publish(snapshot);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);

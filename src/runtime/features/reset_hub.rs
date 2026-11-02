@@ -37,6 +37,8 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     let original: OnInit = unsafe { std::mem::transmute(ORIGINAL.load(Ordering::Acquire)) };
     let result = original(a0, a1, a2, a3, a4, a5, a6, a7);
     let _scope = HookScope::enter_hook(HookId::ResetHub);
+    // SPEC-core-06: the hitbox visualizer drops this fighter's sphere records (no game call; its effect module may reuse the numbers).
+    crate::runtime::features::hitbox::forget_fighter(a0);
     // Package 6: the waiting-room practice engine records the entry the game just initialised.
     unsafe { crate::runtime::lobby::observe(a0) };
     // SAFETY: `a0` is the fighter object the game just initialised.

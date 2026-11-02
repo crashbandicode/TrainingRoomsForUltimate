@@ -65,6 +65,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "macros::on_p1_input", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     // ui-screens: the layer's after-draw call-in from the Training layout tick (the clip editor's held scrub).
     Boundary { function: "macros::after_layout_draw", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
+    // SPEC-core-06: the hitbox visualizer's per-fighter pass, called from the CPU core's frame wrapper: nothing until boot installs it.
+    Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
@@ -100,6 +102,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
     }
     match f.module.as_str() {
         "input_delay" => Some(Feature::InputDelay),
+        "hitbox" => Some(Feature::Hitbox),
         "lra_reset" => Some(Feature::LraReset),
         "stage_hazards" => Some(Feature::StageHazards),
         "recorder" => Some(Feature::Recording),
@@ -127,6 +130,10 @@ impl Analysis {
         let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
+        // SPEC-core-06: the held-sphere state machine (`model::hitbox::HandleSet`, not scanned) calls back into the runtime's effect module.
+        for (from, to) in [("hitbox::frame", "hitbox::sphere_alive"), ("hitbox::frame", "hitbox::sphere_kill_own"), ("hitbox::frame", "hitbox::sphere_spawn"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own")] {
+            graph.dynamic.push((from.to_owned(), to.to_owned()));
+        }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
             assert_eq!(graph.find(to).len(), 1, "dynamic edge target {to}");

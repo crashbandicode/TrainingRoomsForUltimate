@@ -25,6 +25,7 @@ use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::model::sites_pkg3::{self, STATE_SITES};
 use crate::model::sites_pkg4;
+use crate::model::sites_hitbox;
 use crate::model::sites_pkg6;
 use crate::model::sites_u4;
 use crate::model::sites_u4b;
@@ -32,7 +33,7 @@ use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, cpu_common, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
+    chords, cpu, cpu_common, hitbox, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
 use crate::runtime::{lobby, mii, p1, roster};
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
@@ -174,6 +175,13 @@ fn run_inner() {
     apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
     // Package 6's CPU-as-P1 rows and the run-time texture helper's rows are compared here too (R2-1): both are capabilities.
     let found6 = p1::check();
+    // SPEC-core-06's rows: compared before anything is written (the rebound thunk's window holds its neighbours).
+    // (Diag builds: the rows named in `diag-poison.txt` read as foreign, as for the other tables.)
+    #[cfg(feature = "diag")]
+    let poison_text = diag_poison_text();
+    #[cfg(not(feature = "diag"))]
+    let poison_text = String::new();
+    let hb_found = hitbox::check(&|name| poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == name));
     let mut u4_found = [GuardOutcome::Stock; sites_u4::SITES.len()];
     for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
@@ -192,6 +200,7 @@ fn run_inner() {
             .or_else(|| by_name(&sites_pkg6::SITES, &found6))
             .or_else(|| by_name(&sites_u4::SITES, &u4_found))
             .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
+            .or_else(|| by_name(&sites_hitbox::SITES, &hb_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -260,6 +269,9 @@ fn run_inner() {
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
+    // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
+    // predicate, the shared natives' rows) must have passed as a whole.
+    let (hitbox_on, hb_written) = hitbox::install(&hb_found, cpu_core_on && capabilities::unit_usable(Feature::Hitbox, &usable));
     // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
     let mut state_written = [Written::Skipped; state_boot::N];
     let state_on = state_boot::install(&state_found, cpu_core_on && capabilities::unit_usable(Feature::StateCore, &usable), &mut state_written);
@@ -333,6 +345,7 @@ fn run_inner() {
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
+    reports.extend(hitbox::reports(&hb_found, &hb_written));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
     let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
@@ -359,6 +372,7 @@ fn run_inner() {
         report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
+        FeatureReport { feature: Feature::Hitbox.name(), installed: hitbox_on, reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"), site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) } },
         FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),
         report(Feature::Recording, recording_on, None),
@@ -405,10 +419,15 @@ fn run_inner() {
 /// Diag builds: `diag-poison.txt` (names separated by blanks, commas or lines) marks those rows foreign before any
 /// install decision, each name logged (`diag_poison <name> found=<bool>`).
 #[cfg(feature = "diag")]
+fn diag_poison_text() -> String {
+    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return String::new() };
+    fs::read_to_string(path.as_str()).unwrap_or_default()
+}
+
+#[cfg(feature = "diag")]
 #[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
-    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
-    let Ok(text) = fs::read_to_string(path.as_str()) else { return };
+    let text = diag_poison_text();
     let poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
         match rows.iter().position(|row| row.name == name) {
             Some(i) => {
@@ -419,7 +438,7 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
         }
     };
     for name in text.split(|c: char| c.is_whitespace() || c == ',').filter(|n| !n.is_empty()) {
-        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name);
+        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name) || sites_hitbox::SITES.iter().any(|row| row.name == name);
         diagnostic(format_args!("[TrainingRooms] diag_poison {name} found={hit}"));
     }
 }
