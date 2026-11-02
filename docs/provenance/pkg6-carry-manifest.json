@@ -313,7 +313,19 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf"
+   "dest_sha256": "1683fc22bccc697cd1fe8dd5b60986093086648c5ef244ea9e1623b6e440fa5f",
+   "edits": [
+    {
+     "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
+     "new": "    /// Complete an explicit return-to-native load without publishing it as a\n    /// plugin resource. Caller has verified the original descriptor/body ready\n    /// on this exact entry's callback. This is not a destructor notification.\n    pub fn returned_native(&mut self, load: LoadToken) -> Result<(), Error> {\n        let state = self.exact(load.0)?;\n        if state.phase == Phase::Departed { return Err(Error::Departed); }\n        if !self.is_current(load.0.epoch) { return Err(Error::StaleToken); }\n        if state.phase != Phase::Loading { return Err(Error::NotReady); }\n        if self.pinned(load.0.slot) { return Err(Error::Pinned); }\n        let generation = state.generation;\n        self.slots[load.0.slot] = Slot { generation, ..Slot::EMPTY };\n        Ok(())\n    }\n\n    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
+     "reason": "F9 explicit return-to-native receipt: retire only exact current unleased load after original native readiness, without inventing a destructor or exposing restored CPU as a plugin source."
+    },
+    {
+     "old": "    #[test]\n    fn normal_load_ready_lease_release_reuse() {",
+     "new": "    #[test]\n    fn returning_native_requires_drained_leases_and_never_publishes_a_source() {\n        let mut book = SourceBook::<1, 2>::new();\n        let ready = book.register_ready(0, book.epoch(), NativeEntry(17), A).unwrap();\n        let hat = book.acquire(ready, COPY_P1).unwrap();\n        let item = book.acquire(ready, ITEM).unwrap();\n        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));\n        assert!(book.release(hat));\n        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));\n        assert!(book.release(item));\n        let restore = book.begin_install(0, book.epoch(), NativeEntry(17), B).unwrap();\n        assert_eq!(book.ready(0), Err(Error::NotReady));\n        // Native-ready receipt arrives on a later callback, not a timeout.\n        assert_eq!(book.returned_native(restore), Ok(()));\n        assert_eq!(book.phase(0), Ok(Phase::Empty));\n        assert_eq!(book.key(0), Ok(None));\n        assert_eq!(book.acquire(ready, COPY_P1), Err(Error::StaleToken));\n        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));\n        let reuse = book.begin_install(0, book.epoch(), NativeEntry(17), A).unwrap();\n        assert_ne!(restore, reuse);\n        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));\n        book.depart_scene().unwrap();\n        assert_eq!(book.returned_native(reuse), Err(Error::Departed));\n        assert_eq!(book.phase(0), Ok(Phase::Departed));\n        assert_eq!(book.native_destroyed(reuse.source()), Ok(0));\n    }\n\n    #[test]\n    fn normal_load_ready_lease_release_reuse() {",
+     "reason": "F9 regression: independent hat/item leases block restore; returned native receipt invalidates old leases/replays; same-address reuse and departure retain ownership correctly."
+    }
+   ]
   },
   {
    "src": "src/source_visible_forms.rs",
