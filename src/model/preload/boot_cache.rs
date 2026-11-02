@@ -8,7 +8,7 @@
 //! a rejected or failed cache cannot turn the preload on or off by itself. The carried reader and the transactional writer
 //! (`store_ini`: temporary file, rename, `.previous` recovery) do the file work.
 
-use super::cycle_preload_config::{load_ini, publish_decision, settings_from_menu, startup_settings, store_ini, Publish, Settings};
+use super::cycle_preload_config::{parse_unset, settings_from_menu, store_ini, Settings, MAX_BYTES};
 use crate::engine::compat::menu::TrainingModpackMenu;
 
 /// What the cache did.
@@ -38,23 +38,39 @@ pub fn desired(menu: &TrainingModpackMenu) -> Settings {
 /// Boot, and a menu apply: make the INI say what the settings say.
 pub fn sync(path: &str, menu: &TrainingModpackMenu) -> Synced {
     let active = desired(menu);
-    let on_disk = startup_settings(load_ini(path));
-    let cache = match publish_decision(on_disk, menu) {
-        // A choice the menu cannot express keeps the file as it is; the active choice is already fail-closed.
-        Publish::Keep(kept) if settings_from_menu(menu).is_none() || kept == active => Cache::Unchanged,
-        Publish::Keep(_) | Publish::Store(_) => match store_ini(path, active) {
+    // Never invoke the legacy default-creating reader: even the first write must reflect JSON.
+    // Invalid menu rows fail closed without touching the cache.
+    let cache = if settings_from_menu(menu).is_none() || cached(path) == Some(active) {
+        Cache::Unchanged
+    } else {
+        match store_ini(path, active) {
             Ok(()) => Cache::Written,
             Err(reason) => Cache::Failed(reason),
-        },
+        }
     };
     Synced { active, cache }
+}
+
+fn cached(path: &str) -> Option<Settings> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).ok()?;
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut text = String::new();
+    file.take((MAX_BYTES + 1) as u64).read_to_string(&mut text).ok()?;
+    if text.len() > MAX_BYTES {
+        return None;
+    }
+    let (settings, unset) = parse_unset(&text).ok()?;
+    (!unset.any()).then_some(settings)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::compat::menu::{OnOff, BASE_MENU};
-    use crate::engine::preload::cycle_preload_config::{render, CyclePreloadSlots, IniLoad};
+    use crate::engine::preload::cycle_preload_config::{load_ini, render, CyclePreloadSlots, IniLoad};
     use crate::model::settings::Snapshot;
     use std::path::PathBuf;
 
@@ -121,6 +137,38 @@ mod tests {
         assert!(!boot.active.group_swap);
         assert_eq!(boot.cache, Cache::Written);
         assert_eq!(load_ini(&path), IniLoad::Parsed(boot.active), "the cache now follows the settings");
+    }
+
+    #[test]
+    fn missing_factory_cache_is_written_and_invalid_menu_does_not_create_one() {
+        let dir = Dir::new("missing-factory");
+        let path = dir.path();
+        let mut invalid = BASE_MENU;
+        invalid.cycle_preload_slots = CyclePreloadSlots::empty();
+        assert_eq!(sync(&path, &invalid).active, Settings::FAIL_CLOSED);
+        assert!(!std::path::Path::new(&path).exists());
+        assert_eq!(sync(&path, &BASE_MENU).cache, Cache::Written);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), render(desired(&BASE_MENU)));
+    }
+
+    #[test]
+    fn off_settings_survive_missing_stale_rejected_and_unwritable_caches() {
+        let dir = Dir::new("off");
+        let path = dir.path();
+        let mut menu = BASE_MENU;
+        super::super::cycle_preload_config::apply_settings(&mut menu, Settings::FAIL_CLOSED);
+        for old in [None, Some(render(Settings::DEFAULT)), Some("invalid".into())] {
+            let _ = std::fs::remove_file(&path);
+            if let Some(old) = old { std::fs::write(&path, old).unwrap(); }
+            assert_eq!(sync(&path, &menu).active, Settings::FAIL_CLOSED);
+            assert_eq!(load_ini(&path), IniLoad::Parsed(Settings::FAIL_CLOSED));
+        }
+        store_ini(&path, Settings::DEFAULT).unwrap();
+        std::fs::create_dir(format!("{path}.tmp")).unwrap();
+        let result = sync(&path, &menu);
+        assert_eq!(result.active, Settings::FAIL_CLOSED);
+        assert!(matches!(result.cache, Cache::Failed(_)));
+        assert_eq!(load_ini(&path), IniLoad::Parsed(Settings::DEFAULT));
     }
 
     #[test]

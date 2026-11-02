@@ -1,16 +1,18 @@
 //! Native input preview, using the existing Training save-state/playback paths.
 //! UI requests carry values only. Game-object work runs on the CPU callback.
-use std::sync::{atomic::{AtomicU8, Ordering}, Mutex};
-use smash::app::{self, BattleObjectModuleAccessor, Fighter};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use smash::app::{self, BattleObjectModuleAccessor};
 use {crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 
 use crate::runtime::macros::{input_record, save_states, practice};
 
-enum Request { Play { recording: Box<MacroRecording>, revision: u64 }, Stop }
+#[derive(Clone, Copy)]
+enum Request { Play { start: StartState, playback: super::named_macros::PlaybackStart, revision: u64 }, Stop }
 #[derive(Clone, Copy, PartialEq)]
 enum Phase { Starting, Playing, Complete, Stopping, Failed }
 struct Session {
-    recording: MacroRecording,
+    start: StartState,
+    playback: super::named_macros::PlaybackStart,
     revision: u64,
     phase: Phase,
     waits: u32,
@@ -20,40 +22,76 @@ struct Session {
     /// not compared; only this fighter changing mid-preview invalidates it.
     kind: i32,
 }
-static REQUEST: Mutex<Option<Request>> = Mutex::new(None);
-static SESSION: Mutex<Option<Session>> = Mutex::new(None);
+static REQUEST: hos_lock::Mailbox<(u64, u64, Request), 32> = hos_lock::Mailbox::new();
+static SERIAL: AtomicU64 = AtomicU64::new(1);
+static REQUESTED: AtomicU64 = AtomicU64::new(0);
+static CONSUMED: AtomicU64 = AtomicU64::new(0);
+static STOP_QUEUED: AtomicBool = AtomicBool::new(false);
+static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+fn request_pending() -> bool { REQUESTED.load(Ordering::Acquire) > CONSUMED.load(Ordering::Acquire) }
+fn post_request(request: Request) {
+    let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
+    if REQUEST.post((serial, super::named_macros::session_revision(), request)) {
+        REQUESTED.fetch_max(serial, Ordering::Release);
+    } else {
+        println!("[MacroHandoff] preview_request_dropped=1");
+    }
+}
+fn take_request() -> Option<Request> {
+    let mut newest = None;
+    let previous = CONSUMED.load(Ordering::Acquire);
+    REQUEST.drain(|(serial, session, request)| {
+        CONSUMED.fetch_max(serial, Ordering::Release);
+        if serial > previous && session == super::named_macros::session_revision()
+            && newest.as_ref().is_none_or(|(seen, _)| serial > *seen) {
+            newest = Some((serial, request));
+        }
+    });
+    if newest.is_some() { STOP_QUEUED.store(false, Ordering::Release); }
+    newest.map(|(_, request)| request)
+}
+fn discard_requests() { let _ = take_request(); }
+
+static SESSION: hos_lock::Mutex<Option<Session>> = hos_lock::Mutex::new(None);
 static STATUS: AtomicU8 = AtomicU8::new(0);
 
 pub fn request_play(recording: MacroRecording, revision: u64) {
-    *REQUEST.lock().unwrap() = Some(Request::Play { recording: Box::new(recording), revision });
+    if let Err(error) = recording.validate() {
+        crate::runtime::macros::replay_capture::preview_failed(&error.to_string());
+        return;
+    }
+    let playback = super::named_macros::prepare_preview(&recording);
     STATUS.store(1, Ordering::Relaxed);
+    STOP_QUEUED.store(false, Ordering::Release);
+    post_request(Request::Play { start: recording.start, playback, revision });
 }
 
 pub fn request_stop() {
-    if occupied() || REQUEST.lock().unwrap().is_some() {
-        *REQUEST.lock().unwrap() = Some(Request::Stop);
+    if occupied() {
+        if !STOP_QUEUED.swap(true, Ordering::AcqRel) { post_request(Request::Stop); }
     } else {
         save_states::finish_preview_restore();
     }
 }
 
 pub fn occupied() -> bool {
-    SESSION.lock().unwrap().is_some() || REQUEST.lock().unwrap().is_some()
+    ACTIVE.load(Ordering::Acquire) || request_pending()
 }
 /// Failed native cleanup keeps its ownership, but closing the panel must leave
 /// a controller route to the native pause/exit menu. No autoplay is re-enabled.
 pub fn recovery_available() -> bool {
-    SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Failed)
+    ACTIVE.load(Ordering::Acquire) && STATUS.load(Ordering::Acquire) == 5
 }
 pub fn start_context() -> Option<StartState> {
-    SESSION.lock().unwrap().as_ref().filter(|s| matches!(s.phase, Phase::Starting | Phase::Playing))
-        .map(|s| s.recording.start)
+    SESSION.lock().as_ref().filter(|s| matches!(s.phase, Phase::Starting | Phase::Playing))
+        .map(|s| s.start)
 }
 pub fn can_emit(module: &mut BattleObjectModuleAccessor) -> bool {
-    REQUEST.lock().unwrap().is_none()
-        && SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Playing
+    !request_pending()
+        && SESSION.lock().as_ref().is_some_and(|s| s.phase == Phase::Playing
             && s.cpu == Some((module.battle_object_id, module as *mut _ as usize)))
-        && crate::runtime::macros::named_macros::clip_foreground()
+        && crate::runtime::macros::named_macros::hook_queries().clip_foreground
 }
 pub fn status() -> &'static str {
     match STATUS.load(Ordering::Relaxed) {
@@ -72,30 +110,31 @@ pub fn status() -> &'static str {
 pub fn needs_native_update(_module: &BattleObjectModuleAccessor) -> bool { occupied() }
 
 pub fn clear_session() {
-    REQUEST.lock().unwrap().take();
-    SESSION.lock().unwrap().take();
+    discard_requests();
+    SESSION.lock().take();
+    ACTIVE.store(false, Ordering::Release);
     save_states::end_preview_restore();
     STATUS.store(0, Ordering::Relaxed);
 }
 
-unsafe fn fail(message: &str) {
+unsafe fn fail(message: &'static str) {
     input_record::stop_playback();
-    REQUEST.lock().unwrap().take();
-    let was_running = SESSION.lock().unwrap().as_ref().is_some_and(|s|
+    discard_requests();
+    let was_running = SESSION.lock().as_ref().is_some_and(|s|
         matches!(s.phase, Phase::Playing | Phase::Complete));
     if was_running {
         request_stop();
     } else if save_states::is_loading() {
         // A deadline is not a successful restore. Let native sleep/buff/partner
         // cleanup continue, without injection or autoplay, until reset/departure.
-        if let Some(s) = SESSION.lock().unwrap().as_mut() { s.phase = Phase::Failed; }
+        if let Some(s) = SESSION.lock().as_mut() { s.phase = Phase::Failed; }
     } else { clear_session(); }
     STATUS.store(5, Ordering::Relaxed);
-    crate::runtime::macros::replay_capture::preview_failed(message);
+    crate::runtime::macros::replay_capture::post_preview_failed(message);
 }
 
 pub fn progress(consumed: usize) {
-    let revision = SESSION.lock().unwrap().as_ref()
+    let revision = SESSION.lock().as_ref()
         .filter(|s| s.phase == Phase::Playing).map(|s| s.revision);
     if let Some(revision) = revision {
         crate::runtime::macros::replay_capture::preview_progress(revision, consumed as u32);
@@ -103,10 +142,10 @@ pub fn progress(consumed: usize) {
 }
 
 pub fn complete() {
-    if let Some(s) = SESSION.lock().unwrap().as_mut() {
+    if let Some(s) = SESSION.lock().as_mut() {
         s.phase = Phase::Complete;
         STATUS.store(3, Ordering::Relaxed);
-        println!("[ClipPreview] inputs_complete revision={} frames={}", s.revision, s.recording.frames.len());
+        println!("[ClipPreview] inputs_complete revision={} frames={}", s.revision, s.playback.len);
     }
 }
 
@@ -124,12 +163,12 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
     if !primary_cpu(module) {
         return;
     }
-    if crate::runtime::roster::character_roster::busy() || !Fighter::is_ready_go() {
+    if crate::runtime::roster::character_roster::busy() || !crate::runtime::game::is_ready_go() {
         if occupied() { input_record::stop_playback(); save_states::cancel_pending(); }
         clear_session();
         return;
     }
-    let replaced = SESSION.lock().unwrap().as_ref().is_some_and(|s|
+    let replaced = SESSION.lock().as_ref().is_some_and(|s|
         matches!(s.phase, Phase::Playing | Phase::Complete)
             && (s.cpu != Some((module.battle_object_id, module as *mut _ as usize))
                 || s.kind != app::utility::get_kind(module)));
@@ -137,26 +176,27 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
         input_record::stop_playback();
         clear_session();
         STATUS.store(5, Ordering::Relaxed);
-        crate::runtime::macros::replay_capture::preview_failed("Preview fighter changed; reset Training before retrying");
+        crate::runtime::macros::replay_capture::post_preview_failed("Preview fighter changed; reset Training before retrying");
         return;
     }
-    if SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Playing)
-        && !crate::runtime::macros::named_macros::clip_foreground() { request_stop(); }
+    if SESSION.lock().as_ref().is_some_and(|s| s.phase == Phase::Playing)
+        && !crate::runtime::macros::named_macros::hook_queries().clip_foreground { request_stop(); }
     // A queued restore owns the native loader until completion. Keep only the
     // newest UI request, then handle it once the current restore is finished.
     if save_states::is_loading() { return; }
-    let request = REQUEST.lock().unwrap().take();
+    let request = take_request();
     match request {
-        Some(Request::Play { recording, revision }) => {
+        Some(Request::Play { start, playback, revision }) => {
             // Identity is the editor's decision (Keep or an answered Switch), not
             // this request's: ownership, scope and restore guards below still apply.
-            if !practice::acquire() || recording.validate().is_err() {
+            if !practice::acquire() {
                 fail("Wait for the selected CPU fighter before previewing");
                 return;
             }
             input_record::stop_playback();
-            *SESSION.lock().unwrap() = Some(Session {
-                recording: *recording, revision, phase: Phase::Starting, waits: 0, cpu: None,
+            ACTIVE.store(true, Ordering::Release);
+            *SESSION.lock() = Some(Session {
+                start, playback, revision, phase: Phase::Starting, waits: 0, cpu: None,
                 kind: app::utility::get_kind(module),
             });
             if let Err(error) = save_states::request_preview_restore(true) { fail(error); }
@@ -164,7 +204,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
         }
         Some(Request::Stop) if occupied() => {
             input_record::stop_playback();
-            if let Some(s) = SESSION.lock().unwrap().as_mut() {
+            if let Some(s) = SESSION.lock().as_mut() {
                 s.phase = Phase::Stopping;
                 s.waits = 0;
             }
@@ -181,7 +221,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
     if !practice::enabled() || !primary_cpu(module) { return; }
     let loading = save_states::is_loading();
     let action = {
-        let mut session = SESSION.lock().unwrap();
+        let mut session = SESSION.lock();
         let Some(s) = session.as_mut() else { return };
         if s.phase == Phase::Failed {
             if loading { return; }
@@ -192,7 +232,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
         }
         if s.phase == Phase::Playing && !input_record::is_playback() {
             drop(session);
-            crate::runtime::macros::replay_capture::preview_failed("Preview start did not settle; restoring the preview setup");
+            crate::runtime::macros::replay_capture::post_preview_failed("Preview start did not settle; restoring the preview setup");
             request_stop();
             return;
         }
@@ -204,7 +244,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
         else {
             s.phase = Phase::Playing;
             s.cpu = Some((module.battle_object_id, module as *mut _ as usize));
-            Some(Ok(Some(s.recording.clone())))
+            Some(Ok(Some(s.playback)))
         }
     };
     match action {
@@ -215,8 +255,9 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
             } else { fail("Preview could not start; close and reopen the editor"); }
         }
         Some(Ok(None)) => {
-            REQUEST.lock().unwrap().take();
-            SESSION.lock().unwrap().take();
+            discard_requests();
+            SESSION.lock().take();
+    ACTIVE.store(false, Ordering::Release);
             save_states::finish_preview_restore();
             STATUS.store(0, Ordering::Relaxed);
             println!("[ClipPreview] restored_idle");

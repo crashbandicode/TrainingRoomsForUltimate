@@ -15,3 +15,6 @@ pub(crate) fn init() {
     #[cfg(feature = "mii-pool-observer")]
     crate::runtime::roster::character_roster::mii_pool_observer::init();
 }
+
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) mod menu_handoff;

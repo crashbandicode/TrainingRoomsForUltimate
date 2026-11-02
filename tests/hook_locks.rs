@@ -9,7 +9,7 @@
 //!   `.try_lock(` / `.try_read(` / `.try_write(`, or hands it by reference to a call (`lock_write(&MOTION)`, the carried code's
 //!   helpers). The static is matched in its own file, or by `module::NAME` elsewhere.
 //! - **Edges:** path calls (`module::f(..)`, `f(..)`, a function handed over by path) as the capability scan resolves them. A
-//!   method call `.m(..)` is followed when exactly one runtime function is named `m`; when several are, the edge is not followed
+//!   method call `.m(..)` is followed when exactly one runtime method with a `self` receiver is named `m`; when several are, the edge is not followed
 //!   and the name is listed in the report (`AMBIGUOUS`), so nothing is dropped without a trace. Methods of model types and of the
 //!   locks are not runtime functions and have no edge.
 //! - **Limits:** calls through `dyn` objects, trait methods, closures stored and called later, and function pointers kept in data
@@ -43,8 +43,14 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
-    ("macros/named_macros.rs", "MOTION"),
-    ("macros/named_macros.rs", "LEGACY"),
+    ("macros/named_macros.rs", "CAPTURE_ORIGIN"),
+    ("macros/named_macros.rs", "RESTORE_ANCHOR"),
+    ("macros/named_macros.rs", "RESTORE_POSE"),
+    ("macros/named_macros.rs", "PANEL_STOPS"),
+    ("macros/replay_preview.rs", "SESSION"),
+    ("macros/replay_capture.rs", "VAULT_HOOK"),
+    ("macros/replay_capture.rs", "CLOSE_INPUT"),
+    ("macros/live_replay.rs", "CAPTURE"),
 ];
 
 #[path = "../src/model/thread_stacks.rs"]
@@ -81,21 +87,12 @@ fn plugin_thread_entries() -> Vec<String> {
     out
 }
 /// `(function key, lock)` reached from a plugin thread on purpose, with the reason it is not a hook waiting on real work.
-const ALLOWED: &[(&str, &str, &str)] = &[
-    // Macro Source = Named Library reserves the layer's buffers on the publishing thread: the allocation runs before `MOTION` is
-    // taken, and the write lock only swaps the reserved buffers in (pkg4 manifest edit, stream/sync).
-    ("named_macros::prepare_buffers", "MOTION", "write lock held for a buffer swap only; the allocation is outside"),
-];
+const ALLOWED: &[(&str, &str, &str)] = &[];
 
 /// A ratchet, not a tolerance (lead, 2026-11-02): violations whose fix is in progress elsewhere, each (function key, file::lock, owner,
 /// the fix that removes it). The test fails on any violation not listed here, AND on a row that no longer occurs (delete it the moment the
 /// fix lands), and prints the table every run. The release-candidate gate requires this table to be empty.
-const PENDING: &[(&str, &str, &str, &str)] = &[(
-    "recorder::rec",
-    "features/recorder.rs::REC",
-    "package 4 (a93ab192186b224a5)",
-    "design C: the named layer's recorder calls on the menu worker (recorder::with_recorder) move to its published MacroQueries and mailbox",
-)];
+const PENDING: &[(&str, &str, &str, &str)] = &[];
 
 const LOCK_METHODS: &[&str] = &["lock", "read", "write", "try_lock", "try_read", "try_write"];
 
@@ -129,7 +126,7 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
     false
 }
 
-/// Callees of `index`: path calls, plus method calls whose name is unique among the scanned functions. Ambiguous method names
+/// Callees of `index`: path calls, plus method calls whose name is unique among scanned receiver methods. Ambiguous method names
 /// are recorded in `ambiguous` (name -> how many functions carry it).
 fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>) -> BTreeSet<usize> {
     let from = &graph.funcs[index];
@@ -164,11 +161,13 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
         if LOCK_METHODS.contains(&name.as_str()) {
             continue;
         }
-        match by_name.get(name).map(Vec::as_slice) {
-            Some([only]) if *only != index => {
+        let methods: Vec<usize> = by_name.get(name).into_iter().flatten().copied()
+            .filter(|&candidate| graph.funcs[candidate].has_receiver).collect();
+        match methods.as_slice() {
+            [only] if *only != index => {
                 out.insert(*only);
             }
-            Some(many) if many.len() > 1 => {
+            many if many.len() > 1 => {
                 ambiguous.insert(name.clone(), many.len());
             }
             _ => {}
@@ -247,7 +246,15 @@ fn the_scan_catches_a_seeded_violation() {
     assert!(text.contains("named_macros::reserve takes macros/named_macros.rs::MOTION"), "helper by reference missed:\n{text}");
     assert!(!text.contains("on_poll"), "a hook-only function was reported:\n{text}");
     assert!(!text.contains("named_macros::store"), "a local call or an atomic method resolved to another module's function:\n{text}");
+    assert!(!text.contains("free_only"), "a model method resolved to a same-named free function:\n{text}");
     assert_eq!(result.ambiguous.get("tick"), Some(&2), "ambiguous names must be listed: {:?}", result.ambiguous);
+}
+
+#[test]
+fn direct_free_function_calls_still_reach_the_hook_lock() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/hook_locks");
+    let result = scan(&fixture, &["worker::direct"], &[("features/chords.rs", "STATE")], &[]);
+    assert!(result.violations.iter().any(|line| line.contains("chords::free_only takes features/chords.rs::STATE")));
 }
 
 /// Every `static NAME: …Mutex<…>` / `…RwLock<…>` of the runtime (ours and carried package-6 code, std or hos-lock).

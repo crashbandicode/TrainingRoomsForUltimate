@@ -91,17 +91,13 @@ pub mod menu {
     use crate::runtime::published;
 
     pub use crate::runtime::compat::menu::{mii_preferences, stage_preferences};
-    pub use crate::runtime::ui::menu_app::{MENU_RECEIVED_INPUT, QUICK_MENU_APP};
+    pub use crate::runtime::ui::menu_app::MENU_RECEIVED_INPUT;
 
     /// The Replay Window asks the plugin's menu to close by clearing this flag (the editor takes the screen); package 5's menu reads it.
     pub static QUICK_MENU_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
     /// Polls the close of the editor keeps P1 neutral for (the plugin menu's own close window).
     pub const MENU_CLOSE_WAIT_FRAMES: u32 = 15;
-
-    /// The stored menu is refreshed after the INI overlay: the one store is the settings file's rows, which `assign(&MENU, ..)`
-    /// already wrote back (`compat::menu`), so there is no second copy to refresh.
-    pub fn refresh_stored_menu_on_quick_app() {}
 
     /// Something other than gameplay owns Player 1's input (the plugin's menu, the replay editor, the native waiting-room UI,
     /// the game's pause menu). The stop chord's own bit is not an owner: it only marks a poll the chord consumed.

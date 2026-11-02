@@ -64,8 +64,17 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
 
     /// The consumer: hand the posted messages to `f` in posting order. A message whose predecessor is still being written stays in
     /// its slot until a later drain (never waits). Returns how many were delivered.
-    pub fn drain(&self, mut f: impl FnMut(T)) -> usize {
-        let mut full: [(u64, usize); N] = [(0, 0); N];
+    pub fn drain(&self, f: impl FnMut(T)) -> usize {
+        let mut scratch = [(0, 0); N];
+        self.drain_with_scratch(&mut scratch, f)
+    }
+
+    /// Identical ordered delivery with caller-owned scratch. Large worker mailboxes can
+    /// reuse heap storage without placing N sequence/index pairs on the thread stack.
+    /// The scratch length must cover the mailbox capacity; only initialized FULL slots
+    /// are read. The existing single-consumer contract still applies.
+    pub fn drain_with_scratch(&self, full: &mut [(u64, usize)], mut f: impl FnMut(T)) -> usize {
+        assert!(full.len() >= N, "mailbox scratch must cover capacity");
         let mut n = 0;
         for (i, state) in self.state.iter().enumerate() {
             if state.load(Acquire) == FULL {
@@ -107,6 +116,54 @@ mod tests {
     use std::thread;
 
     #[test]
+    fn reusable_scratch_matches_order_and_drops_across_drains() {
+        let mailbox: Mailbox<u32, 4> = Mailbox::new();
+        let mut scratch = vec![(u64::MAX, usize::MAX); 4];
+        let mut got = Vec::new();
+        for base in [0, 10, 20] {
+            for i in 0..4 { assert!(mailbox.post(base + i)); }
+            assert!(!mailbox.post(99));
+            assert_eq!(mailbox.drain_with_scratch(&mut scratch, |m| got.push(m)), 4);
+            assert_eq!(mailbox.drain_with_scratch(&mut scratch, |_| panic!("empty")), 0);
+        }
+        assert_eq!(got, vec![0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23]);
+        assert_eq!(mailbox.take_dropped(), 3);
+    }
+
+    #[test]
+    fn pending_predecessor_keeps_successor_queued_until_publication() {
+        let mailbox: Mailbox<u32, 2> = Mailbox::new();
+        let mut scratch = vec![(0, 0); 2];
+        // Pause a producer after reservation/sequence assignment, before FULL.
+        mailbox.state[0].store(WRITING, Release);
+        let predecessor = mailbox.seq.fetch_add(1, AcqRel);
+        assert_eq!(predecessor, 0);
+        assert!(mailbox.post(20));
+        assert_eq!(mailbox.drain_with_scratch(&mut scratch, |_| panic!("gap")), 0);
+        // SAFETY: this test owns slot zero in WRITING, exactly as a poster does.
+        unsafe { (*mailbox.slots[0].get()).write((predecessor, 10)); }
+        mailbox.state[0].store(FULL, Release);
+        let mut got = Vec::new();
+        assert_eq!(mailbox.drain_with_scratch(&mut scratch, |m| got.push(m)), 2);
+        assert_eq!(got, vec![10, 20]);
+        assert_eq!(mailbox.take_dropped(), 0);
+    }
+
+    #[test]
+    fn undersized_scratch_refuses_before_consuming_a_message() {
+        let mailbox: Mailbox<u32, 2> = Mailbox::new();
+        assert!(mailbox.post(7));
+        let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            mailbox.drain_with_scratch(&mut [(0, 0); 1], |_| panic!("must not consume"));
+        }));
+        assert!(refused.is_err());
+        let mut got = Vec::new();
+        assert_eq!(mailbox.drain_with_scratch(&mut [(0, 0); 2], |m| got.push(m)), 1);
+        assert_eq!(got, vec![7]);
+        assert_eq!(mailbox.take_dropped(), 0);
+    }
+
+    #[test]
     fn messages_come_out_in_posting_order_and_a_full_box_counts_drops() {
         let mailbox: Mailbox<u32, 4> = Mailbox::new();
         for i in 0..4 {
@@ -127,11 +184,12 @@ mod tests {
         let consumer = {
             let (mailbox, done) = (mailbox.clone(), done.clone());
             thread::spawn(move || {
+                let mut scratch = vec![(0, 0); 8];
                 let mut received = [0u32; 4];
                 let mut last = [None::<u32>; 4];
                 loop {
                     let finished = done.load(SeqCst);
-                    mailbox.drain(|(who, n)| {
+                    mailbox.drain_with_scratch(&mut scratch, |(who, n)| {
                         // Per poster, messages arrive in its own order.
                         if let Some(previous) = last[who as usize] {
                             assert!(n > previous, "out of order for poster {who}");
@@ -139,7 +197,7 @@ mod tests {
                         last[who as usize] = Some(n);
                         received[who as usize] += 1;
                     });
-                    if finished && mailbox.drain(|(who, _)| received[who as usize] += 1) == 0 {
+                    if finished && mailbox.drain_with_scratch(&mut scratch, |(who, _)| received[who as usize] += 1) == 0 {
                         return received;
                     }
                 }

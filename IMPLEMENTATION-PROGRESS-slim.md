@@ -1268,3 +1268,27 @@ Diffinventory181files; pendingmergeafterfinishingfresh5bgates andcheckpoint.
 Freshadditionaleditor-alonePASS4.585s raw77f6f1deffca59a87bc5a6fb0856020583771f2379e3c27d56157d6c6eded776,
 1112unchanged. CurrentONEYoga smd-fresh exec21157; poll/reap thenrelease via
 yoga-release.py smd-fresh. Hos-locknext; cachemanifest/retirementafterboth.
+
+
+## Fixed8ee merge resolution22:44Z
+Merge parents8e17b52 andEXACT8ee6bb5b12d6378b90b220f196fd3b93f5ea4f6a.
+Eight conflicts: CARRY-OVER keptboth appendsections; pkg4/pkg6 manifests unioned
+exactedit sequences and recalculateddestinationhashes; bothledgersregenerated.
+Threadtable preserves slim's8argument/commentform (no restoredrunsfield/allow),
+takesincoming Heartbeat4720/Menu32432/ReplaySave32416 metadata andArchiveclosure2.
+Allocatedstackbytes unchanged. ExistingMiiCatalogstalesymbolstillownedpkg4;
+mustreport/coveractualenabledthread innewstatic audit, no falseALLclaim.
+Lobbyinit preservesincoming removalofduplicatepractice requestinit anduses
+slim renamedlobby_stage/practice_stage modules. Carrytool keepsidentical
+dedupreasonsbehavior, commentconflict only. Fullm5qderivation42+253PASS.
+Nativekeyboard/pureText/tests untouchedbymerge, includingSignalsconstlock.
+Workingtree rawsloc4=101572,unchangedceiling103200/headroom1628. Priorpending4318
+isnot additiveunchangedafterthiscomposition; finalremainingstream census owed.
+BothfreshcratechecksPASS (SMD5.100s6binaryhashes, hos0.533s2binaryhashes);
+fullreceipts in5b40bac-smd-fresh / hos-lock-fresh. Allclaimsreleased22:41.
+Retiredcompleted5btarget2280998562B/2587files afteridlecheck; fullmanifest and78
+executedbinaryarchiveSHA54c4befea33bd6e981a7666635478d2d5a75d7d40859e896baa3854a9021e655
+retainedremote5b/final-retirement; localmanifest/receipt5b40bac-final-retirement.
+NextfreezeMERGEDsourceintoNEWownsource+EMPTYtarget; native diag first, audit
+actualKeyboardopening reachability withoutforcedretention; thenallgates.
+NoEden/profile/helperboot. Constructorpath issue remainsinvestigation, notfixclaim.

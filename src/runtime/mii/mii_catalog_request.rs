@@ -3,6 +3,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+use crate::model::catalog_reply::{Job, Replies};
+use crate::runtime::ui::menu_app::{CatalogPublication, MENU_RECEIVED_INPUT};
 
 use crate::engine::mii::{
     catalog_request::{Effect, Kind, Live, Requests, Step, Verdict},
@@ -14,9 +16,11 @@ static STATE: Mutex<Broker> = Mutex::new(Broker::empty());
 
 struct Broker {
     policy: Requests,
-    reply: Option<mpsc::Receiver<Snapshot>>,
+    reply: Option<Replies<Arc<Snapshot>>>,
+    in_flight: bool,
     flight_serial: u64,
-    held_editor: Option<(Snapshot, u64)>,
+    held_editor: Option<(Arc<Snapshot>, u64)>,
+    held_menu: Option<CatalogPublication>,
 }
 
 impl Broker {
@@ -24,14 +28,24 @@ impl Broker {
         Self {
             policy: Requests::new(),
             reply: None,
+            in_flight: false,
             flight_serial: 0,
             held_editor: None,
+            held_menu: None,
         }
     }
 
     fn busy(&self) -> bool {
-        self.held_editor.is_some() || self.policy.pending()
+        self.held_menu.is_some() || self.held_editor.is_some() || self.policy.pending()
     }
+}
+
+/// Startup only, before native callbacks are installed.
+pub(super) fn init() {
+    crate::runtime::mii::menu_handoff::init();
+    crate::runtime::ui::menu_app::init_publications();
+    let mut broker = STATE.lock().unwrap();
+    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }
 }
 
 fn live() -> Live {
@@ -67,6 +81,7 @@ pub(crate) fn request(kind: Kind) {
 pub(crate) fn close_opening(opening: u64) {
     let mut broker = STATE.lock().unwrap();
     let restart_auto = broker.policy.close_menu(opening);
+    if broker.held_menu.as_ref().is_some_and(|p| p.epoch == opening) { broker.held_menu = None; }
     if broker
         .held_editor
         .as_ref()
@@ -89,21 +104,25 @@ pub(crate) fn close_opening(opening: u64) {
 pub(super) fn retire() {
     let mut broker = STATE.lock().unwrap();
     broker.policy.retire();
+    broker.held_menu = None;
     broker.held_editor = None;
     PENDING.store(broker.busy(), Ordering::Release);
 }
 
 pub(super) fn service() {
+    crate::runtime::mii::menu_handoff::service();
     if !PENDING.load(Ordering::Acquire) {
         return;
     }
-    let (held, ready) = {
+    let (held, menu, ready) = {
         let mut broker = STATE.lock().unwrap();
         let held = broker.held_editor.take();
+        let menu = broker.held_menu.take();
         let ready = broker.poll();
         PENDING.store(broker.busy(), Ordering::Release);
-        (held, ready)
+        (held, menu, ready)
     };
+    if let Some(publication) = menu { publish_menu(publication); }
     if let Some((snapshot, opening)) = held {
         retain_editor(snapshot, opening);
     }
@@ -113,19 +132,20 @@ pub(super) fn service() {
 }
 
 impl Broker {
-    fn poll(&mut self) -> Option<(Verdict, Snapshot)> {
-        if let Some(reply) = self.reply.as_ref() {
-            match reply.try_recv() {
-                Ok(snapshot) => {
-                    self.reply = None;
+    fn poll(&mut self) -> Option<(Verdict, Arc<Snapshot>)> {
+        if self.in_flight {
+            let reply = self.reply.as_mut().expect("catalog initialized before requests");
+            match reply.poll() {
+                Ok(Ok(snapshot)) => {
+                    self.in_flight = false;
                     let effect = self.policy.complete(self.flight_serial, live());
                     let verdict = effect.verdict;
                     self.drive(effect);
                     return Some((verdict, snapshot));
                 }
                 Err(mpsc::TryRecvError::Empty) => return None,
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    self.reply = None;
+                Ok(Err(())) | Err(mpsc::TryRecvError::Disconnected) => {
+                    self.in_flight = false;
                     let effect = self.policy.failed(live());
                     self.drive(effect);
                     return None;
@@ -153,19 +173,20 @@ impl Broker {
     }
 
     fn enqueue(&mut self) -> Effect {
-        let (sender, receiver) = mpsc::sync_channel(1);
-        match crate::runtime::macros::replay_store::request_mii_catalog(sender) {
+        let Some(replies) = self.reply.as_mut() else { return self.policy.failed(live()); };
+        let Some(sender) = replies.begin() else { return self.policy.failed(live()); };
+        match crate::runtime::macros::replay_store::request_mii_catalog(Job::new(sender)) {
             crate::runtime::macros::replay_store::CatalogQueue::Queued => {
                 self.flight_serial = self.policy.serial();
-                self.reply = Some(receiver);
+                self.in_flight = true;
                 Effect::quiet(Step::Wait)
             }
-            crate::runtime::macros::replay_store::CatalogQueue::Full => {
-                drop(receiver);
+            crate::runtime::macros::replay_store::CatalogQueue::Full(job) => {
+                replies.rejected(job.rejected());
                 self.policy.rejected_full()
             }
-            crate::runtime::macros::replay_store::CatalogQueue::Unavailable => {
-                drop(receiver);
+            crate::runtime::macros::replay_store::CatalogQueue::Unavailable(job) => {
+                replies.rejected(job.rejected());
                 self.policy.failed(live())
             }
         }
@@ -203,18 +224,18 @@ fn abandon_auto(kind: Option<Kind>) {
     }
 }
 
-fn apply(verdict: Verdict, snapshot: Snapshot) {
+fn apply(verdict: Verdict, snapshot: Arc<Snapshot>) {
     match verdict {
         Verdict::Discard => {}
         Verdict::Menu { opening, owners } => {
-            if super::mii_saved_alpha::accept_catalog(Arc::new(snapshot), opening, owners) {
+            if super::mii_saved_alpha::accept_catalog(snapshot, opening, owners) {
                 STATE.lock().unwrap().policy.menu_armed(opening);
             }
         }
         Verdict::Editor { opening } => retain_editor(snapshot, opening),
         Verdict::Auto(token) => {
             #[cfg(feature = "mii-ordinary-cpu-alpha")]
-            super::mii_auto_init::deliver(token, Arc::new(snapshot));
+            super::mii_auto_init::deliver(token, snapshot);
             #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
             {
                 let _ = (token, snapshot);
@@ -223,7 +244,22 @@ fn apply(verdict: Verdict, snapshot: Snapshot) {
     }
 }
 
-fn retain_editor(snapshot: Snapshot, opening: u64) {
+/// Capture has completed. Full/unavailable publication retains the identical
+/// value for the next native callback; the existing close/retire policy cancels it.
+pub(super) fn publish_menu(publication: CatalogPublication) {
+    if !crate::runtime::ui::menu_app::active()
+        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }
+    match crate::runtime::ui::menu_app::publish_catalog(publication) {
+        Ok(()) => { MENU_RECEIVED_INPUT.store(true, Ordering::Release); }
+        Err(publication) => {
+            let mut broker = STATE.lock().unwrap();
+            broker.held_menu = Some(publication);
+            PENDING.store(true, Ordering::Release);
+        }
+    }
+}
+
+fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {
     #[cfg(feature = "mii-editor-alpha")]
     {
         match crate::runtime::mii::mii_editor_bridge::mount_opened_catalog(snapshot, opening) {

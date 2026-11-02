@@ -419,3 +419,14 @@ Keyboard root follow-up: pure value carry transforms now use checked u8 metadata
 Editor-only matrix correction: mii_ordinary_cpu_native original-kind match now applies the same existing coexistence/test cfg as Helper::Ready. This repairs a missing arm condition from the earlier slim feature-scope cleanup; full-feature behavior is unchanged. Actual failed E0599 and corrected carry253 verification retained.
 
 Lead21:59 authorized exact native keyboard Signals mutex replacement with hos_lock const storage; native cold OnceBox allocation proved in78f440d ELF. Only import and guard unwrap transformations; SDK/lease/guard extents unchanged.
+## ui-screens — owned Mii list adapter (2026-11-02)
+
+The existing `src/model/mii_root/mii_menu.rs` (ours-new carried from frozen m5q; source sha256 `94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c`) now supports the approved direct class list with an Add New row and ZR role switching. The original selection, eligibility, exact identity and menu-close action policy remains its owner. Changes are exact-text transforms in `docs/provenance/pkg6-carry-manifest.json`, applied with `tools/carry_pkg6.py carry`; the generated ledger was refreshed and `verify` passed all 264 files against m5q. No fork or stage file was edited.
+
+`src/editors/mii.rs` is new clean-room presentation/worker adapter code. Its tests create synthetic owned saved-Mii records and exercise the real carried policy. Runtime native lifecycle/actions and bust binding are still being wired and are not accepted yet.
+The ui-screens portrait transform also extracts the existing native key-builder call in character_roster.rs into one shared helper (waiting-icon preload and roster UI); its manifest/ledger records the edit. Uses owned game assembly and existing seam guards, not a new pathname provider. Runtime evidence pending.
+
+UI portrait admission correction after ui-13: the existing enforcing character_roster seam gate checks roster.kind_hash and roster.icon_hash before publishing BASE. The menu helper now uses that readiness; core game::Granted has neither carried seam and previously refused every portrait. Exact manifest transform, regenerated ledger, full264-file verification; no guard bypass or fork/stage edit. Runtime portrait acceptance pending.
+
+### UI item picture assets (2026-11-02)
+38 PNGs and sources.json, identity-copied from frozen m5q scripts/item-icons/assets, all ours-new verified before reading. Full digests/transforms: docs/provenance/ui-item-assets.json; generated ledger: docs/provenance/ui-item-assets-ledger.md. tools/carry_ui_items.py verifies binary files (the existing Rust carry tools rewrite UTF-8 text). No fork/stage mutation. The pinned MIT layout builder appends item textures/materials to both Training and waiting archives; stage/fighter pictures still load at runtime. Runtime/recipe gates pending in stream progress.

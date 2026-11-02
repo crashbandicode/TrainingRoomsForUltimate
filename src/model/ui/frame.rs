@@ -172,6 +172,11 @@ pub struct Frame {
     /// stage grid at all, and a signature that changes when the page or the layout changes (thumbnails are requested per page).
     pub tile_n: [u16; super::panes::TILES],
     pub tile_stage_grid: bool,
+    pub tile_item_grid: bool,
+    pub tile_roster_grid: bool,
+    pub tile_cpu: bool,
+    /// A short last row is centred under the full ones (the portrait roster's last row of 9 under 13 columns).
+    pub tile_centre_last: bool,
     pub tile_sig: u32,
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
@@ -194,6 +199,43 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Reuse a frame in place. Constructing a whole temporary on each nested
+    /// screen path exhausted the menu thread's stack when the roster grew.
+    pub fn reset(&mut self) {
+        self.view = View::List;
+        self.chip_weights.fill(0);
+        self.chip_focus = 0;
+        self.chip_visual = ChipVisual::None;
+        self.tile_cols = 0;
+        self.tile_rows = 0;
+        self.tiles.fill(Text::new());
+        self.tile_count = 0;
+        self.tile_focus = 0;
+        self.tile_n.fill(u16::MAX);
+        self.tile_stage_grid = false;
+        self.tile_item_grid = false;
+        self.tile_roster_grid = false;
+        self.tile_cpu = false;
+        self.tile_centre_last = false;
+        self.tile_sig = 0;
+        self.tile_state.fill(0);
+        self.range = RangeView::default();
+        self.clip = ClipBar::default();
+        self.title.clear();
+        self.tabs.fill(Text::new());
+        self.tab_count = 0;
+        self.tab_active = 0;
+        self.crumb.clear();
+        self.groups.fill(Text::new());
+        self.group_count = 0;
+        self.group_active = 0;
+        self.rows.fill(RowLine::default());
+        self.row_count = 0;
+        self.focus = None;
+        self.help.fill(Text::new());
+        self.hint.clear();
+    }
+
     pub const fn new() -> Frame {
         const EMPTY_ROW: RowLine = RowLine {
             label: Text::new(),
@@ -213,6 +255,10 @@ impl Frame {
             tile_focus: 0,
             tile_n: [u16::MAX; super::panes::TILES],
             tile_stage_grid: false,
+            tile_item_grid: false,
+            tile_roster_grid: false,
+            tile_cpu: false,
+            tile_centre_last: false,
             tile_sig: 0,
             tile_state: [0; super::panes::TILES],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
@@ -340,7 +386,7 @@ fn value_tone(menu: &Menu, row: usize) -> Tone {
 /// The page view: tabs, the groups of the page on the left, the active group's rows on the right,
 /// the focused row's two help lines and the key hints.
 pub fn page_frame(menu: &Menu, frame: &mut Frame) {
-    *frame = Frame::new();
+    frame.reset();
     let _ = frame.title.write_str(TITLE);
     for (i, page) in menu.ring().take(TABS).enumerate() {
         let _ = frame.tabs[i].write_str(page.title());

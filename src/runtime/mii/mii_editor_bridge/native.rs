@@ -412,9 +412,12 @@ pub(super) unsafe fn practice_inputs(base: usize) -> [u64; 3] {
 // Private qualification diagnostics only. These bytes are never restored or
 // interpreted as native objects. Capture at four transition milestones, not per
 // frame, to distinguish editor writes from online configuration updates.
+#[cfg(feature = "diag")]
 const INPUT_REGIONS: [(usize, usize); 3] = [(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)];
+#[cfg(feature = "diag")]
 pub(super) struct InputSnapshot { rows: [[u8; 8 * 0x240]; 3] }
 
+#[cfg(feature = "diag")]
 #[derive(Clone, Copy, serde::Serialize)]
 pub(super) struct InputChange {
     pub region: usize,
@@ -424,6 +427,7 @@ pub(super) struct InputChange {
     pub first_changes: crate::engine::compat::fixed::FixedVec<(usize, u8, u8), 64>,
 }
 
+#[cfg(feature = "diag")]
 pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {
     let mut rows = [[0u8; 8 * 0x240]; 3];
     for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {
@@ -432,6 +436,7 @@ pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {
     InputSnapshot { rows }
 }
 
+#[cfg(feature = "diag")]
 impl InputSnapshot {
     /// Compares the baseline with the live regions in place (no second copy is made inside the hook).
     pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {

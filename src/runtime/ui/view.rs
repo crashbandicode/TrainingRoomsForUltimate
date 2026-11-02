@@ -296,12 +296,21 @@ impl Panes {
     }
 
     unsafe fn draw_tiles(&self, frame: &Frame) {
+        // One archive-owned picture per item, shared across all three handheld pages.
+        for i in 0..p::ITEM_ICONS {
+            self.hide(p::IDX_ITEM_ICON + i);
+        }
         let shown = frame.view == View::Tiles;
         let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
         let (cell_w, cell_h) = ((p::ROW_RIGHT - p::ROW_LEFT) / cols, 620.0 / rows);
         let centre = |i: usize| {
-            let (c, r) = (i % usize::from(frame.tile_cols.max(1)), i / usize::from(frame.tile_cols.max(1)));
-            (p::ROW_LEFT + (c as f32 + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
+            let per_row = usize::from(frame.tile_cols.max(1));
+            let (c, r) = (i % per_row, i / per_row);
+            // The roster's short last row sits centred under the full rows (the character select's own layout).
+            let count = usize::from(frame.tile_count);
+            let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
+            let shift = if frame.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
+            (p::ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
         };
         for i in 0..p::TILES {
             if !shown || i >= usize::from(frame.tile_count) || frame.tile_state[i] == TILE_HIDDEN {
@@ -310,6 +319,22 @@ impl Panes {
                 continue;
             }
             let (x, y) = centre(i);
+            if frame.tile_item_grid && usize::from(frame.tile_n[i]) < p::ITEM_ICONS {
+                self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
+                let size = 64.0_f32.min(cell_h - 12.0).min(cell_w / 3.0);
+                let left = x - cell_w / 2.0 + 10.0;
+                self.rect(p::IDX_ITEM_ICON + usize::from(frame.tile_n[i]), left + size / 2.0, y, size, size, [255; 4]);
+                let label_left = left + size + 8.0;
+                let label_w = cell_w - size - 28.0;
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_left + label_w / 2.0, y, label_w, p::TEXT);
+                continue;
+            }
+            if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
+                let size = (cell_h - 28.0).min(cell_w - 12.0);
+                self.rect(p::IDX_TILE + i, x, y + 10.0, size, size, [255, 255, 255, 255]);
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y - cell_h / 2.0 + 12.0, cell_w - 6.0, p::TEXT);
+                continue;
+            }
             if frame.tile_stage_grid && crate::runtime::ui::thumbs::is_bound(i) {
                 // The tile shows its stage's own picture (108 x 90, aspect kept): docked tiles put it at the left with the
                 // name beside it, handheld tiles (tall) put it over the name.

@@ -29,7 +29,8 @@ pub unsafe fn entry(slot: u32) -> Option<*const u8> {
 }
 
 pub unsafe fn training_cpu_quantity() -> Option<u32> {
-    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {
+    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0
+        || !crate::runtime::roster::cpu_quantity_guarded() {
         return None;
     }
     let root = std::ptr::read_volatile(

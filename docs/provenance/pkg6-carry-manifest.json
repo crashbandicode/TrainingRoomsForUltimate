@@ -761,7 +761,19 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf"
+   "dest_sha256": "1683fc22bccc697cd1fe8dd5b60986093086648c5ef244ea9e1623b6e440fa5f",
+   "edits": [
+    {
+     "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
+     "new": "    /// Complete an explicit return-to-native load without publishing it as a\n    /// plugin resource. Caller has verified the original descriptor/body ready\n    /// on this exact entry's callback. This is not a destructor notification.\n    pub fn returned_native(&mut self, load: LoadToken) -> Result<(), Error> {\n        let state = self.exact(load.0)?;\n        if state.phase == Phase::Departed { return Err(Error::Departed); }\n        if !self.is_current(load.0.epoch) { return Err(Error::StaleToken); }\n        if state.phase != Phase::Loading { return Err(Error::NotReady); }\n        if self.pinned(load.0.slot) { return Err(Error::Pinned); }\n        let generation = state.generation;\n        self.slots[load.0.slot] = Slot { generation, ..Slot::EMPTY };\n        Ok(())\n    }\n\n    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
+     "reason": "F9 explicit return-to-native receipt: retire only exact current unleased load after original native readiness, without inventing a destructor or exposing restored CPU as a plugin source."
+    },
+    {
+     "old": "    #[test]\n    fn normal_load_ready_lease_release_reuse() {",
+     "new": "    #[test]\n    fn returning_native_requires_drained_leases_and_never_publishes_a_source() {\n        let mut book = SourceBook::<1, 2>::new();\n        let ready = book.register_ready(0, book.epoch(), NativeEntry(17), A).unwrap();\n        let hat = book.acquire(ready, COPY_P1).unwrap();\n        let item = book.acquire(ready, ITEM).unwrap();\n        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));\n        assert!(book.release(hat));\n        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));\n        assert!(book.release(item));\n        let restore = book.begin_install(0, book.epoch(), NativeEntry(17), B).unwrap();\n        assert_eq!(book.ready(0), Err(Error::NotReady));\n        // Native-ready receipt arrives on a later callback, not a timeout.\n        assert_eq!(book.returned_native(restore), Ok(()));\n        assert_eq!(book.phase(0), Ok(Phase::Empty));\n        assert_eq!(book.key(0), Ok(None));\n        assert_eq!(book.acquire(ready, COPY_P1), Err(Error::StaleToken));\n        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));\n        let reuse = book.begin_install(0, book.epoch(), NativeEntry(17), A).unwrap();\n        assert_ne!(restore, reuse);\n        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));\n        book.depart_scene().unwrap();\n        assert_eq!(book.returned_native(reuse), Err(Error::Departed));\n        assert_eq!(book.phase(0), Ok(Phase::Departed));\n        assert_eq!(book.native_destroyed(reuse.source()), Ok(0));\n    }\n\n    #[test]\n    fn normal_load_ready_lease_release_reuse() {",
+     "reason": "F9 regression: independent hat/item leases block restore; returned native receipt invalidates old leases/replays; same-address reuse and departure retain ownership correctly."
+    }
+   ]
   },
   {
    "src": "src/source_visible_forms.rs",
@@ -791,7 +803,14 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20"
+   "dest_sha256": "244f9f15922470c8a1673aa49219a4a70ef7676773d6ea7f138fdddd6e4f22b6",
+   "edits": [
+    {
+     "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
+     "new": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    let mut out = Vec::new();\n    css_order_each(kinds, values, excluded, |kind| out.push(kind));\n    out\n}\n\n/// `css_order` without heap: each kind in CSS order is handed to `each` (the planner's per-tick form).\npub fn css_order_each(kinds: &[u32], values: &[u8], excluded: Option<u32>, mut each: impl FnMut(u32)) {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .for_each(&mut each);\n}",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/cycle_admission_grace.rs",
@@ -1359,7 +1378,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "a282e41ee3502345704983c001207b630ecda66d60962a5b8650b72b7a8b6ebe",
+   "dest_sha256": "0e4c1df979b9e9431bba06ca916318bb7fa6964fffb58a99802d6dca56863c9a",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -1385,6 +1404,21 @@
      "delete_from": "    #[test]\n    fn choose_deselect_reselect_preserves_selection_order() {",
      "delete_to": "    #[test]\n    fn invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected() {",
      "reason": "two tests that select through the fork's picker; the ordering rules stay covered by the other roster tests, the picker behaviour is re-tested with the editor rows"
+    },
+    {
+     "old": "    pub fn hat_kinds(self) -> Vec<u32> {\n        self.fighters()\n            .into_iter()\n            .filter(|fighter| {\n                fighter.kind() != TrioFighter::KIRBY.kind()\n                    && (cfg!(feature=\"mii-managed-helper-alpha\") || !(0x48..=0x4a).contains(&fighter.kind()))\n            })\n            .map(|fighter| fighter.kind())\n            .collect()\n    }",
+     "new": "    pub fn hat_kinds(self) -> Vec<u32> {\n        self.hat_kinds_fixed().to_vec()\n    }\n\n    /// `hat_kinds` without heap (the preload planner's per-tick form).\n    pub fn hat_kinds_fixed(self) -> KindList {\n        let mut out = KindList::new(0);\n        for fighter in self.fighters_excluding_fixed(None).iter() {\n            if fighter.kind() != TrioFighter::KIRBY.kind()\n                && (cfg!(feature=\"mii-managed-helper-alpha\") || !(0x48..=0x4a).contains(&fighter.kind()))\n            {\n                out.push(fighter.kind());\n            }\n        }\n        out\n    }\n\n    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {\n        self.fighters_excluding_fixed(original).to_vec()\n    }\n\n    /// `fighters_excluding` without heap (the preload planner's per-tick form): All in CSS order, otherwise the ranked\n    /// fighters in rank order, the original's native group left out.\n    pub fn fighters_excluding_fixed(self, original: Option<u32>) -> FighterList {\n        let mut out = FighterList::new(TrioFighter::MARIO);\n        if self.all {\n            let mut kinds = [0u32; CHOICES.len()];\n            for (slot, (kind, _)) in kinds.iter_mut().zip(CHOICES) {\n                *slot = *kind;\n            }\n            let mut values = [0u8; CHOICES.len() + 1];\n            values[0] = 1;\n            values[1..].copy_from_slice(&self.ranks);\n            crate::engine::swap::roster_grid::css_order_each(&kinds, &values, original, |kind| {\n                if let Some(fighter) = TrioFighter::from_kind(kind) {\n                    out.push(fighter);\n                }\n            });\n            return out;\n        }\n        let excluded = original.map(crate::engine::swap::roster_grid::group_kind);\n        for rank in 1..=CHOICES.len() {\n            let Some(index) = self.ranks.iter().position(|r| usize::from(*r) == rank) else { break };\n            let Some(fighter) = TrioFighter::from_kind(CHOICES[index].0) else { continue };\n            if excluded != Some(crate::engine::swap::roster_grid::group_kind(fighter.kind())) {\n                out.push(fighter);\n            }\n        }\n        out\n    }",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
+    },
+    {
+     "delete_from": "    /// Runtime callers use the same native-group exclusion as the portrait editor.\n    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {\n        let catalog",
+     "delete_to": "\n}\n",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it (the Vec body; the new one sits after hat_kinds_fixed)"
+    },
+    {
+     "old": "/// Catalog positions stay fixed; nonzero ranks represent the user's cycle order.",
+     "new": "/// Allocation-free roster and hat lists (R5, F10): the catalog bounds their length.\npub type FighterList = crate::engine::compat::fixed::FixedList<TrioFighter, { CHOICES.len() }>;\npub type KindList = crate::engine::compat::fixed::FixedList<u32, { CHOICES.len() }>;\n\n/// Catalog positions stay fixed; nonzero ranks represent the user's cycle order.",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
     }
    ]
   },
@@ -1393,7 +1427,72 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "33f39ba2db1c4616cf6cbd25a941e080efe73ce6736c61378e8bf34299053822"
+   "dest_sha256": "3a323f7da6cf82d9451862fa90a4a0ee00bee29277e4121a2e59f7d56caac163",
+   "edits": [
+    {
+     "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
+     "new": "    let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);\n",
+     "reason": "R5 / fix ledger F10: the preload planner's Player lane (the ordinary Mii owner's `mixed_targets`) built a Vec per planning step inside the fighter-frame hook scope (Eden s6-07 bisection: ~22 allocations a second with fighters preloaded, none with hats only and none with preload off); the lists are allocation-free and the Mii preferences are read in place"
+    },
+    {
+     "old": "fn matches(target: Target, live: Identity) -> bool {\n    match (target, live) {\n        (Target::Fighter(kind), Identity::Fighter(current)) => {\n            Forms::starting(kind).same_group(current)\n        }\n        (Target::Saved(choice), Identity::Saved(current)) => choice.canonical == current,\n        _ => false,\n    }\n}\n\n",
+     "new": "/// The ordered roster keeps every fighter position, but saved payloads exist\n/// only for the three real Mii classes, already deduplicated by the traversal.\nstruct CycleChoices {\n    kinds: crate::engine::compat::fixed::FixedList<u32, { crate::engine::swap::trio::CHOICES.len() }>,\n    saved: [Option<Choice>; 3],\n}\nimpl CycleChoices {\n    fn new() -> Self {\n        Self { kinds: crate::engine::compat::fixed::FixedList::new(0), saved: [None; 3] }\n    }\n    fn class_index(class: MiiClass) -> usize {\n        (class.kind() - MiiClass::Brawler.kind()) as usize\n    }\n    fn has_class(&self, class: MiiClass) -> bool {\n        self.saved[Self::class_index(class)].is_some()\n    }\n    fn has_group(&self, forms: Forms) -> bool {\n        self.kinds.iter().any(|kind| MiiClass::from_kind(*kind).is_none() && forms.same_group(*kind))\n    }\n    fn push_fighter(&mut self, kind: u32) { self.kinds.push(kind); }\n    fn push_saved(&mut self, choice: Choice) {\n        let class = choice.canonical.class;\n        if self.kinds.push(class.kind()) {\n            self.saved[Self::class_index(class)] = Some(choice);\n        }\n    }\n    fn matches_kind(&self, kind: u32, live: Identity) -> bool {\n        match (MiiClass::from_kind(kind), live) {\n            (None, Identity::Fighter(current)) => Forms::starting(kind).same_group(current),\n            (Some(class), Identity::Saved(current)) => self.saved[Self::class_index(class)]\n                .is_some_and(|choice| choice.canonical == current),\n            _ => false,\n        }\n    }\n    fn matches_at(&self, index: usize, live: Identity) -> bool {\n        self.kinds.get(index).is_some_and(|kind| self.matches_kind(*kind, live))\n    }\n    fn position(&self, live: Identity) -> Option<usize> {\n        self.kinds.iter().position(|kind| self.matches_kind(*kind, live))\n    }\n    /// Materialize only the selected result, never a roster-sized Target array.\n    fn get(&self, index: usize) -> Option<Target> {\n        let kind = *self.kinds.get(index)?;\n        match MiiClass::from_kind(kind) {\n            Some(class) => self.saved[Self::class_index(class)].map(Target::Saved),\n            None => Some(Target::Fighter(kind)),\n        }\n    }\n    fn first(&self) -> Option<Target> { self.get(0) }\n}\n\n",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);",
+     "new": "let mut choices = CycleChoices::new();",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.iter().any(\n                |target| matches!(target, Target::Saved(choice) if choice.canonical.class == class),\n            )",
+     "new": "choices.has_class(class)",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.push(Target::Saved(choice));",
+     "new": "choices.push_saved(choice);",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.iter().any(\n                    |target| matches!(target, Target::Fighter(other) if forms.same_group(*other)),\n                )",
+     "new": "choices.has_group(forms)",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.push(Target::Fighter(kind));",
+     "new": "choices.push_fighter(kind);",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "            .filter(|i| {\n                choices\n                    .get(*i)\n                    .is_some_and(|target| matches(*target, identity))\n            })\n            .or_else(|| choices.iter().position(|target| matches(*target, identity))),",
+     "new": "            .filter(|i| choices.matches_at(*i, identity))\n            .or_else(|| choices.position(identity)),",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "target: *target,",
+     "new": "target,",
+     "count": 2,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "    use crate::engine::mii::selection::{Fallback, Source};\n\n",
+     "new": "    use crate::engine::mii::selection::{Fallback, Source};\n\n    #[test]\n    fn compact_cycle_values_keep_full_roster_capacity_in_under_two_kib() {\n        assert!(std::mem::size_of::<CycleChoices>() <= 2048);\n        let mut choices = CycleChoices::new();\n        for index in 0..crate::engine::swap::trio::CHOICES.len() {\n            choices.push_fighter(index as u32 + 0x100);\n        }\n        assert_eq!(choices.kinds.len(), crate::engine::swap::trio::CHOICES.len());\n        assert_eq!(choices.get(choices.kinds.len() - 1),\n            Some(Target::Fighter(choices.kinds.len() as u32 - 1 + 0x100)));\n    }\n\n",
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes. Private value-size and full-capacity regression."
+    },
+    {
+     "old": "#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
+     "new": "#[cfg(all(test, not(target_os = \"switch\")))]\n#[path = \"../../../tests/support/mii_cycle_compact.rs\"]\nmod compact_regressions;\n\n#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
+     "reason": "pkg4 planner stack root: original independent heap-backed ring equivalence plus first/repeated allocation probes exercise this actual implementation; host-only test allocator, never shipped."
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/cycle_preload_capacity.rs",
@@ -1724,17 +1823,17 @@
      "reason": "`InstallFields`: the seam outcome as fields of package 1's one install line (`seams=<n> seams_stock=<n> seams_skipped=[..] ...`, the rows that fail, counts for the rest); rows checked or changed after the line stay in the tagged late line (`[TrainingSeams] late ...`)"
     },
     {
-     "delete_from": "/// Non-`main` rows as `[label:code,\u2026]`, for the install line (`images=`).",
+     "delete_from": "/// Non-`main` rows as `[label:code,…]`, for the install line (`images=`).",
      "delete_to": "/// Rows whose recorded bits satisfy `keep`",
      "reason": "removed (no caller in the clean room): `ImageLabels` was a field of the fork's own install line; the clean room has one install line (package 1's, `InstallFields` shortened to counts and failing rows)"
     },
     {
-     "delete_from": "/// `[group,\u2026]`, for the install line",
+     "delete_from": "/// `[group,…]`, for the install line",
      "delete_to": "struct Missing;",
      "reason": "removed (no caller in the clean room): `Groups` was a field of the fork's own install line (`authoritative=`), see `ImageLabels`"
     },
     {
-     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
+     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` → `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
      "new": "",
      "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
     },
@@ -1921,7 +2020,14 @@
    "dest": "src/runtime/roster/native_source.rs",
    "crate": "root",
    "src_sha256": "d2032bebfb4f473403e59ba25632d2000ba80efb17de006d9d13bff2dad4767b",
-   "dest_sha256": "fe28b0dbb5a3b96a40e91f36d00365f506cd7d98c3314707d6de11bd1c94ebb6"
+   "dest_sha256": "fad462e82528a32a4c84b5f2c3bdb4d28d953f0b33f8d48724a033a29b125c31",
+   "edits": [
+    {
+     "old": "pub unsafe fn training_cpu_quantity() -> Option<u32> {\n    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {",
+     "new": "pub unsafe fn training_cpu_quantity() -> Option<u32> {\n    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0\n        || !crate::runtime::roster::cpu_quantity_guarded() {",
+     "reason": "F9 (lead ruling 2026-11-02): the pointer path from main+0x52c3420 to the pause menu's No. of CPUs (+0xb40) is a relied-on game layout; it is read only when the game's own root load (main+0x1416c70), reader (main+0x1417030) and the pause menu's writer (main+0x13e8648) passed their 64-byte guards (sites_pkg6 `roster_cpu_quantity_*`). Without them the count is unknown, which every caller already treats as 'not one visible CPU' (no Training source: the preload-off path)"
+    }
+   ]
   },
   {
    "src": "src/native_gc_guard.rs",
@@ -1990,7 +2096,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "c27d67b63cea2c8a7111de6a3b75511cf200079a38f674c61caf78d57cf4d06b",
+   "dest_sha256": "b35a4da1a869981950df61e3c55188febcc52f51e2a966b1c569693c0ac2e5cd",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -2197,6 +2303,51 @@
      "new": "/// Existing readiness readers only; no native calls or Rust mutexes (also used under G lock).\n#[cfg(feature = \"mii-saved-alpha\")]\npub(crate) unsafe fn mii_saved_cpu_visible_ready",
      "count": 1,
      "reason": "Retain shared readiness contract after deleting the diagnostic wrapper."
+    },
+    {
+     "old": "fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {\n",
+     "new": "fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {\n    roster_fixed(m, role).to_vec()\n}\n\n/// `roster` without heap (the preload planner's per-tick form).\nfn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {\n",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "        Role::Player => m.player_roster.fighters_excluding(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding(excluded),\n    };\n    fighters.into_iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())).collect()\n",
+     "new": "        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),\n    };\n    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);\n    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {\n        out.push(*f);\n    }\n    out\n",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "    let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();\n    let original=cycle_original(role);",
+     "new": "    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);\n    for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}\n    let original=cycle_original(role);",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "    mii_saved_alpha::init(base);",
+     "new": "    mii_saved_alpha::init(base);\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    mii_managed_helper::init_storage();",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "    mii_saved_alpha::init(base);\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    mii_managed_helper::init_storage();\n        // Validate the original destructor range before capacity installs its\n        // listener-removed hook at 0x652214 inside that range. The Mii gate's\n        // own patch at 0x6510f4 is outside all capacity fingerprint ranges.\n",
+     "new": "    mii_saved_alpha::init(base);\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    mii_managed_helper::init_storage();\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    mii_replay::init();\n        // Validate the original destructor range before capacity installs its\n        // listener-removed hook at 0x652214 inside that range. The Mii gate's\n        // own patch at 0x6510f4 is outside all capacity fingerprint ranges.\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "    let icon_hash: unsafe extern \"C\" fn(u64, u32, u32) -> u64 =\n        std::mem::transmute(base + 0x3238a70);\n",
+     "new": "",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "let hash = icon_hash(fighter_kind_hash(base, fighter.kind()), costume, 0);",
+     "new": "let hash = fighter_picture_hash(base, fighter.kind(), costume, 0);",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "// Both icon paths use this roster module's published, verified text base.",
+     "new": "/// Native UI key builder shared by waiting-icon preloads and menu portraits.\nunsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u32) -> u64 {\n    let key: unsafe extern \"C\" fn(u64, u32, u32) -> u64 = std::mem::transmute(base + 0x3238a70);\n    key(fighter_kind_hash(base, kind), costume, picture)\n}\n\n/// The active role's costume portrait, queried on the UI job thread. The native\n/// builder supplies patch paths, names and regional costume remapping.\npub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 || !crate::runtime::game::granted(0x3238a70)\n        || !crate::runtime::game::granted(0x138c9b0) { return None; }\n    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };\n    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));\n    let hash = fighter_picture_hash(base, kind, costume, 1);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}\n\n// Both icon paths use this roster module's published, verified text base.",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "    if base == 0 || !crate::runtime::game::granted(0x3238a70)\n        || !crate::runtime::game::granted(0x138c9b0) { return None; }",
+     "new": "    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }",
+     "reason": "ui-13 portrait root fix: use the roster BASE published only after its authoritative native_seams gate; unrelated core Granted excludes both functions and permanently refused every portrait. Preserve both existing64-byte guards and pre-init refusal."
     }
    ]
   },
@@ -2205,21 +2356,35 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "777ff33e518a3196dd68fa30d33d4007bdb77dfbdf1eae12592a88b279f26da0"
+   "dest_sha256": "d84d9f1989485a726c1820d1d93e34df7ec507567a7b02b6b3b58b5474314d7d",
+   "edits": [
+    {
+     "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
+     "new": "    let roster = if role == 0 {\n        menu.player_roster.fighters_excluding_fixed(None)\n    } else {\n        menu.cpu_roster.fighters_excluding_fixed(None)\n    };\n    let preferences = crate::runtime::compat::menu::mii_preferences_view();\n",
+     "reason": "R5 / fix ledger F10: the preload planner's Player lane (the ordinary Mii owner's `mixed_targets`) built a Vec per planning step inside the fighter-frame hook scope (Eden s6-07 bisection: ~22 allocations a second with fighters preloaded, none with hats only and none with preload off); the lists are allocation-free and the Mii preferences are read in place"
+    }
+   ]
   },
   {
    "src": "src/cycle_preload_config.rs",
    "dest": "src/runtime/roster/cycle_preload_config.rs",
    "crate": "root",
    "src_sha256": "c53891e68084204802add8d19aae87e0f32c37882d34a736ec63ea037e5dccb5",
-   "dest_sha256": "4ea8a4831abb8837649c8da3eeee663bed2b34587d39b23b662712bde3ac1f0e"
+   "dest_sha256": "1e6b7a9dec7e8f20af8d1c2b20eac2094bb38743874633f074a99e1ea3a9f8dd",
+   "edits": [
+    {
+     "old": "//! Startup cache for the cycle-preload candidate.\n//!\n//! `init` reads `sd:/ultimate/TrainingRooms/cycle_preload.ini` once.\n//! `snapshot` copies that cache and does not touch the file. Menu apply writes\n//! the INI only when the committed choice changed. Slot count 0 is off: do not\n//! preload while measurements can still record the Off control. The same atomic\n//! word carries `bank_members` (0 off, else a native bank size per role); read it\n//! through `snapshot().bank_members`, never from the file or the menu.\n\nuse std::sync::atomic::{AtomicU16, AtomicU32, Ordering};\nuse std::sync::Once;\n\nuse crate::engine::preload::cycle_preload_config::{\n    adopt_unset, apply_settings, load_ini_unset, pack, publish_decision, startup_settings,\n    store_ini, unpack, IniLoad, Publish, Unset, PATH,\n};\nuse crate::engine::compat::menu::TrainingModpackMenu;\nuse {crate::runtime::compat::sync::assign, crate::runtime::compat::sync::read};\n\nuse crate::engine::preload::cycle_preload_config::Settings;\n\nstatic CACHE: AtomicU32 = AtomicU32::new(0);\nstatic LOADED: Once = Once::new();\n/// Optional keys the startup INI omitted (`Unset::to_bits`), consumed by the\n/// first reconcile that sees the saved menu.\nstatic UNSET: AtomicU16 = AtomicU16::new(0);\n\n/// Load the INI once, overlay both stored menus, and refresh the quick menu.\n///\n/// Call this from `initialize_training_modpack` after the menu loader joins.\n/// Do not call it while that loader holds the quick-menu lock, and do not call\n/// it on a frame callback. A call on either side of `menu::load_from_file` is\n/// safe when the two calls do not overlap: the menu loader overlays the INI\n/// again after it assigns JSON.\npub fn init() {\n    reconcile_loaded_menu();\n    crate::runtime::compat::common::menu::refresh_stored_menu_on_quick_app();\n}\n\n/// Cached choice. Before `init` or a menu-loader reconcile, this is closed\n/// (slots 0, no sources, no samples). Afterward, slots 0 still means do not\n/// preload while measurements can still record the Off control.\npub fn snapshot() -> Settings {\n    unpack(CACHE.load(Ordering::Acquire))\n}\n\n/// One startup read, then copy the cache onto the menu JSON already in memory.\npub(crate) fn reconcile_loaded_menu() {\n    load_cache();\n    let mut settings = snapshot();\n    if !settings.selectable() {\n        return;\n    }\n    let mut menu = read(&crate::runtime::compat::menu::MENU);\n    let mut defaults = read(&crate::runtime::compat::menu::DEFAULTS_MENU);\n    // Keys an older INI omitted take the saved menu choice once, and the INI is\n    // written with them: a menu Off is honoured exactly as after a menu apply.\n    // Keys the INI carries keep winning.\n    let unset = Unset::from_bits(UNSET.swap(0, Ordering::AcqRel));\n    if unset.any() {\n        let adopted = adopt_unset(settings, unset, &menu);\n        if adopted != settings {\n            match store_ini(PATH, adopted) {\n                Ok(()) => {\n                    crate::engine::compat::logging::log_info!(\n                        \"[CyclePreload] adopted saved menu choices for keys missing from cycle_preload.ini: bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}\",\n                        adopted.bank_members,\n                        adopted.group_swap,\n                        adopted.ready_fighters,\n                        adopted.ic_pair_bank,\n                        adopted.original_bank,\n                        adopted.solo_popo_groups,\n                        adopted.ic_pair_groups,\n                        adopted.native_groups,\n                        adopted.pair_groups,\n                        adopted.mii_groups\n                    );\n                    settings = adopted;\n                    store(adopted);\n                }\n                Err(reason) => crate::engine::compat::logging::log_warn!(\n                    \"[CyclePreload] {reason}; keeping the built-in choices for keys missing from cycle_preload.ini\"\n                ),\n            }\n        }\n    }\n    apply_settings(&mut menu, settings);\n    apply_settings(&mut defaults, settings);\n    assign(&crate::runtime::compat::menu::MENU, menu);\n    assign(&crate::runtime::compat::menu::DEFAULTS_MENU, defaults);\n}\n\n/// Persist a normal menu apply. Does not lock the quick menu; the caller may\n/// already hold that lock. Does not read the INI again after startup.\npub(crate) fn publish_applied(menu: &mut TrainingModpackMenu) {\n    load_cache();\n    let previous = snapshot();\n    match publish_decision(previous, menu) {\n        Publish::Keep(settings) => {\n            apply_settings(menu, settings);\n            store(settings);\n        }\n        Publish::Store(settings) => match store_ini(PATH, settings) {\n            Ok(()) => {\n                apply_settings(menu, settings);\n                store(settings);\n                crate::engine::compat::logging::log_info!(\n                    \"[CyclePreload] applied slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}\",\n                    settings.slots,\n                    settings.fighters,\n                    settings.hats,\n                    settings.measurements,\n                    settings.bank_members,\n                    settings.group_swap,\n                    settings.ready_fighters,\n                    settings.ic_pair_bank,\n                    settings.original_bank,\n                    settings.solo_popo_groups,\n                    settings.ic_pair_groups,\n                    settings.native_groups,\n                    settings.pair_groups,\n                    settings.mii_groups\n                );\n            }\n            Err(reason) => {\n                let fallback = if previous.selectable() {\n                    previous\n                } else {\n                    Settings::FAIL_CLOSED\n                };\n                crate::engine::compat::logging::log_warn!(\n                    \"[CyclePreload] {reason}; keeping slots={} bank_members={}\",\n                    fallback.slots,\n                    fallback.bank_members\n                );\n                apply_settings(menu, fallback);\n                store(fallback);\n            }\n        },\n    }\n}\n\nfn load_cache() {\n    LOADED.call_once(|| {\n        let (load, unset) = load_ini_unset(PATH);\n        let settings = startup_settings(load);\n        UNSET.store(unset.to_bits(), Ordering::Release);\n        match load {\n            IniLoad::Parsed(settings) => {\n                crate::engine::compat::logging::log_info!(\n                    \"[CyclePreload] loaded slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}\",\n                    settings.slots,\n                    settings.fighters,\n                    settings.hats,\n                    settings.measurements,\n                    settings.bank_members,\n                    settings.group_swap,\n                    settings.ready_fighters,\n                    settings.ic_pair_bank,\n                    settings.original_bank,\n                    settings.solo_popo_groups,\n                    settings.ic_pair_groups,\n                    settings.native_groups,\n                    settings.pair_groups,\n                    settings.mii_groups\n                );\n            }\n            IniLoad::Created(settings) => {\n                crate::engine::compat::logging::log_info!(\n                    \"[CyclePreload] wrote default cycle_preload.ini; slots={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}\",\n                    settings.slots,\n                    settings.bank_members,\n                    settings.group_swap,\n                    settings.ready_fighters,\n                    settings.ic_pair_bank,\n                    settings.original_bank,\n                    settings.solo_popo_groups,\n                    settings.ic_pair_groups,\n                    settings.native_groups,\n                    settings.pair_groups,\n                    settings.mii_groups\n                );\n            }\n            IniLoad::Unsaved(reason) => {\n                crate::engine::compat::logging::log_error!(\n                    \"[CyclePreload] ERROR {reason}: {PATH} is missing and its default could not be saved; this boot runs the built-in defaults unsaved and the next menu apply or boot tries again\"\n                );\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[CyclePreload] ERROR default_not_saved reason=\\\"{reason}\\\" path={PATH} running=defaults slots={} bank_members={} group_swap={}\",\n                    settings.slots, settings.bank_members, settings.group_swap\n                ));\n            }\n            IniLoad::Rejected(reason) => {\n                crate::engine::compat::logging::log_error!(\n                    \"[CyclePreload] ERROR {reason}: {PATH} is left unchanged; this boot fails closed (slots 0, bank_members 0, every group off) until the file is fixed or a menu apply replaces it\"\n                );\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[CyclePreload] ERROR rejected reason=\\\"{reason}\\\" path={PATH} running=fail_closed slots=0 bank_members=0 group_swap=false\"\n                ));\n            }\n        };\n        store(settings);\n        // After the load, so the line carries the settings this boot applies (E8).\n        #[cfg(feature = \"native-body-bank-alpha\")]\n        crate::runtime::roster::character_roster::body_bank::report_group_swap(&settings);\n    });\n}\n\nfn store(settings: Settings) {\n    let settings = if settings.selectable() {\n        settings\n    } else {\n        Settings::CLOSED\n    };\n    let value = pack(settings);\n    if CACHE.swap(value, Ordering::AcqRel) != value {\n        crate::runtime::roster::cycle_preload::settings_changed();\n    }\n}\n",
+     "new": "//! Runtime publication of the settings.json preload choice.\n//!\n//! Boot and menu publication call the model's transactional INI cache sync on\n//! their own threads. Native callbacks only read the packed atomic snapshot.\nuse std::sync::atomic::{AtomicU32, Ordering};\nuse crate::engine::compat::menu::TrainingModpackMenu;\nuse crate::engine::preload::boot_cache::{self, Cache};\nuse crate::engine::preload::cycle_preload_config::{pack, unpack, Settings, PATH};\n\nstatic CACHE: AtomicU32 = AtomicU32::new(0);\n\n/// Called once from roster boot, after settings.json has been published.\npub fn init() {\n    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);\n    publish(&menu, \"loaded\");\n    #[cfg(feature = \"native-body-bank-alpha\")]\n    crate::runtime::roster::character_roster::body_bank::report_group_swap(&snapshot());\n}\n\n/// No locks, files, allocations, or menu edits on the callback path.\npub fn snapshot() -> Settings {\n    unpack(CACHE.load(Ordering::Acquire))\n}\n\n/// Publishing thread only, before the new menu becomes live and outside hook locks.\n/// A failed INI write never rolls back the player's settings.json choice.\npub(crate) fn publish_applied(menu: &mut TrainingModpackMenu) {\n    publish(menu, \"applied\");\n}\n\nfn publish(menu: &TrainingModpackMenu, event: &str) {\n    let synced = boot_cache::sync(PATH, menu);\n    if let Cache::Failed(reason) = synced.cache {\n        crate::engine::compat::logging::log_warn!(\n            \"[CyclePreload] {reason}; settings.json choice remains active; cache retries on next publish or boot\"\n        );\n    }\n    let s = synced.active;\n    store(s);\n    crate::engine::compat::logging::log_info!(\n        \"[CyclePreload] {} slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}\",\n        event, s.slots, s.fighters, s.hats, s.measurements, s.bank_members,\n        s.group_swap, s.ready_fighters, s.ic_pair_bank, s.original_bank,\n        s.solo_popo_groups, s.ic_pair_groups, s.native_groups, s.pair_groups, s.mii_groups\n    );\n}\n\nfn store(settings: Settings) {\n    let value = pack(settings);\n    if CACHE.swap(value, Ordering::AcqRel) != value {\n        crate::runtime::roster::cycle_preload::settings_changed();\n    }\n}\n",
+     "reason": "D7 boot authority: runtime consumes model boot_cache from published JSON; INI never overlays menu or defaults, including failed writes; atomic callback reader only."
+    }
+   ]
   },
   {
    "src": "src/kirby_hats.rs",
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "1ed4407038fd123f695a324a2cd3a75084db0771853e8ab5deae58d1049b0b81",
+   "dest_sha256": "59d37ed34452ba94110c4ceeb9aa2d34dec371925937956639c9d7e45b5ac677",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
@@ -2327,6 +2492,11 @@
      "new": "fn invalidate_runtime(same_lobby: Option<bool>) {\n    for state in &STATES {",
      "count": 1,
      "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "    let choices=menu.ordered_kirby_hat_kinds(if role==0 {",
+     "new": "    let choices=menu.ordered_kirby_hat_kinds_fixed(if role==0 {",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
     }
    ]
   },
@@ -2365,7 +2535,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "876206adbd0cf3f62753fe337127aef122db8e9f59d829c16261d14c22ce2d91",
+   "dest_sha256": "aedc9c06e6150cf8cbcec521e673eb7d798bad90b6fdf565bae04587c73b3d55",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -2604,6 +2774,11 @@
      "new": "#[cfg(feature = \"native-body-bank-alpha\")] // Its only caller is the body bank.",
      "count": 1,
      "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
+    },
+    {
+     "old": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    let is_capacity=is_capacity_entry(entry,slot);\n",
+     "new": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an\n    // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).\n    #[cfg(feature = \"diag\")]\n    {\n        static SEEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);\n        let quantity = native_source::training_cpu_quantity().unwrap_or(u32::MAX - 1);\n        if SEEN.swap(quantity, Ordering::Relaxed) != quantity {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[CharacterSources] cpu_quantity={quantity} seen_by_service slot={slot}\"));\n        }\n    }\n    let is_capacity=is_capacity_entry(entry,slot);\n",
+     "reason": "diag only (F9 research, lead ruling 2026-11-02): proves whether the native loader callback runs while the pause menu is open, i.e. whether the give-back can run there before the game activates a parked CPU entry"
     }
    ]
   },
@@ -2866,7 +3041,7 @@
    "dest_sha256": "71bb09a5363de91d2388f471a03e28ddbf0527e3fb8037b0c09686e98e09e879",
    "edits": [
     {
-     "old": "/// Start archive retirement in every build, with optional diagnostic heartbeat output.\npub fn start() {\n    let started = if TRACE_ENABLED { now_ms() } else { 0 };\n    let spawned = std::thread::Builder::new()\n        .name(\"practice-heartbeat\".into())\n        .stack_size(0x10000)\n        .spawn(move || {\n            crate::engine::compat::logging::writer_started();\n            let drains_per_beat = (HEARTBEAT_INTERVAL.as_millis() / DRAIN_INTERVAL.as_millis()) as u64;\n            let mut beat = 0u64;\n            let mut drains = 0u64;\n            loop {\n                std::thread::sleep(DRAIN_INTERVAL);\n                // R-A0b: seam outcomes resolved after the install line (runtime-only rows, late NROs).\n                crate::runtime::seams::seam_install::report_late();\n                // Diagnostic build: the hook-sharing drill's stand-in run counts, when they change.\n                #[cfg(feature = \"diag\")]\n                crate::swap_native::seam_drill::report_counts(now_ms());\n                crate::engine::compat::logging::drain();\n                drains += 1;\n                if !drains.is_multiple_of(drains_per_beat) {\n                    continue;\n                }\n                let now = now_ms();\n                // Revision 33: housekeeping off the game threads \u2014 release inflated layout archives\n                // the game finished copying (training::ui).\n                crate::runtime::lobby::training::ui::release_stale_archives(now);\n                if TRACE_ENABLED {\n                    beat += 1;\n                    let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();\n                    crate::engine::compat::logging::diagnostic(format_args!(\n                        \"[Heartbeat] n={} up={}s mode={:?} {} {}\",\n                        beat,\n                        now.saturating_sub(started) / 1000,\n                        crate::runtime::lobby::game_mode::current(),\n                        probes.join(\" \"),\n                        crate::engine::compat::logging::ring_stats()\n                    ));\n                }\n            }\n        });\n    match spawned {\n        Ok(_) => {\n            if TRACE_ENABLED {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[Heartbeat] thread started interval={}s probes={}\",\n                    HEARTBEAT_INTERVAL.as_secs(),\n                    PROBES.len()\n                ));\n            }\n        }\n        Err(error) => {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[Heartbeat] thread unavailable: {error}\"));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[PracticeDiagnostics] writer=caller heartbeat_thread=unavailable\"\n            ));\n        }\n    }\n}\n",
+     "old": "/// Start archive retirement in every build, with optional diagnostic heartbeat output.\npub fn start() {\n    let started = if TRACE_ENABLED { now_ms() } else { 0 };\n    let spawned = std::thread::Builder::new()\n        .name(\"practice-heartbeat\".into())\n        .stack_size(0x10000)\n        .spawn(move || {\n            crate::engine::compat::logging::writer_started();\n            let drains_per_beat = (HEARTBEAT_INTERVAL.as_millis() / DRAIN_INTERVAL.as_millis()) as u64;\n            let mut beat = 0u64;\n            let mut drains = 0u64;\n            loop {\n                std::thread::sleep(DRAIN_INTERVAL);\n                // R-A0b: seam outcomes resolved after the install line (runtime-only rows, late NROs).\n                crate::runtime::seams::seam_install::report_late();\n                // Diagnostic build: the hook-sharing drill's stand-in run counts, when they change.\n                #[cfg(feature = \"diag\")]\n                crate::swap_native::seam_drill::report_counts(now_ms());\n                crate::engine::compat::logging::drain();\n                drains += 1;\n                if !drains.is_multiple_of(drains_per_beat) {\n                    continue;\n                }\n                let now = now_ms();\n                // Revision 33: housekeeping off the game threads — release inflated layout archives\n                // the game finished copying (training::ui).\n                crate::runtime::lobby::training::ui::release_stale_archives(now);\n                if TRACE_ENABLED {\n                    beat += 1;\n                    let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();\n                    crate::engine::compat::logging::diagnostic(format_args!(\n                        \"[Heartbeat] n={} up={}s mode={:?} {} {}\",\n                        beat,\n                        now.saturating_sub(started) / 1000,\n                        crate::runtime::lobby::game_mode::current(),\n                        probes.join(\" \"),\n                        crate::engine::compat::logging::ring_stats()\n                    ));\n                }\n            }\n        });\n    match spawned {\n        Ok(_) => {\n            if TRACE_ENABLED {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[Heartbeat] thread started interval={}s probes={}\",\n                    HEARTBEAT_INTERVAL.as_secs(),\n                    PROBES.len()\n                ));\n            }\n        }\n        Err(error) => {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[Heartbeat] thread unavailable: {error}\"));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[PracticeDiagnostics] writer=caller heartbeat_thread=unavailable\"\n            ));\n        }\n    }\n}\n",
      "new": "",
      "reason": "the fork's `practice-heartbeat` thread (`start`) is removed: the diagnostics drain thread is package 1's `diag_log::start_drain_thread` (it now also runs `seam_install::report_late`, the late seam report), layout archive retirement is package 5's own retire thread (`ui::archive`), and the diag hook-count summary is package 1's `hook_stats` line (review R5). The probes (`ROSTER_SERVICE.hit()` ...) stay as carried"
     }
@@ -3205,7 +3380,7 @@
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
     },
     {
-     "old": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"\ud83d\ude00\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"\ud83d\ude00\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
+     "old": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"😀\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"😀\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
      "new": "",
      "count": 1,
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
@@ -3367,7 +3542,171 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "628b44a3dd1652be29891482dd199b25404fc6c0e790ae6b648d9867cb5bb00d"
+   "dest_sha256": "1f18b830bc14f8d43b9b9175ef7cff3ddf68d07c3905d13063e11e529da4490d",
+   "edits": [
+    {
+     "old": "use std::sync::{mpsc, Arc, Mutex};",
+     "new": "use std::sync::{mpsc, Arc, Mutex};\nuse crate::model::catalog_reply::{Job, Replies};",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "reply: Option<mpsc::Receiver<Snapshot>>,",
+     "new": "reply: Option<Replies<Arc<Snapshot>>>,\n    in_flight: bool,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "held_editor: Option<(Snapshot, u64)>,",
+     "new": "held_editor: Option<(Arc<Snapshot>, u64)>,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "reply: None,",
+     "new": "reply: None,\n            in_flight: false,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn live() -> Live {",
+     "new": "/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n}\n\nfn live() -> Live {",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn poll(&mut self) -> Option<(Verdict, Snapshot)> {\n        if let Some(reply) = self.reply.as_ref() {\n            match reply.try_recv() {\n                Ok(snapshot) => {\n                    self.reply = None;",
+     "new": "fn poll(&mut self) -> Option<(Verdict, Arc<Snapshot>)> {\n        if self.in_flight {\n            let reply = self.reply.as_mut().expect(\"catalog initialized before requests\");\n            match reply.poll() {\n                Ok(Ok(snapshot)) => {\n                    self.in_flight = false;",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "Err(mpsc::TryRecvError::Disconnected) => {\n                    self.reply = None;",
+     "new": "Ok(Err(())) | Err(mpsc::TryRecvError::Disconnected) => {\n                    self.in_flight = false;",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    fn enqueue(&mut self) -> Effect {\n        let (sender, receiver) = mpsc::sync_channel(1);\n        match crate::runtime::macros::replay_store::request_mii_catalog(sender) {\n            crate::runtime::macros::replay_store::CatalogQueue::Queued => {\n                self.flight_serial = self.policy.serial();\n                self.reply = Some(receiver);\n                Effect::quiet(Step::Wait)\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Full => {\n                drop(receiver);\n                self.policy.rejected_full()\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Unavailable => {\n                drop(receiver);\n                self.policy.failed(live())\n            }\n        }\n    }\n\n",
+     "new": "    fn enqueue(&mut self) -> Effect {\n        let Some(replies) = self.reply.as_mut() else { return self.policy.failed(live()); };\n        let Some(sender) = replies.begin() else { return self.policy.failed(live()); };\n        match crate::runtime::macros::replay_store::request_mii_catalog(Job::new(sender)) {\n            crate::runtime::macros::replay_store::CatalogQueue::Queued => {\n                self.flight_serial = self.policy.serial();\n                self.in_flight = true;\n                Effect::quiet(Step::Wait)\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Full(job) => {\n                replies.rejected(job.rejected());\n                self.policy.rejected_full()\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Unavailable(job) => {\n                replies.rejected(job.rejected());\n                self.policy.failed(live())\n            }\n        }\n    }\n\n",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn apply(verdict: Verdict, snapshot: Snapshot)",
+     "new": "fn apply(verdict: Verdict, snapshot: Arc<Snapshot>)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "Arc::new(snapshot)",
+     "new": "snapshot",
+     "count": 2,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn retain_editor(snapshot: Snapshot, opening: u64)",
+     "new": "fn retain_editor(snapshot: Arc<Snapshot>, opening: u64)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "use crate::model::catalog_reply::{Job, Replies};",
+     "new": "use crate::model::catalog_reply::{Job, Replies};\nuse crate::runtime::ui::menu_app::{CatalogPublication, QUICK_MENU_APP, MENU_RECEIVED_INPUT};",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "held_editor: Option<(Arc<Snapshot>, u64)>,",
+     "new": "held_editor: Option<(Arc<Snapshot>, u64)>,\n    held_menu: Option<CatalogPublication>,",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "held_editor: None,",
+     "new": "held_editor: None,\n            held_menu: None,",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "self.held_editor.is_some() || self.policy.pending()",
+     "new": "self.held_menu.is_some() || self.held_editor.is_some() || self.policy.pending()",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    let restart_auto = broker.policy.close_menu(opening);",
+     "new": "    let restart_auto = broker.policy.close_menu(opening);\n    if broker.held_menu.as_ref().is_some_and(|p| p.epoch == opening) { broker.held_menu = None; }",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    broker.policy.retire();",
+     "new": "    broker.policy.retire();\n    broker.held_menu = None;",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    let (held, ready) = {",
+     "new": "    let (held, menu, ready) = {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "        let held = broker.held_editor.take();",
+     "new": "        let held = broker.held_editor.take();\n        let menu = broker.held_menu.take();",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "        (held, ready)",
+     "new": "        (held, menu, ready)",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    if let Some((snapshot, opening)) = held {",
+     "new": "    if let Some(publication) = menu { publish_menu(publication); }\n    if let Some((snapshot, opening)) = held {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {",
+     "new": "/// Capture has completed. A contended UI lock retains the value for the next\n/// native service callback; close/retire cancels it through the existing broker.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    if let Some(mut app) = QUICK_MENU_APP.try_lock() {\n        app.follow_open();\n        if publication.epoch == super::mii_saved_alpha::menu_epoch()\n            && app.publish_catalog(publication) {\n            MENU_RECEIVED_INPUT.store(true, Ordering::Release);\n        }\n        return;\n    }\n    let mut broker = STATE.lock().unwrap();\n    broker.held_menu = Some(publication);\n    PENDING.store(true, Ordering::Release);\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "pub(super) fn service() {",
+     "new": "pub(super) fn service() {\n    crate::runtime::mii::menu_handoff::service();",
+     "reason": "Service typed UI intent only at existing native game callback, before pending catalog work."
+    },
+    {
+     "old": "use std::sync::atomic::{AtomicBool, Ordering};\nuse std::sync::{mpsc, Arc, Mutex};\nuse crate::model::catalog_reply::{Job, Replies};\nuse crate::runtime::ui::menu_app::{CatalogPublication, QUICK_MENU_APP, MENU_RECEIVED_INPUT};\n\nuse crate::engine::mii::{\n    catalog_request::{Effect, Kind, Live, Requests, Step, Verdict},\n",
+     "new": "use std::sync::atomic::{AtomicBool, Ordering};\nuse std::sync::{mpsc, Arc, Mutex};\nuse crate::model::catalog_reply::{Job, Replies};\nuse crate::runtime::ui::menu_app::{CatalogPublication, MENU_RECEIVED_INPUT};\n\nuse crate::engine::mii::{\n    catalog_request::{Effect, Kind, Live, Requests, Step, Verdict},\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n}\n",
+     "new": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n}\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "    }\n}\n\n/// Capture has completed. A contended UI lock retains the value for the next\n/// native service callback; close/retire cancels it through the existing broker.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    if let Some(mut app) = QUICK_MENU_APP.try_lock() {\n        app.follow_open();\n        if publication.epoch == super::mii_saved_alpha::menu_epoch()\n            && app.publish_catalog(publication) {\n            MENU_RECEIVED_INPUT.store(true, Ordering::Release);\n        }\n        return;\n    }\n    let mut broker = STATE.lock().unwrap();\n    broker.held_menu = Some(publication);\n    PENDING.store(true, Ordering::Release);\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {\n",
+     "new": "    }\n}\n\n/// Capture has completed. Full/unavailable publication retains the identical\n/// value for the next native callback; the existing close/retire policy cancels it.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    match crate::runtime::ui::menu_app::publish_catalog(publication) {\n        Ok(()) => { MENU_RECEIVED_INPUT.store(true, Ordering::Release); }\n        Err(publication) => {\n            let mut broker = STATE.lock().unwrap();\n            broker.held_menu = Some(publication);\n            PENDING.store(true, Ordering::Release);\n        }\n    }\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
+     "new": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    super::menu_handoff::init();\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
+     "reason": "Boot-initialize owned close-intent channel; UI producer never shares a native receiver guard (lead19:17)."
+    },
+    {
+     "old": "    super::menu_handoff::init();",
+     "new": "    crate::runtime::mii::menu_handoff::init();",
+     "reason": "Fixed composition module ownership: carried catalog request is nested under roster; close handoff belongs to the clean-room runtime mii module. Lead authorized exact qualified initialization."
+    }
+   ]
   },
   {
    "src": "src/mii_hud_portrait.rs",
@@ -3400,14 +3739,56 @@
    "dest": "src/runtime/mii/mii_managed_helper.rs",
    "crate": "root",
    "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
-   "dest_sha256": "3c45f087b29f10a64d432d86d8f1636488c746c6e76a9b053d1d12b9de96fa04"
+   "dest_sha256": "ebe56d035dba970041f39554d7b0d2ef9680b12166a7d4818c7534250c406335",
+   "edits": [
+    {
+     "old": "use std::sync::{Arc, Mutex};",
+     "new": "use std::sync::Mutex;\nuse crate::model::reusable_snapshot::{Storage, Snapshot as SharedSnapshot};",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "struct State {\n    track: Option<Track>,",
+     "new": "struct State {\n    storage: Option<Storage<Prepared>>,\n    track: Option<Track>,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "static STATE: Mutex<State> = Mutex::new(State {\n    track: None,",
+     "new": "static STATE: Mutex<State> = Mutex::new(State {\n    storage: None,\n    track: None,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "    data: Arc<Prepared>,",
+     "new": "    data: SharedSnapshot<Prepared>,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "pub(super) fn origins_captured() -> bool {",
+     "new": "/// Called once at boot, before native hooks can admit a helper.\npub(super) fn init_storage() {\n    let mut state = STATE.lock().unwrap();\n    if state.storage.is_none() { state.storage = Some(Storage::new()); }\n}\npub(super) fn origins_captured() -> bool {",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "        STATE.lock().unwrap().track.is_none(),\n        \"helper transaction still retained\",",
+     "new": "        {\n            let state = STATE.lock().unwrap();\n            state.track.is_none() && state.storage.as_ref().is_some_and(Storage::available)\n        },\n        \"helper transaction still retained\",",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "    s.track = Some(Track {",
+     "new": "    let data = s.storage.as_mut().ok_or(\"helper storage not initialized\")?\n        .publish(data).map_err(|_| \"helper snapshot reader still retained\")?;\n    s.track = Some(Track {",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "        data: Arc::new(data),",
+     "new": "        data,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_cpu.rs",
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "ca582e25916a342413d5f9454c1d54ebbf81576a26051d432940b722f45f7356",
+   "dest_sha256": "5eef00a74c5c1f4bae8ab605fec7cd303c6dcb38e063765c1a4ca7b35b43ef30",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -3433,6 +3814,11 @@
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
      "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
      "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
+    },
+    {
+     "old": "    s.capture_at=(generation,opening);\n    s.capture\n}\npub(super) fn refresh_library(library:&crate::engine::mii::draft::Library) {\n    let mut s=STATE.lock().unwrap();\n    if let Some(catalog)=s.catalog.take() {s.catalog=Some(Arc::new((*catalog).clone().with_library(library)));}\n}\npub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {\n    let s=STATE.lock().unwrap();\n",
+     "new": "    s.capture_at=(generation,opening);\n    s.capture\n}\npub(super) fn library_catalog() -> Result<Option<Arc<Catalog>>, ()> {\n    let s = STATE.try_lock().map_err(|_| ())?;\n    Ok(s.catalog.as_ref().map(Arc::clone))\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\npub(super) fn publish_library(expected: &Arc<Catalog>, prepared: &Arc<Catalog>) -> Result<bool, ()> {\n    let mut s = STATE.try_lock().map_err(|_| ())?;\n    if !s.catalog.as_ref().is_some_and(|catalog| Arc::ptr_eq(catalog, expected)) { return Ok(false); }\n    s.catalog = Some(Arc::clone(prepared));\n    Ok(true)\n}\npub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {\n    let s=STATE.lock().unwrap();\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
     }
    ]
   },
@@ -3523,7 +3909,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "2d0949f60cbf908144977885db5e80b3846cb47386f99ed3a6d52ef2e51a22b0",
+   "dest_sha256": "1ef8425c725a58639b504b93c3e356706fef67f95399585529cff609223ddaeb",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -3549,6 +3935,11 @@
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
      "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
      "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
+    },
+    {
+     "old": "    s.capture\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\npub(super) fn refresh_library(library:&crate::engine::mii::draft::Library) {\n    let mut s=STATE.lock().unwrap();\n    if let Some(catalog)=s.catalog.take() {s.catalog=Some(Arc::new((*catalog).clone().with_library(library)));}\n}\npub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {\n    let s=STATE.lock().unwrap();\n",
+     "new": "    s.capture\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\npub(super) fn library_catalog() -> Result<Option<Arc<Catalog>>, ()> {\n    let s = STATE.try_lock().map_err(|_| ())?;\n    Ok(s.catalog.as_ref().map(Arc::clone))\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\npub(super) fn publish_library(expected: &Arc<Catalog>, prepared: &Arc<Catalog>) -> Result<bool, ()> {\n    let mut s = STATE.try_lock().map_err(|_| ())?;\n    if !s.catalog.as_ref().is_some_and(|catalog| Arc::ptr_eq(catalog, expected)) { return Ok(false); }\n    s.catalog = Some(Arc::clone(prepared));\n    Ok(true)\n}\npub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {\n    let s=STATE.lock().unwrap();\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
     }
    ]
   },
@@ -3557,14 +3948,57 @@
    "dest": "src/runtime/mii/mii_replay.rs",
    "crate": "root",
    "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-   "dest_sha256": "63893afd95ba42644c811b48612eef174d35de3746c5ffff8b75a0363ca8c198"
+   "dest_sha256": "6235c213d56a9ed095890aace79de09dc94b9628a671f4dd40d61dd13b4bd3f2",
+   "edits": [
+    {
+     "old": "//! Deferred replay resource identity. The existing Training service is the only native seam.\nuse super::*;\nuse std::{\n    collections::VecDeque,\n    sync::{mpsc, Arc},\n};\nuse crate::engine::mii::{\n    draft::Library,\n    lifetime::Configuration,\n    native_values::RowIds,\n    replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},\n};\n\nconst MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;\nstatic WORK: AtomicBool = AtomicBool::new(false);\nstatic STATE: Mutex<State> = Mutex::new(State {\n    pending: VecDeque::new(),\n    inflight: None,\n});\ntype Reply = mpsc::Sender<Result<Configuration, String>>;\nstruct Job {\n    raw: RawMii,\n    selected: Option<(u64, u64, Reply)>,\n}\nstruct Inflight {\n    job: Job,\n    configuration: Configuration,\n    result: mpsc::Receiver<Result<Arc<Library>, String>>,\n}\nstruct State {\n    pending: VecDeque<Job>,\n    inflight: Option<Inflight>,\n}\nfn generation() -> u64 {\n    mii_saved_alpha::current_generation(1)\n}\nfn current(job: &Job) -> bool {\n    job.selected.as_ref().is_none_or(|(epoch, revision, _)| {\n        *epoch == generation() && *revision == crate::runtime::macros::replay_capture::selection_revision()\n    })\n}\nfn finish(job: Job, result: Result<Configuration, String>) {\n    if let Some((_, _, reply)) = job.selected {\n        let _ = reply.send(result);\n    } else if let Err(error) = result {\n        trace!(\"[MiiReplay] deferred import unavailable: {error}; durable raw metadata retained\");\n    }\n}\n\n/// Called only after the companion was committed. This bounded queue is an optimization;\n/// the durable association remains authoritative and selected captures can retry after restart.\npub(crate) fn committed(miis: ReplayMiis) {\n    let mut s = STATE.lock().unwrap();\n    for raw in miis.entries() {\n        if s.pending.len() == MAX_PENDING {\n            break;\n        }\n        s.pending.push_back(Job {\n            raw: *raw,\n            selected: None,\n        });\n    }\n    WORK.store(\n        !s.pending.is_empty() || s.inflight.is_some(),\n        Ordering::Release,\n    );\n}\npub(crate) fn resolve(\n    raw: RawMii,\n    revision: u64,\n) -> Result<mpsc::Receiver<Result<Configuration, String>>, String> {\n    if !mii_ordinary_cpu::enabled() {\n        return Err(\"Replay Mii loading is unavailable in this build\".into());\n    }\n    let (reply, receive) = mpsc::channel();\n    let mut s = STATE.lock().unwrap();\n    if s.pending.len() == MAX_PENDING {\n        return Err(\"Mii import queue is busy; reopen this capture\".into());\n    }\n    s.pending.push_front(Job {\n        raw,\n        selected: Some((generation(), revision, reply)),\n    });\n    WORK.store(true, Ordering::Release);\n    Ok(receive)\n}\npub(crate) fn selected(target: Target, revision: u64) -> Selection {\n    Selection {\n",
+     "new": "//! Deferred replay resource identity. Native callbacks exchange boot-reserved values\n//! with the existing file writer; catalog construction stays on that writer.\nuse super::*;\nuse std::sync::{mpsc, Arc, OnceLock};\nuse crate::model::{catalog_reply::{Job, Replies}, replay_jobs::{Identity, Queue, Work}, pooled_reply};\nuse crate::engine::mii::{\n    draft::Library, inventory::Snapshot as Catalog, lifetime::Configuration,\n    native_values::RowIds,\n    replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},\n};\n\nconst MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;\nstatic STATE: Mutex<Option<State>> = Mutex::new(None);\ntype Outcome = Result<Configuration, Error>;\nstatic REPLIES: OnceLock<pooled_reply::Pool<Outcome>> = OnceLock::new();\nstatic REQUESTS: OnceLock<mpsc::SyncSender<Submission>> = OnceLock::new();\nstruct Submission {\n    raw: RawMii,\n    identity: Option<Identity>,\n    reply: pooled_reply::Job<'static, Outcome>,\n}\n\n#[derive(Clone, Debug)]\npub(crate) enum Error { Native(&'static str), Worker(Arc<str>) }\nimpl Error {\n    pub(crate) fn message(&self) -> &str {\n        match self { Self::Native(s) => s, Self::Worker(s) => s }\n    }\n}\nimpl core::fmt::Display for Error {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { f.write_str(self.message()) }\n}\n\npub(crate) struct Ticket {\n    identity: Identity,\n    reply: pooled_reply::Ticket<'static, Outcome>,\n}\nimpl Ticket {\n    pub(crate) fn try_recv(&self) -> Result<Outcome, mpsc::TryRecvError> {\n        if self.identity != identity() { return Err(mpsc::TryRecvError::Disconnected); }\n        match self.reply.try_recv() {\n            Ok(Ok(value)) => Ok(value),\n            Ok(Err(())) => Err(mpsc::TryRecvError::Disconnected),\n            Err(error) => Err(error),\n        }\n    }\n}\n\npub(crate) struct CatalogMerge {\n    expected: Arc<Catalog>,\n    prepared: Option<Arc<Catalog>>,\n}\n/// One box allocated at startup and returned with every writer completion.\n/// Contains owned values only; no native pointer crosses the worker boundary.\npub(crate) struct ImportPayload {\n    pub(crate) configuration: Option<Configuration>,\n    pub(crate) native: Option<Arc<Catalog>>,\n    pub(crate) library: Option<Arc<Library>>,\n    pub(crate) error: Option<Error>,\n    updates: [Option<CatalogMerge>; 2],\n}\nimpl ImportPayload {\n    fn empty() -> Self {\n        Self { configuration: None, native: None, library: None, error: None, updates: [None, None] }\n    }\n    /// Existing file worker only: cloning a catalog allocates.\n    pub(crate) fn merge(&mut self, library: Arc<Library>) {\n        for update in self.updates.iter_mut().flatten() {\n            update.prepared = Some(Arc::new((*update.expected).clone().with_library(&library)));\n        }\n        self.library = Some(library);\n    }\n}\npub(crate) type ImportReply = Job<Box<ImportPayload>>;\npub(crate) enum ImportQueue {\n    Queued,\n    Full(Box<ImportPayload>, ImportReply),\n    Unavailable(Box<ImportPayload>, ImportReply),\n}\nstruct State {\n    queue: Queue<Submission, ()>,\n    requests: mpsc::Receiver<Submission>,\n    active: Option<Work<Submission>>,\n    payload: Option<Box<ImportPayload>>,\n    replies: Replies<Box<ImportPayload>>,\n    waiting: bool,\n}\npub(super) fn init() {\n    let mut guard = STATE.lock().unwrap();\n    if guard.is_none() {\n        let (sender, requests) = mpsc::sync_channel(MAX_PENDING + 1);\n        let _ = REPLIES.set(pooled_reply::Pool::new(MAX_PENDING + 1));\n        let _ = REQUESTS.set(sender);\n        *guard = Some(State { queue: Queue::new(MAX_PENDING + 1), requests, active: None,\n            payload: Some(Box::new(ImportPayload::empty())), replies: Replies::new(), waiting: false });\n    }\n}\nfn generation() -> u64 { mii_saved_alpha::current_generation(1) }\nfn identity() -> Identity {\n    Identity { epoch: generation(), revision: crate::runtime::macros::replay_capture::selection_revision() }\n}\nimpl State {\n    fn finish(&mut self, result: Result<Configuration, Error>) {\n        if let Some(work) = self.active.take() {\n            work.request.reply.complete(result);\n            self.queue.complete(work.ticket, ());\n            let _ = self.queue.poll(work.ticket);\n        }\n        if let Some(payload) = self.payload.as_mut() { **payload = ImportPayload::empty(); }\n    }\n    fn submit_import(&mut self) {\n        let Some(sender) = self.replies.begin() else { return; };\n        let Some(payload) = self.payload.take() else {\n            self.replies.rejected(sender);\n            self.finish(Err(Error::Native(\"Mii preset owner unavailable\")));\n            return;\n        };\n        match crate::runtime::macros::replay_store::import_mii(payload, Job::new(sender)) {\n            ImportQueue::Queued => self.waiting = true,\n            ImportQueue::Full(payload, reply) => {\n                self.payload = Some(payload); self.replies.rejected(reply.rejected());\n            }\n            ImportQueue::Unavailable(payload, reply) => {\n                self.payload = Some(payload); self.replies.rejected(reply.rejected());\n                self.finish(Err(Error::Native(\"Mii preset owner unavailable\")));\n            }\n        }\n    }\n}\n\n/// File worker only. Durable association remains authoritative if the bounded\n/// optimization queue is full; a later selected capture resolves it again.\npub(crate) fn committed(miis: ReplayMiis) {\n    let (Some(pool), Some(sender)) = (REPLIES.get(), REQUESTS.get()) else { return; };\n    for raw in miis.entries() {\n        let Some((ticket, reply)) = pool.claim() else { break; };\n        drop(ticket); // durable companion has no selected reader\n        if sender.try_send(Submission { raw: *raw, identity: None, reply }).is_err() { break; }\n    }\n}\npub(crate) fn resolve(raw: RawMii, revision: u64) -> Result<Ticket, Error> {\n    if !mii_ordinary_cpu::enabled() { return Err(Error::Native(\"Replay Mii loading is unavailable in this build\")); }\n    let (Some(pool), Some(sender)) = (REPLIES.get(), REQUESTS.get()) else {\n        return Err(Error::Native(\"Mii preset owner unavailable\"));\n    };\n    let current = identity();\n    if revision != current.revision { return Err(Error::Native(\"Replay selection retired\")); }\n    let Some((ticket, reply)) = pool.claim() else {\n        return Err(Error::Native(\"Mii import queue is busy; reopen this capture\"));\n    };\n    sender.try_send(Submission { raw, identity: Some(current), reply })\n        .map_err(|_| Error::Native(\"Mii preset owner unavailable\"))?;\n    Ok(Ticket { identity: current, reply: ticket })\n}\npub(crate) fn selected(target: Target, revision: u64) -> Selection {\n    Selection {\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "    }\n}\n\npub(super) unsafe fn service(entry: *const u8, owner: u32) {\n    if mii_backend::cpu()!=Some(owner)\n        || !WORK.load(Ordering::Acquire)\n        || !mii_ordinary_cpu::enabled()\n    {\n        return;\n    }\n    let completed = {\n        let mut s = STATE.lock().unwrap();\n        let result = s.inflight.as_ref().map(|i| i.result.try_recv());\n        match result {\n            Some(Ok(result)) => Some((s.inflight.take().unwrap(), result)),\n            Some(Err(mpsc::TryRecvError::Disconnected)) => Some((\n                s.inflight.take().unwrap(),\n                Err(\"Mii import writer disconnected\".into()),\n            )),\n            _ => None,\n        }\n    };\n    if let Some((inflight, result)) = completed {\n        let result = result.map(|library| {\n            mii_ordinary_player::refresh_library(&library);\n            mii_ordinary_cpu::refresh_library(&library);\n            inflight.configuration\n        });\n        let result = if current(&inflight.job) {\n            result\n        } else {\n            Err(\"Replay selection retired\".into())\n        };\n        finish(inflight.job, result);\n    }\n    let mut s = STATE.lock().unwrap();\n    if s.inflight.is_some() {\n        return;\n    }\n    while s.pending.front().is_some_and(|job| !current(job)) {\n        finish(\n            s.pending.pop_front().unwrap(),\n            Err(\"Replay selection retired\".into()),\n        );\n    }\n    if s.pending.is_empty() {\n        WORK.store(false, Ordering::Release);\n        return;\n    }\n    drop(s);\n    let Some(catalog) = mii_ordinary_cpu::replay_catalog() else {\n        return;\n    };\n    // No scans or retries before readiness. No locks/native pointers enter the file worker.\n    if !crate::runtime::compat::common::is_ready_go()\n        || INSTALL.active()\n        || menu::captures_input()\n        || lobby::native_ui_busy()\n        || button_config::has_pending_request()\n        || training::save_states::is_loading()\n        || training::recording_or_playback()\n        || crate::runtime::compat::replay_preview::occupied()\n        || !mii_backend::ready()\n        || !(ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some())\n    {\n        return;\n    }\n    let Some(job) = STATE.lock().unwrap().pending.pop_front() else {\n        return;\n    };\n    use crate::runtime::mii::mii_native_access::{lookup_row_id, HAT_TABLE, OUTFIT_TABLE};\n    let tokens = job.raw.tokens();\n    let resolved = (|| {\n        let base = BASE.load(Ordering::Acquire);\n        let rows = RowIds {\n            outfit: lookup_row_id(base, OUTFIT_TABLE, tokens.outfit)?,\n            hat: lookup_row_id(base, HAT_TABLE, tokens.hat)?,\n        };\n        job.raw\n            .resolve(rows)\n            .map_err(|_| \"Replay Mii resource identity did not resolve\")\n    })();\n    match resolved {\n        Ok(configuration) => {\n            if !current(&job) {\n                finish(job, Err(\"Replay selection retired\".into()));\n                return;\n            }\n            let (reply, result) = mpsc::channel();\n            match crate::runtime::macros::replay_store::import_mii(configuration, catalog, reply) {\n                Ok(()) => {\n                    STATE.lock().unwrap().inflight = Some(Inflight {\n                        job,\n                        configuration,\n                        result,\n                    })\n                }\n                Err(error) => finish(job, Err(error)),\n            }\n        }\n        Err(error) => finish(job, Err(error.into())),\n    }\n}\n",
+     "new": "    }\n}\n\n\npub(super) unsafe fn service(entry: *const u8, owner: u32) {\n    if mii_backend::cpu() != Some(owner) || !mii_ordinary_cpu::enabled() { return; }\n    let Ok(mut guard) = STATE.try_lock() else { return; };\n    let Some(state) = guard.as_mut() else { return; };\n    let current = identity();\n    state.queue.retire(current);\n    for _ in 0..MAX_PENDING + 1 {\n        let Ok(request) = state.requests.try_recv() else { break; };\n        if request.identity.is_some_and(|id| id != current) { continue; }\n        let id = request.identity;\n        // Every accepted request owns one pool permit until finish/drop; pool\n        // and queue have the same capacity, so adoption cannot exhaust slots.\n        if let Err(request) = state.queue.submit(request, id) {\n            request.reply.complete(Err(Error::Native(\"Mii import queue unavailable\")));\n        }\n    }\n    if state.waiting {\n        match state.replies.poll() {\n            Ok(Ok(payload)) => { state.payload = Some(payload); state.waiting = false; }\n            Ok(Err(())) | Err(mpsc::TryRecvError::Disconnected) => {\n                state.waiting = false;\n                state.finish(Err(Error::Native(\"Mii import writer disconnected\")));\n            }\n            Err(mpsc::TryRecvError::Empty) => return,\n        }\n    }\n    if state.active.as_ref().is_some_and(|work| work.identity.is_some_and(|id| id != current)) {\n        state.finish(Err(Error::Native(\"Replay selection retired\")));\n    }\n    if state.active.is_some() {\n        let Some(payload) = state.payload.as_mut() else {\n            state.finish(Err(Error::Native(\"Mii preset owner unavailable\"))); return;\n        };\n        if let Some(error) = payload.error.take() { state.finish(Err(error)); return; }\n        if payload.library.is_some() {\n            for role in 0..2 {\n                let Some(update) = payload.updates[role].as_mut() else { continue; };\n                let Some(prepared) = update.prepared.as_ref() else { continue; };\n                let published = if role == 0 {\n                    mii_ordinary_player::publish_library(&update.expected, prepared)\n                } else { mii_ordinary_cpu::publish_library(&update.expected, prepared) };\n                match published {\n                    Err(()) => return, // retain the immutable completion on contention\n                    Ok(true) => payload.updates[role] = None,\n                    Ok(false) => {\n                        let fresh = if role == 0 { mii_ordinary_player::library_catalog() }\n                            else { mii_ordinary_cpu::library_catalog() };\n                        let Ok(fresh) = fresh else { return; };\n                        payload.updates[role] = fresh.map(|expected| CatalogMerge { expected, prepared: None });\n                    }\n                }\n            }\n            if payload.updates.iter().all(Option::is_none) {\n                let configuration = payload.configuration.unwrap();\n                state.finish(Ok(configuration));\n            } else {\n                // A newer catalog won the publication race. Re-merge on the\n                // existing writer; the durable preset import is not repeated.\n                state.submit_import();\n                return;\n            }\n        } else { state.submit_import(); return; }\n    }\n    if !state.queue.has_work() { return; }\n    // No native row scans until the original gameplay and transaction gates permit them.\n    if !crate::runtime::compat::common::is_ready_go() || INSTALL.active() || menu::captures_input()\n        || lobby::native_ui_busy() || button_config::has_pending_request()\n        || training::save_states::is_loading() || training::recording_or_playback()\n        || crate::runtime::compat::replay_preview::occupied() || !mii_backend::ready()\n        || !(ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some()) { return; }\n    let Some(catalog) = mii_ordinary_cpu::replay_catalog() else { return; };\n    let Ok(player) = mii_ordinary_player::library_catalog() else { return; };\n    let Ok(cpu) = mii_ordinary_cpu::library_catalog() else { return; };\n    let Some(work) = state.queue.take_next() else { return; };\n    use crate::runtime::mii::mii_native_access::{lookup_row_id, HAT_TABLE, OUTFIT_TABLE};\n    let tokens = work.request.raw.tokens();\n    let resolved = (|| {\n        let base = BASE.load(Ordering::Acquire);\n        let rows = RowIds { outfit: lookup_row_id(base, OUTFIT_TABLE, tokens.outfit)?,\n            hat: lookup_row_id(base, HAT_TABLE, tokens.hat)? };\n        work.request.raw.resolve(rows).map_err(|_| \"Replay Mii resource identity did not resolve\")\n    })();\n    state.active = Some(work);\n    match resolved {\n        Err(error) => state.finish(Err(Error::Native(error))),\n        Ok(configuration) => {\n            let Some(payload) = state.payload.as_mut() else {\n                state.finish(Err(Error::Native(\"Mii preset owner unavailable\"))); return;\n            };\n            payload.configuration = Some(configuration);\n            payload.native = Some(catalog);\n            payload.updates = [player, cpu].map(|catalog| catalog.map(|expected| CatalogMerge { expected, prepared: None }));\n            state.submit_import();\n        }\n    }\n}\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    }
+   ]
   },
   {
    "src": "src/mii_saved_alpha.rs",
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "0a4a7ea67c553f40727eae99d8d3fcfb7cd2ad26870331d519498b5ca7b29bc2"
+   "dest_sha256": "996b108b292516c531560918c04b9dd7e6fc4697f048e4f205852d664fcd73b0",
+   "edits": [
+    {
+     "old": "pub(super) fn init(base: usize) {",
+     "new": "pub(super) fn init(base: usize) {\n    super::mii_catalog_request::init();",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    // publish_mii_catalog takes an owned Snapshot. ALPHA keeps the Arc, so this\n    // one clone is the menu publish, not a per-tick copy.",
+     "new": "    // Keep the worker-built snapshot shared; the UI constructs its menu off-hook.",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "            ((*catalog).clone(), context)",
+     "new": "            (Arc::clone(&catalog), context)",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    if let Some((catalog, context)) = publish {\n        // No G/state lock remains; App contains owned values only.\n        let mut app = crate::runtime::compat::sync::lock_write(&menu::QUICK_MENU_APP);\n        // Check under App: an older capture may have completed before cancellation.\n        let mounted=app.publish_mii_catalog(catalog, context, menu_epoch(), || {\n            crate::runtime::compat::sync::assign(&menu::MENU_RECEIVED_INPUT, true);\n        });\n        #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n        if mounted {app.qualify_ordinary_cpu_cycle(ordinary_cpu);}\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let _=mounted;\n    }\n",
+     "new": "    if let Some((catalog, context)) = publish {\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let ordinary_cpu = false;\n        super::mii_catalog_request::publish_menu(crate::runtime::ui::menu_app::CatalogPublication {\n            catalog, epoch: context.epoch, context: Some(context), ordinary_cpu,\n        });\n    }\n",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "pub(crate) fn menu_ready(opening: u64) {\n    if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {\n        return;\n    }\n    super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {\n        opening,\n        owners: [current_generation(0), current_generation(1)],\n    });\n}",
+     "new": "pub(crate) fn menu_ready(opening: u64) -> bool {\n    if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {\n        return false;\n    }\n    super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {\n        opening,\n        owners: [current_generation(0), current_generation(1)],\n    });\n    true\n}",
+     "reason": "Report existing native capture admission so editor-only fallback cannot supersede a valid role-aware catalog request."
+    }
+   ]
   },
   {
    "src": "src/mii_saved_fingerprints.rs",
@@ -3660,7 +4094,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/native.rs",
    "crate": "root",
    "src_sha256": "ed5db356207918b67e65c2bb2a9414930aa12673c36a50c3968e8f707c4bc39e",
-   "dest_sha256": "23c0efb6eba1ebfd83d3d56e3db48b1016b34b5873c5cf920d0c021449f7d0e4",
+   "dest_sha256": "23b66414962a5f5402756dd75ea8ce479531a9920776c9d08de64b039ffef82b",
    "edits": [
     {
      "old": "#[derive(Clone, serde::Serialize)]\npub(super) struct InputChange {",
@@ -3681,6 +4115,31 @@
      "old": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    InputSnapshot([(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)]\n        .map(|(offset, len)| std::slice::from_raw_parts((base + offset) as *const u8, len).to_vec()))\n}\n\nimpl InputSnapshot {\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        let observed = input_snapshot(base);\n        std::array::from_fn(|region| {\n            let expected = &self.0[region];\n            let actual = &observed.0[region];\n            let differences = expected.iter().zip(actual).enumerate()\n                .filter(|(_, (a, b))| a != b);\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes: differences.clone().count(),\n                first_changes: differences.take(64).map(|(i, (&a, &b))| (i, a, b)).collect(),\n            }\n        })\n    }\n}",
      "new": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    let mut rows = [[0u8; 8 * 0x240]; 3];\n    for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {\n        row[..len].copy_from_slice(std::slice::from_raw_parts((base + offset) as *const u8, len));\n    }\n    InputSnapshot { rows }\n}\n\nimpl InputSnapshot {\n    /// Compares the baseline with the live regions in place (no second copy is made inside the hook).\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        std::array::from_fn(|region| {\n            let (offset, len) = INPUT_REGIONS[region];\n            let expected = &self.rows[region][..len];\n            let actual = std::slice::from_raw_parts((base + offset) as *const u8, len);\n            let mut first_changes = crate::engine::compat::fixed::FixedVec::new();\n            let mut changed_bytes = 0;\n            for (i, (&a, &b)) in expected.iter().zip(actual).enumerate() {\n                if a != b {\n                    changed_bytes += 1;\n                    first_changes.push((i, a, b));\n                }\n            }\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes,\n                first_changes,\n            }\n        })\n    }\n}",
      "reason": "`input_snapshot` fills the fixed rows and `compare` reads the live regions in place (same hashes, changed-byte count and first 64 differences; the fork copied the live regions a second time, so a byte changing between the hash and the walk can now show in one and not the other, which a private qualification diagnostic tolerates)"
+    },
+    {
+     "old": "const INPUT_REGIONS:",
+     "new": "#[cfg(feature = \"diag\")]\nconst INPUT_REGIONS:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(super) struct InputSnapshot",
+     "new": "#[cfg(feature = \"diag\")]\npub(super) struct InputSnapshot",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(super) unsafe fn input_snapshot(",
+     "new": "#[cfg(feature = \"diag\")]\npub(super) unsafe fn input_snapshot(",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "impl InputSnapshot {",
+     "new": "#[cfg(feature = \"diag\")]\nimpl InputSnapshot {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
     }
    ]
   },
@@ -3752,7 +4211,19 @@
    "dest": "src/runtime/mii/mii_editor_bridge/connected.rs",
    "crate": "root",
    "src_sha256": "982b5cd8a1518d285d433808bca83f02fb5e8cae419e9996ad46ea0e9021c568",
-   "dest_sha256": "77f36932c428a56a58bfbdcaffb5c32404434dd7d3761823585c992d29ebeae5"
+   "dest_sha256": "5ec51e205be806db162a3e9a51f416a1c2f4c947348c22f558e63063fc055673",
+   "edits": [
+    {
+     "old": "            let input_baseline = native::input_snapshot(base);",
+     "new": "            #[cfg(feature = \"diag\")]\n            let input_baseline = native::input_snapshot(base);",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "            s.input_baseline = Some(input_baseline);",
+     "new": "            #[cfg(feature = \"diag\")]\n            { s.input_baseline = Some(input_baseline); }",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/inline_keyboard.rs",
@@ -3780,7 +4251,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "8b2cba722f3db30f294cbd9db62018c0f1359910e826ea6b195e377f4ead0f45",
+   "dest_sha256": "6871288e474ef2b154c7aa7f550e15da3da739e454e729717e9705736dc0d1c4",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -3816,6 +4287,99 @@
      "old": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n",
      "new": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n\nimpl Trace {\n    /// No events: the template of the writer slot's two buffers.\n    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };\n}\n",
      "reason": "stream/stack: Trace::EMPTY, the template the writer slot's two heap buffers are made from at init"
+    },
+    {
+     "old": "use serde::Serialize;",
+     "new": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]",
+     "new": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[cfg_attr(feature = \"diag\", derive(Serialize))]",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Serialize)]\nstruct Event",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, Serialize)]\nstruct Event",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "impl Trace {",
+     "new": "#[cfg(feature = \"diag\")]\nimpl Trace {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    input_baseline: Option<native::InputSnapshot>,",
+     "new": "    #[cfg(feature = \"diag\")]\n    input_baseline: Option<native::InputSnapshot>,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    trace: Trace,",
+     "new": "    #[cfg(feature = \"diag\")]\n    trace: Trace,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    unsafe fn observe_inputs(&mut self, name:",
+     "new": "    #[cfg(feature = \"diag\")]\n    unsafe fn observe_inputs(&mut self, name:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    fn event(&mut self, name:",
+     "new": "    #[cfg(not(feature = \"diag\"))]\n    unsafe fn observe_inputs(&mut self, _name: &'static str) {}\n\n    #[cfg(not(feature = \"diag\"))]\n    fn event(&mut self, _name: &'static str, _values: [u64; 4]) {}\n\n    #[cfg(feature = \"diag\")]\n    fn event(&mut self, name:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(crate) fn write_trace(",
+     "new": "#[cfg(feature = \"diag\")]\npub(crate) fn write_trace(",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    let trace = if restore.is_some() {",
+     "new": "    #[cfg(feature = \"diag\")]\n    let trace = if restore.is_some() {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "        inputs: [0; 3], input_baseline: None, seed, catalog,",
+     "new": "        inputs: [0; 3],\n        #[cfg(feature = \"diag\")]\n        input_baseline: None,\n        seed, catalog,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "        ldn_handshake: handshake::Handshake::new(), trace };",
+     "new": "        ldn_handshake: handshake::Handshake::new(),\n        #[cfg(feature = \"diag\")]\n        trace };",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    crate::runtime::compat::filesystem::init();",
+     "new": "    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    Later(Snapshot),",
+     "new": "    Later(std::sync::Arc<Snapshot>),",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn mount_opened_catalog(catalog: Snapshot, opening: u64)",
+     "new": "fn mount_opened_catalog(catalog: std::sync::Arc<Snapshot>, opening: u64)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);\n    if !editor_opening_current(opening) {\n        return OpenedCatalog::Dropped;\n    }\n    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.mount_mii_editor_catalog(catalog, opening) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }",
+     "new": "    let Some(mut app) = crate::runtime::ui::menu_app::QUICK_MENU_APP.try_lock() else {\n        return OpenedCatalog::Later(catalog);\n    };\n    app.follow_open();\n    if !editor_opening_current(opening) {\n        return OpenedCatalog::Dropped;\n    }\n    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }\n}\n\n",
+     "new": "    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    drop(app);\n    match crate::runtime::ui::menu_app::publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        Ok(()) => {\n            crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n            OpenedCatalog::Shown\n        }\n        Err(publication) => OpenedCatalog::Later(publication.catalog),\n    }\n}\n\n",
+     "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
     }
    ]
   },
@@ -4034,12 +4598,22 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "7d8ac84b4258ad163e41ddf42e280c44b689a5ac28a613e301d5ceeba7ef9618",
+   "dest_sha256": "846c9386080b4506602be32c066c82d319a8137b51fcc57e83cfcdcc42bed628",
    "edits": [
     {
      "old": "notification(\"Practice Stage\".into(), message, 180);",
      "new": "notification(\"Practice Stage\".into(), message.into(), 180);",
      "reason": "the notification facade takes `Cow<'static, str>` so static texts allocate nothing; the formatted message moves in as `Cow::Owned`"
+    },
+    {
+     "old": "//! Default-off request API. Called by the existing StageManager update entry hook.",
+     "new": "//! Feature-gated request API. Called by the verified StageManager update entry hook.",
+     "reason": "The shipped feature closure enables practice-stage-request-alpha; requests still require an explicit UI selection and verified update hook."
+    },
+    {
+     "old": "[PracticeStageRequest] verified={verified} default_off=true ui_wired=true",
+     "new": "[PracticeStageRequest] verified={verified} request_driven=true ui_wired=true",
+     "reason": "The Lobby Stages UI calls request(selection); default_off was false for the shipped feature closure. Initialization is owned once by the verified practice update hook."
     }
    ]
   },
@@ -4154,7 +4728,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "8e72cef70c1637e753c7225eb5c012a03b5917278d28a55f9528cd170c2618ea",
+   "dest_sha256": "7b153123829166de77efc9878adb732fb96e94bc779ab6ab854a688841a2b609",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -4170,6 +4744,56 @@
      "old": "let page_size = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;",
      "new": "let page_size = crate::model::panes::ROWS;",
      "reason": "a page of the Mii list is as many rows as the clean-room list screen shows (package 5's `panes::ROWS`), not the fork's submenu grid"
+    },
+    {
+     "old": "    role: Option<Role>,\n    cursor: usize,",
+     "new": "    role: Option<Role>,\n    list_mode: bool,\n    cursor: usize,",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            role: None,\n            cursor: 0,",
+     "new": "            role: None,\n            list_mode: false,\n            cursor: 0,",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "        self.class = class;\n        self.role = None;",
+     "new": "        self.class = class;\n        self.list_mode = false;\n        self.role = None;",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "    pub fn step(&mut self, delta: isize) {",
+     "new": "    /// The approved class list: saved/replay entries and Add New, with one active role.\n    pub fn open_list(&mut self, class: MiiClass, preferences: &Preferences) {\n        self.open_class(class);\n        self.list_mode = true;\n        self.set_list_role(Role::Player, preferences);\n    }\n\n    fn set_list_role(&mut self, role: Role, preferences: &Preferences) {\n        self.role = Some(role);\n        self.rows = selection::dropdown(&self.snapshot, preferences, role, self.class, self.context.original);\n        self.cursor = if self.editor_only { self.rows.len() } else {\n            self.rows.iter().position(|row| row.selected).unwrap_or(0)\n        };\n    }\n\n    pub fn switch_list_role(&mut self, preferences: &Preferences) {\n        if self.list_mode && !self.editor_only {\n            let role = if self.role == Some(Role::Player) { Role::Cpu } else { Role::Player };\n            self.set_list_role(role, preferences);\n        }\n    }\n\n    pub fn step(&mut self, delta: isize) {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "let count = if self.role.is_some() { self.rows.len() } else { 3 };",
+     "new": "let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode) } else { 3 };",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "        if self.role.is_some() || self.cursor != 2 || !self.snapshot.is_complete() {",
+     "new": "        let add_new = if self.list_mode { self.cursor == self.rows.len() } else { self.role.is_none() && self.cursor == 2 };\n        if !add_new || !self.snapshot.is_complete() {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "                    self.role = None;\n                    self.cursor = usize::from(role == Role::Cpu);\n                    self.rows.clear();",
+     "new": "                    if self.list_mode {\n                        self.set_list_role(role, preferences);\n                    } else {\n                        self.role = None;\n                        self.cursor = usize::from(role == Role::Cpu);\n                        self.rows.clear();\n                    }",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "    pub fn back(&mut self) -> bool {\n",
+     "new": "    pub fn back(&mut self) -> bool {\n        if self.list_mode { return false; }\n",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            let labels = visible.clone().map(|(index, row)| {",
+     "new": "            let mut labels: Vec<String> = visible.clone().map(|(index, row)| {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            let disabled = visible.map(|(_, row)| row.greyed).collect();",
+     "new": "            let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();\n            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {\n                labels.push(\"Add New…\".into());\n                disabled.push(!cfg!(feature = \"mii-editor-alpha\") || !self.snapshot.is_complete());\n            }",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
     }
    ]
   },

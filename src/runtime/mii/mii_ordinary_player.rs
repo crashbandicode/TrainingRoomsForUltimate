@@ -153,9 +153,16 @@ pub(super) fn catalog_ready(catalog:Arc<Catalog>,generation:u64,opening:u64)->bo
     s.capture
 }
 #[cfg(feature="mii-ordinary-cpu-alpha")]
-pub(super) fn refresh_library(library:&crate::engine::mii::draft::Library) {
-    let mut s=STATE.lock().unwrap();
-    if let Some(catalog)=s.catalog.take() {s.catalog=Some(Arc::new((*catalog).clone().with_library(library)));}
+pub(super) fn library_catalog() -> Result<Option<Arc<Catalog>>, ()> {
+    let s = STATE.try_lock().map_err(|_| ())?;
+    Ok(s.catalog.as_ref().map(Arc::clone))
+}
+#[cfg(feature="mii-ordinary-cpu-alpha")]
+pub(super) fn publish_library(expected: &Arc<Catalog>, prepared: &Arc<Catalog>) -> Result<bool, ()> {
+    let mut s = STATE.try_lock().map_err(|_| ())?;
+    if !s.catalog.as_ref().is_some_and(|catalog| Arc::ptr_eq(catalog, expected)) { return Ok(false); }
+    s.catalog = Some(Arc::clone(prepared));
+    Ok(true)
 }
 pub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {
     let s=STATE.lock().unwrap();

@@ -383,7 +383,8 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     }
     let (mut current,mut cursor)={let s=state_for(role).lock().unwrap();
         let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
-    let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();
+    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
+    for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}
     let original=cycle_original(role);
     let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
     for target in &mut targets {
@@ -513,6 +514,11 @@ fn notify_selection(role: Role, fighter: TrioFighter, slot: Option<usize>) {
 }
 
 fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
+    roster_fixed(m, role).to_vec()
+}
+
+/// `roster` without heap (the preload planner's per-tick form).
+fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {
     let excluded = match role {
         Role::Player => crate::engine::swap::roster_grid::cycle_exclusion(
             original_kind(role),
@@ -525,10 +531,14 @@ fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
         }
     };
     let fighters = match role {
-        Role::Player => m.player_roster.fighters_excluding(excluded),
-        Role::Cpu => m.cpu_roster.fighters_excluding(excluded),
+        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),
+        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),
     };
-    fighters.into_iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())).collect()
+    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);
+    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {
+        out.push(*f);
+    }
+    out
 }
 
 /// Numbered slot of `kind`'s group in `role`'s current cycle.
@@ -2188,8 +2198,6 @@ unsafe fn preload_waiting_icons(context: *const u8) {
         return;
     };
     let base = BASE.load(Ordering::Acquire);
-    let icon_hash: unsafe extern "C" fn(u64, u32, u32) -> u64 =
-        std::mem::transmute(base + 0x3238a70);
     let request: unsafe extern "C" fn(*const u8, *const u64, i64, u32) =
         std::mem::transmute(base + 0x323c4e0);
     // F-HUD-c: the icons a swap will bind, at the CPU entry's costume. Its row is final here: the waiting entry
@@ -2200,7 +2208,7 @@ unsafe fn preload_waiting_icons(context: *const u8) {
     let mut count = 0;
     for fighter in TrioFighter::available() {
         let costume = model::waiting_icon_costume(fighter.kind(), cpu_costume);
-        let hash = icon_hash(fighter_kind_hash(base, fighter.kind()), costume, 0);
+        let hash = fighter_picture_hash(base, fighter.kind(), costume, 0);
         if hash & 0xffffffffff != 0 {
             request(
                 loader,
@@ -2212,6 +2220,26 @@ unsafe fn preload_waiting_icons(context: *const u8) {
         }
     }
     trace!("[CharacterRoster] waiting icon preload requested={} costume={} loader=0x{:x}; native load barrier retained", count, cpu_costume, loader as usize);
+}
+
+/// Native UI key builder shared by waiting-icon preloads and menu portraits.
+unsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u32) -> u64 {
+    let key: unsafe extern "C" fn(u64, u32, u32) -> u64 = std::mem::transmute(base + 0x3238a70);
+    key(fighter_kind_hash(base, kind), costume, picture)
+}
+
+/// The active role's costume portrait, queried on the UI job thread. The native
+/// builder supplies patch paths, names and regional costume remapping.
+pub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {
+    let base = BASE.load(Ordering::Acquire);
+    // init publishes BASE only after the enforcing character_roster seam gate
+    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).
+    // These carried seams are not members of game::Granted's core Site tables.
+    if base == 0 { return None; }
+    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };
+    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));
+    let hash = fighter_picture_hash(base, kind, costume, 1);
+    (hash & 0xffffffffff != 0).then_some(hash)
 }
 
 // Both icon paths use this roster module's published, verified text base.
@@ -2328,6 +2356,10 @@ pub fn init() {
         BASE.store(base, Ordering::Release);
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::init(base);
+    #[cfg(feature="mii-managed-helper-alpha")]
+    mii_managed_helper::init_storage();
+    #[cfg(feature="mii-ordinary-cpu-alpha")]
+    mii_replay::init();
         // Validate the original destructor range before capacity installs its
         // listener-removed hook at 0x652214 inside that range. The Mii gate's
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.

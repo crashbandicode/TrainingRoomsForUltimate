@@ -20,6 +20,10 @@ def roster(*kinds):
 
 MENU = {
     "trio_practice": [1, 0],
+    "p1_cpu_control": [0, 1],
+    "cycle_preload_slots": [1, 0, 0, 0, 0, 0],
+    "cycle_preload_bank_members": [1, 0, 0],
+    "cycle_preload_sources": [0, 0, 1],
     # P1: Kirby, Ice Climbers, Pokemon Trainer (Squirtle), Palutena; CPU: Pikachu, Bowser.
     "player_roster": roster(0x06, 0x4b, 0x24, 0x36),
     "cpu_roster": roster(0x08, 0x0f),

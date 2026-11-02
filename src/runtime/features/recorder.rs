@@ -51,6 +51,9 @@ static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 /// Recording or playing back now, published by every taker of `REC` when it lets go (stream/sync slice 3): the question the menu
 /// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+static PLAYBACK: AtomicBool = AtomicBool::new(false);
+#[cfg(feature = "diag")]
+static DIAG_PHASE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
 
 /// `REC`, held; dropping it publishes `ACTIVE` while the lock is still held, so the flag never trails the recorder.
 struct RecGuard(hos_lock::MutexGuard<'static, Recorder>);
@@ -71,6 +74,12 @@ impl core::ops::DerefMut for RecGuard {
 impl Drop for RecGuard {
     fn drop(&mut self) {
         ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
+        PLAYBACK.store(self.0.is_playback(), Ordering::Release);
+        #[cfg(feature = "diag")]
+        DIAG_PHASE.store(match self.0.phase() {
+            Phase::Idle => 0, Phase::Lockout => 1, Phase::Standby => 2,
+            Phase::Recording => 3, Phase::Playback => 4,
+        }, Ordering::Release);
     }
 }
 
@@ -218,7 +227,7 @@ fn load_consts() -> bool {
     true
 }
 
-/// A fighter entry's first body, resolved now (no pointer is kept between frames).
+/// A fighter entry's active body, resolved now (no pointer is kept between frames).
 #[derive(Clone, Copy)]
 pub(crate) struct Body {
     entry_ptr: usize,
@@ -231,7 +240,7 @@ pub(crate) unsafe fn cpu_body() -> Option<Body> {
     body_of(i32::from(cpu::primary_entry_now()))
 }
 
-/// `module` is the practice CPU's own body: a practice scene is live (`scene::current`), and `module` is the first body of package 2's
+/// `module` is the practice CPU's own body: a practice scene is live (`scene::current`), and `module` is the active body of package 2's
 /// primary CPU entry (`cpu::primary_entry_now`; never Nana, the entry's second body). The named layer's per-fighter work and the clip
 /// preview run for this body only (the fork's `practice::primary_cpu`, which package 6 retired in favour of these owners).
 ///
@@ -242,13 +251,13 @@ pub(crate) unsafe fn is_primary_cpu_body(module: &smash::app::BattleObjectModule
         && cpu_body().is_some_and(|body| body.accessor == module as *const smash::app::BattleObjectModuleAccessor as usize)
 }
 
-/// The first body of `entry_id (0 is P1).
+/// The active body of `entry_id` (0 is P1), using the guarded F11 bank reader.
 ///
 /// # Safety
 /// The package 4 natives must have passed their guards.
 pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     let entry_ptr = natives::fighter_entry(entry_id);
-    let fighter = natives::entry_body(entry_ptr);
+    let fighter = natives::entry_active_body(entry_ptr);
     if fighter == 0 {
         return None;
     }
@@ -570,9 +579,12 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
 
 // ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
 
-/// One short lock on the recorder for the named layer's slot export and import.
-pub(crate) fn with_recorder<R>(f: impl FnOnce(&mut Recorder) -> R) -> R {
-    f(&mut rec())
+/// Published alongside ACTIVE when the game releases its recorder guard.
+pub(crate) fn is_playback() -> bool { PLAYBACK.load(Ordering::Acquire) }
+
+/// Game callback only: numbered-slot transfer executes without heap work.
+pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
+    transfer.execute(&mut rec());
 }
 
 /// The record chord of the named layer: the lockout, then the capture (the layer's buffer takes the frames).
@@ -588,7 +600,10 @@ pub(crate) fn start_named_lockout() {
         }
         let Some(body) = cpu_body() else { return };
         let facing = facing_of(natives::lr(body.accessor));
-        named_macros::begin_capture(crate::engine::macros::StartState::default());
+        if !named_macros::begin_capture(crate::engine::macros::StartState::default()) {
+            notices::refuse("Finish saving the previous named capture first");
+            return;
+        }
         rec().start_named_lockout(facing);
         event("named_record_lockout", "facing", i64::from(facing), "", 0);
     }
@@ -632,15 +647,17 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
 /// The CPU's fighter kind now (diag lines of the named layer's roster row).
 #[cfg(feature = "diag")]
 pub fn cpu_kind() -> Option<i32> {
-    // SAFETY: the natives answer only once their guards passed; the read is of the live body.
-    unsafe { cpu_body() }.map(|body| unsafe { ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read() })
+    crate::runtime::ui::facts::fact_cpu_kind()
 }
 
 /// The recorder's phase (diag lines: its one caller is the diag build's named-layer harness, `macros::diag`, so the function is not in
 /// the shipped NRO).
 #[cfg(feature = "diag")]
 pub fn phase() -> Phase {
-    rec().phase()
+    match DIAG_PHASE.load(Ordering::Acquire) {
+        1 => Phase::Lockout, 2 => Phase::Standby, 3 => Phase::Recording,
+        4 => Phase::Playback, _ => Phase::Idle,
+    }
 }
 
 /// The recorder's frame index (the named layer's diag lines).
