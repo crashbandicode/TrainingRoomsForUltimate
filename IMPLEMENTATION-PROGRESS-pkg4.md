@@ -61,3 +61,29 @@ run of that window whose numbers look odd.
   `notices::write_panes` / `input_display::write_plan`, call `chords::commit_shortcut` from the menu outbox and drop the `cfg(feature = "diag")` on it and on `features/writer.rs`.
 - When package 3 merges: call `recorder::on_state_restored` (drop the `cfg(feature = "diag")`) and `recorder::stop` on a load request; remove the diag stand-ins in `recorder::chord_step`.
 - S4-4 waits for pkg6's C3; the Deluxe sync rows wait for L1.
+
+## S4-4 (named macros, replay capture, replay window) — 2026-11-02, successor worker (Sonnet 5.5 high)
+
+Branch `stream/pkg4` on `work/implementation` 8911679 (package 6 head and u4 merged). Playbook followed `ae87443`. Surface build target `cargo-targets/trainingrooms-pkg4` (host gates) and
+`-pkg4-sw` (Switch); Eden labels `s4-03`, `s4-04` (Yoga, `/home/intpa/trainingrooms-eden-p4`, display :94).
+
+### Done
+- Carry: `tools/carry_pkg4.py` + `docs/provenance/pkg4-carry-manifest.json` (42 files from stage m5q, recorded edits, generated ledger `docs/provenance/pkg4-carry-ledger.md`, re-sync test `tests/carry_pkg4.rs`).
+  Pure: `crate::engine::macros` (the macros crate, generic Store reused from `model::store`), `crate::engine::macro_ui` (panel models), `crates/smash-match-data` (vendored, campaign-owned, MIT).
+  Runtime (`src/runtime/macros/`): `named_macros`, `replay_store`, `replay_capture`, `replay_preview`, `replay_move_start`, `live_replay` declared; `capture_plugin` carried, not declared (Deluxe SDK, L1).
+- `port.rs` is the dependency boundary (roster cycle and Mii exact loads, the clip preview's restore, the menu's panel screens): explicit, named in the install line (`macros_port`).
+- Recorder: named lockout / capture / playback through the layer's reserved buffer, stop chord consumed in the poll before the frame is stored, `on_load_request`, `swallow_p1`. Model: `start_named_lockout`, `poll_named`, `control_named`,
+  `finish_named_capture`, `start_named_playback` (tests/input_named.rs, 8 rows). Chords: `Buttons` with the d-pad and both sticks' digital bits (SPEC-core-03 section 4).
+- Guards: 12 new ELF-generated rows (`Feature::NamedMacros`, `tools/gen_sites_pkg4.py`), every `smash` call of the layer mapped to a guarded row (`tests/pkg6_smash_calls.rs`); a rejected row leaves the layer off.
+- hud_draw: `PlanLogGate` (the lead's extra item).
+
+### Eden s4-04 / s4-03 (see eden/EDEN-PACKAGE-4.md, section S4-4)
+
+### Gates
+host `cargo test` 60 binaries, 7,377+ pass; clippy `--all-targets -D warnings` 0; `--no-default-features` builds; Switch release/diag build warning set = package 6's (unused imports, dead code of the carried engines) plus the layer's public API awaiting package 5.
+
+### Open / next
+- Package 5: screens for Named library, Save slot to library, Edit placement, Replay window over `named_macros::{open_library, export_record_slot, open_editor, on_pad, panel_view}` and `replay_capture::{open_editor, browser_view, clip_view, on_input}`.
+- Package 3: the preview restore (`port::save_states::request_preview_restore`); package 6A: the roster cycle behind `port::roster`.
+- Size: +596 KiB resident over the merged tree; per-module pass and proposals in the lead report (smash-match-data 260 KiB, layer 105 KiB, macros model 73 KiB; `opt-level = "z"` for smash-match-data saves 72 KiB).
+- Not run: live capture written after a real match (needs a match and the native replay save).
