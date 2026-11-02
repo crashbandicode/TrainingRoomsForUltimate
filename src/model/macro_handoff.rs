@@ -16,7 +16,7 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
 
 /// The hook-side answers of the named layer (one snapshot, written by the worker after each model change).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MacroQueries {
     /// Macro Source is Named Library.
     pub source_is_named: bool,
@@ -37,7 +37,7 @@ pub struct MacroQueries {
     /// The layer is suspended (a waiting-room scene left with a draft).
     pub suspended: bool,
     /// The placement editor's cross marker, if it shows one (x, y).
-    pub marker: Option<(i32, i32)>,
+    pub marker: Option<(f32, f32)>,
 }
 
 impl MacroQueries {
@@ -390,6 +390,39 @@ mod tests {
         stop.store(true, Ordering::Relaxed);
         let seen: u64 = readers.into_iter().map(|r| r.join().unwrap()).sum();
         assert!(seen > 0);
+    }
+
+    #[test]
+    fn a_slow_worker_keeps_its_capture_until_it_has_copied_the_result() {
+        use std::sync::{Arc, Barrier};
+        let capture = Arc::new(CaptureBuffer::<u16>::new());
+        assert!(capture.prepare(4));
+        assert!(capture.begin());
+        assert!(capture.store(0, 42));
+        assert_eq!(capture.finish(), Some(1));
+        let entered = Arc::new(Barrier::new(2));
+        let leave = Arc::new(Barrier::new(2));
+        let worker = {
+            let (capture, entered, leave) = (capture.clone(), entered.clone(), leave.clone());
+            std::thread::spawn(move || capture.take(|frames| {
+                entered.wait();
+                leave.wait();
+                frames.to_vec()
+            }))
+        };
+        entered.wait();
+        // The game continues while the worker is delayed: it cannot overwrite
+        // the finished recording or mistake it for a running capture.
+        assert!(!capture.begin());
+        assert!(!capture.store(0, 99));
+        assert_eq!(capture.frame_at(0), None);
+        capture.cancel();
+        leave.wait();
+        assert_eq!(worker.join().unwrap(), Some(vec![42]));
+        assert!(capture.begin());
+        assert!(capture.store(0, 7));
+        assert_eq!(capture.finish(), Some(1));
+        assert_eq!(capture.take(<[u16]>::to_vec), Some(vec![7]));
     }
 
     #[test]

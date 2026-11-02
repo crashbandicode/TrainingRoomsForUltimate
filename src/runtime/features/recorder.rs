@@ -588,7 +588,10 @@ pub(crate) fn start_named_lockout() {
         }
         let Some(body) = cpu_body() else { return };
         let facing = facing_of(natives::lr(body.accessor));
-        named_macros::begin_capture(crate::engine::macros::StartState::default());
+        if !named_macros::begin_capture(crate::engine::macros::StartState::default()) {
+            notices::refuse("Finish saving the previous named capture first");
+            return;
+        }
         rec().start_named_lockout(facing);
         event("named_record_lockout", "facing", i64::from(facing), "", 0);
     }

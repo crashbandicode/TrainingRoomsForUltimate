@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 
-use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor, Fighter};
+use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor};
 use smash::lib::lua_const::*;
 use smash::phx::{Hash40, Vector2f, Vector3f};
 use {crate::engine::macros::InputFrame, crate::engine::macros::Library, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
@@ -21,7 +21,7 @@ use crate::engine::macro_ui::macro_panel::{
 
 use crate::runtime::macros::port::consts::{FighterId, MacroSource, OnOff, MENU};
 use crate::runtime::macros::port::input::MappedInputs;
-use crate::runtime::compat::common::{menu, try_get_module_accessor};
+use crate::runtime::compat::common::menu;
 use super::practice;
 use crate::runtime::lobby::training::ui::notifications::upsert;
 
@@ -85,13 +85,8 @@ pub fn waiting_scene_changed(same_lobby: bool) {
 pub fn resume_waiting() {
     if waiting_name_ready() { SUSPENDED.store(false, Ordering::Release); }
 }
-fn waiting_name_ready() -> bool {
-    super::lobby::active() && practice::enabled()
-        && crate::runtime::roster::character_roster::waiting_drafts_ready()
-        && crate::runtime::compat::common::is_ready_go()
-        && try_get_module_accessor(FighterId::Player).is_some()
-        && try_get_module_accessor(FighterId::CPU).is_some()
-}
+fn waiting_name_ready() -> bool { crate::runtime::ui::facts::fact_waiting_ready() }
+
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 // A preview's normal stop/restore advances the motion generation while its
 // export keyboard is open. Only session cleanup invalidates that naming draft.
@@ -173,7 +168,7 @@ fn fighter_prompt_stale(origin:FighterOrigin, revision:u64) -> bool {
         FighterOrigin::Named=>selection_revision(),
         FighterOrigin::Clip=>crate::runtime::macros::replay_capture::selection_revision(),
     };
-    revision!=current || suspended() || !practice::scene_enabled()
+    revision!=current || suspended() || !crate::runtime::ui::facts::fact_scene_enabled()
 }
 fn retire_stale_fighter_prompt() -> bool {
     let Some((origin,revision))=lock_read(&UI).fighter_prompt() else {return false;};
@@ -189,8 +184,12 @@ pub(crate) fn open_clip_fighter_prompt(revision:u64, recorded:String, current:St
     if opened {assign(&menu::MENU_RECEIVED_INPUT,true);}
     opened
 }
+static CHARACTER_PENDING: AtomicBool = AtomicBool::new(false);
+static CHARACTER_REQUEST: hos_lock::Mailbox<(crate::engine::mii::replay::Target, u64), 1> = hos_lock::Mailbox::new();
+static CHARACTER_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();
+
 fn submit_loaded_character() {
-    if !crate::runtime::roster::character_roster::cpu_reload_ready() {return;}
+    if CHARACTER_PENDING.load(Ordering::Acquire) { return; }
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
@@ -202,16 +201,36 @@ fn submit_loaded_character() {
         return;
     }
     if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
-    let accepted=crate::runtime::roster::character_roster::mii_replay::request_named(target);
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    let accepted=target.configuration().is_none() && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
-    if !accepted {
-        // No native request was admitted. A not-yet-qualified owner may become
-        // ready after auto-init; don't consume this one submission prematurely.
-        lock_write(&UI).invalidate_character_request();
-    }
+    CHARACTER_PENDING.store(true, Ordering::Release);
+    let posted = CHARACTER_REQUEST.post((target, selection_revision()));
+    debug_assert!(posted, "one outstanding named character request");
 }
+
+/// Game callback only. The roster remains the sole admission/loader provider.
+pub fn service_character_request() {
+    CHARACTER_REQUEST.drain(|(target, revision)| {
+        let eligible = revision == selection_revision() && source_is_named()
+            && crate::runtime::roster::character_roster::cpu_reload_ready();
+        #[cfg(feature="mii-ordinary-cpu-alpha")]
+        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);
+        #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
+        let accepted = eligible && target.configuration().is_none()
+            && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
+        let posted = CHARACTER_RESULT.post((revision, accepted));
+        debug_assert!(posted, "one outstanding named character result");
+        crate::runtime::ui::worker::wake();
+    });
+}
+
+fn consume_character_result() {
+    CHARACTER_RESULT.drain(|(revision, accepted)| {
+        CHARACTER_PENDING.store(false, Ordering::Release);
+        if revision == selection_revision() && !accepted {
+            lock_write(&UI).invalidate_character_request();
+        }
+    });
+}
+
 static NAME_JOB: std::sync::Mutex<Option<NameJob>> = std::sync::Mutex::new(None);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -313,8 +332,6 @@ struct RestorePose {
 struct Motion {
     capturing: bool,
     playing: bool,
-    captured: Vec<InputFrame>,
-    captured_len: usize,
     play: Vec<InputFrame>,
     start: StartState,
 }
@@ -322,8 +339,6 @@ struct Motion {
 static MOTION: RwLock<Motion> = RwLock::new(Motion {
     capturing: false,
     playing: false,
-    captured: Vec::new(),
-    captured_len: 0,
     play: Vec::new(),
     start: StartState {
         fighter_kind: -1,
@@ -335,6 +350,15 @@ static MOTION: RwLock<Motion> = RwLock::new(Motion {
         speed_y: 0.0,
     },
 });
+
+static CAPTURE: crate::model::macro_handoff::CaptureBuffer<InputFrame> =
+    crate::model::macro_handoff::CaptureBuffer::new();
+
+#[derive(Clone, Copy)]
+struct CaptureCompleted { start: StartState, crop: bool, session: u64 }
+// Only one completed capture can exist: CAPTURE stays worker-owned until this
+// event is consumed. A keyboard may take arbitrarily long without blocking hooks.
+static CAPTURE_COMPLETED: hos_lock::Mailbox<CaptureCompleted, 1> = hos_lock::Mailbox::new();
 
 pub struct PlaybackStart {
     pub facing: f32,
@@ -376,6 +400,29 @@ pub fn panel_visible() -> bool {
         || crate::runtime::macros::replay_capture::browser_visible())
 }
 
+/// Worker-published answers: game callbacks never inspect the panel model.
+static QUERIES: hos_lock::Published<crate::model::macro_handoff::MacroQueries> =
+    hos_lock::Published::new(crate::model::macro_handoff::MacroQueries::IDLE);
+
+pub fn hook_queries() -> crate::model::macro_handoff::MacroQueries { QUERIES.read() }
+
+/// The menu worker is the sole publisher. Publish after draining layer events and
+/// after panel mutations, before servicing a potentially blocking native applet.
+pub fn publish_queries() {
+    let (playback_allowed, plays_current, loaded_kind, restore_in_air, marker) = {
+        let ui = lock_read(&UI);
+        (ui.playback_allowed(), ui.plays_current(),
+            ui.loaded_start().map_or(-1, |start| start.fighter_kind),
+            ui.restore_in_air(), ui.marker())
+    };
+    QUERIES.publish(crate::model::macro_handoff::MacroQueries {
+        source_is_named: source_is_named(), playback_allowed, plays_current,
+        loaded_kind, restore_in_air, panel_visible: panel_visible(),
+        clip_foreground: clip_foreground(), naming_pending: naming_pending(),
+        suspended: suspended(), marker,
+    });
+}
+
 pub fn panel_view() -> Option<View> {
     if suspended() { return None; }
     let ui = lock_read(&UI);
@@ -409,7 +456,7 @@ fn request_native_name() {
     let Some((initial, cursor, title)) = values else { return };
     let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);
     let job = NameJob { id, generation: SESSION_GENERATION.load(Ordering::Relaxed),
-        replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: super::lobby::is_waiting_scene(),
+        replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: crate::runtime::ui::facts::fact_waiting_scene(),
         phase: NamePhase::Active };
     *NAME_JOB.lock().unwrap() = Some(job);
     let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor) }
@@ -459,7 +506,7 @@ pub fn service_keyboard() {
     let Some(job) = job else { return };
     crate::runtime::diag_log::diagnostic(format_args!("[NativeKeyboard] consume id={} replay={}", id, job.replay));
     if !job.waiting && (job.generation != SESSION_GENERATION.load(Ordering::Relaxed)
-        || !practice::enabled() || suspended())
+        || !crate::runtime::ui::facts::fact_practice_enabled() || suspended())
     { return; }
     // The closing applet's confirm/cancel must not become a gameplay input.
     crate::runtime::features::recorder::swallow_p1(15);
@@ -679,7 +726,7 @@ pub fn open_editor() {
 }
 
 fn practice_ready() -> bool {
-    if !practice::enabled() || !crate::runtime::ui::facts::fact_fighters_present() {
+    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_fighters_present() {
         notify("Wait for both practice fighters");
         return false;
     }
@@ -710,14 +757,14 @@ pub unsafe fn snapshot_start(module_accessor: &mut BattleObjectModuleAccessor) -
     }
 }
 
-pub fn begin_capture(start: StartState) {
+pub fn begin_capture(start: StartState) -> bool {
+    if !CAPTURE.begin() { return false; }
     let mut motion = lock_write(&MOTION);
     motion.capturing = true;
     motion.playing = false;
-    motion.captured.clear();
-    motion.captured_len = 0;
     motion.play.clear();
     motion.start = start;
+    true
 }
 
 pub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) -> StartState {
@@ -727,7 +774,7 @@ pub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) ->
 }
 
 pub fn has_captured_frame(index: usize) -> bool {
-    index < lock_read(&MOTION).captured_len
+    CAPTURE.has_frame(index)
 }
 
 pub fn store_frame(index: usize, input: &MappedInputs) {
@@ -741,51 +788,44 @@ pub fn store_frame(index: usize, input: &MappedInputs) {
         rstick_x: input.rstick_x,
         rstick_y: input.rstick_y,
     };
-    let mut motion = lock_write(&MOTION);
-    if !motion.capturing {
-        return;
-    }
-    if motion.captured.len() <= index {
-        motion.captured.resize(index + 1, InputFrame::default());
-    }
-    motion.captured[index] = frame;
-    motion.captured_len = motion.captured_len.max(index + 1);
+    let _ = CAPTURE.store(index, frame);
 }
 
 pub fn frame_at(index: usize) -> MappedInputs {
-    let motion = lock_read(&MOTION);
-    let frames = if motion.playing {
-        motion.play.as_slice()
-    } else {
-        motion.captured.as_slice()
-    };
-    let frame = frames.get(index).copied().unwrap_or_default();
-    MappedInputs {
-        buttons: frame.buttons,
-        lstick_x: frame.lstick_x,
-        lstick_y: frame.lstick_y,
-        rstick_x: frame.rstick_x,
-        rstick_y: frame.rstick_y,
-    }
+    frame_for(index).unwrap_or_default()
 }
 
 pub fn finish_capture(crop: bool) {
-    let (frames, start) = {
+    let start = {
         let mut motion = lock_write(&MOTION);
         motion.capturing = false;
-        let frames = motion.captured[..motion.captured_len].to_vec();
-        (frames, motion.start)
+        motion.start
     };
-    let version = game_version();
-    crate::runtime::diag_log::diagnostic(format_args!(
-        "[PracticeRecording] named_recording_complete captured_frames={} crop={}", frames.len(), crop
-    ));
-    let effect = lock_write(&UI).offer_save(frames, start, crop, &version);
-    apply_effect(effect);
-    request_native_name();
-    if panel_visible() {
-        assign(&menu::MENU_RECEIVED_INPUT, true);
-    }
+    if CAPTURE.finish().is_none() { return; }
+    // No second completion can be posted until the worker takes CAPTURE.
+    let accepted = CAPTURE_COMPLETED.post(CaptureCompleted {
+        start, crop, session: SESSION_GENERATION.load(Ordering::Acquire),
+    });
+    debug_assert!(accepted);
+    crate::runtime::ui::worker::wake();
+}
+
+/// Worker only: copy the completed recording before releasing its capture buffer,
+/// then let the panel own the draft and request the native keyboard.
+pub fn consume_capture() {
+    CAPTURE_COMPLETED.drain(|done| {
+        let current = done.session == SESSION_GENERATION.load(Ordering::Acquire);
+        let frames = CAPTURE.take(|frames| current.then(|| frames.to_vec())).flatten();
+        let Some(frames) = frames else { return; };
+        let version = game_version();
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[PracticeRecording] named_recording_complete captured_frames={} crop={}", frames.len(), done.crop
+        ));
+        let effect = lock_write(&UI).offer_save(frames, done.start, done.crop, &version);
+        apply_effect(effect);
+        request_native_name();
+        if panel_visible() { assign(&menu::MENU_RECEIVED_INPUT, true); }
+    });
 }
 
 pub fn begin_playback() -> Option<PlaybackStart> {
@@ -853,6 +893,7 @@ pub fn end_playback() {
 }
 
 pub fn cancel_motion() {
+    CAPTURE.cancel();
     PLAYBACK_START_PENDING.store(false, Ordering::Relaxed);
     PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);
     RESTORE_POSITION_WAITS.store(0, Ordering::Relaxed);
@@ -1169,6 +1210,7 @@ unsafe fn set_gravity_speed(module_accessor: &mut BattleObjectModuleAccessor, y:
 }
 
 pub fn service_character() {
+    consume_character_result();
     retire_stale_fighter_prompt();
     let named=source_is_named();
     if !named && NAMED_SOURCE_ACTIVE.swap(false,Ordering::AcqRel) {
@@ -1176,7 +1218,7 @@ pub fn service_character() {
     } else if named { NAMED_SOURCE_ACTIVE.store(true,Ordering::Release); }
     // Persisted selection exists before the stage is playable. Native Training
     // mode and an observed entry alone also hold during the initial load screen.
-    if !practice::enabled() || suspended() || unsafe { !Fighter::is_ready_go() }
+    if !crate::runtime::ui::facts::fact_practice_enabled() || suspended() || !crate::runtime::ui::facts::fact_ready_go()
         || panel_visible() || crate::runtime::macros::replay_capture::loading() || !source_is_named()
     {
         return;
@@ -1214,7 +1256,7 @@ pub fn service_character() {
 }
 
 pub unsafe fn preview(module_accessor: &mut BattleObjectModuleAccessor) {
-    let Some((x, y)) = lock_read(&UI).marker() else {
+    let Some((x, y)) = hook_queries().marker else {
         return;
     };
     draw_cross(module_accessor, x, y);
@@ -1227,7 +1269,7 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
     let found = owned.iter().position(|&(object, address, _)| object == id && address == pointer);
     // Keep P1 held while the editor is parked for a CPU reload. The new CPU must
     // remain free to finish its native install and land before preview acquisition.
-    let hold_panel = panel_visible() || (crate::runtime::macros::replay_capture::loading()
+    let hold_panel = hook_queries().panel_visible || (crate::runtime::macros::replay_capture::loading()
         && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
             == FighterId::Player as i32);
     let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)
@@ -1412,11 +1454,9 @@ pub(crate) fn fighter_label(kind: i32) -> String {
 pub fn frame_for(index: usize) -> Option<MappedInputs> {
     let motion = lock_read(&MOTION);
     let frame = if motion.playing {
-        motion.play.get(index)
-    } else if index < motion.captured_len {
-        motion.captured.get(index)
+        motion.play.get(index).copied()
     } else {
-        None
+        CAPTURE.frame_at(index)
     }?;
     Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y, rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })
 }
@@ -1424,25 +1464,14 @@ pub fn frame_for(index: usize) -> Option<MappedInputs> {
 /// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate
 /// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).
 pub fn prepare_buffers() {
-    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped
-    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.
     let wanted = training_mod_macros_max_frames();
-    let (grow_captured, grow_play) = {
-        let motion = lock_read(&MOTION);
-        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)
-    };
-    if !grow_captured && !grow_play {
-        return;
-    }
-    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };
-    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };
+    CAPTURE.prepare(wanted);
+    let grow = lock_read(&MOTION).play.capacity() < wanted;
+    if !grow { return; }
+    let mut play = Vec::with_capacity(wanted);
     {
         let mut motion = lock_write(&MOTION);
-        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {
-            captured.append(&mut motion.captured);
-            std::mem::swap(&mut motion.captured, &mut captured);
-        }
-        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {
+        if motion.play.capacity() < wanted {
             play.append(&mut motion.play);
             std::mem::swap(&mut motion.play, &mut play);
         }

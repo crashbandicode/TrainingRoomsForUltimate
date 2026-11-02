@@ -2,8 +2,8 @@
 //! Native pointers are read only on their owning callbacks. Stored addresses are
 //! equality tokens, never dereferenced later; only owned values reach the writer.
 //!
-//! Revision 28: the hooks are resident whenever the INI says on or a Deluxe
-//! host registered the capture row. Each accepted native record is owned here
+//! The guarded hooks remain resident independently of the initial capture
+//! preference or Deluxe registration. Each accepted native record is owned here
 //! (`RecordOwnership`) whether or not it is captured; the packed `CaptureToggle`
 //! latches the arm state at segment-0 start and is released only by an event
 //! matching that owner. A preference edited mid-record applies at that release.
@@ -565,10 +565,9 @@ pub fn init() {
     #[cfg(not(feature = "deluxe-sdk"))]
     let registered = false;
     let seed = crate::runtime::macros::replay_store::seed_enabled();
-    // Revision 27 semantics without a registered host: hooks only when the INI
-    // says on. With a registered host the guarded adapter is resident from
-    // startup even when off, because a later ON choice cannot install hooks.
-    if !seed && !registered { return; }
+    // Install the guarded adapter independently of the initial preference.
+    // The menu can arm the next record without a reboot or a Deluxe host;
+    // CaptureToggle still latches that preference at native record start.
     if !crate::runtime::lobby::game_mode::init() { return; }
     // Owned main13.0.5 SHA0789f0a4...536c2. Guard every optional replacement before
     // installing any, including constructor/reset, record-start, copy and success.

@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "210bb89683a28c375621ec689cd020ea1d6282e2d661627da2be9f6ed6082315",
+   "dest_sha256": "d2830af0b415a26d2b10b60907e8f9b76853225fc43cecd1126a63d680dbfb5e",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -628,6 +628,126 @@
      "old": "    if !practice::enabled() || !unsafe { practice::acquire() } {\n        notify(\"Wait for both practice fighters\");",
      "new": "    if !practice::enabled() || !crate::runtime::ui::facts::fact_fighters_present() {\n        notify(\"Wait for both practice fighters\");",
      "reason": "ui-screens (design C): the panels' entry points run on the menu worker, which must not read the game: package 6's practice acquire is the fact the frame wrapper published on the game thread (ui::facts)"
+    },
+    {
+     "old": "    captured: Vec<InputFrame>,\n    captured_len: usize,\n",
+     "new": "",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "    captured: Vec::new(),\n    captured_len: 0,\n",
+     "new": "",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub struct PlaybackStart {",
+     "new": "static CAPTURE: crate::model::macro_handoff::CaptureBuffer<InputFrame> =\n    crate::model::macro_handoff::CaptureBuffer::new();\n\n#[derive(Clone, Copy)]\nstruct CaptureCompleted { start: StartState, crop: bool, session: u64 }\n// Only one completed capture can exist: CAPTURE stays worker-owned until this\n// event is consumed. A keyboard may take arbitrarily long without blocking hooks.\nstatic CAPTURE_COMPLETED: hos_lock::Mailbox<CaptureCompleted, 1> = hos_lock::Mailbox::new();\n\npub struct PlaybackStart {",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub fn begin_capture(start: StartState) {\n    let mut motion = lock_write(&MOTION);\n    motion.capturing = true;\n    motion.playing = false;\n    motion.captured.clear();\n    motion.captured_len = 0;\n    motion.play.clear();\n    motion.start = start;\n}\n",
+     "new": "pub fn begin_capture(start: StartState) -> bool {\n    if !CAPTURE.begin() { return false; }\n    let mut motion = lock_write(&MOTION);\n    motion.capturing = true;\n    motion.playing = false;\n    motion.play.clear();\n    motion.start = start;\n    true\n}\n",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "    index < lock_read(&MOTION).captured_len",
+     "new": "    CAPTURE.has_frame(index)",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "    let mut motion = lock_write(&MOTION);\n    if !motion.capturing {\n        return;\n    }\n    if motion.captured.len() <= index {\n        motion.captured.resize(index + 1, InputFrame::default());\n    }\n    motion.captured[index] = frame;\n    motion.captured_len = motion.captured_len.max(index + 1);",
+     "new": "    let _ = CAPTURE.store(index, frame);",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub fn frame_at(index: usize) -> MappedInputs {\n    let motion = lock_read(&MOTION);\n    let frames = if motion.playing {\n        motion.play.as_slice()\n    } else {\n        motion.captured.as_slice()\n    };\n    let frame = frames.get(index).copied().unwrap_or_default();\n    MappedInputs {\n        buttons: frame.buttons,\n        lstick_x: frame.lstick_x,\n        lstick_y: frame.lstick_y,\n        rstick_x: frame.rstick_x,\n        rstick_y: frame.rstick_y,\n    }\n}\n",
+     "new": "pub fn frame_at(index: usize) -> MappedInputs {\n    frame_for(index).unwrap_or_default()\n}\n",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub fn finish_capture(crop: bool) {\n    let (frames, start) = {\n        let mut motion = lock_write(&MOTION);\n        motion.capturing = false;\n        let frames = motion.captured[..motion.captured_len].to_vec();\n        (frames, motion.start)\n    };\n    let version = game_version();\n    crate::runtime::diag_log::diagnostic(format_args!(\n        \"[PracticeRecording] named_recording_complete captured_frames={} crop={}\", frames.len(), crop\n    ));\n    let effect = lock_write(&UI).offer_save(frames, start, crop, &version);\n    apply_effect(effect);\n    request_native_name();\n    if panel_visible() {\n        assign(&menu::MENU_RECEIVED_INPUT, true);\n    }\n}\n",
+     "new": "pub fn finish_capture(crop: bool) {\n    let start = {\n        let mut motion = lock_write(&MOTION);\n        motion.capturing = false;\n        motion.start\n    };\n    if CAPTURE.finish().is_none() { return; }\n    // No second completion can be posted until the worker takes CAPTURE.\n    let accepted = CAPTURE_COMPLETED.post(CaptureCompleted {\n        start, crop, session: SESSION_GENERATION.load(Ordering::Acquire),\n    });\n    debug_assert!(accepted);\n    crate::runtime::ui::worker::wake();\n}\n\n/// Worker only: copy the completed recording before releasing its capture buffer,\n/// then let the panel own the draft and request the native keyboard.\npub fn consume_capture() {\n    CAPTURE_COMPLETED.drain(|done| {\n        let current = done.session == SESSION_GENERATION.load(Ordering::Acquire);\n        let frames = CAPTURE.take(|frames| current.then(|| frames.to_vec())).flatten();\n        let Some(frames) = frames else { return; };\n        let version = game_version();\n        crate::runtime::diag_log::diagnostic(format_args!(\n            \"[PracticeRecording] named_recording_complete captured_frames={} crop={}\", frames.len(), done.crop\n        ));\n        let effect = lock_write(&UI).offer_save(frames, done.start, done.crop, &version);\n        apply_effect(effect);\n        request_native_name();\n        if panel_visible() { assign(&menu::MENU_RECEIVED_INPUT, true); }\n    });\n}\n",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub fn cancel_motion() {",
+     "new": "pub fn cancel_motion() {\n    CAPTURE.cancel();",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "    let frame = if motion.playing {\n        motion.play.get(index)\n    } else if index < motion.captured_len {\n        motion.captured.get(index)\n    } else {\n        None\n    }?;",
+     "new": "    let frame = if motion.playing {\n        motion.play.get(index).copied()\n    } else {\n        CAPTURE.frame_at(index)\n    }?;",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped\n    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.\n    let wanted = training_mod_macros_max_frames();\n    let (grow_captured, grow_play) = {\n        let motion = lock_read(&MOTION);\n        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)\n    };\n    if !grow_captured && !grow_play {\n        return;\n    }\n    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };\n    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };\n    {\n        let mut motion = lock_write(&MOTION);\n        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {\n            captured.append(&mut motion.captured);\n            std::mem::swap(&mut motion.captured, &mut captured);\n        }\n        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }",
+     "new": "    let wanted = training_mod_macros_max_frames();\n    CAPTURE.prepare(wanted);\n    let grow = lock_read(&MOTION).play.capacity() < wanted;\n    if !grow { return; }\n    let mut play = Vec::with_capacity(wanted);\n    {\n        let mut motion = lock_write(&MOTION);\n        if motion.play.capacity() < wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }",
+     "reason": "Design C: capture frames cross to the worker by exclusive ownership; completion posts values, with no hook allocation or keyboard call"
+    },
+    {
+     "old": "pub fn panel_view() -> Option<View> {",
+     "new": "/// Worker-published answers: game callbacks never inspect the panel model.\nstatic QUERIES: hos_lock::Published<crate::model::macro_handoff::MacroQueries> =\n    hos_lock::Published::new(crate::model::macro_handoff::MacroQueries::IDLE);\n\npub fn hook_queries() -> crate::model::macro_handoff::MacroQueries { QUERIES.read() }\n\n/// The menu worker is the sole publisher. Publish after draining layer events and\n/// after panel mutations, before servicing a potentially blocking native applet.\npub fn publish_queries() {\n    let (playback_allowed, plays_current, loaded_kind, restore_in_air, marker) = {\n        let ui = lock_read(&UI);\n        (ui.playback_allowed(), ui.plays_current(),\n            ui.loaded_start().map_or(-1, |start| start.fighter_kind),\n            ui.restore_in_air(), ui.marker())\n    };\n    QUERIES.publish(crate::model::macro_handoff::MacroQueries {\n        source_is_named: source_is_named(), playback_allowed, plays_current,\n        loaded_kind, restore_in_air, panel_visible: panel_visible(),\n        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        suspended: suspended(), marker,\n    });\n}\n\npub fn panel_view() -> Option<View> {",
+     "reason": "Design C: publish Copy panel answers from the worker for hook consumers"
+    },
+    {
+     "old": "    let Some((x, y)) = lock_read(&UI).marker() else {",
+     "new": "    let Some((x, y)) = hook_queries().marker else {",
+     "reason": "Design C: placement marker drawing reads the published answer, not the worker panel lock"
+    },
+    {
+     "old": "    let hold_panel = panel_visible() ||",
+     "new": "    let hold_panel = hook_queries().panel_visible ||",
+     "reason": "Design C: fighter hold reads published panel visibility"
+    },
+    {
+     "old": "fn waiting_name_ready() -> bool {\n    super::lobby::active() && practice::enabled()\n        && crate::runtime::roster::character_roster::waiting_drafts_ready()\n        && crate::runtime::compat::common::is_ready_go()\n        && try_get_module_accessor(FighterId::Player).is_some()\n        && try_get_module_accessor(FighterId::CPU).is_some()\n}",
+     "new": "fn waiting_name_ready() -> bool { crate::runtime::ui::facts::fact_waiting_ready() }\n",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "use crate::runtime::compat::common::{menu, try_get_module_accessor};",
+     "new": "use crate::runtime::compat::common::menu;",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "waiting: super::lobby::is_waiting_scene(),",
+     "new": "waiting: crate::runtime::ui::facts::fact_waiting_scene(),",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "        || !practice::enabled() || suspended())",
+     "new": "        || !crate::runtime::ui::facts::fact_practice_enabled() || suspended())",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "    if !practice::enabled() || !crate::runtime::ui::facts::fact_fighters_present() {",
+     "new": "    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_fighters_present() {",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "revision!=current || suspended() || !practice::scene_enabled()",
+     "new": "revision!=current || suspended() || !crate::runtime::ui::facts::fact_scene_enabled()",
+     "reason": "Design C: worker keyboard services read the existing game-published facts, never live game pointers or mode memory"
+    },
+    {
+     "old": "fn submit_loaded_character() {\n    if !crate::runtime::roster::character_roster::cpu_reload_ready() {return;}\n    let target=lock_read(&UI).loaded_target();\n    let Some(target)=target else{return;};\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    if target.configuration().is_some() {\n        let revision=selection_revision();\n        if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {\n            notify(\"Exact Mii macro loading is unavailable in this build\");\n        }\n        return;\n    }\n    if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    let accepted=crate::runtime::roster::character_roster::mii_replay::request_named(target);\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    let accepted=target.configuration().is_none() && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());\n    if !accepted {\n        // No native request was admitted. A not-yet-qualified owner may become\n        // ready after auto-init; don't consume this one submission prematurely.\n        lock_write(&UI).invalidate_character_request();\n    }\n}",
+     "new": "static CHARACTER_PENDING: AtomicBool = AtomicBool::new(false);\nstatic CHARACTER_REQUEST: hos_lock::Mailbox<(crate::engine::mii::replay::Target, u64), 1> = hos_lock::Mailbox::new();\nstatic CHARACTER_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();\n\nfn submit_loaded_character() {\n    if CHARACTER_PENDING.load(Ordering::Acquire) { return; }\n    let target=lock_read(&UI).loaded_target();\n    let Some(target)=target else{return;};\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    if target.configuration().is_some() {\n        let revision=selection_revision();\n        if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {\n            notify(\"Exact Mii macro loading is unavailable in this build\");\n        }\n        return;\n    }\n    if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}\n    CHARACTER_PENDING.store(true, Ordering::Release);\n    let posted = CHARACTER_REQUEST.post((target, selection_revision()));\n    debug_assert!(posted, \"one outstanding named character request\");\n}\n\n/// Game callback only. The roster remains the sole admission/loader provider.\npub fn service_character_request() {\n    CHARACTER_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision() && source_is_named()\n            && crate::runtime::roster::character_roster::cpu_reload_ready();\n        #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let accepted = eligible && target.configuration().is_none()\n            && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());\n        let posted = CHARACTER_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding named character result\");\n        crate::runtime::ui::worker::wake();\n    });\n}\n\nfn consume_character_result() {\n    CHARACTER_RESULT.drain(|(revision, accepted)| {\n        CHARACTER_PENDING.store(false, Ordering::Release);\n        if revision == selection_revision() && !accepted {\n            lock_write(&UI).invalidate_character_request();\n        }\n    });\n}\n",
+     "reason": "Design C: character intent/receipt crosses the worker/game boundary; only the game callback calls the roster's native admission predicate"
+    },
+    {
+     "old": "pub fn service_character() {",
+     "new": "pub fn service_character() {\n    consume_character_result();",
+     "reason": "Design C: character intent/receipt crosses the worker/game boundary; only the game callback calls the roster's native admission predicate"
+    },
+    {
+     "old": "    if !practice::enabled() || suspended() || unsafe { !Fighter::is_ready_go() }",
+     "new": "    if !crate::runtime::ui::facts::fact_practice_enabled() || suspended() || !crate::runtime::ui::facts::fact_ready_go()",
+     "reason": "Design C: character intent/receipt crosses the worker/game boundary; only the game callback calls the roster's native admission predicate"
+    },
+    {
+     "old": "use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor, Fighter};",
+     "new": "use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor};",
+     "reason": "Design C: character intent/receipt crosses the worker/game boundary; only the game callback calls the roster's native admission predicate"
     }
    ]
   },
@@ -655,7 +775,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "5a1961e219974a761921cb084654794ff7bbecbdb67fbe9de04f2e0ae9a35064",
+   "dest_sha256": "75b3ca8796c8fc807b50975dc0f8a7e233932e317483852b9e58bf8e8381c83d",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -688,6 +808,31 @@
      "old": "unsafe { !Fighter::is_ready_go() || !crate::runtime::lobby::training::practice::acquire() }",
      "new": "!crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()",
      "reason": "ui-screens (design C): opening the replay window runs on the menu worker, which must not read the game: ready-go and package 6's practice acquire are the facts the frame wrapper published on the game thread (ui::facts), at most a frame old"
+    },
+    {
+     "old": "ClipEditor::new(session, clean_statuses())",
+     "new": "ClipEditor::new(session, clean_statuses().to_vec())",
+     "reason": "R5: the hook-side idle/fall membership check uses a fixed array; only the worker-created editor owns a Vec"
+    },
+    {
+     "old": "pub fn clean_statuses() -> Vec<i32> {\n    vec![*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]\n}",
+     "new": "pub fn clean_statuses() -> [i32; 3] {\n    [*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]\n}",
+     "reason": "R5: the hook-side idle/fall membership check uses a fixed array; only the worker-created editor owns a Vec"
+    },
+    {
+     "old": "            let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n                .ok_or(\"Wait for the practice CPU before opening a capture\")?;\n            if !clean_statuses().contains(&unsafe { StatusModule::status_kind(cpu) }) {\n                return Err(\"Open the clip editor while the CPU is idle or falling\".into());\n            }\n            let current = unsafe { app::utility::get_kind(&mut *cpu) };",
+     "new": "            let current = crate::runtime::ui::facts::fact_cpu_kind()\n                .ok_or(\"Wait for the practice CPU before opening a capture\")?;\n            if !crate::runtime::ui::facts::fact_cpu_status().is_some_and(|status| clean_statuses().contains(&status)) {\n                return Err(\"Open the clip editor while the CPU is idle or falling\".into());\n            }",
+     "reason": "Design C: clip editor actions consume the CPU kind/status published by the game callback"
+    },
+    {
+     "old": "        let current = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n            .map(|cpu| unsafe { app::utility::get_kind(&mut *cpu) });",
+     "new": "        let current = crate::runtime::ui::facts::fact_cpu_kind();",
+     "reason": "Design C: clip editor actions consume the CPU kind/status published by the game callback"
+    },
+    {
+     "old": "    let waiting = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby);",
+     "new": "    let waiting = crate::runtime::ui::facts::fact_waiting_scene();",
+     "reason": "Design C: clip editor actions consume the CPU kind/status published by the game callback"
     }
    ]
   },
@@ -717,7 +862,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "e57607280e90ab6ff5b3f39157f2bcef65f587e795b39ef0affb6af57845c1b7",
+   "dest_sha256": "e8a4f9c09e531c9285dcadf0561f8345153da232820ae91fef8d9571b32068a3",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -728,6 +873,16 @@
      "old": "            let key = capture.pool.start_record(native.index);",
      "new": "            let key = crate::model::hook_stats::per_load(|| capture.pool.start_record(native.index));",
      "reason": "hook allocation accounting: starting a record allocates its session once"
+    },
+    {
+     "old": "    // Revision 27 semantics without a registered host: hooks only when the INI\n    // says on. With a registered host the guarded adapter is resident from\n    // startup even when off, because a later ON choice cannot install hooks.\n    if !seed && !registered { return; }\n",
+     "new": "    // Install the guarded adapter independently of the initial preference.\n    // The menu can arm the next record without a reboot or a Deluxe host;\n    // CaptureToggle still latches that preference at native record start.\n",
+     "reason": "Q7/design C: keep the guarded adapter resident when Off at boot so the menu can enable capture live without a Deluxe host; record-start toggle latching is unchanged."
+    },
+    {
+     "old": "//! Revision 28: the hooks are resident whenever the INI says on or a Deluxe\n//! host registered the capture row. Each accepted native record is owned here\n",
+     "new": "//! The guarded hooks remain resident independently of the initial capture\n//! preference or Deluxe registration. Each accepted native record is owned here\n",
+     "reason": "Document resident adapter lifetime independently of the capture preference."
     }
    ]
   },

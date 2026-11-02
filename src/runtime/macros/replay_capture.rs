@@ -234,7 +234,7 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             .ok_or_else(||"Capture track is absent".to_string())?;
         session.mii_for_track(miis,entry as i32,kind).map_err(str::to_string)
     });
-    let result = ClipEditor::new(session, clean_statuses())
+    let result = ClipEditor::new(session, clean_statuses().to_vec())
         .map(|editor| editor.with_move_rules(crate::runtime::macros::replay_move_start::rules()));
     match result {
         Ok(mut editor) => {
@@ -249,12 +249,11 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() {
                 return Err("Practice changed before the capture could open".into());
             }
-            let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
+            let current = crate::runtime::ui::facts::fact_cpu_kind()
                 .ok_or("Wait for the practice CPU before opening a capture")?;
-            if !clean_statuses().contains(&unsafe { StatusModule::status_kind(cpu) }) {
+            if !crate::runtime::ui::facts::fact_cpu_status().is_some_and(|status| clean_statuses().contains(&status)) {
                 return Err("Open the clip editor while the CPU is idle or falling".into());
             }
-            let current = unsafe { app::utility::get_kind(&mut *cpu) };
             editor.select_kind(current);
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
                 association,resolved:[None;8],resolve_failed:0,switch:false});
@@ -368,7 +367,7 @@ pub fn browser_view() -> Option<View> {
 }
 
 pub fn browser_input(pad: Pad) {
-    let waiting = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby);
+    let waiting = crate::runtime::ui::facts::fact_waiting_scene();
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
@@ -718,8 +717,7 @@ pub fn on_action(action: ClipAction) {
     // A track or capture change is an explicit selection: a recorded fighter that is
     // not the settled CPU asks once, and nothing changes until it is answered.
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
-        let current = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
-            .map(|cpu| unsafe { app::utility::get_kind(&mut *cpu) });
+        let current = crate::runtime::ui::facts::fact_cpu_kind();
         if gate_selection(Some(action), current) {
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
             return;
@@ -976,6 +974,6 @@ pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> 
     Some(LiveInput { buttons: ControlModule::get_button(module) as u32, axes })
 }
 
-pub fn clean_statuses() -> Vec<i32> {
-    vec![*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]
+pub fn clean_statuses() -> [i32; 3] {
+    [*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]
 }

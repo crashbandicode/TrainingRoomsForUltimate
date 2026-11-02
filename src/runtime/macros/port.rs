@@ -167,5 +167,46 @@ pub(crate) mod input_record {
 /// `hos_lock::Mailbox` of game-thread events, the deferred effects, publishing `MacroQueries`). A game thread that posts an event calls
 /// `crate::runtime::ui::worker::wake()` after posting.
 pub(crate) fn worker_tick() {
-    crate::runtime::macros::named_macros::run_deferred();
+    if !super::ready() { return; }
+    CLIP_EVENTS.drain(|event| {
+        if event.revision != super::replay_capture::selection_revision() { return; }
+        match event.kind {
+            ClipEventKind::Input(controller) => super::replay_capture::on_input(&controller),
+            ClipEventKind::Draw => super::replay_capture::after_draw(),
+        }
+    });
+    let dropped = CLIP_EVENTS.take_dropped();
+    if dropped != 0 {
+        crate::runtime::diag_log::diagnostic(format_args!("[MacroHandoff] clip_events_dropped={dropped}"));
+    }
+    super::named_macros::consume_capture();
+    super::named_macros::service_character();
+    super::named_macros::run_deferred();
+    super::named_macros::publish_queries();
+    super::sync_owner();
+    super::named_macros::service_keyboard();
+    super::named_macros::run_deferred();
+    super::named_macros::publish_queries();
+    super::sync_owner();
+}
+
+#[derive(Clone, Copy)]
+enum ClipEventKind { Input(input::Controller), Draw }
+#[derive(Clone, Copy)]
+struct ClipEvent { revision: u64, kind: ClipEventKind }
+static CLIP_EVENTS: hos_lock::Mailbox<ClipEvent, 16> = hos_lock::Mailbox::new();
+
+fn post_clip(kind: ClipEventKind) {
+    CLIP_EVENTS.post(ClipEvent { revision: super::replay_capture::selection_revision(), kind });
+    crate::runtime::ui::worker::wake();
+}
+
+pub(crate) fn post_clip_input(controller: input::Controller) {
+    post_clip(ClipEventKind::Input(controller));
+}
+
+pub(crate) fn post_clip_draw() {
+    if super::named_macros::hook_queries().clip_foreground {
+        post_clip(ClipEventKind::Draw);
+    }
 }

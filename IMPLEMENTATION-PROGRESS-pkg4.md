@@ -2,6 +2,14 @@
 
 ## Astra continuation — 2026-11-02
 
+## QUESTIONS
+
+- Shared-interface note: pkg4 extends ui::facts (CPU status/situation and scene/waiting snapshots) for worker ownership, without editing ui-screens editor implementations. Scene facts refresh in existing game/layout callbacks and invalidate on session retirement. Please preserve these additions in integration.
+
+- Lead: please provide the exact authorized integration SHA for pkg6's guarded `entry_active_body` F11 slice when gated. pkg4 is at `c111b81` plus progress docs, implementing independent ownership work first.
+- Lead: live_replay's existing hooks allocate through `hook_stats::per_load` (`start_recording`, per-frame pool growth), and save paths construct Strings/Arc snapshots. The brief's zero-allocation requirement must include these if "every layer" covers live replay; these are not yet fixed or accepted as exceptions. Please confirm ownership of that work while pkg4 proceeds with design C and resident adapter.
+- Lead: final online replay A/B and two-console evidence is allocated to package 7 by implementation-packages; please identify the integration evidence owner for pkg4's resident capture change. No READY claim will cite absent evidence.
+
 - Objective: finish design C, resident capture adapter, s4-09 and all pkg4 gates; READY only after evidence.
 - Thread `01a19c9f-04ad-7f72-8d2f-440ee0a6a04f`: exact-thread SQLite and latest rollout turn verify `gpt-6-astra / medium`.
 - Playbook followed: `ae87443cbb801472e474b3f0c20b5f9c3f5f1f77`; ff-only pull current. README, all seven docs and tools/PROVENANCE read completely (truncated outputs re-read in bounded chunks).
@@ -62,43 +70,45 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 | hook_locks PENDING empty, no exceptions | M | open: design C must remove recorder::rec entry |
 | carry derivation/ledger and zero Unmapped | M | open: final carry verify and s4-09 |
 
-### Continuation checkpoint (context handoff)
+### Active implementation checkpoint
 
-No implementation changes yet. `c111b81` is only the authorized prerequisite merge; no tests run on it in this thread.
-The active goal remains completion of pkg4, not completion of this checkpoint. No operator blocker found.
-
-Read already: worker brief, routing authority, MY_MODEL, stream rules, Astra handover, full pkg4 progress, BUILD,
-DECISIONS, implementation-packages, input index/progress/template, global implementation progress, input specs 01/02/04/05,
-playbook README/all docs/PROVENANCE, macro_handoff.rs, full recorder.rs, port.rs and hook_locks.rs.
-Large initial combined outputs were truncated: re-read MENU-DRAFT lines 1–250 if needed to verify no lost inventory rows,
-SPEC-input-01 lines 124–130 (playback/mirroring paragraph), CARRY-OVER from line 265 onward (its tail was visible in the earlier
-combined output, but explicit bounded re-read is safer). No implementation source from upstream or fork was accessed.
-
-Findings for next step:
-- `port::worker_tick` currently only calls `named_macros::run_deferred`; layer services still originate on game hooks.
-- `port::input_record::{export_named,import_named_slot,is_playback}` reach `recorder::with_recorder` and REC.
-  Export allocates a Vec inside REC; import constructs a Vec on caller then locks REC. They need a genuine command/result handoff.
-- `recorder` game hooks call named capture/frame/start/finish/restore functions directly. Keep native reads in hooks.
-- `recorder::body_of` still calls `natives::entry_body`, not pkg6's pending guarded active-body accessor.
-- `live_replay::init` lines 563–572 contains the Off-at-boot early return `if !seed && !registered { return; }`;
-  final ready publication follows seam guards, writer start and hook install. Audit start/save/tick toggle gates before editing.
-- `tests/hook_locks.rs` PENDING is recorder::rec; ALLOWED also contains named_macros::prepare_buffers/MOTION.
-  Remove actual cross-thread lock sharing, not merely scanner entries. MacroQueries/PlayBuffers/CaptureBuffer already exist.
-- No Claw/session messaging tool exists in the currently exposed/deferred catalog (searched session/message names).
-  Coordinate exact F11 SHA through the shared lead tracker or available native lead channel; no SHA requested yet.
-- Slim oracle move is not in c111b81; retain it on a later explicitly authorized integration.
-
-Exact next bounded commands (all via `/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command ...`):
-1. Reverify exact-thread model/effort and re-arm/reconcile temporary watcher after compaction, per MY_MODEL.
-2. `systemd-run --user --scope -p MemoryMax=512M /usr/bin/timeout 30 git status --short --branch`
-3. Read `tools/carry_pkg4.py` completely and its imported carry helper before any carry command. Read named_macros.rs,
-   replay_capture.rs, replay_preview.rs, live_replay.rs in bounded chunks; inspect shared Published/Mailbox implementations,
-   worker tick call sites, existing model/settings/factory/menu/outbox/sites/guards/reset/clock providers as relevant.
-4. Request/track F11 integration; implement independent worker ownership first. Read queue and live Yoga ledger before any build.
-
-Live state at checkpoint: no host claims, no queue changes, no profiles changed, no compile/Eden process launched.
-Temporary watcher `/tmp/pkg4-model-watch-01a19c9f-04ad-7f72-8d2f-440ee0a6a04f.py` was PID 2596969,
-owner PID 2596795, alert at the same path plus `.alert`; reap before yielding, re-arm on continuation.
+- Live gate reverified after compaction: exact thread remains gpt-6-astra/medium.
+  Watcher PID 2677197 is bound to codex PID 2589048; prior temporary watcher had exited.
+- HEAD remains f72f495 (authorized prerequisite merge c111b81); implementation below is uncommitted and ungated.
+- Resident adapter: recorded two manifest transforms remove the Off/no-Deluxe early return and correct its documentation.
+  Guards, writer-start success, ready publication and record-latched toggle gates remain intact.
+  Carry re-derivation verified 42 files before the next capture edits.
+- Named capture: in-progress transform uses model::macro_handoff::CaptureBuffer for hook-owned frames,
+  hands completion (start/crop/session) to the menu worker via a one-slot Mailbox, and copies/offers the draft there.
+  The buffer cannot be reused until the worker consumes its prior result (begin returns false; recorder does not start
+  against an unavailable buffer). This is the design-C ownership protocol, not an accepted new behavior restriction.
+  Playback still uses MOTION; do not claim all hook locks removed.
+- port::worker_tick consumes finished captures before deferred effects. Keyboard polling was subsequently moved as described below; no runtime keyboard-stall proof is claimed yet.
+- Proven worker-native-read issue: practice::enabled -> context -> game_mode::current reads native memory.
+  lobby::is_waiting_scene also reads that native tuple. Simply moving services to worker_tick is invalid.
+  Extend existing ui::facts at its interface, preserve lifecycle invalidation and modal-keyboard result ownership,
+  and consume copied facts in worker services. No second game-state provider.
+- All previously truncated required doc ranges now read explicitly (MENU-DRAFT 1–250, CARRY-OVER tail,
+  SPEC-input-01 124–130). carry_pkg4 tool fully read; no upstream/non-ours-new source opened.
+- Worker wiring added (ungated): Copy MacroQueries publication; hook marker/panel/clip queries; ClipEvent
+  mailbox (16) carries Controller copies and draw ticks to the worker with selection-revision retirement.
+  Capture completion, native keyboard polling and named character service now run on the worker.
+  Named character requests/results use a single outstanding value-only mailbox pair; roster admission runs
+  on the CPU callback. Replay reload and remaining UI hook queries are still pending.
+- Existing ui::facts extended at its interface (no editor implementation edits): CPU status/situation,
+  explicitly invalidated scene/waiting facts and fresh waiting readiness. Scene facts refresh from game/layout
+  callbacks and survive a modal applet pausing fighter frames; worker code does not read native mode memory.
+  Lead should review this shared interface during integration.
+- Fixed clean_statuses hook allocations with a three-element array (editor converts to Vec on worker).
+  Removed duplicate direct live_replay calls in macros/mod.rs; replay_capture already forwards both.
+- Added model regression for a slow capture consumer: game cannot overwrite the buffer while worker copies,
+  then reuse succeeds. Not run yet.
+- Carry re-derivation/ledger verified all 42 files after the changes. git diff --check clean at the prior checkpoint.
+- No queue entry/claim, no compile/Eden started, no profile changed. Latest shell quoting error was a ParserError
+  before execution of the temporary Python edit script; rerun using PowerShell literal here-string succeeded.
+- Next: finish capture/playback ownership and worker facts; regenerate carry ledger and verify; tests only after
+  queue + live Yoga ledger admission. Read replay_capture/replay_preview in bounded chunks; preserve editor owners.
+  F11 exact authorized SHA still requested above. READY remains unmet.
 
 
 Branch `stream/pkg4` (worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg4`), base 473da26, merged
