@@ -344,7 +344,9 @@ unsafe fn fighter_frame(fighter: usize) {
     if accessor == 0 || !lra_reset::entry_id_valid(entry) {
         return;
     }
-    let training = game::is_training_mode();
+    // The shared scene wrapper (pkg6 D4): native Training or an active lobby practice, never during a hot swap.
+    let scene_now = crate::runtime::scene::current();
+    let training = scene_now.is_some();
     if entry == 0 {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
@@ -368,8 +370,8 @@ unsafe fn fighter_frame(fighter: usize) {
         });
         return;
     }
-    let lobby = LOBBY.load(Ordering::Acquire);
-    let scene = if lobby { Scene::Lobby } else { Scene::Training };
+    let scene = scene_now.unwrap_or(Scene::Training);
+    let lobby = scene == Scene::Lobby;
     if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter)) {
         with(|cpu| cpu.roles.forget(accessor));
         return;
@@ -908,7 +910,7 @@ unsafe fn actionable(accessor: usize) -> bool {
 
 /// Frame advantage, on the player entry's frame: reads both fighters only while the row is On.
 unsafe fn frame_advantage(player: usize) {
-    let lobby = LOBBY.load(Ordering::Acquire);
+    let lobby = crate::runtime::scene::current() == Some(Scene::Lobby);
     let primary = FighterKey::new(i32::from(primary_entry(lobby)), false);
     let Some(cpu_accessor) = primary.and_then(|key| CPU.lock().as_ref().and_then(|c| c.roles.accessor_of(key))) else { return };
     if !with(|cpu| cpu.settings.frame_advantage && cpu.settings.mash_state.is_empty()).unwrap_or(false) {
