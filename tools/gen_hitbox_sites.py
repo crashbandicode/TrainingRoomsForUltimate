@@ -42,6 +42,12 @@ ROWS = [
      "Inside the `ATTACK` implementation (`main+0x2284b80`): the Lua stack read the plugin repeats, `ldr x8,[L,#0x20]; ldr x8,[x8]; ldr x9,[L,#0x10]; add x8,x8,#0x40` (slot of argument 4 = base + 0x10 * index, tested against the top at L+0x10, else the nil sentinel), then the value tags (3 float, 0x13 integer). Relied on, never written."),
     ("hitbox_catch_stack", 0x22AC2EC, RELIED,
      "Inside `CATCH`: the same Lua stack read for argument 3 (`add x8,x8,#0x30`), the size. Relied on, never written."),
+    ("hurtbox_module", 0x203DB10, RELIED,
+     "`HitModule::set_status_all` lua_bind thunk (`ldr x0,[x0,#0xb0]; ldr x8,[x0]; ldr x3,[x8,#0xc8]; br x3`): the hurtbox module is the accessor's `+0xb0`; the plugin reads its tables, it never calls or hooks the thunk (decision HB1). Relied on, never written."),
+    ("hurtbox_groups", 0x469AF0, RELIED,
+     "`HitModule::set_status_all` (vtable `main+0x4f6e1d0` slot 0xc8): the group table at module `+0x60` (0x3c bytes per group, first part `+4`, count `+6`, `i16`) and the part table at `+0x70` (0x50 bytes per part, status word at `+0`). Relied on, never written."),
+    ("hurtbox_part_shape", 0x468490, RELIED,
+     "The hurtbox part update: a part whose status word is 3 (off) gets no shape; otherwise the capsule from the part's offset vectors `+0x08` and `+0x14`, size `+0x20` and node `+0x28` on its bone. Relied on, never written."),
 ]
 
 

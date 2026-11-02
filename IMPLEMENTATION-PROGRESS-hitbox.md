@@ -56,3 +56,17 @@ the game keep their shapes and what would drawing them cost? Read from the owned
   risk of Q3 multiplied; a hurtbox view would need its own budget (e.g. 2-3 spheres per part, or one stretched effect per part, or redrawing only on a
   part change), which is a design decision, not only a toggle.
 - Until HB1 is answered the help text says only what is built: "On: hitboxes and grab boxes are drawn." (`src/model/menu/table.rs`).
+
+## HB1 (a) implemented: hurtboxes drawn too (operator decision 2026-11-02, spec `dcbb2d1`), ~11:30Z
+
+- Layout confirmed from the owned ELF (the groundwork lead above is superseded): `HitModule`'s vtable is `main+0x4f6e1d0` (not `0x4f6af00`), shown by
+  `set_status_all(HitStatus, group)` (slot 0xc8, `0x469af0`) and `set_status_joint(Hash40, HitStatus, group)` (slot 0xb8, `0x4699f0`) whose bodies match their
+  thunk signatures exactly. Groups at module `+0x60` (0x3c bytes; first part `+4`, count `+6`, `i16`), parts at `+0x70` (0x50 bytes; status `+0`, offsets
+  `+0x08` / `+0x14`, size `+0x20`, node `+0x28`), part count `+0x78`; the part update (`0x468490`) skips status 3 (off) and builds the capsule from those fields.
+- Drawn in the per-frame pass after the hitboxes, same exemptions (grab range, shield: nothing), group 0's parts that are not off, the visualizer's sphere rule
+  (capsule = `ceil(d / (1.75 s)) + 1` spheres, 2..16), yellow `[1, 1, 0]`. Three relied rows (`hurtbox_module`, `hurtbox_groups`, `hurtbox_part_shape`); no new
+  native (the tables are read in place, bounded by `group_parts`); help text "On: hitboxes, grab boxes and hurtboxes are drawn."
+- Tests: `core06_hurtbox_shapes_per_fighter`, `core06_hurtbox_layout_matches_the_owned_elf`. Cost: diag `[Hitbox] stats ... hurtbox_spheres= max_hurtbox_spheres=
+  pass_ticks_avg=` (Eden hb rows).
+- Known defect from the lead (not this stream's): the integrated tree hangs when the TrainingRooms menu is closed; settings go through `settings.json` before boot,
+  menu rows run last in a boot.

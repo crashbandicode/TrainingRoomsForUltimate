@@ -146,8 +146,35 @@ unsafe fn clear_spheres(accessor: usize) {
     natives::sphere_kill_kind(accessor, effect);
 }
 
-// ---- the per-frame pass ---------------------------------------------------------------------------------------------
+/// The fighter's hurtboxes (decision HB1): the parts of `HitModule`'s group 0 that are not switched off, each its capsule on its
+/// bone, yellow. The tables are read in place (layout `model::hitbox::layout`, rows `hurtbox_*`); a table that does not look like
+/// one draws nothing. Returns how many spheres were drawn.
+unsafe fn draw_hurtboxes(accessor: usize) -> u32 {
+    let module = ((accessor + layout::HIT_MODULE) as *const usize).read();
+    if module == 0 {
+        return 0;
+    }
+    let groups = ((module + layout::HIT_GROUPS) as *const usize).read();
+    let parts = ((module + layout::HIT_PARTS) as *const usize).read();
+    if groups == 0 || parts == 0 {
+        return 0;
+    }
+    let total = ((module + layout::HIT_PART_TOTAL) as *const i32).read();
+    let group = groups + hitbox::HURTBOX_GROUP * layout::HIT_GROUP_STRIDE;
+    let first = ((group + layout::HIT_GROUP_FIRST) as *const i16).read_unaligned();
+    let count = ((group + layout::HIT_GROUP_COUNT) as *const i16).read_unaligned();
+    let Some(range) = hitbox::group_parts(first, count, total) else { return 0 };
+    let mut drawn = 0;
+    for index in range {
+        let record = ((parts + index * layout::HIT_PART_STRIDE) as *const [u8; layout::HIT_PART_STRIDE]).read_unaligned();
+        if let Some(Shape { joint, size, a, b, .. }) = hitbox::hurtbox_shape(&record) {
+            drawn += draw_shape(accessor, joint, size, a, b, hitbox::HURTBOX_TINT);
+        }
+    }
+    drawn
+}
 
+// ---- the per-frame pass ---------------------------------------------------------------------------------------------
 /// One fighter's pass (SPEC-core-06 §5), after the game's frame for it. A readiness boundary: nothing happens before boot
 /// installed the feature. With the setting Off and nothing to restore it makes no game call at all (Q4).
 ///
@@ -179,6 +206,7 @@ pub unsafe fn frame(fighter: usize) {
         natives::set_sleep_effect(accessor, true);
     }
     let mut spheres = 0;
+    let mut hurt = 0;
     if plan.redraw {
         clear_spheres(accessor);
         for slot in 0..hitbox::SLOTS {
@@ -195,15 +223,16 @@ pub unsafe fn frame(fighter: usize) {
             let b = hitbox::second_centre(read_vec3(data + layout::OFFSET2));
             spheres += draw_shape(accessor, joint, size, a, b, hitbox::hitbox_tint(slot));
         }
+        hurt = draw_hurtboxes(accessor);
     }
     let slept = hitbox::slept_after(facts, plan);
     if slept != facts.slept {
         book_set(accessor, slept);
     }
     #[cfg(feature = "diag")]
-    stats::frame_end(plan, spheres);
+    stats::frame_end(plan, spheres, hurt);
     #[cfg(not(feature = "diag"))]
-    let _ = spheres;
+    let _ = (spheres, hurt);
 }
 
 // ---- the hooks --------------------------------------------------------------------------------------------------------
@@ -327,6 +356,8 @@ mod stats {
     static PASSES: AtomicU32 = AtomicU32::new(0);
     static WORK: AtomicU32 = AtomicU32::new(0);
     static SPHERES: AtomicU32 = AtomicU32::new(0);
+    static HURT: AtomicU32 = AtomicU32::new(0);
+    static MAX_HURT: AtomicU32 = AtomicU32::new(0);
     static SLEEPS: AtomicU32 = AtomicU32::new(0);
     static RESTORES: AtomicU32 = AtomicU32::new(0);
     static COMMANDS: AtomicU32 = AtomicU32::new(0);
@@ -346,7 +377,9 @@ mod stats {
         START.store(now(), Ordering::Relaxed);
     }
 
-    pub fn frame_end(plan: FramePlan, spheres: u32) {
+    pub fn frame_end(plan: FramePlan, spheres: u32, hurt: u32) {
+        HURT.fetch_add(hurt, Ordering::Relaxed);
+        MAX_HURT.fetch_max(hurt, Ordering::Relaxed);
         let ticks = now().wrapping_sub(START.load(Ordering::Relaxed));
         TICKS.fetch_add(ticks, Ordering::Relaxed);
         MAX_TICKS.fetch_max(ticks, Ordering::Relaxed);
@@ -362,16 +395,18 @@ mod stats {
             RESTORES.fetch_add(1, Ordering::Relaxed);
         }
         if spheres != LAST_SPHERES.swap(spheres, Ordering::Relaxed) {
-            diagnostic(format_args!("[Hitbox] pass spheres={spheres} sleep={} restore={} redraw={}", plan.sleep, plan.restore, plan.redraw));
+            diagnostic(format_args!("[Hitbox] pass spheres={spheres} hurtbox_spheres={hurt} sleep={} restore={} redraw={}", plan.sleep, plan.restore, plan.redraw));
         }
         let passes = PASSES.fetch_add(1, Ordering::Relaxed) + 1;
         if passes >= REPORT_EVERY {
             let take = |c: &AtomicU32| c.swap(0, Ordering::Relaxed);
             let passes = take(&PASSES).max(1);
             diagnostic(format_args!(
-                "[Hitbox] stats passes={passes} with_calls={} spheres={} sleeps={} restores={} commands={} max_spheres={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
+                "[Hitbox] stats passes={passes} with_calls={} spheres={} hurtbox_spheres={} max_hurtbox_spheres={} sleeps={} restores={} commands={} max_spheres={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
                 take(&WORK),
                 take(&SPHERES),
+                take(&HURT),
+                take(&MAX_HURT),
                 take(&SLEEPS),
                 take(&RESTORES),
                 take(&COMMANDS),

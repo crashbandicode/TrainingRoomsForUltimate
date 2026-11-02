@@ -19,7 +19,9 @@ Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-
 | `AttackData` and Lua stack layouts the plugin reads | `core06_attack_data_layout_matches_the_owned_elf`, `core06_lua_stack_layout_matches_the_owned_elf` | (all rows) | below |
 | Every native the feature calls is a granted capability; its closure is computed from the code | `tests/capabilities.rs` (`cross_needs_match_the_call_graph`, `a_poisoned_row_disables_...`, `the_native_call_layer_checks_the_grant`) | hb-E9 poisoned row | `CROSS_NEEDS[Hitbox]` |
 | No heap allocation in the hooks and the pass | `HookScope` counters (`HookId::Hitbox*`), `tests/hook_alloc.rs` | hb-E10 `hook_stats` delta 0 | |
-| Cost per frame | diag `[Hitbox] stats` line (ticks per pass) | hb-E10 | `eden/EDEN-HITBOX.md` |
+| Cost per frame | diag `[Hitbox] stats` line (ticks per pass, hitbox and hurtbox spheres) | hb-E10 | `eden/EDEN-HITBOX.md` |
+| Hurtbox shapes per fighter (HB1 (a)): group 0 parts not switched off, capsule from `+0x08` / `+0x14`, size `+0x20`, node `+0x28`, yellow | `core06_hurtbox_shapes_per_fighter`, `core06_hurtbox_layout_matches_the_owned_elf` | hb-E11 screenshot with hurtboxes | |
+| Hurtbox cost row | diag `[Hitbox] stats hurtbox_spheres= max_hurtbox_spheres=` | hb-E10 | `eden/EDEN-HITBOX.md` |
 
 ## Where the layouts come from (13.0.5 `main`, owned ELF `research/game-13.0.5/main-13.0.5.elf`)
 
@@ -68,5 +70,7 @@ the CPU package's. Sharing v1 / chain: N/A (the scan showed nobody at the sites)
   (`cpu_shield_param_hook`), so the hook does no Lua pop/push at all.
 - Q1 / Q3 (projectiles drawn once; effect-pool cost): behaviour as specified (spheres at the command, per-frame pass for fighters only); the cost is measured
   in the diag build (`[Hitbox] stats`), see `eden/EDEN-HITBOX.md`.
-- Hurtboxes: `SPEC-core-06` has none (nor does the upstream feature it describes); the menu row's help text and `docs/MENU-PROPOSAL.md` say "hitboxes and
-  hurtboxes". Not implemented; reported to the lead (operator decision).
+- Hurtboxes: operator decision HB1 (a) (spec updated `dcbb2d1`): drawn yellow from `HitModule` (accessor `+0xb0`; vtable `main+0x4f6e1d0` by its relocations,
+  shown by `set_status_all` / `set_status_joint` / `get_status` / `get_part_size` matching their thunk signatures): group table `+0x60` (0x3c bytes; first `+4`, count `+6`),
+  part table `+0x70` (0x50 bytes; status `+0`, offsets `+0x08` / `+0x14`, size `+0x20`, node `+0x28`), part count `+0x78`; status 3 is off (the part update at
+  `main+0x468490` skips it). Rows `hurtbox_module`, `hurtbox_groups`, `hurtbox_part_shape` (relied). Help text: "On: hitboxes, grab boxes and hurtboxes are drawn."

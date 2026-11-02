@@ -331,7 +331,7 @@ fn core06_site_guards() {
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 8);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 2);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 5);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -384,6 +384,9 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_ACCESSOR_OFFSET, "sv_battle_object_module_accessor"),
         (sites_hitbox::HITBOX_ATTACK_STACK_OFFSET, "hitbox_attack_stack"),
         (sites_hitbox::HITBOX_CATCH_STACK_OFFSET, "hitbox_catch_stack"),
+        (sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"),
+        (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"),
+        (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -528,4 +531,87 @@ fn core06_lua_stack_layout_matches_the_owned_elf() {
     let accessor = model::sites_hitbox::HITBOX_ACCESSOR_OFFSET;
     assert_eq!(w(accessor), 0xf85f_8008, "ldur x8,[x0,#-8]");
     assert_eq!(w(accessor + 4), ldr_x(0, 8, 0x1a0));
+}
+
+// ---- hurtboxes (decision HB1 (a)) -------------------------------------------------------------------------------------
+
+/// A 0x50-byte part record as the game keeps it.
+fn part(status: u32, a: [f32; 3], b: [f32; 3], size: f32, node: u64) -> [u8; 0x50] {
+    let mut r = [0u8; 0x50];
+    r[0..4].copy_from_slice(&status.to_le_bytes());
+    for (i, v) in a.iter().chain(b.iter()).enumerate() {
+        r[8 + 4 * i..12 + 4 * i].copy_from_slice(&v.to_bits().to_le_bytes());
+    }
+    r[0x20..0x24].copy_from_slice(&size.to_bits().to_le_bytes());
+    r[0x28..0x30].copy_from_slice(&node.to_le_bytes());
+    r
+}
+
+#[test]
+fn core06_hurtbox_shapes_per_fighter() {
+    use model::hitbox::layout;
+    assert_eq!(std::mem::size_of::<[u8; layout::HIT_PART_STRIDE]>(), 0x50);
+    // A capsule part: both centres, its size and its bone; drawn yellow with the same sphere rule as a hitbox.
+    let capsule = hitbox::hurtbox_shape(&part(0, [0.0, 1.0, 0.0], [0.0, 6.0, 0.0], 2.5, 0x0000_0004_1234_5678)).unwrap();
+    assert_eq!((capsule.joint, capsule.size, capsule.a, capsule.b), (0x0000_0004_1234_5678, 2.5, [0.0, 1.0, 0.0], Some([0.0, 6.0, 0.0])));
+    assert_eq!(hitbox::spheres(capsule.a, capsule.b, capsule.size).count(), hitbox::sphere_count(5.0, 2.5));
+    // A part whose two centres coincide is one sphere; a centre at the bone's origin is a real centre (no "zero means absent").
+    let ball = hitbox::hurtbox_shape(&part(0, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 3.0, 7)).unwrap();
+    assert_eq!(ball.b, None);
+    let from_origin = hitbox::hurtbox_shape(&part(0, [0.0; 3], [4.0, 0.0, 0.0], 3.0, 7)).unwrap();
+    assert_eq!(from_origin.b, Some([4.0, 0.0, 0.0]));
+    // Intangible (1) and invincible (2) parts are still drawn; a part switched off (3) is not.
+    for status in [0, 1, 2] {
+        assert!(hitbox::hurtbox_shape(&part(status, [0.0; 3], [1.0; 3], 1.0, 7)).is_some(), "status {status}");
+    }
+    assert_eq!(hitbox::hurtbox_shape(&part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 7)), None);
+    // The tint: yellow, fully saturated.
+    assert_eq!(hitbox::HURTBOX_TINT, [1.0, 1.0, 0.0]);
+    // A group's parts: `first..first + count`, inside the module's part count; anything else is not a hurtbox table.
+    assert_eq!(hitbox::group_parts(0, 12, 12), Some(0..12));
+    assert_eq!(hitbox::group_parts(3, 4, 20), Some(3..7));
+    assert_eq!(hitbox::group_parts(0, 0, 0), Some(0..0));
+    assert_eq!(hitbox::group_parts(-1, 4, 20), None);
+    assert_eq!(hitbox::group_parts(0, -4, 20), None);
+    assert_eq!(hitbox::group_parts(10, 12, 20), None, "past the part count");
+    assert_eq!(hitbox::group_parts(0, 65, 100), None, "more parts than any fighter has");
+    // A fighter of 12 capsule parts at most 16 spheres each: the per-frame bound the cost row measures against.
+    assert!(12 * hitbox::SPHERE_MAX <= 192);
+}
+
+#[test]
+fn core06_hurtbox_layout_matches_the_owned_elf() {
+    let Some(main) = common::owned_main("core06_hurtbox_layout_matches_the_owned_elf") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    use model::hitbox::layout;
+    // Every HitModule lua_bind thunk loads the module from the accessor's +0xb0; set_status_all is vtable slot 0xc8.
+    let thunk = sites_hitbox::HITBOX_HURT_MODULE_OFFSET;
+    assert_eq!(w(thunk), ldr_x(0, 0, layout::HIT_MODULE as u32));
+    assert_eq!(w(thunk + 8), ldr_x(3, 8, 0xc8));
+    assert_eq!(main.symbol("_ZN3app8lua_bind30HitModule__set_status_all_implEPNS_26BattleObjectModuleAccessorENS_9HitStatusEi"), Some(thunk));
+    // set_status_all(status, group) (the vtable at main+0x4f6e1d0 by its relocations, slot 0xc8): the group table at +0x60,
+    // 0x3c bytes a group, the count at +6, the first index at +4, the part table at +0x70, 0x50 bytes a part, the status word first.
+    let g = sites_hitbox::HITBOX_HURT_GROUPS_OFFSET;
+    assert_eq!(w(g), ldr_x(9, 0, layout::HIT_GROUPS as u32));
+    assert_eq!(w(g + 4), 0x321e_0fea, "orr w10, wzr, #0x3c");
+    assert_eq!(w(g + 0x10), 0x78c0_6d4b, "ldrsh w11, [x10, #0x6]!");
+    assert_eq!(w(g + 0x2c), add_x(12, 12, layout::HIT_GROUP_FIRST as u32));
+    assert_eq!(w(g + 0x38), ldr_x(15, 0, layout::HIT_PARTS as u32));
+    assert_eq!(w(g + 0x28), movz_w(13, layout::HIT_PART_STRIDE as u32));
+    assert_eq!(w(g + 0x44), 0xb82e_69e1, "str w1, [x15, x14]: the status word at +0 of a part");
+    // The part update: status 3 switches the part off; otherwise the capsule from +0x08 and +0x14, size +0x20, node +0x28.
+    let u = sites_hitbox::HITBOX_HURT_PART_OFFSET;
+    assert_eq!(w(u + 4), 0x7100_0d7f, "cmp w11, #3");
+    assert_eq!(w(0x4684c0), 0xbd40_0b00, "ldr s0, [x24, #0x8]");
+    assert_eq!(w(0x4684c4), add_x(8, 24, 0xc));
+    assert_eq!(w(0x4684c8), add_x(10, 24, 0x10));
+    assert_eq!(w(0x4684e0), ldr_x(3, 24, layout::PART_NODE as u32));
+    assert_eq!(w(0x4684e8), 0xbd40_1700, "ldr s0, [x24, #0x14]");
+    assert_eq!(w(0x4684f0), add_x(8, 24, 0x18));
+    assert_eq!(w(0x4684f4), add_x(10, 24, 0x1c));
+    assert_eq!(w(0x46851c), 0xbd40_2300, "ldr s0, [x24, #0x20]: the size");
+    // The part count at +0x78 (the add-part function reads and bumps it).
+    assert_eq!(w(0x469540), 0xb9807818, "ldrsw x24, [x0, #0x78]");
+    // get_part_size(group) answers the group's count (slot 0x170): `ldrsh w0, [x8, #0x6]`.
+    assert_eq!(w(0x46a8bc), 0x79c0_0d00);
 }

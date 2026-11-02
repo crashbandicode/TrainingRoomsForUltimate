@@ -43,6 +43,24 @@ pub mod layout {
     /// The node's `Hash40`, the bone the hitbox follows.
     pub const NODE: usize = 0x48;
 
+    /// `HitModule` (hurtboxes): the module pointer in the accessor, its group table (0x3c bytes per group: the first part's
+    /// index at `+4`, the part count at `+6`, both `i16`) and its part table (0x50 bytes per part).
+    pub const HIT_MODULE: usize = 0xb0;
+    pub const HIT_GROUPS: usize = 0x60;
+    pub const HIT_GROUP_STRIDE: usize = 0x3c;
+    pub const HIT_GROUP_FIRST: usize = 0x4;
+    pub const HIT_GROUP_COUNT: usize = 0x6;
+    pub const HIT_PARTS: usize = 0x70;
+    /// The number of parts in the part table (`i32`).
+    pub const HIT_PART_TOTAL: usize = 0x78;
+    pub const HIT_PART_STRIDE: usize = 0x50;
+    /// One hurtbox part: its `HitStatus` word, the two offset vectors of its capsule, its size and its node (bone hash).
+    pub const PART_STATUS: usize = 0x00;
+    pub const PART_OFFSET: usize = 0x08;
+    pub const PART_OFFSET2: usize = 0x14;
+    pub const PART_SIZE: usize = 0x20;
+    pub const PART_NODE: usize = 0x28;
+
     /// `lua_State` fields.
     pub const LUA_TOP: usize = 0x10;
     pub const LUA_FRAME: usize = 0x20;
@@ -142,6 +160,42 @@ pub fn spheres(a: [f32; 3], b: Option<[f32; 3]>, size: f32) -> Spheres {
 /// hitbox).
 pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
     (b != [0.0; 3]).then_some(b)
+}
+
+// ---- hurtboxes (decision HB1 (a), 2026-11-02) ----------------------------------------------------------------------
+
+/// Hurtboxes are drawn yellow.
+pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
+/// The `HitStatus` of a part that is switched off (the game's part update skips its shape for it).
+pub const HIT_STATUS_OFF: u32 = 3;
+/// The hurtbox group the pass draws: group 0, the one the fighters' scripts address (`set_status_all(status, 0)`).
+pub const HURTBOX_GROUP: usize = 0;
+/// No fighter has more parts in a group than this; a larger count is not a hurtbox table and nothing is drawn.
+pub const MAX_HURTBOX_PARTS: i16 = 64;
+
+/// The part indices of a group (`first`, `count` as the game stores them; `total` is the module's part count at `+0x78`), or `None`
+/// for a table that does not look like one.
+pub fn group_parts(first: i16, count: i16, total: i32) -> Option<std::ops::Range<usize>> {
+    if first < 0 || count < 0 || count > MAX_HURTBOX_PARTS || i32::from(first) + i32::from(count) > total {
+        return None;
+    }
+    Some(first as usize..first as usize + count as usize)
+}
+
+/// A hurtbox part as a shape to draw: `None` while the part is switched off. A capsule's two centres are both given; when they
+/// are the same point the part is one sphere.
+pub fn hurtbox_shape(record: &[u8; layout::HIT_PART_STRIDE]) -> Option<Shape> {
+    let u32_at = |at: usize| u32::from_le_bytes([record[at], record[at + 1], record[at + 2], record[at + 3]]);
+    let f32_at = |at: usize| f32::from_bits(u32_at(at));
+    let vec3 = |at: usize| [f32_at(at), f32_at(at + 4), f32_at(at + 8)];
+    if u32_at(layout::PART_STATUS) == HIT_STATUS_OFF {
+        return None;
+    }
+    let mut node = [0u8; 8];
+    node.copy_from_slice(&record[layout::PART_NODE..layout::PART_NODE + 8]);
+    let a = vec3(layout::PART_OFFSET);
+    let b = vec3(layout::PART_OFFSET2);
+    Some(Shape { id: 0, joint: u64::from_le_bytes(node), size: f32_at(layout::PART_SIZE), a, b: (b != a).then_some(b) })
 }
 
 // ---- the animation commands' Lua stack -----------------------------------------------------------------------------
