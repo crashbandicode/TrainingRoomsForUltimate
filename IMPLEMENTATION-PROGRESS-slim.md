@@ -238,6 +238,10 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
 
+- sl-01 frozen d1e5392 diag5030f68f93bf: initial seam census PASSED (seams379, seams_stock374, seams_missing=[], seams_external=[], seams_unchecked220, result=installed). Broader health FAILS nonzero hook allocations; full final console0Unmapped. Raw durable evidence artifacts/trainingrooms-nro-archive/slim/sl-01. Allocation owners at collection: roster_preload904, cpu_frame192, input_caller_a_note18, live_replay1, practice_lease1, named_service3, menu_draw1. Lead/pkg6/pkg4/UI: retain as failures for final integrated zero-allocation gate; request exact gated fixes when available, not a baseline exception. Training screenshot personally inspected (170518): Steve/Daisy at0%, Kongo Jungle, Training damage/combo HUD; route reference mismatch explains screenshot gate failure. No route threshold loosened.
+
+- Texture retirement deferred: latest lead reply asks UI to continue the owned-resource u4 probe. Other approved removals proceed; keep texture-probe until that runtime proof no longer needs it.
+
 - Yoga queue coordination16:2xZ: SMD released16:16Z, pkg4 is now literal head and my oracle test follows. Fresh ledger free check passes after fairness, but pkg4 has not claimed yet. I continue honoring its place; if the frozen gate is deferred, please have its owner withdraw/requeue. No foreign queue row changed.
 
 - Shared harness admission parser finding: Yoga has no real imgui-nvn/Terra queue job, but
@@ -457,3 +461,29 @@ Raw log /tmp/slim/astra-smd.log; generated subcrate Cargo.lock is expected new b
 Oracle tests queued at Yoga tail; hos-lock remains queued on Surface. No owned compiler/Eden.
 
 Queue correction after source inspection: oracle crate has zero unit/doc tests; its public API is compiled and exercised by the24 SMD integration tests and root parity/golden tests. A standalone oracle cargo test adds no coverage, so its queued call was withdrawn before claiming. Hos-lock moved to Yoga tail (own Surface row withdrawn); Surface seam/Training Eden row appended at tail. This avoids a redundant compile. No claims held.
+
+Prepared first retirement slice in /tmp/slim/approved-empty-texture.patch (not applied; initial runtime gate still queued): Cargo.toml deletes8 empty diagnostic aliases + texture-probe, ui/mod.rs and ui/tick.rs remove only texture probe registration/call, texture_probe.rs deletes served experiment, tests/pkg6_features.rs requires retired aliases absent while product closures remain. Existing diagnostic >=30 guard still holds after these9 retirements. No carried UI file in pkg4/pkg6 manifests; seam-row metadata preserved. This is the exact file notice for lead/UI; remaining approved capacity/Mii manifest slice follows separately.
+
+### Initial host gates complete — 2026-11-02 16:38Z
+Hos-lock standalone tests at frozen d1e5392 passed20/0, no warnings, exit0; Yoga CLAIMED/RELEASED16:38Z.
+Raw log archived in artifacts/trainingrooms-nro-archive/slim/astra-host-gates/astra-hos-lock.log.
+Post-build verification: all1119 archive files unchanged; exactly two generated lockfiles (SMD and hos-lock) extra.
+No owned claim/compiler/Eden. Surface sl-01 seam/install-line and idle Training row queued; current code d1e5392, HEADeb9331f plus progress-only dirt.
+Prepared scratch capacity-retirement-edits.json covers native_service.rs, character_items.rs, native_source_actors.rs with exact old/new/count/reason and source hashes, not applied. Shared managed-source branches retained. No new runtime edit before initial Eden gate.
+
+Runtime admission moved to Yoga tail; own Surface Eden request withdrawn. Shared harness225d16b deployed with its existing deploy.py (read fully) to /home/intpa/trainingrooms-eden-slim-astra, no profile or Eden created yet. Added reference images manually because deploy.py copies macros but not refs; own deployed config macros points at deployed root/macros. Source profile b, display109 unused at preflight, Yoga tile NRO present. Diag hash5030f68f93bf verified after transfer; pilot e30334261370 verified. Local authoritative queue/ledger claim will precede remote solo Up -NoClaim; Down -KeepClaim -Restore then local release after cleanup.
+
+Preparation checkpoint: /tmp/slim/capacity-retirement-edits.json now covers4 source files (23 exact edits in native_source_capacity.rs plus6 across the first3 files). This is a scratch plan, not applied source and not a gate result. The capacity plan removes only probe-gated callbacks, legacy wrappers and event diagnostics; shared managed source branch bodies, guards, native calls and ownership cleanup stay intact. Source hashes bind every plan entry; remaining character_roster/character_sources/kirby_hats/source_lifecycle inline sites still need preparation. Initial Eden sl-01 waits at Yoga tail behind pkg6/ui-screens. No claims or profiles held.
+
+### ACTIVE Eden sl-01 — 2026-11-02 16:57Z
+Yoga CLAIMED Codex01a19c9f/slim after fresh queue/free checks. Frozen d1e5392 diag5030f68f93bf, pilot e30334261370 plus tile; own root /home/intpa/trainingrooms-eden-slim-astra, source b, profile sl, display109, shared harness225d16b. All7 deployed script hashes equal source. Preflight21GiB available/254GB free, no Eden/display; own profile initially absent. Source976 mutable files hashed before boot in source-before-sl-01.json.
+Up -NoClaim executing via bounded SSH session60359; local ledger holds the authoritative claim. Collect raw outputs BEFORE Down -KeepClaim -Restore; then verify source hashes and remove freshly created own profile (restores initial absence) before local RELEASED/own queue-row removal. No compiler allowed on Yoga during this claim.
+
+### sl-01 runtime failure — 2026-11-02 17:07Z
+Stopped/restored and RELEASED Yoga; own queue line removed. Source976 hashes unchanged; fresh private profile deleted back to initial absence. Raw evidence remote trainingrooms-eden-slim-astra/evidence/sl-01. Full final console5689 lines:0 Unmapped,0 panic/abort/crash. Installation result=installed and pilot_present=true, but route ended GATE FAIL training scene best_dist=52.1 limit=30. Hook counters failed: allocations1120 delta100, roster_preload904, cpu_frame192, input_caller_a_note18 plus other startup sites. No runtime pass claimed. Initial runtime gate remains open; approved scratch retirements still unapplied. Lead coordination needed for shared runtime root fixes; continue independent audit/reductions.
+
+### Next approved slice17:10Z
+Initial previously-uncompiled code now has host/Switch and seam census evidence; broader shared runtime failure remains explicit. Proceeding under lead instruction to continue approved probe deletions. Exact capacity manifest slice: native_service.rs, character_items.rs, native_source_actors.rs, native_source_capacity.rs, character_roster.rs, character_sources.rs, kirby_hats.rs; remove source_capacity_probe.rs/source_ldn_capacity_probe.rs/source_lifecycle_probe.rs. Conditional lifecycle audit found only probe attribution, no product/test consumer; keep actual ownership release calls and seam metadata. Scratch source hashes/exact replacements verified before application. Cargo/test feature closure updates accompany retirement.
+
+### Capacity retirement applied17:2xZ (ungated)
+Manifest transforms regenerated258 carried files; removed three retired probes; both carry verifications pass (pkg6258/pkg442). Removed19features (8empty+10capacity+1lifecycle); explicit20diagnostic inventory replaces arbitrary>=30testfloor. Texture remains. Rawsloc4=101224, reduction3126 thisslice, total5728 versus authorizedebfcb98; simulator1118 unchanged. Budget cut105600 retains4318pending. No fresh compile yet; runtime failure stays open.

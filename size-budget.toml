@@ -1,4 +1,4 @@
-# Code-size budget of the clean room (operator goal 2026-11-02: smaller than the fork; target <= 90,000 at RC).
+# Code-size ratchet of the clean room. Operator 2026-11-02: RC ratchets only; next version >=15% below fork after rustfmt normalization.
 # Counted by tools/sloc.py (the primary's sloc4.py rules since 2026-11-02: Rust lines without blanks, comments and tests,
 # test-gated module files and host-only simulator code apart; third_party/ excluded). Entries before the sloc4 entry
 # were counted with sloc3's rules. Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
@@ -47,3 +47,9 @@ ceiling = 107900
 date = "2026-11-02"
 reason = "head 103,497 (stream/slim 2aa887a, sloc4) plus the pending merges listed above (+4,318), rounded up to the next hundred; integrator-3 lowers it to the actual count after each merge"
 approved_by = "lead 0caa72b8 (2026-11-02 ~14:0xZ: ceiling at head plus the known pending merges)"
+
+[[budget]]
+scope = "total"
+ceiling = 105600
+date = "2026-11-02"
+reason = "cut: approved capacity/lifecycle probe and empty alias retirement; raw sloc4 101224 plus retained pending merge allowance4318 =105542, rounded up. Prior measured104350, slice reduction3126; no counting semantics or normalized-unit conversion."

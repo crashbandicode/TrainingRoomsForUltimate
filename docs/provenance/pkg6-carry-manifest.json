@@ -1845,7 +1845,33 @@
    "dest": "src/runtime/roster/native_source_actors.rs",
    "crate": "root",
    "src_sha256": "27faf933ac59b022af5509dd2a104f6cb383214d6563bb151a147bf05fe2552e",
-   "dest_sha256": "6fee48f5b0a6db63d369806ef449a1c6e6b7427dbb4e2f53398075879d8d730f"
+   "dest_sha256": "0b1a568d3a7683ac00936260728c419f869d99105995df8654271b8acf554228",
+   "edits": [
+    {
+     "old": "// Event-only attribution, including raw current control addresses when the\n// qualification reader refuses their semantics/alignment. Never follow a saved\n// actor or an unvalidated control; actor_record remains the dereference gate.\n#[cfg(feature = \"source-capacity-probe\")]\nunsafe fn visible_event_members(\n    scene: Snapshot, index: usize,\n) -> Option<(u32, Actors, [Option<usize>; 3])> {\n    let owner = scene.layout.owners()[index];\n    let entry = native_source::entry(owner)?;\n    if entry as usize != scene.primary[owner as usize]\n        || super::entry_observation(entry, owner) != Some(scene.original[index])\n    { return None; }\n    let (forms, active_kind) = super::super::ready_forms(entry, owner)?;\n    let plan = visible_plan(entry, owner, forms)?;\n    if plan.first != 2 { return None; }\n    let pointers: [usize; 5] =\n        [0x4178, 0x4180, 0x4188, 0x4190, 0x4198].map(|offset| read(entry, offset));\n    let mut controls = [None; 3];\n    let actors = std::array::from_fn(|index| {\n        if index >= plan.count { return None; }\n        let actor = pointers[plan.first + index] as *const u8;\n        if aligned(actor) && read::<usize>(actor, 0) == BASE.load(Ordering::Acquire) + 0x4f85d30 {\n            controls[index] = Some(read(actor, 0x58));\n        }\n        actor_record(actor)\n    });\n    if native_source::entry(owner) != Some(entry)\n        || super::entry_observation(entry, owner) != Some(scene.original[index])\n        || super::super::ready_forms(entry, owner) != Some((forms, active_kind))\n        || [0x4178, 0x4180, 0x4188, 0x4190, 0x4198].map(|offset| read::<usize>(entry, offset)) != pointers\n    { return None; }\n    Some((active_kind, Actors { pointers, actors }, controls))\n}\n\n#[cfg(feature = \"source-capacity-probe\")]\npub(crate) unsafe fn observe_visible(\n    source: crate::engine::swap::source_lifetime::SourceToken,\n    scene: Snapshot, input: Option<Inputs>, captured: [Option<VisibleBank>; 2], event: &str,\n) {\n    for (index, bank) in captured.iter().copied().enumerate() {\n        let owner = scene.layout.owners()[index];\n        let applicable = matches!(scene.original[index].kinds[0], 0x24..=0x26 | 0x5a | 0x5b);\n        let current = if applicable { input.and_then(|input| visible_bank(scene, input, index)) } else { None };\n        let members = if applicable { visible_event_members(scene, index) } else { None };\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[SourceOverlap] visible_event source={:?} event={} owner={} applicable={} captured_qualified={} event_qualified={} event_only_resample=true input_row={:x?} captured_bank={:x?} event_bank={:x?} event_members(active_kind,actors,raw_controls)={:x?}\",\n            source, event, owner, applicable, bank.is_some(), current.is_some(),\n            input.map(|input| input.slots[owner as usize]), bank, current, members));\n    }\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(any(feature = \"source-ldn-capacity-empty-probe\", feature = \"managed-ldn-third-source-alpha\"))]",
+     "new": "#[cfg(feature = \"managed-ldn-third-source-alpha\")]",
+     "count": 4,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(any(\n        feature = \"source-ldn-capacity-empty-probe\",\n        feature = \"managed-ldn-third-source-alpha\"\n    ))]",
+     "new": "#[cfg(feature = \"managed-ldn-third-source-alpha\")]",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(not(any(\n        feature = \"source-ldn-capacity-empty-probe\",\n        feature = \"managed-ldn-third-source-alpha\"\n    )))]",
+     "new": "#[cfg(not(feature = \"managed-ldn-third-source-alpha\"))]",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    }
+   ]
   },
   {
    "src": "src/native_source.rs",
@@ -1880,12 +1906,18 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "0282b287309623abd29a9dc1132f339962133fb313e357db81d7dc042943311b",
+   "dest_sha256": "fea2b7e07b38385e05cdedaaea26b7cdf9e754e6b08673c183c3267fa8134515",
    "edits": [
     {
      "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
      "new": "    context: &ServiceEntryContext,\n) -> u64 {\n    crate::runtime::threads::headroom(\"native_service\");\n",
      "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "#[cfg(any(feature = \"source-capacity-probe\", feature = \"managed-third-source-alpha\"))]",
+     "new": "#[cfg(feature = \"managed-third-source-alpha\")]",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
     }
    ]
   },
@@ -1915,7 +1947,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
+   "dest_sha256": "dae3e402ce488daab6951351a5c90c162cd1f9cd6f8a5d1177668daa38006537",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1942,6 +1974,102 @@
      "new": "training::save_states::is_loading()",
      "count": 2,
      "reason": "the lobby facade's `save_states::is_loading` is a safe function (package 3's fact): the fork's `unsafe` blocks around it are unnecessary (an `unused_unsafe` warning)"
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\n#[path = \"source_capacity_probe.rs\"]\npub mod source_capacity_probe;\n\n#[cfg(feature = \"source-ldn-capacity-probe\")]\n#[path = \"source_ldn_capacity_probe.rs\"]\nmod source_ldn_capacity_probe;\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-ldn-capacity-link-probe\")]\n    if reason == \"capacity Link native destruction\" {\n        trace!(\"[NativeInstall] capacity Link destructor token={:?} finished={} gate_active_after={}\",\n            token, finished, INSTALL.active());\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-ldn-capacity-probe\")]\n    source_ldn_capacity_probe::scene_changed();\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    source_capacity_probe::scene_changed();\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-ldn-capacity-probe\")]\n    source_ldn_capacity_probe::service(ctx, entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    if source_capacity_probe::service(ctx, entry, owner) {\n        return;\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-ldn-capacity-probe\")]\n    source_ldn_capacity_probe::on_destroy(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    source_capacity_probe::on_destroy(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        source_capacity_probe::scene_changed();\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        source_capacity_probe::install(base);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "any(\n    feature = \"source-capacity-probe\",\n    feature = \"managed-third-source-alpha\"\n)",
+     "new": "feature = \"managed-third-source-alpha\"",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "any(\n            feature = \"source-capacity-probe\",\n            feature = \"managed-third-source-alpha\"\n        )",
+     "new": "feature = \"managed-third-source-alpha\"",
+     "count": 1,
+     "reason": "Retire served source-capacity probe modules and inline sites (pkg6 confirmation, 2026-11-02); preserve managed-source product callbacks and order."
+    },
+    {
+     "old": "#[cfg(feature = \"source-lifecycle-probe\")]\n#[path = \"source_lifecycle_probe.rs\"]\npub mod source_lifecycle_probe;\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    source_lifecycle_probe::service(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    source_lifecycle_probe::destroy(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-lifecycle-probe\")]\n        source_lifecycle_probe::install(base);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
     }
    ]
   },
@@ -1964,12 +2092,114 @@
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "a2e2f8df43383b61341ad8fe0c98af8a18bf3bd1299c7531e5226e683476e485",
+   "dest_sha256": "1ed4407038fd123f695a324a2cd3a75084db0771853e8ab5deae58d1049b0b81",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
      "new": "fn notice(role: usize, text: std::borrow::Cow<'static, str>) {",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    prepare_seen: bool,\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\nfn observe_pending(role: usize, pending: Pending, stage: &str, reason: &str) {\n    crate::engine::compat::logging::diagnostic(format_args!(\n        \"[KirbyHatPending] role={} body=0x{:x} kind=0x{:x} stage={} reason={} age={} started={} cleared={} restoring={} prepare_seen={}\",\n        role, pending.body_id, pending.kind, stage, reason, pending.age,\n        pending.started, pending.cleared, pending.restoring, pending.prepare_seen));\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\npub(crate) fn capacity_probe_idle() -> bool {\n    STATES.iter().all(|state| state.lock().unwrap().pending.is_none())\n        && PENDING_ROLES.load(Ordering::Acquire) == 0\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        prepare_seen: false,\n",
+     "new": "",
+     "count": 2,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    {\n        let pending = state.pending.expect(\"created pending request\");\n        drop(state);\n        observe_pending(role, pending, \"created\", \"shortcut\");\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "                    #[cfg(feature = \"source-capacity-probe\")]\n                    prepare_seen: false,\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        {\n            drop(state);\n            observe_pending(role, pending, \"cancelled\",\n                if identity_changed { \"body identity changed\" } else { \"permission gate\" });\n        }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        {\n            observe_pending(role, pending, \"timeout\", \"age exceeded 900\");\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[KirbyHatPending] timeout_native role={} body=0x{:x} status=0x{:x} changing={} stop={}\",\n                role, pending.body_id, StatusModule::status_kind(body),\n                StatusModule::is_changing(body), StopModule::is_stop(body)));\n        }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "                #[cfg(feature = \"source-capacity-probe\")]\n                observe_pending(role, pending, \"error\", reason);\n",
+     "new": "",
+     "count": 2,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-capacity-probe\")]\n            if !pending.prepare_seen {\n                pending.prepare_seen = true;\n                observe_pending(role, pending, \"prepare\", \"first sources::prepare call\");\n            }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "                    #[cfg(feature = \"source-capacity-probe\")]\n                    observe_pending(role, pending, \"error\", reason);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        let pending = state.pending;\n",
+     "new": "",
+     "count": 2,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        if let Some(pending) = pending {\n            observe_pending(role, pending, \"cancelled\", \"cancel_pending\");\n        }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        if let Some(pending) = pending {\n            observe_pending(role, pending, \"cancelled\", \"scene invalidated\");\n        }\n        #[cfg(not(feature = \"source-capacity-probe\"))]\n        let _ = role;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    let superseded = state.pending;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    {\n        let pending = state.pending.expect(\"created restore request\");\n        drop(state);\n        if let Some(old) = superseded {\n            observe_pending(role, old, \"cancelled\", \"superseded by restore\");\n        }\n        observe_pending(role, pending, \"created\", \"save restore\");\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
+    },
+    {
+     "old": "fn invalidate_runtime(same_lobby: Option<bool>) {\n    for (role, state) in STATES.iter().enumerate() {",
+     "new": "fn invalidate_runtime(same_lobby: Option<bool>) {\n    for state in &STATES {",
+     "count": 1,
+     "reason": "Retire served source-capacity event diagnostics (pkg6 confirmation, 2026-11-02); preserve hat request, restore and lease behavior."
     }
    ]
   },
@@ -1978,7 +2208,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "e1e5a05d5fc6724829cbe4535b2227adce3bd552948909ae45be6bb2d672f53d",
+   "dest_sha256": "8d314d10d809fea9a845a0f0575ff96e574aeda44eb319c9e222442de86c8ced",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -1994,6 +2224,12 @@
      "old": "#[cfg(feature = \"turnip-save-probe\")]\npub(crate) fn turnip_probe_idle() -> bool {\n    !HAS_PENDING.load(Ordering::Acquire) && PENDING.lock().unwrap().is_none()\n}\n\n",
      "new": "",
      "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\npub(crate) fn capacity_probe_idle() -> bool {\n    PENDING.lock().unwrap().is_none() && !HAS_PENDING.load(Ordering::Acquire)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
     }
    ]
   },
@@ -2002,7 +2238,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "7261a8121d80490640efcc8222614725ab5851ac699a2d431c11384c9e929e0a",
+   "dest_sha256": "d58e86a2e79a6c38b89727d2734656b204592da044c3ee7c0281183a8489fa66",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -2013,6 +2249,228 @@
      "old": "pub unsafe fn legacy_training_owner_reserved(",
      "new": "#[cfg(feature = \"source-owner-probe\")]\npub unsafe fn legacy_training_owner_reserved(",
      "reason": "diag code out of the shipped NRO (D11): the only caller is the diag probe `source_owner_probe` (feature `source-owner-probe`); with `reserved` removed (automations are keyed by role) nothing in the release build calls it"
+    },
+    {
+     "old": "#[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n#[derive(Clone, Copy, PartialEq, Eq)]\nstruct AdmissionSeen {\n    wanted: Want,\n    previous: SourceToken,\n    reservation: Option<usize>,\n    conditions: u32,\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    admission: Option<AdmissionSeen>,\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "/// Strict fresh-scene predicate for the separate empty-entry experiment.\n#[cfg(feature = \"source-capacity-probe\")]\npub(super) fn capacity_probe_idle() -> bool {\n    let state = STATE.lock().unwrap();\n    state.sources.iter().all(Option::is_none)\n        && state.wants.iter().all(Option::is_none)\n        && state.leases.iter().all(Option::is_none)\n        && !HAS_CONSUMERS.load(Ordering::Acquire)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n    { let wanted=state.wants.get(channel).copied().flatten();\n      for capacity in &mut state.capacities {\n        if capacity.admission.is_some_and(|seen|Some(seen.wanted)==wanted) {capacity.admission=None;}\n      }\n    }\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n    if is_capacity && matches!(event, Some(\"ready\" | STALL_RETAINED | STALL_FAILED)) {\n        capacity::observe_load_inputs(source.token, source.kind, event.unwrap(), capacity_observation.1);\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "/// Once per pending request/source/condition, only for replacement of a live7.\n/// All supplementary native reads and formatting occur outside STATE.\n#[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\nunsafe fn admission_declined(\n    ctx: &ServiceEntryContext, slot:u32, entry: *const u8, wanted: Want, previous: Option<Source>,\n    condition: u8, reason: &str,\n) {\n    let Some(previous) = previous else { return; };\n    let bit = 1u32 << condition;\n    let (seen, owner, phase, replaceable, requested) = {\n        let state = STATE.lock().unwrap();\n        if state.sources[slot as usize] != Some(previous) || pending_request(&state) != Some(wanted) {\n            return;\n        }\n        let owner = reservation_for(&state,slot);\n        let seen = AdmissionSeen {\n            wanted, previous: previous.token, reservation: owner.map(|value| value.entry),\n            conditions: 0,\n        };\n        if state.capacities[capacity_index(slot)].admission.is_some_and(|old|\n            AdmissionSeen { conditions: 0, ..old } == seen && old.conditions & bit != 0)\n        { return; }\n        (seen, owner, state.book.phase(slot as usize), state.book.can_replace(slot as usize),\n            ready_still_requested(&state, slot as usize))\n    };\n    let detail = capacity::admission_detail(ctx, entry, previous.kind, owner);\n    let mut state = STATE.lock().unwrap();\n    if state.sources[slot as usize] != Some(previous) || pending_request(&state) != Some(wanted)\n        || reservation_for(&state,slot) != owner\n        || state.book.phase(slot as usize) != phase || state.book.can_replace(slot as usize) != replaceable\n        || ready_still_requested(&state, slot as usize) != requested\n    { return; }\n    let old = state.capacities[capacity_index(slot)].admission.filter(|old|\n        AdmissionSeen { conditions: 0, ..*old } == seen).map_or(0, |old| old.conditions);\n    if old & bit != 0 { return; }\n    state.capacities[capacity_index(slot)].admission = Some(AdmissionSeen { conditions: old | bit, ..seen });\n    drop(state);\n    crate::engine::compat::logging::diagnostic(format_args!(\n        \"[ManagedSourceAdmission] declined want_epoch={:?} want_kind=0x{:x} previous={:?} previous_kind=0x{:x} pending_install={} condition={} reason={} phase={:?} can_replace={:?} still_requested={} reservation_entry={:x?} detail(current_entry,dispatch,owned_error,descriptor,parked,canonical,inputs)={:x?}\",\n        wanted.epoch, wanted.kind, previous.token, previous.kind, previous.install.is_some(), condition, reason,\n        phase, replaceable, requested, seen.reservation, detail));\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        if is_capacity {\n            let pending = {\n                let state = STATE.lock().unwrap();\n                pending_request(&state).map(|wanted| (wanted, state.sources[slot as usize]))\n            };\n            if let Some((wanted, previous)) = pending {\n                admission_declined(ctx, slot, entry, wanted, previous, 27,\n                    \"existing source owns a load or is departed\");\n            }\n        }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n    macro_rules! declined {\n        ($code:expr, $reason:expr) => {\n            if is_capacity { admission_declined(ctx, slot, entry, wanted, previous, $code, $reason); }\n        };\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(0, \"book not replaceable or current source still requested\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(1, \"install/ready-go/native-ui/save-state/playback gate\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(2, \"scene backend not qualified\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(3, \"slot not a candidate for this backend\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-capacity-probe\")]\n            declined!(4, \"requested source kind not supported\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-capacity-probe\")]\n            declined!(5, \"no current owned reservation\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-capacity-probe\")]\n        let before = match capacity::load_preflight_checked(\n            ctx, entry, owner, previous.map(|source| source.kind))\n        {\n            Ok(before) => before,\n            Err(reason) => {\n                declined!(8 + reason as u8, match reason {\n                    capacity::LoadDecline::Owned => \"reservation roots or input role identity\",\n                    capacity::LoadDecline::Descriptor => \"previous descriptor\",\n                    capacity::LoadDecline::PreviousKind => \"previous source kind\",\n                    capacity::LoadDecline::Parked => \"previous native parked readiness\",\n                    capacity::LoadDecline::Resource => \"empty resource owner unavailable\",\n                    capacity::LoadDecline::Empty => \"candidate not empty\",\n                    capacity::LoadDecline::Available => \"empty resource owner not available\",\n                    #[cfg(feature = \"managed-grouped-source-alpha\")]\n                    capacity::LoadDecline::Canonical => \"previous canonical actors/input readiness\",\n                    capacity::LoadDecline::Snapshot => \"current dispatcher/scene snapshot\",\n                    capacity::LoadDecline::Inputs => \"current input view unavailable\",\n                    #[cfg(feature = \"managed-grouped-source-alpha\")]\n                    capacity::LoadDecline::InputRole => \"previous input role\",\n                    capacity::LoadDecline::OriginalResources => \"original resource owners unavailable\",\n                    #[cfg(any(feature = \"source-ldn-grouped-helper-capacity-probe\", feature = \"managed-grouped-source-alpha\"))]\n                    capacity::LoadDecline::ParkedGroups => \"existing canonical grouped helper readiness\",\n                });\n                return;\n            }\n        };\n        #[cfg(not(feature = \"source-capacity-probe\"))]\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(24, \"inherited resource costume unavailable\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "        #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n        declined!(25, \"shared install gate unavailable\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-capacity-probe\")]\n            declined!(26, \"second preflight differs from first\");\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n    let cached_book = (is_capacity).then(|| {\n        let mut records = LeaseObservations::new();\n        for live in state.leases.iter().flatten().copied() { records.push(live, None); }\n        (records, candidates(backend).map(|slot| (slot, state.book.phase(slot as usize),\n            state.book.can_replace(slot as usize))))\n    });\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(all(feature = \"managed-third-source-alpha\", feature = \"source-capacity-probe\"))]\n    if let Some((records, slots)) = cached_book {\n        capacity::observe_install_inputs(load.source(), previous.map(|source| (source.token, source.kind)),\n            wanted.kind, capacity_load);\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[SourceOverlap] commit_cache_mirror source={:?} slots(phase,can_replace)={:?} total={} recorded={} omitted={} native_liveness_resampled=false\",\n            load.source(), slots, records.total, records.recorded(), records.omitted()));\n        for (live, _) in records.records.iter().flatten() {\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[SourceOverlap] cached_lease_mirror_record commit_source={:?} retained={:?}\", load.source(), live));\n        }\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "#[cfg(feature=\"source-capacity-probe\")] admission:None,",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity probe admission/event attribution (pkg6 confirmation, 2026-11-02); retain existing non-probe preflight and source ownership behavior."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    let observed = state.leases.iter().flatten().find(|live| live.token == lease.token).copied();\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    if let Some(live) = observed {\n        observe_item_lease(\"release\", live, \"explicit\", Some(book_released));\n    }\n    #[cfg(not(feature = \"source-lifecycle-probe\"))]\n    let _ = book_released;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    let mut observed = None;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "        #[cfg(feature = \"source-lifecycle-probe\")]\n        { observed = Some(*live); }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    if let Some(live) = observed {\n        observe_item_lease(\"retain\", live, \"stored_consumer\", None);\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "// Records bookkeeping transitions only. No additional native object reads.\n#[cfg(feature = \"source-lifecycle-probe\")]\nfn observe_item_lease(event: &str, live: LiveLease, reason: &str, book_released: Option<bool>) {\n    if let Consumer::Item { body, kind } = live.consumer {\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[SourceItemLease] event={} source={:?} lease={:?} object=0x{:x} item_kind=0x{:x} reason={} book_released={:?}\",\n            event, live.source, live.token, body, kind, reason, book_released));\n    }\n}\n\n#[cfg(feature = \"source-lifecycle-probe\")]\nconst OBSERVED_LEASES: usize = 4;\n\n// Bounded copies of the LiveLease cache mirror, not native-liveness samples\n// or a copy of SourceBook's internal lease table. Count every omitted record.\n#[cfg(feature = \"source-lifecycle-probe\")]\nstruct LeaseObservations {\n    records: [Option<(LiveLease, Option<bool>)>; OBSERVED_LEASES],\n    total: usize,\n}\n\n#[cfg(feature = \"source-lifecycle-probe\")]\nimpl LeaseObservations {\n    fn new() -> Self { Self { records: [None; OBSERVED_LEASES], total: 0 } }\n\n    fn push(&mut self, live: LiveLease, book_released: Option<bool>) {\n        if let Some(record) = self.records.get_mut(self.total) {\n            *record = Some((live, book_released));\n        }\n        self.total += 1;\n    }\n\n    fn recorded(&self) -> usize { self.total.min(OBSERVED_LEASES) }\n    fn omitted(&self) -> usize { self.total.saturating_sub(OBSERVED_LEASES) }\n}\n\n#[cfg(feature = \"source-lifecycle-probe\")]\nfn observe_released_items(records: &LeaseObservations, reason: &str, source_filter: Option<SourceToken>) {\n    if records.total == 0 { return; }\n    crate::engine::compat::logging::diagnostic(format_args!(\n        \"[SourceItemLease] release_batch reason={} source_filter={:?} total={} recorded={} omitted={} cache_mirror=true\",\n        reason, source_filter, records.total, records.recorded(), records.omitted()));\n    for (live, book_released) in records.records.iter().flatten().copied() {\n        observe_item_lease(\"release\", live, reason, book_released);\n    }\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    let mut released_items = None;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-lifecycle-probe\")]\n            if matches!(live.consumer, Consumer::Item { .. }) {\n                released_items.get_or_insert_with(LeaseObservations::new)\n                    .push(live, Some(book_released));\n            }\n            #[cfg(not(feature = \"source-lifecycle-probe\"))]\n            let _ = book_released;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    if let Some(released) = released_items {\n        observe_released_items(&released, \"existing_consumer_alive_false\", None);\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    let released = {\n        let mut records = LeaseObservations::new();\n        for live in state.leases.iter().flatten().copied() {\n            if matches!(live.consumer, Consumer::Item { .. }) { records.push(live, None); }\n        }\n        records\n    };\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    observe_released_items(&released, \"scene_departure_book_invalidated\", None);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    let released_items = {\n        let mut records = LeaseObservations::new();\n        for live in state.leases.iter().flatten().copied() {\n            if live.source == source.token && matches!(live.consumer, Consumer::Item { .. }) {\n                records.push(live, None);\n            }\n        }\n        records\n    };\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-lifecycle-probe\")]\n    observe_released_items(&released_items, \"native_source_destroyed_book_invalidated\", Some(source.token));\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "#[cfg_attr(feature = \"source-lifecycle-probe\", derive(Debug))]\n",
+     "new": "",
+     "count": 2,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "let book_released = state.book.release(lease.token);",
+     "new": "state.book.release(lease.token);",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "let book_released = state.book.release(live.token);",
+     "new": "state.book.release(live.token);",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
     }
    ]
   },
@@ -2035,7 +2493,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "dest_sha256": "07a2810103e45d4bf1106f3a6e9a357fd8fefe9173f7f52fa1d214aa22459b85",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -2046,6 +2504,150 @@
      "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
      "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
      "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    pub(super) fn callback(self, owner: u32) -> u8 {\n        match self {\n            Self::Training => u8::from(owner == 0),\n            #[cfg(any(feature = \"source-ldn-capacity-empty-probe\", feature = \"managed-ldn-third-source-alpha\"))]\n            Self::LdnWaiting => match owner { 5 => 1, 6 => 2, _ => 0 },\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Self::QuickplayWaiting => match owner { 5 => 1, 6 => 2, _ => 0 },\n        }\n    }\n    #[cfg(feature = \"source-capacity-probe\")]\n    pub(super) fn callbacks_complete(self, seen: u8) -> bool {\n        match self {\n            Self::Training => seen == 1,\n            #[cfg(any(feature = \"source-ldn-capacity-empty-probe\", feature = \"managed-ldn-third-source-alpha\"))]\n            Self::LdnWaiting => seen == 3,\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Self::QuickplayWaiting => seen == 3,\n        }\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "/// Legacy entry7 wrapper; its remaining callers are the capacity probes.\n#[cfg(feature = \"source-capacity-probe\")]\npub(super) fn creation_delta(before: Snapshot, after: Snapshot) -> bool {\n    creation_delta_at(before, after, SLOT)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(any(\n    feature = \"source-capacity-link-probe\",\n    feature = \"managed-third-source-alpha\"\n))]\n#[cfg(all(not(feature = \"source-capacity-group-probe\"), any(\n    feature = \"source-capacity-link-probe\", not(feature = \"managed-grouped-source-alpha\")\n)))]\n#[cfg(feature = \"source-capacity-link-probe\")]\npub(super) unsafe fn ordinary_actor(entry: *const u8, kind: u32) -> Option<(usize, usize)> {\n    ordinary_actor_at(entry, SLOT, kind)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    Probe = 1,\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    super::source_capacity_probe::listener_removed(ctx);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-link-probe\")]\n    super::source_capacity_probe::actor_cleanup(ctx);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\npub(super) fn creation_supported() -> bool {\n    CREATION_VERIFIED.load(Ordering::Acquire)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "/// Legacy entry7 wrapper; its remaining caller is the capacity probe.\n#[cfg(feature = \"source-capacity-probe\")]\npub(super) unsafe fn create(claimant: Claimant) -> bool {\n    create_at(claimant, SLOT)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "#[cfg(feature = \"source-capacity-probe\")]\npub(super) fn bind_owner(claimant: Claimant, owner: usize) {\n    bind_owner_at(claimant, SLOT, owner);\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-capacity-probe\")]\n    super::source_capacity_probe::owner_cleanup_complete(ctx);\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    #[cfg(feature = \"source-ldn-capacity-empty-probe\")]\n    super::source_capacity_probe::claim_retired(\n        owner, released_index.is_some(),\n        CLAIM[0].load(Ordering::Acquire), CLAIM_OWNER[0].load(Ordering::Acquire),\n    );\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(feature = \"source-ldn-capacity-empty-probe\", feature = \"managed-ldn-third-source-alpha\")",
+     "new": "feature = \"managed-ldn-third-source-alpha\"",
+     "count": 12,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(feature = \"source-capacity-link-probe\", feature = \"managed-third-source-alpha\")",
+     "new": "feature = \"managed-third-source-alpha\"",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(\n    feature = \"source-capacity-link-probe\",\n    feature = \"managed-third-source-alpha\"\n)",
+     "new": "feature = \"managed-third-source-alpha\"",
+     "count": 12,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(\n        feature = \"source-capacity-link-probe\",\n        feature = \"managed-third-source-alpha\"\n    )",
+     "new": "feature = \"managed-third-source-alpha\"",
+     "count": 2,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(feature = \"source-capacity-aegis-probe\", feature = \"source-capacity-trainer-probe\", feature = \"managed-grouped-source-alpha\")",
+     "new": "feature = \"managed-grouped-source-alpha\"",
+     "count": 2,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(feature = \"source-capacity-group-probe\", feature = \"managed-grouped-source-alpha\")",
+     "new": "feature = \"managed-grouped-source-alpha\"",
+     "count": 5,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "any(feature = \"source-ldn-grouped-helper-capacity-probe\", feature = \"managed-grouped-source-alpha\")",
+     "new": "feature = \"managed-grouped-source-alpha\"",
+     "count": 10,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "all(not(feature = \"source-capacity-group-probe\"), any(\n    feature = \"source-capacity-link-probe\", not(feature = \"managed-grouped-source-alpha\")\n))",
+     "new": "not(feature = \"managed-grouped-source-alpha\")",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    feature = \"source-lifecycle-probe\",\n    feature = \"source-ldn-capacity-empty-probe\",\n",
+     "new": "    feature = \"source-lifecycle-probe\",\n",
+     "count": 1,
+     "reason": "Retire served source-capacity diagnostics (pkg6 confirmation, 2026-11-02); retain managed-source product branches."
+    },
+    {
+     "old": "    /// Event-only supplementary reads from this live callback, never saved pointers.\n    #[cfg(feature = \"source-capacity-probe\")]\n    pub(in crate::runtime::roster::character_roster) type AdmissionDetail = (\n        bool, bool, Option<(&'static str, usize)>, Option<[u32; 28]>, Option<bool>, Option<bool>,\n        Result<Inputs, (&'static str, usize, usize)>,\n    );\n\n    #[cfg(feature = \"source-capacity-probe\")]\n    pub(in crate::runtime::roster::character_roster) unsafe fn admission_detail(\n        ctx: &ServiceEntryContext, entry: *const u8, previous: u32, reservation: Option<Reservation>,\n    ) -> AdmissionDetail {\n        let slot = reservation.map_or(SLOT as u32, |owner| owner.slot);\n        let current_entry = native_source::entry(slot) == Some(entry);\n        let dispatch = current_entry && dispatch_identity(ctx, entry).is_some();\n        let parked = dispatch.then(|| native_source::parked_ready(entry, slot, previous));\n        #[cfg(feature = \"managed-grouped-source-alpha\")]\n        let canonical = (parked == Some(true))\n            .then(|| canonical::ready(entry, slot as usize, previous).is_some());\n        #[cfg(not(feature = \"managed-grouped-source-alpha\"))]\n        let canonical = None;\n        let owned_error = reservation.and_then(|owner| owned_checked(owner, entry).err());\n        (current_entry, dispatch, owned_error, dispatch.then(|| descriptor(entry)),\n            parked, canonical, inputs_for(slot as usize))\n    }\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event-only diagnostics (pkg6 confirmation, 2026-11-02); no admission/completion/ownership behavior changed."
+    },
+    {
+     "old": "    // Diagnostic-only copies of the existing load contract. Neither result\n    // participates in admission, completion or native ownership release.\n    #[cfg(feature = \"source-capacity-probe\")]\n    pub(crate) unsafe fn observe_install_inputs(\n        source: crate::engine::swap::source_lifetime::SourceToken,\n        previous: Option<(crate::engine::swap::source_lifetime::SourceToken, u32)>,\n        kind: u32,\n        before: Option<Preflight>,\n    ) {\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[SourceOverlap] install_commit source={:?} previous(source,kind)={:?} kind=0x{:x} captured_preflight_input={:x?}\",\n            source, previous, kind, before.map(|before| before.input)));\n        #[cfg(feature = \"managed-grouped-source-alpha\")]\n        if let Some(before) = before {\n            canonical::observe_visible(source, before.scene, inputs_for(before.input.slot).ok(),\n                before.visible, \"commit\");\n        }\n    }\n\n    #[cfg(feature = \"source-capacity-probe\")]\n    pub(crate) unsafe fn observe_load_inputs(\n        source: crate::engine::swap::source_lifetime::SourceToken,\n        kind: u32,\n        event: &str,\n        before: Option<Preflight>,\n    ) {\n        let Some(before) = before else {\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[SourceOverlap] load_event source={:?} kind=0x{:x} event={} preflight_unavailable=true\",\n                source, kind, event));\n            return;\n        };\n        #[cfg(feature = \"managed-grouped-source-alpha\")]\n        let strict_expected = canonical::loaded_input(before.input, before.previous, kind);\n        #[cfg(not(feature = \"managed-grouped-source-alpha\"))]\n        let strict_expected = Some(before.input);\n        // One bounded read at this terminal event, after the caller released\n        // STATE. This is not the earlier read that decided completion.\n        let observed = inputs_for(before.input.slot);\n        let current = observed.as_ref().ok().copied();\n        let qualified = current.and_then(|input| load_expected_input(before, kind, input));\n        let expected = qualified.or(strict_expected);\n        let mask = |left: Inputs, right: Inputs| {\n            left.slots.iter().zip(right.slots).enumerate().fold(0u16, |mask, (index, (a, b))| {\n                mask | if *a != b { 1u16 << index } else { 0 }\n            })\n        };\n        let changed_from_preflight = current.map(|current| mask(before.input, current));\n        let authorized_visible_mask = strict_expected.zip(qualified).map(|(strict, qualified)| mask(strict, qualified));\n        let unexpected_slots = expected.zip(current).map(|(expected, current)| mask(expected, current));\n        let non_slot_fields_equal = expected.zip(current).map(|(expected, mut current)| {\n            current.slots = expected.slots;\n            current == expected\n        });\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[SourceOverlap] load_event source={:?} kind=0x{:x} event={} event_only_resample=true changed_from_preflight_mask={:x?} unexpected_slots_mask={:x?} non_slot_fields_equal={:?} expected_available={} authorized_visible_mask={:x?} current={:x?}\",\n            source, kind, event, changed_from_preflight, unexpected_slots, non_slot_fields_equal,\n            expected.is_some(), authorized_visible_mask, observed));\n        #[cfg(feature = \"managed-grouped-source-alpha\")]\n        if event == \"stalled; native ownership retained\" {\n            canonical::observe_visible(source, before.scene, current, before.visible, \"stalled\");\n        }\n    }\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event-only diagnostics (pkg6 confirmation, 2026-11-02); no admission/completion/ownership behavior changed."
+    },
+    {
+     "old": "            #[cfg(feature = \"source-capacity-probe\")]\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[SourceOverlap] stalled_scene entry={:p} kind=0x{:x} normalized_scene_diff_mask=0x{:x} input_qualified={} listeners_normalized=true\",\n                entry, kind, snapshot_difference(expected, current), expected_input.is_some()));\n",
+     "new": "",
+     "count": 1,
+     "reason": "Retire served source-capacity event-only diagnostics (pkg6 confirmation, 2026-11-02); no admission/completion/ownership behavior changed."
+    },
+    {
+     "old": "any(\n    feature = \"source-lifecycle-probe\",\n    feature = \"managed-ldn-third-source-alpha\"\n)",
+     "new": "feature = \"managed-ldn-third-source-alpha\"",
+     "count": 1,
+     "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
     }
    ]
   },
@@ -3138,61 +3740,6 @@
    "dest_sha256": "78e25e4a303944e2f49559bac35b8e1eebe689299902b13fc7d82b6d611c3d55"
   },
   {
-   "src": "src/source_lifecycle_probe.rs",
-   "dest": "src/runtime/roster/source_lifecycle_probe.rs",
-   "crate": "root",
-   "src_sha256": "3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2",
-   "dest_sha256": "958047209cd87a45acd63887b9db9ff0bcc49fbcf17f47bc4b2250939ede8d13"
-  },
-  {
-   "src": "src/source_capacity_probe.rs",
-   "dest": "src/runtime/roster/source_capacity_probe.rs",
-   "crate": "root",
-   "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "3ee067ff3732c8af334af6c7c234047ec9e5724c9e7fc9dfaf2536f74e09cb01",
-   "edits": [
-    {
-     "old": "Layout::Training => scene_permitted(),",
-     "new": "Layout::Training => scene_permitted(),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
-     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
-    },
-    {
-     "old": "Layout::Training => baseline(current),",
-     "new": "Layout::Training => baseline(current),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
-     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
-    },
-    {
-     "old": "Layout::Training => true,",
-     "new": "Layout::Training => true,\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => false,",
-     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
-    },
-    {
-     "old": "Layout::Training => snapshot(ctx, entry, SLOT as u32),",
-     "new": "Layout::Training => snapshot(ctx, entry, SLOT as u32),\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => None,",
-     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
-    },
-    {
-     "old": "    #[cfg(feature = \"item-state-probe\")]\n    if !crate::item_state_probe::capacity_probe_idle() {\n        return false;\n    }\n",
-     "new": "",
-     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
-    }
-   ]
-  },
-  {
-   "src": "src/source_ldn_capacity_probe.rs",
-   "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
-   "crate": "root",
-   "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "2a1d01699a2b8508334a61d4a69cb6c0057dc0f438581e046317f1792be2a2bb",
-   "edits": [
-    {
-     "old": "    #[cfg(feature = \"item-state-probe\")]\n    {\n        crate::item_state_probe::capacity_probe_idle()\n    }\n    #[cfg(not(feature = \"item-state-probe\"))]\n    {\n        true\n    }\n",
-     "new": "    true\n",
-     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
-    }
-   ]
-  },
-  {
    "src": "src/mii_pool_observer.rs",
    "dest": "src/runtime/roster/mii_pool_observer.rs",
    "crate": "root",
@@ -3253,6 +3800,24 @@
    "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
    "dest": "src/runtime/lobby/automation_helper/plugin.rs",
    "reason": "not carried: no module reaches it (no `mod` line or `#[path]` declares it, so it was never compiled); deleted 2026-11-02, slim stream, lead ruling"
+  },
+  {
+   "src": "src/source_capacity_probe.rs",
+   "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
+   "dest": "src/runtime/roster/source_capacity_probe.rs",
+   "reason": "not carried: probe served (pkg6 confirmation, 2026-11-02); source-lifecycle observation has no shipped or tested consumer; shared ownership operations retained"
+  },
+  {
+   "src": "src/source_ldn_capacity_probe.rs",
+   "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
+   "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
+   "reason": "not carried: probe served (pkg6 confirmation, 2026-11-02); source-lifecycle observation has no shipped or tested consumer; shared ownership operations retained"
+  },
+  {
+   "src": "src/source_lifecycle_probe.rs",
+   "src_sha256": "3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2",
+   "dest": "src/runtime/roster/source_lifecycle_probe.rs",
+   "reason": "not carried: probe served (pkg6 confirmation, 2026-11-02); source-lifecycle observation has no shipped or tested consumer; shared ownership operations retained"
   }
  ]
 }

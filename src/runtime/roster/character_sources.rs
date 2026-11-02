@@ -124,15 +124,6 @@ impl CleanupObservation {
     }
 }
 
-#[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct AdmissionSeen {
-    wanted: Want,
-    previous: SourceToken,
-    reservation: Option<usize>,
-    conditions: u32,
-}
-
 #[cfg(feature = "managed-third-source-alpha")]
 struct Capacity {
     attempted: Option<SceneEpoch>,
@@ -141,8 +132,6 @@ struct Capacity {
     load: Option<(SourceToken, capacity::Preflight)>,
     first_load: Option<FirstLoad>,
     observation: CleanupObservation,
-    #[cfg(feature = "source-capacity-probe")]
-    admission: Option<AdmissionSeen>,
     /// lobby-preload D: which creation waits were logged in this scene.
     waiting: Waiting<SceneEpoch>,
 }
@@ -150,7 +139,7 @@ struct Capacity {
 impl Capacity {
     const NEW:Self=Self {attempted:None,stable:None,reservation:None,load:None,
         first_load:None,observation:CleanupObservation::new(),
-        #[cfg(feature="source-capacity-probe")] admission:None,waiting:Waiting::NEW};
+        waiting:Waiting::NEW};
 }
 #[cfg(feature = "managed-third-source-alpha")]
 fn capacity_index(slot:u32)->usize {
@@ -160,7 +149,6 @@ fn capacity_index(slot:u32)->usize {
 
 
 #[derive(Clone, Copy)]
-#[cfg_attr(feature = "source-lifecycle-probe", derive(Debug))]
 enum Consumer {
     Reserved,
     Hat { body: u32, kind: u32, slot: u32 },
@@ -171,7 +159,6 @@ enum Consumer {
 }
 
 #[derive(Clone, Copy)]
-#[cfg_attr(feature = "source-lifecycle-probe", derive(Debug))]
 struct LiveLease {
     token: LeaseToken,
     source: SourceToken,
@@ -447,16 +434,6 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
     crate::engine::preload::cycle_preload_policy::missing(targets,sources,slot as usize,
         state.book.can_replace(slot as usize)==Ok(true),state.wants.iter().any(Option::is_some))
         .map(|want|(want,true))
-}
-
-/// Strict fresh-scene predicate for the separate empty-entry experiment.
-#[cfg(feature = "source-capacity-probe")]
-pub(super) fn capacity_probe_idle() -> bool {
-    let state = STATE.lock().unwrap();
-    state.sources.iter().all(Option::is_none)
-        && state.wants.iter().all(Option::is_none)
-        && state.leases.iter().all(Option::is_none)
-        && !HAS_CONSUMERS.load(Ordering::Acquire)
 }
 
 #[derive(Clone, Copy)]
@@ -859,13 +836,6 @@ pub fn waiting_for_capacity(channel: usize) -> bool {
 
 pub fn cancel(channel: usize) {
     let mut state = STATE.lock().unwrap();
-    #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-    { let wanted=state.wants.get(channel).copied().flatten();
-      for capacity in &mut state.capacities {
-        if capacity.admission.is_some_and(|seen|Some(seen.wanted)==wanted) {capacity.admission=None;}
-      }
-    }
-
     if let Some(want) = state.wants.get_mut(channel) {
         *want = None;
     }
@@ -881,83 +851,20 @@ pub fn cancel(channel: usize) {
 
 pub fn release(lease: Lease) {
     let mut state = STATE.lock().unwrap();
-    #[cfg(feature = "source-lifecycle-probe")]
-    let observed = state.leases.iter().flatten().find(|live| live.token == lease.token).copied();
-    let book_released = state.book.release(lease.token);
+    state.book.release(lease.token);
     for live in &mut state.leases {
         if live.is_some_and(|live| live.token == lease.token) { *live = None; }
     }
     HAS_CONSUMERS.store(state.leases.iter().any(Option::is_some), Ordering::Release);
     drop(state);
-    #[cfg(feature = "source-lifecycle-probe")]
-    if let Some(live) = observed {
-        observe_item_lease("release", live, "explicit", Some(book_released));
-    }
-    #[cfg(not(feature = "source-lifecycle-probe"))]
-    let _ = book_released;
 }
 
 fn retain(lease: Lease, consumer: Consumer) {
     let mut state = STATE.lock().unwrap();
-    #[cfg(feature = "source-lifecycle-probe")]
-    let mut observed = None;
     if let Some(live) = state.leases.iter_mut().flatten().find(|live| live.token == lease.token) {
         live.consumer = consumer;
-        #[cfg(feature = "source-lifecycle-probe")]
-        { observed = Some(*live); }
     }
     drop(state);
-    #[cfg(feature = "source-lifecycle-probe")]
-    if let Some(live) = observed {
-        observe_item_lease("retain", live, "stored_consumer", None);
-    }
-}
-
-// Records bookkeeping transitions only. No additional native object reads.
-#[cfg(feature = "source-lifecycle-probe")]
-fn observe_item_lease(event: &str, live: LiveLease, reason: &str, book_released: Option<bool>) {
-    if let Consumer::Item { body, kind } = live.consumer {
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[SourceItemLease] event={} source={:?} lease={:?} object=0x{:x} item_kind=0x{:x} reason={} book_released={:?}",
-            event, live.source, live.token, body, kind, reason, book_released));
-    }
-}
-
-#[cfg(feature = "source-lifecycle-probe")]
-const OBSERVED_LEASES: usize = 4;
-
-// Bounded copies of the LiveLease cache mirror, not native-liveness samples
-// or a copy of SourceBook's internal lease table. Count every omitted record.
-#[cfg(feature = "source-lifecycle-probe")]
-struct LeaseObservations {
-    records: [Option<(LiveLease, Option<bool>)>; OBSERVED_LEASES],
-    total: usize,
-}
-
-#[cfg(feature = "source-lifecycle-probe")]
-impl LeaseObservations {
-    fn new() -> Self { Self { records: [None; OBSERVED_LEASES], total: 0 } }
-
-    fn push(&mut self, live: LiveLease, book_released: Option<bool>) {
-        if let Some(record) = self.records.get_mut(self.total) {
-            *record = Some((live, book_released));
-        }
-        self.total += 1;
-    }
-
-    fn recorded(&self) -> usize { self.total.min(OBSERVED_LEASES) }
-    fn omitted(&self) -> usize { self.total.saturating_sub(OBSERVED_LEASES) }
-}
-
-#[cfg(feature = "source-lifecycle-probe")]
-fn observe_released_items(records: &LeaseObservations, reason: &str, source_filter: Option<SourceToken>) {
-    if records.total == 0 { return; }
-    crate::engine::compat::logging::diagnostic(format_args!(
-        "[SourceItemLease] release_batch reason={} source_filter={:?} total={} recorded={} omitted={} cache_mirror=true",
-        reason, source_filter, records.total, records.recorded(), records.omitted()));
-    for (live, book_released) in records.records.iter().flatten().copied() {
-        observe_item_lease("release", live, reason, book_released);
-    }
 }
 
 pub fn retain_hat(lease: Lease, body: u32) {
@@ -1168,8 +1075,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
         != Some(body) { return; }
     let mut state = STATE.lock().unwrap();
     let mut hats = [None; 2];
-    #[cfg(feature = "source-lifecycle-probe")]
-    let mut released_items = None;
     for index in 0..LEASES {
         let Some(mut live) = state.leases[index] else { continue; };
         if live.settle_polls != 0 {
@@ -1178,23 +1083,12 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             continue;
         }
         if !consumer_alive(live.consumer, &mut hats) {
-            let book_released = state.book.release(live.token);
-            #[cfg(feature = "source-lifecycle-probe")]
-            if matches!(live.consumer, Consumer::Item { .. }) {
-                released_items.get_or_insert_with(LeaseObservations::new)
-                    .push(live, Some(book_released));
-            }
-            #[cfg(not(feature = "source-lifecycle-probe"))]
-            let _ = book_released;
+            state.book.release(live.token);
             state.leases[index] = None;
         }
     }
     HAS_CONSUMERS.store(state.leases.iter().any(Option::is_some), Ordering::Release);
     drop(state);
-    #[cfg(feature = "source-lifecycle-probe")]
-    if let Some(released) = released_items {
-        observe_released_items(&released, "existing_consumer_alive_false", None);
-    }
 }
 
 pub fn scene_changed() {
@@ -1205,14 +1099,6 @@ pub fn scene_changed() {
     let mut state = STATE.lock().unwrap();
     #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = coexist::registry();
-    #[cfg(feature = "source-lifecycle-probe")]
-    let released = {
-        let mut records = LeaseObservations::new();
-        for live in state.leases.iter().flatten().copied() {
-            if matches!(live.consumer, Consumer::Item { .. }) { records.push(live, None); }
-        }
-        records
-    };
     state.wants = [None; CHANNELS];
     state.preload = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
     state.preload_failed = 0;
@@ -1246,8 +1132,6 @@ pub fn scene_changed() {
     // real native destructor runs. No old intent is published after departure.
     drop(state);
     crate::runtime::roster::cycle_preload::scene_end();
-    #[cfg(feature = "source-lifecycle-probe")]
-    observe_released_items(&released, "scene_departure_book_invalidated", None);
 }
 
 /// Preserve the old probe's Training owner2 automation suppression independently
@@ -1474,10 +1358,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
         }
     }
     drop(state);
-    #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-    if is_capacity && matches!(event, Some("ready" | STALL_RETAINED | STALL_FAILED)) {
-        capacity::observe_load_inputs(source.token, source.kind, event.unwrap(), capacity_observation.1);
-    }
     #[cfg(feature = "managed-grouped-source-alpha")]
     if is_capacity && event == Some("ready") {
         crate::engine::compat::logging::diagnostic(format_args!(
@@ -1836,49 +1716,6 @@ fn creation_waiting(intent:CreationIntent,slot:u32,refusal:Refusal) {
         intent.extra,slot,intent.wanted.epoch,intent.wanted.kind,intent.speculative,refusal));
 }
 
-/// Once per pending request/source/condition, only for replacement of a live7.
-/// All supplementary native reads and formatting occur outside STATE.
-#[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-unsafe fn admission_declined(
-    ctx: &ServiceEntryContext, slot:u32, entry: *const u8, wanted: Want, previous: Option<Source>,
-    condition: u8, reason: &str,
-) {
-    let Some(previous) = previous else { return; };
-    let bit = 1u32 << condition;
-    let (seen, owner, phase, replaceable, requested) = {
-        let state = STATE.lock().unwrap();
-        if state.sources[slot as usize] != Some(previous) || pending_request(&state) != Some(wanted) {
-            return;
-        }
-        let owner = reservation_for(&state,slot);
-        let seen = AdmissionSeen {
-            wanted, previous: previous.token, reservation: owner.map(|value| value.entry),
-            conditions: 0,
-        };
-        if state.capacities[capacity_index(slot)].admission.is_some_and(|old|
-            AdmissionSeen { conditions: 0, ..old } == seen && old.conditions & bit != 0)
-        { return; }
-        (seen, owner, state.book.phase(slot as usize), state.book.can_replace(slot as usize),
-            ready_still_requested(&state, slot as usize))
-    };
-    let detail = capacity::admission_detail(ctx, entry, previous.kind, owner);
-    let mut state = STATE.lock().unwrap();
-    if state.sources[slot as usize] != Some(previous) || pending_request(&state) != Some(wanted)
-        || reservation_for(&state,slot) != owner
-        || state.book.phase(slot as usize) != phase || state.book.can_replace(slot as usize) != replaceable
-        || ready_still_requested(&state, slot as usize) != requested
-    { return; }
-    let old = state.capacities[capacity_index(slot)].admission.filter(|old|
-        AdmissionSeen { conditions: 0, ..*old } == seen).map_or(0, |old| old.conditions);
-    if old & bit != 0 { return; }
-    state.capacities[capacity_index(slot)].admission = Some(AdmissionSeen { conditions: old | bit, ..seen });
-    drop(state);
-    crate::engine::compat::logging::diagnostic(format_args!(
-        "[ManagedSourceAdmission] declined want_epoch={:?} want_kind=0x{:x} previous={:?} previous_kind=0x{:x} pending_install={} condition={} reason={} phase={:?} can_replace={:?} still_requested={} reservation_entry={:x?} detail(current_entry,dispatch,owned_error,descriptor,parked,canonical,inputs)={:x?}",
-        wanted.epoch, wanted.kind, previous.token, previous.kind, previous.install.is_some(), condition, reason,
-        phase, replaceable, requested, seen.reservation, detail));
-}
-
 /// Only called with the current native loader callback's argument.
 /// Already-owned loads run before any scene, mode or ownership gate.
 pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
@@ -1896,17 +1733,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         None
     };
     if service_owned(ctx, entry, slot) {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        if is_capacity {
-            let pending = {
-                let state = STATE.lock().unwrap();
-                pending_request(&state).map(|wanted| (wanted, state.sources[slot as usize]))
-            };
-            if let Some((wanted, previous)) = pending {
-                admission_declined(ctx, slot, entry, wanted, previous, 27,
-                    "existing source owns a load or is departed");
-            }
-        }
         return;
     }
     #[cfg(feature="managed-third-source-alpha")]
@@ -1945,15 +1771,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
         Some(generation)
     } else { None };
-    #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-    macro_rules! declined {
-        ($code:expr, $reason:expr) => {
-            if is_capacity { admission_declined(ctx, slot, entry, wanted, previous, $code, $reason); }
-        };
-    }
     if !replaceable {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(0, "book not replaceable or current source still requested");
         #[cfg(feature = "managed-third-source-alpha")]
         if !speculative {
             if let Ok(backend)=qualified_backend() {
@@ -1964,21 +1782,15 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         return;
     }
     if admission_blocker().is_some() {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(1, "install/ready-go/native-ui/save-state/playback gate");
         return;
     }
     let Ok(backend) = qualified_backend() else {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(2, "scene backend not qualified");
         return;
     };
     #[cfg(feature="mii-managed-helper-alpha")]
     if (backend==Backend::Training || wanted.configuration.is_some())
         && !super::mii_managed_helper::admission_ready(wanted.configuration.is_some()) {return;}
     if !candidates(backend).contains(&slot) {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(3, "slot not a candidate for this backend");
         return;
     }
     #[cfg(feature = "managed-third-source-alpha")]
@@ -1986,44 +1798,12 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         // Only this module's current reservation can admit 7. An isolated
         // R3+X experiment's entry never becomes a managed source.
         if !capacity::source_kind(wanted.kind) {
-            #[cfg(feature = "source-capacity-probe")]
-            declined!(4, "requested source kind not supported");
             return;
         }
         let owner = { reservation_for(&STATE.lock().unwrap(),slot) };
         let Some(owner) = owner else {
-            #[cfg(feature = "source-capacity-probe")]
-            declined!(5, "no current owned reservation");
             return;
         };
-        #[cfg(feature = "source-capacity-probe")]
-        let before = match capacity::load_preflight_checked(
-            ctx, entry, owner, previous.map(|source| source.kind))
-        {
-            Ok(before) => before,
-            Err(reason) => {
-                declined!(8 + reason as u8, match reason {
-                    capacity::LoadDecline::Owned => "reservation roots or input role identity",
-                    capacity::LoadDecline::Descriptor => "previous descriptor",
-                    capacity::LoadDecline::PreviousKind => "previous source kind",
-                    capacity::LoadDecline::Parked => "previous native parked readiness",
-                    capacity::LoadDecline::Resource => "empty resource owner unavailable",
-                    capacity::LoadDecline::Empty => "candidate not empty",
-                    capacity::LoadDecline::Available => "empty resource owner not available",
-                    #[cfg(feature = "managed-grouped-source-alpha")]
-                    capacity::LoadDecline::Canonical => "previous canonical actors/input readiness",
-                    capacity::LoadDecline::Snapshot => "current dispatcher/scene snapshot",
-                    capacity::LoadDecline::Inputs => "current input view unavailable",
-                    #[cfg(feature = "managed-grouped-source-alpha")]
-                    capacity::LoadDecline::InputRole => "previous input role",
-                    capacity::LoadDecline::OriginalResources => "original resource owners unavailable",
-                    #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
-                    capacity::LoadDecline::ParkedGroups => "existing canonical grouped helper readiness",
-                });
-                return;
-            }
-        };
-        #[cfg(not(feature = "source-capacity-probe"))]
         let Some(before) =
             capacity::load_preflight(ctx, entry, owner, previous.map(|source| source.kind))
         else {
@@ -2067,8 +1847,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         return;
     }
     let Some(costume) = native_source::inherited_costume(slot) else {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(24, "inherited resource costume unavailable");
         return;
     };
     #[cfg(feature="mii-managed-helper-alpha")]
@@ -2092,8 +1870,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         crate::engine::preload::preload_metrics::MemorySample::capture().committed.get()
     };
     let Some(install) = INSTALL.try_begin(false) else {
-        #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-        declined!(25, "shared install gate unavailable");
         return;
     };
     #[cfg(feature = "managed-third-source-alpha")]
@@ -2106,8 +1882,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         {
             STATE.lock().unwrap().capacities[capacity_index(slot)].first_load = None;
             finish_install(install, "capacity load preflight changed");
-            #[cfg(feature = "source-capacity-probe")]
-            declined!(26, "second preflight differs from first");
             return;
         }
     }
@@ -2239,26 +2013,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
             observed.cleaned = [[None; 3], observed.cleaned[0]];
         }
     }
-    #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-    let cached_book = (is_capacity).then(|| {
-        let mut records = LeaseObservations::new();
-        for live in state.leases.iter().flatten().copied() { records.push(live, None); }
-        (records, candidates(backend).map(|slot| (slot, state.book.phase(slot as usize),
-            state.book.can_replace(slot as usize))))
-    });
     drop(state);
-    #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
-    if let Some((records, slots)) = cached_book {
-        capacity::observe_install_inputs(load.source(), previous.map(|source| (source.token, source.kind)),
-            wanted.kind, capacity_load);
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[SourceOverlap] commit_cache_mirror source={:?} slots(phase,can_replace)={:?} total={} recorded={} omitted={} native_liveness_resampled=false",
-            load.source(), slots, records.total, records.recorded(), records.omitted()));
-        for (live, _) in records.records.iter().flatten() {
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[SourceOverlap] cached_lease_mirror_record commit_source={:?} retained={:?}", load.source(), live));
-        }
-    }
     #[cfg(feature = "managed-third-source-alpha")]
     if first_load_callbacks != 0 {
         crate::engine::compat::logging::diagnostic(format_args!(
@@ -2515,16 +2270,6 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
             return;
         }
     };
-    #[cfg(feature = "source-lifecycle-probe")]
-    let released_items = {
-        let mut records = LeaseObservations::new();
-        for live in state.leases.iter().flatten().copied() {
-            if live.source == source.token && matches!(live.consumer, Consumer::Item { .. }) {
-                records.push(live, None);
-            }
-        }
-        records
-    };
     for live in &mut state.leases {
         if live.is_some_and(|live| live.source == source.token) {
             *live = None;
@@ -2546,8 +2291,6 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
         state.capacities[capacity_index(slot)].load = None;
     }
     drop(state);
-    #[cfg(feature = "source-lifecycle-probe")]
-    observe_released_items(&released_items, "native_source_destroyed_book_invalidated", Some(source.token));
     #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         crate::engine::compat::logging::diagnostic(format_args!(

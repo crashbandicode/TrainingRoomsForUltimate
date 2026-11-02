@@ -120,17 +120,40 @@ fn the_shipped_closure_never_enables_diag() {
 #[test]
 fn every_probe_trace_observer_and_meter_requires_diag() {
     let map = features();
-    let mut checked = 0;
+    let mut checked = BTreeSet::new();
     for name in map.keys().filter(|n| is_diagnostic_name(n)) {
         let reaches_diag = closure(&map, &[name.as_str()]).contains("diag");
         if PRODUCT_DESPITE_NAME.contains(&name.as_str()) {
             assert!(!reaches_diag, "{name} is a product feature");
         } else {
             assert!(reaches_diag, "{name} must require diag");
-            checked += 1;
+            checked.insert(name.as_str());
         }
     }
-    assert!(checked >= 30, "only {checked} diagnostic features found");
+    // Explicit retained inventory: approved probe retirements must not erase unresolved diagnostics.
+    let expected = BTreeSet::from([
+        "automation-results-observer",
+        "console-practice-trace",
+        "console-swap-trace",
+        "hang-trace",
+        "mii-cpu-adapter-probe",
+        "mii-fullconfig-probe",
+        "mii-identical-reload-probe",
+        "mii-identity-probe",
+        "mii-ldn-qualification-probe",
+        "mii-native-adapter-probe",
+        "mii-origin-observer",
+        "mii-pool-observer",
+        "mii-saved-file-probe",
+        "mii-special-change-probe",
+        "named-input-trace",
+        "native-body-bank-probe",
+        "native-unlink-probe",
+        "plugin-heap-meter",
+        "source-owner-probe",
+        "texture-probe",
+    ]);
+    assert_eq!(checked, expected);
 }
 
 #[test]
@@ -138,8 +161,7 @@ fn the_renamed_product_features_and_their_old_names() {
     let map = features();
     for (product, old) in [("lobby-stage", "lobby-stage-probe"), ("practice-stage", "practice-stage-observer")] {
         assert!(!closure(&map, &[product]).contains("diag"), "{product} is product code");
-        let old_closure = closure(&map, &[old]);
-        assert!(old_closure.contains(product) && old_closure.contains("diag"), "{old} = {product} + diag");
+        assert!(!map.contains_key(old), "{old} was an empty diagnostic alias retired after its probe served");
     }
     assert!(closure(&map, &["practice-stage-request-alpha"]).contains("practice-stage"));
     assert!(closure(&map, &["training-stage-rotation-alpha"]).contains("lobby-stage"));

@@ -356,3 +356,15 @@ and of the plugin); `archive.rs` loses `Capture::load`/`save` and `validate.rs` 
 crate's `Cargo.toml` follow; the crate tests `core.rs`, `review_correctness.rs`, `review_selection.rs` and the plugin's
 `shared_capture.rs` tests reach the moved parts through the oracle. New in `shared_capture.rs`'s tests: golden files
 (`tests/fixtures/smd-golden`) pin the published capture bytes, read by a plain JSON reader.
+
+## Slim probe retirement (2026-11-02)
+
+Not carried: probe served (pkg6 confirmation, 2026-11-02). The source-capacity experiments and lifecycle attribution have no shipped/test consumer. Their inline sites are exact manifest edits; shared admission, native guards, creation/load calls, source-book release and ownership cleanup remain. Historical seam provenance is retained.
+
+| Retired destination | Authorized stage path | Stage SHA256 |
+| --- | --- | --- |
+| src/runtime/roster/source_capacity_probe.rs | src/source_capacity_probe.rs | a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e |
+| src/runtime/roster/source_ldn_capacity_probe.rs | src/source_ldn_capacity_probe.rs | e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c |
+| src/runtime/roster/source_lifecycle_probe.rs | src/source_lifecycle_probe.rs | 3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2 |
+
+Cargo also retires eight empty diagnostic aliases: console-map-probe, archive-poison-probe, kirby-resource-probe, lobby-stage-probe, practice-stage-observer, stage-asset-probe, mii-preview-observer and mii-quit-observer. The ten source-capacity features and source-lifecycle-probe are removed with their experiments. Product lobby-stage/practice-stage features remain. The matrix drops only the two exclusions belonging to deleted experiments. Texture-probe remains pending UI proof, as do all unresolved diagnostic tools.

@@ -27,16 +27,6 @@ struct Pending {
     leases_released: bool,
     restoring: bool,
     lease: Option<Lease>,
-    #[cfg(feature = "source-capacity-probe")]
-    prepare_seen: bool,
-}
-
-#[cfg(feature = "source-capacity-probe")]
-fn observe_pending(role: usize, pending: Pending, stage: &str, reason: &str) {
-    crate::engine::compat::logging::diagnostic(format_args!(
-        "[KirbyHatPending] role={} body=0x{:x} kind=0x{:x} stage={} reason={} age={} started={} cleared={} restoring={} prepare_seen={}",
-        role, pending.body_id, pending.kind, stage, reason, pending.age,
-        pending.started, pending.cleared, pending.restoring, pending.prepare_seen));
 }
 
 struct State {
@@ -61,12 +51,6 @@ static SHORTCUT: Mutex<ShortcutLatch> = Mutex::new(ShortcutLatch::new());
 /// The controller operating the CPU under native Behavior=Control has its own latch.
 static OPERATOR_SHORTCUT: Mutex<ShortcutLatch> = Mutex::new(ShortcutLatch::new());
 static PENDING_ROLES: AtomicU8 = AtomicU8::new(0);
-
-#[cfg(feature = "source-capacity-probe")]
-pub(crate) fn capacity_probe_idle() -> bool {
-    STATES.iter().all(|state| state.lock().unwrap().pending.is_none())
-        && PENDING_ROLES.load(Ordering::Acquire) == 0
-}
 
 fn clear_pending(role: usize, state: &mut State) {
     if let Some(pending) = state.pending {
@@ -210,19 +194,11 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
         leases_released: false,
         restoring: false,
         lease: None,
-        #[cfg(feature = "source-capacity-probe")]
-        prepare_seen: false,
     });
     PENDING_ROLES.fetch_or(1 << role, Ordering::Release);
     sources::pause_preload();
     if let Some(target)=sources::preload_hat_target(role,kind) {
         crate::runtime::roster::cycle_preload::request(role,true,target);
-    }
-    #[cfg(feature = "source-capacity-probe")]
-    {
-        let pending = state.pending.expect("created pending request");
-        drop(state);
-        observe_pending(role, pending, "created", "shortcut");
     }
 }
 
@@ -255,8 +231,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                     body_id: (*body).battle_object_id, kind,
                     age: 0, started: false, cleared: false, leases_released: false,
                     restoring: false, lease: None,
-                    #[cfg(feature = "source-capacity-probe")]
-                    prepare_seen: false,
                 });
                 PENDING_ROLES.fetch_or(1 << role, Ordering::Release);
                 crate::engine::compat::logging::diagnostic(format_args!(
@@ -276,12 +250,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     let identity_changed = pending.body_id != (*body).battle_object_id;
     if identity_changed || !permitted() {
         clear_pending(role, &mut state);
-        #[cfg(feature = "source-capacity-probe")]
-        {
-            drop(state);
-            observe_pending(role, pending, "cancelled",
-                if identity_changed { "body identity changed" } else { "permission gate" });
-        }
         return;
     }
     pending.age = pending.age.saturating_add(1);
@@ -314,14 +282,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     if pending.age > 900 {
         clear_pending(role, &mut state);
         drop(state);
-        #[cfg(feature = "source-capacity-probe")]
-        {
-            observe_pending(role, pending, "timeout", "age exceeded 900");
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[KirbyHatPending] timeout_native role={} body=0x{:x} status=0x{:x} changing={} stop={}",
-                role, pending.body_id, StatusModule::status_kind(body),
-                StatusModule::is_changing(body), StopModule::is_stop(body)));
-        }
         notice(role, "Kirby hat could not be loaded".into());
         return;
     }
@@ -337,8 +297,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             // No state mutex is held across native cleanup or its listeners.
             if let Err(reason) = sources::clear_hat_for_switch(body) {
                 clear_pending(role, &mut STATES[role].lock().unwrap());
-                #[cfg(feature = "source-capacity-probe")]
-                observe_pending(role, pending, "error", reason);
                 notice(role, reason.into());
             }
             return;
@@ -347,17 +305,10 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             if let Err(reason) = sources::finish_hat_clear(body, pending.leases_released) {
                 clear_pending(role, &mut state);
                 drop(state);
-                #[cfg(feature = "source-capacity-probe")]
-                observe_pending(role, pending, "error", reason);
                 notice(role, reason.into());
                 return;
             }
             pending.leases_released = true;
-            #[cfg(feature = "source-capacity-probe")]
-            if !pending.prepare_seen {
-                pending.prepare_seen = true;
-                observe_pending(role, pending, "prepare", "first sources::prepare call");
-            }
             match sources::prepare(role, pending.kind,
                 Holder { category: 1, id: u64::from(pending.body_id) }) {
                 Ok(Some(lease)) => {
@@ -368,8 +319,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                 Err(reason) => {
                     clear_pending(role, &mut state);
                     drop(state);
-                    #[cfg(feature = "source-capacity-probe")]
-                    observe_pending(role, pending, "error", reason);
                     notice(role, reason.into());
                     return;
                 }
@@ -406,34 +355,20 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 pub fn cancel_pending() {
     for (role, state) in STATES.iter().enumerate() {
         let mut state = state.lock().unwrap();
-        #[cfg(feature = "source-capacity-probe")]
-        let pending = state.pending;
         clear_pending(role, &mut state);
         drop(state);
-        #[cfg(feature = "source-capacity-probe")]
-        if let Some(pending) = pending {
-            observe_pending(role, pending, "cancelled", "cancel_pending");
-        }
     }
 }
 
 fn invalidate_runtime(same_lobby: Option<bool>) {
-    for (role, state) in STATES.iter().enumerate() {
+    for state in &STATES {
         let mut state = state.lock().unwrap();
-        #[cfg(feature = "source-capacity-probe")]
-        let pending = state.pending;
         state.pending = None;
         if let Some(same_lobby) = same_lobby {
             state.cycle = HatCycle::new();
             state.continuation.scene_changed(same_lobby);
         }
         drop(state);
-        #[cfg(feature = "source-capacity-probe")]
-        if let Some(pending) = pending {
-            observe_pending(role, pending, "cancelled", "scene invalidated");
-        }
-        #[cfg(not(feature = "source-capacity-probe"))]
-        let _ = role;
     }
     *SHORTCUT.lock().unwrap() = ShortcutLatch::default();
     *OPERATOR_SHORTCUT.lock().unwrap() = ShortcutLatch::default();
@@ -467,23 +402,10 @@ pub unsafe fn restore(body: *mut app::BattleObjectModuleAccessor, kind: u32) {
     let role = if role_body(0) == Some(body) { 0 }
         else if role_body(1) == Some(body) { 1 } else { return; };
     let mut state = STATES[role].lock().unwrap();
-    #[cfg(feature = "source-capacity-probe")]
-    let superseded = state.pending;
     clear_pending(role, &mut state);
     state.pending = Some(Pending { body_id: (*body).battle_object_id, kind,
         age: 0, started: false, cleared: false, leases_released: false,
         restoring: true, lease: None,
-        #[cfg(feature = "source-capacity-probe")]
-        prepare_seen: false,
     });
     PENDING_ROLES.fetch_or(1 << role, Ordering::Release);
-    #[cfg(feature = "source-capacity-probe")]
-    {
-        let pending = state.pending.expect("created restore request");
-        drop(state);
-        if let Some(old) = superseded {
-            observe_pending(role, old, "cancelled", "superseded by restore");
-        }
-        observe_pending(role, pending, "created", "save restore");
-    }
 }

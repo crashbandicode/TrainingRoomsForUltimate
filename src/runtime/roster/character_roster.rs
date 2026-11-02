@@ -48,10 +48,7 @@ use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 
 #[path = "native_source.rs"]
 mod native_source;
-#[cfg(any(
-    feature = "source-capacity-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;
 #[path = "character_sources.rs"]
@@ -59,18 +56,6 @@ pub mod sources;
 /// GS-PANIC: the process-memory admission every fighter load the mod starts goes through.
 #[path = "process_memory.rs"]
 pub(crate) mod process_memory;
-
-#[cfg(feature = "source-lifecycle-probe")]
-#[path = "source_lifecycle_probe.rs"]
-pub mod source_lifecycle_probe;
-
-#[cfg(feature = "source-capacity-probe")]
-#[path = "source_capacity_probe.rs"]
-pub mod source_capacity_probe;
-
-#[cfg(feature = "source-ldn-capacity-probe")]
-#[path = "source_ldn_capacity_probe.rs"]
-mod source_ldn_capacity_probe;
 
 #[cfg(feature = "source-owner-probe")]
 #[path = "source_owner_probe.rs"]
@@ -444,11 +429,6 @@ pub fn waiting_drafts_ready() -> bool {
 
 fn finish_install(token: InstallToken, reason: &str) -> bool {
     let finished = INSTALL.finish(token);
-    #[cfg(feature = "source-ldn-capacity-link-probe")]
-    if reason == "capacity Link native destruction" {
-        trace!("[NativeInstall] capacity Link destructor token={:?} finished={} gate_active_after={}",
-            token, finished, INSTALL.active());
-    }
     #[cfg(feature = "managed-third-source-alpha")]
     if reason == "managed source destroyed" {
         trace!(
@@ -845,12 +825,8 @@ pub fn scene_changed(mode: game_mode::Mode) {
     mii_origin_observer::scene_changed();
     #[cfg(feature = "mii-pool-observer")]
     mii_pool_observer::scene_changed();
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::scene_changed();
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::scene_changed();
-    #[cfg(feature = "source-capacity-probe")]
-    source_capacity_probe::scene_changed();
     sources::scene_changed();
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::scene_changed();
@@ -1083,16 +1059,8 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
     mii_pool_observer::service(entry, owner);
     #[cfg(feature = "mii-origin-observer")]
     mii_origin_observer::service(entry, owner);
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::service(ctx, entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::service(entry, owner);
-    #[cfg(feature = "source-lifecycle-probe")]
-    source_lifecycle_probe::service(entry, owner);
-    #[cfg(feature = "source-capacity-probe")]
-    if source_capacity_probe::service(ctx, entry, owner) {
-        return;
-    }
     sources::service(ctx, entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::service(entry, owner);
@@ -1505,14 +1473,8 @@ pub unsafe fn on_destroy(entry: *const u8) {
     mii_pool_observer::on_destroy(owner);
     #[cfg(feature = "mii-origin-observer")]
     mii_origin_observer::on_destroy(owner);
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::on_destroy(entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::on_destroy(entry, owner);
-    #[cfg(feature = "source-capacity-probe")]
-    source_capacity_probe::on_destroy(entry, owner);
-    #[cfg(feature = "source-lifecycle-probe")]
-    source_lifecycle_probe::destroy(entry, owner);
     sources::on_destroy(entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::on_destroy(entry, owner);
@@ -1598,8 +1560,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
     if practice_departure {
         // Native Training -> CSS -> Training retains the same mode tuple. The
         // actual P1 entry destructor is also a scene boundary for plugin intent.
-        #[cfg(feature = "source-capacity-probe")]
-        source_capacity_probe::scene_changed();
         sources::scene_changed();
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::scene_changed();
@@ -2395,15 +2355,8 @@ pub fn init() {
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.
         #[cfg(feature="mii-ordinary-player-alpha")]
         if !mii_ordinary_player::init(base) {return;}
-        #[cfg(feature = "source-lifecycle-probe")]
-        source_lifecycle_probe::install(base);
-        #[cfg(any(
-            feature = "source-capacity-probe",
-            feature = "managed-third-source-alpha"
-        ))]
+        #[cfg(feature = "managed-third-source-alpha")]
         native_source_capacity::init(base);
-        #[cfg(feature = "source-capacity-probe")]
-        source_capacity_probe::install(base);
         #[cfg(feature="mii-ldn-qualification-probe")]
         mii_ldn_qualification::init(base);
         #[cfg(feature="mii-ordinary-cpu-alpha")]

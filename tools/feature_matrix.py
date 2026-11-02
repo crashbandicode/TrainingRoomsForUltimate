@@ -71,10 +71,7 @@ EXCLUSIONS = [
      "src/runtime/lobby/automation_helper.rs:7: results observer and native adapter both hook 0x150e5f0 and 0x150e9d0; enable only one"),
     ("native-body-bank-probe", ("native-body-bank-alpha",),
      "src/runtime/roster/character_roster.rs:32: The fixed bank probe and managed bank candidate cannot share native hooks"),
-    ("source-capacity-group-probe", ("source-ldn-capacity-link-probe", "managed-third-source-alpha"),
-     "src/runtime/roster/source_capacity_probe.rs:20: isolated grouped probe cannot share a build with ordinary P2 or managed third-source admission"),
-    ("source-capacity-aegis-probe", ("source-capacity-trainer-probe",),
-     "src/runtime/roster/source_capacity_probe.rs:23: select one isolated canonical group target per build"),
+
 ]
 
 
