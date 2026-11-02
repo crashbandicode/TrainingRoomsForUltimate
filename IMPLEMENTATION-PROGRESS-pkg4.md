@@ -72,6 +72,8 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 
 ### Active implementation checkpoint
 
+- Committed first worker slice as 0bb051a (WIP, no compile/Eden). Subsequent slot-transfer work is in progress: fixed SlotTransfer request/reply payloads, game-only recorder execution, worker-only completion naming/notifications, and atomic is_playback publication. Added round-trip/refusal model coverage; not run. PENDING audit entry not yet removed. No host claim held.
+
 - Live gate reverified after compaction: exact thread remains gpt-6-astra/medium.
   Watcher PID 2677197 is bound to codex PID 2589048; prior temporary watcher had exited.
 - HEAD remains f72f495 (authorized prerequisite merge c111b81); implementation below is uncommitted and ungated.

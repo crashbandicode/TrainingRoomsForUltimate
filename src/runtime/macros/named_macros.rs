@@ -91,6 +91,7 @@ static GENERATION: AtomicU64 = AtomicU64::new(0);
 // A preview's normal stop/restore advances the motion generation while its
 // export keyboard is open. Only session cleanup invalidates that naming draft.
 static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
+pub(crate) fn session_revision() -> u64 { SESSION_GENERATION.load(Ordering::Acquire) }
 static NAME_SERIAL: AtomicU64 = AtomicU64::new(1);
 // Kept through the requested native install's ordinary session cleanup. True
 // scene/destruction retirement remains the existing CPU generation boundary.
@@ -654,15 +655,15 @@ pub fn export_record_slot(slot: Option<usize>) {
         notify("Choose a Record Slot first");
         return;
     };
-    let (frames, start, mii) = match crate::runtime::macros::port::input_record::export_named(slot) {
-        Ok(ready) => ready,
-        Err(message) => {
-            notify(message);
-            return;
-        }
-    };
+    crate::runtime::macros::port::slots::export(slot);
+}
+
+pub fn slot_export_failed(message: &str) { notify(message); }
+
+/// The requested slot copy has completed on the game thread.
+pub fn slot_exported(frames: Vec<InputFrame>, start: StartState) {
     let version = game_version();
-    let effect = lock_write(&UI).offer_save_with_mii(frames, start, false, &version, mii);
+    let effect = lock_write(&UI).offer_save_with_mii(frames, start, false, &version, None);
     apply_effect(effect);
     request_native_name();
     if panel_visible() {
@@ -1372,10 +1373,15 @@ fn bind_to_slot(id: &str) {
             return;
         }
     };
-    let label = format!("Record Slot {}", slot + 1);
-    match crate::runtime::macros::port::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {
-        Ok(()) => notify(&format!("Copied {} to {label}", recording.name)),
-        Err(err) => notify(&err),
+    if let Err(error) = crate::runtime::macros::port::slots::import(slot, &recording) {
+        notify(&error);
+    }
+}
+
+pub fn slot_imported(name: &str, slot: usize, result: Result<(), crate::model::recording::ImportRefusal>) {
+    match result {
+        Ok(()) => notify(&format!("Copied {name} to Record Slot {}", slot + 1)),
+        Err(error) => notify(&error.message()),
     }
 }
 

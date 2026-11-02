@@ -158,6 +158,7 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
                 diag::frame_done();
             }
             named_macros::service_character_request();
+            port::slots::service_slot_request();
         }
     }
     step(0);

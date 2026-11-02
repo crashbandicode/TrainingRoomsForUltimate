@@ -76,10 +76,7 @@ pub(crate) fn install_report() -> &'static str {
 
 /// The fork's `input_record` as the named layer calls the core (SPEC-input-01 section 9), over `features::recorder`.
 pub(crate) mod input_record {
-    use crate::engine::macros::{InputFrame, MacroRecording, StartState};
-    use crate::engine::mii::lifetime::Configuration;
-    use crate::model::input_delay::MappedInputs;
-    use crate::model::recording::{ExportRefusal, ImportRefusal, Origin, StartSnapshot};
+    use crate::engine::macros::MacroRecording;
     use crate::runtime::features::recorder;
 
     pub(crate) fn stop_playback() {
@@ -87,7 +84,7 @@ pub(crate) mod input_record {
     }
 
     pub(crate) fn is_playback() -> bool {
-        recorder::with_recorder(|rec| rec.is_playback())
+        recorder::is_playback()
     }
 
     /// A clip preview: the recording plays from the layer's buffer, on whichever fighter is on stage.
@@ -109,57 +106,7 @@ pub(crate) mod input_record {
         recorder::start_named_lockout();
     }
 
-    fn frame_of(m: MappedInputs) -> InputFrame {
-        InputFrame { buttons: m.buttons, lstick_x: m.lstick_x, lstick_y: m.lstick_y, rstick_x: m.rstick_x, rstick_y: m.rstick_y }
-    }
 
-    fn mapped_of(f: &InputFrame) -> MappedInputs {
-        MappedInputs { buttons: f.buttons, lstick_x: f.lstick_x, lstick_y: f.lstick_y, rstick_x: f.rstick_x, rstick_y: f.rstick_y }
-    }
-
-    /// `export_named`: a recorded slot as the layer's frames and start state (SPEC-input-01 section 9). The exact Mii of the CPU
-    /// at the lockout is not captured until the roster cycle provides it, so none is attached.
-    pub(crate) fn export_named(slot: usize) -> Result<(Vec<InputFrame>, StartState, Option<Configuration>), &'static str> {
-        let slot = u8::try_from(slot).unwrap_or(u8::MAX);
-        recorder::with_recorder(|rec| match rec.export_slot(slot) {
-            Ok((frames, origin)) => {
-                let start = StartState {
-                    fighter_kind: origin.start.fighter_kind,
-                    costume: origin.start.costume,
-                    facing: f32::from(origin.facing),
-                    situation: origin.start.situation,
-                    status: origin.status,
-                    speed_x: origin.start.speed_x,
-                    speed_y: origin.start.speed_y,
-                };
-                Ok((frames.iter().copied().map(frame_of).collect(), start, None))
-            }
-            Err(refusal) => Err(refusal.message()),
-        })
-    }
-
-    /// `import_named_slot`: replace one slot with `frames`, or change nothing.
-    pub(crate) fn import_named_slot(slot: usize, frames: &[InputFrame], start: StartState, _mii: Option<Configuration>) -> Result<(), String> {
-        let slot = u8::try_from(slot).unwrap_or(u8::MAX);
-        let origin = Origin {
-            facing: if start.facing < 0.0 { -1 } else { 1 },
-            status: start.status,
-            start: StartSnapshot {
-                fighter_kind: start.fighter_kind,
-                costume: start.costume,
-                situation: start.situation,
-                speed_x: start.speed_x,
-                speed_y: start.speed_y,
-            },
-        };
-        let mapped: Vec<MappedInputs> = frames.iter().map(mapped_of).collect();
-        recorder::with_recorder(|rec| rec.import_slot(slot, &mapped, origin)).map_err(ImportRefusal::message)
-    }
-
-    /// Why a slot cannot be exported, as the text the layer shows.
-    pub(crate) fn refusal_text(refusal: ExportRefusal) -> &'static str {
-        refusal.message()
-    }
 }
 
 /// Design C (lead, 2026-11-02): the named-macro layer's model has one owner, the menu worker. This is the worker's tick for it, called
@@ -168,6 +115,7 @@ pub(crate) mod input_record {
 /// `crate::runtime::ui::worker::wake()` after posting.
 pub(crate) fn worker_tick() {
     if !super::ready() { return; }
+    slots::worker_slot_tick();
     CLIP_EVENTS.drain(|event| {
         if event.revision != super::replay_capture::selection_revision() { return; }
         match event.kind {
@@ -208,5 +156,107 @@ pub(crate) fn post_clip_input(controller: input::Controller) {
 pub(crate) fn post_clip_draw() {
     if super::named_macros::hook_queries().clip_foreground {
         post_clip(ClipEventKind::Draw);
+    }
+}
+
+/// Numbered-slot file/UI work stays on the menu worker. Only the fixed transfer
+/// visits the game-owned recorder; strings and completion effects never do.
+pub(crate) mod slots {
+    use std::collections::VecDeque;
+    use std::sync::Mutex;
+    use crate::model::macro_handoff::{SlotTransfer, SlotResult};
+    use crate::model::recording::{Origin, StartSnapshot};
+    use crate::model::input_delay::MappedInputs;
+    use crate::engine::macros::{InputFrame, MacroRecording, StartState};
+
+    enum Completion { Export, Import { name: String, slot: usize } }
+    struct Job { request: Message, completion: Completion }
+    struct Worker { queue: VecDeque<Job>, pending: Option<(u64, Completion)> }
+    static WORKER: Mutex<Worker> = Mutex::new(Worker { queue: VecDeque::new(), pending: None });
+    #[derive(Clone, Copy)]
+    struct Message { session: u64, transfer: SlotTransfer, cancelled: bool }
+    static REQUEST: hos_lock::Mailbox<Message, 1> = hos_lock::Mailbox::new();
+    static REPLY: hos_lock::Mailbox<Message, 1> = hos_lock::Mailbox::new();
+
+    fn enqueue(transfer: SlotTransfer, completion: Completion) {
+        let request = Message { session: super::super::named_macros::session_revision(), transfer, cancelled: false };
+        WORKER.lock().unwrap().queue.push_back(Job { request, completion });
+        crate::runtime::ui::worker::wake();
+    }
+
+    pub fn export(slot: usize) { enqueue(SlotTransfer::export(slot), Completion::Export); }
+
+    pub fn import(slot: usize, recording: &MacroRecording) -> Result<(), String> {
+        let start = recording.start;
+        let origin = Origin {
+            facing: if start.facing < 0.0 { -1 } else { 1 }, status: start.status,
+            start: StartSnapshot { fighter_kind: start.fighter_kind, costume: start.costume,
+                situation: start.situation, speed_x: start.speed_x, speed_y: start.speed_y },
+        };
+        let frames: Vec<_> = recording.frames.iter().map(|frame| MappedInputs {
+            buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
+            rstick_x: frame.rstick_x, rstick_y: frame.rstick_y,
+        }).collect();
+        let transfer = SlotTransfer::import(slot, &frames, origin).map_err(|error| error.message())?;
+        enqueue(transfer, Completion::Import { name: recording.name.clone(), slot });
+        Ok(())
+    }
+
+    // Keep the bounded frame-array copies out of the enclosing fighter callback's stack frame.
+    #[inline(never)]
+    pub fn service_slot_request() {
+        REQUEST.drain(|mut message| {
+            message.cancelled = message.session != super::super::named_macros::session_revision();
+            if !message.cancelled {
+                crate::runtime::features::recorder::transfer_slot(&mut message.transfer);
+            }
+            let posted = REPLY.post(message);
+            debug_assert!(posted, "one outstanding slot transfer");
+            crate::runtime::ui::worker::wake();
+        });
+    }
+
+    pub fn worker_slot_tick() {
+        REPLY.drain(|message| {
+            let pending = WORKER.lock().unwrap().pending.take();
+            let Some((session, completion)) = pending else { return; };
+            if message.cancelled || session != super::super::named_macros::session_revision() { return; }
+            match completion {
+                Completion::Export => {
+                    match message.transfer.result {
+                        SlotResult::ExportFailed(error) => super::super::named_macros::slot_export_failed(error.message()),
+                        SlotResult::Exported => {
+                            let (frames, origin) = message.transfer.exported().unwrap();
+                            let start = StartState { fighter_kind: origin.start.fighter_kind, costume: origin.start.costume,
+                                facing: f32::from(origin.facing), situation: origin.start.situation, status: origin.status,
+                                speed_x: origin.start.speed_x, speed_y: origin.start.speed_y };
+                            let frames = frames.iter().map(|frame| InputFrame { buttons: frame.buttons,
+                                lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
+                                rstick_x: frame.rstick_x, rstick_y: frame.rstick_y }).collect();
+                            super::super::named_macros::slot_exported(frames, start);
+                        }
+                        _ => unreachable!("export reply"),
+                    }
+                }
+                Completion::Import { name, slot } => {
+                    let result = match message.transfer.result {
+                        SlotResult::Imported => Ok(()),
+                        SlotResult::ImportFailed(error) => Err(error),
+                        _ => unreachable!("import reply"),
+                    };
+                    super::super::named_macros::slot_imported(&name, slot, result);
+                }
+            }
+        });
+        let mut worker = WORKER.lock().unwrap();
+        if worker.pending.is_some() { return; }
+        let current = super::super::named_macros::session_revision();
+        while let Some(job) = worker.queue.pop_front() {
+            if job.request.session != current { continue; }
+            let posted = REQUEST.post(job.request);
+            debug_assert!(posted, "one outstanding slot transfer");
+            worker.pending = Some((current, job.completion));
+            break;
+        }
     }
 }

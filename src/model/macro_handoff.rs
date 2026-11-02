@@ -73,6 +73,80 @@ pub enum LayerEvent {
     FrameTick,
 }
 
+/// One bounded numbered-slot transfer. The worker constructs a request, a game
+/// callback executes it against its Recorder, and the worker consumes the reply.
+/// Both directions use the same fixed payload: no allocation occurs in execute.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SlotTransfer {
+    slot: u8,
+    frames: [crate::model::input_delay::MappedInputs; crate::model::recording::SLOT_FRAMES],
+    len: u16,
+    origin: crate::model::recording::Origin,
+    pub result: SlotResult,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotResult {
+    ExportRequest,
+    ImportRequest,
+    Exported,
+    Imported,
+    ExportFailed(crate::model::recording::ExportRefusal),
+    ImportFailed(crate::model::recording::ImportRefusal),
+}
+
+impl SlotTransfer {
+    pub fn export(slot: usize) -> Self {
+        Self {
+            slot: u8::try_from(slot).unwrap_or(u8::MAX),
+            frames: [crate::model::input_delay::MappedInputs::NEUTRAL; crate::model::recording::SLOT_FRAMES],
+            len: 0,
+            origin: crate::model::recording::Origin::NONE,
+            result: SlotResult::ExportRequest,
+        }
+    }
+
+    pub fn import(slot: usize, frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
+        -> Result<Self, crate::model::recording::ImportRefusal>
+    {
+        use crate::model::recording::{ImportRefusal, SLOTS, SLOT_FRAMES};
+        if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
+        if frames.is_empty() { return Err(ImportRefusal::Empty); }
+        if frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(frames.len())); }
+        let mut transfer = Self::export(slot);
+        transfer.frames[..frames.len()].copy_from_slice(frames);
+        transfer.len = frames.len() as u16;
+        transfer.origin = origin;
+        transfer.result = SlotResult::ImportRequest;
+        Ok(transfer)
+    }
+
+    pub fn execute(&mut self, recorder: &mut crate::model::recording::Recorder) {
+        match self.result {
+            SlotResult::ExportRequest => match recorder.export_slot(self.slot) {
+                Ok((frames, origin)) => {
+                    self.frames[..frames.len()].copy_from_slice(frames);
+                    self.len = frames.len() as u16;
+                    self.origin = origin;
+                    self.result = SlotResult::Exported;
+                }
+                Err(error) => self.result = SlotResult::ExportFailed(error),
+            },
+            SlotResult::ImportRequest => {
+                self.result = match recorder.import_slot(self.slot, &self.frames[..usize::from(self.len)], self.origin) {
+                    Ok(()) => SlotResult::Imported,
+                    Err(error) => SlotResult::ImportFailed(error),
+                };
+            }
+            _ => {}
+        }
+    }
+
+    pub fn exported(&self) -> Option<(&[crate::model::input_delay::MappedInputs], crate::model::recording::Origin)> {
+        (self.result == SlotResult::Exported).then(|| (&self.frames[..usize::from(self.len)], self.origin))
+    }
+}
+
 /// Two frame buffers for playback: the hooks read the published one, the worker fills the other.
 pub struct PlayBuffers<T> {
     slots: [UnsafeCell<Vec<T>>; 2],
@@ -329,6 +403,31 @@ impl<T: Copy + Default> Default for CaptureBuffer<T> {
 #[cfg(test)]
 mod tests {
     use super::{CaptureBuffer, MacroQueries, PlayBuffers};
+
+    #[test]
+    fn numbered_slot_transfer_preserves_frames_origin_and_refusals() {
+        use super::{SlotTransfer, SlotResult};
+        use crate::model::recording::{Recorder, Origin, ImportRefusal, ExportRefusal, SLOT_FRAMES};
+        use crate::model::input_delay::MappedInputs;
+        let mut recorder = Recorder::new();
+        let mut empty = SlotTransfer::export(2);
+        empty.execute(&mut recorder);
+        assert_eq!(empty.result, SlotResult::ExportFailed(ExportRefusal::NotRecorded));
+        let frame = MappedInputs { lstick_x: -91, rstick_y: 37, ..MappedInputs::NEUTRAL };
+        let frames = [frame, MappedInputs::NEUTRAL, frame];
+        let origin = Origin { facing: -1, status: 42, ..Origin::NONE };
+        let mut import = SlotTransfer::import(2, &frames, origin).unwrap();
+        import.execute(&mut recorder);
+        assert_eq!(import.result, SlotResult::Imported);
+        assert_eq!(SlotTransfer::import(2, &vec![frame; SLOT_FRAMES + 1], origin),
+            Err(ImportRefusal::TooLong(SLOT_FRAMES + 1)));
+        let mut export = SlotTransfer::export(2);
+        export.execute(&mut recorder);
+        assert_eq!(export.exported(), Some((frames.as_slice(), origin)));
+        let mut invalid = SlotTransfer::export(usize::MAX);
+        invalid.execute(&mut recorder);
+        assert_eq!(invalid.result, SlotResult::ExportFailed(ExportRefusal::SlotOutOfRange));
+    }
 
     #[test]
     fn the_idle_snapshot_has_nothing_loaded_or_visible() {

@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "d2830af0b415a26d2b10b60907e8f9b76853225fc43cecd1126a63d680dbfb5e",
+   "dest_sha256": "92101eeca699b221516e0757ba4717398b9368cec7b379f8c5c4d703b87ea3ee",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -748,6 +748,26 @@
      "old": "use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor, Fighter};",
      "new": "use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor};",
      "reason": "Design C: character intent/receipt crosses the worker/game boundary; only the game callback calls the roster's native admission predicate"
+    },
+    {
+     "old": "static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);",
+     "new": "static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);\npub(crate) fn session_revision() -> u64 { SESSION_GENERATION.load(Ordering::Acquire) }",
+     "reason": "Design C: numbered-slot commands run on the game owner; the worker applies completion and opens naming only after the reply"
+    },
+    {
+     "old": "    let (frames, start, mii) = match crate::runtime::macros::port::input_record::export_named(slot) {\n        Ok(ready) => ready,\n        Err(message) => {\n            notify(message);\n            return;\n        }\n    };",
+     "new": "    crate::runtime::macros::port::slots::export(slot);\n}\n\npub fn slot_export_failed(message: &str) { notify(message); }\n\n/// The requested slot copy has completed on the game thread.\npub fn slot_exported(frames: Vec<InputFrame>, start: StartState) {",
+     "reason": "Design C: numbered-slot commands run on the game owner; the worker applies completion and opens naming only after the reply"
+    },
+    {
+     "old": "lock_write(&UI).offer_save_with_mii(frames, start, false, &version, mii)",
+     "new": "lock_write(&UI).offer_save_with_mii(frames, start, false, &version, None)",
+     "reason": "Design C: numbered-slot commands run on the game owner; the worker applies completion and opens naming only after the reply"
+    },
+    {
+     "old": "    let label = format!(\"Record Slot {}\", slot + 1);\n    match crate::runtime::macros::port::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {\n        Ok(()) => notify(&format!(\"Copied {} to {label}\", recording.name)),\n        Err(err) => notify(&err),\n    }\n}\n",
+     "new": "    if let Err(error) = crate::runtime::macros::port::slots::import(slot, &recording) {\n        notify(&error);\n    }\n}\n\npub fn slot_imported(name: &str, slot: usize, result: Result<(), crate::model::recording::ImportRefusal>) {\n    match result {\n        Ok(()) => notify(&format!(\"Copied {name} to Record Slot {}\", slot + 1)),\n        Err(error) => notify(&error.message()),\n    }\n}\n",
+     "reason": "Design C: numbered-slot commands run on the game owner; the worker applies completion and opens naming only after the reply"
     }
    ]
   },

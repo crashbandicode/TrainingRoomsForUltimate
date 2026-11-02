@@ -51,6 +51,7 @@ static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 /// Recording or playing back now, published by every taker of `REC` when it lets go (stream/sync slice 3): the question the menu
 /// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+static PLAYBACK: AtomicBool = AtomicBool::new(false);
 
 /// `REC`, held; dropping it publishes `ACTIVE` while the lock is still held, so the flag never trails the recorder.
 struct RecGuard(hos_lock::MutexGuard<'static, Recorder>);
@@ -71,6 +72,7 @@ impl core::ops::DerefMut for RecGuard {
 impl Drop for RecGuard {
     fn drop(&mut self) {
         ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
+        PLAYBACK.store(self.0.is_playback(), Ordering::Release);
     }
 }
 
@@ -570,9 +572,12 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
 
 // ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
 
-/// One short lock on the recorder for the named layer's slot export and import.
-pub(crate) fn with_recorder<R>(f: impl FnOnce(&mut Recorder) -> R) -> R {
-    f(&mut rec())
+/// Published alongside ACTIVE when the game releases its recorder guard.
+pub(crate) fn is_playback() -> bool { PLAYBACK.load(Ordering::Acquire) }
+
+/// Game callback only: numbered-slot transfer executes without heap work.
+pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
+    transfer.execute(&mut rec());
 }
 
 /// The record chord of the named layer: the lockout, then the capture (the layer's buffer takes the frames).
