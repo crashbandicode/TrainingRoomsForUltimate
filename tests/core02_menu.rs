@@ -1641,6 +1641,11 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
     // A on a roster tile goes to the roster editor (the worker), with the tile and the button.
     m.press(Button::A);
     assert_eq!(m.take_roster_press(), Some((0, Button::A)));
+    for button in [Button::X, Button::Y, Button::R, Button::ZR] {
+        m.press(button);
+        assert_eq!(m.take_roster_press(), Some((0, button)), "roster input belongs to its editor");
+        assert!(matches!(m.screen(), Some(Screen::Grid { page: 0, cell: 0, .. })));
+    }
     m.press(Button::B);
     assert!(m.screen().is_none());
 }

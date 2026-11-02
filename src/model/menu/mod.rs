@@ -1246,7 +1246,7 @@ impl Menu {
             Button::Down => self.top(screen(page, layout.step(page, cell, Move::Down))),
             Button::Left => self.top(screen(page, layout.step(page, cell, Move::Left))),
             Button::Right => self.top(screen(page, layout.step(page, cell, Move::Right))),
-            Button::L | Button::R => {
+            Button::L | Button::R if !matches!(layout.kind, GridKind::Roster(_)) => {
                 let pages = layout.pages();
                 let next = if button == Button::R { (page + 1) % pages } else { (page + pages - 1) % pages };
                 let cell = cell.min(layout.page_len(next).saturating_sub(1));
@@ -1258,8 +1258,8 @@ impl Menu {
                     self.outbox.stage_press = u16::try_from(tile).ok().map(|tile| (tile, button));
                 }
             }
-            // A, X, Y, ZR on the portrait roster grid: the roster editor applies them (pick, rank, remove, form preview, role).
-            Button::A | Button::X | Button::Y | Button::ZR if matches!(layout.kind, GridKind::Roster(_)) => {
+            // The roster editor owns pick/rank, form preview, Solo Popo, removal and role switching.
+            Button::A | Button::X | Button::Y | Button::R | Button::ZR if matches!(layout.kind, GridKind::Roster(_)) => {
                 if let Some(tile) = layout.tile(page, cell) {
                     self.outbox.roster_press = u16::try_from(tile).ok().map(|tile| (tile, button));
                 }

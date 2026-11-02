@@ -319,3 +319,16 @@ Prior predecessor checklist stays above as historical evidence, not fresh passes
 - Queue ui-11 on Ally respecting tm-f8*/imgui interleave and 3-minute fairness; use retained hashed diag if appropriate, mute before boot, restore+release on all exits.
 - Implement portraits + Solo Popo; then Mii lists/busts and waiting archive/tick; B3 attribution/grace; coordinate pkg4/pkg6 via progress/lead.
 - Never mark READY until all done criteria, final host/Switch gates and compliance report with final release NRO are met.
+
+## Astra active checkpoint — Solo Popo slice (2026-11-02)
+- Current integration base: 9343e05b893e359e221545d9a5af2be180d9ff95, clean authorized no-ff merge of fixed ebfcb98; only integrator-3 progress documentation arrived.
+- Model reverified after compaction: exact thread 01a19c9f-0f91-7fa3-9a01-dce8c4590865, gpt-6-astra/medium. One hidden watcher PID 2648540, owner 2589234; no mismatch sentinel.
+- In-progress source: role-specific Solo Popo kept preferences, Y on Ice Climbers cycle tile; R removes roster members; role-specific help, S label. Pure editor apply owns snapshot updates; regression cases cover role independence and grid input forwarding. NOT compiled or Eden-proven yet.
+- Queued Surface host test behind pkg6/slim and required imgui interleave. No compile/Eden claim held, no remote profile mutations.
+- Portrait path/costume mapping remains SPEC-core-07 open question 6; use existing u4 diagnostic probe and owned game resources to resolve before implementation. No guessed mapping or baked image.
+- Texture review found 64-bit bound mask versus 88 panes and 64 retirement slots: must resolve when enabling portraits, preserving GPU grace rather than immediate release on overflow.
+- Continue Mii catalog integration through existing pkg6 CatalogMenu/context; do not duplicate native providers. READY remains unmet.
+
+## QUESTIONS
+- Lead/pkg6 coordination: this stream will consume QUICK_MENU_APP::take_catalog and the existing CatalogMenu/context, and dispatch its PendingSelection/EditorRequest to pkg6. Please identify any single-init interface changes required beyond this fixed base; no second Mii provider will be added.
+- Portrait mapping probe is still required by SPEC-core-07 Q6. If another stream has already established costume-specific path facts from the owned game, please point to its evidence; otherwise ui-screens will run the u4 probe in its next batched Eden.

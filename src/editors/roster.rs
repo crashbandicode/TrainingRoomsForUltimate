@@ -23,6 +23,8 @@ pub enum Effect {
     Nothing,
     /// The values of the active key changed: write them back.
     Changed,
+    /// Toggle the active role's independent Ice Climbers preference.
+    ToggleSolo,
     /// Only what is shown changed (a previewed form, the role).
     Shown,
 }
@@ -50,6 +52,29 @@ impl RosterEditor {
 
     fn pick(&self) -> bool {
         matches!(self.use_, RosterUse::PlayerPick | RosterUse::CpuPick)
+    }
+
+    pub fn solo_key(&self) -> &'static str {
+        if self.grid.role() == Role::Cpu { "solo_popo_cpu" } else { "solo_popo_player_cycle" }
+    }
+
+    pub fn solo_enabled(&self, menu: &crate::model::menu::Menu) -> bool {
+        menu.kept(self.solo_key()).and_then(Value::as_array).is_some_and(|v| {
+            v.len() == 2 && v[0].as_u64() == Some(1) && v[1].as_u64() == Some(0)
+        })
+    }
+
+    /// Apply one editor input to the menu snapshot, preserving the other role's settings.
+    pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
+        let mut values = self.values(menu.kept(self.key()));
+        match self.press(cell, button, &mut values) {
+            Effect::Changed => menu.set_kept(self.key(), Self::value_of(&values)),
+            Effect::ToggleSolo => {
+                let on = !self.solo_enabled(menu);
+                menu.set_kept(self.solo_key(), serde_json::json!([u8::from(on), u8::from(!on)]));
+            }
+            Effect::Nothing | Effect::Shown => {}
+        }
     }
 
     /// The kept key this editor writes now (the order keys follow the role ZR chose).
@@ -83,7 +108,7 @@ impl RosterEditor {
         Value::Array(values.iter().map(|v| Value::from(*v)).collect())
     }
 
-    /// A press on cell `cell` (A pick / add, Y remove, X next form, ZR the other role's list) against the active key's `values`.
+    /// A pick/add, R remove, Y Solo Popo on Ice Climbers, X form, ZR role.
     pub fn press(&mut self, cell: usize, button: Button, values: &mut [u8]) -> Effect {
         let Some(info) = self.grid.info(cell) else { return Effect::Nothing };
         match (button, info.content) {
@@ -120,7 +145,8 @@ impl RosterEditor {
                     Effect::Nothing
                 }
             }
-            (Button::Y, CellContent::Fighter(kind)) if !self.pick() => {
+            (Button::Y, CellContent::Fighter(0x4b)) if self.use_ == RosterUse::Cycles => Effect::ToggleSolo,
+            (Button::R, CellContent::Fighter(kind)) if !self.pick() => {
                 self.grid.focus_kind(kind);
                 if self.grid.remove(&kinds(), values) {
                     Effect::Changed
@@ -133,7 +159,7 @@ impl RosterEditor {
     }
 
     /// Write the tiles' labels (name with the rank, the pick or the All mark) and the role on the second help line.
-    pub fn decorate(&self, frame: &mut Frame, values: &[u8]) {
+    pub fn decorate(&self, frame: &mut Frame, values: &[u8], solo: bool) {
         let kinds = kinds();
         for cell in 0..CELLS.min(frame.tiles.len()) {
             let Some(info) = self.grid.info(cell) else { continue };
@@ -157,6 +183,9 @@ impl RosterEditor {
                         let _ = label.write_str(info.label);
                     }
                 },
+            }
+            if solo && self.use_ == RosterUse::Cycles && info.kind() == Some(0x4b) {
+                let _ = label.write_str(" S");
             }
             frame.tiles[cell] = label;
         }
@@ -200,13 +229,53 @@ mod tests {
         let kinds = kinds();
         assert_eq!(group_rank(&kinds, &values, 0x58), Some(1));
         assert_eq!(group_rank(&kinds, &values, 0x07), Some(2));
-        assert_eq!(editor.press(cell_of(0x58), Button::Y, &mut values), Effect::Changed);
+        assert_eq!(editor.press(cell_of(0x58), Button::R, &mut values), Effect::Changed);
         assert_eq!(group_rank(&kinds, &values, 0x07), Some(1));
         assert_eq!(editor.press(0, Button::ZR, &mut values), Effect::Shown);
         assert_eq!(editor.key(), "cpu_roster");
         let mut frame = Frame::new();
-        editor.decorate(&mut frame, &values);
+        editor.decorate(&mut frame, &values, false);
         assert!(frame.help[1].string_lossy().contains("CPU"));
+    }
+
+    #[test]
+    fn solo_popo_changes_only_the_cycle_role_preference_and_marks_ice_climbers() {
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        let mut values = editor.values(None);
+        let before = values.clone();
+        assert_eq!(editor.press(cell_of(0x4b), Button::Y, &mut values), Effect::ToggleSolo);
+        assert_eq!(values, before, "Solo Popo does not remove a roster member");
+        assert_eq!(editor.solo_key(), "solo_popo_player_cycle");
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values, true);
+        assert!(frame.tiles[cell_of(0x4b)].string_lossy().ends_with(" S"));
+        assert_eq!(editor.press(cell_of(0), Button::Y, &mut values), Effect::Nothing);
+        editor.press(0, Button::ZR, &mut values);
+        assert_eq!(editor.solo_key(), "solo_popo_cpu");
+        for use_ in [RosterUse::PlayerPick, RosterUse::CpuPick, RosterUse::Hats] {
+            let mut other = RosterEditor::new(use_);
+            let mut values = other.values(None);
+            assert_eq!(other.press(cell_of(0x4b), Button::Y, &mut values), Effect::Nothing);
+        }
+    }
+
+    #[test]
+    fn solo_popo_persists_independently_for_each_role() {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        let cell = cell_of(0x4b);
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::ZR);
+        assert!(!editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::ZR);
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(!editor.solo_enabled(&menu));
+        assert_eq!(menu.kept("solo_popo_cpu"), Some(&serde_json::json!([1, 0])));
+        assert_eq!(menu.settings().menu.get("solo_popo_original"), Some(&[0, 1][..]));
     }
 
     #[test]

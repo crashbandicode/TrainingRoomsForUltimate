@@ -340,17 +340,14 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button, note: &mut Option<&'stat
 
 /// A press on the portrait roster grid: package 6's roster rules on the active kept key (`editors::roster`).
 fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button) {
-    use crate::editors::roster::{Effect, RosterEditor};
+    use crate::editors::roster::RosterEditor;
     let Some(Screen::Grid { layout, .. }) = m.screen().copied() else { return };
     let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind else { return };
     if editor.is_none_or(|e| e.use_() != use_) {
         *editor = Some(RosterEditor::new(use_));
     }
     let Some(e) = editor.as_mut() else { return };
-    let mut values = e.values(m.kept(e.key()));
-    if e.press(usize::from(tile), button, &mut values) == Effect::Changed {
-        m.set_kept(e.key(), RosterEditor::value_of(&values));
-    }
+    e.apply(m, usize::from(tile), button);
 }
 
 /// The page's Record Slot (the row `recording_slot`, one-hot over the five slots).
@@ -388,7 +385,7 @@ fn publish_frame(s: &Session) {
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
                 let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
                 let values = editor.values(menu.kept(editor.key()));
-                editor.decorate(&mut next, &values);
+                editor.decorate(&mut next, &values, editor.solo_enabled(menu));
             }
         }
         if let Some(reason) = s.refusal {
