@@ -170,6 +170,14 @@ impl Queue {
         }
     }
 
+    /// The layout was registered again: nothing this queue wrote is on screen, so the notice showing is drawn
+    /// again on the next tick.
+    pub fn on_layout_registered(&mut self) {
+        if let Some(first) = self.entries[0].as_mut() {
+            first.drawn = false;
+        }
+    }
+
     /// Clear all (session clear; Combo Display Off). Delivery records stay: they say something already
     /// happened.
     pub fn clear(&mut self) {

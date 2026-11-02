@@ -236,7 +236,7 @@ fn delivery_needs_the_whole_visible_time() {
     q.upsert(3, "S", Body::copied("x"), 3, DEFAULT_COLOR);
     // While the menu covers the pane the countdown stops (decision B8 question 3).
     for _ in 0..5 {
-        assert_eq!(q.tick(true, true).visible, false);
+        assert!(!q.tick(true, true).visible);
     }
     assert!(q.is_queued(3));
     assert_eq!(q.take_delivered(), None);
@@ -297,4 +297,18 @@ fn the_standing_api_is_bounded_and_allocation_free() {
     let taken = [q.take_delivered(), q.take_delivered(), q.take_delivered(), q.take_delivered(), q.take_delivered()];
     assert_eq!(ALLOCS.with(Cell::get), before, "no allocation in the standing API");
     assert_eq!(taken, [Some(2), Some(3), Some(4), Some(5), None]);
+}
+#[test]
+fn a_registered_layout_draws_the_showing_notice_again() {
+    let mut q = Queue::new();
+    q.post_static("H", "text", 5, DEFAULT_COLOR);
+    assert!(q.tick(true, false).draw.is_some());
+    assert_eq!(q.tick(true, false).draw, None);
+    q.on_layout_registered();
+    assert_eq!(q.tick(true, false).draw.map(|d| d.body.as_str().to_owned()), Some("text".to_owned()));
+    assert_eq!(q.tick(true, false).draw, None);
+    // Nothing queued: nothing to draw.
+    let mut empty = Queue::new();
+    empty.on_layout_registered();
+    assert!(!empty.tick(true, false).visible);
 }

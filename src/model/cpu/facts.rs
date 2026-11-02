@@ -74,26 +74,6 @@ pub struct PlaybackStart {
     pub ledge: bool,
 }
 
-impl PlaybackStart {
-    /// Bit 8 of the request word marks a ledge playback.
-    pub const LEDGE_BIT: u32 = 1 << 8;
-
-    /// The word the input-recording package's inbox (`published::CPU_PLAYBACK_REQUEST`) carries: `1 + slot`
-    /// in the low byte (0 means no request) and `LEDGE_BIT` for a ledge playback.
-    pub const fn request_word(self) -> u32 {
-        (1 + self.slot as u32) | if self.ledge { Self::LEDGE_BIT } else { 0 }
-    }
-
-    /// The request a word carries, or `None` for 0 (no request) and for a word that is not one.
-    pub const fn from_request_word(word: u32) -> Option<Self> {
-        let low = word & 0xff;
-        if low == 0 || low > 5 || word & !(0xff | Self::LEDGE_BIT) != 0 {
-            return None;
-        }
-        Some(Self { slot: (low - 1) as u8, ledge: word & Self::LEDGE_BIT != 0 })
-    }
-}
-
 /// What the runtime applies after one body's frame. Every field is `None` when nothing is asked.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FrameOut {
