@@ -38,26 +38,11 @@ fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> String + '_ {
     move |e| format!("{what}: {e:?}")
 }
 
-fn add_container(layout: &mut BFLYT) -> Result<()> {
-    layout
-        .clone_pane(&ClonePaneSpec {
-            template: "RootPane".into(),
-            new_name: panes::ROOT.as_str().into(),
-            parent: Some("RootPane".into()),
-            visible: Some(false),
-            ..Default::default()
-        })
-        .map_err(err("container"))?;
-    let root = layout.find_pane_mut(panes::ROOT.as_str()).ok_or("container missing")?;
-    root.flag |= INFLUENCED_ALPHA;
-    Ok(())
-}
-
-fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
+fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
     let template = match spec.kind {
         Kind::Null => "RootPane",
-        Kind::Rect { .. } => RECT_TEMPLATE,
-        Kind::Text { .. } => TEXT_TEMPLATE,
+        Kind::Rect { .. } => if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE },
+        Kind::Text { .. } => if waiting { "set_txt_status" } else { TEXT_TEMPLATE },
     };
     let name = spec.name.as_str();
     layout
@@ -127,16 +112,30 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
     Ok(())
 }
 
-fn build(stock_path: &str, out: &str) -> Result<()> {
+fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let stock = std::fs::read(stock_path).map_err(err("read stock"))?;
     let mut arc = read_arc(&stock).map_err(err("read arc"))?;
     // The writer must keep what it was given: an untouched archive round-trips to the same bytes.
     let untouched = write_arc(&arc).map_err(err("write untouched"))?;
-    let index = arc.position(BFLYT_MEMBER).ok_or("info_training.bflyt not in the archive")?;
+    let member = if waiting { "blyt/info_waiting.bflyt" } else { BFLYT_MEMBER };
+    let recipe_name = if waiting { "info_waiting" } else { "info_training" };
+    let index = arc.position(member).ok_or("requested layout not in the archive")?;
     let mut layout = read_bflyt(&arc.files[index].data).map_err(err("read bflyt"))?;
-    let specs = panes::specs();
+    let mut specs = panes::specs();
+    if waiting {
+        // The waiting archive already has com_white16, a plain UV0 material and
+        // the game's text font. Build our own flat panes from those stock templates;
+        // no Training archive, imported artwork or BNTX rewrite is needed.
+        layout.clone_pane(&ClonePaneSpec {
+            template: "RootPane".into(), new_name: "TrModPort".into(),
+            parent: Some("RootPane".into()), visible: Some(true),
+            ..Default::default()
+        }).map_err(err("waiting port"))?;
+        let root = specs.iter_mut().find(|spec| spec.name == panes::ROOT).ok_or("menu root missing")?;
+        root.parent = panes::Name::new("TrModPort");
+    }
     for spec in &specs {
-        add_pane(&mut layout, spec)?;
+        add_pane(&mut layout, spec, waiting)?;
     }
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
     let target = write_arc(&arc).map_err(err("write arc"))?;
@@ -147,7 +146,7 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
     }
     std::fs::create_dir_all(out).map_err(err("out dir"))?;
     std::fs::write(format!("{out}/target.arc"), &target).map_err(err("write target"))?;
-    std::fs::write(format!("{out}/info_training.tra1"), &recipe).map_err(err("write recipe"))?;
+    std::fs::write(format!("{out}/{recipe_name}.tra1"), &recipe).map_err(err("write recipe"))?;
     let report = serde_json::json!({
         "stock_bytes": stock.len(),
         "stock_fnv": format!("{:016x}", archive_recipe::fingerprint(&stock)),
@@ -156,7 +155,7 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
         "target_bytes": target.len(),
         "target_fnv": format!("{:016x}", archive_recipe::fingerprint(&target)),
         "recipe_bytes": recipe.len(),
-        "panes_added": specs.len(),
+        "panes_added": specs.len() + usize::from(waiting),
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;
@@ -167,7 +166,8 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let result = match args.get(1).map(String::as_str) {
-        Some("build") if args.len() == 4 => build(&args[2], &args[3]),
+        Some("build") if args.len() == 4 => build(&args[2], &args[3], false),
+        Some("build-waiting") if args.len() == 4 => build(&args[2], &args[3], true),
         Some("dump") if args.len() >= 4 => {
             let layout = read_bflyt(&std::fs::read(&args[2]).expect("read bflyt")).expect("parse");
             for name in &args[3..] {
@@ -175,7 +175,7 @@ fn main() {
             }
             Ok(())
         }
-        _ => Err("usage: layout-builder build <stock.arc> <out dir> | dump <bflyt> <pane>...".into()),
+        _ => Err("usage: layout-builder build|build-waiting <stock.arc> <out dir> | dump <bflyt> <pane>...".into()),
     };
     if let Err(message) = result {
         eprintln!("layout-builder: {message}");
