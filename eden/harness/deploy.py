@@ -11,6 +11,7 @@ import argparse
 import subprocess
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -27,16 +28,26 @@ def main(argv=None):
     args = ap.parse_args(argv)
     p = params.need(params.load(), "owner", "prefix", "root", "display")
     here = route._here(p)
+    # The tile cursor and the CPU pilot are NROs of the driver's machine: they travel with the others and the config
+    # the host reads names their place in <root>/nro.
+    aids = {k: getattr(p, k) for k in ("tile", "pilot") if getattr(p, k) and Path(getattr(p, k)).is_file()}
+    args.nro = [*args.nro, *[v for v in aids.values() if v not in args.nro]]
+    p = replace(p, **{k: f"{p.root}/nro/{Path(v).name}" for k, v in aids.items()})
     files = [*HERE.glob("*.py"), *HERE.glob("*.ps1")]
     with tempfile.TemporaryDirectory() as tmp:
         config = Path(tmp) / "harness.config.json"
         config.write_text(params.dump(p), encoding="utf-8")
         dest = f"{p.root}/harness"
         macros = sorted(p.macros_dir.glob("*.edenmacro.json"))
-        if here:
-            Path(dest).mkdir(parents=True, exist_ok=True)
+        if here:  # this machine runs Eden: the same layout, without ssh
+            for sub in ("harness", "macros", "nro"):
+                Path(p.root, sub).mkdir(parents=True, exist_ok=True)
             for f in [*files, config]:
                 Path(dest, f.name).write_bytes(f.read_bytes())
+            for f in macros:
+                Path(p.root, "macros", f.name).write_bytes(f.read_bytes())
+            for n in args.nro:
+                Path(p.root, "nro", Path(n).name).write_bytes(Path(n).read_bytes())
             print(json_paths(p, args.nro))
             return
         target = p.info["ssh"]

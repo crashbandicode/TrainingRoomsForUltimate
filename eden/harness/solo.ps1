@@ -30,6 +30,8 @@ param(
 # and reaches the ledger over ssh).
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
+# -File passes a comma list as one string.
+$Nro = @($Nro | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 $gv = Join-Path $here 'gv.py'
 $ledger = Join-Path $here 'ledger.py'
 function Py([string[]]$arguments) {
