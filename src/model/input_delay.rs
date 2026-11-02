@@ -111,10 +111,13 @@ impl DelayQueue {
         self.len == 0
     }
 
-    /// Empty the queue; the next `delay` polls output neutral.
-    pub fn clear(&mut self, _why: Clear) {
+    /// Empty the queue; the next `delay` polls output neutral. Returns how many records it held
+    /// (the diag build's hub line reports it).
+    pub fn clear(&mut self, _why: Clear) -> usize {
+        let held = self.len;
         self.head = 0;
         self.len = 0;
+        held
     }
 
     fn push_newest(&mut self, record: MappedInputs) {

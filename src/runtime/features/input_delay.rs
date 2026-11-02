@@ -31,7 +31,8 @@ pub unsafe fn final_input_mapping(
     *out = queue.poll(published::input_delay(), published::input_owners(), *out);
 }
 
-/// Empty the queue: the reset hub (decision B8) and, from package 3, every save-state load.
-pub fn clear(why: Clear) {
-    QUEUE.lock().clear(why);
+/// Empty the queue: the reset hub (decision B8) and, from package 3, every save-state load. Returns
+/// how many queued records were dropped.
+pub fn clear(why: Clear) -> usize {
+    QUEUE.lock().clear(why)
 }
