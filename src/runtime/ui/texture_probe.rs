@@ -22,17 +22,21 @@ const PATHS: [&str; 5] = [
 ];
 const START_TICK: u32 = 120;
 const GIVE_UP_TICKS: u32 = 900;
-const HOLD_TICKS: u32 = 600;
+const HOLD_TICKS: u32 = 900;
+/// Frames between one cycle (request, bind, hold, unbind, release) and the next: the proof repeats so the screenshots can be taken at
+/// any time and a repeated load and release shows no growth.
+const IDLE_TICKS: u32 = 240;
 
 struct State {
     phase: u8,
     ticks: u32,
     phase_at: u32,
+    cycle: u32,
     textures: [Option<Texture>; PATHS.len()],
     bound: [bool; PATHS.len()],
 }
 
-static STATE: Mutex<State> = Mutex::new(State { phase: 0, ticks: 0, phase_at: 0, textures: [None; PATHS.len()], bound: [false; PATHS.len()] });
+static STATE: Mutex<State> = Mutex::new(State { phase: 0, ticks: 0, phase_at: 0, cycle: 0, textures: [None; PATHS.len()], bound: [false; PATHS.len()] });
 
 /// Tile `i`'s place in the row of the proof: 200 x 167 (the stage texture's 108 x 90 aspect), 225 apart, centred.
 fn place(index: usize) -> (f32, f32) {
@@ -46,9 +50,11 @@ pub unsafe fn tick(panes: &Panes) {
     texture::tick();
     let now = s.ticks;
     match s.phase {
-        0 if now >= START_TICK => {
-            let _ = texture::install();
-            diagnostic(format_args!("[Texture] request usable={} allocations={}", texture::usable(), hook_allocations()));
+        0 if now - s.phase_at >= START_TICK => {
+            if s.cycle == 0 {
+                let _ = texture::install();
+            }
+            diagnostic(format_args!("[Texture] request cycle={} usable={} allocations={}", s.cycle, texture::usable(), hook_allocations()));
             for (i, path) in PATHS.iter().enumerate() {
                 let hash = texture::path_hash(path);
                 let loaded = texture::load(hash);
@@ -81,7 +87,7 @@ pub unsafe fn tick(panes: &Panes) {
                         diagnostic(format_args!("[Texture] never ready idx={i} facts={:?}", t.facts()));
                     }
                 }
-                diagnostic(format_args!("[Texture] shown bound={:?} allocations={}", s.bound, hook_allocations()));
+                diagnostic(format_args!("[Texture] shown cycle={} bound={:?} allocations={}", s.cycle, s.bound, hook_allocations()));
                 s.phase = 2;
                 s.phase_at = now;
             }
@@ -104,8 +110,14 @@ pub unsafe fn tick(panes: &Panes) {
             s.phase_at = now;
         }
         3 if texture::retired_waiting() == 0 => {
-            diagnostic(format_args!("[Texture] released after={} allocations={}", now - s.phase_at, hook_allocations()));
+            diagnostic(format_args!("[Texture] released cycle={} after={} allocations={}", s.cycle, now - s.phase_at, hook_allocations()));
             s.phase = 4;
+            s.phase_at = now;
+        }
+        4 if now - s.phase_at >= IDLE_TICKS => {
+            s.cycle += 1;
+            s.phase = 0;
+            s.phase_at = now;
         }
         _ => {}
     }
