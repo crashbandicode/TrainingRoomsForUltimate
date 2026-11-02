@@ -180,3 +180,18 @@ tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, t
 | P1 menu adapter | worker press ring | menu worker | lock-free SPSC ring (single producer: the P1 hook), counted drop |
 | Give item (tick) | `ui::requests::GIVE_ITEM` atomic | menu worker | atomic handoff; the tick calls `character_items::request` |
 | named-macro hooks (pkg4) | `UI`, `RECORD_SLOT`, `MOTION`, ... | menu worker (panel entry points) | design C: pkg4 moves hooks to published queries + mailbox; until then the worker holds them only for model steps |
+
+## 2026-11-02 ~13:45Z checkpoint (restart-safe)
+- Branch `stream/ui-screens`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-ui-screens`, HEAD `4a979d2` (WIP sync slice 3) on
+  `ade1dd9` (merge of work 8b73694: pkg4's providers + facts rule) on `1992045` (slice 1 gated) on `90341d2` (merge 48eebe1).
+- Eden: ui-10 (diag 45860626): menu-open attribution = 0 menu allocations per open (`menu_input` 0, `menu_thumbs` 0, `menu_draw` 1 once);
+  all growth `roster_preload` (pkg6 R5/F10); Give item, Lobby Stages, Save slot pass; 0 Unmapped. sync-01/sync-02 on stream/sync.
+- Gates at 4a979d2: tests 9251 pass, clippy 0, no-default-features ok, Switch release dd4616c8 + diag badc76cf 0 warnings;
+  hook_locks fails on 2 owner paths: (1) pkg6 preload `publish_applied -> load_cache -> assign(&MENU) -> store -> EDITED` on the
+  publishing path; (2) pkg4 `worker -> recorder::with_recorder -> REC` (design C). Lead asked: owner follow-ups or temporary ALLOWED rows.
+- No claim held; lent rig restored (13:32Z `mismatches: []`); Ally released 13:44Z.
+- Next: lead's answer on the 2 paths -> green sha to integrator-3; pkg4 design C on top; then roster grid (13x7 = 87 cells; pane table
+  40 -> 88 tiles, labels carry rank/role, est. +32-40 KB resident; portraits through u4's texture path), Mii lists, waiting room,
+  B3 stack path + archive-hook allocation; stream/sync's uncommitted `tests/hook_locks.rs` filter refinement is superseded by this branch's.
+- Own tools added since the playbook record: `eden/lent/rows_sync01(b).py`, `rows_sync02c.py`, `rows_ui10.py` (row drivers on the Ally lent
+  rig; playbook drivers are Yoga-local), `ally-build.sh` modes `hoslock`/`hooklocks` (single-crate / single-test re-runs inside a claim).
