@@ -396,3 +396,20 @@ A macro draft still has one payload allocation, while external naming no longer
 allocates an outer draft. No validation, confirmation, placement or retry behavior
 is removed. The large-enum suppression and its KNOWN row are removed; all 18
 transforms are recorded in the pkg4 manifest and the ledger is regenerated.
+
+## Slim keyboard value boundary (lead scoped authorization21:18Z)
+
+The actual Text/Decision/callback-value state moves from the carried native
+inline_keyboard adapter into src/model/mii/inline_keyboard.rs, consumed by that
+adapter and host probes. Both destinations derive from the same authorized
+ours-new m5q source via exact manifest edits. The pure entry precedes the native
+entry, so the tool's source-to-destination module mapping still resolves the
+native keyboard child to its SDK adapter. The carried mii module adds one
+declaration. No upstream or mixed source was opened.
+
+Native Changed/Moved/Entered/Object/Work/InputText/Appear layouts and SDK
+declarations remain unchanged. Only value validation/decision handling moves;
+lease, locking, UI-thread ownership and Finalize ordering remain in the adapter.
+The initial extraction intentionally retains usize metadata and allocating
+macro validation to reproduce the original defect with the actual shared code.
+It is a regression baseline, not a completed fix or runtime acceptance.

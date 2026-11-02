@@ -949,3 +949,28 @@ claim/queue. Futurecompile requiresnewadmission/currentcachecheck/newtarget.
 RemainingSIZE-PLANcounterabstractionwouldtouchactiveleadstates/pkg4recorder; boot
 tableconsolidationcrossessharedinstall/runtimeboundaries. Noextraneouseditsmade.
 Exacta6gatedslice isreviewable; requirednative/stack/runtimeintegration remainspending.
+
+## Authorized keyboard root slice — lead21:18Z
+Read exact scopedauthorization inLEAD-INBOX. Newactualpuremodel under
+src/model/mii/inline_keyboard.rs, declaredbycarriedmii/mod.rs; nativeadapterconsumes
+it. PreserveABIcallbacks, lease/locks, finalizedownership andfrozenEnter.
+Confirmedoldallocation: macro_name encode_utf16 collectVec; macrocallback
+String::from_utf16 wholetext andcursorprefix. Baseline/finalactualcode probesplanned.
+Contract: Mii<=10units, noNUL, cursor<=len; Mii permitsunpairedUTF16/controlunits
+historically. Macro<=96units/48Unicode scalars, validwholeUTF16, noNUL/control,
+cursoronvalidUTF16boundary. EmptyMiiEnter=>Cancel; emptyMacroEnter retained.
+Invalidcallbacksetsstickyinvalid withoutreplacingpriorvalidtext/decision;
+laterchanged/movedmustnotalterfrozenEnter. Nootherbehaviorrefactorauthorized.
+ChangedfilesnotifiedinINBOX; existingcarrytoolfullyread. Nojobs/claims yet.
+
+Keyboard extraction checkpoint: actual pure module now consumed by native
+adapter; original usize/String/Vec retained for before-fix allocation probe.
+New tests/inline_keyboard.rs exercises exported actual implementation; no copied
+test model/source-extraction harness. Source carry253 verify m5q PASS; ledger
+regenerated. New pure destination is a second exact transform of the same
+authorized source, ordered BEFORE native entry to preserve child module mapping.
+Native ABI/layout declarations unchanged. Baseline has intentionally not removed
+the stale KNOWN row or fixed enum layout; do not treat it as a final lint gate.
+Next freeze baseline, claim one isolated host allocation regression, preserve
+expected failure, then implement streaming validation/checked byte metadata.
+No current claims/compiler/Eden/profile; both previous targets remain retired.

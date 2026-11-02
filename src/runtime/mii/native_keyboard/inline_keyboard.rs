@@ -3,81 +3,9 @@
 //! owns its keyboard on one UI thread and never persists its pointers.
 //! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
-use std::convert::TryFrom;
 
-const MII_UNITS: usize = 10;
-const MACRO_UNITS: usize = super::MAX_NAME_CHARS * 2;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum Limit {
-    #[default]
-    Mii,
-    Macro,
-}
-
-impl Limit {
-    fn units(self) -> usize { match self { Self::Mii => MII_UNITS, Self::Macro => MACRO_UNITS } }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Text {
-    units: [u16; MACRO_UNITS + 1],
-    len: usize,
-    cursor: usize,
-    limit: Limit,
-}
-
-impl Text {
-    // Keep the old Mii constructor/ten-unit contract at the compatibility path.
-    #[cfg(any(test, feature = "mii-editor-alpha"))]
-    pub(crate) fn new(units: &[u16], cursor: usize) -> Option<Self> {
-        Self::with_limit(units, cursor, Limit::Mii)
-    }
-
-    pub(super) fn macro_name(name: &str, cursor: usize) -> Option<Self> {
-        Self::with_limit(&name.encode_utf16().collect::<Vec<_>>(), cursor, Limit::Macro)
-    }
-
-    fn with_limit(units: &[u16], cursor: usize, limit: Limit) -> Option<Self> {
-        if units.len() > limit.units() || cursor > units.len() || units.contains(&0) {
-            return None;
-        }
-        if limit == Limit::Macro {
-            let name = String::from_utf16(units).ok()?;
-            if name.chars().count() > super::MAX_NAME_CHARS || name.chars().any(char::is_control)
-                || String::from_utf16(&units[..cursor]).is_err() { return None; }
-        }
-        let mut text = Self { units: [0; MACRO_UNITS + 1], len: units.len(), cursor, limit };
-        text.units[..units.len()].copy_from_slice(units);
-        Some(text)
-    }
-
-    pub(crate) fn units(&self) -> &[u16] { &self.units[..self.len] }
-    // Mii's native config must still receive exactly 11 units/22 bytes.
-    #[cfg(any(test, feature = "mii-editor-alpha"))]
-    pub(crate) fn terminated(&self) -> &[u16] { &self.units[..self.limit.units() + 1] }
-    pub(crate) fn cursor(&self) -> usize { self.cursor }
-}
-
-#[derive(Clone, Copy, Debug)]
-// One fixed-size callback result, bounded to 96 UTF-16 units. Keeping the text
-// inline avoids allocating/freeing in native callbacks or retaining heap owners
-// across Finalize; the unused Cancel payload costs only this small stack value.
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum Decision {
-    Enter(Text),
-    Cancel,
-}
-
-#[derive(Default)]
-struct Signals {
-    limit: Limit,
-    text: Option<Text>,
-    decision: Option<Decision>,
-    initialized: bool,
-    finished: bool,
-    invalid: bool,
-}
+use crate::engine::mii::inline_keyboard::{Limit, Signals};
+pub(crate) use crate::engine::mii::inline_keyboard::{Decision, Text};
 
 // Native calls never run with this lock held. Only our SDK callbacks and the
 // single owning UI-thread poll access it; Finalize finishes before the next owner.
@@ -125,44 +53,22 @@ struct Entered {
     len: i32,
 }
 
-fn text_signal(units: &[u16], len: i32, cursor: i32, limit: Limit) -> Option<Text> {
-    let len = usize::try_from(len).ok()?;
-    let cursor = usize::try_from(cursor).ok()?;
-    Text::with_limit(units.get(..len)?, cursor, limit)
-}
-
 unsafe extern "C" fn changed(arg: *const Changed) {
     let Some(arg) = arg.as_ref() else { return; };
-    let mut signals = SIGNALS.lock().unwrap();
-    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);
-    signals.invalid |= text.is_none();
-    if text.is_some() { signals.text = text; }
+    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);
 }
 
 unsafe extern "C" fn moved(arg: *const Moved) {
     let Some(arg) = arg.as_ref() else { return; };
-    let mut signals = SIGNALS.lock().unwrap();
-    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);
-    signals.invalid |= text.is_none();
-    if text.is_some() { signals.text = text; }
+    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);
 }
 
 unsafe extern "C" fn entered(arg: *const Entered) {
     let Some(arg) = arg.as_ref() else { return; };
-    let mut signals = SIGNALS.lock().unwrap();
-    let text = text_signal(&arg.text, arg.len, arg.len, signals.limit);
-    signals.invalid |= text.is_none();
-    if let Some(text) = text {
-        signals.text = Some(text);
-        signals.decision = Some(if text.limit == Limit::Mii && text.len == 0 {
-            Decision::Cancel
-        } else { Decision::Enter(text) });
-    }
+    SIGNALS.lock().unwrap().enter(&arg.text, arg.len);
 }
 
-unsafe extern "C" fn cancelled() {
-    SIGNALS.lock().unwrap().decision = Some(Decision::Cancel);
-}
+unsafe extern "C" fn cancelled() { SIGNALS.lock().unwrap().cancel(); }
 
 unsafe extern "C" fn initialized() { SIGNALS.lock().unwrap().initialized = true; }
 unsafe extern "C" fn finished() { SIGNALS.lock().unwrap().finished = true; }
@@ -237,7 +143,7 @@ impl Keyboard {
             return None;
         }
         let lease = Lease::acquire()?;
-        *SIGNALS.lock().unwrap() = Signals { limit: text.limit, ..Signals::default() };
+        *SIGNALS.lock().unwrap() = Signals { limit: text.limit(), ..Signals::default() };
         let mut work = Box::new(Work([0; 0x698]));
         let mut object = Object { implementation: 0, work: 0 };
         sdk_construct(&mut object);
@@ -252,13 +158,13 @@ impl Keyboard {
         sdk_initialized(&mut object, initialized);
         sdk_finished(&mut object, finished);
         let mut input = InputText([0; 506]);
-        sdk_text_set(&mut input, text.units.as_ptr());
+        sdk_text_set(&mut input, text.terminated().as_ptr());
         sdk_input_text(&mut object, &input);
-        sdk_cursor(&mut object, text.cursor as i32);
+        sdk_cursor(&mut object, text.cursor() as i32);
         let appear = Appear {
             keyboard_type: 0, ok_text: [0; 9], optional_left: 0, optional_right: 0,
             prediction: 0, disable_cancel: 0, disabled_keys: 0,
-            max_length: text.limit.units() as i32, min_length: 1,
+            max_length: text.limit().units() as i32, min_length: 1,
             enable_return: 0, padding0: [0; 3], flags: 0, use_save_data: 0,
             padding1: [0; 7], user_id: [0; 16],
         };
@@ -276,7 +182,7 @@ impl Keyboard {
         #[cfg(not(feature = "mii-editor-alpha"))]
         sdk_calc(&mut self.object);
         let signals = std::mem::replace(&mut *SIGNALS.lock().unwrap(),
-            Signals { limit: self.text.limit, ..Signals::default() });
+            Signals { limit: self.text.limit(), ..Signals::default() });
         if let Some(text) = signals.text { self.text = text; }
         self.initialized |= signals.initialized;
         self.invalid |= signals.invalid;
@@ -357,30 +263,3 @@ extern "C" {
     fn sdk_finished(this: *mut Object, callback: unsafe extern "C" fn());
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mii_limit_and_native_buffer_size_are_unchanged() {
-        let text = Text::new(&[65; 10], 4).unwrap();
-        assert_eq!(text.terminated().len(), 11);
-        assert_eq!(std::mem::size_of_val(text.terminated()), 22);
-        assert!(Text::new(&[65; 11], 0).is_none());
-        assert!(Text::new(&[65], 2).is_none());
-        assert!(Text::new(&[0], 0).is_none());
-    }
-
-    #[test]
-    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {
-        let name = "😀".repeat(super::super::MAX_NAME_CHARS);
-        let text = Text::macro_name(&name, 2).unwrap();
-        assert_eq!(text.units().len(), 96);
-        assert_eq!(text.cursor(), 2);
-        assert!(Text::macro_name(&format!("{name}a"), 0).is_none());
-        assert!(Text::macro_name(&"a".repeat(49), 0).is_none());
-        assert!(Text::macro_name("😀", 1).is_none());
-        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());
-        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());
-    }
-}

@@ -13,6 +13,7 @@ pub mod selection;
 
 pub mod ordinary_cpu;
 pub mod draft;
+pub mod inline_keyboard;
 // C116.1 refactor WP5: exact identity receipts (5a) and the transition coordinator (5b/5c).
 pub mod identity;
 pub mod transition;

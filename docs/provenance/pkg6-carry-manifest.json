@@ -889,7 +889,14 @@
    "dest": "src/model/mii/mod.rs",
    "crate": "mii",
    "src_sha256": "b4f41714bcabceaf12ab039628a59777a38b2662123626f09f4df9d41688cd60",
-   "dest_sha256": "b4f41714bcabceaf12ab039628a59777a38b2662123626f09f4df9d41688cd60"
+   "dest_sha256": "26e0612207bfac3f99365b1413076d41c03ea3e41af4068964ee2698f81a4d4f",
+   "edits": [
+    {
+     "old": "pub mod draft;",
+     "new": "pub mod draft;\npub mod inline_keyboard;",
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/lifetime.rs",
@@ -2931,10 +2938,10 @@
   },
   {
    "src": "src/native_keyboard/inline_keyboard.rs",
-   "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
+   "dest": "src/model/mii/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "cfffde8120f1d46dc3c13b233d99b392ebf0df1310890f8d80f0f32d8c3f94e4",
+   "dest_sha256": "48b03e9ff042fdfa42fbc775f25338fd01b8312b655e641e832d1483332a3605",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -2971,6 +2978,201 @@
      "new": "                    #[cfg(feature = \"mii-editor-alpha\")]\n                    initialized: self.initialized,\n                    finished: signals.finished, invalid: self.invalid,\n                    #[cfg(feature = \"mii-editor-alpha\")]\n                    state })",
      "count": 1,
      "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "//! Shared native adapter. The SDK's Calc dispatches callbacks synchronously.\n//! Mii editing and waiting naming share one lease and callback signals. The caller\n//! owns its keyboard on one UI thread and never persists its pointers.\n//! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.\nuse std::sync::{atomic::{AtomicBool, Ordering}, Mutex};\nuse std::convert::TryFrom;\n\n",
+     "new": "//! Inline keyboard value validation and callback decisions, without SDK pointers.\n//! The native adapter consumes these same values before and after Calc/Finalize.\nuse super::draft::MAX_NAME_CHARS;\nuse std::convert::TryFrom;\n\n",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "super::super::MAX_NAME_CHARS",
+     "new": "MAX_NAME_CHARS",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "super::MAX_NAME_CHARS",
+     "new": "MAX_NAME_CHARS",
+     "count": 2,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "// Native calls never run with this lock held. Only our SDK callbacks and the\n// single owning UI-thread poll access it; Finalize finishes before the next owner.\nstatic SIGNALS: Mutex<Signals> = Mutex::new(Signals {\n    limit: Limit::Mii, text: None, decision: None,\n    initialized: false, finished: false, invalid: false,\n});\nstatic LEASED: AtomicBool = AtomicBool::new(false);\npub(crate) fn active() -> bool { LEASED.load(Ordering::Acquire) }\n\n// Also held around ordinary Training's synchronous ShowKeyboard. There is one\n// physical keyboard lease across both transports and the Mii compatibility shim.\npub(super) struct Lease;\nimpl Lease {\n    pub(super) fn acquire() -> Option<Self> {\n        LEASED.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).ok()?;\n        Some(Self)\n    }\n}\nimpl Drop for Lease {\n    fn drop(&mut self) { LEASED.store(false, Ordering::Release); }\n}\n\npub(super) fn current_thread() -> usize { unsafe { skyline::nn::os::GetCurrentThread() as usize } }\n\n#[repr(C)]\nstruct Changed {\n    text: [u16; 502],\n    len: i32,\n    dictionary_start: i32,\n    dictionary_end: i32,\n    cursor: i32,\n}\n\n#[repr(C)]\nstruct Moved {\n    text: [u16; 502],\n    len: i32,\n    cursor: i32,\n}\n\n#[repr(C)]\nstruct Entered {\n    text: [u16; 502],\n    len: i32,\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "unsafe extern \"C\" fn changed(arg: *const Changed) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);\n    signals.invalid |= text.is_none();\n    if text.is_some() { signals.text = text; }\n}\n\nunsafe extern \"C\" fn moved(arg: *const Moved) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);\n    signals.invalid |= text.is_none();\n    if text.is_some() { signals.text = text; }\n}\n\nunsafe extern \"C\" fn entered(arg: *const Entered) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.len, signals.limit);\n    signals.invalid |= text.is_none();\n    if let Some(text) = text {\n        signals.text = Some(text);\n        signals.decision = Some(if text.limit == Limit::Mii && text.len == 0 {\n            Decision::Cancel\n        } else { Decision::Enter(text) });\n    }\n}\n\nunsafe extern \"C\" fn cancelled() {\n    SIGNALS.lock().unwrap().decision = Some(Decision::Cancel);\n}\n\nunsafe extern \"C\" fn initialized() { SIGNALS.lock().unwrap().initialized = true; }\nunsafe extern \"C\" fn finished() { SIGNALS.lock().unwrap().finished = true; }\n\n#[repr(C)]\nstruct Object { implementation: usize, work: usize }\n\n#[repr(C, align(8))]\nstruct Work([u8; 0x698]);\n\n#[repr(C)]\nstruct InputText([u16; 506]);\n\n#[repr(C)]\nstruct Appear {\n    keyboard_type: u32,\n    ok_text: [u16; 9],\n    optional_left: u16,\n    optional_right: u16,\n    prediction: u8,\n    disable_cancel: u8,\n    disabled_keys: u32,\n    max_length: i32,\n    min_length: i32,\n    enable_return: u8,\n    padding0: [u8; 3],\n    flags: u32,\n    use_save_data: u8,\n    padding1: [u8; 7],\n    user_id: [u8; 16],\n}\n\nconst _: () = {\n    assert!(std::mem::size_of::<Object>() == 0x10);\n    assert!(std::mem::size_of::<Work>() == 0x698);\n    assert!(std::mem::size_of::<Appear>() == 0x48);\n    assert!(std::mem::offset_of!(Appear, flags) == 0x2c);\n    assert!(std::mem::offset_of!(Appear, user_id) == 0x38);\n    assert!(std::mem::size_of::<Changed>() == 0x3fc);\n    assert!(std::mem::size_of::<Moved>() == 0x3f4);\n    assert!(std::mem::size_of::<Entered>() == 0x3f0);\n};\n\npub(crate) struct Poll {\n    pub text: Text,\n    pub decision: Option<Decision>,\n    #[cfg(feature = \"mii-editor-alpha\")]\n    pub initialized: bool,\n    pub finished: bool,\n    pub invalid: bool,\n    #[cfg(feature = \"mii-editor-alpha\")]\n    pub state: i32,\n}\n\npub(crate) struct Keyboard {\n    object: Object,\n    // Allocation stays alive and aligned until SDK Finalize has returned.\n    work: Option<Box<Work>>,\n    text: Text,\n    thread: usize,\n    active: bool,\n    initialized: bool,\n    invalid: bool,\n    lease: Option<Lease>,\n}\n\nimpl Keyboard {\n    /// Must run on the bound UI thread. Applet-drawn mode still needs the\n    /// operator's console acceptance; the normal inline mode requires a renderer.\n    pub(crate) unsafe fn open(text: Text, thread: usize) -> Option<Self> {\n        if thread != current_thread() || sdk_work_size() != 0x698 {\n            return None;\n        }\n        let lease = Lease::acquire()?;\n        *SIGNALS.lock().unwrap() = Signals { limit: text.limit, ..Signals::default() };\n        let mut work = Box::new(Work([0; 0x698]));\n        let mut object = Object { implementation: 0, work: 0 };\n        sdk_construct(&mut object);\n        if !sdk_initialize(&mut object, work.0.as_mut_ptr().cast(), true, 1) {\n            sdk_destruct(&mut object);\n            return None;\n        }\n        sdk_changed(&mut object, changed);\n        sdk_moved(&mut object, moved);\n        sdk_entered(&mut object, entered);\n        sdk_cancelled(&mut object, cancelled);\n        sdk_initialized(&mut object, initialized);\n        sdk_finished(&mut object, finished);\n        let mut input = InputText([0; 506]);\n        sdk_text_set(&mut input, text.units.as_ptr());\n        sdk_input_text(&mut object, &input);\n        sdk_cursor(&mut object, text.cursor as i32);\n        let appear = Appear {\n            keyboard_type: 0, ok_text: [0; 9], optional_left: 0, optional_right: 0,\n            prediction: 0, disable_cancel: 0, disabled_keys: 0,\n            max_length: text.limit.units() as i32, min_length: 1,\n            enable_return: 0, padding0: [0; 3], flags: 0, use_save_data: 0,\n            padding1: [0; 7], user_id: [0; 16],\n        };\n        sdk_appear(&mut object, &appear);\n        Some(Self { object, work: Some(work), text, thread, active: true,\n                    initialized: false, invalid: false, lease: Some(lease) })\n    }\n\n    pub(super) fn on_owner_thread(&self) -> bool { self.thread == current_thread() }\n\n    pub(crate) unsafe fn poll(&mut self) -> Option<Poll> {\n        if !self.active || !self.on_owner_thread() { return None; }\n        #[cfg(feature = \"mii-editor-alpha\")]\n        let state = sdk_calc(&mut self.object);\n        #[cfg(not(feature = \"mii-editor-alpha\"))]\n        sdk_calc(&mut self.object);\n        let signals = std::mem::replace(&mut *SIGNALS.lock().unwrap(),\n            Signals { limit: self.text.limit, ..Signals::default() });\n        if let Some(text) = signals.text { self.text = text; }\n        self.initialized |= signals.initialized;\n        self.invalid |= signals.invalid;\n        Some(Poll { text: self.text, decision: signals.decision,\n                    #[cfg(feature = \"mii-editor-alpha\")]\n                    initialized: self.initialized,\n                    finished: signals.finished, invalid: self.invalid,\n                    #[cfg(feature = \"mii-editor-alpha\")]\n                    state })\n    }\n\n    /// Caller first copies pending values. Finalize owns its native join; never\n    /// free the work buffer or release the editor context before it returns.\n    pub(crate) unsafe fn close(&mut self) -> bool {\n        if !self.on_owner_thread() { return false; }\n        if self.active {\n            sdk_disappear(&mut self.object);\n            sdk_finalize(&mut self.object);\n            sdk_destruct(&mut self.object);\n            self.active = false;\n            *SIGNALS.lock().unwrap() = Signals::default();\n            self.work = None;\n            self.lease = None;\n        }\n        true\n    }\n}\n\nimpl Drop for Keyboard {\n    fn drop(&mut self) {\n        if self.active {\n            // A mistaken owner drop must not free SDK-owned storage or finalize\n            // on a different thread. Keep the lease unavailable too: otherwise\n            // an orphaned callback could corrupt the next keyboard's signals.\n            // Normal completion and suspension explicitly close on the owner.\n            if let Some(work) = self.work.take() { std::mem::forget(work); }\n            if let Some(lease) = self.lease.take() { std::mem::forget(lease); }\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[NativeKeyboard] keyboard_owner_dropped_before_finalize; lease retained\"));\n        }\n    }\n}\n\nextern \"C\" {\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboardC1Ev\"]\n    fn sdk_construct(this: *mut Object);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboardD1Ev\"]\n    fn sdk_destruct(this: *mut Object);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard25GetRequiredWorkBufferSizeEv\"]\n    fn sdk_work_size() -> u64;\n    #[link_name = \"_ZN2nn5swkbd30InlineKeyboardForLibraryApplet10InitializeEPvbi\"]\n    fn sdk_initialize(this: *mut Object, work: *mut std::ffi::c_void, display: bool, mode: i32) -> bool;\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard8FinalizeEv\"]\n    fn sdk_finalize(this: *mut Object);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard4CalcEv\"]\n    fn sdk_calc(this: *mut Object) -> i32;\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard6AppearERKNS0_9AppearArgE\"]\n    fn sdk_appear(this: *mut Object, arg: *const Appear);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard9DisappearEv\"]\n    fn sdk_disappear(this: *mut Object);\n    #[link_name = \"_ZN2nn5swkbd9InputText3SetEPKDs\"]\n    fn sdk_text_set(this: *mut InputText, text: *const u16);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard12SetInputTextERKNS0_9InputTextE\"]\n    fn sdk_input_text(this: *mut Object, text: *const InputText);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard12SetCursorPosEi\"]\n    fn sdk_cursor(this: *mut Object, cursor: i32);\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard24SetChangedStringCallbackEPFvPKNS0_16ChangedStringArgEE\"]\n    fn sdk_changed(this: *mut Object, callback: unsafe extern \"C\" fn(*const Changed));\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard22SetMovedCursorCallbackEPFvPKNS0_14MovedCursorArgEE\"]\n    fn sdk_moved(this: *mut Object, callback: unsafe extern \"C\" fn(*const Moved));\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard23SetDecidedEnterCallbackEPFvPKNS0_15DecidedEnterArgEE\"]\n    fn sdk_entered(this: *mut Object, callback: unsafe extern \"C\" fn(*const Entered));\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard24SetDecidedCancelCallbackEPFvvE\"]\n    fn sdk_cancelled(this: *mut Object, callback: unsafe extern \"C\" fn());\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard29SetFinishedInitializeCallbackEPFvvE\"]\n    fn sdk_initialized(this: *mut Object, callback: unsafe extern \"C\" fn());\n    #[link_name = \"_ZN2nn5swkbd14InlineKeyboard27SetFinishedKeyboardCallbackEPFvvE\"]\n    fn sdk_finished(this: *mut Object, callback: unsafe extern \"C\" fn());\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "enum Limit {",
+     "new": "pub enum Limit {",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "fn units(self) -> usize",
+     "new": "pub fn units(self) -> usize",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "pub(crate) struct Text",
+     "new": "pub struct Text",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "pub(crate) fn",
+     "new": "pub fn",
+     "count": 4,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "pub(super) fn",
+     "new": "pub fn",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "#[allow(clippy::large_enum_variant)]\n",
+     "new": "",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "pub(crate) enum Decision",
+     "new": "pub enum Decision",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "struct Signals {",
+     "new": "pub struct Signals {",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "pub struct Signals {\n    limit: Limit,\n    text: Option<Text>,\n    decision: Option<Decision>,\n    initialized: bool,\n    finished: bool,\n    invalid: bool,\n}\n",
+     "new": "pub struct Signals {\n    pub limit: Limit,\n    pub text: Option<Text>,\n    pub decision: Option<Decision>,\n    pub initialized: bool,\n    pub finished: bool,\n    pub invalid: bool,\n}\n",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "fn text_signal(",
+     "new": "pub fn text_signal(",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "    pub fn cursor(&self) -> usize { self.cursor }",
+     "new": "    pub fn cursor(&self) -> usize { self.cursor }\n    pub fn limit(&self) -> Limit { self.limit }",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "    #[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub fn terminated",
+     "new": "    pub fn terminated",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "#[cfg(test)]\nmod tests",
+     "new": "impl Signals {\n    pub fn change(&mut self, units: &[u16], len: i32, cursor: i32) {\n        let text = text_signal(units, len, cursor, self.limit);\n        self.invalid |= text.is_none();\n        if text.is_some() { self.text = text; }\n    }\n\n    pub fn enter(&mut self, units: &[u16], len: i32) {\n        let text = text_signal(units, len, len, self.limit);\n        self.invalid |= text.is_none();\n        if let Some(text) = text {\n            self.text = Some(text);\n            self.decision = Some(if text.limit == Limit::Mii && text.len == 0 {\n                Decision::Cancel\n            } else { Decision::Enter(text) });\n        }\n    }\n\n    pub fn cancel(&mut self) { self.decision = Some(Decision::Cancel); }\n}\n\n#[cfg(test)]\nmod tests",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    }
+   ]
+  },
+  {
+   "src": "src/native_keyboard/inline_keyboard.rs",
+   "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
+   "dest_sha256": "0dcd86c939a45fe4034e484088904506dfb3d053e92fed4655c08933c5c19557",
+   "edits": [
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
+     "new": "#[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn new",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn terminated",
+     "new": "#[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn terminated",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub initialized",
+     "new": "#[cfg(feature = \"mii-editor-alpha\")]\n    pub initialized",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub state",
+     "new": "#[cfg(feature = \"mii-editor-alpha\")]\n    pub state",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "        let state = sdk_calc(&mut self.object);",
+     "new": "        #[cfg(feature = \"mii-editor-alpha\")]\n        let state = sdk_calc(&mut self.object);\n        #[cfg(not(feature = \"mii-editor-alpha\"))]\n        sdk_calc(&mut self.object);",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "                    initialized: self.initialized, finished: signals.finished,\n                    invalid: self.invalid, state })",
+     "new": "                    #[cfg(feature = \"mii-editor-alpha\")]\n                    initialized: self.initialized,\n                    finished: signals.finished, invalid: self.invalid,\n                    #[cfg(feature = \"mii-editor-alpha\")]\n                    state })",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "use std::convert::TryFrom;\n",
+     "new": "",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "const MII_UNITS: usize = 10;\nconst MACRO_UNITS: usize = super::MAX_NAME_CHARS * 2;\n\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\nenum Limit {\n    #[default]\n    Mii,\n    Macro,\n}\n\nimpl Limit {\n    fn units(self) -> usize { match self { Self::Mii => MII_UNITS, Self::Macro => MACRO_UNITS } }\n}\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(crate) struct Text {\n    units: [u16; MACRO_UNITS + 1],\n    len: usize,\n    cursor: usize,\n    limit: Limit,\n}\n\nimpl Text {\n    // Keep the old Mii constructor/ten-unit contract at the compatibility path.\n    #[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn new(units: &[u16], cursor: usize) -> Option<Self> {\n        Self::with_limit(units, cursor, Limit::Mii)\n    }\n\n    pub(super) fn macro_name(name: &str, cursor: usize) -> Option<Self> {\n        Self::with_limit(&name.encode_utf16().collect::<Vec<_>>(), cursor, Limit::Macro)\n    }\n\n    fn with_limit(units: &[u16], cursor: usize, limit: Limit) -> Option<Self> {\n        if units.len() > limit.units() || cursor > units.len() || units.contains(&0) {\n            return None;\n        }\n        if limit == Limit::Macro {\n            let name = String::from_utf16(units).ok()?;\n            if name.chars().count() > super::MAX_NAME_CHARS || name.chars().any(char::is_control)\n                || String::from_utf16(&units[..cursor]).is_err() { return None; }\n        }\n        let mut text = Self { units: [0; MACRO_UNITS + 1], len: units.len(), cursor, limit };\n        text.units[..units.len()].copy_from_slice(units);\n        Some(text)\n    }\n\n    pub(crate) fn units(&self) -> &[u16] { &self.units[..self.len] }\n    // Mii's native config must still receive exactly 11 units/22 bytes.\n    #[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn terminated(&self) -> &[u16] { &self.units[..self.limit.units() + 1] }\n    pub(crate) fn cursor(&self) -> usize { self.cursor }\n}\n\n#[derive(Clone, Copy, Debug)]\n// One fixed-size callback result, bounded to 96 UTF-16 units. Keeping the text\n// inline avoids allocating/freeing in native callbacks or retaining heap owners\n// across Finalize; the unused Cancel payload costs only this small stack value.\n#[allow(clippy::large_enum_variant)]\npub(crate) enum Decision {\n    Enter(Text),\n    Cancel,\n}\n\n#[derive(Default)]\nstruct Signals {\n    limit: Limit,\n    text: Option<Text>,\n    decision: Option<Decision>,\n    initialized: bool,\n    finished: bool,\n    invalid: bool,\n}\n\n",
+     "new": "use crate::engine::mii::inline_keyboard::{Limit, Signals};\npub(crate) use crate::engine::mii::inline_keyboard::{Decision, Text};\n\n",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "fn text_signal(units: &[u16], len: i32, cursor: i32, limit: Limit) -> Option<Text> {\n    let len = usize::try_from(len).ok()?;\n    let cursor = usize::try_from(cursor).ok()?;\n    Text::with_limit(units.get(..len)?, cursor, limit)\n}\n\nunsafe extern \"C\" fn changed(arg: *const Changed) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);\n    signals.invalid |= text.is_none();\n    if text.is_some() { signals.text = text; }\n}\n\nunsafe extern \"C\" fn moved(arg: *const Moved) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.cursor, signals.limit);\n    signals.invalid |= text.is_none();\n    if text.is_some() { signals.text = text; }\n}\n\nunsafe extern \"C\" fn entered(arg: *const Entered) {\n    let Some(arg) = arg.as_ref() else { return; };\n    let mut signals = SIGNALS.lock().unwrap();\n    let text = text_signal(&arg.text, arg.len, arg.len, signals.limit);\n    signals.invalid |= text.is_none();\n    if let Some(text) = text {\n        signals.text = Some(text);\n        signals.decision = Some(if text.limit == Limit::Mii && text.len == 0 {\n            Decision::Cancel\n        } else { Decision::Enter(text) });\n    }\n}\n\nunsafe extern \"C\" fn cancelled() {\n    SIGNALS.lock().unwrap().decision = Some(Decision::Cancel);\n}\n\n",
+     "new": "unsafe extern \"C\" fn changed(arg: *const Changed) {\n    let Some(arg) = arg.as_ref() else { return; };\n    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);\n}\n\nunsafe extern \"C\" fn moved(arg: *const Moved) {\n    let Some(arg) = arg.as_ref() else { return; };\n    SIGNALS.lock().unwrap().change(&arg.text, arg.len, arg.cursor);\n}\n\nunsafe extern \"C\" fn entered(arg: *const Entered) {\n    let Some(arg) = arg.as_ref() else { return; };\n    SIGNALS.lock().unwrap().enter(&arg.text, arg.len);\n}\n\nunsafe extern \"C\" fn cancelled() { SIGNALS.lock().unwrap().cancel(); }\n\n",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "text.limit",
+     "new": "text.limit()",
+     "count": 3,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "text.units.as_ptr()",
+     "new": "text.terminated().as_ptr()",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "text.cursor as i32",
+     "new": "text.cursor() as i32",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"\ud83d\ude00\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"\ud83d\ude00\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
+     "new": "",
+     "count": 1,
+     "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
     }
    ]
   },
