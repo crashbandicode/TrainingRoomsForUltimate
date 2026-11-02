@@ -15,6 +15,7 @@ tools/PROVENANCE.md read in full, and the tools run: `tools/build/nro_size.py`, 
 | `a6d1e77` | Merge stream/pkg6 `98d6f5b` (clean) |
 | `2bd47c2` | One wrapper per native (lead ruling): seven addresses wrapped twice, `state_natives` copies deleted, `tests/native_wrappers.rs` |
 | `bf836c8` | Diag builds: two closures that need no `mut` |
+| `a968c05` | Merge stream/sync `dc01e5a` (hos-lock kernel-arbiter locks, `published::Live`, the menu-close hang's root fix). `compat/menu.rs`: sync's file; package 6's preload canonicalisation and roster re-plan pasted into sync's `before_publish` / `after_publish` as ui-screens sent them (no lock edit); `apply_snapshot` and `CURRENT` gone. Needs one merged-tree Eden boot before the push (menu-close cycles, a menu commit reaching the preload engine, a P1 hot swap, hook allocations 0, no `Unmapped`): asked pkg6 to run its s6 rows on this NRO |
 | `73831b8` | Diag probes behind features `texture-probe` / `seam-drill`, wired to their callers; `run_buff` loses the `fighter` parameter that 1076ddc left unused (gates queued) |
 
 ## Gate evidence
@@ -23,7 +24,7 @@ tools/PROVENANCE.md read in full, and the tools run: `tools/build/nro_size.py`, 
 | --- | --- | --- | --- | --- | --- |
 | `27d84f4` | 61 binaries, 7,697 passed, 0 failed | exit 0 | exit 0 | `99282821…` 2,879,488 B resident | `2174f5b1…` 3,100,672 B |
 | `bf836c8` | 63 binaries, 7,826 passed, 0 failed (on `2bd47c2`; `bf836c8` changes diag code + one test attribute, its wrapper test re-run) | exit 0 | exit 0 | `bbe6ffceb32ff61ea2a040f0bd05bd168f6be28baa9ee61e1acc09ed421e5be1` 2,940,928 B | `6a54682d40f279095bf61cf9c1acbc7ed1c846e8992bd0fe0e46a89d1fe9fb4d` 3,162,112 B |
-| `73831b8` | open (queued: Surface held by pkg6's s6-04 Eden boot; also queued on the Yoga) | open | open | open | open |
+| `a968c05` (incl. `73831b8`) | open (queued on the Surface and the Yoga; every host held by an Eden boot at 12:0xZ) | open | open | open | open |
 
 Each cargo call: `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`, `CARGO_TERM_COLOR=never`, one call each; Switch
 builds with the campaign rustup home (docs/BUILD.md). Logs kept under `/tmp/integrator3/` (test.log, test2.log, clippy*.log,

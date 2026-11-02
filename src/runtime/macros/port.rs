@@ -8,7 +8,7 @@ pub(crate) mod sync {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     pub(crate) use crate::runtime::compat::sync::read;
-    pub(crate) use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+    pub(crate) use hos_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
     pub(crate) fn lock_read<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
         lock.read()

@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::engine::macro_ui::clip_panel::ClipAction;
 use crate::engine::macro_ui::macro_panel::Pad;
@@ -32,8 +32,6 @@ static PENDING: Mutex<Option<Command>> = Mutex::new(None);
 static STARTED: AtomicBool = AtomicBool::new(false);
 /// The layer's step in progress (`macros::step`) and the count of CPU-body frames the layer finished: the watchdog's two facts.
 pub(crate) static STEP: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
-/// Where a settings publish of the layer is (recorder::publish 1..3, compat::menu::apply_snapshot 4..5, 0 done).
-pub(crate) static PUBLISH: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
 static FRAMES: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
 /// One CPU-body frame of the layer finished.
@@ -114,7 +112,7 @@ pub(crate) fn start() {
             still += 1;
             if still == 10 && !told {
                 told = true;
-                diagnostic(format_args!("[NamedMacroDiag] stall frames={now} step={} publish={}", STEP.load(Ordering::Relaxed), PUBLISH.load(Ordering::Relaxed)));
+                diagnostic(format_args!("[NamedMacroDiag] stall frames={now} step={}", STEP.load(Ordering::Relaxed)));
             }
         } else {
             still = 0;
