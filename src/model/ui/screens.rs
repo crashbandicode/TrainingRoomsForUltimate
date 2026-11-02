@@ -6,7 +6,7 @@
 
 use core::fmt::Write;
 
-use super::frame::{page_frame, Frame, RangeView, RowLine, Text, Tone, View};
+use super::frame::{page_frame, ChipVisual, Frame, RangeView, RowLine, Text, Tone, View};
 use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
 use super::catalog::ITEMS;
@@ -254,6 +254,11 @@ fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame
         *slot = *weight;
     }
     frame.chip_focus = chip as u8;
+    frame.chip_visual = match ROWS[row].id {
+        "di_state" => ChipVisual::Di,
+        "sdi_state" => ChipVisual::Sdi,
+        _ => ChipVisual::None,
+    };
     // The two help lines say what is chosen, in words (the chips show it as badges).
     frame.help[1].clear();
     let mut first = true;
@@ -581,6 +586,19 @@ mod tests {
         assert_eq!(f.chip_focus, 8, "the focus starts on Neutral");
         assert_eq!(f.chip_weights[8], 1);
         assert!(f.help[1].string_lossy().contains("Neutral x1"), "{:?}", f.help[1]);
+        assert_eq!(f.chip_visual, ChipVisual::Di, "the DI grid draws the game's DI visual");
+    }
+
+    #[test]
+    fn only_the_di_and_sdi_grids_ask_for_the_games_visual() {
+        for (title, want) in [("DI Direction", ChipVisual::Di), ("SDI Direction", ChipVisual::Sdi), ("Airdodge Direction", ChipVisual::None)] {
+            let mut m = menu();
+            open(&mut m, title);
+            m.press(Button::A);
+            let f = frame(&m);
+            assert_eq!(f.view, View::Chips, "{title}");
+            assert_eq!(f.chip_visual, want, "{title}");
+        }
     }
 
     fn open_grid(mode: crate::model::menu::grid::ConsoleMode, title: &str) -> Menu {

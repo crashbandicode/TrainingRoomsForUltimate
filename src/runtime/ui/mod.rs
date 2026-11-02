@@ -10,9 +10,8 @@
 
 pub mod anchors;
 pub mod archive;
+pub mod chips;
 pub mod effect_texture;
-#[cfg(feature = "diag")]
-pub mod effect_probe;
 pub mod hud;
 pub mod input;
 pub mod menu_app;

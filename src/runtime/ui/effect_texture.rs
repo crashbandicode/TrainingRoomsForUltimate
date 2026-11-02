@@ -167,10 +167,12 @@ pub unsafe fn texture_of(picture: &Picture) -> Option<Texture> {
 }
 
 /// Upper bound the survey reports of the manager's entries (diagnostics).
+#[cfg(feature = "diag")]
 pub const SURVEY_ENTRIES: usize = facts::ENTRY_COUNT;
 
 /// Diag: one line per used manager entry (key, resource index, hash40, bytes address, first bytes of the file), so a run shows which files the
 /// game keeps resident.
+#[cfg(feature = "diag")]
 pub fn survey(mut line: impl FnMut(core::fmt::Arguments<'_>)) {
     let Some(manager) = manager() else {
         line(format_args!("survey manager=none"));
@@ -197,6 +199,7 @@ pub fn survey(mut line: impl FnMut(core::fmt::Arguments<'_>)) {
 }
 
 /// Diag: the structures of one visual, one line per emitter and texture (slots, sizes, formats, colour fields).
+#[cfg(feature = "diag")]
 pub fn describe(visual: Visual, mut line: impl FnMut(core::fmt::Arguments<'_>)) {
     let common = match locate() {
         Ok(c) => c,
