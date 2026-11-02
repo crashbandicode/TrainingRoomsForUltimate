@@ -12,24 +12,24 @@ pub mod items;
 #[cfg(test)]
 #[path = "../model/kirby/mod.rs"]
 pub mod kirby;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/lobby/mod.rs"]
 pub mod lobby;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii/mod.rs"]
 pub mod mii;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
 #[cfg(test)]
 #[path = "../model/p1/mod.rs"]
 pub mod p1;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
 #[path = "../model/seams/mod.rs"]
 pub mod seams;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;
 #[path = "../model/stages/mod.rs"]

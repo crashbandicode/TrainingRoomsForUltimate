@@ -7,6 +7,7 @@
 mod alloc;
 mod boot;
 mod clock;
+mod compat;
 pub(crate) mod diag_log;
 #[cfg(feature = "diag")]
 mod diag_reload;
@@ -15,6 +16,8 @@ mod game;
 mod hub;
 mod import;
 mod install;
+mod lobby;
+mod mii;
 mod published;
 mod ui;
 

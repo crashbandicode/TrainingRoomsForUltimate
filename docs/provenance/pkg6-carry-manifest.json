@@ -25,7 +25,30 @@
    "cpu_pilot::pilot": "crate::engine::p1",
    "preload_metrics": "crate::engine::preload::preload_metrics",
    "logging": "crate::engine::compat::logging",
-   "swap_native::seam_install": "crate::runtime::seams::seam_install"
+   "swap_native::seam_install": "crate::runtime::seams::seam_install",
+   "common": "crate::runtime::compat::common",
+   "common::game_mode": "crate::runtime::lobby::game_mode",
+   "training": "crate::runtime::lobby::training",
+   "hazard_manager": "crate::runtime::compat::hazard_manager",
+   "replay_preview": "crate::runtime::compat::replay_preview",
+   "replay_capture": "crate::runtime::compat::replay_capture",
+   "replay_store": "crate::runtime::compat::replay_store",
+   "consts": "crate::runtime::compat::consts",
+   "mii_native_access": "crate::runtime::mii::mii_native_access",
+   "mii_identity_binding": "crate::runtime::mii::mii_identity_binding",
+   "mii_editor_bridge": "crate::runtime::mii::mii_editor_bridge",
+   "native_keyboard": "crate::runtime::mii::native_keyboard",
+   "training_stage_rotation": "crate::runtime::lobby::training_stage_rotation",
+   "practice_stage_request": "crate::runtime::lobby::practice_stage_request",
+   "practice_stage_observer": "crate::runtime::lobby::practice_stage_observer",
+   "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
+   "character_roster": "crate::runtime::roster::character_roster",
+   "character_lifecycle": "crate::runtime::roster::character_lifecycle",
+   "cycle_preload": "crate::runtime::roster::cycle_preload",
+   "cycle_preload_config": "crate::runtime::roster::cycle_preload_config",
+   "swap_native::scope_gate": "crate::runtime::roster::swap_native::scope_gate",
+   "practice_trace": "crate::runtime::lobby::diag::practice_trace",
+   "hang_trace": "crate::runtime::lobby::diag::hang_trace"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -56,7 +79,8 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "character_items": "crate::engine::items::character_items",
    "menu_json": "crate::engine::compat::menu_json",
-   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT"
+   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
+   "MENU": "crate::runtime::compat::menu::MENU"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -93,6 +117,14 @@
   "byteflags": {
    "byteflags": "crate::engine::compat::choice::byteflags",
    "count": "crate::engine::compat::choice::count"
+  },
+  "sync": {
+   "read": "crate::runtime::compat::sync::read",
+   "lock_write": "crate::runtime::compat::sync::lock_write",
+   "assign": "crate::runtime::compat::sync::assign"
+  },
+  "macros": {
+   "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS"
   }
  },
  "files": [
@@ -1156,6 +1188,587 @@
    "crate": "root",
    "src_sha256": "d8ba023eb0abfc27c45ed682db90ce5c694af48de2f8eada92c3caf4b5455b76",
    "dest_sha256": "8c159948f195bfed7a859cb93d497712b47c92af6265598eddfe3483ecf5c83c"
+  },
+  {
+   "src": "src/common/game_mode.rs",
+   "dest": "src/runtime/lobby/game_mode.rs",
+   "crate": "root",
+   "src_sha256": "99b29598127ca8ff85c1d5658fe6f3458fd63908e382d7df699a54177bf4e571",
+   "dest_sha256": "02dcf893d9ddef153b6ba293e946d0bbeaaf8af783c9ad5c76d1551eca3b0743"
+  },
+  {
+   "src": "src/native_keyboard.rs",
+   "dest": "src/runtime/mii/native_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
+   "dest_sha256": "7665ecd33d985428c5543e94401f6cfcd60ca3cd941c42b80beb609c9b950556"
+  },
+  {
+   "src": "src/native_keyboard/inline_keyboard.rs",
+   "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
+   "dest_sha256": "0f4a8fa2fb4f59306735d854b3a8c118ca18b4a9bf98874b9df905d372c63032"
+  },
+  {
+   "src": "src/mii_identity_binding.rs",
+   "dest": "src/runtime/mii/mii_identity_binding.rs",
+   "crate": "root",
+   "src_sha256": "058d1f2097aa6ff80c832fed9d50da662cff0f87facee684b966e06ff8cf5f05",
+   "dest_sha256": "9da000621651af4a83d1f275ef5d5d02f8ff583d51629425df346d4e6e59ab43"
+  },
+  {
+   "src": "src/mii_native_access.rs",
+   "dest": "src/runtime/mii/mii_native_access.rs",
+   "crate": "root",
+   "src_sha256": "eeddc0e5ea9cecd6ae48b4f82e9f25d7e9d2538138a9e742bb6d4224b77b1731",
+   "dest_sha256": "20f928c6ee7296716416d79317574e66e5dd191a56a4aadc1420199f832e0785"
+  },
+  {
+   "src": "src/mii_native_cpu_scope.rs",
+   "dest": "src/runtime/mii/mii_native_cpu_scope.rs",
+   "crate": "root",
+   "src_sha256": "35d892a35e1de3a48e9eef8a64d217343ff5ee8a3310a1b021cf90a73a35775b",
+   "dest_sha256": "497dfa986df279f6aecc82c45488730b407a3052c08a367302ed3a8e990cb8c4"
+  },
+  {
+   "src": "src/training_stage_rotation.rs",
+   "dest": "src/runtime/lobby/training_stage_rotation.rs",
+   "crate": "root",
+   "src_sha256": "28da0ade48dbe422fe6adbe67c5412d803410ccdc0e70a0d3f374398b670c739",
+   "dest_sha256": "cc0c0b022fa01a92e69ff2a55242dc45b5eda0d3054284d4af14e90a2def280b"
+  },
+  {
+   "src": "src/mii_auto_init.rs",
+   "dest": "src/runtime/mii/mii_auto_init.rs",
+   "crate": "root",
+   "src_sha256": "93ef4e97fdb8e90947145a77aa5ce39440bf6996d832804cabe76739be9e88fb",
+   "dest_sha256": "86c472e5635c5fa8ad705ae599eb2f83b9931e2bd42fb9ab4648e245fd215779"
+  },
+  {
+   "src": "src/mii_backend.rs",
+   "dest": "src/runtime/mii/mii_backend.rs",
+   "crate": "root",
+   "src_sha256": "c8c330a103e9db5f5db5032b2550e349c549ef538ab67c55b2728ea9ff09fc89",
+   "dest_sha256": "3026d5ee1b6f8f2bcd570c3775b7c00fc8fad5ddfddb6387a4b7445aa3391e2a"
+  },
+  {
+   "src": "src/mii_catalog_request.rs",
+   "dest": "src/runtime/mii/mii_catalog_request.rs",
+   "crate": "root",
+   "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
+   "dest_sha256": "9b1dfcc620feb8b25416078e4746e1da74abc0c1a8c69bf360501510e2392d75"
+  },
+  {
+   "src": "src/mii_cpu_adapter.rs",
+   "dest": "src/runtime/mii/mii_cpu_adapter.rs",
+   "crate": "root",
+   "src_sha256": "6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2",
+   "dest_sha256": "cce7fa18a6a055902b2b40beec13017ebb7e827caaa2eed722bd4ae2eb72e030"
+  },
+  {
+   "src": "src/mii_hud_portrait.rs",
+   "dest": "src/runtime/mii/mii_hud_portrait.rs",
+   "crate": "root",
+   "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
+   "dest_sha256": "5832ced6c12f6efe582ec72f9a4258947e670c0362fab2b9e42ee366dd237210"
+  },
+  {
+   "src": "src/mii_ldn_qualification.rs",
+   "dest": "src/runtime/mii/mii_ldn_qualification.rs",
+   "crate": "root",
+   "src_sha256": "30a65caa8eddecfb43916fff091fc8e4e40dc83b93cbefccb23069455b8af2f6",
+   "dest_sha256": "dc9aa6c4546e12cdd0a7f88a93db574321e464e3c98f4583dfc6912e3daf7a8b"
+  },
+  {
+   "src": "src/mii_managed_helper.rs",
+   "dest": "src/runtime/mii/mii_managed_helper.rs",
+   "crate": "root",
+   "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
+   "dest_sha256": "3c45f087b29f10a64d432d86d8f1636488c746c6e76a9b053d1d12b9de96fa04"
+  },
+  {
+   "src": "src/mii_native_adapter.rs",
+   "dest": "src/runtime/mii/mii_native_adapter.rs",
+   "crate": "root",
+   "src_sha256": "a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9",
+   "dest_sha256": "093806ac789f81ff7e165a8a785992c859082bb42a8e98a39c733650e1f0e03b"
+  },
+  {
+   "src": "src/mii_ordinary_cpu.rs",
+   "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
+   "crate": "root",
+   "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
+   "dest_sha256": "dc8458ef6a22e923d0c196d86616f39f3e37e0210810ff024830ab66e4be71e0"
+  },
+  {
+   "src": "src/mii_ordinary_cpu_native.rs",
+   "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
+   "crate": "root",
+   "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
+   "dest_sha256": "ccc4800cba21ea9760e6676a9471578f5b6bad34d390254bc3cf888ee5091077"
+  },
+  {
+   "src": "src/mii_ordinary_gate.rs",
+   "dest": "src/runtime/mii/mii_ordinary_gate.rs",
+   "crate": "root",
+   "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
+   "dest_sha256": "ce2644f46ccf0ef9b36d16ba90051baaf6e4ba29ed471b193267836eb2d72418"
+  },
+  {
+   "src": "src/mii_ordinary_native.rs",
+   "dest": "src/runtime/mii/mii_ordinary_native.rs",
+   "crate": "root",
+   "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
+   "dest_sha256": "887581118fcc935809797b564a98b1cf11221af545aefc0a147a6d622638c8d8"
+  },
+  {
+   "src": "src/mii_ordinary_player.rs",
+   "dest": "src/runtime/mii/mii_ordinary_player.rs",
+   "crate": "root",
+   "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
+   "dest_sha256": "e61d1e05976bd876aa261151332c4de591930dbd017ac21a65e98d769f6fbc10"
+  },
+  {
+   "src": "src/mii_replay.rs",
+   "dest": "src/runtime/mii/mii_replay.rs",
+   "crate": "root",
+   "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
+   "dest_sha256": "3c726dbe7fda2fa42d667cfa6982f800d50fa2d003cdf6bb25d78a1c8e512359"
+  },
+  {
+   "src": "src/mii_saved_alpha.rs",
+   "dest": "src/runtime/mii/mii_saved_alpha.rs",
+   "crate": "root",
+   "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
+   "dest_sha256": "be33eb68ef758fd6ea172c61eb4a081f6c79af0f8563716eb5d281766c9deb92"
+  },
+  {
+   "src": "src/mii_saved_fingerprints.rs",
+   "dest": "src/runtime/mii/mii_saved_fingerprints.rs",
+   "crate": "root",
+   "src_sha256": "3c3299699e107f41b78f087b9b8451284e48a496ff8f617f2f5f2e161cb0428f",
+   "dest_sha256": "faa34901752643a5fe5a0627354e933edbcf0e54739cfbecc58276729f2ca1e9"
+  },
+  {
+   "src": "src/mii_saved_native.rs",
+   "dest": "src/runtime/mii/mii_saved_native.rs",
+   "crate": "root",
+   "src_sha256": "8c2a2841660d0e08a684ac946525d63137bf672540bf1570226465db9a525ad5",
+   "dest_sha256": "d0434b8eaacdd240a02fd62a460ae0feaee054d1e52f443f12785d4d26b54a79"
+  },
+  {
+   "src": "src/mii_selector_native.rs",
+   "dest": "src/runtime/mii/mii_selector_native.rs",
+   "crate": "root",
+   "src_sha256": "d2136f80078ff37c1d2fbb91ce1f217b1b63efa160e8a81f64861c2e3304103d",
+   "dest_sha256": "ee0d2cedb3ccdaa4f0d1b2429a89f57119c3829825580fa6e19742b65ffe3eca"
+  },
+  {
+   "src": "src/mii_source_provenance.rs",
+   "dest": "src/runtime/mii/mii_source_provenance.rs",
+   "crate": "root",
+   "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
+   "dest_sha256": "9e9afda29fd99a07349c0d4f0724d6b30e714e43497ea8f1318f27edd364d12d"
+  },
+  {
+   "src": "src/mii_ordinary_gate.S",
+   "dest": "src/runtime/mii/mii_ordinary_gate.S",
+   "crate": "root",
+   "src_sha256": "86d7f95e3ae9506016095386016484061baf3c58073fa9e25825daa7f016b45d",
+   "dest_sha256": "86d7f95e3ae9506016095386016484061baf3c58073fa9e25825daa7f016b45d"
+  },
+  {
+   "src": "src/mii_editor_bridge/resume_adapter.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/resume_adapter.rs",
+   "crate": "root",
+   "src_sha256": "3c61b782426a242d53d888a67fe2fefa48f9dfd10cea9d1e322a0063dfd0e020",
+   "dest_sha256": "43af833aa121e82dda24750f5f68d537d08ad47093234a3e8549afc6a56f02c7"
+  },
+  {
+   "src": "src/mii_editor_bridge/lifecycle.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/lifecycle.rs",
+   "crate": "root",
+   "src_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1",
+   "dest_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1"
+  },
+  {
+   "src": "src/mii_editor_bridge/cosmetic_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/cosmetic_resume.rs",
+   "crate": "root",
+   "src_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31",
+   "dest_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31"
+  },
+  {
+   "src": "src/mii_editor_bridge/ldn_lifecycle.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/ldn_lifecycle.rs",
+   "crate": "root",
+   "src_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e",
+   "dest_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e"
+  },
+  {
+   "src": "src/mii_editor_bridge/native.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/native.rs",
+   "crate": "root",
+   "src_sha256": "ed5db356207918b67e65c2bb2a9414930aa12673c36a50c3968e8f707c4bc39e",
+   "dest_sha256": "1867ad9dc7f67844bbf137325ec2e814993393c66d57f1509ca8df6e95cf5ae9"
+  },
+  {
+   "src": "src/mii_editor_bridge/connected_native.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/connected_native.rs",
+   "crate": "root",
+   "src_sha256": "df061e002c881c1a57c7219077fa97b027c123af7216c81b94ca1f7c50953839",
+   "dest_sha256": "13b1954b6646c7e13bb620d66c61b279eeb16beb68f67573d9e4b7c9467abe1b"
+  },
+  {
+   "src": "src/mii_editor_bridge/native_default.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/native_default.rs",
+   "crate": "root",
+   "src_sha256": "db28494490813b40de6cea6afd1f33a68f00a37da2475177b036d1bda4586bbd",
+   "dest_sha256": "315399804836c1b6d733facdf6fcbf511bb78b2ece51926103cb971f61ecdd1e"
+  },
+  {
+   "src": "src/mii_editor_bridge/settings_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/settings_resume.rs",
+   "crate": "root",
+   "src_sha256": "f1c4d34b2513d591adff5cd660a3a07155c219874e6b528c5d855eaa9bfea4d1",
+   "dest_sha256": "8c47d06cbcb3a27c47e71031b75ceaf47d685a76adebab063069dc47d182ab4a"
+  },
+  {
+   "src": "src/mii_editor_bridge/screen_reentry.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/screen_reentry.rs",
+   "crate": "root",
+   "src_sha256": "6bfd52bf43def84a995078e3dbbac758e5d3a1bf9db930d244caf402c2c98c31",
+   "dest_sha256": "6bfd52bf43def84a995078e3dbbac758e5d3a1bf9db930d244caf402c2c98c31"
+  },
+  {
+   "src": "src/mii_editor_bridge/editor_origin.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/editor_origin.rs",
+   "crate": "root",
+   "src_sha256": "c3530b9636eacbd7cab848235a06d45e2ce647aa77537ececf331bdc8665f420",
+   "dest_sha256": "3261a0188d5bdbf7493cbaa02106f03236ebc035845a21fdd27a771e5501b7f0"
+  },
+  {
+   "src": "src/mii_editor_bridge/fingerprints.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
+   "crate": "root",
+   "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
+   "dest_sha256": "7508c8e1b13a129027368a428aeca1a38a1409c960567880d757de70b2d08bbd"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_vm.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_vm.rs",
+   "crate": "root",
+   "src_sha256": "ada145e3ea2fe8b8c431b19cfbd6ce41264d77fa38ea345b2e13889beead6383",
+   "dest_sha256": "ada145e3ea2fe8b8c431b19cfbd6ce41264d77fa38ea345b2e13889beead6383"
+  },
+  {
+   "src": "src/mii_editor_bridge/ui_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/ui_resume.rs",
+   "crate": "root",
+   "src_sha256": "ff2007bc3608fb37f9eea716e1c311160002cc6946546c2e7f799ff86d181522",
+   "dest_sha256": "971ad7f1903f8dc69e3f404353212ec96cf19c1e19e8b32296e58c8f414ab5d4"
+  },
+  {
+   "src": "src/mii_editor_bridge/name_keyboard.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/name_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a",
+   "dest_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a"
+  },
+  {
+   "src": "src/mii_editor_bridge/connected.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/connected.rs",
+   "crate": "root",
+   "src_sha256": "982b5cd8a1518d285d433808bca83f02fb5e8cae419e9996ad46ea0e9021c568",
+   "dest_sha256": "77f36932c428a56a58bfbdcaffb5c32404434dd7d3761823585c992d29ebeae5"
+  },
+  {
+   "src": "src/mii_editor_bridge/inline_keyboard.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/inline_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "944bd6ac264824f1bd4f75ab5820d12d4271978178a944c3412401ded69d7f38",
+   "dest_sha256": "613d89fa1f85c7824e2fd474228420fc9073266b90aa92ec23892d6156b13600"
+  },
+  {
+   "src": "src/mii_editor_bridge/draft.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/draft.rs",
+   "crate": "root",
+   "src_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be",
+   "dest_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be"
+  },
+  {
+   "src": "src/mii_editor_bridge/specials_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/specials_resume.rs",
+   "crate": "root",
+   "src_sha256": "4ea3dff7cdc733df70dc082064f477fc76e648955eef0be3d413a7b67f41512d",
+   "dest_sha256": "4ea3dff7cdc733df70dc082064f477fc76e648955eef0be3d413a7b67f41512d"
+  },
+  {
+   "src": "src/mii_editor_bridge/mod.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
+   "crate": "root",
+   "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
+   "dest_sha256": "e3e18efb14ac3f47da916ea8c54cbf59db2d87bd2b9281142c34d99b04e3ec45"
+  },
+  {
+   "src": "src/mii_editor_bridge/return_gate.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/return_gate.rs",
+   "crate": "root",
+   "src_sha256": "8828460840d5d17897e634a4b03aa5a508fe38284144b9a205419c6736640c59",
+   "dest_sha256": "8828460840d5d17897e634a4b03aa5a508fe38284144b9a205419c6736640c59"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_focus.luac",
+   "crate": "root",
+   "src_sha256": "f710662343d3ccc7006d4540258172f527f7c1d14e7589f6d3de8457db453979",
+   "dest_sha256": "f710662343d3ccc7006d4540258172f527f7c1d14e7589f6d3de8457db453979"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_capture.lua",
+   "crate": "root",
+   "src_sha256": "514eb19b92ea58e523fb8aa9c7883970e5fed1c415745d99f2b2c3cf0e49e138",
+   "dest_sha256": "514eb19b92ea58e523fb8aa9c7883970e5fed1c415745d99f2b2c3cf0e49e138"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_policy.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_policy.lua",
+   "crate": "root",
+   "src_sha256": "37cb1413a2edc9d6015b32a16c24ee61c3b707e67adcaf7e407c33c04b5f7b19",
+   "dest_sha256": "37cb1413a2edc9d6015b32a16c24ee61c3b707e67adcaf7e407c33c04b5f7b19"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/manifest.json",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/manifest.json",
+   "crate": "root",
+   "src_sha256": "fadb714194e812c1d1eaf19b2475a7ab60ed54d1030c33a6f7d625c4c6f0d381",
+   "dest_sha256": "fadb714194e812c1d1eaf19b2475a7ab60ed54d1030c33a6f7d625c4c6f0d381"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_capture.lua",
+   "crate": "root",
+   "src_sha256": "1fdf5bfc72e6014c8eb021d574da8cdde685765573584fadcc84d6ea5bfec448",
+   "dest_sha256": "1fdf5bfc72e6014c8eb021d574da8cdde685765573584fadcc84d6ea5bfec448"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/open_sub.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/open_sub.lua",
+   "crate": "root",
+   "src_sha256": "ccfa18394f0fd8e6176ed1349b03a50d8cee709b31a2181a5deb9b7cf48673a6",
+   "dest_sha256": "ccfa18394f0fd8e6176ed1349b03a50d8cee709b31a2181a5deb9b7cf48673a6"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_random.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_random.luac",
+   "crate": "root",
+   "src_sha256": "e9df46fec86e4a133aff1501ed594c160d1701ef42b99d314e9f04633e41bef6",
+   "dest_sha256": "e9df46fec86e4a133aff1501ed594c160d1701ef42b99d314e9f04633e41bef6"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/pending.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/pending.lua",
+   "crate": "root",
+   "src_sha256": "413c8a5361b0cddfa7e1c9b4d4c03065f9270ece3b0fc0bdbf54914ea4295758",
+   "dest_sha256": "413c8a5361b0cddfa7e1c9b4d4c03065f9270ece3b0fc0bdbf54914ea4295758"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_focus.lua",
+   "crate": "root",
+   "src_sha256": "b5f76c6ece9fcba3e36be17ef7af89cd16b8ca50965557e83d9468d6bf4faf8b",
+   "dest_sha256": "b5f76c6ece9fcba3e36be17ef7af89cd16b8ca50965557e83d9468d6bf4faf8b"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/focus.luac",
+   "crate": "root",
+   "src_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946",
+   "dest_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/closures.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/closures.luac",
+   "crate": "root",
+   "src_sha256": "54fccd3227a1db0a97e821a6c3910331f08162b08e5d5242342e9a33675137aa",
+   "dest_sha256": "54fccd3227a1db0a97e821a6c3910331f08162b08e5d5242342e9a33675137aa"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_focus.luac",
+   "crate": "root",
+   "src_sha256": "9b632d89577ff50e2f7e05d3e46d916860fca10af3fb98911a642d59cc501b3d",
+   "dest_sha256": "9b632d89577ff50e2f7e05d3e46d916860fca10af3fb98911a642d59cc501b3d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_focus.lua",
+   "crate": "root",
+   "src_sha256": "c1b1812544a6efc9636cf01775d208eb1b2b4d8711c7480d53bedd2c9b92ff4f",
+   "dest_sha256": "c1b1812544a6efc9636cf01775d208eb1b2b4d8711c7480d53bedd2c9b92ff4f"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_random.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_random.lua",
+   "crate": "root",
+   "src_sha256": "0e6e0f5a6521490590c661e88c79cec9f80aa4af431c3ca51c493c7f947d038a",
+   "dest_sha256": "0e6e0f5a6521490590c661e88c79cec9f80aa4af431c3ca51c493c7f947d038a"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_focus.luac",
+   "crate": "root",
+   "src_sha256": "f2527e45cfbb58c9c57c296df7ac8249a24da07c184364c0a98a492568b9b06d",
+   "dest_sha256": "f2527e45cfbb58c9c57c296df7ac8249a24da07c184364c0a98a492568b9b06d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_capture.luac",
+   "crate": "root",
+   "src_sha256": "b01941660bd3a72223f43f2e3a19df43f317af0a05ec10982795088564cc7622",
+   "dest_sha256": "b01941660bd3a72223f43f2e3a19df43f317af0a05ec10982795088564cc7622"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_policy.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_policy.luac",
+   "crate": "root",
+   "src_sha256": "122dbe55b0b2eb3dcca4e5c2796f88e3f194aceea593793531ff32b9fc7db72b",
+   "dest_sha256": "122dbe55b0b2eb3dcca4e5c2796f88e3f194aceea593793531ff32b9fc7db72b"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/sub_cursor.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/sub_cursor.luac",
+   "crate": "root",
+   "src_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946",
+   "dest_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/open_sub.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/open_sub.luac",
+   "crate": "root",
+   "src_sha256": "e071a161f1d179daf96fd16434af4776d21130857e991bdf50066a171e276479",
+   "dest_sha256": "e071a161f1d179daf96fd16434af4776d21130857e991bdf50066a171e276479"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/focus.lua",
+   "crate": "root",
+   "src_sha256": "33067d644c1647b7244e5dad5cba4231cb08506ecead7be5d4d340eeedcd3832",
+   "dest_sha256": "33067d644c1647b7244e5dad5cba4231cb08506ecead7be5d4d340eeedcd3832"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/capture.lua",
+   "crate": "root",
+   "src_sha256": "d29c8c6d1eb23186ffe0949db391d32a2a302ee85331b63c2b02e8e809ca95df",
+   "dest_sha256": "d29c8c6d1eb23186ffe0949db391d32a2a302ee85331b63c2b02e8e809ca95df"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_capture.lua",
+   "crate": "root",
+   "src_sha256": "6ebcec535f6289ae4abc23be97edd363ebf5711966aee02b371b808f277ad03d",
+   "dest_sha256": "6ebcec535f6289ae4abc23be97edd363ebf5711966aee02b371b808f277ad03d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_focus.lua",
+   "crate": "root",
+   "src_sha256": "029070cab093fc75174c61c113e65f3eecc99771d5ad9dec4c75a6458a0a4944",
+   "dest_sha256": "029070cab093fc75174c61c113e65f3eecc99771d5ad9dec4c75a6458a0a4944"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/closures.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/closures.lua",
+   "crate": "root",
+   "src_sha256": "c696005781374045995d413ee97eec3225a8513a3ce2ebca223044e32e3258be",
+   "dest_sha256": "c696005781374045995d413ee97eec3225a8513a3ce2ebca223044e32e3258be"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/pending.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/pending.luac",
+   "crate": "root",
+   "src_sha256": "f93bd82137fb0861a57a6e9f2249b9589cd7e2e20bd8c7fc39f416e7ae7ef447",
+   "dest_sha256": "f93bd82137fb0861a57a6e9f2249b9589cd7e2e20bd8c7fc39f416e7ae7ef447"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_capture.luac",
+   "crate": "root",
+   "src_sha256": "984a537395d78c8555b3264eacd03028241384e858bd701bfcbb8fb92da9608c",
+   "dest_sha256": "984a537395d78c8555b3264eacd03028241384e858bd701bfcbb8fb92da9608c"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/capture.luac",
+   "crate": "root",
+   "src_sha256": "616bd5fff3898b091732954ed4ecc83eed644060a5a9e988c303059b4999472a",
+   "dest_sha256": "616bd5fff3898b091732954ed4ecc83eed644060a5a9e988c303059b4999472a"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_capture.luac",
+   "crate": "root",
+   "src_sha256": "db9ed78708cc978e0935f703d4f309e9212686e7b937ee2951a0cfea5656b854",
+   "dest_sha256": "db9ed78708cc978e0935f703d4f309e9212686e7b937ee2951a0cfea5656b854"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/sub_cursor.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/sub_cursor.lua",
+   "crate": "root",
+   "src_sha256": "56bb83190cfc0cb05f05fb4e568f146d2aa159033b1414df1d31d5afe94840f6",
+   "dest_sha256": "56bb83190cfc0cb05f05fb4e568f146d2aa159033b1414df1d31d5afe94840f6"
+  },
+  {
+   "src": "src/mii_closed_ack.rs",
+   "dest": "src/runtime/mii/mii_closed_ack.rs",
+   "crate": "root",
+   "src_sha256": "eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b",
+   "dest_sha256": "2bb3ec82b360a38e3157aed8afbe39ea1a9edbf8e78d1d2f0fb0a4ffba60d638"
+  },
+  {
+   "src": "src/practice_stage_request.rs",
+   "dest": "src/runtime/lobby/practice_stage_request.rs",
+   "crate": "root",
+   "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
+   "dest_sha256": "55e8753c011a750ea616edfe5ea590587dae8aa94f2870ebd6ae7d1d94ddb83a"
+  },
+  {
+   "src": "src/practice_stage_request_words.rs",
+   "dest": "src/runtime/lobby/practice_stage_request_words.rs",
+   "crate": "root",
+   "src_sha256": "33c687a9d8cf3cacf29c4ce1a37082ee6cbcf93a88a0f4d485bc63f1154f439d",
+   "dest_sha256": "33c687a9d8cf3cacf29c4ce1a37082ee6cbcf93a88a0f4d485bc63f1154f439d"
+  },
+  {
+   "src": "src/practice_stage_observer.rs",
+   "dest": "src/runtime/lobby/practice_stage_observer.rs",
+   "crate": "root",
+   "src_sha256": "7ee9680b0e147c0f3a3bd5f18a3b27acb979a1d80857ca59d92cc0718f9c94a0",
+   "dest_sha256": "93cbc092a0b7af12d896c964013c3af1ad58ad3bb4af5a691b85b06ffcf487a0"
+  },
+  {
+   "src": "src/lobby_stage_probe.rs",
+   "dest": "src/runtime/lobby/lobby_stage_probe.rs",
+   "crate": "root",
+   "src_sha256": "0b660f82e43258aaee60241bc531c29d8a35e17078a038f35b79ecd03f11dd37",
+   "dest_sha256": "f32d024769f401fe680af3dff280795d1046ec1b7ebe714b658f1cef2432e681"
+  },
+  {
+   "src": "src/training/lobby.rs",
+   "dest": "src/runtime/lobby/training/lobby.rs",
+   "crate": "root",
+   "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
+   "dest_sha256": "4e649beef44e2d87cec164174467bbc3db5dbb7c3c44475a1c8442541a03c2b8"
+  },
+  {
+   "src": "src/training/practice.rs",
+   "dest": "src/runtime/lobby/training/practice.rs",
+   "crate": "root",
+   "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
+   "dest_sha256": "bbf33fae575e0ac6a2c77d58a93dc3489e84c090b4dae9759f66a7b65a2a5c94"
   }
  ]
 }
