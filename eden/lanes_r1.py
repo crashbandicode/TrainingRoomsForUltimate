@@ -23,12 +23,25 @@ import route_local as r  # noqa: E402
 import hook_stats  # noqa: E402
 
 DIAG = f"{r.PROFILE_SD}/TrainingRooms/practice-diagnostics.log"
+DIAG_PREVIOUS = f"{r.PROFILE_SD}/TrainingRooms/practice-diagnostics.previous.log"
 HERE = Path(__file__).resolve().parent
 
 
 def diag_text():
-    rc, out, _ = r.remote(f"if (Test-Path {DIAG}) {{ Get-Content {DIAG} }}")
+    """The previous and the current diagnostics file (the diag build rotates at 128 KiB, which a long run
+    reaches): lines are selected by their millisecond stamp, never by their count."""
+    rc, out, _ = r.remote(f"foreach ($f in '{DIAG_PREVIOUS}', '{DIAG}') {{ if (Test-Path $f) {{ Get-Content $f }} }}")
     return out
+
+
+def last_stamp():
+    """The newest millisecond stamp in the log (the first token of the line)."""
+    stamps = [int(l.split(" ", 1)[0]) for l in diag_text().splitlines() if l.split(" ", 1)[0].isdigit()]
+    return max(stamps) if stamps else 0
+
+
+def lines_after(stamp):
+    return [l for l in diag_text().splitlines() if l.split(" ", 1)[0].isdigit() and int(l.split(" ", 1)[0]) > stamp]
 
 
 def play(label, macro, cap=60):
@@ -45,7 +58,7 @@ def lane_delay(label):
     print(out[-400:], err[-200:])
     local = HERE / "runs" / label / "probes"
     local.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["/usr/bin/scp", "-q", "-r", "-o", "ControlPath=/tmp/trssh-%C", f"{r.YOGA}:{probes}/jump-scan", f"{probes}/jump-scan.json", str(local)], check=True)
+    subprocess.run(["/usr/bin/scp", "-q", "-r", "-o", "ControlPath=/tmp/trssh-%C", f"{r.YOGA}:{probes}/jump-scan", f"{r.YOGA}:{probes}/jump-scan.json", str(local)], check=True)
     res = subprocess.run(["/usr/bin/python3", "-I", str(HERE / "analyze_probe.py"), str(local), "jump-scan", "6.5"], capture_output=True, text=True)
     print(res.stdout[-600:])
     m = re.search(r"onset_frame=(\d+)", res.stdout)
@@ -93,7 +106,7 @@ def lane_hazards(label, seconds=75, every=7):
 
 def lane_pause(label):
     """R2: delay 5, walk, pause with the stick held, use the pause menu, resume with the stick released."""
-    before = len(diag_text().splitlines())
+    before = last_stamp()
     r.snap(label, "pause0-before")
     r.call(label, "macro.play", {"path": f"{r.WORK}/inbox/tr-pause-lane.edenmacro.json"})
     shots = {}
@@ -110,7 +123,7 @@ def lane_pause(label):
     time.sleep(1.0)
     shots["after"] = r.snap(label, "pause2-after-resume")
     time.sleep(3.0)  # the diag drain thread writes every 50 ms
-    lines = [l for l in diag_text().splitlines()[before:] if "pause_owner" in l]
+    lines = [l for l in lines_after(before) if "pause_owner" in l]
     for l in lines:
         print("  ", l)
     begin = [re.search(r"queue_dropped=(\d+) owners=0x([0-9a-f]+)", l) for l in lines if " begin " in l]
