@@ -116,6 +116,28 @@ fn boot_reserved_import_box_and_endpoint_survive_full_retry_and_completion() {
 
 #[path = "../src/model/catalog_mailbox.rs"]
 mod catalog_mailbox;
+#[path = "../src/model/close_handoff.rs"]
+mod close_handoff;
+
+#[test]
+fn native_close_first_full_cancel_reopen_and_retry_allocate_nothing() {
+    use close_handoff::{channel, Intent};
+    let (producer, mut consumer) = channel(1);
+    for epoch in 0..32 {
+        let opening = 1 + epoch as u32 * 4;
+        let value = Arc::new(vec![epoch; 128]);
+        let make = |opening| Intent { opening, epoch, value: Arc::clone(&value) };
+        assert!(producer.post(make(opening)).is_ok());
+        let retry = producer.post(make(opening + 2)).err().unwrap();
+        assert!(native(|| consumer.observe(opening, epoch, true)).is_none());
+        assert!(producer.post(retry).is_ok());
+        // Coalesced reopen cancels the old close and retains the current one.
+        assert!(native(|| consumer.observe(opening + 2, epoch, true)).is_none());
+        let received = native(|| consumer.observe(opening + 3, epoch, false)).unwrap();
+        assert!(Arc::ptr_eq(&received, &value));
+        assert!(native(|| consumer.observe(opening + 3, epoch, false)).is_none());
+    }
+}
 #[test]
 fn native_catalog_post_full_retry_and_worker_take_allocate_nothing() {
     use catalog_mailbox::{channel, Publication};

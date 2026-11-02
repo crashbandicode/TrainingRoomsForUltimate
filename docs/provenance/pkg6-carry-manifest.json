@@ -1905,7 +1905,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "e3db8f3f26af6dc86c689089d312e4fccc8fdc5a16e47472f5a0d210883a09e6",
+   "dest_sha256": "13614347a5531e458aec075f59fc2368a98e9ce0cf8b9a3b1c5e174d6a8a7a25",
    "edits": [
     {
      "old": "use std::sync::{mpsc, Arc, Mutex};",
@@ -2058,6 +2058,11 @@
      "old": "    }\n}\n\n/// Capture has completed. A contended UI lock retains the value for the next\n/// native service callback; close/retire cancels it through the existing broker.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    if let Some(mut app) = QUICK_MENU_APP.try_lock() {\n        app.follow_open();\n        if publication.epoch == super::mii_saved_alpha::menu_epoch()\n            && app.publish_catalog(publication) {\n            MENU_RECEIVED_INPUT.store(true, Ordering::Release);\n        }\n        return;\n    }\n    let mut broker = STATE.lock().unwrap();\n    broker.held_menu = Some(publication);\n    PENDING.store(true, Ordering::Release);\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {\n",
      "new": "    }\n}\n\n/// Capture has completed. Full/unavailable publication retains the identical\n/// value for the next native callback; the existing close/retire policy cancels it.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    match crate::runtime::ui::menu_app::publish_catalog(publication) {\n        Ok(()) => { MENU_RECEIVED_INPUT.store(true, Ordering::Release); }\n        Err(publication) => {\n            let mut broker = STATE.lock().unwrap();\n            broker.held_menu = Some(publication);\n            PENDING.store(true, Ordering::Release);\n        }\n    }\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {\n",
      "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
+     "new": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    super::menu_handoff::init();\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
+     "reason": "Boot-initialize owned close-intent channel; UI producer never shares a native receiver guard (lead19:17)."
     }
    ]
   },

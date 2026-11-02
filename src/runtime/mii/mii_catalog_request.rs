@@ -42,6 +42,7 @@ impl Broker {
 
 /// Startup only, before native callbacks are installed.
 pub(super) fn init() {
+    super::menu_handoff::init();
     crate::runtime::ui::menu_app::init_publications();
     let mut broker = STATE.lock().unwrap();
     if broker.reply.is_none() { broker.reply = Some(Replies::new()); }

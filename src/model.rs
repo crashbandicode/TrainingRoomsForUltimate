@@ -141,3 +141,7 @@ pub mod catalog_mailbox;
 /// Reply endpoints returned only after both request owners retire.
 #[path = "model/pooled_reply.rs"]
 pub mod pooled_reply;
+
+/// Owned menu close intents retained until their matching native transition.
+#[path = "model/close_handoff.rs"]
+pub mod close_handoff;
