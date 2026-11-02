@@ -1555,7 +1555,14 @@
    "dest": "src/runtime/mii/native_keyboard.rs",
    "crate": "root",
    "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
-   "dest_sha256": "7665ecd33d985428c5543e94401f6cfcd60ca3cd941c42b80beb609c9b950556"
+   "dest_sha256": "d9cd86a44fdad98b0f0d654742891e508a45f2cad28d9a9a86ab7aa0676084a2",
+   "edits": [
+    {
+     "old": "use parking_lot::Mutex;",
+     "new": "use hos_lock::Mutex;",
+     "reason": "stream/sync (menu-close hang, 2026-11-02): parking_lot's parker on os=switch is a pure spin loop that livelocks under Horizon's fixed priorities; the plugin's locks are hos-lock (crates/hos-lock: kernel address arbiter, no heap, same API)"
+    }
+   ]
   },
   {
    "src": "src/native_keyboard/inline_keyboard.rs",

@@ -3,7 +3,7 @@
 //! menu tile pane, forces the menu container visible so the tiles can be photographed, holds them, then unbinds and retires them and
 //! logs the release. Never in the shipped NRO; pkg5's stage grid calls the same `texture` functions when its page opens and closes.
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::panes as p;
 use crate::runtime::alloc::hook_allocations;

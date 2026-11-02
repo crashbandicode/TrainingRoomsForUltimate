@@ -5,7 +5,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::input_delay::Owners;

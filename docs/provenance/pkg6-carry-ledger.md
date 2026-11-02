@@ -166,7 +166,7 @@ file in this repository.
 | `src/runtime/roster/source_owner_probe.rs` | `src/source_owner_probe.rs` | `511b72f076e488f1` | `5e5a7de953ed59a5` | path rewrite only |
 | `src/runtime/roster/heap_metrics.rs` | `src/heap_metrics.rs` | `3d1034938c59603c` | `3d1034938c59603c` | path rewrite only |
 | `src/runtime/lobby/game_mode.rs` | `src/common/game_mode.rs` | `99b29598127ca8ff` | `02dcf893d9ddef15` | path rewrite only |
-| `src/runtime/mii/native_keyboard.rs` | `src/native_keyboard.rs` | `6416fd30fcebbcd1` | `7665ecd33d985428` | path rewrite only |
+| `src/runtime/mii/native_keyboard.rs` | `src/native_keyboard.rs` | `6416fd30fcebbcd1` | `d9cd86a44fdad98b` | stream/sync (menu-close hang, 2026-11-02): parking_lot's parker on os=switch is a pure spin loop that livelocks under Horizon's fixed priorities; the plugin's locks are hos-lock (crates/hos-lock: kernel address arbiter, no heap, same API) |
 | `src/runtime/mii/native_keyboard/inline_keyboard.rs` | `src/native_keyboard/inline_keyboard.rs` | `4e3eb198a8c8924d` | `0f4a8fa2fb4f5930` | path rewrite only |
 | `src/runtime/mii/mii_identity_binding.rs` | `src/mii_identity_binding.rs` | `058d1f2097aa6ff8` | `9da000621651af4a` | path rewrite only |
 | `src/runtime/mii/mii_native_access.rs` | `src/mii_native_access.rs` | `eeddc0e5ea9cecd6` | `20f928c6ee729671` | path rewrite only |

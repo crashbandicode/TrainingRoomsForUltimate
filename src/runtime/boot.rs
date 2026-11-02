@@ -79,6 +79,9 @@ pub fn run() {
     }
     #[cfg(feature = "diag")]
     crate::runtime::sync_probe::run();
+    // Diag build: the kernel arbiter the plugin's locks wait in answers as its source says (hos-lock README).
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!("[Sync] arbiter self_test {}", hos_lock::horizon::self_test()));
     let developer = read_developer_ini();
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the

@@ -19,7 +19,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::cpu::hash::hash40;
@@ -248,8 +248,18 @@ macro_rules! state_diag {
     };
 }
 
+/// The last published settings generation the state machine adopted (only read and written under `STATE`).
+static ADOPTED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Run `f` on the state; a newly published value (`published::Live`) is adopted first (stream/sync: the menu worker publishes
+/// through `published`, never through this lock).
 fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
-    STATE.lock().as_mut().map(f)
+    let mut guard = STATE.lock();
+    let state = guard.as_mut()?;
+    if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
+        adopt(state, live.states);
+    }
+    Some(f(state))
 }
 
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
@@ -287,7 +297,14 @@ pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
     SCORE_AURA.store(hash40("sys_score_aura"), Ordering::Release);
 }
 
-fn set_flags(settings: &StateSettings) {
+/// The publishing thread's half of a publish (atomics only): the flags the hooks test before they take `STATE`, and, when the
+/// feature is off, the cancel of whatever runs (done by `adopt` at the next hook under `STATE`; the flags clear now).
+pub(crate) fn set_flags(settings: &StateSettings) {
+    if !settings.enable && ENABLE.load(Ordering::Acquire) {
+        CANCEL.store(true, Ordering::Release);
+        LOADING.store(false, Ordering::Release);
+        KILLING.store(false, Ordering::Release);
+    }
     ENABLE.store(settings.enable, Ordering::Release);
     AUTOLOAD.store(settings.autoload, Ordering::Release);
     RESPAWN_INVINCIBILITY.store(settings.respawn_invincibility, Ordering::Release);
@@ -304,17 +321,17 @@ fn fighter_buffing(accessor: usize) -> bool {
 
 /// A menu commit or the first publish. Turning Enable Save States Off cancels every load in progress
 /// (SPEC-state-01 §5.6).
-pub fn publish(settings: StateSettings) {
-    set_flags(&settings);
-    with(|state| {
-        if state.settings.enable && !settings.enable {
-            state.machine.cancel_all();
-            LOADING.store(false, Ordering::Release);
-            KILLING.store(false, Ordering::Release);
-        }
-        state.settings = settings;
-    });
+/// A published value reaches the state machine (at the next hook, under `STATE`): turning the feature off cancels what runs. The
+/// flags were set by the publishing thread (`set_flags`).
+fn adopt(state: &mut State, settings: StateSettings) {
+    if CANCEL.swap(false, Ordering::AcqRel) || (state.settings.enable && !settings.enable) {
+        state.machine.cancel_all();
+    }
+    state.settings = settings;
 }
+
+/// A publish turned the feature off: the running save or load is cancelled at the next `with`.
+static CANCEL: AtomicBool = AtomicBool::new(false);
 
 /// The chord engine's calls (package 4): the Save and Load chords passed.
 pub fn request_save() {

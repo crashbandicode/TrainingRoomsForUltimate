@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::engine::macro_ui::clip_panel::ClipAction;
 use crate::engine::macro_ui::macro_panel::Pad;

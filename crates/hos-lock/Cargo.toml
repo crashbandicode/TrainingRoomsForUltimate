@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 intpa
+[package]
+name = "hos-lock"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+publish = false
+description = "Mutex and RwLock for Skyline plugins (Horizon): lock_api raw locks on one word, waiting in the kernel's address arbiter; no spin, no heap, const init"
+
+[lib]
+name = "hos_lock"
+path = "src/lib.rs"
+
+[dependencies]
+lock_api = "0.4"
+
+# `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
