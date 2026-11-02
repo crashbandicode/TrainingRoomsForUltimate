@@ -162,10 +162,10 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
         let methods: Vec<usize> = by_name.get(name).into_iter().flatten().copied()
             .filter(|&candidate| graph.funcs[candidate].has_receiver).collect();
         match methods.as_slice() {
-            Some([only]) if *only != index => {
+            [only] if *only != index => {
                 out.insert(*only);
             }
-            Some(many) if many.len() > 1 => {
+            many if many.len() > 1 => {
                 ambiguous.insert(name.clone(), many.len());
             }
             _ => {}

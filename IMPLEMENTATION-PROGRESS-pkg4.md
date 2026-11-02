@@ -93,6 +93,15 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- 17:16Z Yoga hook_locks2330a7a failed at compilation, zero tests ran; claim RELEASED immediately,
+  own queue line removed. Raw locks-2330a7a.log/.exit retained. Exact error:
+  error[E0308]: mismatched types, tests/hook_locks.rs:165:13 and168:13,
+  match methods.as_slice() has type &[usize]; Some([only]) / Some(many) expected [usize], found Option<_>.
+  Corrected both stale Option patterns to slice patterns; next frozen retry queues END.
+- Dirty placement row adds diag open_placement dispatch to existing named_macros::open_editor, then
+  checks X+1 persistence and identical frames. Grid driver now navigates rows/columns from actual view;
+  old repeated Right could never leave first row. These rows remain unrun. Current staged Switch9a1bd0e
+  archive270211c3... has static callback locks but predates this diag command; refresh before next build.
 - 17:1xZ continuation: exact model Astra medium and existing watcher verified. The first resumed MY_MODEL
   read again lacked a memory scope; disclosed here, subsequent commands bounded. Full stack_depth.py read.
 - UI HOLD attribution follow-up: current after_layout_draw only publishes scene facts and posts ClipEvent::Draw;
