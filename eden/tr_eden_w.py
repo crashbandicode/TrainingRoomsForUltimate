@@ -72,16 +72,27 @@ def ledger(line):
 
 
 def open_claims():
-    """Owners with an open claim on THIS host. The ledger is shared; a claim that names the Surface and not
-    the Yoga (another host's Eden) does not hold the Yoga."""
-    state = {}
+    """Owners with an open claim on THIS host (the Yoga; the ledger is shared), from the last 12 hours. The host a
+    claim is ON is its "on <host>" phrase; a line that only mentions another host in passing does not claim the
+    Yoga; a line without an "on <host>" phrase falls back to every host it names (conservative). An owner holds a
+    claim while it has more CLAIMED than RELEASED lines for the Yoga (counts, so two runs of one owner do not
+    release each other)."""
+    import calendar
+    now = time.time()
+    count, last = {}, {}
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
-        if m:
-            host = re.search(r"\bon (Yoga|Surface|Ally)\b", line)
-            other_host = bool(host) and host.group(1) != "Yoga"
-            state[m.group(2)] = m.group(1) == "CLAIMED" and not other_host
-    return [k for k, v in state.items() if v and k != OWNER]
+        m = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d)Z (CLAIMED|RELEASED): (\S+ \S+)", line)
+        if not m or now - calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M")) > 12 * 3600:
+            continue
+        hosts = re.findall(r"\bon (?:the )?(surface|yoga|ally)\b", line, re.I) or re.findall(r"\b(surface|yoga|ally)\b", line, re.I)
+        if hosts and "yoga" not in {h.lower() for h in hosts}:
+            continue
+        count[m.group(3)] = count.get(m.group(3), 0) + (1 if m.group(2) == "CLAIMED" else -1)
+        if m.group(2) == "CLAIMED":
+            last[m.group(3)] = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
+    # A balance above zero whose newest CLAIMED is older than three hours is a ledger slip, not a live claim.
+    return [k for k, v in count.items() if v > 0 and now - last.get(k, 0) < 3 * 3600 and not OWNER.startswith(k)]
+
 
 def mem_available_kib():
     return next(int(l.split()[1]) for l in Path("/proc/meminfo").read_text().splitlines()

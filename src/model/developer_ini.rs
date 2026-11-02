@@ -1,63 +1,130 @@
-//! `sd:/ultimate/TrainingRooms/developer.ini` (decision N1, `docs/DECISIONS.md`): the Developer
-//! page is hidden, and its rows do nothing, unless the file says `developer_page=on`. Read once at
-//! boot. A missing file, an unreadable one, or any other value means hidden.
+//! `sd:/ultimate/TrainingRooms/developer.ini` (decision N1, `docs/DECISIONS.md`; SPEC-core-01 §2 and
+//! its N1 acceptance row): the Developer page is hidden, and its rows do nothing, unless the file says
+//! `developer_page=on`. Read once at boot. The gate fails closed: anything that is not one clean,
+//! complete, unambiguous `developer_page=on` hides the page, and the reason is reported on the
+//! install line (`developer=off reason=…`).
 //!
 //! Format: one `key=value` per line; spaces around the key, the `=` and the value are ignored; a
 //! line whose first non-blank character is `;` or `#`, a `[section]` line and a line without `=`
-//! are ignored. The key and the value are compared exactly (`developer_page`, `on`). When the key
-//! appears more than once, the last line wins, as in the fork's other INI files. A leading UTF-8
-//! byte-order mark is skipped. At most `MAX_BYTES` are read.
+//! are ignored. The key and the value are compared exactly (`developer_page`, lowercase `on`). A
+//! leading UTF-8 byte-order mark is skipped. The whole file is validated before it is trusted:
+//!
+//! - a missing file, a read error (including one after a partial read) or any byte that is not
+//!   valid UTF-8 anywhere in the file hides the page;
+//! - a file longer than `MAX_BYTES` hides the page (the loader reads `MAX_BYTES + 1` bytes, which is
+//!   enough to tell, and never trusts the prefix);
+//! - the key appearing more than once, in any order and with any values, hides the page.
 
-/// The most bytes of the file that are read (the fork's INI files cap at the same size).
+use std::io::Read;
+
+/// The largest file that is accepted (the fork's INI files cap at the same size).
 pub const MAX_BYTES: usize = 8 * 1024;
 
 /// The key the Developer page reads.
 pub const KEY: &str = "developer_page";
 
+/// Why the page is shown or hidden; the install line prints `text()`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Reason {
+    /// No `developer.ini`.
+    #[default]
+    Missing,
+    /// The file exists but opening or reading it failed.
+    Unreadable,
+    /// The file is longer than `MAX_BYTES`.
+    TooLarge,
+    /// The file is not valid UTF-8.
+    NotUtf8,
+    /// `developer_page` appears more than once.
+    DuplicateKey,
+    /// The file has no `developer_page` line.
+    KeyAbsent,
+    /// `developer_page` has a value other than exactly `on`.
+    NotOn,
+    /// One `developer_page=on` line in a clean file.
+    On,
+}
+
+impl Reason {
+    pub const fn text(self) -> &'static str {
+        match self {
+            Reason::Missing => "missing",
+            Reason::Unreadable => "unreadable",
+            Reason::TooLarge => "too_large",
+            Reason::NotUtf8 => "not_utf8",
+            Reason::DuplicateKey => "duplicate_key",
+            Reason::KeyAbsent => "key_absent",
+            Reason::NotOn => "not_on",
+            Reason::On => "on",
+        }
+    }
+}
+
 /// What the file says.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DeveloperIni {
-    /// `developer_page=on` was the last `developer_page` line.
+    /// The page is shown: the file held exactly one `developer_page=on` line and nothing disqualified it.
     pub developer_page: bool,
+    pub reason: Reason,
 }
 
-/// Parse the contents of the file (bytes, so a file that is not UTF-8 simply reads as hidden).
+impl DeveloperIni {
+    const fn hidden(reason: Reason) -> Self {
+        Self { developer_page: false, reason }
+    }
+}
+
+/// Parse the whole contents of the file. `contents` is everything that was read; a value longer than
+/// `MAX_BYTES` means the file is over the limit (the loader reads `MAX_BYTES + 1` bytes at most).
 pub fn parse(contents: &[u8]) -> DeveloperIni {
-    let contents = &contents[..contents.len().min(MAX_BYTES)];
-    let contents = contents.strip_prefix(b"\xef\xbb\xbf").unwrap_or(contents);
-    let mut result = DeveloperIni::default();
-    for line in contents.split(|b| *b == b'\n') {
-        let line = trim(line);
-        if line.is_empty() || line[0] == b';' || line[0] == b'#' || line[0] == b'[' {
+    if contents.len() > MAX_BYTES {
+        return DeveloperIni::hidden(Reason::TooLarge);
+    }
+    let Ok(text) = std::str::from_utf8(contents) else {
+        return DeveloperIni::hidden(Reason::NotUtf8);
+    };
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let mut seen: Option<bool> = None;
+    for line in text.split('\n') {
+        let line = line.trim_ascii();
+        if line.is_empty() || line.starts_with([';', '#', '[']) {
             continue;
         }
-        let Some(eq) = line.iter().position(|b| *b == b'=') else {
+        let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        let (key, value) = (trim(&line[..eq]), trim(&line[eq + 1..]));
-        if key == KEY.as_bytes() {
-            result.developer_page = value == b"on";
+        if key.trim_ascii() != KEY {
+            continue;
         }
+        if seen.is_some() {
+            return DeveloperIni::hidden(Reason::DuplicateKey);
+        }
+        seen = Some(value.trim_ascii() == "on");
     }
-    result
+    match seen {
+        None => DeveloperIni::hidden(Reason::KeyAbsent),
+        Some(false) => DeveloperIni::hidden(Reason::NotOn),
+        Some(true) => DeveloperIni { developer_page: true, reason: Reason::On },
+    }
 }
 
-fn trim(mut bytes: &[u8]) -> &[u8] {
-    while let [first, rest @ ..] = bytes {
-        if first.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
+/// Read the file from `reader`: at most `MAX_BYTES + 1` bytes (one more than the limit tells an
+/// oversized file from one of exactly the limit), a read error at any point rejects the file.
+pub fn read(reader: impl Read) -> DeveloperIni {
+    let mut bytes = Vec::new();
+    match reader.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes) {
+        Ok(_) => parse(&bytes),
+        Err(_) => DeveloperIni::hidden(Reason::Unreadable),
     }
-    while let [rest @ .., last] = bytes {
-        if last.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
+}
+
+/// Load the file at `path` (the boot loader and the host tests use this one path).
+pub fn load(path: &str) -> DeveloperIni {
+    match std::fs::File::open(path) {
+        Ok(file) => read(file),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => DeveloperIni::hidden(Reason::Missing),
+        Err(_) => DeveloperIni::hidden(Reason::Unreadable),
     }
-    bytes
 }
 
 #[cfg(test)]

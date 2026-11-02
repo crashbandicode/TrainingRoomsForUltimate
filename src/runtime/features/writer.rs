@@ -1,6 +1,6 @@
 //! The small-file writer (lead ruling 2026-11-02, review R5): a settings or INI write requested from a hook, a
 //! menu tick or a chord only stores the request in a fixed slot; this thread, which owns its own stack, performs
-//! the transactional write (`model::ini_files::write_atomic`: temporary file, flush, replace with a backup) outside
+//! the transactional write (`model::store::write_replace`, the Store's one write, through `ini_files::write_atomic`: temporary file, sync, replace with a backup) outside
 //! hook scope, so the hook path stays allocation-free and does no file I/O. A slot holds the newest request of its
 //! kind (later requests replace earlier unwritten ones). The files:
 //!
