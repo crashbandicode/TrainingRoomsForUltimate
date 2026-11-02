@@ -59,6 +59,10 @@ pub mod recording;
 pub mod settings;
 #[path = "model/sha256.rs"]
 pub mod sha256;
+#[path = "model/sites_u4.rs"]
+pub mod sites_u4;
+#[path = "model/ui_texture.rs"]
+pub mod ui_texture;
 #[path = "model/sites_ui.rs"]
 pub mod sites_ui;
 #[path = "model/sites.rs"]

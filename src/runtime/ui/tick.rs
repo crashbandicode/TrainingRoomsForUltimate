@@ -110,6 +110,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             }
         }
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::ui::texture_probe::tick(panes);
 }
 
 unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
