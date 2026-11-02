@@ -259,3 +259,32 @@ fn core04_slider_rows() {
     assert_eq!(settings::parse_row(&weighted, &json!([5, 2, 0])), Ok(vec![5, 2, 0]));
     assert_eq!(settings::parse_row(&weighted, &json!([6, 0, 0])), Err(Reason::ElementAboveMax));
 }
+
+#[test]
+fn core04_draft9_fields_default() {
+    // Rows of draft 9 that this build does not have yet are absent in an older file and load clean;
+    // when present they are kept verbatim (a later package gives them their rows).
+    let loaded = parse(&json!({"menu": {"lra_reset": [1, 0]}}).to_string());
+    assert!(!loaded.corrupt());
+    let loaded = parse(&json!({"menu": {"respawn_invincibility": [0, 1], "aerial_delay_range": [2, 9]}}).to_string());
+    assert!(!loaded.corrupt());
+    assert_eq!(loaded.settings.menu.extra().get("aerial_delay_range"), Some(&json!([2, 9])));
+}
+
+#[test]
+fn core04_character_item_retired() {
+    let loaded = parse(&json!({"menu": {"character_item": [0, 1, 0]}, "defaults_menu": {"character_item": [1]}}).to_string());
+    assert!(!loaded.corrupt());
+    assert!(loaded.settings.menu.extra().get("character_item").is_none());
+    assert!(!loaded.settings.to_json().contains("character_item"));
+}
+
+#[test]
+fn core04_per_field_default_on_bad_field() {
+    let text = json!({"menu": {"input_delay": "x", "lra_reset": [0, 1], "stage_hazards": [9, 9]}}).to_string();
+    let loaded = parse(&text);
+    assert_eq!(loaded.issues.len(), 2);
+    assert_eq!(loaded.settings.menu.input_delay(), 0, "bad field defaults");
+    assert!(!loaded.settings.menu.lra_reset(), "the good field still loads");
+    assert!(!loaded.settings.menu.stage_hazards(), "bad field defaults (Off)");
+}

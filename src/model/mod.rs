@@ -9,6 +9,7 @@ pub mod guard;
 pub mod input_delay;
 pub mod install_line;
 pub mod lra_reset;
+pub mod migration;
 pub mod settings;
 pub mod sites;
 pub mod stage_hazards;

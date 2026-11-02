@@ -31,7 +31,7 @@ fork's menu structs and is not carried (the settings reader here is new code tha
 
 ## Findings against the specs (for the lead)
 
-- SPEC-core-08 (as it stood in the worktree before 5e34c82) named `training_modpack.json` as the fork's
+- SPEC-core-08 (still so in 5e34c82, §4 first row and §10 item 1) names `training_modpack.json` as the fork's
   settings file. In the fork that file is the updater record (`{"update":{"last_update_version":…}}`, see the
   carried fixtures `…-training_modpack.json`); the settings file is `training_modpack_menu.conf`.
   `storage::file::LEGACY_SETTINGS` uses the real name.

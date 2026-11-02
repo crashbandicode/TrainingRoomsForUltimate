@@ -1,7 +1,6 @@
 # Test provenance, package 1
 
-`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test` (69 at the
-M3 commit). "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not
+`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test` (88 after the SPEC-core-08 plan). "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not
 Switch-compiled yet). Status: **host pass** = test exists and passes; **deferred** = the spec row belongs to a
 later package or needs the Switch runtime; **runtime, unbuilt** = code written, not compiled for the Switch.
 
@@ -71,6 +70,25 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | Missing address disables | §9 | `state07_missing_address_disables` | - | host pass |
 | Change applies at next stage load | §5.4 | - | E-state-07-toggle-then-reload | Eden only |
 | Waiting-room per-request policy | §6.3 | - | E-state-07-lobby-no-global-write | deferred (package 6; `policy.rs` not carried yet) |
+
+## SPEC-core-08 (first-boot import, pure plan) and draft 9 settings
+
+| Requirement | § | Host test | Eden row | Status |
+| --- | --- | --- | --- | --- |
+| Plan lists only the routed files; skips existing and excluded | §4, §9 | `migration::plan_copies_listed_files_only`, `migration::plan_skips_existing_and_excluded` | - | host pass |
+| Only `migration.json` blocks a rerun (a pre-installed `developer.ini` does not) | §2, §9, lead rule 2026-11-02 | `migration::marker_blocks_rerun`, `migration::only_the_marker_means_already_imported` | CORE08-E02 | host pass |
+| No source: marker with `none`; io error: partial; too large | §4, §9 | `migration::no_source_writes_none_marker`, `migration::io_error_is_partial`, `migration::too_large_skipped` | CORE08-E04, E05 | host pass |
+| S1 items 1-2: settings renamed, INI files copied, old name accepted once | §9 | `migration::settings_renamed_on_copy`, `migration::ini_files_copied`, `migration::loader_accepts_old_name_once` | CORE08-E06 | host pass (see note 2) |
+| N8: captures without cap, `.part` then rename, blocking/background split, marker last | §5, §9 | `migration::captures_have_no_size_cap`, `migration::captures_part_then_rename`, `migration::plan_splits_blocking_and_background`, `migration::marker_after_background_part`, `migration::captures_originals_untouched` | CORE08-E08, E09 | host pass (plan only) |
+| N6: `character_item` retired and ignored on load | §4, core04 | `migration::character_item_ignored_after_import`, `core04_character_item_retired` | CORE08-E07 | host pass |
+| N6: item-on-load conversion of save-state records | §4 | - | CORE08-E07 | deferred (needs SPEC-state-01/-04 records; package 3) |
+| Receipt shape with sha256 per file; the copy loop, thread, `.part` writes | §4, §9 | - | CORE08-E01 | deferred (runtime, sha256 not written yet) |
+| Draft 9 fields default when absent; per-field default on a bad field | core04 §3.1, §9 | `core04_draft9_fields_default`, `core04_per_field_default_on_bad_field` | core04-E9 | host pass (rows themselves arrive with their packages) |
+
+Note 2: SPEC-core-08 §4 names `training_modpack.json` as the fork's settings file. It is the fork's
+updater record; the settings are in `training_modpack_menu.conf` (CARRY-OVER.md, findings). The plan and
+`storage::file::LEGACY_SETTINGS` use the real name; copying the updater file as `settings.json` would have
+loaded factory settings over the player's own. Lead: please correct the spec.
 
 Note 1: the spec says unknown keys are dropped on rewrite. This build knows 3 of the ~90 rows, so dropping
 them would erase the player's other settings until their packages land; they are kept verbatim instead

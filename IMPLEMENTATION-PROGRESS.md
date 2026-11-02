@@ -11,6 +11,8 @@ Playbook followed: `53fd1f2`. Host only; no Eden, no Switch, no push.
 - M2 settings: `settings.json` reader/writer (S1 name, S2 policy, duplicate keys, unknown rows kept), tested on
   two real fork files.
 - M3 pure models and tests for Input Delay, Stage Hazards, L+R+A Reset.
+- SPEC-core-08 plan (`model/migration.rs`, pure): copy list, marker-only rerun rule (a pre-installed `developer.ini` does not block), N8 split. Copy loop, sha256 receipt and N6 conversion are not done.
+- Merged `review/menu-proposal` (5e34c82) after the first commits; specs re-read: retired key `character_item`, draft 9 fields (kept as unknown rows until their packages), S2 name `settings.invalid-<n>.json` already as implemented.
 - M4 (partly): runtime boot and the three hooks written, **not Switch-compiled**.
 
 ## Running / blocked

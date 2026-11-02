@@ -27,8 +27,9 @@ use serde_json::{Map, Value};
 pub const WEIGHT_MAX: u8 = 5;
 /// Largest slider value (the two damage ranges).
 pub const SLIDER_MAX: u8 = 150;
-/// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4).
-pub const RETIRED: [&str; 2] = ["update_policy", "menu_open_start_press"];
+/// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4;
+/// `character_item` since decision N6, converted once by the first-boot import).
+pub const RETIRED: [&str; 3] = ["update_policy", "menu_open_start_press", "character_item"];
 
 /// How a row's array is read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
