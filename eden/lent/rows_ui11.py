@@ -11,6 +11,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import hook_stats  # noqa: E402
+sys.path.insert(0, str(HERE.parents[1] / "tools"))
+import stack_table  # noqa: E402
 PHASE = sys.argv[1]
 sys.argv = [sys.argv[0], PHASE]
 import ui_lent as u  # noqa: E402
@@ -89,7 +91,7 @@ def main():
            f"player={final_player} cpu={final_cpu}")
     # Read whole lines from the retained file: the plug transport truncates each
     # line, which can hide coverage and the per-hook allocation attribution.
-    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]' | ForEach-Object {{ $_.Line }}")
+    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]|\\[ThreadStack\\]' | ForEach-Object {{ $_.Line }}")
     (r6.OUT / "roster-hook-stats.log").write_text(stats, encoding="utf-8")
     ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
     r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
@@ -97,6 +99,18 @@ def main():
     ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
     r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
            "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
+    threads, _, spawns = stack_table.collect(stats.splitlines())
+    menu_stack = threads.get("tr-menu")
+    # The approved table uses 25% headroom plus 16 KiB SDK reserve,
+    # rounded to a 4 KiB page; the compiled static path is 35,600 bytes.
+    need = max(35_600, menu_stack["used"]) if menu_stack else 0
+    required_stack = ((need + need // 4 + 16_384 + 4095) // 4096) * 4096
+    menu_spawns = [size for name, _, size, _ in spawns if name == "tr-menu"]
+    r6.row("menu stack retains measured margin on the approved 60 KiB stack",
+           bool(menu_stack) and menu_spawns == [61_440]
+           and menu_stack["size"] == 61_440 and not menu_stack["low"]
+           and menu_stack["size"] >= required_stack,
+           f"stack={menu_stack} spawns={menu_spawns} required={required_stack}")
     console = u.get(PHASE, "console.log", r6.OUT)
     unmapped = [line for line in console.read_text(errors="replace").splitlines() if "unmapped" in line.lower()]
     (r6.OUT / "unmapped-lines.log").write_text("\n".join(unmapped), encoding="utf-8")
