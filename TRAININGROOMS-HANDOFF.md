@@ -69,6 +69,15 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
   `cargo-targets/trainingrooms-<name>`, Yoga folder `/home/intpa/trainingrooms-build-<name>`, Eden labels `s<N>-NN`.
   The lead merges into `work/implementation` at each gate (integration worktree `TrainingRoomsForUltimate-work`,
   lead only) and deletes stream branches at the end.
+### 2026-11-02 ~06:xxZ — stream heads (checkpoint)
+
+- `work/implementation` (integration, local, not pushed past `473da26`): `fa8b77d` pkg2 core → `4895ea3` shared Store
+  → `5fe6bbf` scene wrapper (cherry-pick). Streams: pkg2 `299bb62` (P2-1…P2-8 host; Eden pending, Surface), pkg3
+  `58f6486`+ (S3-1; S3-2/3/5 next; import runtime assigned), pkg4 `5a5d42e` (S4-1…S4-3; S4-4 after pkg6's Mii crate;
+  Eden s4 on the Yoga), pkg5 `47d3d61`+ (menu renders in game; S5-2…), pkg6 `8acbbe6` (109 files carried; successor
+  at cycle_preload_config / C6 / C7), r1fix (Astra R1–R5). Stream rules add a 3-minute host-fairness wait.
+- Docs pushed this phase: spec corrections `b2d1d30` (replay capture default off; charge nulls), card-swap answers
+  `7970d94` (`.smd-N.tmp` skipped, exact `developer.ini`, undo U1 open for the operator).
 ### 2026-11-02 ~04:4xZ — standing push order; package 1 complete on origin
 
 - Operator (via the primary): general push permission until the first version ships to the card — fast-forward
