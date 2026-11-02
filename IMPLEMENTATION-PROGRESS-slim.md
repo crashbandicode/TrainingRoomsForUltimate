@@ -183,7 +183,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified;61b0aab releasee2946b9d resident3,440,640B via playbook compliance.py nro_facts; archivedreleaseNRO. |
 | Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml;61b0aab releasee2946b9d; archived61b0aab-release/compliance.md machine rows pass. |
 | Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; fullhost61b0aab exit0,1110trackedsource hashes unchanged; compliance machine row pass. |
-| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass fora6e4d07 | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchived1110source/log receipts; prior10a8232 ordinary-player-only Switch also0; unchanged feature-scope code. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
+| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for fresh5b40bac | Fresh empty-target host/clippy-Dwarnings/no-default/release/diag all0;1112 source hashes unchanged;70 executed host binary hashes and cgroup peak retained in *-fresh receipts. Native warnings remain, no warning-free Switch claim. |
 | No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | FAIL | sl-02 installation heap_allocations=0, but full hook parser FAIL:11rows,7nonzero deltas, final818/delta100; archivedhook-stats-final-verdict.log. sl-01 failure also retained. Finalzero-hookgateOPEN. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
 | Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
@@ -192,7 +192,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Card scan before the site is chosen: `tools/build/scan-offsets.py` over the card copy, for the site and, for a virtual function, its vtable slot. Evidence: the scan's output and the copy's date. | M | unverified | Acceptance pending; no pass claimed. |
 | (another plugin hooks or may hook the site) Sharing v1 or the chain rules ([HOOK-SHARING](HOOK-SHARING.md)); the owner election runs before the byte guard; both stand-in modes (`foreign=inline`, `foreign=far`) and both load orders tested in Eden. N/A only when the scan showed nobody at the site, with the scan cited. | C | unverified | Acceptance pending; no pass claimed. |
 | Hook after the prologue, or call the game function instead of hooking it; hook the most specific instruction. | M | unverified | Acceptance pending; no pass claimed. |
-| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | 61b0aab-release/compliance.md: no diagmarkers inreleasee2946b9d. |
+| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | Fresh5b40bac-release-fresh/compliance.md: no diag markers in releasece1e216a, resident3440640B. |
 | The shipped NRO writes its install line and nothing per frame. **C** (a logging plugin whose product is the log) its data files too, but no per-frame diagnostics. | M | unverified | Acceptance pending; no pass claimed. |
 | Read-only rules reviewed in the code, hook by hook: no checked random number drawn, no native code that draws one skipped or reordered, no simulated state written (ssbu-desync-detector `docs/WHAT-IS-CHECKED.md`). Evidence: the review in the evidence doc. | C | unverified | Acceptance pending; no pass claimed. |
 | Replay A/B with the desync detector: the same replay with and without the plugin, identical check values and positions. | C | unverified | Acceptance pending; no pass claimed. |
@@ -1237,3 +1237,34 @@ Current YogaONE matrix-trace-fresh exec67557; poll/reap then release via
 crate rechecks, exactreleasecompliance, independentreview/integratedroute pending.
 Freshcache census22:32 global50824757216B; reserve1GB forchecks.
 NoEden/profile/helperboot. Configuration proposal explicitly deferred/unapplied.
+
+
+## Feature/compliance checkpoint22:39Z
+Fresh CORE9 matrix nowPASS (default/diag builds +7individualchecks); exactlogs/
+source receipts in5b40bac-matrix-*-fresh. Editor-alone additional check queued
+behindpkg6 at22:39, admission correctlyrefused withoutclaim; noownjob/Eden/profile.
+Freshrelease compliance onclean docse105b4f exit1:4mandatory machinefailures,
+29agentrows, sameguardregex falsepositive andREADME/GIF/HANDOFF gaps retained.
+Exactreport5b40bac-release-fresh/compliance.md. Checklistfivegates/diagstringrows
+updated; integratedruntime/independentreview/remainingKNOWN stillOPEN.
+22:35 normalledgerrelease failed beforeappend: OSError [Errno122] Disk quota
+exceeded inlocal/tmp/tr-ledger-sl-*.txt. Controlleralreadyreaped. Directremote
+appendrecordedRELEASED22:35, ownqueue removed. Archived11OWN/tmp/slim/*.tar
+(205475840B) toslim/temp-source-archives withSHAverification thenremovedonlythose
+temporaries; normalledgeradmission/releaseworksagain. No foreigncleanup.
+Signalsproof snippets+JSON nowin5b40bac-diag-fresh/stack, actualcold/contended
+atomicpaths andsvc34/35; no wholecallback/SDKallocation inference.
+Fresh SMD/hos-lock rechecks pending aftereditor, then owncache retirement.
+
+
+## Fixed integration authorization22:40Z
+Lead22:39 independently reviewed fulla6..5b carrydiff/puretext/nativeABI and
+verified253carry plusfivefreshloghashes/unchangedsource/70binaryidentities.
+Authorized merge EXACT8ee6bb5b12d6378b90b220f196fd3b93f5ea4f6a into this
+5b-derived branch forbounded keyboardconsumer/native-reachability investigation.
+Preserve keyboard changes/unionmanifests; reportconflicts. No movingmerge,
+forcedretention, ceilingraise, Configurationpatch, helperboot orfinalacceptance.
+Diffinventory181files; pendingmergeafterfinishingfresh5bgates andcheckpoint.
+Freshadditionaleditor-alonePASS4.585s raw77f6f1deffca59a87bc5a6fb0856020583771f2379e3c27d56157d6c6eded776,
+1112unchanged. CurrentONEYoga smd-fresh exec21157; poll/reap thenrelease via
+yoga-release.py smd-fresh. Hos-locknext; cachemanifest/retirementafterboth.
