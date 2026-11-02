@@ -109,3 +109,30 @@ For a final modified-Training batch, pass --archive-base vanilla --archive-loads
 Before staging a fixture under an owned temporary mods directory, bind the exact NRO/ELF/report to the run, obtain normal queue/ledger admission and wait for the helper hold to be lifted. The existing lent staging script preserves mods unchanged: an added fixture therefore needs its own manifest and verified removal before that script's full restore verification. Do not overwrite an existing mod or leave the fixture in the kept tree. No fixture was staged in this preflight.
 
 Twelve actual hook/archive gate unit tests pass, including B3 base mismatch, insufficient per-layout reload count, missing/early retirement and counted allocations. Receipt/log/source hashes are in runs/ui-b3-preflight. This is parser/fixture readiness, not native behavior or visual acceptance.
+
+
+## Setup screen acceptance batch — implemented, not yet run
+
+Candidate 996f8b8 wires the existing Save setup and Setup library entries to the
+fixed da1 transaction provider. The following rows require the final composed
+NRO, the same complete hook/Unmapped/stack gates as ui-11, and retained before/
+after files and screenshots. Host controller tests do not satisfy these rows.
+
+| Row | Action and required observation |
+| --- | --- |
+| Saved snapshot | Save both fighters to a numbered slot, then move/change live damage before opening Save setup. The exported file must contain the saved pair, saved stage and saved exact Mii identities, rather than the later live positions/damage. |
+| Empty or incomplete slot | Attempt export before both fighters have a valid saved pair. Show a refusal; create no setup file. |
+| Confirm and fresh read | Name a valid draft through the real keyboard, confirm, leave/reopen the library, and load the written file independently. Name and both saved fighters must agree with the screenshot and original saved values. |
+| Cancel | Cancel both the pending snapshot panel and an open naming panel. Neither creates a file; an accepted snapshot ticket still retires and a later save can start. |
+| Failed write | Use an owned temporary fixture with a deliberately unavailable destination. Confirm a valid name; show the error and retain the draft/name for retry. Preserve all pre-existing setup files; restore the fixture before continuing. |
+| Library A | Choose a setup with A. Until actual menu close, both numbered-slot records and live fighters remain unchanged. On close, bind both halves to the frozen slot and perform the standard restore. |
+| Library Y | Choose with Y, including with save states disabled. On actual close, bind both saved halves without moving the fighters. |
+| Frozen selection | After selecting a binding, change the menu's selected save slot before closing. The original frozen slot receives the binding; the later selected slot remains unchanged. |
+| Refusal on close | Change a qualifying fighter/stage or retire the lobby before close. Show the provider refusal, close normally, and do not mutate either saved half. Reopening must not retry the discarded selection. |
+| Same-lobby suspension | Suspend a naming draft through the actual waiting-room interruption and return to that same lobby. Continue its original name and target; do not silently capture or retarget another slot. |
+| Actual retirement | Depart to a new lobby while a draft/job exists. The old draft cannot export or bind there; an already accepted job is polled to retirement without reopening the panel. |
+| Exact Mii | Repeat snapshot/A with an actual saved Mii for each applicable role; missing or mismatched exact identities refuse rather than substituting a same-class fighter. |
+
+Any failed precondition ends that row under its current label. Runtime fixture
+changes require an owned manifest and verified cleanup before the full lent
+profile restore. The helper-path boot hold is still binding.

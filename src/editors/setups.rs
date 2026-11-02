@@ -107,8 +107,8 @@ impl<T: Copy, K: Copy> Setups<T, K> {
         Ok(())
     }
 
-    /// On a refusal the selection stays available and the caller keeps the menu
-    /// open. Once accepted, the provider owns it and repeated close cannot post it.
+    /// On refusal the selection stays available for the caller to retry or discard.
+    /// Once accepted, the provider owns it and repeated close cannot post it.
     pub fn close_menu<P: Provider<Target = T, Ticket = K>>(
         &mut self,
         provider: &mut P,
