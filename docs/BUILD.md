@@ -8,6 +8,11 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 - **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
   use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
+- **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
+  operator's counter, `tools/sloc.py`: no blanks, comments or tests; `third_party/` excluded) and fails above
+  `size-budget.toml`, or when that file records a raise without the lead's approval. `cargo test` runs it
+  (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch). The budget only ratchets
+  down; the plan is `docs/SIZE-PLAN.md`.
 - **Switch builds** (`cargo skyline build --release`, `cargo skyline build --release --features diag`) do not use
   the pin. cargo-skyline 3.5.0 runs `rustup run skyline-v3 cargo build -Zbuild-std=core,alloc,std,panic_abort` with
   `RUSTFLAGS=--cfg skyline_std_v3` (strings of the binary, identical on both hosts). The `skyline-v3` toolchain is

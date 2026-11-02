@@ -1,0 +1,12 @@
+# Code-size budget of the clean room (operator goal 2026-11-02: smaller than the fork; target <= 90,000 at RC).
+# Counted by tools/sloc.py (the operator's sloc3.py rules: Rust lines without blanks, comments and tests;
+# third_party/ excluded). Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
+# Append entries, never edit old ones. The last entry of a scope is its ceiling. The first ceiling of a scope and
+# every raise need approved_by (the lead); a cut needs only a reason. Plan and history: docs/SIZE-PLAN.md.
+
+[[budget]]
+scope = "total"
+ceiling = 114100
+date = "2026-11-02"
+reason = "start: 106,983 measured at 7bb86fd plus 7,061 pending in unmerged stream branches and worktrees (pkg6 +2,416, hitbox +1,272, u4b +990, ui-screens +721, stack +640, sync +495, f6 +481, deluxe +83 without its vendored SDK, pkg4 -37; tools/sloc.py tree count minus merge base, 2026-11-02 ~12:10Z), rounded up to the next hundred"
+approved_by = "lead 0caa72b8 (slim stream brief, 2026-11-02: start at measured plus pending)"
