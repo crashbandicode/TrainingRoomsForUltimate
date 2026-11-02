@@ -135,3 +135,20 @@ Own tools (playbook coverage):
 - `eden/route4.py`: kept — the playbook's hybrid route (MACROS "Hybrid": recorded segment macro, gated by screenshot distance, tile cursor steps with `settled ... at=` checks, TILE-CURSOR).
 - `eden/rows_s44.py`: kept — the rows themselves (diag request file and line gates); the playbook has no generic row runner.
 - `/tmp/pkg4s44/{cg,sw,clippy}.ps1`: one-call cargo wrappers under the guard (playbook WORKFLOW §4 commands); `open_claims.py` / `wait_*.py`: per-host ledger parser and queue waiter (EDEN "Queue runs" pattern).
+
+### Card scan of the 12 named_macros rows (2026-11-02 11:5xZ)
+`scan-offsets.py` (playbook ae87443, under systemd-run MemoryMax=2G timeout 300) over the MTP preflight copy
+`/home/intpa/ssbu-cpu-pilot-install/switch-mtp-v0101-v021/pilot/after/.../skyline/plugins` (16 plugins, folder dated 2026-11-01 10:19, the copy package 1 cited),
+offsets 20013e0 2001260 2001280 2001600 2001610 2001370 2001390 2043970 2043a00 2043a10 2089200 2089290: no reference in 13 plugins; `libtraining_modpack.nro`
+(the fork, never installed with this plugin, B1) references 2001260/2001280/2001600/2001610; `libimgui_smash.nro` and `libssbu_online_deluxe_rewrite.nro` hold
+the 32-bit constant 0x2001600 (ControlModule::get_stick_x_no_clamp) once each. All 12 rows are Called rows (the 64-byte rule tolerates another plugin's hook in
+the called function, calls go through it), so no sharing is needed; the install line reports each row's outcome. Checklist row "card scan": pass.
+
+### tr_eden4.py against the playbook's gv.py / solo.ps1 (for the lead's parameterised tool)
+Same steps and order: owner claim check, MemAvailable >= 10 GiB, df >= 40 GB, claim line before Up, hard-linked profile copy (`prep`), plugin set-aside and install,
+rootful X display + GPU lock, bounded `eden-run.py` launch (8 GiB, 3600 s), `core.volume` 0 set/saved/read back before `game.load`, `down` releases even after a
+failed Up, `scan` of console.log, `restore`. Differences (parameters a shared tool would need): work root, profile name (`t4`), source profile (Yoga `b`), owner id,
+display (:94) and unit names are constants of this file instead of gv.py's `y`/:68; Python only (solo.ps1's PowerShell steps folded in); `--settings <json>` copies
+`settings.json` into the data folder; `--diag-txt`; `--seed <dir>` copies a tree into the data folder before boot (captures, macros, INI); the previous output
+folder is archived as `.before-<label>`; the ledger parser keys open claims per host (`on [the] Yoga|Surface|Ally`, a claim on another host does not block);
+`call` accepts `b64:` JSON; a `macro` subcommand plays a recorded segment. The receipts (`PREP-<label>.json`, `LAUNCH-<label>.json`) have the same role as gv.py's.
