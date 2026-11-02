@@ -176,7 +176,7 @@ pub const MAX_HURTBOX_PARTS: i16 = 64;
 /// The part indices of a group (`first`, `count` as the game stores them; `total` is the module's part count at `+0x78`), or `None`
 /// for a table that does not look like one.
 pub fn group_parts(first: i16, count: i16, total: i32) -> Option<std::ops::Range<usize>> {
-    if first < 0 || count < 0 || count > MAX_HURTBOX_PARTS || i32::from(first) + i32::from(count) > total {
+    if first < 0 || !(0..=MAX_HURTBOX_PARTS).contains(&count) || i32::from(first) + i32::from(count) > total {
         return None;
     }
     Some(first as usize..first as usize + count as usize)

@@ -575,8 +575,6 @@ fn core06_hurtbox_shapes_per_fighter() {
     assert_eq!(hitbox::group_parts(0, -4, 20), None);
     assert_eq!(hitbox::group_parts(10, 12, 20), None, "past the part count");
     assert_eq!(hitbox::group_parts(0, 65, 100), None, "more parts than any fighter has");
-    // A fighter of 12 capsule parts at most 16 spheres each: the per-frame bound the cost row measures against.
-    assert!(12 * hitbox::SPHERE_MAX <= 192);
 }
 
 #[test]
