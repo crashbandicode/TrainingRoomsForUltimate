@@ -7,7 +7,7 @@
 mod alloc;
 mod boot;
 mod clock;
-mod diag_log;
+pub(crate) mod diag_log;
 mod features;
 mod game;
 mod hub;

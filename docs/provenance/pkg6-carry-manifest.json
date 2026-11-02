@@ -22,7 +22,9 @@
    "stage_forms": "crate::engine::stages::stage_forms",
    "stage_menu": "crate::engine::stages::stage_menu",
    "character_items": "crate::engine::items::character_items",
-   "cpu_pilot::pilot": "crate::engine::p1"
+   "cpu_pilot::pilot": "crate::engine::p1",
+   "preload_metrics": "crate::engine::preload::preload_metrics",
+   "logging": "crate::engine::compat::logging"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1115,6 +1117,13 @@
    "crate": "root",
    "src_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15",
    "dest_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15"
+  },
+  {
+   "src": "src/preload_metrics.rs",
+   "dest": "src/model/preload/preload_metrics.rs",
+   "crate": "root",
+   "src_sha256": "795ede5522c0ac2c16bd2c03e774f06ec9e3ba838feea46d20101926d192cfca",
+   "dest_sha256": "f87fc175bf0a3f14b1f4fdbbd418c4233f411f0568060d4e8b0c292aa69c86ef"
   }
  ]
 }

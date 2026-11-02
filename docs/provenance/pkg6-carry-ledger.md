@@ -125,3 +125,4 @@ file in this repository.
 | `src/model/p1/examples/completed-attacks-walk-off.json` | `src/cpu_pilot/examples/completed-attacks-walk-off.json` | `8b0a1b85b16755d3` | `8b0a1b85b16755d3` | path rewrite only |
 | `src/model/p1/examples/fight-five-seconds-walk-off.json` | `src/cpu_pilot/examples/fight-five-seconds-walk-off.json` | `c51d31284ff68191` | `c51d31284ff68191` | path rewrite only |
 | `src/model/p1/examples/immediate-release.json` | `src/cpu_pilot/examples/immediate-release.json` | `82802c1f5a65658f` | `82802c1f5a65658f` | path rewrite only |
+| `src/model/preload/preload_metrics.rs` | `src/preload_metrics.rs` | `795ede5522c0ac2c` | `f87fc175bf0a3f14` | path rewrite only |

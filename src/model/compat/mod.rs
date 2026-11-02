@@ -7,6 +7,7 @@
 #[cfg(test)]
 pub mod choice;
 pub mod grid;
+pub mod logging;
 #[cfg(test)]
 pub mod menu;
 #[cfg(test)]
