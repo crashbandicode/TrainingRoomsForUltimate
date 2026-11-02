@@ -22,5 +22,8 @@ Stream `pkg5`, branch `stream/pkg5`, worktree `/home/intpa/smash-training-lobby/
 - Settings write on close: temp + rename placeholder; r1fix's storage API replaces it.
 - Eden batch 2 (grids, pilot absent, Developer page, HUD Off, each mockup compared) waits for the Yoga (fairness rule: 3 minutes after another stream's RELEASED).
 
+## Merge of work/implementation (2026-11-02, d12a09c)
+Conflicts: `src/runtime.rs` (both `mod ui;` and `mod scene;`) and `CARRY-OVER.md` (both sections kept). The stage grid takes its labels from package 6's `engine::stages::catalog` (117 stages + All = 118 tiles) through a `StageLabel` function the worker passes in; `menu::grid::STAGE_TILES` stays a model constant (the by-path test crates cannot see `engine`) and a lib test in `src/lib.rs` ties it to `TILE_COUNT`. Host tests all pass after the merge; the Switch build after the merge is not done (the Surface and the Yoga are Eden hosts; build and full clippy wait for a free host).
+
 ## Gates at the last commit
 `cargo test` all pass, `cargo clippy --all-targets -- -D warnings` clean, `cargo build --no-default-features` ok, Switch release build ok (sha256 `3423fb04...`, resident 450,560 B), diag build ok.

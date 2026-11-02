@@ -157,10 +157,15 @@ fn handle(code: u8, menu: &mut Option<Menu>) {
     }
 }
 
+/// Package 6's stage list (the lobby's 117 selectable stages), by catalog index.
+fn stage_label(i: usize) -> &'static str {
+    crate::engine::stages::catalog::STAGES.get(i).map_or("-", |(_, label)| *label)
+}
+
 fn publish_frame(menu: Option<&Menu>) {
     let Some(menu) = menu else { return };
     let mut frame = FRAME.lock();
-    frame_of(menu, &mut frame);
+    frame_of(menu, &mut frame, stage_label);
     FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 
