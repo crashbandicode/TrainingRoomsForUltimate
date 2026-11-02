@@ -149,6 +149,8 @@ fn env() -> Env {
 #[derive(Default)]
 struct Session {
     menu: Option<Menu>,
+    setups: super::setups::Ui,
+    setup_note: Option<String>,
     phase: Phase,
     /// The panel row the menu is on while `phase` is `Panel`.
     panel: Option<Editor>,
@@ -166,6 +168,7 @@ struct Session {
 impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
+        if self.setups.watching() { return true; }
         #[cfg(feature = "mii-saved-alpha")]
         if self.pending_close.is_some() { return true; }
         self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
@@ -205,6 +208,9 @@ fn run() {
 fn handle(code: u8, s: &mut Session) {
     if code == EV_RESET {
         s.menu = None;
+        // Practice cleanup can suspend a same-lobby draft. The provider and
+        // external-name owner distinguish actual retirement on the worker.
+        s.setup_note = None;
         s.panel = None;
         s.refusal = None;
         s.roster = None;
@@ -248,6 +254,7 @@ fn handle(code: u8, s: &mut Session) {
     #[cfg(feature = "mii-saved-alpha")]
     if s.pending_close.is_some() { return; }
     s.refusal = None;
+    s.setup_note = None;
     #[cfg(feature = "mii-editor-alpha")]
     let mut editor_request = None;
     let panel = s.phase == Phase::Panel;
@@ -256,7 +263,11 @@ fn handle(code: u8, s: &mut Session) {
         m.set_console(console_mode());
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
-            external::press_panel(button);
+            if s.panel.is_some_and(is_setup) {
+                s.setups.press(button);
+            } else {
+                external::press_panel(button);
+            }
         } else if matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))) && button != Button::B {
             if let Some(list) = s.mii.as_mut() {
                 #[cfg(feature = "mii-editor-alpha")]
@@ -302,6 +313,12 @@ fn handle(code: u8, s: &mut Session) {
 /// Follow the layer's panels (`model::flow`): open the one the menu just entered, hand the menu over to the clip editor, step back out
 /// of a panel that closed, and publish the frame when it changed.
 fn sync_panels(s: &mut Session) {
+    // Consume synchronous list/name effects before flow sees their closed panel,
+    // and retire accepted jobs even after the disposable menu was reset.
+    if let Some(note) = s.setups.tick() {
+        notices::post("Setup library", &note, 180, DEFAULT_COLOR);
+        s.setup_note = Some(note);
+    }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
     if s.menu.is_none() {
         return;
@@ -315,25 +332,36 @@ fn sync_panels(s: &mut Session) {
     if open {
         sync_mii(s);
     }
+    if open && s.phase == Phase::Menu && s.setups.panel_up() {
+        s.phase = Phase::Panel;
+        s.panel = s.setups.active_editor();
+    }
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
-            Some(Screen::External(editor)) if external::is_layer_panel(*editor) => Some(*editor),
+            Some(Screen::External(editor)) if external::is_layer_panel(*editor) || is_setup(*editor) => Some(*editor),
             _ => None,
         });
         if let Some(editor) = entered {
             let slot = s.menu.as_ref().and_then(record_slot);
-            if external::open_panel(editor, slot) {
+            let opened = if is_setup(editor) {
+                match s.menu.as_ref().map(|m| s.setups.open(editor, m)) {
+                    Some(Ok(())) => true,
+                    Some(Err(why)) => { s.setup_note = Some(why); false }
+                    None => false,
+                }
+            } else { external::open_panel(editor, slot) };
+            if opened {
                 s.phase = Phase::Panel;
                 s.panel = Some(editor);
             } else {
-                s.refusal = Some(external::refusal_of(editor, slot));
+                if !is_setup(editor) { s.refusal = Some(external::refusal_of(editor, slot)); }
                 if let Some(m) = s.menu.as_mut() {
                     m.press(Button::B);
                 }
             }
         }
     }
-    let seen = Seen { menu_open: open, panel_visible: external::panel_up(), clip_visible: external::clip_up() };
+    let seen = Seen { menu_open: open, panel_visible: external::panel_up() || s.setups.panel_up(), clip_visible: external::clip_up() };
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
     match step {
@@ -341,12 +369,15 @@ fn sync_panels(s: &mut Session) {
         Step::CloseLayer => {
             // The menu lost its renderer or the session ended: the layer's panel goes with it.
             external::close_panel();
+            s.setups.leave_panel();
             s.panel = None;
         }
         Step::PopRow => {
+            s.setups.leave_panel();
             s.panel = None;
             if let Some(m) = s.menu.as_mut() {
-                m.press(Button::B);
+                // A resumed external name can overlay the reopened page.
+                if matches!(m.screen(), Some(Screen::External(_))) { m.press(Button::B); }
             }
         }
         Step::HandOverToClip => {
@@ -452,7 +483,9 @@ fn publish_frame(s: &Session) {
         clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
     } else if s.phase == Phase::Panel {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
-        let Some(view) = external::panel_view_now() else { return };
+        let Some(view) = (if s.panel.is_some_and(is_setup) {
+            s.setups.view()
+        } else { external::panel_view_now() }) else { return };
         panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
     } else if matches!(menu.screen(), Some(Screen::External(Editor::MiiList(_)))) {
         if let Some(list) = s.mii.as_ref() {
@@ -482,6 +515,10 @@ fn publish_frame(s: &Session) {
             next.help[1].clear();
             let _ = core::fmt::Write::write_str(&mut next.help[1], reason);
         }
+    }
+    if let Some(note) = &s.setup_note {
+        next.help[1].clear();
+        let _ = core::fmt::Write::write_str(&mut next.help[1], note);
     }
     // The last frame handed over (only this thread takes it): an unchanged frame is not handed over again.
     let mut last = LAST_FRAME.lock();
@@ -547,7 +584,7 @@ fn begin_close(
         retry_close(s);
         return;
     }
-    if let Some(menu) = s.menu.as_mut() { close(menu); }
+    if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
 }
 
 #[cfg(feature = "mii-saved-alpha")]
@@ -567,14 +604,14 @@ fn retry_close(s: &mut Session) {
     }
     match crate::runtime::mii::menu_handoff::post_close(intent) {
         Ok(()) => {
-            if let Some(menu) = s.menu.as_mut() { close(menu); }
+            if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
         }
         Err(intent) => s.pending_close = Some(intent),
     }
 }
 
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
-fn close(menu: &mut Menu) {
+fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     let outbox = menu.take_outbox();
     let settings = menu.commit().clone();
     published::publish(&settings.menu, outbox.rerolls);
@@ -603,6 +640,11 @@ fn close(menu: &mut Menu) {
     if let Some(on) = outbox.replay_capture {
         writer::request_replay_capture(on);
     }
+    // This path is reached only after the Mii close intent was accepted.
+    // A refusal changes no setup and does not trap the player in the menu.
+    if let Err(why) = setups.close_menu() {
+        notices::post("Setup library", why, 180, DEFAULT_COLOR);
+    }
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
@@ -611,3 +653,7 @@ fn close(menu: &mut Menu) {
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
 }
 
+
+fn is_setup(editor: Editor) -> bool {
+    matches!(editor, Editor::SetupSave | Editor::SetupLibrary)
+}

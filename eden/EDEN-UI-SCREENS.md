@@ -87,3 +87,52 @@ The freezes of ui-02/ui-04/ui-05 were first read as the firewall prompt of that 
 
 ## ui-14 — portrait guard-domain fix164dc3e
 The native roster guard now admits 86 portrait keys and all86 textures bind on each exercised role/page. Mario/DK ranks, CPU Mario and Samus pick pass; screenshots retain labels and runtime portraits. Full finalconsole0Unmapped; menu high-water32336/61440 (29104free), archivezero/grace pass. OverallFAIL: finalhooktotal1632 and originalCPU Solo row absent. Separate gated-by-screenshot CPU toggle persisted[1,0] without changingPlayer[1,0]; this does not erase the batch failure. Updateddriver waits for freshCPU portrait readiness beforeY and remainsungated. Costume/modreplacement/fightermissingtexture tests remainopen. Evidence: runs/ui-14 including failedrows, followupshots/settings, finalrawlogs, run.json, memory.peak5288398848 and restoremanifest. Profile fullyrestored17:58:44Z and claimreleased17:59Z.
+
+## ui-15 — direction graphics and fresh CPU portrait binding
+Frozen Rust0c3cd63, diagnostic NRO701a526e, driverbe9ce4b. DI bound10 with64x256 texture and tint[200,244,255,255]; SDI bound10 with256x128 white texture. Reviewed screenshots show the direction graphics. All86 roster portraits bound; exact role ranks/Samus and independent Solo Popo transitions passed after waiting for fresh CPU page binding. Menu high-water32480/61440, free28960, lowfalse. Full retained console has0Unmapped. Archive zero-allocation/grace checks passed for the exercised hand-outs only.
+
+Overall **FAIL**: row-end hook total892; final attributed2202 (input-note27, input-apply1, CPU192, live1, preload1978, named2, draw1), later aggregate2222. These failures are not waived. The current item-picture recipes were not part of this run. Raw evidence, screenshots, settings, run.json and restore receipts are in runs/ui-15; Windows Job peak5501251584B. Eden stopped and fresh process count0; five plugins, two exefs,87 files and Qt configuration restored with no mismatches or kept-tree changes. Canonical ledger release18:52:48Z supersedes the malformed initial release.
+
+## Current cc29613 candidate — runtime pending
+Item pictures and regenerated Training/waiting recipes are host/artifact gated, not runtime accepted. Host lib1179pass/0fail/2ignored, clippy all-targets with warnings denied and no-default-features build pass. Switch diagnostic and release builds pass; fullhost still has the inherited QUICK_MENU_APP ownership failure pending the reviewed typed consumer/provider composition. Four static thread-table bounds remain unresolved. Neither successful compilation nor these historical screenshots constitutes final acceptance.
+
+The next ui-11 driver requires --menu-static-bytes from the exact staged candidate's retained stack_depth.py <elf> table <exact-thread-table.rs> report. Preserve that report with its ELF SHA in the run manifest; never substitute an earlier candidate's number. The driver enforces the composed 56 KiB allocation and applies the existing 25% headroom plus 16 KiB reserve to the larger of static and live high-water. It refuses the historical 60 KiB allocation.
+
+The next ui-11 driver captures the38-item picture grid and the screen after leaving it; screenshots require review and the existing full-log allocation/Unmapped gates remain binding. Mii actions, mod/costume/fallback portraits, waiting-host behavior and B3 modified-archive/reload rows remain open. Helper-path acceptance boots are held by the lead pending the separate native fault investigation.
+
+## B3 fixture and reload preflight — runtime still unrun
+
+The private generated archives in runs/ui-builder-83d2c58/{training,waiting}/target.arc are valid modified inputs for B3. Their directories retain the target layout member, their fingerprints differ from the recipe's vanilla input, and they already have the preservation audit above. Identity and intended mod-relative paths are in runs/ui-b3-preflight/fixtures.json. Training SHA256241150ca432b6d3f445ce1a044de30475af0da86d586f47b97dbc90d22e1d311; waiting326f8341ed801372721c1ae70c85705dcc19584806a3f535638f1dd2d605f090. These contain owned-game derivatives and stay private.
+
+For a final modified-Training batch, pass --archive-base vanilla --archive-loads 2 to rows_ui11 after the two actual loads and their retirements. The gate requires each Training hand-out to use the vanilla base, zero per-load allocations, two covered hand-outs and every matching release after at least5000ms. A stock-only load cannot pass this B3 row. Waiting coverage must separately request info_waiting through gate_layout_archives with the same base/count requirements; the Training driver does not pretend to exercise waiting mode.
+
+Before staging a fixture under an owned temporary mods directory, bind the exact NRO/ELF/report to the run, obtain normal queue/ledger admission and wait for the helper hold to be lifted. The existing lent staging script preserves mods unchanged: an added fixture therefore needs its own manifest and verified removal before that script's full restore verification. Do not overwrite an existing mod or leave the fixture in the kept tree. No fixture was staged in this preflight.
+
+Twelve actual hook/archive gate unit tests pass, including B3 base mismatch, insufficient per-layout reload count, missing/early retirement and counted allocations. Receipt/log/source hashes are in runs/ui-b3-preflight. This is parser/fixture readiness, not native behavior or visual acceptance.
+
+
+## Setup screen acceptance batch — implemented, not yet run
+
+Candidate 996f8b8 wires the existing Save setup and Setup library entries to the
+fixed da1 transaction provider. The following rows require the final composed
+NRO, the same complete hook/Unmapped/stack gates as ui-11, and retained before/
+after files and screenshots. Host controller tests do not satisfy these rows.
+
+| Row | Action and required observation |
+| --- | --- |
+| Saved snapshot | Save both fighters to a numbered slot, then move/change live damage before opening Save setup. The exported file must contain the saved pair, saved stage and saved exact Mii identities, rather than the later live positions/damage. |
+| Empty or incomplete slot | Attempt export before both fighters have a valid saved pair. Show a refusal; create no setup file. |
+| Confirm and fresh read | Name a valid draft through the real keyboard, confirm, leave/reopen the library, and load the written file independently. Name and both saved fighters must agree with the screenshot and original saved values. |
+| Cancel | Cancel both the pending snapshot panel and an open naming panel. Neither creates a file; an accepted snapshot ticket still retires and a later save can start. |
+| Failed write | Use an owned temporary fixture with a deliberately unavailable destination. Confirm a valid name; show the error and retain the draft/name for retry. Preserve all pre-existing setup files; restore the fixture before continuing. |
+| Library A | Choose a setup with A. Until actual menu close, both numbered-slot records and live fighters remain unchanged. On close, bind both halves to the frozen slot and perform the standard restore. |
+| Library Y | Choose with Y, including with save states disabled. On actual close, bind both saved halves without moving the fighters. |
+| Frozen selection | After selecting a binding, change the menu's selected save slot before closing. The original frozen slot receives the binding; the later selected slot remains unchanged. |
+| Refusal on close | Change a qualifying fighter/stage or retire the lobby before close. Show the provider refusal, close normally, and do not mutate either saved half. Reopening must not retry the discarded selection. |
+| Same-lobby suspension | Suspend a naming draft through the actual waiting-room interruption and return to that same lobby. Continue its original name and target; do not silently capture or retarget another slot. |
+| Actual retirement | Depart to a new lobby while a draft/job exists. The old draft cannot export or bind there; an already accepted job is polled to retirement without reopening the panel. |
+| Exact Mii | Repeat snapshot/A with an actual saved Mii for each applicable role; missing or mismatched exact identities refuse rather than substituting a same-class fighter. |
+
+Any failed precondition ends that row under its current label. Runtime fixture
+changes require an owned manifest and verified cleanup before the full lent
+profile restore. The helper-path boot hold is still binding.

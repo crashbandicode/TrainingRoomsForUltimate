@@ -1,8 +1,9 @@
 """ui-11 rows on the lent Ally rig (Eden in Training via `ui_lent.py route`): the portrait roster grid (Character Cycles with the
 Player and CPU lists, Player Character), the install line read whole, and the hook counters. Uses the ui-06 walker and helpers.
 
-    rows_ui11.py live-ui-11
+    rows_ui11.py live-ui-11 --menu-static-bytes <exact retained ELF stack_depth bound>
 """
+import argparse
 import json
 import re
 import sys
@@ -14,7 +15,22 @@ sys.path.insert(0, str(HERE.parent))
 import hook_stats  # noqa: E402
 sys.path.insert(0, str(HERE.parents[1] / "tools"))
 import stack_table  # noqa: E402
-PHASE = sys.argv[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("phase")
+parser.add_argument("--menu-static-bytes", type=int, required=True,
+                    help="tr-menu static bytes from the retained exact candidate ELF stack_depth report")
+parser.add_argument("--archive-base", choices=("stock", "vanilla"),
+                    help="required base for Training hand-outs (vanilla for the modified-archive B3 row)")
+parser.add_argument("--archive-loads", type=int, default=1,
+                    help="minimum Training hand-outs; use at least 2 for a retained reload batch")
+args = parser.parse_args()
+if args.archive_loads <= 0:
+    parser.error("--archive-loads must be positive")
+if args.menu_static_bytes <= 0:
+    parser.error("--menu-static-bytes must be positive")
+PHASE = args.phase
+MENU_STATIC_BYTES = args.menu_static_bytes
+MENU_STACK_BYTES = 57_344  # Lead-approved composed allocation; no budget override.
 sys.argv = [sys.argv[0], PHASE]
 import ui_lent as u  # noqa: E402
 import rows_ui06 as r6  # noqa: E402
@@ -51,6 +67,15 @@ def main():
     w.keys("w10")
     w.open()
     w.page("Fighters & Stages")
+    # The 38 pictures are recipe textures, so they have no asynchronous native
+    # upload to await. Retain the grid and the page after leaving it for visual
+    # review: pictures must appear beside labels and disappear on B. These
+    # screenshots alone are not an automatic visual acceptance assertion.
+    w.focus("Give item")
+    w.keys("a w8")
+    r6.shot("item-pictures-grid")
+    w.keys("b w8")
+    r6.shot("item-pictures-left-grid")
     w.focus("Character Cycles")
     w.keys("a w15")
     r6.shot("roster-cycles-open")
@@ -119,9 +144,10 @@ def main():
     ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
     r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
            "; ".join(reasons) if reasons else f"{len(hook_stats.parse(stats))} complete samples")
-    ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
+    ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"],
+                                                   required_base=args.archive_base, minimum_handouts=args.archive_loads)
     r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
-           "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
+           "; ".join(reasons) if reasons else f"base={args.archive_base or 'any'} minimum={args.archive_loads}; all hand-outs matched by layout/size; grace >=5000ms")
     requests = [int(n) for n in re.findall(r"\[Thumbs\] page .* requested=(\d+)", stats)]
     bound = [int(n) for n in re.findall(r"\[Thumbs\] bound=(\d+)", stats)]
     r6.row("roster requests and binds runtime portrait textures",
@@ -129,15 +155,18 @@ def main():
     threads, _, spawns = stack_table.collect(stats.splitlines())
     menu_stack = threads.get("tr-menu")
     # The approved table uses 25% headroom plus 16 KiB SDK reserve,
-    # rounded to a 4 KiB page; the compiled static path is 35,600 bytes.
-    need = max(35_600, menu_stack["used"]) if menu_stack else 0
+    # rounded to a 4 KiB page. The static bound must come from this run's
+    # retained ELF report, not a historical UI binary or a guessed lower value.
+    need = max(MENU_STATIC_BYTES, menu_stack["used"]) if menu_stack else 0
     required_stack = ((need + need // 4 + 16_384 + 4095) // 4096) * 4096
     menu_spawns = [size for name, _, size, _ in spawns if name == "tr-menu"]
-    r6.row("menu stack retains measured margin on the approved 60 KiB stack",
-           bool(menu_stack) and menu_spawns == [61_440]
-           and menu_stack["size"] == 61_440 and not menu_stack["low"]
+    menu_sizes = {int(m.group(4)) for m in stack_table.THREAD_RE.finditer(stats) if m.group(2) == "tr-menu"}
+    r6.row("menu stack retains measured margin on the approved 56 KiB stack",
+           bool(menu_stack) and menu_spawns == [MENU_STACK_BYTES]
+           and menu_sizes == {MENU_STACK_BYTES}
+           and menu_stack["size"] == MENU_STACK_BYTES and not menu_stack["low"]
            and menu_stack["size"] >= required_stack,
-           f"stack={menu_stack} spawns={menu_spawns} required={required_stack}")
+           f"static={MENU_STATIC_BYTES} stack={menu_stack} spawns={menu_spawns} sizes={sorted(menu_sizes)} required={required_stack}")
     console = u.get(PHASE, "console.log", r6.OUT)
     unmapped = [line for line in console.read_text(errors="replace").splitlines() if "unmapped" in line.lower()]
     (r6.OUT / "unmapped-lines.log").write_text("\n".join(unmapped), encoding="utf-8")
