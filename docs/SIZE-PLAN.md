@@ -1,5 +1,17 @@
 # Size plan: a clean room smaller than the fork (2026-11-02, slim stream)
 
+## Current operator criterion (2026-11-02 14:2xZ; relayed by Astra lead)
+This supersedes the historical RC target below: measure a scratch rustfmt-normalized copy with
+the operator's tools/sloc-fmt.ps1 (sloc4 semantics). At least 15% under the fork is a NEXT-version
+goal; RC size must ratchet down. Keep raw sloc4 alongside normalized measurements. No layout
+compression, counting-rule change or behavior loss counts as a reduction.
+At98f9ab0: raw104350; normalized133508 including tools167 (133341 excluding scripts),
+rustfmt1.9.0-stable,0 formatting failures. Primary's normalized base ebfcb98=136069 excluding
+scripts; fork M5q=131081 excluding scripts. Same-basis contribution=-2728 lines; current is
+still2260 above fork. This is source size, not NRO resident size. Pending additions remain
+itemized in size-budget.toml; integration must remeasure and ratchet.
+
+
 Goal (operator, 2026-11-02): the implementation smaller than the fork's (M5q = 112,500), target **≤ 90,000 at RC**,
 without dropping a feature or proven behaviour. Means: delete dead code (not hide it), retire probes that served,
 tables instead of repeated arms/structs, shared abstractions for the carried engines' repeated patterns, one

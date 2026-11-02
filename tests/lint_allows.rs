@@ -3,8 +3,8 @@
 //! by file and lint by lint with its exact count, and `Cargo.toml` may set no lint to `allow`. A new suppression
 //! fails this test; so does a `KNOWN` row whose suppressions are gone, so the table only shrinks.
 //!
-//! No row has a recorded operator approval today (2026-11-02). The rows below are hos-lock's two (stream/sync)
-//! and the remaining carried ones (decision D9 accepted those narrowly for byte-identical carried code); the lead
+//! Exactly two hos-lock suppressions have operator approval (2026-11-02 14:2xZ, L2). The other rows are
+//! the remaining carried ones (decision D9 accepted those narrowly for byte-identical carried code); the lead
 //! takes each to the operator or has it removed at the root (with a recorded carry edit for carried code). A row
 //! gains `approved` only with the operator's approval and its date.
 
@@ -14,7 +14,7 @@ use std::path::Path;
 
 /// (file, lint, count, status).
 const KNOWN: &[(&str, &str, usize, &str)] = &[
-    ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "pending: stream/sync, lock_api's RawMutex/RawRwLock traits require `const INIT`"),
+    ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "approved: operator 2026-11-02 14:2xZ, L2; lock_api RawMutex/RawRwLock require const INIT"),
     ("src/model/macro_ui/macro_panel.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg4 manifest), D9"),
     ("src/runtime/macros/replay_store.rs", "dead_code", 1, "pending: carried (pkg4 manifest), only caller behind `deluxe-sdk` (off, L1)"),
     ("src/runtime/mii/mii_backend.rs", "dead_code", 2, "pending: carried (pkg6 manifest), D9, feature-gated callers"),

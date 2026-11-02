@@ -1,0 +1,10 @@
+{"seq":0,"clocks":{},"body":{"boundary":"recording_start"}}
+{"seq":1,"clocks":{},"body":{"raw":{"raw":{"encoding":"smash13_0_5_serializer_counter_u32le","hex":"7b000000"},"source_offset":2097272}}}
+{"seq":2,"clocks":{},"body":{"lifecycle":{"actor":0,"event":{"spawn":{"identity":{"fighter_kind":18,"costume":2,"entry":1,"control":"unknown","native_object_id":91},"cause":"unknown"}}}}}
+{"seq":3,"clocks":{},"body":{"state":{"actor":0,"phase":"before","sample":{"kinematics":{"position":{"x":-0.0,"y":3e-45,"z":-1e-45},"facing":-1.0,"velocity":{"x":-0.0,"y":1e-45,"z":4e-45}},"situation":{"situation_kind":0,"status_kind":14},"animation":"unsupported","vitals":"unsupported"}}}}
+{"seq":4,"clocks":{},"body":{"input":{"entry":1,"actor":0,"origin":"effective","layout":"training_native_f32","buttons":{"bits":2147484161},"left_stick":{"f32":{"x":-0.0,"y":1e-45}},"right_stick":{"f32":{"x":0.0041666664,"y":2.0}}}}}
+{"seq":5,"clocks":{},"body":{"raw":{"raw":{"encoding":"smash13_0_5_serializer_counter_u32le","hex":"7c000000"},"source_offset":2097272}}}
+{"seq":6,"clocks":{},"body":{"state":{"actor":0,"phase":"before","sample":{"kinematics":{"position":{"x":-0.0,"y":3e-45,"z":-1e-45},"facing":-1.0,"velocity":{"x":-0.0,"y":1e-45,"z":4e-45}},"situation":{"situation_kind":0,"status_kind":14},"animation":"unsupported","vitals":"unsupported"}}}}
+{"seq":7,"clocks":{},"body":{"input":{"entry":1,"actor":0,"origin":"effective","layout":"training_native_f32","buttons":{"bits":2147484161},"left_stick":{"f32":{"x":-2.0,"y":-0.004166667}},"right_stick":{"f32":{"x":0.004166667,"y":-1e-45}}}}}
+{"seq":8,"clocks":{},"body":{"boundary":"recording_end"}}
+{"seq":9,"clocks":{},"body":{"end":{"events":9}}}

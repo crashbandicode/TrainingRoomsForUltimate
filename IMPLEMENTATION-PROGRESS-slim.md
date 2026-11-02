@@ -287,3 +287,34 @@ does not override this worker brief or the current lead status.
 Temporary build wrappers now propagate cargo exit status; sw-inner.ps1 copies an NRO only after cargo success and fails if it is absent. No build was run during this wrapper correction.
 
 Official sloc4 cross-check: 7974c7c=104350; authorized base ebfcb98=106952; net slim contribution -2602. Both simulator counts 1118. Disk preflight 246G free; cargo-targets aggregate 16G.
+
+### Active host validation — 2026-11-02 15:06Z
+Exact thread model/effort reverified after compaction: gpt-6-astra / medium; watcher session11182 live.
+Surface free + queue confirmed admission after interleave grace; slim was queue head.
+Claim15:06Z Codex01a19c9f/slim for one cargo test on clean HEAD98f9ab0 (code7974c7c).
+Preflight243G free; targets17G. Build session72821, log /tmp/slim/astra-host-second.log,
+SMD_GOLDEN_BLESS=1, own target, incremental0, MemoryMax6G, timeout1800.
+Release claim/remove queue row when done. No Eden/profile mutation.
+Earlier pkg6 admission question resolved. Additional complete reads: SPEC-cpu-04/05/06/07,
+SMD docs/FORMAT.md. No additional source edits before this gate.
+
+### Host test gate and corrected operator criteria — 2026-11-02 15:09Z
+cargo test at98f9ab0 passed: 69 suites,9259 passed,0 failed,6 ignored,0 filtered;
+no warning/error diagnostics. Exact log /tmp/slim/astra-host-second.log; exit0.
+Surface RELEASED15:09Z; own queue row removed and unblessed repeat appended at tail.
+No owned compiler/Eden/profile changes remain.
+Inspected complete golden bytes: timeline1693B SHA256543f2c8bb8e7423957a241feddf91f1b734b692df49d0a2a3cb475a97397ff39;
+manifest3138B SHA2562e0de195ac6e3a1751d17ff857d18b02c4bdf8f84d3c0756e9ec4a889179c3d4.
+Timeline seq0..9, one boundary start/end, end.events9; manifest complete.events10/last_seq9.
+Unknown/unsupported channels and opaque serializer provenance retained; tiny floats and negative zero intentional.
+Oracle parity plus JSON-reader contract passed. Unblessed deterministic repeat still pending.
+
+Read current STATUS lead reply and primary TRAINING_LOBBY_HANDOFF.md14:2xZ relay:
+operator revised size to rustfmt-normalized, >=15% under fork NEXT version; RC ratchets only.
+Exactly two hos-lock declare_interior_mutable_const exceptions approved, L2.
+These supersede older <=90k RC/empty-allows instructions for those two entries only.
+Updated lint approval provenance without changing the whitelist or adding suppressions.
+All other pending lint rows still need root closure. Approved probes and validation remain required.
+Read operator sloc-fmt.ps1 fully; scratch normalized measurement of98f9ab0 running session68371.
+
+Normalized98f9ab0 result:133508 implementation incl.tools167,133341 excluding scripts; simulator2102 excluded; test44925 excluded. rustfmt1.9.0-stable,0 failures. Primary same-basis ebfcb98=136069; delta=-2728. Fork131081, current+2260. Raw104350 remains reported separately.
