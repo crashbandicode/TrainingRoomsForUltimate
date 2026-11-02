@@ -252,14 +252,25 @@ impl Panes {
             let weight = frame.chip_weights[i];
             let tile = if weight != 0 { [58, 66, 84, 255] } else { p::HIGHLIGHT };
             self.rect(p::IDX_CHIP + i, x, y, p::CHIP_SIZE, p::CHIP_SIZE, tile);
-            match CHIP_ANGLE[i] {
-                Some(angle) => {
+            // DI / SDI: the pointer carries the game's own effect texture (`chips`), turned to the chip's direction.
+            let layer = if i == crate::runtime::ui::chips::NEUTRAL { None } else { crate::runtime::ui::chips::layer() };
+            match (CHIP_ANGLE[i], layer) {
+                (Some(angle), Some(layer)) => {
+                    let at = crate::model::effect_chips::place(layer.visual, angle, x, y, p::CHIP_SIZE, layer.width, layer.height);
+                    let tint = if weight != 0 { layer.tint } else { [layer.tint[0] / 2, layer.tint[1] / 2, layer.tint[2] / 2, 255] };
+                    self.rect(p::IDX_CHIP_NEEDLE + i, at.x, at.y, at.w, at.h, tint);
+                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], at.rot);
+                }
+                (Some(angle), None) => {
                     let radians = angle.to_radians();
                     let (dx, dy) = (radians.cos(), radians.sin());
                     self.rect(p::IDX_CHIP_NEEDLE + i, x + dx * 34.0, y + 12.0 + dy * 34.0, 12.0, 52.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
                     pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], angle - 90.0);
                 }
-                None => self.rect(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM }),
+                (None, _) => {
+                    self.rect(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
+                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], 0.0);
+                }
             }
             let mut name = crate::model::frame::Text::<16>::new();
             let _ = core::fmt::Write::write_str(&mut name, DIRECTIONS[i]);

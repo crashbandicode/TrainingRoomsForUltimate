@@ -71,6 +71,12 @@ pub mod settings_file;
 pub mod sha256;
 #[path = "model/sites_u4.rs"]
 pub mod sites_u4;
+#[path = "model/sites_u4b.rs"]
+pub mod sites_u4b;
+#[path = "model/effect_texture.rs"]
+pub mod effect_texture;
+#[path = "model/effect_chips.rs"]
+pub mod effect_chips;
 #[path = "model/ui_texture.rs"]
 pub mod ui_texture;
 #[path = "model/ui/stage_textures.rs"]

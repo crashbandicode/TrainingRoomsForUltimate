@@ -49,6 +49,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "cpu::apply_defence", owner: Some(Feature::CpuDefence), gate: Gate::Flag("DEFENCE_ON") },
     // The run-time texture helper (u4): every entry of it checks `usable()` (its rows passed and were granted) first.
     Boundary { function: "texture::load", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::load_resident", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
     Boundary { function: "texture::poll", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
     Boundary { function: "texture::bind", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
     Boundary { function: "texture::unbind", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },

@@ -72,7 +72,46 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
-    QUEUE.lock().post_static(header, body, length, color);
+    // Any thread (the menu worker, the writer thread, a hook): the notice goes into a lock-free mailbox that the HUD tick, on the
+    // game's UI thread, moves into the queue (stream/sync: no thread but the game's takes `QUEUE`). A full mailbox drops the notice
+    // and counts it.
+    for (slot, state) in MAILBOX_STATE.iter().enumerate() {
+        if state.compare_exchange(EMPTY, WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            // SAFETY: the slot is ours between WRITING and FULL (claimed by the exchange above).
+            unsafe { *MAILBOX[slot].0.get() = Some((header, body, length, color)) };
+            state.store(FULL, Ordering::Release);
+            return;
+        }
+    }
+    MAILBOX_DROPPED.fetch_add(1, Ordering::Relaxed);
+}
+
+const MAILBOX_SLOTS: usize = 8;
+const EMPTY: u8 = 0;
+const WRITING: u8 = 1;
+const FULL: u8 = 2;
+const READING: u8 = 3;
+type Posted = Option<(&'static str, &'static str, u16, [u8; 4])>;
+struct MailSlot(std::cell::UnsafeCell<Posted>);
+// SAFETY: a slot's cell is touched only by the one thread that moved its state to WRITING or READING.
+unsafe impl Sync for MailSlot {}
+static MAILBOX: [MailSlot; MAILBOX_SLOTS] = [const { MailSlot(std::cell::UnsafeCell::new(None)) }; MAILBOX_SLOTS];
+static MAILBOX_STATE: [std::sync::atomic::AtomicU8; MAILBOX_SLOTS] = [const { std::sync::atomic::AtomicU8::new(EMPTY) }; MAILBOX_SLOTS];
+/// Notices dropped because the mailbox was full (diagnostics).
+static MAILBOX_DROPPED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Move the posted notices into the queue (the HUD tick, under `QUEUE`).
+fn take_mail(queue: &mut Queue) {
+    for (slot, state) in MAILBOX_STATE.iter().enumerate() {
+        if state.compare_exchange(FULL, READING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            // SAFETY: the slot is ours between READING and EMPTY.
+            let posted = unsafe { (*MAILBOX[slot].0.get()).take() };
+            state.store(EMPTY, Ordering::Release);
+            if let Some((header, body, length, color)) = posted {
+                queue.post_static(header, body, length, color);
+            }
+        }
+    }
 }
 
 /// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
@@ -130,7 +169,11 @@ pub fn reset_combo_display() {
 /// One HUD tick. `menu_open` is the plugin menu's flag (package 5; the owner bit meanwhile).
 pub fn hud_tick() -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);
-    let out = QUEUE.lock().tick(combo_display(), menu_open);
+    let out = {
+        let mut queue = QUEUE.lock();
+        take_mail(&mut queue);
+        queue.tick(combo_display(), menu_open)
+    };
     #[cfg(feature = "diag")]
     {
         static LAST_VISIBLE: AtomicU8 = AtomicU8::new(2);

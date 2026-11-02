@@ -18,7 +18,6 @@ use crate::model::ini_files;
 use crate::model::input_delay::Owners;
 use crate::model::menu::chord::Chord;
 use crate::model::menu_shortcuts::{self, MenuShortcuts};
-use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::recorder;

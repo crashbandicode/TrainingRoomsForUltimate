@@ -18,6 +18,7 @@ use super::sites_pkg3::STATE_SITES;
 use super::sites_pkg4;
 use super::sites_pkg6;
 use super::sites_u4;
+use super::sites_u4b;
 use super::sites_ui::UI_SITES;
 
 /// Every row of every table, in install-line order.
@@ -29,12 +30,13 @@ pub fn all_sites() -> impl Iterator<Item = &'static Site> {
         .chain(UI_SITES.iter())
         .chain(sites_pkg6::SITES.iter())
         .chain(sites_u4::SITES.iter())
+        .chain(sites_u4b::SITES.iter())
 }
 
 /// The install unit that owns a row: its feature's unit, except that the run-time texture helper's rows (they say `Ui` in their table)
 /// are the `UiTexture` unit, so a helper whose rows are rejected leaves the menu installed.
 pub fn unit_of_row(site: &Site) -> Feature {
-    if sites_u4::SITES.iter().any(|row| row.name == site.name) {
+    if sites_u4::SITES.iter().chain(sites_u4b::SITES.iter()).any(|row| row.name == site.name) {
         Feature::UiTexture
     } else {
         unit_of(site.feature)
@@ -95,9 +97,9 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 8] = [
     (Feature::CpuCore, &["fighter_information", "is_operation_cpu"]),
     (Feature::CpuMash, &["motion_kind", "transition_term_hook"]),
     (Feature::InputDisplay, &["fighter_manager_get_entry", "status_kind"]),
-    (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "utility_get_category", "work_get_int"]),
+    (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),
-    (Feature::Recording, &["fighter_information", "is_operation_cpu", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
+    (Feature::Recording, &["fighter_information", "is_operation_cpu", "pos_x", "pos_y", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
     (Feature::StateCore, &["change_status_force", "damage_of", "effect_req", "effect_req_on_joint", "fighter_information", "is_operation_cpu", "lua_const_lookup", "pos_x", "prev_status_kind", "situation_kind", "status_kind", "work_get_param_float", "work_is_flag", "work_set_flag", "work_set_float"]),
 ];
 

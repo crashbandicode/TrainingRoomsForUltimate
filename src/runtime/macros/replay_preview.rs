@@ -111,7 +111,7 @@ pub fn complete() {
 }
 
 unsafe fn primary_cpu(module: &mut BattleObjectModuleAccessor) -> bool {
-    practice::primary_cpu(module) && crate::runtime::compat::common::is_operation_cpu(module)
+    crate::runtime::features::recorder::is_primary_cpu_body(module) && crate::runtime::compat::common::is_operation_cpu(module)
 }
 
 pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
@@ -124,7 +124,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
     if !primary_cpu(module) {
         return;
     }
-    if crate::runtime::macros::port::roster::busy() || !Fighter::is_ready_go() {
+    if crate::runtime::roster::character_roster::busy() || !Fighter::is_ready_go() {
         if occupied() { input_record::stop_playback(); save_states::cancel_pending(); }
         clear_session();
         return;

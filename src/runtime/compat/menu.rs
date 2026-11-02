@@ -168,14 +168,43 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 }
 
 /// A publish's last step for the typed menu, on the publishing thread after the new value went live: rows the engines changed are
-/// written back into the settings the menu opens on. (Package 6's roster re-plan runs here when a live menu changed:
-/// `character_roster::settings_changed(&previous, None)`; the first publish of a run has nothing to compare with.)
+/// written back into the settings the menu opens on. When a live menu changed, package 6's roster re-plan is only *noted* here: the
+/// menu worker runs it ([`run_roster_change`], a thread, never a game hook, so its allocations stay out of the hook counters), so a
+/// publish does only the publish (stream/stack: run here, the planner sat under boot's frame on Skyline's 64 KiB thread). The first
+/// publish of a run has nothing to compare with.
 pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
     if next != published {
         PENDING.lock()[0] = Some(next);
         crate::runtime::ui::worker::request_writeback();
     }
     if let Some(previous) = previous.filter(|previous| *previous != next) {
+        note_roster_change(previous);
+    }
+}
+
+/// The roster's pending re-plan: the menu as it was before the earliest publish the roster has not seen yet (several publishes
+/// before its next frame are compared once, earliest against live).
+static ROSTER_CHANGE: Mutex<Option<TrainingModpackMenu>> = Mutex::new(None);
+static ROSTER_CHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn note_roster_change(previous: TrainingModpackMenu) {
+    let mut pending = ROSTER_CHANGE.lock();
+    if pending.is_none() {
+        *pending = Some(previous);
+    }
+    ROSTER_CHANGED.store(true, std::sync::atomic::Ordering::Release);
+    drop(pending);
+    crate::runtime::ui::worker::wake();
+}
+
+/// The menu worker's step (`ui::worker::run`, after each wake): the roster re-plans for a noted settings change, once per change
+/// (one atomic load when nothing changed).
+pub(crate) fn run_roster_change() {
+    if !ROSTER_CHANGED.swap(false, std::sync::atomic::Ordering::AcqRel) {
+        return;
+    }
+    let previous = ROSTER_CHANGE.lock().take();
+    if let Some(previous) = previous {
         crate::runtime::roster::character_roster::settings_changed(&previous, None);
     }
 }
@@ -188,8 +217,8 @@ pub fn apply_kept(settings: &Settings) {
         stage: kept(settings, "stage_preferences"),
         mii: kept(settings, "mii_preferences"),
     };
-    let old = KEPT.write().replace(kept);
-    drop(old);
+    // The previous value is dropped after the guard (end of this statement), outside the lock.
+    let _previous = KEPT.write().replace(kept);
 }
 
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.

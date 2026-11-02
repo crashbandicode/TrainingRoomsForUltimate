@@ -54,6 +54,9 @@ impl Assignable for AtomicBool {
 impl Lockable for Mutex<App> {
     type Guard = MutexGuard<'static, App>;
     fn lock_write(&'static self) -> Self::Guard {
-        self.lock()
+        // The menu app's open state is caught up by its taker (the menu worker only bumps an atomic, stream/sync).
+        let mut app = self.lock();
+        app.follow_open();
+        app
     }
 }

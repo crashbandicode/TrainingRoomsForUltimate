@@ -125,6 +125,20 @@ the "no heap in hooks" item stays **open** until the allocating hook is found (p
 | `/tmp/integrator3/warns.py`, `classify.py`, `dupscan.py`, `resolve.py` | Not covered: Switch warning counts by kind/module, the duplicate-wrapper scan (now the committed test `tests/native_wrappers.rs`), merge-conflict resolution. |
 | `tools/build/nro_size.py`, `tools/check/compliance.py` | Playbook tools, used as is. |
 
+## Dead-code warnings (plan; nothing deleted that a running stream wires)
+At `566780a`: 105 release / 94 diag (`/tmp/integrator3/warns-*3.tsv`, `classify.py`). Owners: pkg4 port and replay stubs (~35),
+pkg6 carried Mii/roster (~46) and lobby (~11), UI screens (`menu_app.rs` 11), one unused parameter (fixed in `73831b8`).
+**Kept until ui-screens merges (lead 2026-11-02):** these pkg4 screen entry points stay dead until a screen calls them; at RC
+each is called by a screen or deleted:
+- `named_macros`: panel_view, on_pad, open_library, export_record_slot, offer_external_name, open_external_library,
+  capture_active, playback_active, using_frames, has_captured_frame, frame_at, mii_at_lockout, open_editor, take_confirmed_name,
+  take_list_action, take_list_choice, external_name_open, set_ui_ready, menu_context / MenuContext.
+- `replay_capture`: open_editor, browser_view, browser_input, loading_view, cancel_reload, clip_view, owns_close_input, on_pad,
+  scrub_pace, after_draw.
+- `port`: export_named, frame_of, refusal_text.
+- `replay_preview`: recovery_available, status.
+The push waits until the warnings are gone (lead); what remains at each gate is listed here.
+
 ## Open after this record
 - Gates of `73831b8` (queued), then `stream/sync` merged first when it has commits (no lock call site edited by the integrator;
   package 6 added no new `parking_lot` use: 22 files before and after).

@@ -60,6 +60,12 @@ pub enum HookId {
     RosterPreload,
     PracticeLease,
     StateFrame,
+    /// Package 4 S4-4, nested the same way: the recorder's AI epilogue and P1 poll stages, the named layer's once-per-frame services
+    /// (keyboard, character request, panel hold, clip reload) and its save-state restore follow-up.
+    RecorderAi,
+    RecorderPoll,
+    NamedService,
+    NamedRestore,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -101,6 +107,10 @@ impl HookId {
         HookId::RosterPreload,
         HookId::PracticeLease,
         HookId::StateFrame,
+        HookId::RecorderAi,
+        HookId::RecorderPoll,
+        HookId::NamedService,
+        HookId::NamedRestore,
         HookId::Other,
     ];
 
@@ -138,6 +148,10 @@ impl HookId {
             HookId::RosterPreload => "roster_preload",
             HookId::PracticeLease => "practice_lease",
             HookId::StateFrame => "state_frame",
+            HookId::RecorderAi => "recorder_ai",
+            HookId::RecorderPoll => "recorder_poll",
+            HookId::NamedService => "named_service",
+            HookId::NamedRestore => "named_restore",
             HookId::Other => "other",
         }
     }

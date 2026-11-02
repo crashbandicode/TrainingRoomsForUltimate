@@ -30,6 +30,14 @@ struct Command {
 
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);
 static STARTED: AtomicBool = AtomicBool::new(false);
+/// The layer's step in progress (`macros::step`) and the count of CPU-body frames the layer finished: the watchdog's two facts.
+pub(crate) static STEP: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+static FRAMES: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// One CPU-body frame of the layer finished.
+pub(crate) fn frame_done() {
+    FRAMES.fetch_add(1, Ordering::Relaxed);
+}
 
 const SAVE_SLOT: u8 = 1;
 const OPEN_LIBRARY: u8 = 2;
@@ -40,6 +48,7 @@ const NAME: u8 = 6;
 const REPLAY_WINDOW: u8 = 7;
 const CLIP: u8 = 8;
 const LIST_CAPTURES: u8 = 9;
+const EXPORT_SLOT: u8 = 10;
 
 fn parse(line: &str) -> Option<Command> {
     let mut words = line.split_whitespace();
@@ -57,6 +66,10 @@ fn parse(line: &str) -> Option<Command> {
             command.number = words.next()?.parse().ok()?;
             let rest: Vec<&str> = words.collect();
             set_text(&rest.join(" "), &mut command);
+        }
+        "export_slot" => {
+            command.kind = EXPORT_SLOT;
+            command.number = words.next()?.parse().ok()?;
         }
         "open_library" => {
             command.kind = OPEN_LIBRARY;
@@ -86,8 +99,27 @@ pub(crate) fn start() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MacroDiag, || loop {
+    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MacroDiag, || {
+        // The stack this thread runs on (its size is the stack table's row), so a fault report (an SP below a stack bottom) can be
+        // attributed to a thread.
+        let here = 0u8;
+        diagnostic(format_args!("[NamedMacroDiag] thread tr-macro-diag stack_near={:p}", &here));
+        let (mut last, mut still, mut told) = (0u64, 0u32, false);
+        loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
+        // Watchdog: the layer's frames stopped while they were counting (a stalled game thread): say once where.
+        let now = FRAMES.load(Ordering::Relaxed);
+        if now != 0 && now == last {
+            still += 1;
+            if still == 10 && !told {
+                told = true;
+                diagnostic(format_args!("[NamedMacroDiag] stall frames={now} step={}", STEP.load(Ordering::Relaxed)));
+            }
+        } else {
+            still = 0;
+            told = false;
+        }
+        last = now;
         let Some(path) = FixedPath::<128>::in_root("diag-macro.req") else { continue };
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };
         let _ = std::fs::remove_file(path.as_str());
@@ -104,6 +136,7 @@ pub(crate) fn start() {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
             *PENDING.lock() = Some(command);
+        }
         }
     });
 }
@@ -153,6 +186,10 @@ fn run(command: Command) {
             named_macros::diag_confirm_name(text);
             diagnostic(format_args!("[NamedMacroDiag] save_slot slot={} name={text:?}", command.number));
         }
+        EXPORT_SLOT => {
+            named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));
+            diagnostic(format_args!("[NamedMacroDiag] export_slot slot={}", command.number));
+        }
         OPEN_LIBRARY => {
             named_macros::open_library(usize::try_from(command.number).ok());
             diagnostic(format_args!("[NamedMacroDiag] open_library slot={}", command.number));
@@ -197,14 +234,15 @@ fn run(command: Command) {
         },
         STATUS => {
             diagnostic(format_args!(
-                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?}",
+                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?} cpu_kind={:?}",
                 named_macros::source_is_named(),
                 named_macros::panel_visible(),
                 replay_capture::browser_visible(),
                 replay_capture::panel_visible(),
                 replay_store::toggle().is_armed(),
                 replay_store::toggle().is_ready(),
-                crate::runtime::features::recorder::phase()
+                crate::runtime::features::recorder::phase(),
+                crate::runtime::features::recorder::cpu_kind()
             ));
         }
         _ => {}
