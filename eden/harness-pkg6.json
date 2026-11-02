@@ -1,0 +1,13 @@
+{
+  "owner": "Codex 01a19cb7/pkg6",
+  "prefix": "s6",
+  "stream": "pkg6",
+  "host": "surface",
+  "root": "/home/intpa/trainingrooms-eden-pkg6",
+  "profile": "s6",
+  "display": ":98",
+  "unit": "trp6",
+  "refs": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6/eden/refs",
+  "macros": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6/eden/macros",
+  "install_gate": "plugin=training_rooms/"
+}
