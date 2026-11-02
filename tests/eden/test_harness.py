@@ -76,6 +76,19 @@ class LedgerParse(unittest.TestCase):
         seconds = [e for e in events if "e202df30" in e.owner]
         self.assertEqual(seconds[1].when - seconds[0].when, 8 * 60 + 30)  # 19:09Z to 19:17:30Z
 
+    def test_two_entries_on_one_line_are_two_events(self):
+        # real ledger line 1815 (2026-11-02): a writer did not start a new line, so the stack claim sat inside u4b's
+        text = ("2026-11-02 11:31Z CLAIMED: Claude 0caa72b8/u4b-build (u4b) host gates and Switch compile on the Yoga, no Eden."
+                "2026-11-02 11:32Z CLAIMED: Claude 0caa72b8/stack (stack stream) one compile on the Ally WSL, never beside eden.exe\n"
+                "2026-11-02 11:35Z RELEASED: Claude 0caa72b8/u4b-build u4b gates on the Yoga done\n")
+        events = ledger.parse(text)
+        self.assertEqual([(e.kind, e.owner) for e in events],
+                         [("CLAIMED", "Claude 0caa72b8/u4b-build"), ("CLAIMED", "Claude 0caa72b8/stack"),
+                          ("RELEASED", "Claude 0caa72b8/u4b-build")])
+        self.assertEqual([c.owner for c in ledger.open_claims(text, "yoga", now=NOW)[0]], [])  # u4b's Yoga claim is closed
+        self.assertEqual([c.owner for c in ledger.open_claims(text, "ally", now=NOW)[0]], ["Claude 0caa72b8/stack"])
+        self.assertEqual(len(ledger.parse(LEDGER)), 13)  # ordinary lines are not split
+
     def test_a_seconds_stamp_release_closes_the_claim(self):
         fresh, _ = ledger.open_claims(LEDGER, "ally", now=NOW)
         self.assertEqual(fresh, [])  # CLAIMED 11:57:12Z, RELEASED 11:59:40Z

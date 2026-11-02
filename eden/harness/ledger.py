@@ -37,6 +37,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import params  # noqa: E402
 
 LINE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?::(\d{2}))?Z (CLAIMED|RELEASED)(?: again| \([^)]*\))?:? (.*)$")
+# Two entries written onto one line (a writer that did not start on a new line) are two events.
+JOINED = re.compile(r"(?<=\S)(?=\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?Z (?:CLAIMED|RELEASED))")
 ON = re.compile(r"\bon (?:the )?(surface|yoga|ally)\b", re.I)
 ANY = re.compile(r"\b(surface|yoga|ally)\b", re.I)
 MODEL = re.compile(r"^(claude|gpt|grok|fable|opus|sonnet)-[\w.-]+$", re.I)
@@ -72,7 +74,7 @@ def is_eden(rest):
 def parse(text):
     """CLAIMED / RELEASED events in file order (the file is append only: later in the file is later)."""
     events = []
-    for line in text.splitlines():
+    for line in (part for raw in text.splitlines() for part in JOINED.split(raw)):
         m = LINE.match(line.strip())
         if not m:
             continue
