@@ -328,7 +328,7 @@ fn cpu_sites_fixed_camera_setup_loads_the_manager_through_the_slot_and_stores_th
 }
 
 /// The install line of the merged tree is never cut (Eden on the Ally: a 2048-byte buffer cut it at `cpu_tech=installed`, and later an
-/// 8 KiB one inside `macros_port`): it is rendered whole on the boot thread (`install_line::render`). Every row of every table
+/// 8 KiB one inside `macros_port`): it is rendered whole on the boot thread into a fixed buffer of the computed worst case (`install_line::render_into`, `install_capacity`). Every row of every table
 /// (`capabilities::all_sites`, package 2's rows included) with the longest guard outcome, and every feature the boot reports with a
 /// reason, still ends with `result=` and `heap_allocations=`.
 #[test]
@@ -368,7 +368,9 @@ fn the_install_line_of_every_site_and_feature_is_whole_and_ends_with_its_result(
         migration: Some("partial"),
         heap_allocations: Some(0),
     };
-    let text = install_line::render(&line);
+    let mut buffer = vec![0u8; 128 * 1024];
+    let (text, overflow) = install_line::render_into(&mut buffer, &line);
+    assert!(!overflow);
     assert!(text.len() > 8192, "the merged line ({} characters) is longer than the old fixed buffer", text.len());
     assert!(text.ends_with(" migration=partial result=installed heap_allocations=0"), "{}", &text[text.len() - 120..]);
     assert!(text.contains(" cpu_shield_damage=not_installed reason=") && text.contains(" cpu_camera=not_installed reason="));

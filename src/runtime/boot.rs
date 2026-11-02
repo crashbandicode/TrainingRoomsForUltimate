@@ -336,6 +336,7 @@ fn run_inner() {
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
+    feature_reports_fit(&features);
     #[cfg(feature = "seam-drill")]
     crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
@@ -589,4 +590,9 @@ fn init_roster_cycle() {
     roster::init();
     mii::init();
     lobby::init();
+}
+/// The install line's buffer is sized for `install_capacity::MAX_FEATURE_REPORTS` feature reports: a boot that reports more does not
+/// build (`INSTALL_LINE_CAPACITY` would no longer be the worst case).
+fn feature_reports_fit<const N: usize>(_: &[FeatureReport; N]) {
+    const { assert!(N <= crate::install_capacity::MAX_FEATURE_REPORTS, "raise install_capacity::MAX_FEATURE_REPORTS") }
 }
