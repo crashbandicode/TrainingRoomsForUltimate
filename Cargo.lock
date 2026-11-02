@@ -15,6 +15,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "compile-time-lua-bind-hash"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "660bcccd4aaa4836cb685952d9ea4fb2b57d2565f4fd0c492fce4d2c0a1be0c0"
+dependencies = [
+ "lua_bind_hash",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -34,6 +45,12 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libc-nnsdk"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ece4a9a361bf75974e2c18b719e8fd501e4e336d7a5db22d077c4f2367a94be9"
+
+[[package]]
+name = "libc-nnsdk"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1256a11d163c7288d94909f8120ede53294d8c233df314b0e4f01cf0269707da"
@@ -48,6 +65,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lua_bind_hash"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee9675fd198b39d86a7d5d20c59ae9639a3b4157f28ebd6cc09b9f1397ab118a"
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -59,7 +82,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26aa8c57f278ea8e9158530faf0154ee253fe2ed49383730878d62175ace86a3"
 dependencies = [
- "libc-nnsdk",
+ "libc-nnsdk 0.5.0",
 ]
 
 [[package]]
@@ -84,6 +107,12 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "proc-macro2"
@@ -167,7 +196,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b4c2c28cda0d198befe59479c593537fc306cabb61d32a9428fcd2725df35c6"
 dependencies = [
- "libc-nnsdk",
+ "libc-nnsdk 0.5.0",
  "nnsdk",
  "skyline_macro",
 ]
@@ -185,10 +214,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "skyline_smash"
+version = "0.1.0"
+source = "git+https://github.com/ultimate-research/skyline-smash.git?rev=01bf5835cc1140f5052ddfb2b4f9e98008f22679#01bf5835cc1140f5052ddfb2b4f9e98008f22679"
+dependencies = [
+ "compile-time-lua-bind-hash",
+ "lazy_static",
+ "libc-nnsdk 0.4.0",
+ "nnsdk",
+ "paste",
+ "skyline",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
+
+[[package]]
+name = "ssbu-cpu-pilot-core"
+version = "0.1.1"
+source = "git+https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot?rev=8b03e3bffea8a156628f76cd9ca31c346f52ac70#8b03e3bffea8a156628f76cd9ca31c346f52ac70"
 
 [[package]]
 name = "syn"
@@ -220,6 +267,8 @@ dependencies = [
  "serde",
  "serde_json",
  "skyline",
+ "skyline_smash",
+ "ssbu-cpu-pilot-core",
 ]
 
 [[package]]

@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::choice::byteflags;
 
 use crate::engine::preload::cycle_preload_config as preload;
+use crate::engine::stages::lobby_stages::LobbyStageOrder;
 use crate::model::settings::Snapshot;
 
 byteflags! {
@@ -51,6 +52,12 @@ const fn solo_popo_cpu_default() -> OnOff {
     OnOff::OFF
 }
 const fn solo_popo_original_default() -> OnOff {
+    OnOff::OFF
+}
+const fn lobby_practice_default() -> OnOff {
+    OnOff::OFF
+}
+const fn training_stage_rotation_default() -> OnOff {
     OnOff::OFF
 }
 
@@ -105,6 +112,15 @@ pub struct TrainingModpackMenu {
     /// Mii Groups.
     #[serde(default = "preload::default_mii_groups")]
     pub cycle_preload_mii_groups: OnOff,
+    /// Lobby Practice (the waiting room runs the practice session).
+    #[serde(default = "lobby_practice_default")]
+    pub lobby_practice: OnOff,
+    /// Training Stage Rotation (ordinary Training starts on the next stage of the Lobby Stages order).
+    #[serde(default = "training_stage_rotation_default")]
+    pub training_stage_rotation: OnOff,
+    /// The ordered stage list (`lobby_stages`: a kept key of the settings file, not a setting row).
+    #[serde(default)]
+    pub lobby_stages: LobbyStageOrder,
 }
 
 /// The factory values (`BASE_MENU` in the fork).
@@ -125,6 +141,9 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     cycle_preload_native_groups: OnOff::ON,
     cycle_preload_pair_groups: OnOff::ON,
     cycle_preload_mii_groups: OnOff::ON,
+    lobby_practice: OnOff::OFF,
+    training_stage_rotation: OnOff::OFF,
+    lobby_stages: LobbyStageOrder::NATIVE,
 };
 
 impl TrainingModpackMenu {
@@ -169,12 +188,20 @@ impl TrainingModpackMenu {
             cycle_preload_native_groups: on_off("cycle_preload_native_groups", BASE_MENU.cycle_preload_native_groups),
             cycle_preload_pair_groups: on_off("cycle_preload_pair_groups", BASE_MENU.cycle_preload_pair_groups),
             cycle_preload_mii_groups: on_off("cycle_preload_mii_groups", BASE_MENU.cycle_preload_mii_groups),
+            lobby_practice: on_off("lobby_practice", BASE_MENU.lobby_practice),
+            training_stage_rotation: on_off("training_stage_rotation", BASE_MENU.training_stage_rotation),
+            // a kept key: a missing or malformed list is the native order
+            lobby_stages: snapshot
+                .extra()
+                .get("lobby_stages")
+                .and_then(|value| serde_json::from_value(value.clone()).ok())
+                .unwrap_or(BASE_MENU.lobby_stages),
         }
     }
 
     /// Every row this view holds as (setting id, elements), in the order of the fields: the write-back of D1 (package 5's commit
     /// path persists them; `compat::menu::write_back(row_id, value)` is one of these pairs).
-    pub fn rows(&self) -> [(&'static str, Vec<u8>); 16] {
+    pub fn rows(&self) -> [(&'static str, Vec<u8>); 18] {
         [
             ("solo_popo_original", self.solo_popo_original.to_byte_vec()),
             ("solo_popo_player_cycle", self.solo_popo_player_cycle.to_byte_vec()),
@@ -192,6 +219,8 @@ impl TrainingModpackMenu {
             ("cycle_preload_native_groups", self.cycle_preload_native_groups.to_byte_vec()),
             ("cycle_preload_pair_groups", self.cycle_preload_pair_groups.to_byte_vec()),
             ("cycle_preload_mii_groups", self.cycle_preload_mii_groups.to_byte_vec()),
+            ("lobby_practice", self.lobby_practice.to_byte_vec()),
+            ("training_stage_rotation", self.training_stage_rotation.to_byte_vec()),
         ]
     }
 }
@@ -227,6 +256,30 @@ mod tests {
             }
         }
         assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn the_lobby_fields_follow_the_rows_and_the_kept_stage_list() {
+        use crate::engine::stages::lobby_stages::{LobbyStageOrder, STAGES};
+        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
+        assert_eq!(factory.lobby_practice, OnOff::OFF);
+        assert_eq!(factory.training_stage_rotation, OnOff::OFF);
+        assert_eq!(factory.lobby_stages, LobbyStageOrder::NATIVE);
+        // all = 1 and no ranks: the whole catalog in its listed order
+        let mut order = vec![1u8];
+        order.extend(std::iter::repeat_n(0u8, STAGES.len()));
+        let text = format!(
+            r#"{{"menu":{{"lobby_practice":[1,0],"training_stage_rotation":[1,0],"lobby_stages":{order:?}}}}}"#
+        );
+        let loaded = crate::model::settings::parse(&text);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let view = TrainingModpackMenu::from_snapshot(&loaded.settings.menu);
+        assert_eq!(view.lobby_practice, OnOff::ON);
+        assert_eq!(view.training_stage_rotation, OnOff::ON);
+        assert_eq!(view.lobby_stages.stages().len(), STAGES.len());
+        // a malformed kept list is the native order, never a panic
+        let loaded = crate::model::settings::parse(r#"{"menu":{"lobby_stages":[9,9]}}"#);
+        assert_eq!(TrainingModpackMenu::from_snapshot(&loaded.settings.menu).lobby_stages, LobbyStageOrder::NATIVE);
     }
 
     #[test]

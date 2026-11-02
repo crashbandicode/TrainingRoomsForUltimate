@@ -1,13 +1,18 @@
 //! Adapters for the names the carried fork code expects from the fork's mixed files (package 6, docs/PACKAGE-6-PLAN.md section 2).
 //! Our code, small, and the only place the carried files' expectations are met: the carried files themselves are never edited.
 //!
-//! `grid` is unconditional (the carried stage grid names it); the typed-menu adapters stay test-only with the preload engine they
-//! serve until its runtime consumer lands.
+//! `grid` and `logging` are unconditional; the typed-menu adapters serve the engines that run on the Switch (the model/runtime
+//! split: `cfg(any(test, target_os = "switch"))`, the host build then has no dead code).
 
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 pub mod choice;
 pub mod grid;
-#[cfg(test)]
+pub mod logging;
+#[cfg(any(test, target_os = "switch"))]
+pub mod fixed;
+#[cfg(any(test, target_os = "switch"))]
 pub mod menu;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 pub mod menu_json;
+#[cfg(any(test, target_os = "switch"))]
+pub mod panel_view;

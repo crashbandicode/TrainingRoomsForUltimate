@@ -17,6 +17,12 @@ const RELEASE: &[&str] = &[
     "native-body-bank-alpha",
 ];
 
+/// PENDING DEVIATION from the shipped closure (operator decision L1, parked by the lead 2026-11-02): `deluxe-sdk` is left out of
+/// `default` until the Deluxe plugin SDK repository states a license (D3: a crate without a license is not added). The feature stays
+/// declared (the table is the fork's); it has no `dep:` entry and nothing to compile yet. Remove it from this list and put it back in
+/// `default` when L1 is answered.
+const PENDING_DEVIATIONS: &[&str] = &["deluxe-sdk"];
+
 /// Product features kept under a diagnostic-looking name (external boundary).
 const PRODUCT_DESPITE_NAME: &[&str] = &["cpu-pilot-probe"];
 
@@ -64,14 +70,33 @@ fn is_diagnostic_name(name: &str) -> bool {
 }
 
 #[test]
-fn default_features_are_exactly_the_shipped_release_list() {
+fn default_features_are_the_shipped_release_list_minus_the_pending_deviations() {
     let map = features();
     let default = map.get("default").expect("a default feature list");
-    let expected: Vec<String> = RELEASE.iter().map(|s| s.to_string()).collect();
-    assert_eq!(default, &expected, "`cargo skyline build --release` must build the shipped product");
+    let expected: Vec<String> =
+        RELEASE.iter().filter(|f| !PENDING_DEVIATIONS.contains(f)).map(|s| s.to_string()).collect();
+    assert_eq!(default, &expected, "`cargo skyline build --release` builds the shipped product except the pending deviations");
     for f in RELEASE {
         assert!(map.contains_key(*f), "release feature {f} is declared");
     }
+}
+
+#[test]
+fn the_only_deviation_from_the_shipped_closure_is_deluxe_sdk_pending_l1() {
+    // Explicit on purpose: a second deviation, or this one outliving L1, must change this test.
+    assert_eq!(PENDING_DEVIATIONS, &["deluxe-sdk"]);
+    let map = features();
+    let shipped = closure(&map, &["default"]);
+    assert!(!shipped.contains("deluxe-sdk"), "deluxe-sdk is not in the default closure while L1 is open: {shipped:?}");
+    let full: BTreeSet<String> = closure(&map, RELEASE);
+    let missing: Vec<&String> = full.difference(&shipped).collect();
+    // `automation-results-native` is not in either closure; what differs is `deluxe-sdk` alone.
+    assert_eq!(missing, vec![&"deluxe-sdk".to_string()], "the closure of the M5o list minus the default closure");
+    assert!(map.get("deluxe-sdk").is_some_and(|deps| deps.is_empty()), "no dep: entry until the license is stated");
+    assert!(
+        !MANIFEST.lines().filter(|l| !l.trim_start().starts_with('#')).any(|l| l.contains("deluxe-plugin-sdk")),
+        "the SDK crate is not a dependency"
+    );
 }
 
 #[test]

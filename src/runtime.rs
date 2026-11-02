@@ -7,7 +7,8 @@
 mod alloc;
 mod boot;
 mod clock;
-mod diag_log;
+mod compat;
+pub(crate) mod diag_log;
 #[cfg(feature = "diag")]
 mod diag_reload;
 mod features;
@@ -15,12 +16,18 @@ mod game;
 mod hub;
 mod import;
 mod install;
+mod lobby;
+mod mii;
+mod p1;
 mod published;
 mod ui;
 
 mod scene;
+mod seams;
 mod state_boot;
 mod state_natives;
+#[cfg(feature = "diag")]
+mod sync_probe;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {
