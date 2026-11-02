@@ -189,3 +189,49 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | unverified | Acceptance pending; no pass claimed. |
 | The model and effort gate and the per-thread watcher follow the routing authority (`/home/intpa/.codex/DELEGATION_ROUTING.md`); they are not restated here. | M | unverified | Acceptance pending; no pass claimed. |
 | Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | unverified | Acceptance pending; no pass claimed. |
+
+### Restart checkpoint — first compile, 2026-11-02 14:26Z
+
+HEAD e237f0f on stream/slim follows authorized merge dae0787. Fixes are UNCOMPILED.
+First cargo test failed with exit=101 before any tests ran:
+error[E0609]: no field `runs` on type `&ThreadStack`
+  --> tests/hook_locks.rs:69:16
+warning: unused import: `crc32` at src/model/cpu/hash.rs:98.
+Exact raw output: /tmp/slim/astra-host-first.log. No golden fixture generated.
+
+e237f0f preserves the three previous diag exclusions using stable ThreadId values;
+the sole crc32 test caller now imports its canonical owner directly.
+No added lint suppression, lock exemption, or behavior change intended.
+
+Operational state: CLAIMED 14:25Z / RELEASED 14:26Z on Surface, Codex 01a19c9f/slim,
+in the Yoga ledger. Queue line removed. No held claims, compiler, Eden or profile changes.
+No push, tag, release or card access. Target trainingrooms-slim exists and is retained for continuing work.
+Prebuild disk 245G free, aggregate targets 16G. Watcher 2608818 stopped/exited at handoff.
+Shared harness ledger.py and params.py read completely and reused read-only from
+/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-harness/eden/harness.
+No harness merge and no new admission tool.
+
+Next:
+1. Verify exact thread model/effort and rearm an owner-bound watcher.
+2. Finish applicable spec/index reads before further reductions. Read so far: brief, operating rules,
+handover, complete playbook README/docs/PROVENANCE, BUILD, DECISIONS, MENU-DRAFT via ranges,
+implementation-packages, SIZE-PLAN, IMPLEMENTATION-PROGRESS, CARRY-OVER via ranges
+(recheck stack/pkg6 C7 range if uncertain), TEMPLATE, SPEC-core-01, PACKAGE-6-PLAN,
+both carry tools and model/runtime module roots.
+3. Requeue Surface for one cargo test. Honor 3-minute release fairness and parallel owners.
+Use TR_HOST=surface, TR_OWNER="Codex 01a19c9f/slim", TR_PREFIX=sl, TR_STREAM=slim.
+Bounded helper: /usr/bin/python3 -I <harness>/ledger.py free, queue, claim, release.
+Check disk, target totals and live processes before claiming.
+4. SMD_GOLDEN_BLESS=1; systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800
+/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -File /tmp/slim/cg-inner.ps1
+-Args1 "test" -Log /tmp/slim/astra-host-second.log
+Release immediately and remove queue row even on failure.
+cg-inner.ps1 records exit=N but does not propagate cargo exit: inspect log.
+sw-inner.ps1 can copy a stale NRO on failure: never accept without successful compile evidence.
+Both existing wrappers were read completely.
+5. Inspect blessed fixtures; separately admitted unblessed repeat, then clippy, no-default,
+SMD/hos-lock tests, Switch release/diag, size and seam Eden gates.
+6. Only after prior edits are gated, retire approved probes through manifests and regenerate ledgers.
+Roster/Mii refactors require pkg6 baseline rows and integrated fixes.
+READY remains absent. All final acceptance criteria remain open; no operator blocker identified.
+
