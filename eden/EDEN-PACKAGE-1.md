@@ -144,3 +144,27 @@ ear/checked as before) |
 | release NRO has no hub_run | **pass** | byte search of dist/release/libtraining_rooms.nro: hub_run=False input_delay_cleared=False; the diag NRO has both (True) |
 | Unmapped / panic scan | **pass** | console.log panic\|abort\|crash\|Unmapped: 0 matches in tr105 (5726 lines) and tr106 (5694 lines); un.json and memory.peak kept (6,072,090,624 and 6,077,005,824 B) |
 | Released, profile restored | **yes** | both Downs live: false, left: []; the profile's plugins are the two original NROs, sha256 equal to source  (a restore step deleted the set-aside copies once; both were re-copied from  and verified); no display unit or lock left |
+
+## Input Delay at the caller-side sites, with and without the CPU pilot (2026-11-02, labels tr107 to tr110)
+
+Builds (hashes verified on the Surface and again after `scp` to the Yoga; worktree HEAD `e20416a`): release `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9`,
+diag `4792c91a4f631e797c8fcee41f3629dd5a39c0f0544437fd0fe5ac1d80c9e888`. Pilot: `libssbu_cpu_pilot.nro`, v0.2.1, sha256 `e30334261370a09453d5eeb36513a44c945440694d86d916375dfd83ef9c7582` (73,728 B), read-only copy from
+`/home/intpa/ssbu-cpu-pilot-install/switch-mtp-v0101-v021/pilot/after/…/skyline/plugins/` (the card's copy of the 2026-11-01 MTP preflight). Tile cursor as before.
+Same rules: Yoga, claim before and release after each Down (ledger 02:35Z/02:38Z, 02:38Z/02:41Z, 02:41Z/02:44Z, 02:44Z/02:46Z), own profile copy `t1`, muted (`volume.get` 0 each boot), display `:93`.
+Settings in every boot: Input Delay 5, L+R+A On, Hazards Off. Harness changes (`tr_eden.py`): `--nro path:installed-name`, the pilot's output folder is archived per label, and a `restore` command that returns
+the plugin set to source `b`'s by sha256 before it deletes anything.
+
+| Row | Label, set | Result | Evidence |
+| --- | --- | --- | --- |
+| A install line | tr107, release, no pilot | **pass** | `484967633 plugin=training_rooms/0.1.0 game=13.0.5 build=21450c64… input_caller_a_note=stock/near input_caller_a_apply=stock/near input_caller_b_note=stock/near input_caller_b_apply=stock/near reset_check=stock/near … input_delay=installed lra_reset=installed stage_hazards=installed reset_hub=installed settings: input_delay=5 lra_reset=on stage_hazards=off result=installed heap_allocations=0` (four caller sites replace the old `final_input_mapping`; every site `stock`); `practice-diagnostics.log` holds the session_start line |
+| A delay | tr107 | **pass** | continuous-run onset at macro frame **74** (`runs/tr107/probes/jump-scan`, noise floor 4.34, first frame above 6.5 is 8.58), baseline 69 from tr104 (same method, delay 0, the earlier release build, no pilot): +5 frames |
+| A L+R+A resets | tr107 | **pass** | `runs/tr107/lra-montage.png`: spawn, walked right, back at spawn after the chord |
+| B both install lines | tr108, release + pilot, default names | **pass** | ours as in A (`input_delay=installed … result=installed`); pilot `plugin=ssbu-cpu-pilot/0.2.1 level=3 … fim_valid=stock/near fim_exit=stock/near hud=stock/near ai_begin=stock/near guests=0 ai_end=stock/near guests=0 results_rematch=owner:stock/near … result=installed heap_allocations=0 menu=host_missing menu_allocations=0` (`runs/tr108/pilot-events.log`) |
+| B delay | tr108 | **pass** | onset **74** (noise floor 4.16), same as without the pilot |
+| B pilot still works | tr108 | install line only | no quick in-Training observable is documented (the pilot's source and docs are not on these hosts; its menu row needs the Deluxe host, `menu=host_missing`); its `fim_valid` and `fim_exit` sites installed (`stock/near`) beside our caller-side hooks |
+| C other load order | tr109, our NRO installed as `0libtraining_rooms.nro` | **pass** | both install lines identical in content to B; delay onset **74** (noise floor 4.46) |
+| Load-order evidence | tr108 vs tr109 | | birth time of each plugin's `events.log` (written at the end of its `main`; the plugins' ticks use different clocks and are not comparable): tr108 pilot `…45.315512119` before ours `…45.388512839` (pilot loaded first, 73 ms earlier); tr109 ours `…42.369255998` before pilot `…42.392256225` (ours first, 23 ms earlier). Files in `runs/tr108` and `runs/tr109/load-order-birth-times.txt`. Skyline loads in directory order, here by file name. |
+| D `hub_run` with the pilot | tr110, diag + pilot | **pass** | `485574919 #2 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=5` (Training entry), `#3` after the walk-then-L+R+A macro, `#4` after the chord-plus-stick hold, all `input_delay_cleared=5`; pilot line `plugin=ssbu-cpu-pilot/0.2.1 … result=installed` |
+| Release has no `hub_run` | `dist/release/libtraining_rooms.nro` | **pass** | byte search: `hub_run=False`; diag `hub_run=True` |
+| Unmapped / panic scan | tr107-tr110 | **pass** | `console.log` `panic\|abort\|crash\|Unmapped`: 0 matches in all four (5726, 5728, 5746, 5714 lines); `run.json` and `memory.peak` kept (6,061,506,560 / 6,008,090,624 / 6,022,520,832 / 6,024,269,824 B) |
+| Released, profile restored | | **yes** | every Down `alive: false`, `left: []`; `restore` matched the plugin set to source `b` by sha256 (`libarcropolis` 92171b2f4dbd, `libssbu_desync_detector` 7603ad747733) before it removed the per-label set-aside copies; no display unit or lock left |

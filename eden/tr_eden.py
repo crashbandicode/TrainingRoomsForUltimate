@@ -135,12 +135,14 @@ def prep(label, nros, settings, diag_txt):
         target = aside / f"{path.stem}.{label}-{int(time.time())}.nro"
         path.replace(target)
         receipt["set_aside"].append(target.name)
-    for nro in map(Path, nros):
+    for spec in nros:  # <path> or <path>:<installed name> (load order follows the file name)
+        src, _, name = spec.partition(":")
+        nro = Path(src)
         assert nro.suffix == ".nro" and nro.is_file(), f"missing NRO: {nro}"
-        shutil.copyfile(nro, plugins / nro.name)
+        shutil.copyfile(nro, plugins / (name or nro.name))
     receipt["plugins"] = {p.name: digest(p) for p in sorted(plugins.glob("*.nro"))}
-    assert not (plugins / "libtraining_modpack.nro").exists(), "fork NRO present"
-    for rel in (OUTPUT, Path("user/sdmc/ultimate/ssbu-tile-cursor")):
+    assert not any("training_modpack" in p.name for p in plugins.glob("*.nro")), "fork NRO present"
+    for rel in (OUTPUT, Path("user/sdmc/ultimate/ssbu-tile-cursor"), Path("user/sdmc/ultimate/ssbu-cpu-pilot")):
         previous = PROFILE / rel
         if previous.exists():
             archived = previous.with_name(f"{previous.name}.before-{label}")
@@ -239,7 +241,7 @@ def up(args):
     if busy:
         print(json.dumps({"active_claims": busy}))
         sys.exit(3)
-    nro_hashes = {Path(n).name: digest(n) for n in args.nro}
+    nro_hashes = {n.partition(":")[2] or Path(n).name: digest(n.partition(":")[0]) for n in args.nro}
     ledger(f"CLAIMED: {OWNER} TrainingRooms package-1 Eden rows (clean-room plugin boot/delay/hazard/reset), "
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
@@ -333,6 +335,38 @@ def scan(args):
     print(f"-- {len(text)} lines, {len(hits)} matching")
 
 
+def restore(args):
+    """Put the profile copy back to source b's plugin set: originals come back from the set-aside folder
+    (matched by sha256), this tool's NROs are removed, nothing is deleted until the set matches."""
+    sk = PROFILE / PLUGINS.parent
+    plugins, aside = PROFILE / PLUGINS, sk / "plugins-set-aside-trainingrooms-p1"
+    src_plugins = SOURCE / PLUGINS
+    want = {p.name: digest(p) for p in src_plugins.glob("*.nro")}
+    have = {p.name: digest(p) for p in plugins.glob("*.nro")}
+    pool = {digest(p): p for p in sorted(aside.glob("*.nro"))} if aside.is_dir() else {}
+    for name, h in want.items():
+        if have.get(name) == h:
+            continue
+        if name in have:
+            (plugins / name).unlink()
+        assert h in pool, f"original {name} not found in the set-aside folder"
+        shutil.copyfile(pool[h], plugins / name)
+    for name in list(have):
+        if name not in want:
+            (plugins / name).unlink()
+    final = {p.name: digest(p) for p in plugins.glob("*.nro")}
+    assert final == want, f"plugin set differs from source: {final} vs {want}"
+    if aside.is_dir():
+        for p in aside.glob("*.nro"):
+            p.unlink()
+        aside.rmdir()
+    for rel in list((PROFILE / "user/sdmc/ultimate").glob("TrainingRooms*")) + \
+            list((PROFILE / "user/sdmc/ultimate").glob("ssbu-tile-cursor*")) + \
+            list((PROFILE / "user/sdmc/ultimate").glob("ssbu-cpu-pilot*")):
+        shutil.rmtree(rel)
+    print(json.dumps({"restored": {k: v[:12] for k, v in final.items()}}))
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="op", required=True)
@@ -351,6 +385,8 @@ def main():
     p = sub.add_parser("down")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=down)
+    p = sub.add_parser("restore")
+    p.set_defaults(fn=restore)
     p = sub.add_parser("scan")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=scan)
