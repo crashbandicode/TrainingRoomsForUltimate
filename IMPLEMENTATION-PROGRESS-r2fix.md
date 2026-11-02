@@ -47,3 +47,15 @@ Regenerate the table after a runtime change:
 ## Switch builds (Yoga, `trainingrooms-build-r2fix`)
 
 See `eden/EDEN-R2FIX.md` for hashes and Eden rows.
+
+## Merged with work/implementation a3ec141 (2026-11-02)
+
+Merge commit `989081f` (pkg5 `1ed64fc`, package 6 `1497af6` + `5175312`, u4's texture helper). Conflict only in `src/runtime/boot.rs`. Gates on the merged tree: all
+host tests pass (59 test binaries), clippy `-D warnings` clean, `cargo build --no-default-features` ok. Switch builds on the Surface (own target, campaign rustup
+home): release `2976d3cfee4bc5493bbd1b0d0a835984ea2f56a513852db34b2240a4701d4d13` (resident 1,044,480 B = 1020 KiB), diag
+`4a5176d3db9980719d938551781efe5c7520146d150d4e326d5810ad8b003788` (resident 1,208,320 B = 1180 KiB). No Eden run on the merged tree (r2-01/r2-02 above ran on
+`c3befec`).
+
+Capability model after the merge: six site tables (`all_sites`), `Feature::P1Cpu` (its prerequisite list is now its closure), `Feature::UiTexture` (u4's rows, so a
+rejected texture row does not take the menu down; `texture::usable()` also asks the grant), package 6's lobby/Mii/roster/seam installer outside the model (own seam
+guards; their calls into `game::natives` / `state_natives` are behind the grant), boundaries `p1::frame`, `p1::input` and the texture functions.
