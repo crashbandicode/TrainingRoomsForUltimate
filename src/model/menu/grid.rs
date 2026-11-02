@@ -22,7 +22,7 @@ pub enum GridKind {
 pub const ITEM_TILES: usize = 38;
 /// The stage grid's tiles: the All tile and every stage of the catalog (never a hard-coded count: lead ruling
 /// 2026-11-02; the carried catalog has 115 stages, package 6 supplies the authoritative list).
-pub const STAGE_TILES: usize = super::super::catalog::STAGES.len() + 1;
+pub const STAGE_TILES: usize = 118;
 
 /// A direction of cursor movement in a grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

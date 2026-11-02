@@ -275,6 +275,7 @@ dependencies = [
 [[package]]
 name = "nx-layout-toolbox"
 version = "0.1.0"
+source = "git+https://github.com/crashbandicode/Toolbox-Cli?rev=9010ca890b6339346758fa68bb53075d24aa0f95#9010ca890b6339346758fa68bb53075d24aa0f95"
 dependencies = [
  "binrw",
  "byteorder",

@@ -9,7 +9,7 @@ use core::fmt::Write;
 use super::frame::{page_frame, Frame, RowLine, Text, Tone, View};
 use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
-use super::catalog::{ITEMS, STAGES};
+use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout};
 use super::menu::table::{Control, Row, GROUPS, ROWS};
 use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState};
@@ -250,11 +250,15 @@ fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame
 
 /// The label of tile `n` of a grid. The stage grid's first tile is All; the model counts 118 stage tiles (All and
 /// 117), the carried catalog lists 115 stages, so the tiles after them are numbered until the catalog is whole.
-fn tile_label(kind: GridKind, n: usize, short: bool, out: &mut Text<28>) {
+/// The label of stage `i` of the catalog (package 6's list, handed in by the runtime: this module is also compiled by
+/// the by-path test crates, which do not have the engine).
+pub type StageLabel = fn(usize) -> &'static str;
+
+fn tile_label(kind: GridKind, n: usize, short: bool, stage: StageLabel, out: &mut Text<28>) {
     let name: &str = match kind {
         GridKind::Items => ITEMS.get(n).copied().unwrap_or("-"),
         GridKind::Stages if n == 0 => "All",
-        GridKind::Stages => STAGES.get(n - 1).copied().unwrap_or("-"),
+        GridKind::Stages => stage(n - 1),
     };
     if short {
         // Docked tiles are narrow: the first 14 characters, cut at a space where there is one.
@@ -272,7 +276,7 @@ fn tile_label(kind: GridKind, n: usize, short: bool, out: &mut Text<28>) {
     }
 }
 
-fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cell: usize, frame: &mut Frame) {
+fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cell: usize, stage: StageLabel, frame: &mut Frame) {
     base(menu, screen, frame);
     frame.view = View::Tiles;
     frame.tile_cols = layout.cols;
@@ -280,7 +284,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     let len = layout.page_len(page).min(frame.tiles.len());
     for i in 0..len {
         if let Some(n) = layout.tile(page, i) {
-            tile_label(layout.kind, n, layout.short_names, &mut frame.tiles[i]);
+            tile_label(layout.kind, n, layout.short_names, stage, &mut frame.tiles[i]);
         }
     }
     frame.tile_count = len as u8;
@@ -369,7 +373,7 @@ fn external_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
 }
 
 /// The frame of whatever the menu shows now. Grid screens (`Screen::Grid`) are drawn by `grids`.
-pub fn frame_of(menu: &Menu, frame: &mut Frame) {
+pub fn frame_of(menu: &Menu, frame: &mut Frame, stage: StageLabel) {
     let Some(screen) = menu.screen().copied() else {
         page_frame(menu, frame);
         return;
@@ -384,7 +388,7 @@ pub fn frame_of(menu: &Menu, frame: &mut Frame) {
         Screen::Overrides { situation, cursor } => overrides_frame(menu, &screen, situation, cursor, frame),
         Screen::Chords { cursor } => chords_frame(menu, &screen, cursor, frame),
         Screen::ChordEntry { captured, .. } => chord_entry_frame(menu, &screen, captured, frame),
-        Screen::Grid { layout, page, cell } => grid_frame(menu, &screen, layout, page, cell, frame),
+        Screen::Grid { layout, page, cell } => grid_frame(menu, &screen, layout, page, cell, stage, frame),
         Screen::External(_) => external_frame(menu, &screen, frame),
     }
 }
@@ -402,7 +406,7 @@ mod tests {
 
     fn frame(m: &Menu) -> Frame {
         let mut f = Frame::new();
-        frame_of(m, &mut f);
+        frame_of(m, &mut f, |i| if i == 0 { "Battlefield" } else { "Stage" });
         f
     }
 
