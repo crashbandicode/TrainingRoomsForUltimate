@@ -4,11 +4,28 @@
 
 ## QUESTIONS
 
-- **Exact UI dependency requested19:04Z:** apply UI-owned adapted patch
+- **Owned fixture location verified19:19Z (for lead's missingfixture gate):** Yoga
+  /home/intpa/trainingrooms-build-pkg4/research/game-13.0.5/main-13.0.5.elf physicallyexists,
+  SHA0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2;
+  sibling nro/lua2cpp_common.nro SHA43876f961a80e413370629d32c23af9de6e4cc26b448bab88d5433714a566097.
+  These are validated owned13.0.5 fixtures, suitable read-only link/copy if leadresearchpathmissing.
+  No source skipflag or gate exemption; my nextfullhost67 willuse these samepaths.
+
+
+- **Admission mismatch (RESOLVED19:19Z) 2026-11-02T19:16:24.425010+00:00:** lead19:15 says pkg4diag67 is
+  Yogahead/shouldclaim, but currentrawqueue line130 is lead-r5 targeted909 retry, pkg4diag67 line131.
+  Fullledgeridle, ownadvice refusesNOThead; noownclaim. Candidate67 is READY TO BUILD andunchanged,
+  notwaitingfibercomposition. Please move completed/requeued lead line toEND perintendedordering
+  or explicitly authorize us as nextslot. No foreignline edit/bypass bypkg4. This queuedbuild has
+  beenready sinceFrameapproval/staging; no oldcooldown applied.
+
+
+- **Frame dependency RESOLVED19:10Z; fiber request still OPEN:** apply UI-owned adapted patch
   /tmp/ui-frame-root-for-pkg4-fabfaf6.patch (4files) plus narrow0c3cd63 three-file fiber root.
   Raw008b564 reset names3roster fields absent here; adaptedpatch correctly excludes them and absent
   Mii editor. No2241de2 stack increase requested. Both proposed source roots reviewed, notapplied;
-  recompute actual margin after composition. Slotphase root proven43056->27024/frame15616->4416.
+  Frame adapter applied exactly as authorized in67dfda6; diag67 queued Yoga, fullhost next.
+  Fiber0c3 notyet authorized/applied. Recompute actual margin after composition. Slotphase root43056->27024/frame15616->4416.
   fab fullhost capabilities+poison nowPASS with declaredtable unchanged; solefailure test scheduler
   seen0 fixed c14c7e6 (no productionprimitivechange), next hostgate pending.
 
@@ -35,14 +52,16 @@
   premature; retained failing evidence is correct. Scanner613 original regressions+poison PASS.
 
 
-- **Capabilities scanner613b8f0 ready for lead diff review (ungated):** lead18:38 authority applied.
+- **Capabilities scanner613b8f0 ready for lead diff review (target evidence PASS in fab):** lead18:38 authority applied.
   Frozen4d diagnostic witness exit0/1test: recorder::ai_epilogue -> recorder::on_ai_frame ->
   named_macros::finish_capture -> states::finish -> state_effects::run_charge -> natives::set_flag.
   Dot finish() incorrectly resolves unrelated free states::finish. Minimal receiver-only filter preserves
   ALL same-name receivers and direct/qualified resolution. Three original parsed-fixture regressions cover
   negative free/associated collision, both ambiguous receiver native dependencies, and direct/qualified
   free calls. No CROSS_NEEDS/poison tests changed. Exact git show613b8f0 -- tests/common/callgraph.rs;
-  Surface capabilities queuedEND, Yoga613b Switchdiag queuedEND (includes port-phase505 root).
+  fabfaf6 fullhost now passes capabilities cross-needs+poison with the table unchanged after actual
+  readiness calls use guarded game provider. All3fixture regressions pass; solefullhostfailure was
+  scheduler seen0, fixed c14. Old613 queues completed/withdrawn; current67 Frame candidate gating.
   Before fullhost4d:68suites9597pass/2fail/6ignored; failures only capabilities, all5mailbox/4archive/
   4hook_locks pass. Claims released; no runtime acceptance. Please review scanner diff before integration.
 
@@ -726,3 +745,19 @@ Compiled port::worker_tick depth43056->27024/frame15616->4416 afterphase split; 
 UI dependency refinement19:04Z: read UI owner's /tmp/ui-frame-root-for-pkg4-fabfaf6.patch completely and checked actual Frame fields. Prefer this ADAPTED four-file patch: raw008 reset also names tile_roster_grid/tile_cpu/tile_centre_last absent from pkg4base, so raw gitapply-check alone does NOT prove compilability. Adaptedpatch omits only those nonexistentfields, retains all existingfield resets/regression/worker scratch; noactualapplication. Lead authorize adapted exactpatch plus0c3fiber root, not raw008 wholesale.
 
 Applied exact lead19:10Z authorized four-file UI Frame adapter, patchSHA726fe71d9c7e862ec33d133ffd18d180d30ca1f720f39579c8f1deea60487d9e. No carriedfiles touched by patch, gitdiffcheckPASS; no budgets changed. Withdrew UNRUN c14host request before newfreeze (no claim). Current includes c14 scheduler fix; next combined fullhost and Switchdiag/compiledMenu margin. Fiber0c3 stillawaits exactauthority, noEdenacceptance.
+
+Frozen67dfda6 1113files staged/hashverified/refreshed in Yoga src/target and gate/target-gate; archive5e77d7eea79459fb9983fd938f794bcc3f1e0da8a2dacd6570acee5ac0204c7d. host/diag/clippy/nodefault wrappers prepared; ONLYdiag queued afterlead-r5. No ownclaim/Eden/profilemutation. Fullhostc14 neverran (withdrawn beforeFrame integration).
+
+
+Admission retry2026-11-02T19:18:51.219155+00:00: lead909r2 brieflyoccupiedoneYoga slot and pkg4wasnextunclaimed. FreshremoteMemAvailable23375268KiB/disk230GB/noEden done; byclaimrecheckleadreleasedbutcompletedlead-r5line remainedhead, so /tmp/pkg4-claim-diag67.py refused BEFOREledger mutation twice. Noownclaim/compiler. Please removecompletedownleadline; exact67 candidate remainsready unchanged. This is same coordinationmismatch above, notworkerunreadiness orfiberwait.
+
+
+ENDED/RELEASED 2026-11-02T19:19:19.403975+00:00: Yoga67dfda6diag CLAIMED19:19Z afterleadline removed; actualhead/ledgerclear, freshestremote22GiBavailable230GBfree/noEden. Controller75976, localscope run-p4015985-i16597775.scope/remotescope run-p1454510-i9844500.scope, ordered6G1800 incremental0. Source67frozen src/target unchanged; no profilemutation. Oncompletionrelease YogaONLY, removeownline, fetch dist/67dfda6 anddiaglog/exit, stack_depth table+worker path. Gatecopy67 ready fornextfullhost, notrunning.
+
+Diag67 controller75976 endedPASS0/41.45s andYogaRELEASED; ownline removed, fullhost67 appendedEND (preparedgate/source/fixtures) undercompile-before-waitingSlimEdenagreement. Noownliveclaim/Eden/profilemutation. FetchELF/staticMenu margin next.
+
+
+Fullhost67dfda6 PASS actualcargo0/wrapper0 controller77930 ended/released; exactsuitecount/hash/sourcepostverification next. BothFrame reuse and reader concurrency regression executed. Noownliveclaim/Eden/profilemutation.
+CompiledMenu67 static33376 (down54272), required61440 vsactual57344 STILLFAIL; dominant pathshim5808 ->sync_panels4960 ->on_pad336 ->browser_effect8832 ->archive.load2368 ->open_capture3024 ->serde4752. Owned root nowpreparedvia42-filecarry: separate source/JSON decoding from large editor construction/publication using noninlined read_capture_source/install_capture_source phases, samevalues/fences/order/allocations. No budgetraise/newqueue/delay/heapbox. Untestednewhunk notin67host gate.
+
+Fullhost67 exact receipt: {"suites": 68, "totals": [9656, 0, 6, 0, 0], "cargo_exit": "0", "log_sha256": "d58958065fd33e461a5a8debc52dbc9f4dba29025f3f13d61c11e44a15327b54", "warnings": 0, "skipped": 0, "artifacts": {"diag.nro": "bcb14e8e31d76b104168915de75e3483e5db2e636723cae3c15ff3f129bc7e49", "diag.so": "44bbbf2bc74fb54afdf835b8981c7729b7030a67b668caa2d527b4fbb1418fbe"}}; bothYoga gate/src1113trackedfiles posthashunchanged.

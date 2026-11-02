@@ -228,7 +228,22 @@ fn open_browser(expected_revision: Option<u64>) {
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
+/// The decoded source is small ownership metadata; its buffers remain worker-owned.
+struct CaptureSource {
+    session: ReplaySession,
+    name: String,
+    previous: Option<ReplaySession>,
+    miis: Option<crate::engine::mii::replay::ReplayMiis>,
+}
+
 fn open_capture(id: &str, revision: u64) -> Result<(), String> {
+    let source = read_capture_source(id)?;
+    install_capture_source(source, revision)
+}
+
+/// Finish archive/JSON decoding before reserving the large editor construction frame.
+#[inline(never)]
+fn read_capture_source(id: &str) -> Result<CaptureSource, String> {
     let (session, name, previous, miis) = match id {
         "latest" => (
             latest().ok_or("No latest Vault capture")?,
@@ -251,6 +266,13 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             (saved.session, saved.replay_name, None, saved.miis)
         }
     };
+    Ok(CaptureSource { session, name, previous, miis })
+}
+
+/// The editor publication fence and its payload live only after decoding has unwound.
+#[inline(never)]
+fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), String> {
+    let CaptureSource { session, name, previous, miis } = source;
     // Inspect the full owned session once, before ClipEditor selects/crops a track.
     let association=std::array::from_fn(|entry| {
         let miis=miis.as_ref().ok_or_else(||"This capture has no exact Mii configuration; ordinary Mii preferences cannot substitute".to_string())?;
