@@ -1,16 +1,18 @@
-"""F6 Eden rows (first-boot group-build hitch), run ON the Surface after `route_f6.py <label>` reached Training.
+"""F6 Eden rows, run on the Eden host after the shared harness route reached Training.
 
 Writes the boot settings with `settings` (before `up`), or drives laps with `laps`: waits until the preload has prefetched the
 groups (`[GroupSwap] prefetched`), then presses the P1 cycle chord (ZL + D-pad Right) and, with --cpu, the CPU chord (ZL + D-pad
-Left) N times each, every press gated on the role's `[BodyBank] ready owner=<role>` line (or a 20 s cap: a native Reload has no bank line), with a screenshot after each group build.
-Never opens the TrainingRooms menu (known hang on menu close, 2026-11-02): every option comes from the settings file.
+Left) N times each, every press gated on the role's `[BodyBank] ready owner=<role>` line.
+The native baseline explicitly selects --native-reload and requires `[CharacterRoster] complete owner=<role>`.
+A missing completion ends the lane with a retained failed receipt. Options come from the settings file.
 
 Usage: f6_rows.py settings <out.json>
-       f6_rows.py laps <label> [--p1 N] [--cpu N] [--settle S]
+       f6_rows.py laps <label> --harness <shared eden/harness> [--native-reload] [--p1 N] [--cpu N]
 Results: `eden/runs/<label>/laps.jsonl` (one record per press) and the diag lines it waited on.
 """
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -52,8 +54,16 @@ def settings(out):
 
 
 def laps(args):
-    import route_f6 as rt
-    sd = rt.SD / "TrainingRooms"
+    # Use the shared, reviewed harness; do not start or claim an instance here.
+    harness = Path(args.harness or os.environ.get("TR_HARNESS", str(HERE / "harness")))
+    if not (harness / "route.py").is_file():
+        raise SystemExit(f"shared harness missing: {harness}")
+    sys.path.insert(0, str(harness))
+    import params
+    import route
+    config = params.load()
+    session = route.session(args.label, config)
+    sd = config.data_dir
     diag, prev = sd / "practice-diagnostics.log", sd / "practice-diagnostics.previous.log"
     out = HERE / "runs" / args.label
     out.mkdir(parents=True, exist_ok=True)
@@ -81,34 +91,41 @@ def laps(args):
 
     def shot(name):
         try:
-            return str(rt.shot(args.label, name))
+            return str(session.t.shot(name))
         except (SystemExit, Exception) as exc:  # evidence, never a gate
             return f"shot failed: {exc}"
 
     start = 0
-    ready = wait_for(start, "[GroupSwap] prefetched", args.settle)
-    print("prefetched:", ready, flush=True)
+    if not args.native_reload:
+        ready = wait_for(start, "[GroupSwap] prefetched", args.settle)
+        if ready is None:
+            raise SystemExit("GATE FAIL: no prefetched group; no cycle inputs sent")
+        print("prefetched:", ready, flush=True)
     records = []
     for role, n in ((0, args.p1), (1, args.cpu)):
         for i in range(n):
             m = count()
-            rt.press(args.label, "zl,right" if role == 0 else "zl,left", 200)
-            queued = wait_for(m, "[CharacterRoster] queued", 8)
-            # this tree logs no `[CharacterRoster] complete`; the bank's ready line ends a bank swap (f6-03)
-            done = wait_for(m, f"[BodyBank] ready owner={role}", 20)
+            session.press("zl,right" if role == 0 else "zl,left", 200)
+            queued = wait_for(m, f"[CharacterRoster] queued owner={role}", 8)
+            completion = "[CharacterRoster] complete" if args.native_reload else "[BodyBank] ready"
+            done = wait_for(m, f"{completion} owner={role}", 20)
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
             rec = {"role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,
                    "shot": shot(f"r{role}-p{i + 1}") if any("[GroupSwap] built" in x for x in built) else None}
             records.append(rec)
+            # Persist each attempted lap, including a failure, before another input.
+            with (out / "laps.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")
+            if done is None:
+                shot(f"r{role}-p{i + 1}-gate-failed")
+                raise SystemExit(f"GATE FAIL: {completion} owner={role} missing after cycle")
             print(json.dumps({k: rec[k] for k in ("role", "press", "done")})[:300], flush=True)
             for x in built:
                 print("  ", x[:400], flush=True)
             # Let a prefetch of the next group finish before the next press (the planner's own pace).
-            wait_for(count(), "[GroupSwap] prefetched", args.gap)
-    with (out / "laps.jsonl").open("a", encoding="utf-8") as f:
-        for r in records:
-            f.write(json.dumps(r) + "\n")
+            if not args.native_reload:
+                wait_for(count(), "[GroupSwap] prefetched", args.gap)
     print("LAPS DONE", len(records), flush=True)
 
 
@@ -123,6 +140,8 @@ def main():
     s.add_argument("--cpu", type=int, default=0)
     s.add_argument("--settle", type=float, default=15)
     s.add_argument("--gap", type=float, default=6)
+    s.add_argument("--harness", help="shared eden/harness directory (or TR_HARNESS)")
+    s.add_argument("--native-reload", action="store_true", help="no bank prefetch; require native roster completion")
     a = p.parse_args()
     if a.op == "settings":
         settings(a.out)
