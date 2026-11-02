@@ -364,6 +364,23 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         fighter,
     };
 
+    #[cfg(feature = "diag")]
+    if DUMP.load(Ordering::Acquire) {
+        diagnostic(format_args!(
+            "[TrainingRooms] state pos entry={} kind={} x={} y={} lr={} dmg={} status={} situation={}",
+            raw.entry,
+            raw.kind,
+            natives::pos_x(accessor),
+            n::pos_y(accessor),
+            n::lr(accessor),
+            natives::damage(accessor, 0),
+            raw.status,
+            raw.situation
+        ));
+        if raw.entry == 1 && !nana {
+            DUMP.store(false, Ordering::Release);
+        }
+    }
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
@@ -943,6 +960,15 @@ pub fn start_writer() {
     }
 }
 
+/// Diag build: dump both fighters' positions at their next frames.
+#[cfg(feature = "diag")]
+static DUMP: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "diag")]
+fn request_dump() {
+    DUMP.store(true, Ordering::Release);
+}
+
 /// Diag build: the Eden tests drive the Save and Load chords by creating request files in the profile's
 /// `TrainingRooms` folder (`diag-save.req`, `diag-load.req`), which this thread consumes. Not in the
 /// shipped NRO.
@@ -950,7 +976,20 @@ pub fn start_writer() {
 pub fn start_diag_triggers() {
     let _ = std::thread::Builder::new().name("tr-state-diag".into()).stack_size(64 * 1024).spawn(|| loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
-        for (name, action) in [("diag-save.req", request_save as fn()), ("diag-load.req", request_load as fn())] {
+        // A settings file dropped by the test script replaces the live settings (the menu is not built yet).
+        if let Some(path) = FixedPath::<128>::in_root("diag-settings.json") {
+            if let Ok(bytes) = std::fs::read(path.as_str()) {
+                let _ = std::fs::remove_file(path.as_str());
+                let loaded = crate::model::settings::parse_bytes(&bytes);
+                crate::runtime::published::publish(&loaded.menu, 0);
+                diagnostic(format_args!("[TrainingRooms] state diag_settings applied issues={}", loaded.issues.len()));
+            }
+        }
+        for (name, action) in [
+            ("diag-save.req", request_save as fn()),
+            ("diag-load.req", request_load as fn()),
+            ("diag-pos.req", request_dump as fn()),
+        ] {
             if let Some(path) = FixedPath::<128>::in_root(name) {
                 if std::fs::remove_file(path.as_str()).is_ok() {
                     action();
