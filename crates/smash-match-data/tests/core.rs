@@ -4,10 +4,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use smash_match_data::archive::{open_timeline, read_manifest};
-use smash_match_data::clip::{ActorStatus, MissingReason};
-use smash_match_data::validate::{competitive_conformance, Conformance};
-use smash_match_data::*;
+use smash_match_data_oracle::archive::{open_timeline, read_manifest};
+use smash_match_data_oracle::clip::{ActorStatus, MissingReason};
+use smash_match_data_oracle::validate::{competitive_conformance, Conformance};
+use smash_match_data_oracle::*;
 
 // ---------------------------------------------------------------------------
 // Helpers

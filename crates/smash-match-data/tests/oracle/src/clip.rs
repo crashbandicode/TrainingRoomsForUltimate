@@ -498,20 +498,28 @@ impl<T: Clone> Tracker<T> {
     }
 }
 
-impl Capture {
-    pub fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {
+/// The clip methods of a whole `Capture` (inherent methods in the library before the slim stream moved this module).
+pub trait CaptureClip {
+    fn clip_context(&self, at: SelectAt) -> Option<ClipContext>;
+    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext>;
+    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]>;
+    fn clip_events_for(&self, start: SelectAt, end: SelectAt, actor: ActorId) -> Option<&[Event]>;
+}
+
+impl CaptureClip for Capture {
+    fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {
         clip_context(&self.events, at)
     }
 
-    pub fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {
+    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {
         clip_context_for(&self.events, at, actor)
     }
 
-    pub fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {
+    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {
         clip_events(&self.events, start, end)
     }
 
-    pub fn clip_events_for(
+    fn clip_events_for(
         &self,
         start: SelectAt,
         end: SelectAt,

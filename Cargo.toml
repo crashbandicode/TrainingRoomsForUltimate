@@ -26,6 +26,11 @@ smash-match-data = { path = "crates/smash-match-data" }
 # parking_lot and parking_lot_core out of the lock file.
 hos-lock = { path = "crates/hos-lock" }
 
+[dev-dependencies]
+# The test oracle of smash-match-data (reference Recorder, clip resolution, whole-capture helpers; test code only): the
+# capture parity tests of `model::macros::shared_capture` (slim stream, 2026-11-02).
+smash-match-data-oracle = { path = "crates/smash-match-data/tests/oracle" }
+
 [target.'cfg(target_os = "switch")'.dependencies]
 skyline = "=0.6.0"
 # Package 6 (D3, lead-accepted): the fork's game-call crate for the carried code. MIT (`license = "MIT"` in its Cargo.toml). Pinned to the rev of stage m5o's lock.

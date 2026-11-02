@@ -232,6 +232,16 @@ outside `automation_helper_native`. After the slice the census shows unconsumed 
 109,812 → 109,108 (−704). Eden: one boot row checks the install line (`seams=`/`seams_unchecked=` updated,
 `result=installed`, nothing named missing).
 
+## smash-match-data (Phase B, lead ruling 2026-11-02)
+
+The library keeps what the plugin uses: `archive` (writer, manifest, timeline reader), `model`, `validate`
+(`validate_header`, `StreamChecker`). Moved to the test-only oracle crate `crates/smash-match-data/tests/oracle`, where a
+consumer that needs them takes them (or from the upstream `smash-match-data-design` crate, git `faac04e`): `capture.rs`
+(`Recorder`, `RecorderOptions`, `Finished`, `CaptureError`), `clip.rs` (`clip_context*`, `clip_events*`,
+`selection_end*`, `ClipContext`, `Resolved`, `SelectAt`, the `Capture` clip methods as `CaptureClip`), `Capture::load`,
+`Capture::save` and `validate_capture` (`whole.rs`, `CaptureExt`). The plugin's parity tests still compare its writer with
+the `Recorder`; golden files pin the published bytes for outside readers. Count 109,108 → 108,159 (−949).
+
 ## 6. Phase B order (after stream/sync and stream/stack are merged)
 
 1. Never-compiled files and the uncompilable probe code (no Eden: the NRO does not change; carry-manifest edits).

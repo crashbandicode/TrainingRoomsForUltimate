@@ -8,6 +8,10 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 - **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
   use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
+- **Vendored crates' own tests** (2026-11-02): the root package has no workspace, so `cargo test` does not run
+  `crates/*/tests`. Each gate run adds one call per crate: `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
+  (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
+  `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
   operator's counter, `tools/sloc.py`: no blanks, comments or tests; `third_party/` excluded) and fails above
   `size-budget.toml`, or when that file records a raise without the lead's approval. `cargo test` runs it

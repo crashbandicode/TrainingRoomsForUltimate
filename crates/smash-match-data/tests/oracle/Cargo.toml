@@ -1,0 +1,13 @@
+[package]
+name = "smash-match-data-oracle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test oracle of smash-match-data: the reference Recorder, clip resolution and whole-capture helpers (test code only)"
+
+[lib]
+name = "smash_match_data_oracle"
+path = "src/lib.rs"
+
+[dependencies]
+smash-match-data = { path = "../.." }

@@ -1,7 +1,7 @@
 //! Review of selection boundaries and the operator's explicit competitive target.
-use smash_match_data::clip::{clip_events, SelectAt};
-use smash_match_data::model::*;
-use smash_match_data::validate::{competitive_conformance, Conformance};
+use smash_match_data_oracle::clip::{clip_events, SelectAt};
+use smash_match_data_oracle::model::*;
+use smash_match_data_oracle::validate::{competitive_conformance, Conformance};
 
 #[test]
 fn reversed_clip_is_invalid_while_equal_endpoints_are_empty() {

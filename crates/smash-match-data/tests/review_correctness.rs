@@ -1,6 +1,6 @@
 //! Shared selection regression from the operator's data-correctness review.
 //! Every fixture goes through Recorder and validates without even warnings.
-use smash_match_data::*;
+use smash_match_data_oracle::*;
 
 fn clock(n: u64) -> Clocks {
     Clocks::tick(n).with_record(n)

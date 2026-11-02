@@ -345,3 +345,14 @@ work, pkg6, pkg4, ui-screens, hitbox, deluxe and f6 trees (2026-11-02): each del
 
 Also recorded: `src/model/seams/native_seams/mod.rs` re-exports `model::guard`'s rule set instead of its copy (five edits).
 `tools/carry_pkg6.py ledger` lists a reason shared by many edits of one file once.
+
+### smash-match-data keeps what the plugin uses (lead ruling 2026-11-02)
+
+Recorded pkg4-manifest edits (`tools/carry_pkg4.py verify` re-derives every file from its source): `capture.rs` (the
+reference `Recorder`) and `clip.rs` (clip resolution; its inherent `impl Capture` becomes the trait `CaptureClip`) move to
+the test-only oracle crate `crates/smash-match-data/tests/oracle` (`smash-match-data-oracle`, a dev-dependency of the crate
+and of the plugin); `archive.rs` loses `Capture::load`/`save` and `validate.rs` loses `validate_capture`, both now
+`tests/oracle/src/whole.rs` (written here from those removed lines; `CaptureExt` keeps the method syntax); `lib.rs` and the
+crate's `Cargo.toml` follow; the crate tests `core.rs`, `review_correctness.rs`, `review_selection.rs` and the plugin's
+`shared_capture.rs` tests reach the moved parts through the oracle. New in `shared_capture.rs`'s tests: golden files
+(`tests/fixtures/smd-golden`) pin the published capture bytes, read by a plain JSON reader.

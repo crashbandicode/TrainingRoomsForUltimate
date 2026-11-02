@@ -117,7 +117,25 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "f5a43c2d99d21a44f7da738475195ea27a58bac90e52acf009b60f08f56fbd7b"
+   "dest_sha256": "2522d200491e6b1f41e00f2021d0e6e4cec778f7cf6d4f6917c223ade086b69b",
+   "edits": [
+    {
+     "old": "    use smash_match_data::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, Recorder, RecorderOptions};",
+     "new": "    use smash_match_data_oracle::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, validate_capture, CaptureExt, Recorder,\n        RecorderOptions};",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the parity oracle is the test-only oracle crate"
+    },
+    {
+     "old": "validate::validate_capture(",
+     "new": "validate_capture(",
+     "count": 2,
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the parity oracle is the test-only oracle crate"
+    },
+    {
+     "old": "                assert!(track.export(&window, \"boundary\", \"13.0.5\", &[expected.start.status + 1]).is_err());\n            }\n        }\n    }\n",
+     "new": "                assert!(track.export(&window, \"boundary\", \"13.0.5\", &[expected.start.status + 1]).is_err());\n            }\n        }\n    }\n\n    /// The bytes the plugin publishes for `session()` are pinned (`tests/fixtures/smd-golden`), and a plain JSON reader\n    /// that knows only `docs/FORMAT.md` reads them, as an outside consumer (Export, AI) would. `SMD_GOLDEN_BLESS=1`\n    /// rewrites the files after an intended format change (slim stream, 2026-11-02).\n    #[test]\n    fn the_published_capture_matches_the_golden_files_and_a_plain_reader() {\n        let golden = PathBuf::from(env!(\"CARGO_MANIFEST_DIR\")).join(\"tests/fixtures/smd-golden\");\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        for file in [MANIFEST_FILE, TIMELINE_FILE] {\n            let bytes = fs::read(dir.join(file)).unwrap();\n            if std::env::var_os(\"SMD_GOLDEN_BLESS\").is_some() {\n                fs::create_dir_all(&golden).unwrap();\n                fs::write(golden.join(file), &bytes).unwrap();\n            }\n            assert_eq!(bytes, fs::read(golden.join(file)).unwrap(), \"{file} differs from tests/fixtures/smd-golden\");\n        }\n        let manifest: serde_json::Value = serde_json::from_slice(&fs::read(golden.join(MANIFEST_FILE)).unwrap()).unwrap();\n        assert_eq!(manifest[\"format\"], \"smash-match-data\");\n        assert_eq!(manifest[\"timeline_file\"], TIMELINE_FILE);\n        assert_eq!(manifest[\"completion\"][\"state\"], \"complete\");\n        let text = fs::read_to_string(golden.join(TIMELINE_FILE)).unwrap();\n        let events: Vec<serde_json::Value> = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();\n        for (i, event) in events.iter().enumerate() {\n            assert_eq!(event[\"seq\"].as_u64(), Some(i as u64), \"seq strictly increasing from 0\");\n            assert!(event[\"clocks\"].is_object());\n            assert_eq!(event[\"body\"].as_object().map(|b| b.len()), Some(1), \"one kind per body\");\n        }\n        let end = &events.last().unwrap()[\"body\"][\"end\"];\n        assert_eq!(end[\"events\"].as_u64(), Some(events.len() as u64 - 1), \"the end line counts the lines before it\");\n        assert_eq!(manifest[\"completion\"][\"last_seq\"].as_u64(), Some(events.len() as u64 - 1));\n    }\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): golden files pin the published capture bytes for outside consumers"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/ui_anchor.rs",
@@ -339,7 +357,7 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "3499ed6485324a0a0dac609fa7c9c16f5502c57c98b2de797de722f9cbf78119",
-   "dest_sha256": "c21465eb04a85ae879fbbb3953bda7b70074eb62bead5b1be957bbeb52c61971",
+   "dest_sha256": "0fd110f7d144bd7311be48e0539795b625edcda7acb833dd67ce8ef497b5e438",
    "edits": [
     {
      "old": "//! * `replay`: saved-replay import behind the `replay` feature.\n",
@@ -350,6 +368,36 @@
      "old": "#[cfg(feature = \"replay\")]\npub mod replay;\n",
      "new": "",
      "reason": "the replay module is not vendored (see Cargo.toml)"
+    },
+    {
+     "old": "//! * [`capture`]: producer-side [`Recorder`] that validates as it records and\n//!   writes a streaming manifest + JSONL capture, or keeps events in memory.\n",
+     "new": "",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
+    },
+    {
+     "old": "//! * [`clip`]: selected-frame and clip-start state resolution.\n",
+     "new": "",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
+    },
+    {
+     "old": "//! * [`validate`]: rule checks shared by the recorder and offline validation.\n//!\n",
+     "new": "//! * [`validate`]: rule checks shared by the writer and offline validation.\n//!\n//! This copy carries what the TrainingRooms plugin uses. The reference producer (`Recorder`), the clip\n//! resolution and the whole-capture helpers are the test oracle crate `tests/oracle`.\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
+    },
+    {
+     "old": "pub mod capture;\npub mod clip;\n",
+     "new": "",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
+    },
+    {
+     "old": "pub use capture::{CaptureError, Finished, Recorder, RecorderOptions};\npub use clip::{\n    clip_context, clip_context_for, clip_events, clip_events_for, selection_end, selection_end_for,\n    ClipContext, Resolved, SelectAt,\n};\n",
+     "new": "",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
+    },
+    {
+     "old": "pub use validate::{validate_capture, Conformance, Issue, IssueCode};",
+     "new": "pub use validate::{Conformance, Issue, IssueCode};",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): capture, clip and validate_capture are the test oracle (tests/oracle)"
     }
    ]
   },
@@ -359,30 +407,43 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1",
-   "dest_sha256": "52da75eb9204cd93c1e73efccf5bdab46c4a9af33eaf657c58040e9b999a7d98",
+   "dest_sha256": "58a7031c094d23d587814852c0e4f019e1a1b68cbbdadcb4e8d76ff77e808ca5",
    "edits": [
     {
      "old": "serde_json::from_str(text)",
      "new": "serde_json::from_slice(text.as_bytes())",
      "reason": "size: the manifest is read with from_slice; reading the timeline lines through the same reader type shares one monomorphised deserializer per format type instead of a second copy for the string reader (the line was already valid UTF-8, a String); results are identical"
+    },
+    {
+     "old": "\n// ---------------------------------------------------------------------------\n// Whole-capture convenience\n// ---------------------------------------------------------------------------\n\nimpl Capture {\n    /// Load a capture directory fully into memory.\n    pub fn load(dir: impl AsRef<Path>) -> Result<Capture, ArchiveError> {\n        let dir = dir.as_ref();\n        let manifest = read_manifest(dir)?;\n        let mut reader = open_timeline(dir, &manifest)?;\n        let mut events = Vec::new();\n        while let Some(event) = reader.next_event()? {\n            events.push(event);\n        }\n        let completeness = reader\n            .completeness()\n            .cloned()\n            .unwrap_or(Completeness::Incomplete {\n                problems: vec![TruncationProblem::MissingEnd],\n            });\n        Ok(Capture {\n            manifest,\n            events,\n            completeness,\n        })\n    }\n\n    /// Write this capture to `dir`. Any existing `end` event is replaced by a\n    /// fresh one so the output is self-consistent. An `incomplete` source is\n    /// saved as `truncated` with the original problems in the reason.\n    pub fn save(\n        &self,\n        dir: impl AsRef<Path>,\n        options: &WriteOptions,\n    ) -> Result<Manifest, ArchiveError> {\n        let mut manifest = self.manifest.clone();\n        let mut writer = ArchiveWriter::create(dir, manifest.clone(), options)?;\n        let mut last_clocks = Clocks::NONE;\n        let mut count = 0u64;\n        for event in &self.events {\n            if matches!(event.body, EventBody::End { .. }) {\n                continue;\n            }\n            writer.write_event(event)?;\n            last_clocks = event.clocks;\n            count += 1;\n        }\n        let end_seq = writer.last_seq().map_or(0, |seq| seq + 1);\n        writer.write_event(&Event {\n            seq: end_seq,\n            clocks: last_clocks,\n            body: EventBody::End { events: count },\n        })?;\n        manifest.completion = match &self.completeness {\n            Completeness::Complete => Completion::complete(),\n            Completeness::DeclaredTruncated { reason } => Completion {\n                state: CompletionState::Truncated,\n                reason: reason.clone(),\n                events: None,\n                last_seq: None,\n            },\n            other @ Completeness::Incomplete { .. } => {\n                Completion::truncated(format!(\"re-saved {other}\"))\n            }\n        };\n        writer.finish(manifest)\n    }\n}\n",
+     "new": "\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): `Capture::load`/`save` are test oracle code (tests/oracle/src/whole.rs)"
     }
    ]
   },
   {
    "src": "src/capture.rs",
-   "dest": "crates/smash-match-data/src/capture.rs",
+   "dest": "crates/smash-match-data/tests/oracle/src/capture.rs",
    "crate": "smd",
    "root": "smd",
    "src_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
-   "dest_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc"
+   "dest_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
+   "edits": []
   },
   {
    "src": "src/clip.rs",
-   "dest": "crates/smash-match-data/src/clip.rs",
+   "dest": "crates/smash-match-data/tests/oracle/src/clip.rs",
    "crate": "smd",
    "root": "smd",
    "src_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc",
-   "dest_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc"
+   "dest_sha256": "750720745f3b6ef0a90d5253ce227c553ce8f987c3b7f83b504bc6c5321bca0b",
+   "edits": [
+    {
+     "old": "impl Capture {\n    pub fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {\n        clip_context(&self.events, at)\n    }\n\n    pub fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {\n        clip_context_for(&self.events, at, actor)\n    }\n\n    pub fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {\n        clip_events(&self.events, start, end)\n    }\n\n    pub fn clip_events_for(\n        &self,\n        start: SelectAt,\n        end: SelectAt,\n        actor: ActorId,\n    ) -> Option<&[Event]> {\n        clip_events_for(&self.events, start, end, actor)\n    }\n}\n",
+     "new": "/// The clip methods of a whole `Capture` (inherent methods in the library before the slim stream moved this module).\npub trait CaptureClip {\n    fn clip_context(&self, at: SelectAt) -> Option<ClipContext>;\n    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext>;\n    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]>;\n    fn clip_events_for(&self, start: SelectAt, end: SelectAt, actor: ActorId) -> Option<&[Event]>;\n}\n\nimpl CaptureClip for Capture {\n    fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {\n        clip_context(&self.events, at)\n    }\n\n    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {\n        clip_context_for(&self.events, at, actor)\n    }\n\n    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {\n        clip_events(&self.events, start, end)\n    }\n\n    fn clip_events_for(\n        &self,\n        start: SelectAt,\n        end: SelectAt,\n        actor: ActorId,\n    ) -> Option<&[Event]> {\n        clip_events_for(&self.events, start, end, actor)\n    }\n}\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): clip.rs is the test oracle (tests/oracle); a trait carries the clip methods of the foreign `Capture`"
+    }
+   ]
   },
   {
    "src": "src/model.rs",
@@ -398,7 +459,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524",
-   "dest_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524"
+   "dest_sha256": "c02db8a0e1343ed0fba5231f7f73aa823c72f3fdda9183fbac52933b136c16fb",
+   "edits": [
+    {
+     "old": "\n// ---------------------------------------------------------------------------\n// Whole capture\n// ---------------------------------------------------------------------------\n\npub fn validate_capture(capture: &Capture) -> Vec<Issue> {\n    let manifest = &capture.manifest;\n    let mut issues = Vec::new();\n    if manifest.format != FORMAT_NAME {\n        issues.push(Issue::error(\n            IssueCode::Format,\n            None,\n            format!(\"format is {:?}, expected {FORMAT_NAME:?}\", manifest.format),\n        ));\n    }\n    if !FORMAT_VERSION.can_read(manifest.format_version) {\n        issues.push(Issue::error(\n            IssueCode::Format,\n            None,\n            format!(\n                \"format version {} is not readable by {FORMAT_VERSION}\",\n                manifest.format_version\n            ),\n        ));\n    }\n    issues.extend(validate_header(&manifest.capture));\n\n    let mut checker = StreamChecker::new(&manifest.capture);\n    for event in &capture.events {\n        issues.extend(checker.check(event));\n    }\n\n    match &capture.completeness {\n        Completeness::Complete => {\n            if !checker.ended() {\n                issues.push(Issue::error(\n                    IssueCode::MissingEnd,\n                    None,\n                    \"capture claims complete but the timeline has no end event\",\n                ));\n            }\n        }\n        other @ Completeness::DeclaredTruncated { .. } => {\n            issues.push(Issue::info(\n                IssueCode::Completeness,\n                None,\n                other.to_string(),\n            ));\n        }\n        other @ Completeness::Incomplete { .. } => {\n            issues.push(Issue::warning(\n                IssueCode::Completeness,\n                None,\n                other.to_string(),\n            ));\n        }\n    }\n\n    if manifest.completion.state != CompletionState::Open {\n        if manifest.actors != checker.actor_summaries() {\n            issues.push(Issue::warning(\n                IssueCode::ManifestMismatch,\n                None,\n                \"manifest actor summary differs from the timeline\",\n            ));\n        }\n        if manifest.boundaries != checker.boundaries() {\n            issues.push(Issue::warning(\n                IssueCode::ManifestMismatch,\n                None,\n                \"manifest boundaries differ from the timeline\",\n            ));\n        }\n        if let Some(declared) = manifest.completion.events {\n            if declared != capture.events.len() as u64 {\n                issues.push(Issue::warning(\n                    IssueCode::ManifestMismatch,\n                    None,\n                    format!(\n                        \"manifest declares {declared} events but the capture holds {}\",\n                        capture.events.len()\n                    ),\n                ));\n            }\n        }\n    }\n\n    if manifest.capture.rules.target == RulesetTarget::Competitive {\n        match competitive_conformance(&manifest.capture.rules.actual) {\n            Conformance::Conforms => {}\n            Conformance::Deviates { reasons } => issues.push(Issue::warning(\n                IssueCode::RulesTarget,\n                None,\n                format!(\n                    \"actual rules deviate from the competitive target: {}\",\n                    reasons.join(\", \")\n                ),\n            )),\n            Conformance::Undetermined { unknown } => issues.push(Issue::info(\n                IssueCode::RulesTarget,\n                None,\n                format!(\n                    \"competitive conformance undetermined; unknown: {}\",\n                    unknown.join(\", \")\n                ),\n            )),\n        }\n    }\n    issues\n}\n\nimpl Capture {\n    pub fn validate(&self) -> Vec<Issue> {\n        validate_capture(self)\n    }\n}\n",
+     "new": "\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): `validate_capture` is test oracle code (tests/oracle/src/whole.rs)"
+    }
+   ]
   },
   {
    "src": "Cargo.toml",
@@ -406,7 +474,7 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "f0b6dba3d83cfed9e3761f1fd4a403b3340792d646dde7402689d8bd0315ab5d",
-   "dest_sha256": "c3041ae2837944d9eb41148aef6d65842b7b996b6b72f5a95a40160cd420642d",
+   "dest_sha256": "c7c956cb30f741a81f40ed84b6b885cb555e151b38ad15337e0d152942f2d6da",
    "edits": [
     {
      "delete_from": "[features]",
@@ -417,6 +485,11 @@
      "old": "smash-replay-core = { git = \"https://git.syntaxbyexample.com/intpa/smash-replay-export.git\", rev = \"bf84744fd7feeecc81ff3ed7495ffc63c8ae80fa\", optional = true }\n",
      "new": "",
      "reason": "the optional smash-replay-core git dependency is dropped with its feature"
+    },
+    {
+     "old": "sha2 = \"0.10\"\n",
+     "new": "sha2 = \"0.10\"\n\n# The test oracle (reference producer, clip resolution, whole-capture helpers); test code only.\n[dev-dependencies]\nsmash-match-data-oracle = { path = \"tests/oracle\" }\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the crate tests use the oracle crate"
     }
    ]
   },
@@ -434,7 +507,15 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032",
-   "dest_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032"
+   "dest_sha256": "ec639a3422f41b46601086b5cffffa20fde62f48231afbce05a665dc3ca27abd",
+   "edits": [
+    {
+     "old": "smash_match_data::",
+     "new": "smash_match_data_oracle::",
+     "count": 4,
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the tests reach the library and the moved parts through the oracle crate"
+    }
+   ]
   },
   {
    "src": "tests/review_archive.rs",
@@ -450,7 +531,15 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb",
-   "dest_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb"
+   "dest_sha256": "1a9fdf870e2c1681ef33610c0705c740873d17bf542aae2db185e6f22fa1a4e4",
+   "edits": [
+    {
+     "old": "smash_match_data::",
+     "new": "smash_match_data_oracle::",
+     "count": 1,
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the tests reach the library and the moved parts through the oracle crate"
+    }
+   ]
   },
   {
    "src": "tests/review_precision.rs",
@@ -466,7 +555,15 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db",
-   "dest_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db"
+   "dest_sha256": "1a690ee235ce045ee71a017366201f9631e092d0ac8d82ef8cb07163129c94c7",
+   "edits": [
+    {
+     "old": "smash_match_data::",
+     "new": "smash_match_data_oracle::",
+     "count": 3,
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): the tests reach the library and the moved parts through the oracle crate"
+    }
+   ]
   },
   {
    "src": "src/training/named_macros.rs",
@@ -563,8 +660,8 @@
      "old": "pub fn prepare_buffers() {\n    let mut motion = lock_write(&MOTION);\n    let wanted = training_mod_macros_max_frames();\n    let (captured, played) = (motion.captured.len(), motion.play.len());\n    if motion.captured.capacity() < wanted {\n        motion.captured.reserve_exact(wanted - captured);\n    }\n    if motion.play.capacity() < wanted {\n        motion.play.reserve_exact(wanted - played);\n    }\n}\n",
      "new": "pub fn prepare_buffers() {\n    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped\n    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.\n    let wanted = training_mod_macros_max_frames();\n    let (grow_captured, grow_play) = {\n        let motion = lock_read(&MOTION);\n        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)\n    };\n    if !grow_captured && !grow_play {\n        return;\n    }\n    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };\n    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };\n    {\n        let mut motion = lock_write(&MOTION);\n        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {\n            captured.append(&mut motion.captured);\n            std::mem::swap(&mut motion.captured, &mut captured);\n        }\n        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }\n}\n",
      "reason": "stream/sync (menu-close hang, 2026-11-02): a hook never waits on a lock another thread holds across real work; the Named-library buffer reservation (an allocation, on the publishing thread) runs before MOTION is taken, and the write lock only swaps the buffers"
-     },
-     {
+    },
+    {
      "old": "notification(\"Named Macro\".to_owned(), message.to_owned(), 180);",
      "new": "notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
      "reason": "package 6's notification facade takes Cow arguments (static text allocates nothing)"
