@@ -35,6 +35,17 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 | item PENDING | scene cancel and native item service; same lease/cancellation boundary |
 | hat STATES[2], SHORTCUT, OPERATOR_SHORTCUT | scene/input/service/save restoration; scene drops each role guard before optional reporting |
 | practice OWNED | scene/frame/destruction and save/record acquisition; entry checks precede acquire, guard released before clear_session_state |
+| practice-stage STATE | UI context/request/status, native stage update, scene departure; nonblocking refusal and epoch invalidation retained |
+| training-stage ROTATION | sequence initialization, entry/reentry, resource callback and direct-stage completion/departure; menu snapshot precedes rotation guard, stage STATE -> ROTATION order retained |
+
+The composed `4f9878d` diag ELF proves another cold scene path:
+`practice_stage_request::depart` at `0xa2018` calls its standard-mutex
+`try_lock` at `0x5c3f8`; the null branch at `0x5c408` reaches OnceBox
+initialization at `0x1f7e1c`. Nonblocking acquisition did not avoid lazy
+allocation. Neither stage owner's init acquires its lock. Stage-request
+retirement can enter ROTATION via `direct_uncertain`; the native sequence
+hook also acquires ROTATION on first use. Both now use the same constant
+primitive, with unchanged guard boundaries and callback ordering.
 
 Parent `character_roster` retains its standard Mutex import for unmodified probe
 and inherited owners. Explicit OwnerMutex types select only roster/waiting
