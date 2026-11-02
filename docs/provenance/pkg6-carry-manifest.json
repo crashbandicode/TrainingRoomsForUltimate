@@ -50,7 +50,9 @@
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
    "stage_menu": "crate::engine::stages::stage_menu",
-   "character_items": "crate::engine::items::character_items"
+   "character_items": "crate::engine::items::character_items",
+   "menu_json": "crate::engine::compat::menu_json",
+   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -83,6 +85,10 @@
    "saved": "crate::engine::mii::saved",
    "selection": "crate::engine::mii::selection",
    "transition": "crate::engine::mii::transition"
+  },
+  "byteflags": {
+   "byteflags": "crate::engine::compat::choice::byteflags",
+   "count": "crate::engine::compat::choice::count"
   }
  },
  "files": [
@@ -1001,6 +1007,35 @@
      "delete_from": "    #[test]\n    fn action_picker_discards_old_checks_and_preserves_ordinary_settings() {",
      "delete_to": "    #[test]\n    fn all_choices_round_trip_including_second_page() {",
      "reason": "the test drives the fork's full menu app: the fork's old menu structure (StatefulTable/SubMenu/App/create_app) is replaced by package 1's item-grid editor row and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_consts/src/cycle_preload_config.rs",
+   "dest": "src/model/preload/cycle_preload_config.rs",
+   "crate": "consts",
+   "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
+   "dest_sha256": "c4a1e933df47c0eeae62a83dc0a5bec7b2d2db5668adf46a0c34d1fe5770880b",
+   "edits": [
+    {
+     "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
+     "delete_to": "pub const fn default_slots()",
+     "reason": "the fork's menu-macro module `bank_submenu` (`impl_submenutrait!` of the fork's menu tables) is removed: the clean-room menu is package 1's editor rows (SPEC-core-02), which already list Ready Fighter Bodies; the choice type and its constants stay"
+    },
+    {
+     "delete_from": "mod ready_submenu {",
+     "delete_to": "/// Menu row index for a ready-fighter total.",
+     "reason": "the fork's menu-macro module `ready_submenu`, as above"
+    },
+    {
+     "delete_from": "    #[test]\n    fn character_extras_appends_one_control_per_fact() {",
+     "delete_to": "    #[test]\n    fn ic_pair_bank_defaults_on_needs_three_cells_and_parses_like_group_swap() {",
+     "reason": "test removed: it lists the fork's `create_app` Character Extras tab (ids, titles, toggle names); the clean-room rows, titles and option names are tested against package 1's menu table in `tests/core02_menu.rs`, and the factory rows against `compat::menu` (`the_factory_menu_is_the_factory_snapshot_row_for_row`)"
+    },
+    {
+     "old": "        let mut app = unsafe { crate::create_app() };\n        app.update_all_from_json(&serde_json::to_string(&selected).unwrap());\n        let committed: crate::engine::compat::menu::TrainingModpackMenu =\n            serde_json::from_str(&app.current_settings_to_json()).unwrap();\n",
+     "new": "        let committed: crate::engine::compat::menu::TrainingModpackMenu =\n            serde_json::from_str(&serde_json::to_string(&selected).unwrap()).unwrap();\n",
+     "reason": "the commit round trip no longer goes through the fork's `create_app` table (`update_all_from_json` / `current_settings_to_json`): the typed menu is serialised and read back directly, the same serde path"
     }
    ]
   }

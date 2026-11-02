@@ -50,3 +50,10 @@ Stream rules: `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`.
   package 2's fighter/accessor natives, package 3/4 stubs (`replay_preview::occupied`, `named_macros::*`, `save_states::is_loading`) as interface modules, `skyline_smash`
   (D3: MIT, rev 01bf583), and the `Seam` install API (`swap_native/seam_install.rs`) carried first.
 - Remaining by-path Mii tests (`quickplay_backend`, `ldn_backend`, `source_provenance`, `heap_metrics`, `ui_archive_name`, `replay185_headgear`) wait for the root files they include.
+
+## Successor worker, step 1 (2026-11-02): cycle_preload_config carried (C2a)
+- `cycle_preload_config.rs` carried (`engine::preload`, 2,719 lines, 37 carried tests; 4 manifest edits, see CARRY-OVER.md C2a). **No `byteflags` dependency**: `model::compat::choice` is a clean-room `byteflags!`/`count!` (the crate's macro forces `non_snake_case` allows and three git deps); the tool rewrites the carried `use byteflags::...`. Lead to be told (deviation from the accepted dependency).
+- `compat::menu`: 13 typed `cycle_preload_*` fields + Solo Popo, serde attributes as the fork, `from_snapshot` / `rows` (write-back), known default divergences pinned (`solo_popo_original`, `cycle_preload_measurements`: fork On, factory Off; lead decision wanted for the cycle_preload INI first-boot value). `compat::menu_json::parse_menu_file` stand-in.
+- Clean-room INI transaction tests (9) pass against the unchanged carried writer/reader. Gates at this commit: `cargo test` 2,480 pass, clippy `-D warnings` 0, `--no-default-features` builds. Switch builds not run (no runtime change; areas still `cfg(test)`).
+- Next: C6 (CPU-as-P1: needs `ssbu-cpu-pilot-core` dep check + Q11 fallback rows), then the C7 cluster (needs `skyline_smash`, `seam_install`, package 2/3/4 interfaces; list of exact needs goes to the lead).
+- Lead question answered in the report: lobby/rotation catalog = `training_mod_consts/src/lobby_stages.rs` `STAGES` (117 entries, id + label), carried as `engine::stages::lobby_stages::STAGES`.
