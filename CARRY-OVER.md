@@ -77,7 +77,6 @@ Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party
 used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
 `Cargo.toml`.
 
-<<<<<<< HEAD
 ## pkg5 (menu rendering and assets)
 
 Carried files (stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`;
@@ -97,7 +96,7 @@ Game data and the committed recipe: `assets/info_training.tra1` (about 11 KB) ho
 the plugin's own panes only; the dumped stock archive lives only under gitignored `eden/runs/` / scratch folders
 (`tests/ui_sites.rs` and the recipe tests never read it). `tools/layout-builder` is a host tool over the operator's MIT
 `nx-layout-toolbox` (docs/BUILD.md).
-=======
+
 ## pkg3 (save states), 2026-11-02
 
 Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`
@@ -159,4 +158,3 @@ Carried `training_mod_consts/src/cycle_preload_config.rs` (ours-new, m5o `49c8a7
 - **`cycle_preload.ini` is a regenerated boot cache** (`model::preload::boot_cache::sync`): settings.json is the only source of the active choice; the INI is written from it on first boot or when stale, rejected or missing, and is never read back to change the choice (6 host tests: first boot writes the player's settings, stale cache never overrides, rejected cache regenerated, failed write keeps the old file and the active choice, malformed rows fail closed).
 - **R1 durable publish**: recorded edit to `write_new`: `sync_all` failure now fails the store before the rename (the fork ignored it). Risk to check at the first Eden boot: if the Skyline std `File::sync_all` reports an error on the console, every store would fail; the E8 first-boot row exercises it.
 - **Stages unconditional** (`7f7b5f1`): see the commit message; `model::stages::catalog` is the facade for package 5.
->>>>>>> work/implementation

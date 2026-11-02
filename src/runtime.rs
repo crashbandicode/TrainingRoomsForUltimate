@@ -13,11 +13,9 @@ mod game;
 mod hub;
 mod install;
 mod published;
-<<<<<<< HEAD
 mod ui;
-=======
+
 mod scene;
->>>>>>> work/implementation
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {
