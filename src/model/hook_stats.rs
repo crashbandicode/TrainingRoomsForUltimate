@@ -320,7 +320,7 @@ mod tests {
         count_allocation();
         assert_eq!((hook_allocations(), load_allocations()), (hooks, loads), "outside a hook nothing is counted");
         let _scope = HookScope::enter_hook(HookId::UiArchive);
-        per_load(|| count_allocation());
+        per_load(count_allocation);
         assert_eq!((hook_allocations(), load_allocations()), (hooks, loads + 1));
         count_allocation();
         assert_eq!((hook_allocations(), load_allocations()), (hooks + 1, loads + 1), "a hook allocation outside per_load is the steady-state kind");
