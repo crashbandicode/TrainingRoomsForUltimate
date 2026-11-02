@@ -9,6 +9,7 @@ use std::thread::Thread;
 
 use parking_lot::Mutex;
 
+use crate::model::menu::grid::ConsoleMode;
 use crate::model::menu::input::Button;
 use crate::model::menu::{Env, Menu};
 use crate::model::settings::Settings;
@@ -98,11 +99,23 @@ pub fn start(settings: Settings) {
     }
 }
 
+/// The console's operation mode now (`nn::oe::GetOperationMode`: 0 handheld, 1 console/docked). SPEC-core-03 §2.5:
+/// read each time a grid opens; a mode change while a grid is open applies at its next opening.
+fn console_mode() -> ConsoleMode {
+    // SAFETY: a plain query with no arguments.
+    if unsafe { skyline::nn::oe::GetOperationMode() } == 0 {
+        ConsoleMode::Handheld
+    } else {
+        ConsoleMode::Docked
+    }
+}
+
 /// What the menu needs to know about the install now (SPEC-core-02 `Env`).
 fn env() -> Env {
     Env {
         developer_page: published::developer_page(),
         pilot_present: crate::runtime::ui::state::PILOT_PRESENT.load(Ordering::Acquire),
+        console: console_mode(),
         ..Env::default()
     }
 }
@@ -135,6 +148,7 @@ fn handle(code: u8, menu: &mut Option<Menu>) {
     if !OPEN.load(Ordering::Acquire) {
         return;
     }
+    m.set_console(console_mode());
     m.press(button);
     if m.is_closed() {
         close(m);
