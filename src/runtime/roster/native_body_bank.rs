@@ -1986,7 +1986,7 @@ unsafe fn registered_kind(r: Option<usize>, cell: usize) -> Option<u32> {
 /// K15 (`swap_model::copy_packages`): the member sets this bank may register, as descriptor words:
 /// the attached window and every group that holds keys or bodies. While no group does, nothing:
 /// the window's registration stays native's own.
-type CopyPackageSets = crate::engine::compat::fixed::FixedList<[u32; NATIVE_MEMBERS], { MAX_EXTRA_GROUPS + 1 }>;
+type CopyPackageSets = crate::engine::swap::swap_model::copy_packages::PackageSets;
 
 /// One native group's value-only teardown receipt. Bounds are its three cells,
 /// three context words, and those members plus the special-object prefetch key.

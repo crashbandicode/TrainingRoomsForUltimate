@@ -169,6 +169,42 @@ fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
 }
 
 #[test]
+fn changed_copy_holdings_preserve_reference_order_without_allocations() {
+    use crate::engine::swap::swap_model::{copy_packages as packages, copy_registry::*};
+    let mut held = packages::empty_holdings();
+    for generation in 0..128 {
+        let mut wanted = packages::empty_holdings();
+        let count = if generation % 7 == 0 { 0 } else { packages::MAX_HOLDINGS };
+        for i in 0..count {
+            let mut roster = [Record::DEFAULT; ENTRIES];
+            roster[0] = Record { entry: 0, kinds: [KIRBY, 0, 1], costume: (generation % 8) as u32 };
+            roster[1] = Record { entry: 1, kinds: [0x31, NO_KIND, NO_KIND], costume: 3 };
+            // Duplicate occurrences and surviving old values exercise matching,
+            // while repeated full replacement checks that history cannot grow.
+            assert!(wanted.push(packages::Acquisition { roster, set: [KIRBY, 0, 1],
+                member: ((i + generation) % 3) as u32, costume: 2 }));
+        }
+        let expected = packages::sync(&held, &wanted);
+        COUNT.with(|count| count.set(0));
+        TRACK.with(|track| track.set(true));
+        let plan = packages::sync_bounded(&held, &wanted);
+        let mut released = packages::empty_holdings();
+        for index in plan.release.iter() { assert!(released.push(held.remove(*index))); }
+        for acquisition in plan.acquire.iter() { assert!(held.push(*acquisition)); }
+        for acquisition in released.iter().chain(plan.acquire.iter()) {
+            std::hint::black_box(packages::roster_bytes(&acquisition.roster));
+        }
+        TRACK.with(|track| track.set(false));
+        assert_eq!(COUNT.with(Cell::get), 0);
+        assert_eq!(&*plan.acquire, expected.acquire.as_slice());
+        assert_eq!(&*plan.release, expected.release.as_slice());
+        let settled = packages::sync(&held, &wanted);
+        assert!(settled.acquire.is_empty() && settled.release.is_empty());
+        assert_eq!(held.len(), wanted.len());
+    }
+}
+
+#[test]
 fn activation_history_tracks_replacement_without_growing() {
     let mut history = crate::model::body_activation::History::<(usize, u32), 12>::new();
     COUNT.with(|count| count.set(0));

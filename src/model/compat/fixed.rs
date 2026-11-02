@@ -96,6 +96,15 @@ impl<T: Copy, const N: usize> FixedList<T, N> {
     }
 
     pub fn clear(&mut self) { self.len = 0; }
+
+    /// Remove one initialized item, preserving the order of the remaining items.
+    pub fn remove(&mut self, index: usize) -> T {
+        assert!(index < self.len);
+        let item = self.items[index];
+        self.items.copy_within(index + 1..self.len, index);
+        self.len -= 1;
+        item
+    }
 }
 
 impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {

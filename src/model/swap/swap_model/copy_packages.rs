@@ -33,6 +33,31 @@
 use super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};
 use super::request_bit::{acquired_keys, acquired_keys_iter, completion_members_iter, copy_key, released_keys};
 use std::collections::BTreeMap;
+use crate::engine::compat::fixed::FixedList;
+use crate::engine::swap::body_bank::{MAX_EXTRA_GROUPS, NATIVE_MEMBERS};
+
+/// The attached window plus the bank's physical groups; each has at most three
+/// completion members. This bounds native holdings, not the generic model API.
+pub type PackageSets = FixedList<[u32; NATIVE_MEMBERS], { MAX_EXTRA_GROUPS + 1 }>;
+pub const MAX_HOLDINGS: usize = (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS;
+pub type Holdings = FixedList<Acquisition, MAX_HOLDINGS>;
+
+pub const fn empty_holdings() -> Holdings {
+    Holdings::new(Acquisition { set: [NO_KIND; SUBS], member: NO_KIND, costume: 0,
+        roster: [super::copy_registry::Record::DEFAULT; ENTRIES] })
+}
+
+pub struct BoundedSync {
+    pub acquire: Holdings,
+    pub release: FixedList<usize, MAX_HOLDINGS>,
+}
+
+pub fn sync_bounded(held: &Holdings, wanted: &Holdings) -> BoundedSync {
+    let mut plan = BoundedSync { acquire: empty_holdings(), release: FixedList::new(0) };
+    sync_changes(held.iter().copied(), wanted.iter().copied(),
+        |value| assert!(plan.acquire.push(value)), |index| assert!(plan.release.push(index)));
+    plan
+}
 
 /// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is
 /// `0x17f0290(G68, roster, member, costume)` with the same values.
@@ -116,19 +141,25 @@ pub fn sync(held: &[Acquisition], wanted: &[Acquisition]) -> Sync {
 pub fn sync_iter(held: impl Iterator<Item = Acquisition> + Clone,
     wanted: impl Iterator<Item = Acquisition> + Clone) -> Sync {
     let mut acquire = Vec::new();
+    let mut release = Vec::new();
+    sync_changes(held, wanted, |value| acquire.push(value), |index| release.push(index));
+    Sync { acquire, release }
+}
+
+fn sync_changes(held: impl Iterator<Item = Acquisition> + Clone,
+    wanted: impl Iterator<Item = Acquisition> + Clone,
+    mut acquire: impl FnMut(Acquisition), mut release: impl FnMut(usize)) {
     for (i, want) in wanted.clone().enumerate() {
         let occurrence = wanted.clone().take(i).filter(|other| *other == want).count();
         if occurrence >= held.clone().filter(|other| *other == want).count() {
-            acquire.push(want);
+            acquire(want);
         }
     }
-    let mut release = Vec::new();
-    for (i, have) in held.clone().enumerate() {
+    for i in (0..held.clone().count()).rev() {
+        let have = held.clone().nth(i).expect("repeatable holdings iterator");
         let occurrence = held.clone().take(i).filter(|other| *other == have).count();
-        if occurrence >= wanted.clone().filter(|other| *other == have).count() { release.push(i); }
+        if occurrence >= wanted.clone().filter(|other| *other == have).count() { release(i); }
     }
-    release.reverse();
-    Sync { acquire, release }
 }
 
 /// The key multiset `held` keeps referenced in G68.
