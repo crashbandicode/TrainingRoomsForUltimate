@@ -652,3 +652,7 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
 - Resume trigger: integrator-3's work sha with ui-screens 71ba1f7 and pkg6's entry_active_body landed.- Note (slim, eb8e034): smash-match-data's capture.rs, clip.rs, Capture::load/save and validate_capture moved to the test-only oracle crate
   crates/smash-match-data/tests/oracle (recorded as pkg4-manifest edits, pkg4 ledger regenerated). Take it with the work merge; if design C touches
   those files, build on that commit.
+
+
+### 18:45Z capability before-fix witness
+Model gate reverified Astra/medium, existing hidden watcher active/no alert. Surface actual head/full ledger parsed/process idle/disk234GB; one admitted frozen4d44184 diagnostic test exit0, 1passed/154filtered. Exact witness: recorder::ai_epilogue -> recorder::on_ai_frame -> named_macros::finish_capture -> states::finish -> state_effects::run_charge -> natives::set_flag. This is diagnostic evidence, not capability acceptance. Raw log/exit in eden/runs/build-4d44184. Controller78318 ended; claim released and own queue line removed. No Eden/profile changes. Applying lead18:38 narrow receiver filter with original regressions next; current owned port-phase HEAD505ac1b remains ungated.
