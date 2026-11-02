@@ -140,6 +140,9 @@ def main():
     wait_match(label, "sss-t41.png", (45, 205, 435, 515), 8, 15, "stage name Pokemon Stadium 2")
     press(label, "a")
     wait_match(label, "css.png", (55, 50, 1225, 420), 12, 40, "character select")
+    if len(sys.argv) > 2 and sys.argv[2] == "--stop-at-css":
+        print("ROUTE STOPPED AT CSS", flush=True)
+        return
     press(label, "lstick,up")
     time.sleep(1)
     press(label, "a")

@@ -32,7 +32,7 @@ def main():
     op, label = sys.argv[1], sys.argv[2]
     rest = sys.argv[3:]
     if op == "route":
-        sys.argv = ["route_hb.py", label]
+        sys.argv = ["route_hb.py", label, *rest]
         r.main()
     elif op in ("lines", "count", "wait"):
         if op == "count":
