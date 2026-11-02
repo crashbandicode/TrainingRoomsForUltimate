@@ -395,8 +395,54 @@ def r_r5():
     row("R5: hook allocation delta 0 on every sample", lines and all(d == 0 for d in deltas[1:]), lines[-1] if lines else "none")
 
 
+def r_r5_soak():
+    """R5 acceptance: explicit fighters+hats, >=180 s of live zero-allocation samples."""
+    m, applied = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+                         "cycle_preload_sources": [0, 0, 1]}, "R5 fighters+hats soak")
+    plan = wait_for(m, "[CyclePreload] applied", 15)
+    configured = applied is not None and plan is not None and "slots=2 fighters=true hats=true" in plan
+    row("R5 fighters+hats settings applied", configured, plan)
+    if not configured:
+        return
+    samples = {}
+    deadline = time.monotonic() + 225
+    while time.monotonic() < deadline:
+        for line in after(m):
+            if "hook_stats allocations=" in line:
+                samples[stamp_of(line)] = line
+        stamps = sorted(samples)
+        if len(stamps) >= 2 and stamps[-1] - stamps[0] >= 180_000:
+            break
+        time.sleep(2)
+    ordered = [samples[t] for t in sorted(samples)]
+    (OUT / "r5-soak-samples.txt").write_text("\n".join(ordered) + "\n")
+    stats = [re.search(r"allocations=(\d+) delta=(\d+) hook_calls=(\d+)", line) for line in ordered]
+    span = max(samples) - min(samples) if samples else 0
+    live = len(stats) >= 2 and all(x and int(x[3]) > 0 for x in stats)
+    zero = bool(stats) and all(x and int(x[2]) == 0 for x in stats)
+    gaps = [b - a for a, b in zip(sorted(samples), sorted(samples)[1:])]
+    row("R5 >=3 minutes live fighters+hats with every allocation delta zero",
+        span >= 180_000 and live and zero and max(gaps, default=0) <= 25_000,
+        f"samples={len(stats)} span_ms={span} live={live} all_deltas_zero={zero} max_gap_ms={max(gaps, default=0)}")
+    # Preserve each cumulative hook counter as well; no scope is omitted from attribution.
+    counters = []
+    for line in ordered:
+        field = re.search(r" allocs=(\S+)", line)
+        counters.append(dict((name, int(value)) for name, value in
+                             re.findall(r"([^,:]+):(\d+)", field[1] if field else "")))
+    reached = set()
+    for line in ordered:
+        field = re.search(r" hooks=(\S+)", line)
+        if field:
+            reached.update(name for name, _ in re.findall(r"([^,:]+):(\d+)", field[1]))
+    names = sorted(reached | set().union(*(c.keys() for c in counters)))
+    deltas = {name: counters[-1].get(name, 0) - counters[0].get(name, 0) for name in names} if counters else {}
+    (OUT / "r5-hook-deltas.json").write_text(json.dumps(deltas, indent=2) + "\n")
+    row("R5 every named hook counter unchanged throughout soak", live and all(v == 0 for v in deltas.values()), deltas)
+
+
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "f9": r_f9, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "f9": r_f9, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5, "r5soak": r_r5_soak}
 
 
 def main():
