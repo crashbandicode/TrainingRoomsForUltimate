@@ -75,6 +75,8 @@ pub fn run() {
     cpu::set_lobby(false);
     // Package 4: the shortcuts file (fail-closed, created when absent) and the recorder's generator.
     chords::load_ini();
+    #[cfg(feature = "diag")]
+    crate::runtime::features::writer::start();
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
 

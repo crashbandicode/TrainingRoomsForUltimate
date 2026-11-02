@@ -9,3 +9,5 @@ pub mod notices;
 pub mod recorder;
 pub mod reset_hub;
 pub mod stage_hazards;
+#[cfg(feature = "diag")]
+pub mod writer;
