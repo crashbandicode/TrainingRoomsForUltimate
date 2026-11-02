@@ -126,6 +126,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             }
         }
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::ui::texture_probe::tick(panes);
 }
 
 /// A log line from the tick. The tick runs inside the UI hooks; its lines are the once-per-registration kind (layout
