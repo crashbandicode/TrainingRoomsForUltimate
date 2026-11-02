@@ -10,7 +10,7 @@
 use std::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 
 /// Which page of the menu is showing, as the Mii code asks: only "the menu's own page list is up" matters to it.

@@ -18,7 +18,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::cpu::defence::SdiAnswer;
 use crate::model::cpu::command::CmdFacts;
@@ -256,20 +256,23 @@ fn bump(which: usize) {
 #[inline(always)]
 fn bump(_which: usize) {}
 
+/// The last published settings generation the CPU adopted (only read and written under `CPU`).
+static ADOPTED: AtomicU32 = AtomicU32::new(0);
+
+/// Run `f` on the CPU state; a newly published value (`published::Live`) is adopted first. `CPU` is taken by game threads only
+/// (stream/sync): the menu worker publishes through `published`, never through this lock.
 fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
-    CPU.lock().as_mut().map(f)
+    let mut guard = CPU.lock();
+    let cpu = guard.as_mut()?;
+    if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
+        cpu.publish(live.cpu, crate::runtime::published::take_rerolls());
+    }
+    Some(f(cpu))
 }
 
 /// Create the state (boot, before any hook is installed).
 pub fn init(settings: CpuSettings, seed: u64) {
     *CPU.lock() = Some(Cpu::new(settings, seed));
-}
-
-/// A menu commit or the first publish: the new settings and the menu outbox's re-roll bits
-/// (decisions Q18 A, B11).
-pub fn publish(snapshot: &Snapshot, rerolls: u8) {
-    let settings = CpuSettings::from_snapshot(snapshot);
-    with(|cpu| cpu.publish(settings, rerolls));
 }
 
 /// The CPU takes the choices of the `reroll::*` bits again (package 6: the waiting room's practice start re-rolls every cached choice
@@ -733,7 +736,7 @@ unsafe fn apply_mash(accessor: usize, out: &FrameOut) {
         let attribute = EFFECT_CONCLUDE.load(Ordering::Acquire);
         if attribute != UNRESOLVED {
             let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
-            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
+            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, &[0.0; 3], 2.0, (0, 0, true, attribute));
         }
     }
 }
@@ -745,7 +748,7 @@ unsafe fn apply_tech(accessor: usize, out: &FrameOut) {
     }
     if let Some(status) = out.force_status {
         cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
-        natives::change_status_force(accessor, status);
+        natives::change_status_force(accessor, status, true);
     }
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if let (Some(value), true) = (out.hide.cursor, cursor != UNRESOLVED) {

@@ -331,6 +331,23 @@ fn state01_nana_handoff() {
     assert_eq!(nana_save.capture, None);
 }
 
+/// Solo Popo removed Nana (the runtime then reports `popo: false` for Popo, `states::nana_removed`): out of REBIRTH the load ends at
+/// Popo, no `NanaPosMove` marker waits for a second body that does not exist (SPEC-state-01 §5.3 step 9).
+#[test]
+fn state01_solo_popo_has_no_handoff() {
+    let mut rng = rng();
+    let s = settings();
+    let mut machine = machine_with(saved(10.0, 0.0, 1.0, GROUND, 0x4b), saved(1.0, 0.0, 1.0, GROUND, 7), 0);
+    request(&mut machine, &s, &mut rng);
+    machine.frame(&FrameIn { kind: 0x4b, ..input(0) }, &s, &mut rng);
+    machine.frame(&input(1), &s, &mut rng);
+    let solo = FrameIn { popo: false, kind: 0x4b, prev_rebirth: true, ..input(0) };
+    machine.frame(&solo, &s, &mut rng);
+    let placed = machine.frame(&FrameIn { status: StatusNow::Wait, ..solo }, &s, &mut rng);
+    assert!(!placed.nana_next, "no second body to hand the record to");
+    assert_eq!(machine.marker(Role::Player, 0), Marker::NoAction);
+}
+
 #[test]
 fn state01_save_captures_into_the_save_slot_only() {
     let mut rng = rng();

@@ -1489,9 +1489,8 @@ pub static STATE_SITES: [Site; 114] = [
     },
 ];
 
-/// Offsets the runtime names (each is a row above; `tests/state_sites.rs` checks them against the ELF).
-pub const STATE_POS_Y_OFFSET: usize = 0x206ae40;
-pub const STATE_LR_OFFSET: usize = 0x206af10;
+/// Offsets the runtime names (each is a row above; `tests/state_sites.rs` checks them against the ELF). The natives package 2 or 4
+/// already wraps (pos_y, lr, work get/set int, stage id) are called through `runtime::game::natives` only (one wrapper per native).
 pub const STATE_SET_LR_OFFSET: usize = 0x206af20;
 pub const STATE_SET_POS_OFFSET: usize = 0x206aea0;
 pub const STATE_INIT_POS_OFFSET: usize = 0x206adc0;
@@ -1517,12 +1516,9 @@ pub const STATE_ITEM_ACTIVE_COUNT_OFFSET: usize = 0x2144630;
 pub const STATE_ITEM_ACTIVE_ITEM_OFFSET: usize = 0x2144640;
 pub const STATE_ITEM_OBJECT_ID_OFFSET: usize = 0x20f4450;
 pub const STATE_ITEM_REMOVE_OFFSET: usize = 0x2144720;
-pub const STATE_WORK_GET_INT_OFFSET: usize = 0x208dbc0;
-pub const STATE_WORK_SET_INT_OFFSET: usize = 0x208dbd0;
 pub const STATE_WORK_ON_FLAG_OFFSET: usize = 0x208dc90;
 pub const STATE_WORK_OFF_FLAG_OFFSET: usize = 0x208dca0;
 pub const STATE_STATUS_REQUEST_OFFSET: usize = 0x20876c0;
-pub const STATE_STAGE_ID_OFFSET: usize = 0x227ebb0;
 pub const STATE_GET_PARAM_INT_OFFSET: usize = 0x208de30;
 pub const STATE_SET_DEAD_RUMBLE_OFFSET: usize = 0x2281a20;
 pub const STATE_REQ_QUAKE_OFFSET: usize = 0x1ff0ab0;

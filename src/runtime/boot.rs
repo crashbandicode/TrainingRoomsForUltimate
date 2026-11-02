@@ -66,6 +66,10 @@ pub fn run() {
         diag_log::flush();
         return;
     }
+    // The hook-sharing drill (feature `seam-drill`): with `foreign=` in diag.txt it hooks its sites as a plugin that does not share
+    // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::before();
 
     // 2. Panic policy (decision B2): log it, no pop-up. `panic = "abort"` then ends the process.
     std::panic::set_hook(Box::new(|info| {
@@ -79,6 +83,9 @@ pub fn run() {
     }
     #[cfg(feature = "diag")]
     crate::runtime::sync_probe::run();
+    // Diag build: the kernel arbiter the plugin's locks wait in answers as its source says (hos-lock README).
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!("[Sync] arbiter self_test {}", hos_lock::horizon::self_test()));
     let developer = read_developer_ini();
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
@@ -318,6 +325,8 @@ pub fn run() {
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -347,7 +356,7 @@ pub fn run() {
 fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
     let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
     let Ok(text) = fs::read_to_string(path.as_str()) else { return };
-    let mut poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
+    let poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
         match rows.iter().position(|row| row.name == name) {
             Some(i) => {
                 outcomes[i] = GuardOutcome::Foreign { first_diff: 0 };

@@ -515,13 +515,20 @@ fn cycle_original(role: Role) -> Option<u32> {
     Some(kind)
 }
 
-fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> std::borrow::Cow<'static, str> {
+fn notify_args(role: Role, args: std::fmt::Arguments<'_>) {
+    let title = if role == Role::Player {
+        "Player Character"
+    } else {
+        "CPU Character"
+    };
+    training::ui::notifications::notification_args(title.into(), args, 180);
+}
+
+fn notify_selection(role: Role, fighter: TrioFighter, slot: Option<usize>) {
     match slot {
-        Some(index) => format!("{}. {}", index + 1, fighter.name()).into(),
-        None if cycle_original(role) == Some(fighter.kind()) => {
-            format!("0. {}", fighter.name()).into()
-        }
-        None => fighter.name().into(),
+        Some(index) => notify_args(role, format_args!("{}. {}", index + 1, fighter.name())),
+        None if cycle_original(role) == Some(fighter.kind()) => notify_args(role, format_args!("0. {}", fighter.name())),
+        None => notify(role, fighter.name().into()),
     }
 }
 
@@ -638,7 +645,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         Some("Wait for the character swap to finish")
     } else if training::recording_or_playback() {
         Some("Finish recording or playback before swapping")
-    } else if unsafe { training::save_states::is_loading() } {
+    } else if training::save_states::is_loading() {
         Some("Wait for the save-state restore to finish")
     } else if lobby::native_ui_busy() {
         Some("Close the current game menu before swapping")
@@ -722,7 +729,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 pub fn cpu_reload_ready() -> bool {
     if busy()
         || training::recording_or_playback()
-        || unsafe { training::save_states::is_loading() }
+        || training::save_states::is_loading()
         || lobby::native_ui_busy()
         || button_config::has_pending_request()
         || menu::captures_input()
@@ -1198,7 +1205,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             trace!("[CharacterRoster] complete owner={} target={} kind=0x{:x} slot={:?} ticks={} body_id=0x{:x}",
                 owner, active.target.name(), active.target.kind(), active.slot.map(|i| i+1),
                 active.ticks, read::<u32>(read::<*const u8>(entry, 0x4160), 8));
-            notify(role, selection_label(role, active.target, active.slot));
+            notify_selection(role, active.target, active.slot);
         } else {
             // Departure cancels plugin intent, but the native entry may finish
             // before it is destroyed. Release only serialization; never publish
@@ -1410,7 +1417,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, target.kind());
         }
         role.sync_selection(target);
-        notify(role, selection_label(role, target, slot));
+        notify_selection(role, target, slot);
         trace!(
             "[CharacterRoster] already active owner={} kind=0x{:x} slot={:?}",
             owner,

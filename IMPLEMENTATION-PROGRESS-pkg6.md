@@ -107,3 +107,9 @@ The C7 cluster (layer 6 of `docs/provenance/pkg6-layers.md`) is one strongly con
 - Allocation points left in carried callbacks (for the diag R5 row): numbered `selection_label` text per completed swap, the two Mii `skipped` notices; plus worker B's list.
 - Eden sets A/B/D: not run (the unwired consumers above block most rows).
 
+
+## Third successor (rulings 1-3), 2026-11-02 10:40Z
+- Model gate: resumed as `claude-opus-5-5` / high (was `claude-sonnet-5-5` / high before the 10:17Z session end); the lead confirmed the pair is in policy. Hidden watcher `/tmp/pkg6-watch/watch-a3-opus.ps1` (model only, exits with the harness PID, log `watch-a3.log`). Playbook read in full at `ae87443`.
+- Commits: `0edad21` (package 1 API: the counting allocator's byte meter), `c008bcf` (ruling 1: one global allocator, `tools/feature_matrix.py`; ruling 2: helper dispositions, ledger sections). Tree identical to the lead's WIP `7f15bd0`.
+- Gates on this tree (Surface, 10:14-10:17Z): `cargo test` 7,771 pass, owned-ELF facts included (62 binaries, 0 failed); clippy `--all-targets -D warnings` clean. Pending: `--no-default-features`, Switch release + diag, `feature_matrix.py --set core --mode switch`, then Eden (Surface queue #1).
+- Claims: one claim per build (`/tmp/pkg6-watch/a3_gate.ps1`: claim, one cargo call, release, also on failure). Eden harness `eden/s6_eden.py` (Surface, profile `s6`, display `:98`).

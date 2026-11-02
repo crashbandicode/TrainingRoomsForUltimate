@@ -10,7 +10,7 @@
 
 use std::cell::Cell;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::input_adapter::InputAdapter;
@@ -65,6 +65,12 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 fn apply() {
     // A pass that made no call has no note.
     let (out, slot, holder) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0, 0))).unwrap_or((0, 0, 0));
+    // Package 6: the controller operating the CPU (native Behavior = Control) reaches the roster cycle's operator handlers.
+    if out != 0 && slot == 1 && scene::is_training() {
+        let controller = CONTROLLER.try_with(|cell| cell.get()).unwrap_or(0);
+        // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
+        unsafe { crate::runtime::roster::handle_operator_input(out as *mut MappedInputs, controller) };
+    }
     if out == 0 || !input_delay::applies(slot as i32, scene::is_training()) {
         return;
     }

@@ -11,7 +11,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
 use crate::model::ini_files;
@@ -68,6 +68,13 @@ pub unsafe fn on_poll(controller: usize) {
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let accepted = {
         let mut state = STATE.lock();
+        // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
+        // thread takes `STATE` while it works).
+        if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
+            state.chords = ChordSet { shortcuts: state.chords.shortcuts, ..live.chords };
+        }
+        let [first, second] = shortcuts();
+        state.chords.shortcuts = MenuShortcuts::new(first, second);
         state.style = style;
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
@@ -95,9 +102,24 @@ pub fn consume(request: Request) -> bool {
     STATE.lock().detector.consume(request)
 }
 
+/// The CPU cycle chord passes on the controller that operates the CPU (package 6: native Behavior = Control): its own raw sample,
+/// no pending flag.
+///
+/// # Safety
+/// `controller` is the live `Controller` pointer of the operator's poll, or 0.
+pub unsafe fn operator_cycle(controller: usize) -> bool {
+    if controller == 0 {
+        return false;
+    }
+    let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
+    let sample = Sample::of(read(field::STYLE), read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
+    let state = STATE.lock();
+    !blocked() && Detector::operator_cycle(&state.chords, sample)
+}
+
 /// Some shortcut request is pending (package 6's roster cycle waits for it to be handled).
 pub fn any_pending() -> bool {
-    STATE.lock().detector.any_pending()
+    STATE.lock().detector.has_pending_request()
 }
 
 /// The menu shortcut chord passed since the last call (the INI shortcuts, detected from the raw controller before
@@ -111,12 +133,9 @@ pub fn session_clear() {
     STATE.lock().detector.clear_session();
 }
 
-/// A menu commit or the first publish: the six chord rows replace the old ones as a whole; the
-/// shortcuts (they live in the INI) are kept.
-pub fn publish(snapshot: &Snapshot) {
-    let mut state = STATE.lock();
-    state.chords = state.chords.with_rows(snapshot);
-}
+/// The last published settings generation the detector adopted (only read and written under `STATE`). A publish replaces the six
+/// chord rows as a whole (`published::Live`); the shortcuts live in the INI and reach the detector through `SHORTCUT_MASKS`.
+static ADOPTED: AtomicU32 = AtomicU32::new(0);
 
 fn ini_path() -> Option<FixedPath<128>> {
     FixedPath::<128>::in_root(menu_shortcuts::FILE_NAME)
@@ -131,7 +150,6 @@ pub fn load_ini() {
     if let Some(error) = error {
         diagnostic(format_args!("[TrainingRooms] button_config.ini could not be created: {error}"));
     }
-    STATE.lock().chords.shortcuts = shortcuts;
     publish_shortcuts(shortcuts);
 }
 
@@ -140,9 +158,8 @@ pub fn load_ini() {
 /// the request: no file I/O here). A refused edit changes nothing; a failed write keeps the change in memory for
 /// the session and says so (SPEC-input-04 question 6 (b), (c)).
 pub fn commit_shortcut(slot: usize, chord: Chord) -> Result<(), ini_files::EditRefusal> {
-    let current = STATE.lock().chords.shortcuts;
-    let next = ini_files::check_edit(current, slot, chord)?;
-    STATE.lock().chords.shortcuts = next;
+    let [first, second] = shortcuts();
+    let next = ini_files::check_edit(MenuShortcuts::new(first, second), slot, chord)?;
     publish_shortcuts(next);
     crate::runtime::features::writer::request_shortcuts(next);
     Ok(())
