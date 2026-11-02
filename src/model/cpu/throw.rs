@@ -5,11 +5,12 @@
 //! playing recording unless *Settings override playback* is On (the caller checks it).
 
 use super::command::{CmdFacts, CmdOut};
-use super::counter::{CounterId, Counters};
+use super::counter::CounterId;
+use super::facts::FrameFacts;
 use super::ids::{Table, C, UNRESOLVED};
-use super::mash::{BufferContext, Mash};
-use super::rng::Rng;
+use super::mash::{Mash, Step};
 use super::settings::CpuSettings;
+use super::status::Situation;
 
 /// Indices of the Throw Options row.
 pub mod throw_option {
@@ -45,18 +46,8 @@ impl Throw {
 
     /// The throw and pummel rule for a command query (SPEC-cpu-06 §5 "Throws and pummels"). `cat2` is
     /// true for the category-2 query, on which the throw bits are delivered (question 1).
-    #[allow(clippy::too_many_arguments)]
-    pub fn step(
-        &mut self,
-        t: &Table,
-        s: &CpuSettings,
-        rng: &mut Rng,
-        counters: &mut Counters,
-        mash: &mut Mash,
-        ctx: BufferContext,
-        cat2: bool,
-        f: &CmdFacts,
-    ) -> CmdOut {
+    pub fn step(&mut self, step: Step, cat2: bool, f: &CmdFacts) -> CmdOut {
+        let Step { t, s, rng, counters, mash, ctx } = step;
         let mut out = CmdOut::default();
         let holding = t.is(C::StatusCatchWait, f.status) || t.is(C::StatusCatchPull, f.status) || t.is(C::StatusCatchAttack, f.status);
         // 1. Not holding anyone: forget the grab.
@@ -114,30 +105,19 @@ impl Throw {
 }
 
 /// The fast-fall rule (SPEC-cpu-06 §5 "Fast fall", once per frame): `true` when the flag and the
-/// flash effect are to be applied now.
-#[allow(clippy::too_many_arguments)]
-pub fn fast_fall_frame(
-    t: &Table,
-    s: &CpuSettings,
-    rng: &mut Rng,
-    counters: &mut Counters,
-    mash: &mut Mash,
-    airborne: bool,
-    falling: bool,
-    status: i32,
-    reserve_dive: bool,
-    playback_running: bool,
-) -> bool {
-    if !mash.rolled.fast_fall || !airborne {
+/// flash effect are to be applied now. A running playback (the step's context) yields.
+pub fn fast_fall_frame(step: Step, f: &FrameFacts) -> bool {
+    let Step { t, s, rng, counters, mash, ctx } = step;
+    if !mash.rolled.fast_fall || f.situation != Situation::Air {
         return false;
     }
-    if !falling {
+    if !f.falling {
         // Rolled at the apex, every frame until the fall begins.
         mash.rolled.fast_fall_delay = s.fast_fall_delay.pick(rng);
         counters.get(CounterId::FastFall).full_reset();
         return false;
     }
-    if !(t.is(C::StatusFall, status) || t.is(C::StatusAttackAir, status)) || playback_running || reserve_dive {
+    if !(t.is(C::StatusFall, f.status) || t.is(C::StatusAttackAir, f.status)) || ctx.playback.running || f.reserve_dive {
         return false;
     }
     !counters.get(CounterId::FastFall).should_delay(mash.rolled.fast_fall_delay)

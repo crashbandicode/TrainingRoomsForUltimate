@@ -7,8 +7,7 @@
 use super::counter::{CounterId, Counters};
 use super::facts::{FrameFacts, FrameOut, PlaybackStart};
 use super::ids::{Table, C};
-use super::mash::{BufferContext, Mash};
-use super::rng::Rng;
+use super::mash::Step;
 use super::settings::{situation, trigger, CpuSettings, Weights};
 use super::status::Situation;
 
@@ -44,6 +43,14 @@ pub fn effective(row: &Weights<10>, lobby_without_practice: bool) -> Weights<10>
     out
 }
 
+/// The transition-term hook's question: the body's status, the term asked about and the game's own answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TermQuery {
+    pub status: i32,
+    pub term: i32,
+    pub original: bool,
+}
+
 /// One body's ledge state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Ledge {
@@ -72,20 +79,11 @@ impl Ledge {
         self.delay = None;
     }
 
-    /// The game asks whether `term` is enabled for this body (`WorkModule::is_enable_transition_term`)
-    /// and the original answered `original`. SPEC-cpu-03 §4: deny the native automatic climb while the
-    /// CPU waits, delays, or waits for its playback to start; otherwise the original answer.
-    #[allow(clippy::too_many_arguments)]
-    pub fn transition_term(
-        &self,
-        t: &Table,
-        s: &CpuSettings,
-        counters: &Counters,
-        playback_running: bool,
-        status: i32,
-        term: i32,
-        original: bool,
-    ) -> bool {
+    /// The game's question `q` for this body (`WorkModule::is_enable_transition_term`). SPEC-cpu-03 §4: deny the
+    /// native automatic climb while the CPU waits, delays, or waits for its playback to start; otherwise the
+    /// original answer.
+    pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback_running: bool, q: TermQuery) -> bool {
+        let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
         if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
             return original;
@@ -104,17 +102,8 @@ impl Ledge {
 
     /// One frame of the ledge step (SPEC-cpu-03 §5). `playback_running` is an input playback that is
     /// not this feature's own: the feature yields entirely.
-    #[allow(clippy::too_many_arguments)]
-    pub fn frame(
-        &mut self,
-        t: &Table,
-        s: &CpuSettings,
-        rng: &mut Rng,
-        counters: &mut Counters,
-        mash: &mut Mash,
-        ctx: BufferContext,
-        f: &FrameFacts,
-    ) -> FrameOut {
+    pub fn frame(&mut self, step: Step, f: &FrameFacts) -> FrameOut {
+        let Step { t, s, rng, counters, mash, ctx } = step;
         let mut out = FrameOut::default();
         if ctx.playback.running || s.ledge_state.is_empty() {
             return out;

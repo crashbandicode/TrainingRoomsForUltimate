@@ -7,6 +7,8 @@
 //! angle, aerial delay, full hop, fast fall, falling aerial) are kept here so every entry point rolls
 //! them the same way.
 
+use super::counter::Counters;
+use super::ids::Table;
 use super::playback::PlaybackState;
 use super::rng::Rng;
 use super::settings::{CpuSettings, Weights};
@@ -139,6 +141,18 @@ pub struct BufferContext {
     /// A waiting scene with practice not enabled: `PLAYBACK_n` are removed from every Action row.
     pub lobby_without_practice: bool,
     pub playback: PlaybackState,
+}
+
+/// What one body's rule step works with (the ledge, out-of-shield and throw steps, the fast fall): the game's ids,
+/// the settings, the plugin's generator, this body's counters and mash, and the buffer context. `state::Cpu` builds
+/// one per call from its own fields.
+pub struct Step<'a> {
+    pub t: &'a Table,
+    pub s: &'a CpuSettings,
+    pub rng: &'a mut Rng,
+    pub counters: &'a mut Counters,
+    pub mash: &'a mut Mash,
+    pub ctx: BufferContext,
 }
 
 /// One fighter body's mash state.
