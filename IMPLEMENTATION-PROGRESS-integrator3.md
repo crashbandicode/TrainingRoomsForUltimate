@@ -41,14 +41,14 @@ nodef*.log, sw-*.log). Surface claims and releases: ledger lines 10:53/10:55Z, 1
 | pure logic in model with host tests; runtime only under cfg(switch) | M | pass | compliance: `src/lib.rs`; 7,826 host tests |
 | gates, one cargo call each | M | pass for `bf836c8`; open for `73831b8` | table above |
 | no heap in hooks: counting allocator, `heap_allocations=0` in the install line | M | machine half pass; runtime half open | compliance allocator row; `tests/hook_alloc.rs`; no Eden boot of the integrated NRO yet (the line must read `heap_allocations=0`) |
-| fixed buffers, writer thread on a static stack, stack-built paths | M | open (one point for the RC) | hooks: fixed buffers (`tests/hook_alloc.rs`); the install line is rendered into a `String` on the boot thread, outside hook scope (`install_line::render`, lead's direction, = ui-screens `8658812`) because a fixed buffer cut it twice (2,048 B, 8,192 B); the RC decides whether that counts as the fixed-buffer rule |
+| fixed buffers, writer thread on a static stack, stack-built paths | M | open → integrator-3 after sync (lead ruling: static buffer sized by a const from the site tables, host worst-case test, `result=line_overflow` never silent) | hooks: fixed buffers (`tests/hook_alloc.rs`); the install line is rendered into a `String` on the boot thread, outside hook scope (`install_line::render`, lead's direction, = ui-screens `8658812`) because a fixed buffer cut it twice (2,048 B, 8,192 B); the RC decides whether that counts as the fixed-buffer rule |
 | root cause or operator-approved workaround, listed with date; shared causes checked for one abstraction | M | open (list) | this integrator added no workaround; shared-cause abstraction applied: one wrapper per native (`2bd47c2`), one native-call grant layer (R2-1). The operator-approved workaround list across streams is the lead's to compile |
 
 ### Hook safety
 | Item | Tag | Result | Evidence |
 | --- | --- | --- | --- |
 | version guard, `result=unsupported_version` | M | pass (code + host tests) | `runtime/boot.rs` step 1, `model::version` tests |
-| 64-byte guard on every hooked, called and relied-on site | M | pass; compliance row **fails on a checker limit** | compliance: `884 guard(s) in src/, sizes [0, 64]`; the single "0" is `Site::EMPTY`'s initializer `guard: [0; GUARD_BYTES]` (`src/model/seams/native_seams/mod.rs:229`, `GUARD_BYTES = 64`), which the checker's regex does not read as an array of 64; every real guard is 64 bytes |
+| 64-byte guard on every hooked, called and relied-on site | M | pass; compliance row fails on a **recorded checker limit** (lead ruling 2026-11-02) | compliance: `884 guard(s) in src/, sizes [0, 64]`; the single "0" is `Site::EMPTY`'s initializer `guard: [0; GUARD_BYTES]` (`src/model/seams/native_seams/mod.rs:229`, `GUARD_BYTES = 64`), which the checker's regex does not read as an array of 64. Evidence that every real guard is the 64 bytes of 13.0.5: the host tests against the owned ELF (`core01_sites_match_owned_elf`, `cpu_common_guards_match_the_owned_module`, `tests/state_sites.rs`, `tests/cpu_sites.rs`), all passing in the gate runs above |
 | card scan of each site over a dated card copy | M | open | per stream (e.g. pkg2: 2026-11-01 10:19 MTP preflight copy, 16 plugins); no single scan of every offset of the integrated tables yet |
 | hook sharing / chaining; both stand-in modes and both load orders in Eden | C (applies: the CPU pilot and other card plugins share sites) | open | the drill is now buildable (`--features seam-drill`, `73831b8`); no Eden run of it on the integrated tree |
 | hook after the prologue, or call instead | M | open (RC review) | each row's `Placement` in the site tables; `Entry` placements are leaf thunks whose 16-byte far jump fits (row notes), to be reviewed as a list |
@@ -80,12 +80,12 @@ nodef*.log, sw-*.log). Surface claims and releases: ledger lines 10:53/10:55Z, 1
 ### Evidence and docs
 | Item | Tag | Result | Evidence |
 | --- | --- | --- | --- |
-| README: paragraph, full-screen GIF, install path, build commands, license, AI disclaimer | M | **fail** (compliance) | `README has a GIF, build commands and a license line`: fail; disclaimer row passes |
-| a GIF under docs/media | M | **fail** (compliance) | `docs/media/*.gif: none` |
+| README: paragraph, full-screen GIF, install path, build commands, license, AI disclaimer | M | **fail** (compliance) → pkg7 (RC row, lead ruling) | `README has a GIF, build commands and a license line`: fail; disclaimer row passes |
+| a GIF under docs/media | M | **fail** (compliance) → pkg7 (RC row) | `docs/media/*.gif: none` |
 | dated evidence doc | M | pass | compliance lists the dated docs |
 | numbers from committed, tested scripts | C | open | compliance `agent`: `tools/` has no `test_*.py`; applies wherever an evidence doc cites log-derived numbers |
 | no operator quotes, no claims beyond the tests | M | pass for this file | |
-| handoff file current | M | **fail** (compliance: `HANDOFF.md` missing) | the handoff is `TRAININGROOMS-HANDOFF.md` (lead's); the checker looks for `HANDOFF.md` only, so either rename/link or record the limit |
+| handoff file current | M | **fail** (compliance: `HANDOFF.md` missing) → pkg7 (RC row) | package 7 writes the plugin repo's `HANDOFF.md` (the playbook's name) with the illustrated summary; the campaign handoff `TRAININGROOMS-HANDOFF.md` stays the lead's |
 
 ### Release and card (no operator order)
 | Item | Tag | Result | Evidence |
