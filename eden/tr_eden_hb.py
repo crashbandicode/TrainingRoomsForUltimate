@@ -84,7 +84,7 @@ def open_claims():
     now = time.time()
     count, last = {}, {}
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d)Z (CLAIMED|RELEASED): (\S+ \S+)", line)
+        m = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d)(?::\d\d)?Z (CLAIMED|RELEASED): (\S+ \S+)", line)
         if not m or now - calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M")) > 12 * 3600:
             continue
         hosts = re.findall(r"\bon (?:the )?(surface|yoga|ally)\b", line, re.I)[:1] or re.findall(r"\b(surface|yoga|ally)\b", line, re.I)  # r2fix: a claim is on the FIRST "on <host>" phrase (a Surface compile claim that mentions "my Eden run is on the Yoga" is not a Yoga claim)
