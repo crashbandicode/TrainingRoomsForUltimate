@@ -206,6 +206,8 @@ pub(crate) mod slots {
     #[cfg(feature = "diag")]
     pub fn export_diag(slot: usize) { enqueue(SlotTransfer::export(slot), Completion::Export { diagnostic: true }); }
 
+    // Keep fixed transport construction out of the caller's file/JSON stack frame.
+    #[inline(never)]
     pub fn import(slot: usize, recording: &MacroRecording) -> Result<(), String> {
         let start = recording.start;
         let origin = Origin {
@@ -236,20 +238,25 @@ pub(crate) mod slots {
         });
     }
 
-    pub fn worker_slot_tick() {
+    enum Finished {
+        Export { diagnostic: bool, result: Result<(Vec<InputFrame>, StartState), crate::model::recording::ExportRefusal> },
+        Import { name: String, slot: usize, result: Result<(), crate::model::recording::ImportRefusal> },
+    }
+
+    // Finish all fixed-array transport work before callbacks can load/import another
+    // recording. Inlining would retain this frame across the completion's file work.
+    #[inline(never)]
+    fn receive_reply() -> Option<Finished> {
+        let mut finished = None;
         REPLY.drain(|message| {
             let pending = WORKER.lock().unwrap().pending.take();
             let Some((session, completion)) = pending else { return; };
             if message.cancelled || session != super::super::named_macros::session_revision() { return; }
             match completion {
                 Completion::Export { diagnostic } => {
-                    #[cfg(not(feature = "diag"))]
-                    let _ = diagnostic;
                     match message.transfer.result {
                         SlotResult::ExportFailed(error) => {
-                            super::super::named_macros::slot_export_failed(error.message());
-                            #[cfg(feature = "diag")]
-                            if diagnostic { super::super::diag::slot_export_complete(false); }
+                            finished = Some(Finished::Export { diagnostic, result: Err(error) });
                         },
                         SlotResult::Exported => {
                             let (frames, origin) = message.transfer.exported().unwrap();
@@ -259,9 +266,7 @@ pub(crate) mod slots {
                             let frames = frames.iter().map(|frame| InputFrame { buttons: frame.buttons,
                                 lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
                                 rstick_x: frame.rstick_x, rstick_y: frame.rstick_y }).collect();
-                            super::super::named_macros::slot_exported(frames, start);
-                            #[cfg(feature = "diag")]
-                            if diagnostic { super::super::diag::slot_export_complete(true); }
+                            finished = Some(Finished::Export { diagnostic, result: Ok((frames, start)) });
                         }
                         _ => unreachable!("export reply"),
                     }
@@ -272,10 +277,39 @@ pub(crate) mod slots {
                         SlotResult::ImportFailed(error) => Err(error),
                         _ => unreachable!("import reply"),
                     };
-                    super::super::named_macros::slot_imported(&name, slot, result);
+                    finished = Some(Finished::Import { name, slot, result });
                 }
             }
         });
+        finished
+    }
+
+    pub fn worker_slot_tick() {
+        if let Some(finished) = receive_reply() {
+            match finished {
+                Finished::Export { diagnostic, result } => {
+                    #[cfg(not(feature = "diag"))]
+                    let _ = diagnostic;
+                    let success = result.is_ok();
+                    match result {
+                        Ok((frames, start)) => super::super::named_macros::slot_exported(frames, start),
+                        Err(error) => super::super::named_macros::slot_export_failed(error.message()),
+                    }
+                    #[cfg(feature = "diag")]
+                    if diagnostic { super::super::diag::slot_export_complete(success); }
+                    #[cfg(not(feature = "diag"))]
+                    let _ = success;
+                }
+                Finished::Import { name, slot, result } =>
+                    super::super::named_macros::slot_imported(&name, slot, result),
+            }
+        }
+        send_next();
+    }
+
+    // A separate transport phase: no UI callbacks run with this fixed-array frame.
+    #[inline(never)]
+    fn send_next() {
         let mut worker = WORKER.lock().unwrap();
         if worker.pending.is_some() { return; }
         let current = super::super::named_macros::session_revision();

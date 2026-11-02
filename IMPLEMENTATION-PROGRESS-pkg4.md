@@ -4,18 +4,26 @@
 
 ## QUESTIONS
 
-- **Compiled stack root17:5xZ, implementation AUTHORIZED18:12Z:** diag59986e0 stack table FAIL
-  menu97776B against57344B. Exact path port::worker_tick15616 -> worker_events70608 ->
-  replay_capture::close_editor_revision3680. Mailbox::drain allocates [(u64,usize);N] on stack;
-  pkg4 Vault/Live4096-slot queues therefore instantiate65536B sort scratch, even for an empty drain.
-  Lead18:12Z authorized root fix: additive drain_with_scratch API taking caller-owned mutable sequence/index storage,
-  retaining exact sequence ordering/drop semantics; existing drain stays for small hook mailboxes.
-  Pkg4 worker allocates/reuses scratch on its own heap, outside hooks. Need lead authorization for narrow
-  crates/hos-lock/src/mailbox.rs interface hunk (no weakening bounds or worker stack-size workaround).
-  Prepared /tmp/pkg4-mailbox-scratch.patch (additive API + ordered/reuse/drop regression; tests/macro_mailbox.rs includes production mailbox unit tests in root cargo test) and
-  /tmp/pkg4-worker-scratch-manifest.patch (two worker-owned reusable Vec scratch consumers).
-  Shared patch passes git apply --check; unapplied/untested, no shared-crate edit yet.
-  No Eden boot on this unsafe compiled worker path.
+- **Capabilities gate18:31Z / shared scanner AUTHORIZED18:38Z:** fullhost4d44184 ran68 suites:
+  9597passed/2failed/6ignored/0filtered; only capabilities target fails. All5 mailbox tests, moved4archive
+  tests and hook_locks4 pass; new production crate compilation explicit, noSKIPPED lines.
+  Exact failures tests/capabilities.rs325 cross_needs_match_the_call_graph and390 poisoned-row:
+  recorder::ai_epilogue (recording) can call work_set_flag but its unit stays installed.
+  Raw /home/intpa/trainingrooms-build-pkg4-surface/host-4d44184.log lines1371-1389.
+  Current shared Graph::resolve(method=true) returns ALL same-name functions, including free functions;
+  unlike hook_locks's corrected receiver-qualified resolver. New hook-owned model method calls may collide
+  with unrelated free native state functions. Need witness/check before any capability table regeneration.
+  Request narrow shared Graph receiver-filter + regression authority, then recompute actual remaining
+  capability differences. No allowlist, no poison-test bypass, no blanket CROSS_NEEDS expansion.
+
+
+- **Mailbox scratch scope RESOLVED18:12Z / implementation4d44184:** Lead authorized the additive
+  hos-lock API and both worker consumers. Implemented worker-only reusable heap scratch, preserving
+  small drain, capacity/order/drop/single-consumer contracts. Root mailbox test entry includes5 tests
+  (concurrency, pending predecessor, undersized refusal, repeated reuse/full/drop/empty, original drain).
+  Carry42 passes; compile/stack/runtime gates remain OPEN. Original59986e0 Menu97776/57344 FAIL retained.
+  No stack budget increase. Fresh1113-file source4d44184 staged/verified and fullhost queuedEND.
+  Need exact UI integration if its older Frame path still dominates after this own root fix.
 
 - **UI fiber stack finding17:5xZ:** same59986e0 ELF hooks budget checks134 callbacks,1FAIL:
   ui_pass_calculate25104>16384; tick1792 -> chips::request10784 -> effect_texture::pictures11424.
@@ -140,6 +148,45 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- diag4d44184 NROcc953c7aec41541390bd990deea7c65a30e2968a4f55ab311c5edad58eaf5756,
+  ELFc7ec1a56185217e61aa6a56b4bcc4ac83e4d17590beef43651a1fba260c7b401, archived build-4d44184.
+  Static Menu97776->54272 but required86016>actual57344: FAIL. Deepest now UI publish_frame18240/
+  screens::base8864/page_frame9024/Frame::new7376; exact UI root composition stillneeded.
+  port::worker_events frame70608->7200, depth13088 proves large mailbox scratch removal.
+  Separate own port::worker_tick43056 path retained slot arrays15616 across diag completion ->
+  bind_to_slot15040/fileparse. Dirty ownport fix now separates receive_reply (fixed transport -> owned
+  completion), UI completion, send_next; no-inline phase boundaries keep arrays out of nested filework.
+  import fixedconstruction also isolated from caller JSONframe. No behavioral delay/bounds change,
+  no new hook allocation/budget increase; rustfmtparse/diffcheck only, freshcompileproof pending.
+- Lead18:38 authorized narrow common Graph receiver filter plus negative/positive/direct regression,
+  retaining all genuine ambiguous receivers and poisoned-row checks. Beforefix witness stillqueuedSurface
+  on exact4d originalscanner; no scanner/CROSS_NEEDS edit yet. No own claim/Eden/profile change.
+- RELEASED18:35Z Yoga Switchdiag4d44184 PASS0/42.59s, warnings remain, controller61007 ended; stack/hash audit next, no runtime acceptance. Prior remote scope run-p1380224-i9759353.scope,
+  wrapper diag-4d44184.ps1 ordered .log/.exit and successful NRO+ELF retained dist/4d44184.
+  ActualTRhead/fullledger/newpriority/noforkrequest/process clear;232GBfree,roots33GiB+local~21GiB.
+  Release immediately on completion. Surface no claim; capabilities explain witness queuedEND there.
+- Fullhost4d exact receipt Cargo101 (outertool1),68suites9597passed/2failed/6ignored/0filtered,
+  all5mailbox +4archive +hook_locks4 passed; fresh hos-lock/training_rooms compile, noSKIPPED.
+  All1113 source files unchanged after run. RawlogSHA420ebad901c8b2de36c4eaf294643e9408ff337ed5d7c95429aa4f5b99d55f11;
+  archived eden/runs/build-4d44184/host-4d44184.{log,exit},host-summary.json. OverallFAIL capabilities.
+- RELEASED18:31Z Surface fullhost4d44184 exit1, sole failed target capabilities; exact counts/failure analysis next. Controller61373 ended; no own Surface claim. Prior systemd run-p3793862-i16376557.scope,
+  wrapper /tmp/pkg4-surface-host4d.ps1, ordered /home/intpa/trainingrooms-build-pkg4-surface/host-4d44184.log/.exit.
+  Fresh1113-file source/sole emptytarget, both owned fixture hashes verified, cargo1.98.1,
+  incremental0/noSKIP,6GiB/1800s. Actualqueuehead/fullledger/priority/fork/process clear;236GBfree,
+  availablememory~15GiB, rootsupper19+33GiB under60. Release immediately on wrapper completion.
+  Yoga diagnostic4d stillqueued (UI precedes); no Yoga claim, no Eden/profile mutation.
+- Lead18:20 offered Surface for ready gates. Moved UNRUN fullhost4d44184 from Yoga to SurfaceEND;
+  UI0c3cd63 claimed while staging, so follow UI, never bypass. Local isolated
+  /home/intpa/trainingrooms-build-pkg4-surface/src1113 hashes verified, sole /target (new),
+  owned research symlink main/common hashes verified, cargo1.98.1. Wrapper /tmp/pkg4-surface-host4d.ps1,
+  ordered host-4d44184.log/.exit. Local237GBfree/targets18GiB + Yoga~33GiB leaves buildroom under60.
+  Queued separate Yoga Switchdiag4d44184 END using existing src/target, to prove stack on same source.
+  No pkg4 claim yet, no Eden/profile mutations. Recheck raw ledger/process/disk before either admission.
+- Frozen4d44184 (currentHEAD) staged to Yoga gate/target-gate and src/target;1113 files each hash-match
+  archive dc84f88b5b0c1ed13581ce7a9ac50930e5ac4d8a9e0fa3cb67ecbd7414915123.
+  host-4d44184.ps1 and diag-4d44184.ps1 prepared; ONLY fullhost queuedEND, no own claim.
+  Host has both owned native fixtures/noSKIP. Scratch patch applied withlead18:12authority.
+  Need fullhost then one queuedSwitchdiag/compiledstack evidence before any Eden.
 - Lead18:12Z authorized additive mailbox scratch API + two worker consumers. Applied; small drain and
   capacity/order/drop/single-consumer semantics unchanged. Worker-only Vec scratch allocated once/reused.
   Added pending-predecessor and undersized-refusal tests plus repeated reuse/full/drop/empty; existing
