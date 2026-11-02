@@ -754,3 +754,25 @@ Manifest artifacts/trainingrooms-nro-archive/slim/cache-cleanup-61b0aab/
 surface-target-manifest.json saysdeleted. Source, NRO, ELF, rawlogs, receipts and
 stack reports retained. OwnYoga61target remains for continuing source work; a
 future claim requires a fresh global census, not the superseded47GB figure.
+
+### 2026-11-02 20:04Z — exact guard checker limitation
+Reproduced compliance.py's guard regex over every src Rust file. Of849matches,
+the sole non-64 literal count is src/model/seams/native_seams/mod.rs:143,
+Site::EMPTY's guard: [0; GUARD_BYTES]. GUARD_BYTES is re-exported from model/guard.rs,
+whose line13 defines64; Site.guard and Seam.guard are typed[u8;GUARD_BYTES].
+This is a valid64-byte repeat initializer, not a zero-length guard. The report's
+sizes[0,64] is the literal-hex regex limitation. No initializer expansion, test
+waiver or shared checker edit was made merely to turn the scanner green.
+61host raw log630/633/850 namesPASS for wp_a2/wp_a3 guard tests and
+engine::seams::native_seams::tests::compared_rows_match_the_owned_elf, using the
+hash-verified owned ELF. This resolves the machine size finding manually only;
+it does not certify every install/ownership/runtime row or change the retained
+compliance exit1. Broad guard acceptance remains separately evidenced/pending.
+
+### 2026-11-02 20:08Z — coordination dependency remains open
+No new lead integration/native authorization found; lead STATUS/checkpoint still
+records its bounded turn closed19:38Z. Requested asynchronously that the primary
+resume tr-lead-astra-3 to resolve the existing top QUESTIONS. This is not a grant
+of authorization and not a READY/operator-blocker declaration. The goal remains
+active, with no owned claims/compiler/Eden/profile/queue. NativeText proposal is
+still scratch-only. Do not re-run old-source Eden to fill this wait.
