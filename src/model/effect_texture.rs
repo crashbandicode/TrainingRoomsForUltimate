@@ -156,6 +156,77 @@ pub struct TextureInfo {
     pub format: u32,
 }
 
+/// Only the emitter fields printed by the picture diagnostic. The four key
+/// arrays are used transiently to calculate tint; keeping them in every picture
+/// inflated the UI fiber path beyond its 16 KiB budget.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EmitterColourSummary {
+    pub scale: f32,
+    pub sources: [Source; 4],
+    pub fixed0: [f32; 4],
+    pub fixed1: [f32; 4],
+}
+
+impl From<&EmitterColours> for EmitterColourSummary {
+    fn from(colours: &EmitterColours) -> Self {
+        Self { scale: colours.scale, sources: colours.sources, fixed0: colours.fixed0, fixed1: colours.fixed1 }
+    }
+}
+
+/// How many pictures one visual keeps (each emitter's distinct textures; the 13.0.5 file has 4 per visual).
+pub const MAX_PICTURES: usize = 8;
+
+/// One texture of an effect: what to draw, and the emitter colour to tint it with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Picture {
+    pub texture: TextureInfo,
+    /// The emitter (index in its set) and sampler (0-2) that name the texture first.
+    pub emitter: usize,
+    pub sampler: usize,
+    /// Colour 0 at life 0.3 times the colour scale (`model::effect_texture::tint_rgba`), white when the emitter's colour fields are not readable.
+    pub tint: [u8; 4],
+    pub colours: Option<EmitterColourSummary>,
+}
+
+/// The textures of one visual.
+#[derive(Clone, Copy, Debug)]
+pub struct Pictures {
+    pub set: usize,
+    pub emitters: usize,
+    pub count: usize,
+    pub pictures: [Option<Picture>; MAX_PICTURES],
+}
+
+/// The distinct textures of the emitters of `visual`, in emitter then sampler order.
+pub fn pictures<M: Memory>(mem: &M, common: Common, visual: Visual) -> Result<Pictures, Absent> {
+    let set = effect_set(mem, common.effn, visual.effect_name())?;
+    let emitters = emitters(mem, common.resource, set)?;
+    let mut out = Pictures { set, emitters: emitters.count, count: 0, pictures: [None; MAX_PICTURES] };
+    for (e, emitter) in emitters.emitters.iter().take(emitters.count).enumerate() {
+        let colours = mem.bytes(emitter.emtr, EMTR_BYTES).and_then(EmitterColours::parse);
+        for (k, slot) in emitter.slots.iter().enumerate() {
+            if *slot == SLOT_NONE || out.pictures.iter().flatten().any(|p| p.texture.slot == *slot) {
+                continue;
+            }
+            // A slot this resource does not hold belongs to the parent resource the particle system falls back to (its slot resolver
+            // recurses into it): the chip does not draw that sampler, the others stay.
+            let texture = match texture_of_slot(mem, common.resource, *slot) {
+                Ok(texture) => texture,
+                Err(Absent::NoTexture) => continue,
+                Err(other) => return Err(other),
+            };
+            if out.count < MAX_PICTURES {
+                out.pictures[out.count] = Some(Picture { texture, emitter: e, sampler: k, tint: colours.as_ref().map_or([255; 4], tint_rgba), colours: colours.as_ref().map(EmitterColourSummary::from) });
+                out.count += 1;
+            }
+        }
+    }
+    if out.count == 0 {
+        return Err(Absent::NoTexture);
+    }
+    Ok(out)
+}
+
 /// What the plugin keeps of an emitter: its binary's address, the textures its three samplers use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Emitter {
@@ -590,6 +661,80 @@ mod tests {
             m.put_u64(brti + BRTI_VIEW, brti as u64 + 0x1_0000);
         }
         m
+    }
+
+    #[test]
+    fn picture_metadata_keeps_the_tint_and_diagnostic_fields_without_key_arrays() {
+        // The callback may hold both the returned collection and a selected
+        // picture. Full EmitterColours in each slot exceeded the fiber budget.
+        assert!(core::mem::size_of::<Pictures>() <= 2048);
+        let mut m = game();
+        let mut bytes = emtr_bytes();
+        bytes[emtr::COLOUR_SCALE..emtr::COLOUR_SCALE + 4].copy_from_slice(&0.0f32.to_le_bytes());
+        m.put(EMTR0, &bytes);
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        let first = found.pictures[0].unwrap();
+        assert_eq!(first.tint, [179, 179, 255, 255]);
+        let summary = first.colours.unwrap();
+        assert_eq!(summary.scale, 0.0);
+        assert_eq!(summary.sources, [Source::Keyed, Source::Fixed, Source::Fixed, Source::Random]);
+        assert_eq!(summary.fixed0, [1.0, 1.0, 1.0, 0.19]);
+        assert_eq!(summary.fixed1, [0.0, 0.457, 1.0, 1.0]);
+        m.put(EMTR0 + emtr::COLOUR_SCALE, &f32::NAN.to_le_bytes());
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert!(found.pictures.iter().flatten().all(|p| p.tint == [255; 4] && p.colours.is_none()));
+    }
+
+    fn add_texture(m: &mut Image, index: usize, slot: Slot) {
+        let brti = BRTI0 + index * 0x1000;
+        if index >= 2 { m.region(brti).resize(0x100, 0); }
+        m.put_u64(BRTI_ARRAY + index * 8, brti as u64);
+        m.put(brti, b"BRTI");
+        m.put_u32(brti + BRTI_FORMAT, 0x1a01);
+        m.put_u32(brti + BRTI_WIDTH, 64);
+        m.put_u32(brti + BRTI_HEIGHT, 256);
+        m.put_u64(brti + BRTI_SLOT, slot);
+        m.put_u64(brti + BRTI_VIEW, brti as u64 + 0x1_0000);
+    }
+
+    #[test]
+    fn pictures_keep_first_slot_occurrence_in_emitter_then_sampler_order() {
+        let mut m = game();
+        let (a, b, c) = (0x0000_0007_0000_0011, 0x0000_0007_0000_0012, 0x0000_0007_0000_0013);
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, 3);
+        m.put_u32(RES + RESOURCE_TEXTURE_COUNT, 3);
+        add_texture(&mut m, 2, c);
+        // A duplicate never changes its first emitter/sampler; a parent-only
+        // slot is skipped without hiding a later resident texture.
+        for (i, slots) in [[b, a, b], [a, 0xdead, b], [c, SLOT_NONE, a]].iter().enumerate() {
+            let at = EMITTERS + i * EMITTER_STRIDE;
+            m.put_u64(at + EMITTER_EMTR, EMTR0 as u64);
+            for (k, slot) in slots.iter().enumerate() { m.put_u64(at + EMITTER_SLOTS[k], *slot); }
+        }
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert_eq!((found.set, found.emitters, found.count), (2, 3, 3));
+        let actual: Vec<_> = found.pictures.iter().flatten().map(|p| (p.emitter, p.sampler, p.texture.slot)).collect();
+        assert_eq!(actual, [(0, 0, b), (0, 1, a), (2, 0, c)]);
+    }
+
+    #[test]
+    fn pictures_retain_the_first_eight_distinct_slots_at_capacity() {
+        let mut m = game();
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, MAX_EMITTERS as u32);
+        m.put_u32(RES + RESOURCE_TEXTURE_COUNT, (MAX_EMITTERS * 3) as u32);
+        for i in 0..MAX_EMITTERS * 3 {
+            let slot = 0x0000_0007_0000_0011 + i as u64;
+            add_texture(&mut m, i, slot);
+            let at = EMITTERS + (i / 3) * EMITTER_STRIDE;
+            m.put_u64(at + EMITTER_EMTR, EMTR0 as u64);
+            m.put_u64(at + EMITTER_SLOTS[i % 3], slot);
+        }
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert_eq!(found.count, MAX_PICTURES);
+        for (i, picture) in found.pictures.iter().enumerate() {
+            let p = picture.unwrap();
+            assert_eq!((p.emitter, p.sampler, p.texture.slot), (i / 3, i % 3, 0x0000_0007_0000_0011 + i as u64));
+        }
     }
 
     #[test]

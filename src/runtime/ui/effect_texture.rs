@@ -17,7 +17,7 @@
 use core::slice;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use crate::model::effect_texture::{self as facts, Absent, Common, EmitterColours, Memory, TextureInfo, Visual, EMTR_BYTES};
+use crate::model::effect_texture::{self as facts, Absent, Common, Memory, Visual};
 use crate::model::guard::GuardOutcome;
 use crate::model::sites_u4b::{self, SITES};
 use crate::model::sites_ui::decode_adrp_ldr;
@@ -101,59 +101,11 @@ pub fn locate() -> Result<Common, Absent> {
     facts::find_common(&Live, manager().ok_or(Absent::Manager)?)
 }
 
-/// How many pictures one visual keeps (each emitter's distinct textures; the 13.0.5 file has 4 per visual).
-pub const MAX_PICTURES: usize = 8;
+pub use crate::model::effect_texture::{Picture, Pictures, MAX_PICTURES};
 
-/// One texture of an effect: what to draw, and the emitter colour to tint it with.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Picture {
-    pub texture: TextureInfo,
-    /// The emitter (index in its set) and sampler (0-2) that name the texture first.
-    pub emitter: usize,
-    pub sampler: usize,
-    /// Colour 0 at life 0.3 times the colour scale (`model::effect_texture::tint_rgba`), white when the emitter's colour fields are not readable.
-    pub tint: [u8; 4],
-    pub colours: Option<EmitterColours>,
-}
-
-/// The textures of one visual.
-#[derive(Clone, Copy, Debug)]
-pub struct Pictures {
-    pub set: usize,
-    pub emitters: usize,
-    pub count: usize,
-    pub pictures: [Option<Picture>; MAX_PICTURES],
-}
-
-/// The distinct textures of the emitters of `visual`, in emitter then sampler order.
+/// The distinct textures of the visual, with compact render/diagnostic metadata.
 pub fn pictures(visual: Visual) -> Result<Pictures, Absent> {
-    let common = locate()?;
-    let set = facts::effect_set(&Live, common.effn, visual.effect_name())?;
-    let emitters = facts::emitters(&Live, common.resource, set)?;
-    let mut out = Pictures { set, emitters: emitters.count, count: 0, pictures: [None; MAX_PICTURES] };
-    for (e, emitter) in emitters.emitters.iter().take(emitters.count).enumerate() {
-        let colours = Live.bytes(emitter.emtr, EMTR_BYTES).and_then(EmitterColours::parse);
-        for (k, slot) in emitter.slots.iter().enumerate() {
-            if *slot == facts::SLOT_NONE || out.pictures.iter().flatten().any(|p| p.texture.slot == *slot) {
-                continue;
-            }
-            // A slot this resource does not hold belongs to the parent resource the particle system falls back to (its slot resolver
-            // recurses into it): the chip does not draw that sampler, the others stay.
-            let texture = match facts::texture_of_slot(&Live, common.resource, *slot) {
-                Ok(texture) => texture,
-                Err(Absent::NoTexture) => continue,
-                Err(other) => return Err(other),
-            };
-            if out.count < MAX_PICTURES {
-                out.pictures[out.count] = Some(Picture { texture, emitter: e, sampler: k, tint: colours.as_ref().map_or([255; 4], facts::tint_rgba), colours });
-                out.count += 1;
-            }
-        }
-    }
-    if out.count == 0 {
-        return Err(Absent::NoTexture);
-    }
-    Ok(out)
+    facts::pictures(&Live, locate()?, visual)
 }
 
 /// A UI texture for `picture`: the game's own registration of the resident texture view (`texture::load_resident`). The texture is released
