@@ -29,6 +29,7 @@
 //! ```
 
 
+pub mod handoff;
 mod capture_archive;
 mod capture_toggle;
 mod library;

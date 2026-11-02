@@ -31,7 +31,7 @@ KEY = ["-o", "BatchMode=yes", "-o", "UserKnownHostsFile=/tmp/opencode/ally-known
 HOST = "intpa@dreamland-ally"
 AID = r"C:\Eden\trainingrooms-pkg5\nro\diag"   # read only: the four aid NROs (sha-checked by the stage)
 AIDS = ["libnro_hook.nro", "libparam_hook.nro", "libssbu_cpu_pilot.nro", "libssbu_tile_cursor.nro"]
-MACRO = "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg5/eden/macros/tr-main-to-stage-select.edenmacro.json"
+MACRO = HERE.parent / "macros" / "tr-main-to-stage-select.edenmacro.json"
 SHOTS = Path("/tmp/tr-ui/shots")
 TILE = "ssbu-tile-cursor/events.log"
 DIAG = "TrainingRooms/practice-diagnostics.log"

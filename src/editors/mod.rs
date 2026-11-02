@@ -4,4 +4,8 @@
 
 pub mod clip;
 #[cfg(any(test, target_os = "switch"))]
+pub mod mii;
+#[cfg(any(test, target_os = "switch"))]
+pub mod roster;
+#[cfg(any(test, target_os = "switch"))]
 pub mod stages;

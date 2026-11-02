@@ -49,6 +49,8 @@ pub mod input_display;
 pub mod install_line;
 #[path = "model/lra_reset.rs"]
 pub mod lra_reset;
+#[path = "model/macro_handoff.rs"]
+pub mod macro_handoff;
 #[path = "model/menu/mod.rs"]
 pub mod menu;
 #[path = "model/menu_shortcuts.rs"]

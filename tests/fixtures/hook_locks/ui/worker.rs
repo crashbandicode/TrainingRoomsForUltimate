@@ -10,6 +10,12 @@ pub fn run() {
     // A local function and an atomic method of the same name as another module's lock taker: neither reaches named_macros::store.
     store(1);
     FLAG.store(true, Ordering::Release);
+    // This model method cannot call a runtime free function merely sharing its name.
+    settings.free_only();
+}
+
+pub fn direct() {
+    crate::runtime::features::chords::free_only();
 }
 
 fn store(value: u8) {

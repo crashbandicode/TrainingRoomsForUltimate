@@ -74,6 +74,15 @@ impl LiveCapturePool {
         key
     }
 
+    /// Worker handoff: preserve the game owner's monotonic incarnation even
+    /// after a dropped event retired a prior timeline.
+    pub fn start_record_owned(&mut self, key: NativeRecordKey) -> bool {
+        if key.generation <= self.generation { return false; }
+        self.generation = key.generation - 1;
+        self.start_record(key.index);
+        true
+    }
+
     pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }
 
     /// A native prefix reset replaces a slot without changing its numeric index.

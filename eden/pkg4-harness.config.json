@@ -1,0 +1,15 @@
+{
+  "owner": "Codex 01a19c9f-04ad-7f72-8d2f-440ee0a6a04f/pkg4",
+  "prefix": "s4",
+  "stream": "pkg4",
+  "host": "yoga",
+  "root": "/home/intpa/trainingrooms-eden-p4",
+  "profile": "t4",
+  "source": "/home/intpa/ssbu-desync-1029/profiles/b",
+  "display": ":94",
+  "unit": "trpkg4",
+  "nro": [],
+  "pilot": "/home/intpa/trainingrooms-eden-p4/inbox/pilot/libssbu_cpu_pilot.nro",
+  "tile": "/home/intpa/trainingrooms-eden-p4/inbox/libssbu_tile_cursor.nro",
+  "install_gate": "result=installed"
+}

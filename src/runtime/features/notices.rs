@@ -158,7 +158,9 @@ pub fn hud_tick() -> TickOut {
     let out = {
         let mut queue = QUEUE.lock();
         take_mail(&mut queue);
-        queue.tick(combo_display(), menu_open)
+        // Waiting practice has no Combo Display option. A value observed in a
+        // previous native Training scene must not clear its notifications.
+        queue.tick(!scene::is_native_training() || combo_display(), menu_open)
     };
     #[cfg(feature = "diag")]
     {
