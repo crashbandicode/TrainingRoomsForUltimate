@@ -267,7 +267,8 @@ def shot(label, name, target=None):
     return path
 
 
-def up(args):
+def up(args, claim=True):
+    """claim=False: a relaunch inside a claim this owner already holds (the file set changed); no second CLAIMED line."""
     label = args.label
     assert not eden_processes(), f"this host already runs Eden: {eden_processes()}"
     assert not Path(f"/tmp/.X11-unix/X{DISPLAY[1:]}").exists(), f"display {DISPLAY} in use"
@@ -275,14 +276,15 @@ def up(args):
     assert mem >= 10 * 1024 ** 2, f"MemAvailable {mem} KiB < 10 GiB"
     free = shutil.disk_usage("/").free
     assert free >= 40 * 10 ** 9, f"df free {free} < 40 GB"
-    busy = open_claims()
+    busy = open_claims() if claim else []
     if busy:
         print(json.dumps({"active_claims": busy}))
         sys.exit(3)
     nro_hashes = {n.partition(":")[2] or Path(n).name: digest(n.partition(":")[0]) for n in args.nro}
-    ledger(f"CLAIMED: {OWNER} TrainingRooms F6 Eden rows (first-boot group-build hitch: split, warm-up proof), "
-           f"solo run {label} on the {HOST}, display {DISPLAY}, own profile {PROFILE} (copy of "
-           f"{SOURCE.parent.parent.name}/profiles/{SOURCE.name}), plugins {nro_hashes}. No LAN. No physical Switch writes.")
+    if claim:
+        ledger(f"CLAIMED: {OWNER} TrainingRooms F6 Eden rows (first-boot group-build hitch: split, warm-up proof), "
+               f"solo run {label} on the {HOST}, display {DISPLAY}, own profile {PROFILE} (copy of "
+               f"{SOURCE.parent.parent.name}/profiles/{SOURCE.name}), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
         print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
                                   if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
@@ -310,11 +312,11 @@ def up(args):
         print("game.load", json.dumps(client_call(label, "game.load", {"path": GAME}, timeout=60)))
     except BaseException as exc:
         print(f"UP FAILED: {exc!r}", file=sys.stderr)
-        down(args, failed=True)
+        down(args, failed=True, release=claim)
         raise
 
 
-def down(args, failed=False):
+def down(args, failed=False, release=True):
     label = args.label
     receipt = ROOT / f"LAUNCH-{label}.json"
     note = {}
@@ -353,9 +355,10 @@ def down(args, failed=False):
     subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"trf6-{label}-gpu-lock"], check=False,
                    stderr=subprocess.DEVNULL)
     left = eden_processes()
-    ledger(f"RELEASED: {OWNER} TrainingRooms F6 Eden run {label} stopped on the {HOST} (display {DISPLAY} "
-           f"stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
-           f"No physical Switch writes.")
+    if release:
+        ledger(f"RELEASED: {OWNER} TrainingRooms F6 Eden run {label} stopped on the {HOST} (display {DISPLAY} "
+               f"stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
+               f"No physical Switch writes.")
     print("down", json.dumps({"label": label, "failed_up": failed, **note, "left": left}))
 
 
