@@ -308,6 +308,9 @@ pub enum NativeCall {
     SetRequestBit,
 }
 
+/// At most eight bits in KeySet, followed by the one per-kind native release.
+pub type ReleaseCalls = crate::engine::compat::fixed::FixedList<NativeCall, 9>;
+
 /// An acquisition the ledger tracks. Not `Clone`/`Copy`; dropping it is a leak the owner must
 /// report through [`Ledger::retain_dropped`] (no native work in `Drop`, WORKPLAN §5.4).
 #[derive(Debug, PartialEq, Eq)]
@@ -623,6 +626,15 @@ impl Ledger {
         occupancy: &dyn LiveConsumers,
         role: Role,
     ) -> Result<Vec<NativeCall>, (AcqToken, LedgerRefusal)> {
+        self.release_fixed(token, occupancy, role).map(|calls| calls.to_vec())
+    }
+
+    pub fn release_fixed(
+        &mut self,
+        token: AcqToken,
+        occupancy: &dyn LiveConsumers,
+        role: Role,
+    ) -> Result<ReleaseCalls, (AcqToken, LedgerRefusal)> {
         if let Some(conflict) = occupancy.conflict(role, token.kind, Use::Release) {
             return Err((token, LedgerRefusal::Conflict(conflict)));
         }
@@ -630,9 +642,11 @@ impl Ledger {
             return Err((token, LedgerRefusal::UnknownToken));
         };
         let _ = self.acquisitions.remove(i);
-        let mut calls: Vec<NativeCall> = orphan_keys(token.kind, self.flags).iter(token.kind)
-            .map(NativeCall::ReleaseKey).collect();
-        calls.push(NativeCall::ReleaseKind { kind: token.kind });
+        let mut calls = ReleaseCalls::new(NativeCall::ReleaseKind { kind: token.kind });
+        for key in orphan_keys(token.kind, self.flags).iter(token.kind) {
+            assert!(calls.push(NativeCall::ReleaseKey(key)));
+        }
+        assert!(calls.push(NativeCall::ReleaseKind { kind: token.kind }));
         Ok(calls)
     }
 

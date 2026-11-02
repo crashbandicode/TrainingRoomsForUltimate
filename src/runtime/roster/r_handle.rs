@@ -29,7 +29,7 @@ use std::sync::{Mutex, MutexGuard};
 use crate::engine::swap::swap_model::request_bit as bit0;
 use crate::engine::swap::swap_model::ledger::{
     AcqToken, BatchId, Holder, Ledger, LedgerRefusal, LiveConsumers, NativeCall, NativeRequest, RFlags,
-    ReleaseRecipe, Role,
+    ReleaseCalls, ReleaseRecipe, Role,
 };
 
 macro_rules! trace {
@@ -174,11 +174,11 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
         let selected: Vec<usize> = handle.held.iter().enumerate()
             .filter(|(_, (g, token))| group.is_none_or(|x| *g == x) && kinds.is_none_or(|ks| ks.contains(&token.kind())))
             .map(|(i, _)| i).collect();
-        let mut plan: Vec<(u32, Vec<NativeCall>)> = Vec::new();
+        let mut plan: Vec<(u32, ReleaseCalls)> = Vec::new();
         for i in selected.into_iter().rev() {
             let (_, token) = handle.held.remove(i);
             let kind = token.kind();
-            match handle.ledger.release(token, occupancy, role) {
+            match handle.ledger.release_fixed(token, occupancy, role) {
                 Ok(calls) => plan.push((kind, calls)),
                 Err((token, why)) => {
                     let text = refusal_text(&why);
@@ -192,7 +192,7 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
     };
     for (kind, calls) in &plan {
         execute(base, r, calls);
-        for call in calls {
+        for call in calls.iter() {
             if let NativeCall::ReleaseKey(key) = call { receipt.keys.push(key.value()); }
         }
         receipt.released += 1;

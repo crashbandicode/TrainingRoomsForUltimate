@@ -32,6 +32,31 @@ static ALLOCATOR: CountAlloc = CountAlloc;
 mod observed_map;
 
 #[test]
+fn native_release_recipes_use_key_mask_bound_without_allocations() {
+    use crate::engine::swap::swap_model::ledger::*;
+    for kind in (0..128).chain(std::iter::once(NO_KIND)) {
+        for r48 in 0..3 {
+            for (r7d, r7f) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                let flags = RFlags { r48, r7d, r7f };
+                let mut ledger = Ledger::new(flags);
+                let batch = ledger.new_batch();
+                let (token, _) = ledger.acquire(kind, Holder::Prefetch(GroupId(0)),
+                    ReleaseRecipe::OwnedPerKind, batch, &NoConsumers, Role::Player).unwrap();
+                let expected: Vec<_> = orphan_keys(kind, flags).iter(kind)
+                    .map(NativeCall::ReleaseKey).chain(std::iter::once(NativeCall::ReleaseKind { kind })).collect();
+                COUNT.with(|count| count.set(0));
+                TRACK.with(|track| track.set(true));
+                let calls = ledger.release_fixed(token, &NoConsumers, Role::Player).unwrap();
+                TRACK.with(|track| track.set(false));
+                assert_eq!(COUNT.with(Cell::get), 0);
+                assert_eq!(&*calls, expected.as_slice());
+                assert!(ledger.tokens().is_empty());
+            }
+        }
+    }
+}
+
+#[test]
 fn native_map_walk_preserves_bounds_and_uses_no_heap() {
     #[repr(C)]
     #[derive(Clone, Copy)]
