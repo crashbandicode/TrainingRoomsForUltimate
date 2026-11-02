@@ -29,6 +29,8 @@ pub struct Func {
     /// The innermost `mod` of the definition, else the file's stem (`cpu`; `mod.rs` takes its folder's name).
     pub module: String,
     pub name: String,
+    /// A declared `self` receiver; free/associated functions cannot be dot-call targets.
+    pub has_receiver: bool,
     /// The text of the attributes before it (`skyline::hook(offset = sites_pkg2::SDI_HOOK_OFFSET)`).
     pub attrs: String,
     pub body: Vec<Tok>,
@@ -291,8 +293,14 @@ impl Parser<'_> {
                     // The body: the first `{` before a `;` outside every group.
                     let mut k = name_at + 1;
                     let mut body = None;
+                    let mut has_receiver = false;
                     while k < toks.len() {
                         if is_punct(&toks[k], '(') || is_punct(&toks[k], '[') {
+                            if is_punct(&toks[k], '(') {
+                                has_receiver |= toks[k + 1..matching(toks, k)].iter()
+                                    .take_while(|t| !is_punct(t, ',') && !is_punct(t, ':') && **t != Tok::PathSep)
+                                    .any(|t| ident(t) == Some("self"));
+                            }
                             k = matching(toks, k) + 1;
                         } else if is_punct(&toks[k], '{') {
                             body = Some((k, matching(toks, k)));
@@ -306,7 +314,7 @@ impl Parser<'_> {
                     match body {
                         Some((open, close)) => {
                             let inner = &toks[open + 1..close];
-                            self.funcs.push(Func { file: self.file.to_owned(), module: module.to_owned(), name, attrs: attrs.clone(), body: inner.to_vec() });
+                            self.funcs.push(Func { file: self.file.to_owned(), module: module.to_owned(), name, has_receiver, attrs: attrs.clone(), body: inner.to_vec() });
                             // Nested items (a local `fn`, a `mod`) are found too; the outer function keeps them.
                             self.items(inner, module);
                             i = close + 1;

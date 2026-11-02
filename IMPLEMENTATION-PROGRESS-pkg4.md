@@ -4,6 +4,16 @@
 
 ## QUESTIONS
 
+- **New confirmed Off-to-On binding defect16:4xZ:** writer::request_replay_capture only updates
+  CAPTURE_ENABLED + file slot. Live hooks read replay_store::TOGGLE; runtime census finds request_choice
+  only in feature-gated capture_plugin (deluxe-sdk absent from defaults). Thus resident hook installation
+  alone cannot make the TrainingRooms menu arm capture. Request narrow shared hunk authorization in
+  src/runtime/features/writer.rs::request_replay_capture to invoke the existing atomic CaptureToggle
+  request_choice alongside persistence. Preserve desired/latched-record semantics (Pending during a record),
+  guard failure Unavailable and existing file-write failure semantics; no polling/second provider.
+  I can implement/gate this hunk once ownership is confirmed; independent queued gates continue.
+
+
 - Replay ownership design note for lead: Vault capture will use Copy Begin/Sample/End events to the existing
   menu worker, retaining its existing MAX_FRAMES and eight-entry bounds. Hook state holds only pending
   samples/epoch; worker alone owns ReplaySession Vecs. A bounded-mailbox overflow must be counted and mark
@@ -81,6 +91,16 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Host67dad67-r2 claimed/released16:41Z. lib1175 passed0failed2ignored; hook_locks2passed1failed.
+  Exact violations:
+  `worker::run -> ... -> named_macros::restored_target takes macros/named_macros.rs::RESTORE_ANCHOR (called from named_macros::publish_queries)`
+  `worker::run -> ... -> replay_preview::start_context takes macros/replay_preview.rs::SESSION (called from named_macros::restore_in_air)`.
+  Traced both: publish_queries calls MacroUi::restored_target and MacroUi::restore_in_air methods in
+  model/macro_ui/macro_panel.rs, not same-named runtime free functions. Scanner's unique-name dot-call
+  resolution admitted free functions. Root fix records receiver presence in shared Func metadata and
+  restricts ONLY hook_locks dot-call edges to actual receiver methods; existing capability resolver unchanged.
+  Fixtures now declare real receiver methods; new regression proves direct free-function lock calls still fail.
+  ALLOWED/PENDING remain empty. Fix not yet run; no false pass claimed, next queued gate follows commit.
 - Rust snapshot8268f0f staged in Yoga own src/target (archive808ff04ef255db8c8c53a0007de6746a5dd8860aa57a32c95090f6bdc35808c2);
   diag-8268f0f.ps1 prepared with ordered capture, no compile/claim yet. Host gate remains frozen67dad67.
 - Full external helper reads completed: eden-run.py SHA5c9f9dca, edenctl.py2fe7c401, display-rootful.ps1a930b7a6;
