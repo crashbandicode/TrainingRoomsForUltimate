@@ -72,3 +72,21 @@ Implementation / hook safety / online / release and card rows: N/A (no plugin, N
 ## Next
 1. Commit (done at the end of this turn; the hash is in the lead report). 2. Lead merges into `work/implementation` and offers it to the streams; first adopter runs one boot and reports gv `mute`/`solo.ps1`
 shape problems here. 3. After adoption the lead deletes the copies listed in docs/HARNESS.md.
+
+## Smoke boot 1: Surface, `solo.ps1` + ssh route (2026-11-02, claim 13:16Z to 13:18Z, own profile `g`, display :91)
+NRO: integrator-3 diag `a3bcb55e` (48eebe1) + tile cursor `b8313ca2` + CPU pilot `e3033426`. Whole sequence ran unattended from `/tmp/harness-wait/smoke-surface.ps1` (it waits for the turn, then
+deploy, Up, route, shot, collect, Down); no manual step. Ledger lines: CLAIMED 13:16Z, RELEASED 13:18Z. All passed on the first try:
+- preflight ok (19.6 GiB MemAvailable, 265 GB free), claim written (turn reached only after imgui-nvn-sol and deluxe had theirs; the helper held me back correctly), `prep`: pilot/tile/diag installed,
+  set-aside of the source's `libssbu_gnw_judge_log.nro` (and the old copies), old tile-cursor data archived, display and launch (Eden pid recorded in `LAUNCH-hx-01.json`).
+- mute: `settings.set` -> value "0", `save`, `get` -> value "0" (the reply is a dict with `value`; `gv.muted` read it), 2 s after launch, before `game.load`.
+- route over the ssh transport (`route.py hx-01 --transport ssh --install-gate plugin=training_rooms/ --training-gate diag:[CharacterRoster] observed owner=0`): install line at launch+12 s,
+  main menu matched at launch+59 s (13:16:35 -> 13:17:34; A presses 3 to 7 saw dist 123 on the title/loading screens, the 8th matched at 1.8), the macro `tr-main-to-stage-select` finished
+  (sha256 `ce6714b4...` kept in `macros.jsonl`), stage select dist 0.6, tile gate `settled screen=sss at=6` read only after the stage select appeared, character select 3.2, ready 5.6,
+  `[CharacterRoster] observed owner=0` at launch+111 s, `ROUTE DONE` at 13:18:30 (115 s after launch with every wait gated).
+- one shot through `gv.py shot` over ssh (PNG in `<root>/shots/hx-01/`), `gv.py call status` (running, loading_complete, game_fps 24.0, system_fps 22.0 on this offline Surface with the diag NRO).
+- `gv.py scan hx-01`: 11,934 lines, 0 failing, 0 other Unmapped, 0 panic/abort/crash. `memory.peak` 7,037,403,136 (kept in `eden/runs/hx-01/`).
+- `Down -Restore`: Eden stopped (state stopped), display stopped, scan, restore (plugin set back to the source's `libssbu_gnw_judge_log.nro`, our data folders removed), RELEASED, 0 Eden processes left.
+- Link economy: the copy keeps the read-only game content hard-linked (`st_nlink == 2`); `du -sh` and `--apparent-size` of the copy are both 6.5 G because profile g's non-content part (xdg caches, saves) is copied, as in every stream's copy.
+Fixes found before and during the smoke: `deploy.py` did not create the macros/nro folders on the local host and the tile cursor/pilot paths were driver-side paths (commit `9ab3392`), comma NRO lists (`solo.ps1`), the
+ledger's ssh read had no retry (one dropped connection killed the helper; `7a8c43a`), Ally `ps` printed CLIXML progress noise, the interleave rule's list of parallel owners and 3-minute grace (`0c7020a`, `613997c`).
+Not exercised on a live Eden: the `local` route transport (host-tested with a fake control API; the smoke used `ssh`, which on the Surface goes to itself).
