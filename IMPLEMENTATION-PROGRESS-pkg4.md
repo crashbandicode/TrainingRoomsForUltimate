@@ -40,3 +40,24 @@ Between about 04:36Z and 04:52Z (host clock of the Yoga) I ran seven `cargo skyl
 rule is never to compile beside a running Eden. Each build ran under `systemd-run --scope -p MemoryMax=6G` with `timeout 1800`; most took 2-5 s (cached
 std), the first about 4 min. From that point on every build runs on the Surface (campaign toolchain, `docs/BUILD.md`). pkg5 can rerun any Eden
 run of that window whose numbers look odd.
+
+## Gate state at 6a4f12d (2026-11-02)
+
+- `cargo test`: 24 binaries, 1,227 tests, 0 failed (Surface, `CARGO_TARGET_DIR=…/cargo-targets/trainingrooms-pkg4`, one call, under systemd-run).
+- `cargo clippy --all-targets -- -D warnings`: 0 warnings; `cargo build --no-default-features`: clean (Yoga gate folder `/home/intpa/trainingrooms-build-pkg4/gate`,
+  `SKIP_OWNED_ELF_FACT=1`: the owned ELF lives on the Surface, where the ELF tests ran in the full test run).
+- Switch builds (Yoga, `cargo skyline build --release` and `--features diag`), warning-free: release `67963181dc8d76d4c7f80246e6febbcb643c1d07f6e2d114836cd00883c48874`
+  resident 299,008 B (file 253,952 B); diag `233ea667a1a48b6f84fede07174389c0e28d90a49a28413b8dd15188cd52ac38` resident 409,600 B. The Surface build of the same source has
+  another hash (the source path is in the binary). Root cause of an earlier +86 KB: `log10f` pulled the compiler's libm into the NRO; the fade is a table now (`input_display::FADE_TABLE`, host-tested).
+- Eden s4-01 / s4-02: `eden/EDEN-PACKAGE-4.md` (all rows pass except the ones listed there as not run). Claim/release lines in the Yoga ledger; my queue line removed.
+- `compliance.py` (playbook `009c9ac`) machine rows that still fail are project-level (README GIF, `HANDOFF.md` name, docs/media), as for package 1.
+
+## For the lead
+
+- Merge notes (shared-file edits): `sites.rs` (+2 `Feature` variants), `boot.rs` (`install_pkg4`, site-report `Vec`, `chords::load_ini`, `recorder::init`, diag-only `writer::start`),
+  `install.rs` (buffer 4096), `cpu.rs` (pub accessors, `recorder::request_playback`, `recorder::session_clear`), `cpu/ids.rs` (22 names), `published.rs`, `hub.rs`,
+  `input_delay.rs` (note passes the controller; apply runs display then recorder), `menu/mod.rs` (`replay_capture` env default false).
+- When package 5 merges: call `notices::hud_tick` and `input_display::hud_tick` from the layout tick (remove the interim calls at the end of `recorder::on_ai_frame`), write panes in
+  `notices::write_panes` / `input_display::write_plan`, call `chords::commit_shortcut` from the menu outbox and drop the `cfg(feature = "diag")` on it and on `features/writer.rs`.
+- When package 3 merges: call `recorder::on_state_restored` (drop the `cfg(feature = "diag")`) and `recorder::stop` on a load request; remove the diag stand-ins in `recorder::chord_step`.
+- S4-4 waits for pkg6's C3; the Deluxe sync rows wait for L1.
