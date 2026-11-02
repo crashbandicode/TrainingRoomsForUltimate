@@ -103,3 +103,59 @@ No Eden or Switch build while another stream's claim is open on the host (ledger
   firewall prompt before the Replay window row. console.log: 10 `Unmapped` lines at 5 s at 0x109f5f3b7x: outside the plugin window, above 0x1000:
   attributed stock emulator noise (lead).
 - In the tree, not yet gated: Give item A -> `character_items::request` from the tick (`ui::requests`), B3 vanilla read through `nn::fs` (no heap).
+
+## Playbook (operator order 2026-11-02 ~12:0xZ)
+Playbook followed: ae87443 (pulled 2026-11-02 ~11:40Z, already current). Read completely: README.md, docs/{CHECKLIST,WORKFLOW,EDEN,HOOK-SHARING,MACROS,TILE-CURSOR,GIFS}.md,
+tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, tools/build/nro_size.py, tools/eden-solo/{solo.ps1,gv.py}.
+
+### Checklist (docs/CHECKLIST.md): M 33: pass 21, open 8, N/A 4. C 9: N/A 8, open 1
+| Item | Tag | Result | Evidence |
+| --- | --- | --- | --- |
+| cdylib only | M | pass | Cargo.toml `crate-type = ["cdylib"]`; nro_size on the release NRO: open (next build) |
+| release profile, skyline =0.6.0, toolchain 1.98.1 | M | pass | Cargo.toml [profile.release]; rust-toolchain.toml 1.98.1 |
+| model pure + host tests, runtime cfg(switch) | M | pass | src/model/ui/{screens,flow}.rs, src/editors/*.rs tests; lib.rs `#[cfg(target_os = "switch")] mod runtime` |
+| gates (test, clippy -D warnings, no-default-features, release, diag) | M | open | last full set at 97e8eb4; rerun on the next screen commit |
+| no heap in hooks (heap_allocations=0) | M | pass (boot) / open (rows) | ui-06 install line `heap_allocations=0`; R5 row delta open (menu-close hang) |
+| fixed buffers, writer thread, stack paths | M | pass | install_line::render on the boot thread; B3 `VANILLA_PATH_C` static path (Eden proof open) |
+| root cause, one abstraction | M | open | menu-close hang: root cause found (parking_lot spin parker), one abstraction = stream/sync locks; not shipped yet |
+| version guard 13.0.5 | M | pass | install line `game=13.0.5` (ui-09 console.log) |
+| 64-byte guards | M | pass | install line `ui_*=stock/checked`; this stream adds no site |
+| card scan for the site | M | N/A-as-M: no new site in this stream | sites are pkg5/pkg4's; no new hook |
+| hook sharing | C | N/A | no new hook site |
+| hook after prologue / call instead | M | pass | stream calls game functions only through pkg4/pkg5/pkg6 entry points |
+| no diag strings in shipped NRO | M | open | compliance.py --nro on the next release NRO |
+| shipped writes only install line | M | open | release NRO run not yet done for this stream |
+| logging plugin data files | C | N/A | not a logging plugin |
+| online read-only / replay A/B / two consoles | C x3 | N/A | the stream's screens run in Training and the lobby menu only; pkg6 owns online paths |
+| Eden claim written and released | M | pass | ledger lines 10:52Z/11:04Z, 11:10Z/11:27Z RELEASED (Ally) |
+| one Eden per host, >= 10 GiB, not profile a/:61 | M | pass | Ally free 12.8 GiB before ui-09; lent rig only |
+| profile copy hard-linked | M | N/A (Windows lent rig) | lent rig is used in place with a verified set-aside/restore (stage_ui.ps1, mismatches []), lead's Ally rule |
+| copies linked/copied (part of the profile-copy item) | M | N/A as above | no copied tree |
+| one target dir per copy, df >= 40 GB, manifests | M | pass / open | cargo-targets/trainingrooms-ui-screens(-sw); df 173G; deletion manifest open at stream end |
+| waits gated on a log line/screenshot | M | pass | ui_lent.py route GATE lines (ui-09) |
+| precondition abort and retry under next label | M | pass | live-ui-09 relaunch after the failed launch (no run.json) |
+| shortest ruleset | M | N/A | Training mode, no match end needed |
+| profile restored, host released | M | pass | restore-verify 11:27:08Z `mismatches: []`, CLAIM back; ledger RELEASED |
+| console.log scan, run.json, memory.peak kept | M | pass / open | ui-09 console.log + run.json in eden/runs/ui-09; memory.peak: open (wui.py records peak in run.json) |
+| memory/time guard on local commands | M | pass | cg/sw wrappers: systemd-run MemoryMax=6G timeout 1800 |
+| outputs under the label | M | pass | eden/runs/ui-0N/ |
+| README paragraph + GIF | M | open (repo level, lead) | |
+| dated evidence doc | M | pass | eden/EDEN-UI-SCREENS.md |
+| numbers from tested scripts | C | open | R5 delta and grace numbers will need a tested log script |
+| no operator quotes / claims beyond tests | M | pass | |
+| handoff current | M | pass | this file, updated at checkpoints |
+| release/tag/rebuild/MTP | C x3 | N/A | no operator order |
+| user connects the Switch / nothing pushed or written | M x2 | pass | no push, tag, card, DBI or USB |
+| Forgejo, push only on order, messages from a file | M | pass | origin git.syntaxbyexample.com; commits -F temp file |
+| model/effort gate + watcher | M | pass | watch-opus.ps1 pid 1078155 |
+| spawned workers read the playbook | M | N/A | no workers spawned |
+
+### My own tools: replaced or kept
+- `eden/lent/stage_ui.ps1` kept: set-aside/boot/restore of the lent Ally Windows rig (lead rule); playbook `gv.py prep` builds Yoga-local Linux profile copies.
+- `eden/lent/wui.py` kept (pkg5's wa_s5.py re-rooted): launches/drives Windows Eden on the Ally; `gv.py`/`solo.ps1` are Yoga-only (AppImage, display :68, owner 88c0f449).
+- `eden/lent/ui_lent.py` kept: ssh orchestration to the Ally; route uses the tile cursor (TILE-CURSOR) and screenshot gates (MACROS "Gate menu waits"). Segment macros: open.
+- `eden/lent/rows_ui06.py` kept: this stream's row checks (pkg5's s5_walk walker).
+- `eden/ally/ledger.py` kept: claim/release lines in the Yoga ledger from a non-Yoga runner; solo.ps1 only claims for its own local Eden.
+- `/tmp/ui-screens-watch/{cg,sw,cgs,sws}.ps1` kept: the playbook's memory/time guard for cargo (no playbook tool for it).
+- `pack/ally-switch.sh` kept: Ally WSL Switch build (lead-authorised host); no playbook remote-build tool.
+- NRO size: replaced by playbook `tools/build/nro_size.py` from the next build on.
