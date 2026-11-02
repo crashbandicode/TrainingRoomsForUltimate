@@ -18,6 +18,9 @@ pub mod pane;
 pub mod probe;
 pub mod registry;
 pub mod state;
+pub mod texture;
+#[cfg(feature = "diag")]
+pub mod texture_probe;
 pub mod tick;
 pub mod view;
 pub mod worker;
