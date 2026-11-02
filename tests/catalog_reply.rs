@@ -59,3 +59,21 @@ fn native_submit_full_retry_poll_and_reuse_allocate_nothing() {
     job.complete(Arc::new(vec![23]));
     assert_eq!(native(|| replies.poll().unwrap().unwrap())[0], 23);
 }
+
+#[path = "../src/model/reusable_snapshot.rs"]
+mod reusable_snapshot;
+
+#[test]
+fn helper_snapshot_publish_reader_retirement_and_reuse_allocate_nothing() {
+    let mut storage = reusable_snapshot::Storage::new(); // boot allocation
+    for n in 0..32u64 {
+        let transaction = native(|| storage.publish([n; 512]).unwrap());
+        let reader = native(|| transaction.clone());
+        native(|| drop(transaction));
+        assert!(!storage.available());
+        assert_eq!(native(|| storage.publish([99; 512]).err()), Some([99; 512]));
+        assert_eq!(reader[511], n);
+        native(|| drop(reader));
+        assert!(storage.available());
+    }
+}

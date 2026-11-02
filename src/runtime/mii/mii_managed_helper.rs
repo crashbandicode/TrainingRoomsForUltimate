@@ -4,7 +4,8 @@ use super::mii_selector_native::{self as native, PublicationTarget, Snapshot};
 use super::{mii_saved_alpha, native_fighter_install, native_source, InstallToken, BASE, INSTALL};
 use crate::engine::swap::source_lifetime::{LoadToken, SourceToken};
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+use crate::model::reusable_snapshot::{Storage, Snapshot as SharedSnapshot};
 use crate::engine::mii::{
     inventory::MiiClass,
     lifetime::Configuration,
@@ -13,11 +14,13 @@ use crate::engine::mii::{
     selection::{self, PlayerOrigin},
 };
 struct State {
+    storage: Option<Storage<Prepared>>,
     track: Option<Track>,
     next: u64,
     capture_wait_noted: bool,
 }
 static STATE: Mutex<State> = Mutex::new(State {
+    storage: None,
     track: None,
     next: 1,
     capture_wait_noted: false,
@@ -28,7 +31,7 @@ struct Track {
     gate: Gate,
     source: SourceToken,
     install: InstallToken,
-    data: Arc<Prepared>,
+    data: SharedSnapshot<Prepared>,
 }
 pub(super) struct Prepared {
     before: Snapshot,
@@ -36,6 +39,11 @@ pub(super) struct Prepared {
     configuration: Configuration,
     player_epoch: u64,
     hat_change: bool,
+}
+/// Called once at boot, before native hooks can admit a helper.
+pub(super) fn init_storage() {
+    let mut state = STATE.lock().unwrap();
+    if state.storage.is_none() { state.storage = Some(Storage::new()); }
 }
 pub(super) fn origins_captured() -> bool {
     super::mii_ordinary_player::helper_origin_captured()
@@ -109,7 +117,10 @@ pub(super) unsafe fn prepare(
         "helper original capture/slot unavailable",
     )?;
     check(
-        STATE.lock().unwrap().track.is_none(),
+        {
+            let state = STATE.lock().unwrap();
+            state.track.is_none() && state.storage.as_ref().is_some_and(Storage::available)
+        },
         "helper transaction still retained",
     )?;
     native::target_rows(c)?;
@@ -182,12 +193,14 @@ pub(super) fn bind(
     };
     let next = s.next.checked_add(1).ok_or("helper ticket exhausted")?;
     let gate = Gate::new(ticket).ok_or("helper ticket invalid")?;
+    let data = s.storage.as_mut().ok_or("helper storage not initialized")?
+        .publish(data).map_err(|_| "helper snapshot reader still retained")?;
     s.track = Some(Track {
         ticket,
         gate,
         source,
         install,
-        data: Arc::new(data),
+        data,
     });
     s.next = next;
     Ok(())

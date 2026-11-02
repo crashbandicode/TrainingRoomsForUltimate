@@ -125,3 +125,7 @@ pub mod entry_cells;
 /// Startup-allocated catalog reply transport; native callers never allocate channels.
 #[path = "model/catalog_reply.rs"]
 pub mod catalog_reply;
+
+/// Boot-allocated storage for immutable native transaction snapshots.
+#[path = "model/reusable_snapshot.rs"]
+pub mod reusable_snapshot;

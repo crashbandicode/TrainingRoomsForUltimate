@@ -1515,7 +1515,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "b837646c326bc80efe84e1ec71606d4b0fa674fec0f7c8b41c952d0ca20d7f60",
+   "dest_sha256": "676e3014263bf383a629286a759229e09d7d701ced0603b2a469c8ee4d277929",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1557,6 +1557,11 @@
      "old": "    let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();\n    let original=cycle_original(role);",
      "new": "    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);\n    for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}\n    let original=cycle_original(role);",
      "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "    mii_saved_alpha::init(base);",
+     "new": "    mii_saved_alpha::init(base);\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    mii_managed_helper::init_storage();",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
     }
    ]
   },
@@ -2074,7 +2079,49 @@
    "dest": "src/runtime/mii/mii_managed_helper.rs",
    "crate": "root",
    "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
-   "dest_sha256": "3c45f087b29f10a64d432d86d8f1636488c746c6e76a9b053d1d12b9de96fa04"
+   "dest_sha256": "ebe56d035dba970041f39554d7b0d2ef9680b12166a7d4818c7534250c406335",
+   "edits": [
+    {
+     "old": "use std::sync::{Arc, Mutex};",
+     "new": "use std::sync::Mutex;\nuse crate::model::reusable_snapshot::{Storage, Snapshot as SharedSnapshot};",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "struct State {\n    track: Option<Track>,",
+     "new": "struct State {\n    storage: Option<Storage<Prepared>>,\n    track: Option<Track>,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "static STATE: Mutex<State> = Mutex::new(State {\n    track: None,",
+     "new": "static STATE: Mutex<State> = Mutex::new(State {\n    storage: None,\n    track: None,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "    data: Arc<Prepared>,",
+     "new": "    data: SharedSnapshot<Prepared>,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "pub(super) fn origins_captured() -> bool {",
+     "new": "/// Called once at boot, before native hooks can admit a helper.\npub(super) fn init_storage() {\n    let mut state = STATE.lock().unwrap();\n    if state.storage.is_none() { state.storage = Some(Storage::new()); }\n}\npub(super) fn origins_captured() -> bool {",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "        STATE.lock().unwrap().track.is_none(),\n        \"helper transaction still retained\",",
+     "new": "        {\n            let state = STATE.lock().unwrap();\n            state.track.is_none() && state.storage.as_ref().is_some_and(Storage::available)\n        },\n        \"helper transaction still retained\",",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "    s.track = Some(Track {",
+     "new": "    let data = s.storage.as_mut().ok_or(\"helper storage not initialized\")?\n        .publish(data).map_err(|_| \"helper snapshot reader still retained\")?;\n    s.track = Some(Track {",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    },
+    {
+     "old": "        data: Arc::new(data),",
+     "new": "        data,",
+     "reason": "R5/F9 native Mii helper allocation: reuse startup-allocated immutable Prepared storage after all reader snapshots retire; no per-bind allocation or payload clone."
+    }
+   ]
   },
   {
    "src": "src/mii_native_adapter.rs",
