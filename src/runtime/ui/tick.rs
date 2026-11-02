@@ -13,7 +13,7 @@ use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, OPEN, PAUSE_ACTIVE};
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, MENU_SHOWN, OPEN, PAUSE_ACTIVE};
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
@@ -54,6 +54,7 @@ const HELP_REST_Y: f32 = -80.0;
 pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(name) = registry::layout_name(layout) else { return };
     hud::run(layout, name);
+    hud::hud_rule(layout, name);
     if name != INFO_TRAINING {
         return;
     }
@@ -89,6 +90,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         }
     }
     let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire);
+    MENU_SHOWN.store(visible, Ordering::Release);
     pane::set_visible(panes.container, visible);
     if visible {
         pane::set_alpha(panes.container, alpha);
@@ -119,18 +121,17 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     r.shown = false;
     let root = (*layout).root_pane;
     let total = pane::count(root);
-    let container = pane::find(root, p::ROOT.as_bytes());
     r.status_r = pane::find(root, b"status_R");
     r.help = pane::find(root, b"L_staying_help");
-    if container.is_null() {
-        diagnostic(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
-        return;
-    }
     let mut all = [core::ptr::null_mut(); p::COUNT];
     let mut missing = 0;
     for (index, slot) in all.iter_mut().enumerate() {
-        *slot = pane::find(container, p::name_of(index).as_bytes());
+        *slot = pane::find(root, p::name_of(index).as_bytes());
         missing += usize::from(slot.is_null());
+    }
+    if missing == p::COUNT {
+        diagnostic(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
+        return;
     }
     let capacity = if all[p::row_label_index(0)].is_null() { 0 } else { pane::text_capacity(all[p::row_label_index(0)]) };
     diagnostic(format_args!(
@@ -142,6 +143,7 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     if missing == 0 {
         #[cfg(feature = "diag")]
         dump_text_box(all[p::row_label_index(0)]);
+        let container = all[p::IDX_MENU];
         r.panes = Some(Panes { container, all });
     }
 }

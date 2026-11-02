@@ -74,6 +74,8 @@ pub enum Align {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Kind {
+    /// A container with no picture or text: visibility and position only.
+    Null,
     /// A flat rectangle: the stock solid texture tinted by its vertex colours.
     Rect { color: [u8; 4] },
     /// A text box in the game's `nintendo64` font; `chars` is the buffer's capacity in UTF-16 units.
@@ -83,6 +85,8 @@ pub enum Kind {
 #[derive(Clone, Copy, Debug)]
 pub struct Spec {
     pub name: Name,
+    /// The pane it is a child of: `RootPane`, or a container of this table.
+    pub parent: Name,
     pub kind: Kind,
     /// Centre of the pane, relative to the container.
     pub x: f32,
@@ -126,6 +130,8 @@ pub const HELP_W: f32 = 1760.0;
 pub const HELP_Y: [f32; 2] = [-372.0, -420.0];
 pub const HINT_Y: f32 = -472.0;
 
+/// The right-hand value column sits this much lower than its label (the game's font draws right-aligned text higher).
+pub const VALUE_DROP: f32 = 8.0;
 pub const FONT: (f32, f32) = (22.0, 34.0);
 pub const FONT_SMALL: (f32, f32) = (18.0, 28.0);
 
@@ -137,14 +143,27 @@ pub const fn group_y(group: usize) -> f32 {
     ROW_FIRST_Y - GROUP_ROW_H * group as f32
 }
 
+// ---- direction grid geometry ---------------------------------------------------------------------------
+
+pub const CHIP_SIZE: f32 = 190.0;
+pub const CHIP_PITCH: f32 = 214.0;
+
+/// Centre of the chip at grid position (column, row) as in menu::CHIP_POS (columns 0-2 relative, 3 absolute).
+pub const fn chip_xy(col: u8, row: u8) -> (f32, f32) {
+    let x = -300.0 + CHIP_PITCH * col as f32 + if col == 3 { 70.0 } else { 0.0 };
+    (x, 150.0 - CHIP_PITCH * row as f32)
+}
+
 // ---- names ---------------------------------------------------------------------------------------------
 //
 // The panes in tree (draw) order, back to front. An index is stable: the builder adds the panes in this
 // order and the runtime keeps its resolved pointers in an array of the same order.
 
-pub const IDX_BG: usize = 0;
-pub const IDX_TAB_HI: usize = 1;
-pub const IDX_TAB: usize = 2;
+/// The menu's container, under `RootPane`.
+pub const IDX_MENU: usize = 0;
+pub const IDX_BG: usize = 1;
+pub const IDX_TAB_HI: usize = IDX_BG + 1;
+pub const IDX_TAB: usize = IDX_TAB_HI + 1;
 pub const IDX_TITLE: usize = IDX_TAB + TABS;
 pub const IDX_SEP: usize = IDX_TITLE + 1;
 pub const IDX_CRUMB: usize = IDX_SEP + 1;
@@ -157,8 +176,28 @@ pub const IDX_ROW: usize = IDX_ROW_HI + 1;
 pub const IDX_SEP_HELP: usize = IDX_ROW + 2 * ROWS;
 pub const IDX_HELP: usize = IDX_SEP_HELP + 1;
 pub const IDX_HINT: usize = IDX_HELP + 2;
-/// How many panes the menu adds under the container.
-pub const COUNT: usize = IDX_HINT + 1;
+/// The direction grid's chips (3 x 3 relative to the opponent plus the two absolute ones): a tile, a needle that
+/// points the chip's way, a label and a weight badge each, and the focus ring.
+pub const CHIPS: usize = 11;
+pub const IDX_CHIP_HI: usize = IDX_HINT + 1;
+pub const IDX_CHIP: usize = IDX_CHIP_HI + 1;
+pub const IDX_CHIP_NEEDLE: usize = IDX_CHIP + CHIPS;
+pub const IDX_CHIP_LABEL: usize = IDX_CHIP_NEEDLE + CHIPS;
+pub const IDX_CHIP_BADGE: usize = IDX_CHIP_LABEL + CHIPS;
+/// The item and stage grids' tiles (up to 5 x 8): a tile and a label each, and the focus ring. Their size and place
+/// are set when a grid opens (the layout follows the console mode).
+pub const TILES: usize = 40;
+pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
+pub const IDX_TILE: usize = IDX_TILE_HI + 1;
+pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;
+/// The notification panel (SPEC-input-05): its own container under `RootPane`, a backing rectangle, a header and a
+/// text box. Written by the notices code of the input package.
+pub const IDX_NOTICE: usize = IDX_TILE_LABEL + TILES;
+pub const IDX_NOTICE_BASE: usize = IDX_NOTICE + 1;
+pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
+pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
+/// How many panes the plugin adds to the layout.
+pub const COUNT: usize = IDX_NOTICE_TEXT + 1;
 
 pub const fn tab_index(i: usize) -> usize {
     IDX_TAB + i
@@ -176,6 +215,13 @@ pub const fn row_value_index(i: usize) -> usize {
 /// The name of pane `index` (`< COUNT`).
 pub const fn name_of(index: usize) -> Name {
     match index {
+        IDX_MENU => ROOT,
+        IDX_NOTICE => Name::new("TrModDisp0"),
+        IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
+        IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
+        IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
+        IDX_CHIP_HI => Name::new("tr_ch_hi"),
+        IDX_TILE_HI => Name::new("tr_ti_hi"),
         IDX_BG => Name::new("tr_bg"),
         IDX_TAB_HI => Name::new("tr_tab_hi"),
         IDX_TITLE => Name::new("tr_title"),
@@ -188,6 +234,12 @@ pub const fn name_of(index: usize) -> Name {
         i if i == IDX_HELP => Name::new("tr_help_0"),
         i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
         IDX_HINT => Name::new("tr_hint"),
+        i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => Name::indexed("tr_ch_", i - IDX_CHIP),
+        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
+        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Name::indexed("tr_cl_", i - IDX_CHIP_LABEL),
+        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Name::indexed("tr_cb_", i - IDX_CHIP_BADGE),
+        i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
+        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
         i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
@@ -216,7 +268,7 @@ pub fn linear(srgb: [u8; 4]) -> [u8; 4] {
     [channel(srgb[0]), channel(srgb[1]), channel(srgb[2]), srgb[3]]
 }
 
-pub const PANEL: [u8; 4] = [8, 10, 14, 236];
+pub const PANEL: [u8; 4] = [8, 10, 14, 255];
 pub const ACCENT: [u8; 4] = [176, 48, 40, 255];
 pub const HIGHLIGHT: [u8; 4] = [38, 44, 56, 255];
 pub const RULE: [u8; 4] = [60, 66, 78, 255];
@@ -226,19 +278,39 @@ pub const TEXT_ON: [u8; 4] = [110, 210, 160, 255];
 pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
 
 const fn rect(name: Name, x: f32, y: f32, w: f32, h: f32, color: [u8; 4], visible: bool) -> Spec {
-    Spec { name, kind: Kind::Rect { color }, x, y, w, h, visible }
+    Spec { name, parent: ROOT, kind: Kind::Rect { color }, x, y, w, h, visible }
 }
 
 #[allow(clippy::too_many_arguments)]
 const fn text(name: Name, x: f32, y: f32, w: f32, h: f32, align: Align, font: (f32, f32), chars: u16, color: [u8; 4]) -> Spec {
-    Spec { name, kind: Kind::Text { align, font, chars, color }, x, y, w, h, visible: true }
+    Spec { name, parent: ROOT, kind: Kind::Text { align, font, chars, color }, x, y, w, h, visible: true }
+}
+
+const ROOT_PANE: Name = Name::new("RootPane");
+
+const fn under(mut spec: Spec, parent: Name) -> Spec {
+    spec.parent = parent;
+    spec
 }
 
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
+        IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        IDX_NOTICE_BASE => under(rect(name, 0.0, 405.0, 1000.0, 150.0, [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER => under(text(name, 0.0, 445.0, 960.0, 50.0, Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT => under(text(name, 0.0, 390.0, 960.0, 70.0, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, 0.0, 0.0, PANEL_W, PANEL_H, PANEL, true),
+        IDX_CHIP_HI => rect(name, 0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0, ACCENT, false),
+        IDX_TILE_HI => rect(name, 0.0, 0.0, 100.0, 60.0, ACCENT, false),
+        i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, 0.0, 0.0, CHIP_SIZE, CHIP_SIZE, HIGHLIGHT, false),
+        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => rect(name, 0.0, 0.0, 10.0, 84.0, TEXT, false),
+        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Spec { visible: false, ..text(name, 0.0, 0.0, CHIP_SIZE, 44.0, Align::Center, FONT_SMALL, 16, TEXT) },
+        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, 0.0, 0.0, 60.0, 44.0, Align::Center, FONT, 4, TEXT) },
+        i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, 0.0, 0.0, 100.0, 60.0, HIGHLIGHT, false),
+        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, 0.0, 0.0, 100.0, 40.0, Align::Center, FONT_SMALL, 28, TEXT) },
         IDX_TAB_HI => rect(name, -740.0, TAB_Y, 200.0, TAB_H, ACCENT, true),
         IDX_TITLE => text(name, 600.0, TAB_Y, 560.0, TAB_H, Align::Right, FONT_SMALL, 40, TEXT_DIM),
         IDX_SEP => rect(name, 0.0, TAB_Y - 52.0, 1760.0, 3.0, RULE, true),
@@ -286,6 +358,9 @@ mod tests {
         }
         assert_ne!(ROOT, name_of(IDX_BG));
         assert_eq!(all.len(), COUNT);
+        for i in 0..COUNT {
+            assert_eq!(all.iter().filter(|s| s.name == name_of(i)).count(), 1, "{i}");
+        }
     }
 
     #[test]
@@ -302,7 +377,7 @@ mod tests {
 
     #[test]
     fn every_pane_lies_inside_the_panel() {
-        for s in specs() {
+        for s in specs().into_iter().filter(|s| s.parent == ROOT) {
             assert!(s.x - s.w / 2.0 >= -PANEL_W / 2.0 - 1.0 && s.x + s.w / 2.0 <= PANEL_W / 2.0 + 1.0, "{:?} x", s.name);
             assert!(s.y - s.h / 2.0 >= -PANEL_H / 2.0 - 1.0 && s.y + s.h / 2.0 <= PANEL_H / 2.0 + 1.0, "{:?} y", s.name);
         }

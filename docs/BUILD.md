@@ -36,3 +36,23 @@ cargo-skyline from `/home/intpa/smash-training-lobby/toolchain/tools/skyline-ins
 `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` — byte-identical to the release NRO built
 earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`), so the build is
 reproducible and the override is not needed. Resident size: `nro_size.py` → 172,032 B.
+
+## Layout archive recipe (package 5, host tool)
+
+2026-11-02. `assets/info_training.tra1` is built, not hand-written: `tools/layout-builder` reads the player's own stock
+`info_training` layout archive (451,604 B on 13.0.5; dumped by the **diag** build into
+`sd:/ultimate/TrainingRooms/stock/`, copied under the gitignored `eden/runs/<label>/` or a scratch folder; game data is
+never committed), adds the plugin's panes (`src/model/ui/panes.rs`, the one pane table the runtime also reads) to its
+`info_training.bflyt` and writes a `TRA1` recipe: copy ranges of the stock archive plus the plugin's own bytes. The
+committed recipe holds no complete game archive; the plugin applies it to the bytes the game just decompressed and refuses
+an archive whose length and FNV-1a fingerprint differ (`model::archive_recipe`).
+
+    cargo build --release --manifest-path tools/layout-builder/Cargo.toml     # own CARGO_TARGET_DIR
+    layout-builder build <stock info_training.arc> <out dir>                  # target.arc (private), info_training.tra1, report.json
+    cp <out dir>/info_training.tra1 assets/info_training.tra1
+
+The tool uses the operator's own MIT crate **nx-layout-toolbox** (repository `crashbandicode/Toolbox-Cli`, crate 0.1.0) as a
+path dependency, host only: it is not linked into the plugin. The copy used 2026-11-02 is at
+`/home/intpa/toolbox-cli-aux/Toolbox-Cli` on the Yoga (no `.git` in the copy; `Cargo.toml` sha256 `277c6db5a7c2b2835df2343d93dc9d61f5ac025f279edc99fe84b46910e553da`,
+`Cargo.lock` `15d4c9567926c5f926a5d72034c7dfba3d28c13005ea729e21c6d4bc0ab38396`, `LICENSE` (MIT) `9e92a41dfcbe9d29997aba9c5cfbb9d2fa15287e2d5184b66dd8565d16f38e9b`, `src/` tar sha256 `bcf09cdd560b4cce6b5e7d418644623dab1784744920e5759440348bb67b2396`) and was copied to
+`../pkg5-scratch/Toolbox-Cli` beside the worktrees, the path `tools/layout-builder/Cargo.toml` names.

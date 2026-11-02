@@ -7,6 +7,8 @@
 
 #[path = "model/ui/adapter.rs"]
 pub mod adapter;
+#[path = "model/ui/catalog.rs"]
+pub mod catalog;
 #[path = "model/archive_name.rs"]
 pub mod archive_name;
 #[path = "model/archive_recipe.rs"]
@@ -45,6 +47,8 @@ pub mod stage_hazards;
 pub mod storage;
 #[path = "model/ui/frame.rs"]
 pub mod frame;
+#[path = "model/ui/screens.rs"]
+pub mod screens;
 #[path = "model/ui/panes.rs"]
 pub mod panes;
 #[path = "model/version.rs"]

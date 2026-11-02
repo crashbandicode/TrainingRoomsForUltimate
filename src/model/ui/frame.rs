@@ -95,9 +95,31 @@ pub struct RowLine {
     pub value_tone: Tone,
 }
 
+/// What fills the area right of the divider.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum View {
+    /// The rows of the page or a popup.
+    #[default]
+    List,
+    /// The direction grid's chips.
+    Chips,
+    /// The item or stage grid's tiles.
+    Tiles,
+}
+
 /// One frame of the menu.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Frame {
+    pub view: View,
+    /// Weight of each chip (array index order of options::DIRECTIONS) and the focused chip.
+    pub chip_weights: [u8; super::panes::CHIPS],
+    pub chip_focus: u8,
+    /// The tile grid: its geometry, the labels of the tiles on this page and the focused tile.
+    pub tile_cols: u8,
+    pub tile_rows: u8,
+    pub tiles: [Text<28>; super::panes::TILES],
+    pub tile_count: u8,
+    pub tile_focus: u8,
     pub title: Text<40>,
     pub tabs: [Text<40>; TABS],
     pub tab_count: u8,
@@ -123,6 +145,14 @@ impl Frame {
             value_tone: Tone::Normal,
         };
         Frame {
+            view: View::List,
+            chip_weights: [0; super::panes::CHIPS],
+            chip_focus: 0,
+            tile_cols: 0,
+            tile_rows: 0,
+            tiles: [Text::new(); super::panes::TILES],
+            tile_count: 0,
+            tile_focus: 0,
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,

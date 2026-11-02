@@ -55,6 +55,7 @@ fn add_container(layout: &mut BFLYT) -> Result<()> {
 
 fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
     let template = match spec.kind {
+        Kind::Null => "RootPane",
         Kind::Rect { .. } => RECT_TEMPLATE,
         Kind::Text { .. } => TEXT_TEMPLATE,
     };
@@ -63,7 +64,7 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
         .clone_pane(&ClonePaneSpec {
             template: template.into(),
             new_name: name.into(),
-            parent: Some(panes::ROOT.as_str().into()),
+            parent: Some(spec.parent.as_str().into()),
             translate_x: Some(spec.x),
             translate_y: Some(spec.y),
             translate_z: Some(0.0),
@@ -78,6 +79,7 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
     let pane = layout.find_pane_mut(name).ok_or("pane missing")?;
     pane.flag |= INFLUENCED_ALPHA;
     match spec.kind {
+        Kind::Null => {}
         Kind::Rect { color } => {
             let picture = pane.picture.as_mut().ok_or("not a picture")?;
             let color = panes::linear(color);
@@ -132,7 +134,6 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
     let untouched = write_arc(&arc).map_err(err("write untouched"))?;
     let index = arc.position(BFLYT_MEMBER).ok_or("info_training.bflyt not in the archive")?;
     let mut layout = read_bflyt(&arc.files[index].data).map_err(err("read bflyt"))?;
-    add_container(&mut layout)?;
     let specs = panes::specs();
     for spec in &specs {
         add_pane(&mut layout, spec)?;
@@ -155,7 +156,7 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
         "target_bytes": target.len(),
         "target_fnv": format!("{:016x}", archive_recipe::fingerprint(&target)),
         "recipe_bytes": recipe.len(),
-        "panes_added": specs.len() + 1,
+        "panes_added": specs.len(),
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;

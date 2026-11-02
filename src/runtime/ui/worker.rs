@@ -13,7 +13,7 @@ use crate::model::menu::input::Button;
 use crate::model::menu::{Env, Menu};
 use crate::model::settings::Settings;
 use crate::model::storage::{self, FixedPath};
-use crate::model::frame::page_frame;
+use crate::model::screens::frame_of;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::input_delay;
 use crate::runtime::published;
@@ -100,7 +100,11 @@ pub fn start(settings: Settings) {
 
 /// What the menu needs to know about the install now (SPEC-core-02 `Env`).
 fn env() -> Env {
-    Env { developer_page: published::developer_page(), ..Env::default() }
+    Env {
+        developer_page: published::developer_page(),
+        pilot_present: crate::runtime::ui::state::PILOT_PRESENT.load(Ordering::Acquire),
+        ..Env::default()
+    }
 }
 
 fn run() {
@@ -142,7 +146,7 @@ fn handle(code: u8, menu: &mut Option<Menu>) {
 fn publish_frame(menu: Option<&Menu>) {
     let Some(menu) = menu else { return };
     let mut frame = FRAME.lock();
-    page_frame(menu, &mut frame);
+    frame_of(menu, &mut frame);
     FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 

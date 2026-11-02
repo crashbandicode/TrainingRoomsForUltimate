@@ -112,6 +112,21 @@ pub unsafe fn set_width(pane: *mut Pane, width: f32) {
     }
 }
 
+pub unsafe fn set_height(pane: *mut Pane, height: f32) {
+    if (*pane).size_y != height {
+        (*pane).size_y = height;
+        (*pane).flags |= 1 << PaneFlag::IsGlobalMatrixDirty as u8;
+    }
+}
+
+/// Turn a pane about its centre (degrees, counter-clockwise).
+pub unsafe fn set_rot_z(pane: *mut Pane, degrees: f32) {
+    if (*pane).rot_z != degrees {
+        (*pane).rot_z = degrees;
+        (*pane).flags |= 1 << PaneFlag::IsGlobalMatrixDirty as u8;
+    }
+}
+
 /// The four vertex colours of a picture pane.
 pub unsafe fn set_rect_color(pane: *mut Pane, color: [u8; 4]) {
     let picture = pane as *mut Picture;

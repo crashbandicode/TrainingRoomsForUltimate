@@ -53,7 +53,16 @@ pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteRepor
 
 /// Compare the package's sites and install what is usable. `input_ready`: the final-input-mapping caller
 /// hooks (Input Delay's four sites) are installed, which is where the menu reads Player 1.
+/// Whether the standalone CPU pilot plugin is loaded: it exports ssbu_cpu_pilot_state_v1 (Skyline loads every plugin before any main runs, so the answer is final at boot).
+fn pilot_present() -> bool {
+    let mut address = 0usize;
+    // SAFETY: a plain symbol lookup with a NUL-terminated name.
+    let result = unsafe { skyline::nn::ro::LookupSymbol(&mut address, b"ssbu_cpu_pilot_state_v1\0".as_ptr()) };
+    result == 0 && address != 0
+}
+
 pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
+    state::PILOT_PRESENT.store(pilot_present(), std::sync::atomic::Ordering::Release);
     let mut found = [GuardOutcome::Stock; UI_SITES.len()];
     for (slot, site) in found.iter_mut().zip(UI_SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
@@ -87,7 +96,7 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
         registry::set_manager_slot(slot.unwrap_or_default() as usize);
         worker::start(settings.clone());
         anchors::install();
-        diagnostic(format_args!("[Ui] anchors installed manager_slot=main+{:#x}", slot.unwrap_or_default() - game::text_base() as u64));
+        diagnostic(format_args!("[Ui] anchors installed manager_slot=main+{:#x} pilot_present={}", slot.unwrap_or_default() - game::text_base() as u64, state::PILOT_PRESENT.load(std::sync::atomic::Ordering::Acquire)));
     } else {
         diagnostic(format_args!(
             "[Ui] anchors skipped archive={archive_hook} input={input_ready} slot={}",

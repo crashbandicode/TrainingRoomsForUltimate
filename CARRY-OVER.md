@@ -76,3 +76,23 @@ Facts read from outside the specs, all public game or third-party MIT facts and 
 Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party `smash` constants crate may be
 used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
 `Cargo.toml`.
+
+## pkg5 (menu rendering and assets)
+
+Carried files (stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`;
+all `ours-new` in `docs/provenance/provenance-files.json`; nothing under `upstream-ref/` and no mixed fork file was opened):
+
+| Here | Fork path | sha256 of the stage file | Taken | Clean-room changes |
+| --- | --- | --- | --- | --- |
+| `src/model/archive_name.rs` | `src/training/ui/archive_name.rs` | `5fc664d1ca98fc7fe008af0a398b0de52cc03c16575221b04e7eb7ab673cff3d` | whole file | none (byte copy) |
+| `src/model/archive_retire.rs` | `src/training/ui/archive_retirement.rs` | `47ae08193cd91aceab2e32a1a88f1702789eff4cdca3b9ba5e042c16d621fd33` | whole file | `retire_expired` made `pub` (was `pub(super)`) |
+| `src/model/archive_recipe.rs` | `src/training/ui/waiting_archive.rs` + `scripts/make_waiting_patch.py` | `2ea3a4f49f5332419a00f1b751cd0f28f1f4188623d1deb1578acac70a5d62f4`, `5d4c546aaebc0016b5cd79bd0c6df4f5beb619d44936da0bb97241a6bde868e3` | the recipe format, the FNV-1a fingerprint and the greedy copy/literal matcher | one source (the stock archive) instead of two, magic `TRA1`, own bound, the matcher in Rust, new tests |
+| `src/runtime/ui/registry.rs` | `src/training/ui/layout_registry.rs` | `137d76960fabcd56f604c3f7f71844f2ed6f582e03b46aa4abd2d4a2f55ffea6` | the holder / manager walk | constants from SPEC-core-05 §4.1 instead of the fork's macro crate; `find` by bytes |
+
+Not carried: `anchors.rs` (its pins and decode are written from SPEC-core-05 §4.1: `model::sites_ui`), the fork's roster, stage and item panel code
+(package 6 wires them to the model), `layout.arc`, `waiting_ui.patch` (the waiting-room archive is package 6).
+
+Game data and the committed recipe: `assets/info_training.tra1` (about 11 KB) holds copy ranges of the stock archive and
+the plugin's own panes only; the dumped stock archive lives only under gitignored `eden/runs/` / scratch folders
+(`tests/ui_sites.rs` and the recipe tests never read it). `tools/layout-builder` is a host tool over the operator's MIT
+`nx-layout-toolbox` (docs/BUILD.md).
