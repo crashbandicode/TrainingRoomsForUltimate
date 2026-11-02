@@ -2034,7 +2034,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "13614347a5531e458aec075f59fc2368a98e9ce0cf8b9a3b1c5e174d6a8a7a25",
+   "dest_sha256": "1f18b830bc14f8d43b9b9175ef7cff3ddf68d07c3905d13063e11e529da4490d",
    "edits": [
     {
      "old": "use std::sync::{mpsc, Arc, Mutex};",
@@ -2192,6 +2192,11 @@
      "old": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
      "new": "\n/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    super::menu_handoff::init();\n    crate::runtime::ui::menu_app::init_publications();\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n",
      "reason": "Boot-initialize owned close-intent channel; UI producer never shares a native receiver guard (lead19:17)."
+    },
+    {
+     "old": "    super::menu_handoff::init();",
+     "new": "    crate::runtime::mii::menu_handoff::init();",
+     "reason": "Catalog request is path-declared under roster, so boot close-handoff initialization uses its canonical runtime::mii module path."
     }
    ]
   },
