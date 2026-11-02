@@ -27,3 +27,9 @@ Conflicts: `src/runtime.rs` (both `mod ui;` and `mod scene;`) and `CARRY-OVER.md
 
 ## Gates at the last commit
 `cargo test` all pass, `cargo clippy --all-targets -- -D warnings` clean, `cargo build --no-default-features` ok, Switch release build ok (sha256 `3423fb04...`, resident 450,560 B), diag build ok.
+## Successor session (2026-11-02, Sonnet 5.5 high; watcher `/tmp/pkg5-watch2`)
+- Builds (Ally WSL, `eden/ally/ally-build.sh`): `f05365e` release `162d04ef` (495,616 B resident), diag `824fe986` (602,112 B); `00cfb44` release `31b25337` (495,616 B), diag `adf4e987` (606,208 B); host tests 3,305 pass, clippy 0, `--no-default-features` ok, 0 Switch warnings. Clippy fix for Rust 1.98.1: `Text::string_lossy` (Copy type, by-value rule), `is_multiple_of`. `work/implementation` has its own lint fix of the same two sites (`6c9e530`, `Label::to_string_lossy`): take one of the two at the merge.
+- Eden batch 2 done on the Ally (s5-10, s5-11, s5-12): `eden/EDEN-PACKAGE-5.md`.
+- Fixed from the mockup comparison: direction chips overflowed the help panel (size 184 / pitch 206, recipe rebuilt `225fdfd0`); docked tile labels cut mid-word and ambiguous (now 12 characters plus two dots).
+- Open from the comparison (not fixed: design work, each listed in `eden/EDEN-PACKAGE-5.md`): DI / SDI chips are the clean room's arrows (run-time chips wait for U4), no "Selected (weight)" side panel on the direction grids, the delay popup is the checklist only (no range control yet), overrides screen is one column without "Use Mash set", item names in the docked item grid keep the old order of the list, Button chords row shows no "6 chords" value.
+- Host-aware ledger helper `eden/ally/ledger.py` and `s5_eden.py` (pkg6 `9360dfa` rule): a claim line names only the host it claims.
