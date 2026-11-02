@@ -207,11 +207,10 @@ impl Stock for VanillaFile {
 
 /// Rebuild into `out` from the vanilla file; its length when it worked.
 fn build_on_vanilla(out: &mut Vec<u8>) -> Result<usize, &'static str> {
+    // The length is the recipe's own (the stock archive it was made for): no `fstat` on the `arc:` file (Eden s5-21 saw 128 null
+    // reads from the game's file layer after one), and a shorter file simply fails its reads.
+    let len = archive_recipe::header(RECIPE)?.stock_len;
     let file = File::open(VANILLA_PATH).map_err(|_| "vanilla base not readable")?;
-    let len = file.metadata().map_err(|_| "vanilla base not readable")?.len() as usize;
-    if !(MIN_STOCK_BYTES..=MAX_STOCK_BYTES).contains(&len) {
-        return Err("vanilla base not readable");
-    }
     let mut vanilla = VanillaFile { file, len };
     archive_recipe::build_into(&mut vanilla, RECIPE, out)?;
     Ok(len)
