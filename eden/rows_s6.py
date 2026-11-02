@@ -275,6 +275,43 @@ def r_pause():
     row("F9 research: pause menu dumps around No. of CPUs 1/2/3/1", all(x and "written=true" in x for x in lines), lines)
 
 
+def set_cpus(target, current):
+    """Native pause menu: open (the cursor starts on No. of CPUs), step to `target`, close. Returns the mark before the close."""
+    tap("plus", wait=2.0)
+    for _ in range(abs(target - current)):
+        tap("right" if target > current else "left", wait=0.8)
+    m = mark()
+    tap("plus", wait=2.0)
+    return m
+
+
+def r_f9():
+    """F9: with a helper source loaded (preload on), raise No. of CPUs 1 -> 2 -> 3 and back to 1; every extra CPU shows its native
+    fighter (HUD and body), the helper is given back before it is shown, and a helper is admitted again at 1."""
+    before = [x for x in read_diag() if "[CharacterSources] install slot=" in x]
+    row("F9 precondition: a helper source was loaded into a parked entry", bool(before), before[-1:] if before else "no install line")
+    m0 = mark()
+    m = set_cpus(2, 1)
+    time.sleep(4)
+    seen = [x for x in after(m0) if "cpu_quantity=2" in x]
+    gb = [x for x in after(m0) if "give_back" in x]
+    shot("f9-cpus2")
+    row("F9 count 2: the loader callback sees it (paused: before the close)", bool(seen), seen[:2])
+    row("F9 count 2: the helper in entry 2 is given back to its native fighter", any("give_back done slot=2" in x for x in gb), gb[-3:])
+    m0 = mark()
+    set_cpus(3, 2)
+    time.sleep(4)
+    gb = [x for x in after(m0) if "give_back" in x]
+    shot("f9-cpus3")
+    row("F9 count 3: entry 3 given back too (or held no helper)", all("refused" not in x for x in gb), gb[-3:] or "no helper in entry 3")
+    m0 = mark()
+    set_cpus(1, 3)
+    time.sleep(20)
+    again = [x for x in after(m0) if "[CharacterSources] install slot=" in x]
+    shot("f9-cpus1")
+    row("F9 back to 1: a helper is admitted again", bool(again), again[:2])
+
+
 def r_lease():
     lines = [x for x in read_diag() if "practice_session" in x]
     row("practice lease: why native Training holds no session (refusal reason)", bool(lines), lines[-3:])
@@ -359,7 +396,7 @@ def r_r5():
 
 
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "f9": r_f9, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
 
 
 def main():
