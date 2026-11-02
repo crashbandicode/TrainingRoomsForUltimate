@@ -23,12 +23,13 @@
 //! missing={:x?}` (WP2's format).
 
 use super::observe;
+use crate::engine::compat::fixed::DebugIter;
 use crate::engine::seams::native_fields as fields;
-use std::sync::{Mutex, MutexGuard};
+use hos_lock::{Mutex, MutexGuard};
 use crate::engine::swap::swap_model::request_bit as bit0;
 use crate::engine::swap::swap_model::ledger::{
     AcqToken, BatchId, Holder, Ledger, LedgerRefusal, LiveConsumers, NativeCall, NativeRequest, RFlags,
-    ReleaseRecipe, Role,
+    ReleaseCalls, ReleaseRecipe, Role,
 };
 
 macro_rules! trace {
@@ -54,7 +55,7 @@ pub(crate) struct RHandle {
 static LEDGERS: [Mutex<Option<RHandle>>; 2] = [Mutex::new(None), Mutex::new(None)];
 
 fn lock(role: Role) -> MutexGuard<'static, Option<RHandle>> {
-    LEDGERS[role.index()].lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    LEDGERS[role.index()].lock()
 }
 
 impl RHandle {
@@ -133,7 +134,7 @@ pub(crate) unsafe fn acquire(base: usize, role: Role, group: usize, kind: u32, h
         acquire(r as *mut u8, kind);
     }
     trace!("[Ledger] acquire owner={} kind={:#x} keys={:x?} holder={:?} recipe={:?} batch={} issued={}",
-        owner, kind, keys.iter(kind).map(|k| k.value()).collect::<Vec<_>>(), holder, recipe, batch.0, call.is_some());
+        owner, kind, DebugIter(keys.iter(kind).map(|k| k.value())), holder, recipe, batch.0, call.is_some());
     Ok(())
 }
 
@@ -170,14 +171,17 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
     let (r, owner, plan) = {
         let mut slot = lock(role);
         let Some(handle) = slot.as_mut() else { return receipt; };
-        let selected: Vec<usize> = handle.held.iter().enumerate()
-            .filter(|(_, (g, token))| group.is_none_or(|x| *g == x) && kinds.is_none_or(|ks| ks.contains(&token.kind())))
-            .map(|(i, _)| i).collect();
-        let mut plan: Vec<(u32, Vec<NativeCall>)> = Vec::new();
-        for i in selected.into_iter().rev() {
+        let mut plan: Vec<(u32, ReleaseCalls)> = Vec::new();
+        // Descending removal leaves every earlier index unchanged. Preserve the
+        // old selection/release order without allocating a second index list.
+        for i in (0..handle.held.len()).rev() {
+            let (g, token) = &handle.held[i];
+            if !group.is_none_or(|x| *g == x) || !kinds.is_none_or(|ks| ks.contains(&token.kind())) {
+                continue;
+            }
             let (_, token) = handle.held.remove(i);
             let kind = token.kind();
-            match handle.ledger.release(token, occupancy, role) {
+            match handle.ledger.release_fixed(token, occupancy, role) {
                 Ok(calls) => plan.push((kind, calls)),
                 Err((token, why)) => {
                     let text = refusal_text(&why);
@@ -191,12 +195,12 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
     };
     for (kind, calls) in &plan {
         execute(base, r, calls);
-        for call in calls {
+        for call in calls.iter() {
             if let NativeCall::ReleaseKey(key) = call { receipt.keys.push(key.value()); }
         }
         receipt.released += 1;
         trace!("[Ledger] release owner={} kind={:#x} calls={:x?} reason={}", owner, kind,
-            calls.iter().map(|c| match c { NativeCall::ReleaseKey(k) => k.value(), NativeCall::ReleaseKind { kind } => *kind, _ => 0 }).collect::<Vec<_>>(), reason);
+            DebugIter(calls.iter().map(|c| match c { NativeCall::ReleaseKey(k) => k.value(), NativeCall::ReleaseKind { kind } => *kind, _ => 0 })), reason);
     }
     for (kind, text) in &receipt.kept {
         trace!("[Ledger] retained owner={} kind={:#x} reason={} ({})", owner, kind, text, reason);
@@ -244,9 +248,8 @@ pub(crate) fn settle(role: Role, group: usize, kinds: &[u32], reason: &str) -> V
 pub(crate) fn settle_stale_on_empty(role: Role, reason: &str) -> usize {
     let mut slot = lock(role);
     let Some(handle) = slot.as_mut() else { return 0; };
-    let stale: Vec<(usize, AcqToken)> = std::mem::take(&mut handle.held);
-    let count = stale.len();
-    for (group, token) in stale {
+    let count = handle.held.len();
+    for (group, token) in handle.held.drain(..) {
         let (kind, batch) = (token.kind(), token.batch());
         if handle.ledger.settle(token) {
             trace!("[Ledger] stale owner={} group={} kind={:#x} batch={} settled reason={}", handle.owner,
@@ -296,7 +299,7 @@ pub(crate) fn reset_exclusive(role: Role, group: usize) -> Result<(), Vec<BatchI
     match handle.ledger.reset_batch_permit(batch) {
         Ok(_) => Ok(()),
         Err(others) => {
-            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", handle.owner, batch.0, others.iter().map(|b| b.0).collect::<Vec<_>>());
+            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", handle.owner, batch.0, DebugIter(others.iter().map(|b| b.0)));
             Err(others)
         }
     }
@@ -323,17 +326,21 @@ pub(crate) unsafe fn set_pair_refs(role: Role, r: usize, group: usize, reference
             Ok(before)
         }
         Err(others) => {
-            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", owner, batch.0, others.iter().map(|b| b.0).collect::<Vec<_>>());
+            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", owner, batch.0, DebugIter(others.iter().map(|b| b.0)));
             Err(others)
         }
     }
 }
 
-/// Nothing held by us and nothing recorded for native: a canonical Reload may be issued.
-pub(crate) fn expect_free(role: Role) -> Result<(), Vec<u32>> {
-    match lock(role).as_ref() {
-        Some(handle) => handle.ledger.expect_free().map_err(|keys| keys.iter().map(|k| k.value()).collect()),
-        None => Ok(()),
+/// Diagnose the same sorted held keys before Reload, without collecting a copy.
+/// This is observation only: it neither refuses nor performs native cleanup.
+pub(crate) fn expect_free(role: Role, owner: u32, phase: &str) {
+    let slot = lock(role);
+    if let Some(handle) = slot.as_ref() {
+        let keys = handle.ledger.predicted_iter().map(|(key, _)| key);
+        if keys.clone().next().is_some() {
+            trace!("[Ledger] expect_free owner={} phase={} keys_held={:x?}", owner, phase, DebugIter(keys));
+        }
     }
 }
 
@@ -343,10 +350,12 @@ pub(crate) fn expect_free(role: Role) -> Result<(), Vec<u32>> {
 /// # Safety
 /// As for `observe::walk_map`: the owner's task idle, the current callback.
 pub(crate) unsafe fn reconcile(role: Role, phase: &str) {
-    let (r, owner, predicted) = match lock(role).as_ref() {
-        Some(handle) => (handle.r, handle.owner, handle.ledger.predicted()),
-        None => return,
-    };
+    // Read-only field probes and formatting make no native calls. Keep one coherent
+    // ledger view while walking the idle map; no copied prediction or tree is needed.
+    let slot = lock(role);
+    let Some(handle) = slot.as_ref() else { return; };
+    let (r, owner) = (handle.r, handle.owner);
+    let predicted = DebugIter(handle.ledger.predicted_iter());
     let map = fields::read::<u64>(r, 0x18).unwrap_or(0);
     let task_pending = fields::child(r, 0xa8).and_then(|task| fields::read::<u32>(task, 0x10)).unwrap_or(0);
     if task_pending != 0 {
@@ -355,10 +364,10 @@ pub(crate) unsafe fn reconcile(role: Role, phase: &str) {
     }
     match observe::walk_map(r) {
         Some(nodes) => {
-            let actual: Vec<(u32, u32)> = nodes.iter().map(|n| (n.key, n.refs)).collect();
-            let result = match lock(role).as_ref() { Some(handle) => handle.ledger.reconcile(&actual), None => return };
+            let actual = nodes.iter().map(|n| (n.key, n.refs));
             trace!("[Ledger] reconcile owner={} phase={} map={} task_pending=0 predicted={:x?} actual={:x?} residual={:x?} missing={:x?}",
-                owner, phase, map, predicted, actual, result.residual, result.missing);
+                owner, phase, map, predicted, DebugIter(actual.clone()),
+                DebugIter(handle.ledger.residual_iter(actual.clone())), DebugIter(handle.ledger.missing_iter(actual)));
         }
         None => trace!("[Ledger] reconcile owner={} phase={} map={} task_pending=0 predicted={:x?} walk=invalid", owner, phase, map, predicted),
     }

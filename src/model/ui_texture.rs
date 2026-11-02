@@ -36,6 +36,11 @@ pub const TEXTURE_WIDTH: usize = 0x48;
 pub const TEXTURE_HEIGHT: usize = 0x4a;
 pub const TEXTURE_REGISTERED: usize = 0x5c;
 pub const SLOT_UNSET: u64 = u64::MAX;
+/// A UI frame can replace every tile, one shared chip texture, and five diagnostic probe textures.
+pub const MAX_RETIRED_PER_FRAME: usize = super::panes::TILES + 1 + 5;
+pub const RETIRE_DELAY_FRAMES: u64 = 8;
+/// Include the generation being retired before the next clock advance.
+pub const RETIRE_SLOTS: usize = MAX_RETIRED_PER_FRAME * (RETIRE_DELAY_FRAMES as usize + 1);
 pub const TEXTURE_STATE: usize = 0x60;
 /// `[[tex+0x60]+0x18]`, the state value that means the texture finished.
 pub const STATE_FIELD: usize = 0x18;
@@ -140,5 +145,19 @@ mod tests {
         assert_eq!(q.len(), 2);
         assert_eq!(q.pop_due(1), Some(1));
         assert!(q.push(3, 1));
+    }
+
+    #[test]
+    fn every_portrait_can_change_each_frame_without_shortening_retirement_grace() {
+        let mut queue: RetireQueue<u64, RETIRE_SLOTS> = RetireQueue::new(RETIRE_DELAY_FRAMES);
+        for frame in 0..40 {
+            while let Some(retired_at) = queue.pop_due(frame) {
+                assert!(frame >= retired_at + RETIRE_DELAY_FRAMES);
+            }
+            for _ in 0..MAX_RETIRED_PER_FRAME {
+                assert!(queue.push(frame, frame), "all panes and diagnostic textures fit at frame {frame}");
+            }
+        }
+        assert!(queue.len() <= MAX_RETIRED_PER_FRAME * RETIRE_DELAY_FRAMES as usize);
     }
 }

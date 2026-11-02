@@ -4,7 +4,8 @@ use super::mii_selector_native::{self as native, PublicationTarget, Snapshot};
 use super::{mii_saved_alpha, native_fighter_install, native_source, InstallToken, BASE, INSTALL};
 use crate::engine::swap::source_lifetime::{LoadToken, SourceToken};
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use hos_lock::Mutex;
+use crate::model::reusable_snapshot::{Storage, Snapshot as SharedSnapshot};
 use crate::engine::mii::{
     inventory::MiiClass,
     lifetime::Configuration,
@@ -13,11 +14,13 @@ use crate::engine::mii::{
     selection::{self, PlayerOrigin},
 };
 struct State {
+    storage: Option<Storage<Prepared>>,
     track: Option<Track>,
     next: u64,
     capture_wait_noted: bool,
 }
 static STATE: Mutex<State> = Mutex::new(State {
+    storage: None,
     track: None,
     next: 1,
     capture_wait_noted: false,
@@ -28,7 +31,7 @@ struct Track {
     gate: Gate,
     source: SourceToken,
     install: InstallToken,
-    data: Arc<Prepared>,
+    data: SharedSnapshot<Prepared>,
 }
 pub(super) struct Prepared {
     before: Snapshot,
@@ -36,6 +39,11 @@ pub(super) struct Prepared {
     configuration: Configuration,
     player_epoch: u64,
     hat_change: bool,
+}
+/// Called once at boot, before native hooks can admit a helper.
+pub(super) fn init_storage() {
+    let mut state = STATE.lock();
+    if state.storage.is_none() { state.storage = Some(Storage::new()); }
 }
 pub(super) fn origins_captured() -> bool {
     super::mii_ordinary_player::helper_origin_captured()
@@ -51,7 +59,7 @@ pub(super) fn admission_ready(mii_request: bool) -> bool {
     let player = mii_request && super::mii_ordinary_player::helper_origin_captured();
     let cpu = super::mii_ordinary_cpu::helper_origin_captured();
     let ready = policy::helper_captures_ready(mii_request, original_cpu, player, cpu);
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     let report = !ready && !s.capture_wait_noted;
     s.capture_wait_noted = !ready;
     drop(s);
@@ -109,7 +117,10 @@ pub(super) unsafe fn prepare(
         "helper original capture/slot unavailable",
     )?;
     check(
-        STATE.lock().unwrap().track.is_none(),
+        {
+            let state = STATE.lock();
+            state.track.is_none() && state.storage.as_ref().is_some_and(Storage::available)
+        },
         "helper transaction still retained",
     )?;
     native::target_rows(c)?;
@@ -151,7 +162,7 @@ pub(super) fn bind(
     install: InstallToken,
 ) -> Result<(), &'static str> {
     let source = load.source();
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     check(
         s.track.is_none()
             && INSTALL.owns(install)
@@ -182,12 +193,14 @@ pub(super) fn bind(
     };
     let next = s.next.checked_add(1).ok_or("helper ticket exhausted")?;
     let gate = Gate::new(ticket).ok_or("helper ticket invalid")?;
+    let data = s.storage.as_mut().ok_or("helper storage not initialized")?
+        .publish(data).map_err(|_| "helper snapshot reader still retained")?;
     s.track = Some(Track {
         ticket,
         gate,
         source,
         install,
-        data: Arc::new(data),
+        data,
     });
     s.next = next;
     Ok(())
@@ -212,7 +225,7 @@ fn target(t: &Track) -> PublicationTarget<'_> {
 }
 pub(super) unsafe fn install(source: SourceToken) -> bool {
     let descriptor = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         let Some(t) = s
             .track
             .as_ref()
@@ -234,13 +247,12 @@ pub(super) unsafe fn install(source: SourceToken) -> bool {
 pub(super) fn tracked(entry: usize) -> bool {
     STATE
         .lock()
-        .unwrap()
         .track
         .as_ref()
         .is_some_and(|t| t.ticket.entry == entry)
 }
 pub(super) unsafe fn enter_native(entry: *mut u8) -> bool {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     let Some(t) = s
         .track
         .as_mut()
@@ -258,7 +270,7 @@ pub(super) unsafe fn enter_native(entry: *mut u8) -> bool {
     )
 }
 pub(super) unsafe fn leave_native(entry: *mut u8) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if let Some(t) = s
         .track
         .as_mut()
@@ -271,7 +283,7 @@ pub(super) unsafe fn leave_native(entry: *mut u8) {
     }
 }
 pub(super) fn refuse(entry: usize, reason: &str) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if let Some(t) = s.track.as_mut().filter(|t| t.ticket.entry == entry) {
         t.gate.refuse();
         drop(s);
@@ -283,7 +295,7 @@ pub(super) fn refuse(entry: usize, reason: &str) {
 }
 pub(super) unsafe fn prequeue(entry: usize, selected: usize) -> bool {
     let track = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         let Some(t) = s.track.as_ref().filter(|t| t.ticket.entry == entry) else {
             return false;
         };
@@ -294,7 +306,7 @@ pub(super) unsafe fn prequeue(entry: usize, selected: usize) -> bool {
         // The gate's configure-skip writer (U5) runs for the ordinary CPU/Player tracks only.
         let publication = native::publication(target(&track), selected, &mut evidence,
             crate::engine::mii::identity::ExpectedMutation::None)?;
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let t = s.track.as_mut().ok_or("helper ticket retired")?;
         check(
             t.source == track.source
@@ -331,14 +343,14 @@ pub(super) unsafe fn prequeue(entry: usize, selected: usize) -> bool {
 /// Terminal transactions skip further SourceBook readiness/G reads; INSTALL
 /// remains owned until the actual destructor. Missing tracks cover a refused bind.
 pub(super) fn retained_terminal(source: SourceToken) -> bool {
-    let s = STATE.lock().unwrap();
+    let s = STATE.lock();
     s.track
         .as_ref()
         .filter(|t| t.source == source)
         .is_none_or(|t| matches!(t.gate.phase(), Phase::Refused | Phase::Departed))
 }
 pub(super) fn refuse_completion(source: SourceToken, reason: &str) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     let Some(t) = s.track.as_mut().filter(|t| t.source == source) else {
         return;
     };
@@ -358,7 +370,7 @@ pub(super) unsafe fn completed(
     ticks: u16,
 ) -> Result<Option<helpers::MiiProof>, &'static str> {
     let track = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         let t = s.track.as_ref().ok_or("helper ticket absent")?;
         check(
             t.source == source && current(t) && t.gate.can_complete(t.ticket),
@@ -380,7 +392,7 @@ pub(super) unsafe fn completed(
         Err("ready task outstanding") if ticks < 900 => return Ok(None),
         result => result?,
     };
-    let s = STATE.lock().unwrap();
+    let s = STATE.lock();
     let t = s.track.as_ref().ok_or("helper completion retired")?;
     check(
         t.source == source
@@ -403,13 +415,13 @@ pub(super) unsafe fn completed(
     Ok(Some(proof))
 }
 pub(super) fn release(source: SourceToken) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.track.as_ref().is_some_and(|t| t.source == source) {
         s.track = None;
     }
 }
 pub(super) fn depart() {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     s.capture_wait_noted = false;
     if let Some(t) = s.track.as_mut() {
         t.gate.depart();

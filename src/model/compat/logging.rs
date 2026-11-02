@@ -17,7 +17,7 @@ pub fn diagnostic(args: fmt::Arguments<'_>) {
     capture::push(args);
 }
 
-/// The fork's `log::info!`, `log::warn!` and `log::error!` (a level in the carried INI loader's messages, a Switch-only file): one
+/// The fork's `log::info!` and `log::warn!` (a level in the carried INI loader's messages, a Switch-only file): one
 /// diagnostic line each.
 #[cfg(target_os = "switch")]
 macro_rules! log_info {
@@ -28,11 +28,7 @@ macro_rules! log_warn {
     ($($arg:tt)*) => { $crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
 }
 #[cfg(target_os = "switch")]
-macro_rules! log_error {
-    ($($arg:tt)*) => { $crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
-}
-#[cfg(target_os = "switch")]
-pub(crate) use {log_error, log_info, log_warn};
+pub(crate) use {log_info, log_warn};
 
 /// Marks a heap-meter snapshot: with `plugin-heap-meter` (a diag feature) on the Switch, one `[HeapMeter]` line with the byte meter of
 /// the plugin's one counting allocator (`model::hook_stats`); nothing otherwise.

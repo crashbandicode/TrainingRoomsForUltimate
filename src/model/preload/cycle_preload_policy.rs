@@ -40,21 +40,27 @@ pub const CPU_FIGHTERS: usize = 3;
 /// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next
 /// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.
 pub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {
-    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);
-    for depth in 0..N {
-        for (lane, targets) in lanes.iter().enumerate() {
-            if let Some(target) = targets[depth] {
-                order.push((lane, target));
-            }
-        }
-    }
-    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {
-        let (head, tail) = order.split_at(last_hat + 1);
-        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();
-        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));
-        ranked.extend_from_slice(tail);
-        order = ranked;
-    }
+    let Some(last_hat_depth) = lanes[PLAYER_HATS].iter().rposition(Option::is_some) else {
+        return merge(lanes, slots);
+    };
+    // Visit the same three stable partitions directly. The last hat is lane 0,
+    // so the head includes other lanes only at strictly earlier depths.
+    let head = || (0..=last_hat_depth).flat_map(|depth| {
+        lanes.iter().enumerate().filter_map(move |(lane, targets)| {
+            (depth < last_hat_depth || lane == PLAYER_HATS)
+                .then_some((lane, targets[depth]))
+                .and_then(|(lane, target)| target.map(|target| (lane, target)))
+        })
+    });
+    let order = head().filter(|(lane, _)| *lane != CPU_FIGHTERS)
+        .chain(head().filter(|(lane, _)| *lane == CPU_FIGHTERS))
+        .chain((last_hat_depth..N).flat_map(|depth| {
+            lanes.iter().enumerate().filter_map(move |(lane, targets)| {
+                (depth > last_hat_depth || lane != PLAYER_HATS)
+                    .then_some((lane, targets[depth]))
+                    .and_then(|(lane, target)| target.map(|target| (lane, target)))
+            })
+        }));
     let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);
     let mut result = [None; N];
     let mut count = 0;

@@ -11,7 +11,7 @@ use std::convert::TryFrom;
 
 use smash::app::{self, lua_bind::*, BattleObjectModuleAccessor, Fighter};
 use smash::lib::lua_const::*;
-use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
+use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
 use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle}};
 
 use crate::runtime::lobby::game_mode;
@@ -29,7 +29,8 @@ static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
 static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));
 static RELOAD: Mutex<Option<Reload>> = Mutex::new(None);
 static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);
-static CLOSE_INPUT: Mutex<CloseInputGuard> = Mutex::new(CloseInputGuard::new());
+static CLOSE_ARM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static CLOSE_INPUT: hos_lock::Mutex<CloseInputGuard> = hos_lock::Mutex::new(CloseInputGuard::new());
 #[cfg(feature = "named-input-trace")]
 static CLOSE_TRACE_LEFT: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "named-input-trace")]
@@ -98,29 +99,57 @@ static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 /// This uses the existing native-service loading window and its safety gates.
 #[derive(Clone,Copy)]
 struct ResolveSelection { action:Option<ClipAction>, entry:usize }
+#[cfg(feature="mii-ordinary-cpu-alpha")]
+type ResolveTicket = crate::runtime::roster::character_roster::mii_replay::Ticket;
+#[cfg(not(feature="mii-ordinary-cpu-alpha"))]
+type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;
 struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     selection:Option<ResolveSelection>,
-    resolving:Option<std::sync::mpsc::Receiver<Result<Configuration,String>>> }
+    resolving:Option<ResolveTicket>, resolve_error:Option<String> }
 pub(crate) fn selection_revision()->u64 {SELECTION_REVISION.load(Ordering::Acquire)}
 fn target_ready(target:Target,current:Option<i32>)->bool {
-    let Some(kind)=current else {return false;};
+    let Some(_kind)=current else {return false;};
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    { crate::runtime::roster::character_roster::mii_replay::ready(target,kind as u32) }
+    { crate::runtime::macros::identity::clip_ready(target) }
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    {target.ready(kind as u32,None)}
+    {target.ready(_kind as u32,None)}
 }
-static CAPTURE: Mutex<Capture> = Mutex::new(Capture {
-    recording: false,
-    session: ReplaySession { tracks: Vec::new(), truncated: false },
-    previous: None,
-    pending: [None; 8],
-});
+use crate::engine::macros::handoff::{VaultArchive as Capture, VaultEvent};
+static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
 
-struct Capture {
-    recording: bool,
-    session: ReplaySession,
-    previous: Option<ReplaySession>,
+// Only native callbacks own the in-flight pair and native replay epoch.
+struct VaultHook {
+    epoch: u64, recording: bool, truncated: bool, counts: [usize; 8],
     pending: [Option<ReplayFrame>; 8],
+}
+static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {
+    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
+});
+static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();
+static VAULT_DROPPED_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+fn post_vault(epoch: u64, event: VaultEvent) -> bool {
+    let posted = VAULT_EVENTS.post(event);
+    if !posted { VAULT_DROPPED_EPOCH.store(epoch, Ordering::Release); }
+    crate::runtime::ui::worker::wake();
+    posted
+}
+
+/// Worker entry, before UI commands may open the captured timeline.
+pub fn worker_vault_events() {
+    // Only this worker uses the scratch; allocate directly on its heap once.
+    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());
+    let mut scratch = SCRATCH.lock().unwrap();
+    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }
+    VAULT_EVENTS.drain_with_scratch(&mut scratch, |event| {
+        CAPTURE.lock().unwrap().apply(event, VAULT_DROPPED_EPOCH.load(Ordering::Acquire));
+    });
+    let dropped = VAULT_EVENTS.take_dropped();
+    if dropped != 0 {
+        let epoch = VAULT_DROPPED_EPOCH.load(Ordering::Acquire);
+        CAPTURE.lock().unwrap().note_loss(epoch);
+        println!("[MacroHandoff] vault_events_dropped={dropped} epoch={epoch}");
+    }
 }
 
 pub fn init() {
@@ -156,7 +185,7 @@ pub fn open_editor() {
 }
 
 fn open_browser(expected_revision: Option<u64>) {
-    if !crate::runtime::lobby::training::practice::enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()
+    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()
         || crate::runtime::lobby::training::recording_or_playback()
         || crate::runtime::macros::save_states::is_loading()
         || crate::runtime::roster::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
@@ -196,14 +225,29 @@ fn open_browser(expected_revision: Option<u64>) {
         // interruption while that I/O was in flight.
         if expected_revision.is_some_and(|revision|
             !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
         *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
             revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });
     }
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
+/// The decoded source is small ownership metadata; its buffers remain worker-owned.
+struct CaptureSource {
+    session: ReplaySession,
+    name: String,
+    previous: Option<ReplaySession>,
+    miis: Option<crate::engine::mii::replay::ReplayMiis>,
+}
+
 fn open_capture(id: &str, revision: u64) -> Result<(), String> {
+    let source = read_capture_source(id)?;
+    install_capture_source(source, revision)
+}
+
+/// Finish archive/JSON decoding before reserving the large editor construction frame.
+#[inline(never)]
+fn read_capture_source(id: &str) -> Result<CaptureSource, String> {
     let (session, name, previous, miis) = match id {
         "latest" => (
             latest().ok_or("No latest Vault capture")?,
@@ -226,6 +270,13 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             (saved.session, saved.replay_name, None, saved.miis)
         }
     };
+    Ok(CaptureSource { session, name, previous, miis })
+}
+
+/// The editor publication fence and its payload live only after decoding has unwound.
+#[inline(never)]
+fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), String> {
+    let CaptureSource { session, name, previous, miis } = source;
     // Inspect the full owned session once, before ClipEditor selects/crops a track.
     let association=std::array::from_fn(|entry| {
         let miis=miis.as_ref().ok_or_else(||"This capture has no exact Mii configuration; ordinary Mii preferences cannot substitute".to_string())?;
@@ -234,7 +285,7 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             .ok_or_else(||"Capture track is absent".to_string())?;
         session.mii_for_track(miis,entry as i32,kind).map_err(str::to_string)
     });
-    let result = ClipEditor::new(session, clean_statuses())
+    let result = ClipEditor::new(session, clean_statuses().to_vec())
         .map(|editor| editor.with_move_rules(crate::runtime::macros::replay_move_start::rules()));
     match result {
         Ok(mut editor) => {
@@ -246,15 +297,14 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             if !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening()) {
                 return Ok(()); // Cancel/departure owns this result; never publish it late.
             }
-            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() {
+            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() {
                 return Err("Practice changed before the capture could open".into());
             }
-            let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
+            let current = crate::runtime::ui::facts::fact_cpu_kind()
                 .ok_or("Wait for the practice CPU before opening a capture")?;
-            if !clean_statuses().contains(&unsafe { StatusModule::status_kind(cpu) }) {
+            if !crate::runtime::ui::facts::fact_cpu_status().is_some_and(|status| clean_statuses().contains(&status)) {
                 return Err("Open the clip editor while the CPU is idle or falling".into());
             }
-            let current = unsafe { app::utility::get_kind(&mut *cpu) };
             editor.select_kind(current);
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
                 association,resolved:[None;8],resolve_failed:0,switch:false});
@@ -306,7 +356,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
                 if let Some(mut editor) = taken {
                     editor.pause();
                     *RELOAD.lock().unwrap() = Some(Reload { editor, requested:false, ticks:0,
-                        revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive) });
+                        revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive), resolve_error:None });
                     crate::runtime::macros::replay_preview::request_stop();
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE, false);
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
@@ -359,6 +409,11 @@ pub fn fighter_choice(choice: Option<FighterChoice>) {
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
+pub fn browser_queries() -> (bool, bool) {
+    BROWSER.lock().unwrap().as_ref().map_or((false, false), |browser|
+        (browser.ui.pending(), browser.ui.release_cpu(false)))
+}
+
 pub fn browser_visible() -> bool {
     !crate::runtime::macros::named_macros::suspended() && BROWSER.lock().unwrap().is_some()
 }
@@ -368,7 +423,7 @@ pub fn browser_view() -> Option<View> {
 }
 
 pub fn browser_input(pad: Pad) {
-    let waiting = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby);
+    let waiting = crate::runtime::ui::facts::fact_waiting_scene();
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
@@ -401,8 +456,8 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
 }
 
 fn capture_ready() -> bool {
-    crate::runtime::lobby::training::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
-        && unsafe { Fighter::is_ready_go() && !crate::runtime::macros::save_states::is_loading() }
+    crate::runtime::ui::facts::fact_practice_enabled() && !crate::runtime::macros::named_macros::suspended()
+        && crate::runtime::ui::facts::fact_ready_go() && !crate::runtime::macros::save_states::is_loading()
         && !crate::runtime::lobby::training::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
 }
 
@@ -411,7 +466,7 @@ fn capture_ready() -> bool {
 pub fn quiescing_capture() -> bool {
     // Most command-flag calls have no browser request; avoid native mode reads
     // on that hot path. Release the browser lock before querying other owners.
-    let pending = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending());
+    let pending = crate::runtime::macros::named_macros::hook_queries().browser_pending;
     pending && !crate::runtime::macros::named_macros::suspended()
         && crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)
 }
@@ -419,20 +474,26 @@ pub fn quiescing_capture() -> bool {
 pub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {
     if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }
     let clean = clean_statuses().contains(&StatusModule::status_kind(module));
-    BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.release_cpu(clean))
+    crate::runtime::macros::named_macros::hook_queries().browser_release && !clean
 }
 
-unsafe fn service_browser() {
+fn service_browser() {
     if !BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending()) { return; }
-    let eligible = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby) && capture_ready();
-    let clean = eligible && crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
-        .is_some_and(|cpu| clean_statuses().contains(&StatusModule::status_kind(cpu)));
+    let eligible = crate::runtime::ui::facts::fact_waiting_scene() && capture_ready();
+    let clean = eligible && crate::runtime::ui::facts::fact_cpu_status()
+        .is_some_and(|status| clean_statuses().contains(&status));
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
         (browser.ui.tick(eligible, clean), browser.revision)
     };
     browser_effect(effect, revision);
+}
+
+/// Worker-only logical draft presence; parking for a reload is not closing.
+pub fn editor_open() -> bool {
+    let present = EDITOR.lock().unwrap().is_some();
+    present || RELOAD.lock().unwrap().is_some()
 }
 
 pub fn panel_visible() -> bool {
@@ -458,6 +519,7 @@ pub fn suspend_waiting() {
         reload.ticks = 0;
         reload.revision = revision;
         reload.resolving = None;
+        reload.resolve_error = None;
     }
     REVISION.fetch_add(1, Ordering::Relaxed);
     *HOLD.lock().unwrap() = (0, 0, false);
@@ -492,17 +554,51 @@ pub fn cancel_reload() {
 
 /// Only the value-only editor survives its requested CPU install. Native preview
 /// cleanup must finish before handing control to the existing character loader.
-pub unsafe fn service_reload() {
+static RELOAD_PENDING: AtomicBool = AtomicBool::new(false);
+static RELOAD_REQUEST: hos_lock::Mailbox<(Target, u64), 1> = hos_lock::Mailbox::new();
+static RELOAD_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();
+
+fn queue_reload(target: Target, revision: u64) {
+    if RELOAD_PENDING.swap(true, Ordering::AcqRel) { return; }
+    let posted = RELOAD_REQUEST.post((target, revision));
+    debug_assert!(posted, "one outstanding clip character request");
+}
+
+/// Game callback: the roster owns native admission and loading.
+pub fn service_reload_request() {
+    RELOAD_REQUEST.drain(|(target, revision)| {
+        let eligible = revision == selection_revision()
+            && crate::runtime::roster::character_roster::cpu_reload_ready();
+        #[cfg(feature="mii-ordinary-cpu-alpha")]
+        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);
+        #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
+        let accepted = eligible && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
+        let posted = RELOAD_RESULT.post((revision, accepted));
+        debug_assert!(posted, "one outstanding clip character result");
+        crate::runtime::ui::worker::wake();
+    });
+}
+
+fn consume_reload_result() {
+    RELOAD_RESULT.drain(|(revision, accepted)| {
+        RELOAD_PENDING.store(false, Ordering::Release);
+        if let Some(pending) = RELOAD.lock().unwrap().as_mut().filter(|p| p.revision == revision) {
+            pending.requested = accepted;
+        }
+    });
+}
+
+pub fn service_reload() {
+    consume_reload_result();
     if crate::runtime::macros::named_macros::suspended() { return; }
-    if !crate::runtime::lobby::training::practice::scene_enabled() {
+    if !crate::runtime::ui::facts::fact_scene_enabled() {
         let had_reload=RELOAD.lock().unwrap().take().is_some();
         if had_reload || panel_visible() || browser_visible() {close_editor_inner(had_reload);}
         return;
     }
     service_browser();
     if crate::runtime::macros::lobby::native_ui_busy() { return; }
-    let cpu=crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU);
-    let current=cpu.map(|cpu|app::utility::get_kind(&mut *cpu));
+    let current=crate::runtime::ui::facts::fact_cpu_kind();
     let mut reload=RELOAD.lock().unwrap();
     if let Some(pending)=reload.as_mut() {
         pending.ticks=pending.ticks.saturating_add(1);
@@ -518,7 +614,7 @@ pub unsafe fn service_reload() {
                 return;
             }
             let result = match pending.resolving.as_ref().map(|receive| receive.try_recv()) {
-                Some(Ok(result)) => Some(result),
+                Some(Ok(result)) => Some(result.map_err(|error| error.to_string())),
                 Some(Err(std::sync::mpsc::TryRecvError::Empty)) if pending.ticks <= 600 => None,
                 _ => Some(Err("Recorded Mii metadata could not be read; reopen this capture".into())),
             };
@@ -549,7 +645,7 @@ pub unsafe fn service_reload() {
             }
             return;
         }
-        let mut failure=None;
+        let mut failure=pending.resolve_error.take();
         if let Some(receive)=pending.resolving.as_ref() {
             match receive.try_recv() {
                 Ok(Ok(configuration))=>{
@@ -557,20 +653,20 @@ pub unsafe fn service_reload() {
                     pending.editor.resolved[entry]=Some(configuration);
                     pending.resolving=None;
                 }
-                Ok(Err(error))=>failure=Some(error),
+                Ok(Err(error))=>failure=Some(error.to_string()),
                 Err(std::sync::mpsc::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
                 Err(std::sync::mpsc::TryRecvError::Empty)=>{},
             }
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};
         #[cfg(feature="mii-ordinary-cpu-alpha")]
-        if let Some(reason)=target.and_then(|target|crate::runtime::roster::character_roster::mii_replay::refusal(target,pending.revision)) {
+        if let Some(reason)=target.and_then(|target|crate::runtime::macros::identity::clip_refusal(target,pending.revision)) {
             failure=Some(reason.into());
         }
-        let grounded_idle=cpu.is_some_and(|cpu|StatusModule::status_kind(cpu)==*FIGHTER_STATUS_KIND_WAIT
-            && StatusModule::situation_kind(cpu)==*SITUATION_KIND_GROUND);
+        let grounded_idle=crate::runtime::ui::facts::fact_cpu_status()==Some(*FIGHTER_STATUS_KIND_WAIT)
+            && crate::runtime::ui::facts::fact_cpu_situation()==Some(*SITUATION_KIND_GROUND);
         if failure.is_none() && target.is_some_and(|target|target_ready(target,current))
-            && !crate::runtime::roster::character_roster::busy() && Fighter::is_ready_go() && grounded_idle {
+            && !crate::runtime::roster::character_roster::busy() && crate::runtime::ui::facts::fact_ready_go() && grounded_idle {
             // The requested switch has settled; the editor stops enforcing it.
             let mut pending=reload.take().unwrap();
             pending.editor.switch=false;
@@ -590,32 +686,23 @@ pub unsafe fn service_reload() {
                 let raw=pending.editor.raw();
                 let revision=pending.revision;
                 drop(reload);
-                let result=raw.and_then(|raw|crate::runtime::roster::character_roster::mii_replay::resolve(raw,revision));
+                let result=raw.and_then(|raw|crate::runtime::roster::character_roster::mii_replay::resolve(raw,revision).map_err(|error| error.message().to_owned()));
                 if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {
                     match result {Ok(receive)=>pending.resolving=Some(receive),Err(error)=>{
-                        let (send,receive)=std::sync::mpsc::channel();let _=send.send(Err(error));
-                        pending.resolving=Some(receive);
+                        pending.resolve_error=Some(error);
                     }}
                 }
             }
         } else if let Some(target)=target.filter(|_|!pending.requested) {
             let revision=pending.revision;
             drop(reload);
-            if crate::runtime::roster::character_roster::cpu_reload_ready() {
-                #[cfg(feature="mii-ordinary-cpu-alpha")]
-                let requested=crate::runtime::roster::character_roster::mii_replay::request(target,revision);
-                #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-                let requested=crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
-                if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {
-                    pending.requested=requested;
-                }
-            }
+            queue_reload(target, revision);
         }
         return;
     }
     drop(reload);
     if crate::runtime::macros::replay_preview::occupied() || !crate::runtime::macros::named_macros::clip_foreground()
-        || !Fighter::is_ready_go() {return;}
+        || !crate::runtime::ui::facts::fact_ready_go() {return;}
     let mut editor=EDITOR.lock().unwrap();
     let Some(active)=editor.as_ref() else {return;};
     // The recorded fighter is requested only for an answered Switch. Keep, a
@@ -632,7 +719,7 @@ pub unsafe fn service_reload() {
         Ok(target) if target.is_none_or(|target|!target_ready(target,current))=>{
             let mut pending=editor.take().unwrap();pending.pause();
             *RELOAD.lock().unwrap()=Some(Reload {editor:pending,requested:false,ticks:0,
-                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None});
+                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None,resolve_error:None});
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE,false);
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);
         }
@@ -644,11 +731,42 @@ pub fn clip_view() -> Option<ClipView> {
     EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())
 }
 
+#[derive(Clone, Copy)]
+enum PreviewNotice {
+    Progress { revision: u64, consumed: u32 },
+    Failed { session: u64, revision: u64, message: &'static str },
+}
+static PREVIEW_NOTICES: hos_lock::Mailbox<PreviewNotice, 16> = hos_lock::Mailbox::new();
+
 pub fn preview_progress(revision: u64, consumed: u32) {
-    let mut editor = EDITOR.lock().unwrap();
-    if revision == REVISION.load(Ordering::Relaxed) {
-        if let Some(editor) = editor.as_mut() { editor.preview_progress(consumed); }
-    }
+    PREVIEW_NOTICES.post(PreviewNotice::Progress { revision, consumed });
+    crate::runtime::ui::worker::wake();
+}
+
+pub fn post_preview_failed(message: &'static str) {
+    PREVIEW_NOTICES.post(PreviewNotice::Failed {
+        session: crate::runtime::macros::named_macros::session_revision(),
+        revision: REVISION.load(Ordering::Acquire), message,
+    });
+    crate::runtime::ui::worker::wake();
+}
+
+pub fn worker_preview_notices() {
+    PREVIEW_NOTICES.drain(|notice| match notice {
+        PreviewNotice::Progress { revision, consumed } => {
+            if revision == REVISION.load(Ordering::Acquire) {
+                if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.preview_progress(consumed); }
+            }
+        }
+        PreviewNotice::Failed { session, revision, message } => {
+            if session == crate::runtime::macros::named_macros::session_revision()
+                && revision == REVISION.load(Ordering::Acquire) {
+                preview_failed(message);
+            }
+        }
+    });
+    let dropped = PREVIEW_NOTICES.take_dropped();
+    if dropped != 0 { println!("[MacroHandoff] preview_notices_dropped={dropped}"); }
 }
 
 pub fn preview_failed(message: &str) {
@@ -675,14 +793,18 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
         // BROWSER before touching named UI, whose visibility path reads BROWSER.
         (browser.take().is_some(), EDITOR.lock().unwrap().take().is_some())
     };
-    crate::runtime::macros::replay_preview::request_stop();
+    if RELOAD.lock().unwrap().is_some() {
+        crate::runtime::macros::replay_preview::request_stop();
+    } else {
+        crate::runtime::macros::replay_preview::request_close();
+    }
     PENDING.lock().unwrap().take();
     REVISION.fetch_add(1, Ordering::Relaxed);
     *HOLD.lock().unwrap() = (0, 0, false);
     if was_open || was_browsing || was_loading {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
         crate::runtime::features::recorder::swallow_p1(15);
-        CLOSE_INPUT.lock().unwrap().arm(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES);
+        CLOSE_ARM.store(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES, Ordering::Release);
         #[cfg(feature = "named-input-trace")]
         {
             CLOSE_TRACE_LEFT.store(CLOSE_TRACE_LIMIT, Ordering::Relaxed);
@@ -696,7 +818,10 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
 
 /// Poll once per P1 mapping, including outside Training to discard stale ownership.
 pub fn owns_close_input(in_training: bool, close_held: bool) -> bool {
-    CLOSE_INPUT.lock().unwrap().poll(in_training, close_held)
+    let mut guard = CLOSE_INPUT.lock();
+    let frames = CLOSE_ARM.swap(0, Ordering::AcqRel);
+    if frames != 0 { guard.arm(frames); }
+    guard.poll(in_training, close_held)
 }
 
 /// Bounded console evidence of the actual mapper boundary; no persistent writes.
@@ -718,8 +843,7 @@ pub fn on_action(action: ClipAction) {
     // A track or capture change is an explicit selection: a recorded fighter that is
     // not the settled CPU asks once, and nothing changes until it is answered.
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
-        let current = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
-            .map(|cpu| unsafe { app::utility::get_kind(&mut *cpu) });
+        let current = crate::runtime::ui::facts::fact_cpu_kind();
         if gate_selection(Some(action), current) {
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
             return;
@@ -914,56 +1038,51 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
 
 pub unsafe fn before_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::before_frame(fighter);
-    let replay = in_replay();
-    if !replay || !Fighter::is_ready_go() {
-        CAPTURE.lock().unwrap().recording = false;
+    if !in_replay() || !crate::runtime::game::is_ready_go() {
+        let mut hook = VAULT_HOOK.lock();
+        if hook.recording {
+            post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: hook.truncated });
+            hook.recording = false;
+            hook.pending = [None; 8];
+        }
         return;
     }
     let Some(module) = fighter.battle_object.module_accessor.as_mut() else { return };
-    // Nana shares Popo's entry/controller; she must not double that fighter's clock.
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
-    if !capture.recording {
-        capture.recording = true;
-        let previous = std::mem::replace(&mut capture.session,
-            ReplaySession { tracks: Vec::new(), truncated: false });
-        if previous.tracks.iter().any(|track| !track.frames.is_empty()) {
-            capture.previous = Some(previous);
-        }
-        capture.pending = [None; 8];
+    let mut hook = VAULT_HOOK.lock();
+    if !hook.recording {
+        hook.epoch += 1;
+        hook.recording = true;
+        hook.truncated = false;
+        hook.counts = [0; 8];
+        hook.pending = [None; 8];
+        if !post_vault(hook.epoch, VaultEvent::Begin { epoch: hook.epoch }) { hook.truncated = true; }
     }
-    let tracks = &mut capture.session.tracks;
-    if !tracks.iter().any(|t| t.entry == entry) {
-        tracks.push(ReplayTrack { entry, frames: Vec::new(), quantized_analog: false });
-    }
-    capture.pending[entry as usize] = Some(state(module));
+    if !hook.truncated { hook.pending[entry as usize] = Some(state(module)); }
 }
 
 pub unsafe fn after_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::after_frame(fighter);
-    if !in_replay() || !Fighter::is_ready_go() { return; }
+    if !in_replay() || !crate::runtime::game::is_ready_go() { return; }
     let Some(module) = fighter.battle_object.module_accessor.as_mut() else { return };
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
-    if capture.session.truncated { return; }
-    let Some(mut sample) = capture.pending[entry as usize].take() else { return };
-    let Some(track) = capture.session.tracks.iter_mut().find(|t| t.entry == entry) else { return };
-    if track.frames.len() >= MAX_FRAMES {
-        capture.session.truncated = true;
+    let mut hook = VAULT_HOOK.lock();
+    if !hook.recording || hook.truncated { return; }
+    let Some(mut sample) = hook.pending[entry as usize].take() else { return };
+    let observed = observed_input(module);
+    if hook.counts[entry as usize] >= MAX_FRAMES || observed.is_none() {
+        hook.truncated = true;
+        post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: true });
         return;
     }
-    let Some(observed) = observed_input(module) else {
-        capture.session.truncated = true;
-        return;
-    };
-    let (input, quantized) = observed.project();
-    track.quantized_analog |= quantized;
+    let (input, quantized) = observed.unwrap().project();
     sample.input = input;
-    track.frames.push(sample);
+    hook.counts[entry as usize] += 1;
+    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; }
 }
 
 pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> Option<LiveInput> {
@@ -976,6 +1095,6 @@ pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> 
     Some(LiveInput { buttons: ControlModule::get_button(module) as u32, axes })
 }
 
-pub fn clean_statuses() -> Vec<i32> {
-    vec![*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]
+pub fn clean_statuses() -> [i32; 3] {
+    [*FIGHTER_STATUS_KIND_WAIT, *FIGHTER_STATUS_KIND_FALL, *FIGHTER_STATUS_KIND_FALL_AERIAL]
 }

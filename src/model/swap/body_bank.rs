@@ -864,50 +864,56 @@ pub fn plan_extra_groups_with(
         + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()
         + budget.hats_wanted;
     let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);
-    // (lane depth, kind): depth is the distance from the live fighter, so a role
-    // whose nearer neighbours are already built does not outrank the other role.
-    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];
-    // Whole special groups (PT, Aegis, the pair) at their lane depth.
-    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];
+    // Borrow the complete lanes instead of allocating temporary candidate lists.
+    // Prefix checks preserve first-occurrence order without imposing a lane cap.
+    let eligible = |role: usize, kind: u32| {
+        windows[role].filter(|window| window_swappable_with(*window, policy))
+            .is_some_and(|window| exclude[role] != Some(kind)
+                && window.index_of(kind).is_none()
+                && !existing[role].iter().any(|group| group.index_of(kind).is_some()))
+    };
+    let candidates = |role: usize| upcoming[role].iter().copied().enumerate()
+        .filter(move |&(depth, kind)| eligible(role, kind)
+            && Members::special_group(kind, budget.special).is_none()
+            && group_member_kind(kind, policy)
+            && !upcoming[role][..depth].contains(&kind));
+    let specials = |role: usize| upcoming[role].iter().copied().enumerate()
+        .filter_map(move |(depth, kind)| {
+            if !eligible(role, kind) { return None; }
+            let group = Members::special_group(kind, budget.special)?;
+            let is_mii = group.special() == Special::Mii;
+            if (is_mii && existing[role].iter().any(|held| held.special() == Special::Mii))
+                || upcoming[role][..depth].iter().copied()
+                    .filter(|&prior| eligible(role, prior))
+                    .filter_map(|prior| Members::special_group(prior, budget.special))
+                    .any(|held| held.kinds()[0] == group.kinds()[0]
+                        || (is_mii && held.special() == Special::Mii))
+            { return None; }
+            Some((depth, group))
+        });
     let mut room = [0usize; 2];
     let mut group_slots = [0usize; 2];
     for role in 0..2 {
-        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };
+        if !windows[role].is_some_and(|window| window_swappable_with(window, policy)) { continue; }
         group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());
         room[role] = group_slots[role] * NATIVE_MEMBERS;
-        for (depth, &kind) in upcoming[role].iter().enumerate() {
-            if exclude[role] == Some(kind)
-                || window.index_of(kind).is_some()
-                || existing[role].iter().any(|group| group.index_of(kind).is_some())
-            { continue; }
-            if let Some(group) = Members::special_group(kind, budget.special) {
-                // One Mii identity per resource owner: a second lane Mii, or a
-                // Mii group this role already holds, stays canonical (DESIGN §2).
-                let second_mii = group.special() == Special::Mii
-                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)
-                        || existing[role].iter().any(|held| held.special() == Special::Mii));
-                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {
-                    specials[role].push((depth, group));
-                }
-                continue;
-            }
-            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {
-                candidates[role].push((depth, kind));
-            }
-        }
     }
     // Special groups are taken whole at their own lane depth, interleaved with
     // the ordinary candidates; one that no longer fits the remaining bodies or a
     // free group slot is skipped, never split.
-    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];
+    use crate::engine::compat::fixed::FixedList;
+    let mut chosen_special = [FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut scursor = [0usize; 2];
-    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
+    // These are output storage bounds: at most three native cells per free
+    // group, already enforced by room/group_slots below; inputs remain uncapped.
+    let mut chosen = [FixedList::<u32, { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new(0); 2];
     let mut cursor = [0usize; 2];
-    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {
-        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {
+    let take = |role: usize, chosen: &mut [FixedList<u32, { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {
+        if *remaining == 0 || chosen[role].len() >= room[role] {
             return false;
         }
-        chosen[role].push(candidates[role][cursor[role]].1);
+        let Some((_, kind)) = candidates(role).nth(cursor[role]) else { return false; };
+        chosen[role].push(kind);
         cursor[role] += 1;
         *remaining -= 1;
         true
@@ -915,10 +921,9 @@ pub fn plan_extra_groups_with(
     let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);
     for depth in 0..deepest {
         for role in 0..2 {
-            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {
+            if candidates(role).nth(cursor[role]).is_some_and(|(d, _)| d == depth) {
                 take(role, &mut chosen, &mut cursor, &mut remaining);
-            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {
-                let group = specials[role][scursor[role]].1;
+            } else if let Some((_, group)) = specials(role).nth(scursor[role]).filter(|(d, _)| *d == depth) {
                 scursor[role] += 1;
                 let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);
                 if remaining >= group.count() && slots_used < group_slots[role] {
@@ -944,7 +949,7 @@ pub fn plan_extra_groups_with(
     }
     for role in 0..2 {
         while remaining >= 2
-            && cursor[role] + 1 < candidates[role].len()
+            && candidates(role).nth(cursor[role] + 1).is_some()
             && chosen[role].len() + 2 <= room[role]
             && chosen[role].len().is_multiple_of(NATIVE_MEMBERS)
         {
@@ -955,13 +960,13 @@ pub fn plan_extra_groups_with(
     // What no pair can use still buys a one-member group, nearest neighbour first.
     while remaining > 0 {
         let Some(role) = (0..2)
-            .filter(|&role| cursor[role] < candidates[role].len() && chosen[role].len() < room[role])
-            .min_by_key(|&role| candidates[role][cursor[role]].0) else { break; };
+            .filter(|&role| candidates(role).nth(cursor[role]).is_some() && chosen[role].len() < room[role])
+            .min_by_key(|&role| candidates(role).nth(cursor[role]).map(|(depth, _)| depth)) else { break; };
         take(role, &mut chosen, &mut cursor, &mut remaining);
     }
     for role in 0..2 {
         let mut slot = 0;
-        for group in &chosen_special[role] {
+        for group in chosen_special[role].iter() {
             if slot >= MAX_EXTRA_GROUPS { break; }
             result[role][slot] = Some(*group);
             slot += 1;
@@ -1020,6 +1025,10 @@ pub struct GroupCounts {
 }
 
 pub fn count_extra_groups(groups: &[(Members, GroupState)]) -> GroupCounts {
+    count_extra_groups_iter(groups.iter().copied())
+}
+
+pub fn count_extra_groups_iter(groups: impl IntoIterator<Item = (Members, GroupState)>) -> GroupCounts {
     let mut counts = GroupCounts::default();
     for (members, state) in groups {
         let count = members.count() as u8;

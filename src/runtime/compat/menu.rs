@@ -175,8 +175,8 @@ pub(crate) fn view_before_publish() -> Option<TrainingModpackMenu> {
 }
 
 /// A publish's first step for the typed menu, on the publishing thread (boot, the menu worker, the diag reload), before the new value
-/// goes live and outside every lock a hook takes: the rows as published become the rows that go live. (Package 6's preload engine
-/// canonicalises them here when a menu was already live: `cycle_preload_config::publish_applied`.)
+/// goes live and outside every lock a hook takes: the rows as published become the rows that go live. Package 6 syncs its preload
+/// cache here when a menu was already live; cache write failure never changes the published choice.
 pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) -> TrainingModpackMenu {
     let mut next = published;
     if crate::runtime::roster::running() && previous.is_some() {

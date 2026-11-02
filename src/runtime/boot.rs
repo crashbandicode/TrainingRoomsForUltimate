@@ -83,6 +83,14 @@ fn run_inner() {
         diag_log::flush();
         return;
     }
+    // Counter storage must exist before ANY hook, including seam-drill hooks.
+    // Allocation before this point reads unavailable TLS without initializing
+    // it. Reservation/rollback calls only native scalar-slot SDK functions.
+    if let Err(error) = crate::runtime::hook_tls::init() {
+        diagnostic(format_args!("[TrainingRooms] install_refused reason=hook_counter_native_tls_unavailable result={error:#x}"));
+        diag_log::flush();
+        return;
+    }
     // The hook-sharing drill (feature `seam-drill`): with `foreign=` in diag.txt it hooks its sites as a plugin that does not share
     // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
     #[cfg(feature = "seam-drill")]
@@ -217,7 +225,19 @@ fn run_inner() {
         }
     };
 
-    let input_delay_on = sites::feature_usable(Feature::InputDelay, usable);
+    // Reserve every scalar TLS key before installing any input callback.
+    // A partial failure rolls back all keys and reports an unavailable feature.
+    let (input_delay_on, input_delay_reason) = if sites::feature_usable(Feature::InputDelay, usable) {
+        match input_delay::init() {
+            Ok(()) => (true, None),
+            Err(result) => {
+                diagnostic(format_args!("[TrainingRooms] input TLS reservation failed: result={result:#x}"));
+                (false, Some("native_tls_unavailable"))
+            }
+        }
+    } else {
+        (false, None)
+    };
     if input_delay_on {
         skyline::install_hook!(input_delay::caller_a_note);
         skyline::install_hook!(input_delay::caller_a_apply);
@@ -286,6 +306,13 @@ fn run_inner() {
     let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
     let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
     let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
+    // F9: the No. of CPUs field the cycle's Training sources depend on is read only when the game's own root load, reader and pause
+    // menu writer are the 13.0.5 instructions (the rows name it in the install line otherwise; then Training admits no source: the
+    // shipped preload-off path).
+    roster::set_cpu_quantity_guarded(roster::CPU_QUANTITY_ROWS.iter().all(|name| own_row_usable(name)));
+    // F11: the running body of an entry (natives::entry_active_body) follows the game's active-cell index only when its read is the
+    // 13.0.5 one; otherwise every reader gets the first body, as before.
+    crate::runtime::game::natives::ACTIVE_CELL_GUARDED.store(own_row_usable("entry_active_cell"), std::sync::atomic::Ordering::Release);
     if roster_on {
         init_roster_cycle();
     } else {
@@ -316,7 +343,7 @@ fn run_inner() {
     };
     let common_blocked = cpu_common_reason == Some("site_guard_failed");
     let features = [
-        report(Feature::InputDelay, input_delay_on, None),
+        report(Feature::InputDelay, input_delay_on, input_delay_reason),
         report(Feature::LraReset, lra_on, None),
         report(Feature::StageHazards, hazards_on, None),
         report(Feature::ResetHub, hub_on, None),
@@ -330,7 +357,7 @@ fn run_inner() {
         report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
-        FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
+        FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),
         report(Feature::Recording, recording_on, None),
         report(Feature::Notices, notices_on, None),

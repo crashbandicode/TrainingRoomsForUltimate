@@ -182,5 +182,63 @@ class HookStatsGateTests(unittest.TestCase):
         row = hook_stats.parse(self.GOOD)[1]
         self.assertEqual(row["hooks"]["hazard_rule"], 30)
 
+class LayoutArchiveGateTests(unittest.TestCase):
+    GOOD = ("100 #1 [LayoutArchive] handed out info_training bytes=500 stock=400 base=vanilla load_allocations=0\n"
+            "5200 #2 [LayoutArchive] released info_training bytes=500 after=5100ms\n")
+
+    def test_vanilla_fallback_and_stock_waiting_retire_without_allocating(self):
+        text = self.GOOD + self.GOOD.replace("info_training", "info_waiting").replace("base=vanilla", "base=stock").replace("5100ms", "5000ms")
+        self.assertEqual(hook_stats.gate_layout_archives(text, ["info_training", "info_waiting"]), (True, []))
+
+    def test_b3_cannot_pass_from_an_ordinary_stock_handout(self):
+        self.assertTrue(hook_stats.gate_layout_archives(
+            self.GOOD, ["info_training"], required_base="vanilla")[0])
+        ok, reasons = hook_stats.gate_layout_archives(
+            self.GOOD.replace("base=vanilla", "base=stock"), ["info_training"], required_base="vanilla")
+        self.assertFalse(ok)
+        self.assertTrue(any("expected vanilla" in reason for reason in reasons))
+
+    def test_reload_requires_each_requested_layout_to_repeat_and_retire(self):
+        waiting = self.GOOD.replace("info_training", "info_waiting")
+        required = ["info_training", "info_waiting"]
+        self.assertFalse(hook_stats.gate_layout_archives(
+            self.GOOD * 2 + waiting, required, required_base="vanilla", minimum_handouts=2)[0])
+        self.assertTrue(hook_stats.gate_layout_archives(
+            self.GOOD * 2 + waiting * 2, required, required_base="vanilla", minimum_handouts=2)[0])
+        self.assertFalse(hook_stats.gate_layout_archives(
+            self.GOOD * 2 + waiting + waiting.splitlines()[0], required,
+            required_base="vanilla", minimum_handouts=2)[0])
+        self.assertFalse(hook_stats.gate_layout_archives(
+            self.GOOD + self.GOOD.replace("base=vanilla", "base=stock"), ["info_training"],
+            required_base="vanilla", minimum_handouts=2)[0])
+
+    def test_unknown_base_and_zero_coverage_requirement_are_rejected(self):
+        for kwargs in ({"required_base": "invented"}, {"minimum_handouts": 0}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                hook_stats.gate_layout_archives(self.GOOD, ["info_training"], **kwargs)
+
+    def test_load_allocation_is_not_hidden_by_clean_steady_state_counters(self):
+        text = self.GOOD.replace("load_allocations=0", "load_allocations=1") + HookStatsGateTests.GOOD
+        ok, reasons = hook_stats.gate_layout_archives(text, ["info_training"])
+        self.assertFalse(ok)
+        self.assertTrue(any("load allocations 1" in reason for reason in reasons))
+
+    def test_early_missing_or_unmatched_retirement_fails(self):
+        for text in (self.GOOD.replace("5100ms", "4999ms"),
+                     self.GOOD.splitlines()[0], self.GOOD.splitlines()[1],
+                     self.GOOD.replace("released info_training bytes=500", "released info_training bytes=501")):
+            with self.subTest(text=text):
+                self.assertFalse(hook_stats.gate_layout_archives(text, ["info_training"])[0])
+
+    def test_refusal_missing_layout_and_truncated_records_fail(self):
+        for text, required in (("", []),
+                               (self.GOOD + "[LayoutArchive] no free archive buffer (layout_arc=skipped)", ["info_training"]),
+                               (self.GOOD, ["info_waiting"]),
+                               ("[LayoutArchive] handed out info_training bytes=500", ["info_training"]),
+                               (self.GOOD + "[LayoutArchive] released info_training", ["info_training"])):
+            with self.subTest(text=text, required=required):
+                self.assertFalse(hook_stats.gate_layout_archives(text, required)[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

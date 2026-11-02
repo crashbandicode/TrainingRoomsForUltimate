@@ -1,11 +1,11 @@
-//! Default-off request API. Called by the existing StageManager update entry hook.
+//! Feature-gated request API. Called by the verified StageManager update entry hook.
 //! No global match selector, stage/resource pointer, task, or refcount writes.
 //! UI integration is feature-gated; actual native mutation acceptance is pending.
 
 use crate::engine::stages::practice_stage_request_policy as policy;
 use policy::{ActivationRead, Commit, Resource, Scene, View};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::{getRegionAddress, Region};
 use crate::engine::stages::lobby_stages::{native_stage, Selection};
 
@@ -95,7 +95,7 @@ pub struct MenuContext { scene: Scene, original: usize }
 
 pub fn menu_context() -> Option<MenuContext> {
     if !VERIFIED.load(Ordering::Acquire) { return None; }
-    let state = STATE.try_lock().ok()?;
+    let state = STATE.try_lock()?;
     let (scene, original) = state.seen?;
     (scene.epoch == EPOCH.load(Ordering::Acquire)).then_some(MenuContext { scene, original })
 }
@@ -113,7 +113,7 @@ pub fn request(stage: impl Into<Selection>) -> Result<u64, &'static str> { queue
 fn queue(selection: Selection, context: Option<MenuContext>) -> Result<u64, &'static str> {
     if !VERIFIED.load(Ordering::Acquire) { return Err("native contract not verified"); }
     let stage = native_stage(selection)?;
-    let mut state=STATE.try_lock().map_err(|_| "request busy")?;
+    let mut state=STATE.try_lock().ok_or("request busy")?;
     if state.queued.is_some() || state.live.is_some() { return Err("request already owned"); }
     let (scene, original)=state.seen.ok_or("no current practice update")?;
     if scene.epoch != EPOCH.load(Ordering::Acquire) { return Err("scene departed"); }
@@ -130,13 +130,13 @@ fn queue(selection: Selection, context: Option<MenuContext>) -> Result<u64, &'st
     Ok(id)
 }
 
-pub fn status() -> Option<Status> { STATE.try_lock().ok().and_then(|s| s.status) }
+pub fn status() -> Option<Status> { STATE.try_lock().and_then(|s| s.status) }
 
 /// Invalidate plugin tickets, even when a departing allocation address is reused.
 /// No native dereference or cleanup occurs here. StageManager owns accepted work.
 pub(crate) fn depart() {
     EPOCH.fetch_add(1, Ordering::AcqRel);
-    if let Ok(mut state)=STATE.try_lock() { state.retire(); }
+    if let Some(mut state)=STATE.try_lock() { state.retire(); }
 }
 
 #[repr(C)]
@@ -293,7 +293,7 @@ unsafe fn publish(c:Commit,descriptor:[u8;0xb0]) {
 /// Same native entry callback as the passive observer; no competing hook.
 pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_object:usize) {
     if !VERIFIED.load(Ordering::Acquire) { return; }
-    let Ok(mut state)=STATE.try_lock() else { return };
+    let Some(mut state)=STATE.try_lock() else { return };
     let scene=Scene { epoch:EPOCH.load(Ordering::Acquire),wrapper,core,mode,melee };
     if state.seen.is_some_and(|(old,_)|old!=scene) { state.retire(); }
     state.seen=Some((scene,active_object));
@@ -367,5 +367,5 @@ pub(crate) fn init(base:usize) {
             && std::slice::from_raw_parts((base+offset) as *const u32,words.len())==*words
     }));
     VERIFIED.store(verified,Ordering::Release);
-    crate::engine::compat::logging::diagnostic(format_args!("[PracticeStageRequest] verified={verified} default_off=true ui_wired=true"));
+    crate::engine::compat::logging::diagnostic(format_args!("[PracticeStageRequest] verified={verified} request_driven=true ui_wired=true"));
 }

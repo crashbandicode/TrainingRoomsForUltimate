@@ -1,5 +1,6 @@
 //! Current combined alpha: one shared catalog read, then current-callback capture.
 use super::*;
+use hos_lock::Mutex;
 use std::sync::Arc;
 use crate::engine::mii::{
     auto_init::{self, Initialization, Token},
@@ -52,16 +53,16 @@ pub(super) unsafe fn origin_capture_pending(role: Role, qualified: bool, capture
     auto_init::holds_origin_replacement(qualified, origin, automatic, capture, ready_go, ready)
 }
 pub(super) fn reading_token() -> Option<Token> {
-    STATE.lock().unwrap().init.reading()
+    STATE.lock().init.reading()
 }
 pub(super) fn cancel() {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     s.init.cancel();
     s.held = None;
     PENDING.store(false, Ordering::Release);
 }
 pub(super) fn reset() {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     s.init.reset();
     s.held = None;
     PENDING.store(true, Ordering::Release);
@@ -77,7 +78,7 @@ unsafe fn idle() -> bool {
         && !training::recording_or_playback()
         && !crate::runtime::compat::replay_preview::occupied()
         && STATES.iter().all(|s| {
-            let s = s.lock().unwrap();
+            let s = s.lock();
             s.active.is_none() && s.pending.is_none()
         })
 }
@@ -95,7 +96,7 @@ pub(super) unsafe fn service(entry: *const u8, owner: u32) {
         && scope(Role::Player).is_some_and(|s| s.owner == 0)
         && idle()
         && (ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some());
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     let current = current_token();
     if s.held.is_some() {
         // Keep the owned catalog until this callback may arm capture. No extra file read.
@@ -138,14 +139,14 @@ pub(super) unsafe fn service(entry: *const u8, owner: u32) {
 }
 
 pub(super) fn deliver(token: Token, catalog: Arc<Snapshot>) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.init.reading() == Some(token) {
         s.held = Some((token, catalog));
     }
 }
 
 pub(super) fn abandon(token: Token) {
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.held.as_ref().is_some_and(|(started, _)| *started == token) {
         s.held = None;
     }

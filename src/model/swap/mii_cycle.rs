@@ -111,14 +111,55 @@ fn numbered_saved(
     Some(resolved)
 }
 
-fn matches(target: Target, live: Identity) -> bool {
-    match (target, live) {
-        (Target::Fighter(kind), Identity::Fighter(current)) => {
-            Forms::starting(kind).same_group(current)
-        }
-        (Target::Saved(choice), Identity::Saved(current)) => choice.canonical == current,
-        _ => false,
+/// The ordered roster keeps every fighter position, but saved payloads exist
+/// only for the three real Mii classes, already deduplicated by the traversal.
+struct CycleChoices {
+    kinds: crate::engine::compat::fixed::FixedList<u32, { crate::engine::swap::trio::CHOICES.len() }>,
+    saved: [Option<Choice>; 3],
+}
+impl CycleChoices {
+    fn new() -> Self {
+        Self { kinds: crate::engine::compat::fixed::FixedList::new(0), saved: [None; 3] }
     }
+    fn class_index(class: MiiClass) -> usize {
+        (class.kind() - MiiClass::Brawler.kind()) as usize
+    }
+    fn has_class(&self, class: MiiClass) -> bool {
+        self.saved[Self::class_index(class)].is_some()
+    }
+    fn has_group(&self, forms: Forms) -> bool {
+        self.kinds.iter().any(|kind| MiiClass::from_kind(*kind).is_none() && forms.same_group(*kind))
+    }
+    fn push_fighter(&mut self, kind: u32) { self.kinds.push(kind); }
+    fn push_saved(&mut self, choice: Choice) {
+        let class = choice.canonical.class;
+        if self.kinds.push(class.kind()) {
+            self.saved[Self::class_index(class)] = Some(choice);
+        }
+    }
+    fn matches_kind(&self, kind: u32, live: Identity) -> bool {
+        match (MiiClass::from_kind(kind), live) {
+            (None, Identity::Fighter(current)) => Forms::starting(kind).same_group(current),
+            (Some(class), Identity::Saved(current)) => self.saved[Self::class_index(class)]
+                .is_some_and(|choice| choice.canonical == current),
+            _ => false,
+        }
+    }
+    fn matches_at(&self, index: usize, live: Identity) -> bool {
+        self.kinds.get(index).is_some_and(|kind| self.matches_kind(*kind, live))
+    }
+    fn position(&self, live: Identity) -> Option<usize> {
+        self.kinds.iter().position(|kind| self.matches_kind(*kind, live))
+    }
+    /// Materialize only the selected result, never a roster-sized Target array.
+    fn get(&self, index: usize) -> Option<Target> {
+        let kind = *self.kinds.get(index)?;
+        match MiiClass::from_kind(kind) {
+            Some(class) => self.saved[Self::class_index(class)].map(Target::Saved),
+            None => Some(Target::Fighter(kind)),
+        }
+    }
+    fn first(&self) -> Option<Target> { self.get(0) }
 }
 
 /// Resolve one ordered step using the existing catalog and per-role selectors.
@@ -162,47 +203,39 @@ fn next_cycle_with_ice_climbers(
         Identity::Fighter(_) => PlayerOrigin::NotMii,
         Identity::Saved(canonical) => PlayerOrigin::Mii(Origin(canonical)),
     };
-    let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);
+    let mut choices = CycleChoices::new();
     for fighter in ordered {
         let kind = fighter.kind();
         if let Some(class) = MiiClass::from_kind(kind) {
-            if choices.iter().any(
-                |target| matches!(target, Target::Saved(choice) if choice.canonical.class == class),
-            ) {
+            if choices.has_class(class) {
                 continue;
             }
             if let Some(choice) = numbered_saved(
                 catalog, preferences, role, class, player_origin, original,
             ) {
-                choices.push(Target::Saved(choice));
+                choices.push_saved(choice);
             }
         } else {
             let forms = Forms::starting(kind);
             if (matches!(original, Identity::Fighter(current) if forms.same_group(current))
                 && !(separate_ice_climbers && kind == 0x4b))
-                || choices.iter().any(
-                    |target| matches!(target, Target::Fighter(other) if forms.same_group(*other)),
-                )
+                || choices.has_group(forms)
             {
                 continue;
             }
-            choices.push(Target::Fighter(kind));
+            choices.push_fighter(kind);
         }
     }
     let position = match live {
         Live::Original => None,
         Live::Numbered { identity, cursor } => cursor
-            .filter(|i| {
-                choices
-                    .get(*i)
-                    .is_some_and(|target| matches(*target, identity))
-            })
-            .or_else(|| choices.iter().position(|target| matches(*target, identity))),
+            .filter(|i| choices.matches_at(*i, identity))
+            .or_else(|| choices.position(identity)),
     };
     if let Some(index) = position {
         if let Some(target) = choices.get(index + 1) {
             return Some(Step {
-                target: *target,
+                target,
                 cursor: Some(index + 1),
             });
         }
@@ -214,7 +247,7 @@ fn next_cycle_with_ice_climbers(
         }
     }
     choices.first().map(|target| Step {
-        target: *target,
+        target,
         cursor: Some(0),
     }).or_else(|| {
         slot_zero.then_some(Step {
@@ -312,11 +345,27 @@ fn next_qualified<T>(
     None
 }
 
+#[cfg(all(test, not(target_os = "switch")))]
+#[path = "../../../tests/support/mii_cycle_compact.rs"]
+pub(crate) mod compact_regressions;
+
 #[cfg(all(test, feature = "mii-saved-alpha"))]
 mod tests {
     use super::*;
     use crate::engine::mii::inventory::{build_snapshot, RawSlot, TaggedId, CHARINFO_LEN};
     use crate::engine::mii::selection::{Fallback, Source};
+
+    #[test]
+    fn compact_cycle_values_keep_full_roster_capacity_in_under_two_kib() {
+        assert!(std::mem::size_of::<CycleChoices>() <= 2048);
+        let mut choices = CycleChoices::new();
+        for index in 0..crate::engine::swap::trio::CHOICES.len() {
+            choices.push_fighter(index as u32 + 0x100);
+        }
+        assert_eq!(choices.kinds.len(), crate::engine::swap::trio::CHOICES.len());
+        assert_eq!(choices.get(choices.kinds.len() - 1),
+            Some(Target::Fighter(choices.kinds.len() as u32 - 1 + 0x100)));
+    }
 
     #[test]
     fn partner_refresh_preserves_the_slot_before_the_next_mii() {

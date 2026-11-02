@@ -10,7 +10,7 @@
 use crate::engine::stages::training_stage_rotation_policy as policy;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use {crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};
@@ -46,7 +46,7 @@ pub(crate) fn training_entry(context: usize) {
         (menu.training_stage_rotation == OnOff::ON, menu.lobby_stages)
     };
     let prefs = crate::runtime::compat::common::menu::stage_preferences();
-    let outcome = ROTATION.lock().unwrap().entry(context, enabled, order, &prefs);
+    let outcome = ROTATION.lock().entry(context, enabled, order, &prefs);
     if outcome != policy::Entry::Disabled {
         log(format_args!(
             "[TrainingRotation] entry owner=0x{context:x} melee=0x{:02x} native_training={} outcome={outcome:?}",
@@ -56,7 +56,7 @@ pub(crate) fn training_entry(context: usize) {
 
 /// The product reenter succeeded for `context`; its next age-zero call is a return.
 pub(crate) fn reenter_requested(context: usize) {
-    ROTATION.lock().unwrap().reenter_requested(context);
+    ROTATION.lock().reenter_requested(context);
     log(format_args!("[TrainingRotation] reenter owner=0x{context:x}"));
 }
 
@@ -78,7 +78,7 @@ pub(crate) unsafe fn resource_request(ctx: &InlineCtx, mode: crate::runtime::lob
     // Snapshot the setting before taking ROTATION: never nest the menu lock
     // inside the policy lock or retain it across a native callback decision.
     let enabled = enabled();
-    let result = ROTATION.lock().unwrap().apply(enabled, |native| {
+    let result = ROTATION.lock().apply(enabled, |native| {
         // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.
         let record = base + 0x454a7e8 + native as usize * 72;
         Some(crate::engine::seams::native_fields::read_unchecked::<u64>(record, 24) & 0xffffffffff)
@@ -103,7 +103,7 @@ pub(crate) fn direct_completed(mode: u32, melee: u8, native: u32, hash: u64) {
     if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {
         return;
     }
-    ROTATION.lock().unwrap().direct_completed(native, hash);
+    ROTATION.lock().direct_completed(native, hash);
 }
 
 /// A published direct change departed before completion in ordinary Training.
@@ -111,7 +111,7 @@ pub(crate) fn direct_uncertain(mode: u32, melee: u8) {
     if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {
         return;
     }
-    ROTATION.lock().unwrap().direct_uncertain();
+    ROTATION.lock().direct_uncertain();
 }
 
 // Training sequence installer: the store that clears the reenter byte of a
@@ -120,7 +120,7 @@ pub(crate) fn direct_uncertain(mode: u32, melee: u8) {
 #[skyline::hook(offset = 0x23ecb18, inline)]
 unsafe fn sequence_initialized(ctx: &mut InlineCtx) {
     let context = ctx.registers[20].x() as usize;
-    ROTATION.lock().unwrap().sequence_initialized();
+    ROTATION.lock().sequence_initialized();
     log(format_args!("[TrainingRotation] sequence_initialized context=0x{context:x}"));
 }
 

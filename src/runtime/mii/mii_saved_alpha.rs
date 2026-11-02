@@ -1,6 +1,7 @@
 //! Default-off native Training saved-original same-class menu/cycle adapter. No diagnostic shots or chords.
 //! Included in character_roster to share its current service callback and INSTALL ownership.
 use super::*;
+use hos_lock::Mutex;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use crate::engine::mii::{
@@ -78,6 +79,7 @@ fn notice(reason: &str) {
 }
 
 pub(super) fn init(base: usize) {
+    super::mii_catalog_request::init();
     // Generated from the same pristine row/applier/INSTALL receipts as fullconfig. No new hook.
     let valid = super::mii_saved_fingerprints::valid(base);
     ENABLED.store(valid, Ordering::Release);
@@ -93,21 +95,22 @@ pub(crate) fn menu_open() -> u64 {
     let opening = MENU_EPOCH.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_auto_init::cancel();
-    let mut state = ALPHA.lock().unwrap();
+    let mut state = ALPHA.lock();
     state.menu.cancel();
     refresh_work(&state);
     opening
 }
 
 /// Queue the catalog read after App reset. No file IO and no writer wait on this thread.
-pub(crate) fn menu_ready(opening: u64) {
+pub(crate) fn menu_ready(opening: u64) -> bool {
     if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {
-        return;
+        return false;
     }
     super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {
         opening,
         owners: [current_generation(0), current_generation(1)],
     });
+    true
 }
 
 pub(super) fn accept_catalog(catalog: Arc<Snapshot>, opening: u64, owners: [u64; 2]) -> bool {
@@ -118,7 +121,7 @@ pub(super) fn accept_catalog(catalog: Arc<Snapshot>, opening: u64, owners: [u64;
     {
         return false;
     }
-    let mut state = ALPHA.lock().unwrap();
+    let mut state = ALPHA.lock();
     // Closing preserves the selection epoch. Recheck under the same lock as
     // menu_close so a completion that waited behind close cannot rearm capture.
     if !crate::runtime::compat::common::menu::quick_menu_active()
@@ -146,7 +149,7 @@ pub(crate) fn menu_close(pending: Option<PendingSelection>) {
     super::mii_catalog_request::close_opening(menu_epoch());
     // Match the ordinary loader's request gate; menu capture itself is expected here.
     let another_action = lobby::native_ui_busy() || button_config::has_pending_request();
-    let mut state = ALPHA.lock().unwrap();
+    let mut state = ALPHA.lock();
     let validated = [state.menu.validated(MiiRole::Player), state.menu.validated(MiiRole::Cpu)];
     state.menu.cancel();
     if another_action {
@@ -173,7 +176,7 @@ pub(crate) fn menu_close(pending: Option<PendingSelection>) {
             if unified(i) || !validated[i] {
                 continue;
             }
-            let mut state = ALPHA.lock().unwrap();
+            let mut state = ALPHA.lock();
             if pending.context.epoch != menu_epoch() {
                 break;
             }
@@ -202,7 +205,7 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
         return original_kind(roster_role).is_some_and(|k|MiiClass::from_kind(k).is_some())
             || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());
     }
-    let mut state = ALPHA.lock().unwrap();
+    let mut state = ALPHA.lock();
     let Some(owner) = state.owner[i].as_ref() else {
         let protected = state.owner.iter().any(Option::is_some)
             || original_kind(roster_role).is_some_and(|k| (0x48..=0x4a).contains(&k))
@@ -307,7 +310,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {
 unsafe fn service_work(entry: *mut u8, owner: u32, i: usize) -> bool {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080030);
-    let track = ALPHA.lock().unwrap().track[i];
+    let track = ALPHA.lock().track[i];
     if let Some(mut track) = track {
         if track.entry != entry as usize {
             return false;
@@ -323,7 +326,7 @@ unsafe fn service_work(entry: *mut u8, owner: u32, i: usize) -> bool {
         if track.ticks == 600 {
             notice("native reload readiness pending; INSTALL retained until witnessed readiness or exact destructor");
         }
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         if let Some(current) = s.track[i].as_mut().filter(|t| t.token == track.token) {
             current.ticks = track.ticks;
             current.saw_reload = track.saw_reload;
@@ -339,7 +342,7 @@ unsafe fn continue_saved_service(entry: *mut u8, owner: u32, i: usize) -> bool {
     if mii_backend::current().and_then(|l|l.logical(owner))!=Some(i) {return false;}
     // At most one catalog/current capture per menu-open and ready owner. No idle-frame census.
     let capture = {
-        let s = ALPHA.lock().unwrap();
+        let s = ALPHA.lock();
         if s.menu.needs(role(i)) {
             s.catalog.as_ref().map(|c| {
                 (
@@ -361,14 +364,14 @@ unsafe fn continue_saved_service(entry: *mut u8, owner: u32, i: usize) -> bool {
     if unified(i) || !permitted(i)
         || native_source::training_cpu_quantity() != Some(1)
         || STATES.iter().any(|state| {
-            let s = state.lock().unwrap();
+            let s = state.lock();
             s.active.is_some() || s.pending.is_some()
         })
     {
         return false;
     }
     let request = {
-        let s = ALPHA.lock().unwrap();
+        let s = ALPHA.lock();
         s.intent[i].and_then(|intent| {
             let o = s.owner[i].as_ref()?;
             (o.entry == entry as usize && o.state.phase() == Phase::Ready).then(|| {
@@ -415,7 +418,7 @@ unsafe fn settle_saved_track(entry: *mut u8, owner: u32, i: usize, track: Track)
     } else {
         Some(native::current(entry, role(i), track.epoch, track.after))
     };
-    let mut s = ALPHA.lock().unwrap();
+    let mut s = ALPHA.lock();
     let Some(current) = s.track[i].filter(|t| {
         t.entry == track.entry && t.epoch == track.epoch && t.token == track.token
     }) else {
@@ -471,7 +474,7 @@ unsafe fn settle_saved_track(entry: *mut u8, owner: u32, i: usize, track: Track)
     let released = finish_install(track.token, reason);
     if done {
         if i == 0 {
-            state_for(Role::Player).lock().unwrap().cursor = cycled.then_some(0);
+            state_for(Role::Player).lock().cursor = cycled.then_some(0);
         }
         notify(
             if i == 0 { Role::Player } else { Role::Cpu },
@@ -509,7 +512,7 @@ unsafe fn finish_saved_capture(
     if !mii_backend::ready()
         || INSTALL.active()
         || STATES.iter().any(|state| {
-            let s = state.lock().unwrap();
+            let s = state.lock();
             s.active.is_some() || s.pending.is_some()
         })
     {
@@ -532,7 +535,7 @@ unsafe fn finish_saved_capture(
     } else {
         Err("current original is not saved Mii")
     };
-    let mut s = ALPHA.lock().unwrap();
+    let mut s = ALPHA.lock();
     if s.epoch[i] != epoch || menu_epoch() != capture_menu_epoch || !s.menu.needs(role(i)) {
         return Some(false);
     }
@@ -570,8 +573,7 @@ unsafe fn finish_saved_capture(
     let cpu_context=ordinary_cpu.then(super::mii_ordinary_cpu::cpu_context);
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     let cpu_context=None;
-    // publish_mii_catalog takes an owned Snapshot. ALPHA keeps the Arc, so this
-    // one clone is the menu publish, not a per-tick copy.
+    // Keep the worker-built snapshot shared; the UI constructs its menu off-hook.
     let publish = s.menu.take_owned_context(captured_context,ordinary,cpu_context)
         .map(|context| {
             #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -586,21 +588,16 @@ unsafe fn finish_saved_capture(
                     None
                 };
             }
-            ((*catalog).clone(), context)
+            (Arc::clone(&catalog), context)
         });
     refresh_work(&s);
     drop(s);
     if let Some((catalog, context)) = publish {
-        // No G/state lock remains; App contains owned values only.
-        let mut app = crate::runtime::compat::sync::lock_write(&menu::QUICK_MENU_APP);
-        // Check under App: an older capture may have completed before cancellation.
-        let mounted=app.publish_mii_catalog(catalog, context, menu_epoch(), || {
-            crate::runtime::compat::sync::assign(&menu::MENU_RECEIVED_INPUT, true);
-        });
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
-        if mounted {app.qualify_ordinary_cpu_cycle(ordinary_cpu);}
         #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-        let _=mounted;
+        let ordinary_cpu = false;
+        super::mii_catalog_request::publish_menu(crate::runtime::ui::menu_app::CatalogPublication {
+            catalog, epoch: context.epoch, context: Some(context), ordinary_cpu,
+        });
     }
     None
 }
@@ -617,7 +614,7 @@ unsafe fn submit_saved_intent(
     let current = match native::current(entry, role(i), epoch, expected) {
         Ok(v) => v,
         Err(reason) => {
-            let mut state = ALPHA.lock().unwrap();
+            let mut state = ALPHA.lock();
             state.intent[i] = None;
             refresh_work(&state);
             drop(state);
@@ -652,7 +649,7 @@ unsafe fn submit_saved_intent(
         return false;
     }
     let Some(pose) = capture_reload_pose(entry, owner) else {
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         s.intent[i] = None;
         refresh_work(&s);
         drop(s);
@@ -664,7 +661,7 @@ unsafe fn submit_saved_intent(
         return false;
     };
     let submitted = {
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         if s.epoch[i] != epoch || s.intent[i].is_none() {
             None
         } else {
@@ -692,7 +689,7 @@ unsafe fn submit_saved_intent(
         return false;
     };
     {
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         s.track[i] = Some(Track {
             entry: entry as usize,
             epoch,
@@ -706,7 +703,7 @@ unsafe fn submit_saved_intent(
         refresh_work(&s);
     }
     if let Err(reason) = native::apply(entry, role(i), epoch, commit) {
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         if let Some(o) = s.owner[i].as_mut() {
             let _ = o.state.abandon_unwritten(tx.ticket());
         }
@@ -735,7 +732,7 @@ pub(super) fn scene_changed() {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_ordinary_cpu::scene_changed();
     MENU_EPOCH.fetch_add(1, Ordering::AcqRel);
-    let mut s = ALPHA.lock().unwrap();
+    let mut s = ALPHA.lock();
     s.menu.cancel();
     s.catalog = None;
     s.intent = [None, None];
@@ -760,10 +757,10 @@ pub(super) fn scene_changed() {
 }
 pub(super) fn on_destroy(entry: *const u8, owner: u32) {
     let i=match owner {0=>0,1|4=>1,_=>return};
-    let exact={let state=state_for(if i==0 {Role::Player}else{Role::Cpu}).lock().unwrap();
+    let exact={let state=state_for(if i==0 {Role::Player}else{Role::Cpu}).lock();
         state.observed.is_some_and(|(at,_)|at==entry as usize)
             || state.active.is_some_and(|a|a.entry==entry as usize)};
-    let legacy={let s=ALPHA.lock().unwrap();s.owner[i].as_ref().is_some_and(|o|o.entry==entry as usize)
+    let legacy={let s=ALPHA.lock();s.owner[i].as_ref().is_some_and(|o|o.entry==entry as usize)
         || s.track[i].is_some_and(|t|t.entry==entry as usize)};
     #[cfg(feature="mii-ordinary-player-alpha")]
     let exact=exact || super::mii_ordinary_player::owns(entry as usize) || super::mii_ordinary_player::tracked(entry as usize);
@@ -772,7 +769,7 @@ pub(super) fn on_destroy(entry: *const u8, owner: u32) {
     if !exact && !legacy {return;}
     MENU_EPOCH.fetch_add(1, Ordering::AcqRel);
     let token = {
-        let mut s = ALPHA.lock().unwrap();
+        let mut s = ALPHA.lock();
         s.epoch[i] = OWNER_EPOCH[i]
             .fetch_add(1, Ordering::AcqRel)
             .saturating_add(1);

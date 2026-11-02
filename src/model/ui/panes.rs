@@ -2,8 +2,8 @@
 //! the model crate"): every pane the layout archive carries for the menu, by name, with its place and size.
 //! The host builder (`tools/layout-builder`) builds the BFLYT from this table; the runtime finds its panes by
 //! the same names and writes only text, colours, visibility and positions into them. Nothing here is
-//! upstream's: the layout is flat (one container, no parts) and draws only text boxes and flat rectangles,
-//! so the archive needs no new texture.
+//! upstream's: the layout is flat (one container, no parts), with text boxes, rectangles and the
+//! approved owned-game item pictures. Stage and fighter portraits are loaded at runtime.
 //!
 //! Units are the native canvas, 1920 x 1080, origin at the centre, y up (it maps to 1280 x 720).
 
@@ -191,16 +191,18 @@ pub const IDX_CHIP_LABEL: usize = IDX_CHIP_NEEDLE + CHIPS;
 pub const IDX_CHIP_BADGE: usize = IDX_CHIP_LABEL + CHIPS;
 /// The item and stage grids' tiles (up to 5 x 8): a tile and a label each, and the focus ring. Their size and place
 /// are set when a grid opens (the layout follows the console mode).
-pub const TILES: usize = 40;
+pub const TILES: usize = 88;
 pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
 pub const IDX_TILE: usize = IDX_TILE_HI + 1;
 pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;
+pub const ITEM_ICONS: usize = 38;
+pub const IDX_ITEM_ICON: usize = IDX_TILE_LABEL + TILES;
 /// How many panes the menu itself owns and the runtime resolves at registration; the panes after these (the
 /// notification panel and the input log) belong to the input package, which finds them by name when it draws.
 pub const MENU_COUNT: usize = IDX_NOTICE;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`, a backing rectangle, a header and a
 /// text box. Written by the notices code of the input package.
-pub const IDX_NOTICE: usize = IDX_TILE_LABEL + TILES;
+pub const IDX_NOTICE: usize = IDX_ITEM_ICON + ITEM_ICONS;
 pub const IDX_NOTICE_BASE: usize = IDX_NOTICE + 1;
 pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
 pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
@@ -260,6 +262,7 @@ pub const fn row_value_index(i: usize) -> usize {
 /// The name of pane `index` (`< COUNT`).
 pub const fn name_of(index: usize) -> Name {
     match index {
+        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => Name::indexed("tr_item_", i - IDX_ITEM_ICON),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
@@ -360,6 +363,7 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
+        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, 0.0, 0.0, 64.0, 64.0, [255; 4], false),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_BASE => under(rect(name, 0.0, 405.0, 1000.0, 150.0, [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
@@ -445,6 +449,11 @@ mod tests {
         assert_eq!(all.len(), COUNT);
         for i in 0..COUNT {
             assert_eq!(all.iter().filter(|s| s.name == name_of(i)).count(), 1, "{i}");
+        }
+        for i in IDX_ITEM_ICON..IDX_ITEM_ICON + ITEM_ICONS {
+            assert!(i < MENU_COUNT, "item pictures must be resolved in the menu pointer array");
+            assert_eq!(spec(i).parent, ROOT);
+            assert!(!spec(i).visible);
         }
     }
 

@@ -1,13 +1,13 @@
-//! The menu as package 6's Mii files see it (`compat::menu_app`: the fork's `QUICK_MENU_APP`, `AppPage`,
-//! `MENU_RECEIVED_INPUT`). The Mii saved-catalog and editor-bridge code publishes an owned catalog into the open menu
-//! and asks for the Mii list to show it; this holder keeps what it published and whether the menu is open, and the menu
-//! worker takes the catalog when it draws the Mii list screen (`Editor::MiiList`).
-//!
-//! Status (2026-11-02): the holder, the page tracking and the signatures are real; the Mii list screen that consumes
-//! `take_catalog` is not built yet (the row opens the "arrives with the package that owns it" placeholder), so a mount is
-//! accepted while the menu is open and kept until the screen exists or the menu closes.
+//! Native menu-page compatibility and an explicit publication channel to the UI.
+//! Catalogs never live inside the hook-owned App; only the UI worker receives
+//! publications and constructs the catalog menu.
 
-use std::any::Any;
+use std::sync::Arc;
+#[cfg(feature = "mii-saved-alpha")]
+use std::sync::OnceLock;
+#[cfg(feature = "mii-saved-alpha")]
+use crate::model::catalog_mailbox::{self, Producer, Consumer, Publication};
+use crate::engine::{mii::inventory::Snapshot, mii_root::mii_menu::Context};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use hos_lock::Mutex;
@@ -24,63 +24,26 @@ impl AppPage {
     pub const SUBMENU: AppPage = AppPage(1);
 }
 
-/// What the Mii code last published into the menu.
+/// Worker-built catalog plus facts captured on the native game thread.
+pub struct CatalogPublication {
+    pub catalog: Arc<Snapshot>,
+    pub context: Option<Context>,
+    pub epoch: u64,
+    pub ordinary_cpu: bool,
+}
+
+/// The menu's pending native publication. It owns no game pointers.
 pub struct App {
     pub page: AppPage,
-    /// The published catalog (package 6's ngine::mii::inventory::Snapshot, which is behind a feature this module does
-    /// not depend on: held type-erased, the Mii list screen downcasts it).
-    catalog: Option<(Box<dyn Any + Send>, u64)>,
-    /// The owner context that came with the catalog (the Mii menu's `Context`, owned by package 6).
-    context: Option<Box<dyn Any + Send>>,
-    ordinary_cpu: bool,
-    /// The `OPEN_SEQ` this value last followed (`follow_open`).
     seen_open: u32,
 }
 
 impl App {
     const fn new() -> App {
-        App { page: AppPage::CLOSED, catalog: None, context: None, ordinary_cpu: false, seen_open: 0 }
+        App { page: AppPage::CLOSED, seen_open: 0 }
     }
 
-    /// Mount an owned Mii catalog for the open Mii list (the editor entry). `false` when the menu is closed or the
-    /// epoch is stale (an older capture finished after a newer opening).
-    pub fn mount_mii_editor_catalog<S: Any + Send>(&mut self, catalog: S, epoch: u64) -> bool {
-        // The menu's open flag is the truth (it is also cleared when the renderer is lost, R2-2); page follows the worker.
-        if !active() || self.catalog.as_ref().is_some_and(|(_, held)| *held > epoch) {
-            return false;
-        }
-        self.catalog = Some((Box::new(catalog), epoch));
-        true
-    }
-
-    /// Publish the catalog with its owner context into the open menu; `on_mounted` runs once it is held.
-    pub fn publish_mii_catalog<S: Any + Send, C: Any + Send>(&mut self, catalog: S, context: C, epoch: u64, on_mounted: impl FnOnce()) -> bool {
-        if !self.mount_mii_editor_catalog(catalog, epoch) {
-            return false;
-        }
-        self.context = Some(Box::new(context));
-        on_mounted();
-        true
-    }
-
-    /// The ordinary-CPU cycle was qualified for the catalog now held.
-    pub fn qualify_ordinary_cpu_cycle(&mut self, qualified: bool) {
-        self.ordinary_cpu = qualified;
-    }
-
-    pub fn ordinary_cpu_qualified(&self) -> bool {
-        self.ordinary_cpu
-    }
-
-    /// The Mii list screen takes what was published (and its context), once.
-    pub fn take_catalog(&mut self) -> Option<(Box<dyn Any + Send>, u64, Option<Box<dyn Any + Send>>)> {
-        let (catalog, epoch) = self.catalog.take()?;
-        Some((catalog, epoch, self.context.take()))
-    }
-
-    /// Catch up with the menu's opens and closes (`note_open`): the page follows the open flag, and a close since the last look drops
-    /// what was published and not yet shown. Run by every holder of `QUICK_MENU_APP` when it takes the lock (`compat::sync`), so the
-    /// menu worker never takes it (stream/sync: the Mii code on a game thread never waits on the worker).
+    /// Native compatibility holders follow the worker's atomic open sequence.
     pub fn follow_open(&mut self) {
         let seq = OPEN_SEQ.load(Ordering::Acquire);
         if seq == self.seen_open {
@@ -97,14 +60,52 @@ impl App {
         self.seen_open = seq;
     }
 
-    /// The menu opened or closed: closing drops what was published and not yet shown.
+    /// Native page compatibility follows menu state; publications are separate.
     pub fn set_open(&mut self, open: bool) {
         self.page = if open { AppPage::SUBMENU } else { AppPage::CLOSED };
-        if !open {
-            self.catalog = None;
-            self.context = None;
-        }
     }
+}
+
+
+#[cfg(feature = "mii-saved-alpha")]
+const PUBLICATION_CAPACITY: usize = 2;
+#[cfg(feature = "mii-saved-alpha")]
+static PUBLICATIONS: OnceLock<Producer<CatalogPublication>> = OnceLock::new();
+// Only the UI worker takes this guard. Native producers hold no reference to it.
+#[cfg(feature = "mii-saved-alpha")]
+static CATALOG_READER: OnceLock<Mutex<Consumer<CatalogPublication>>> = OnceLock::new();
+
+/// Boot only, before native callbacks can publish.
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) fn init_publications() {
+    if PUBLICATIONS.get().is_some() { return; }
+    let (producer, consumer) = catalog_mailbox::channel(PUBLICATION_CAPACITY);
+    let _ = CATALOG_READER.set(Mutex::new(consumer));
+    let _ = PUBLICATIONS.set(producer);
+}
+
+/// Native producer. Failed submission returns identical ownership to its policy.
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) fn publish_catalog(publication: CatalogPublication) -> Result<(), CatalogPublication> {
+    let sequence = sequence();
+    if !active() || publication.epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch()
+        || !crate::runtime::mii::menu_handoff::opening_current(sequence) { return Err(publication); }
+    let Some(producer) = PUBLICATIONS.get() else { return Err(publication); };
+    producer.post(Publication { sequence, epoch: publication.epoch, value: publication })
+        .map_err(|held| held.value)
+}
+
+/// UI worker only. Never takes the native App guard. Reject a close/reopen or
+/// epoch retirement both before and after this bounded drain.
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) fn take_catalog() -> Option<CatalogPublication> {
+    let sequence = sequence();
+    let epoch = crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch();
+    let open = active();
+    let publication = CATALOG_READER.get()?.lock().take(sequence, epoch, open);
+    if !open || !active() || sequence != self::sequence()
+        || epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch() { return None; }
+    publication
 }
 
 pub static QUICK_MENU_APP: Mutex<App> = Mutex::new(App::new());
@@ -127,3 +128,6 @@ pub fn active() -> bool {
 pub fn captures_input() -> bool {
     crate::runtime::ui::state::readiness_facts(0).owns_input
 }
+
+/// Native handoff observes the same opening/closing sequence as App.
+pub(crate) fn sequence() -> u32 { OPEN_SEQ.load(Ordering::Acquire) }

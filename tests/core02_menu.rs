@@ -10,7 +10,7 @@ mod model;
 use model::factory::DEFS;
 use model::menu::chord::Chord;
 use model::menu::delay::{DelayRange, DelaySpec};
-use model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, ITEM_TILES, STAGE_TILES};
+use model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse, ITEM_TILES, STAGE_TILES};
 use model::menu::input::{Button, HoldRepeat, HOLD_REPEAT_PERIOD};
 use model::menu::table::{row_count, Control, Editor, Page, GROUPS, ROWS};
 use model::menu::{
@@ -1633,11 +1633,19 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
     m.press(Button::A);
     m.press(Button::R);
     assert_eq!(at(&m), (0, 0));
-    // Other editors are opened as external sub-screens and close with B.
+    // The roster rows open the one-page 13 x 7 portrait grid (the same in both console modes) and close with B.
     m.press(Button::B);
     goto(&mut m, "Kirby Hats");
     m.press(Button::A);
-    assert_eq!(m.screen(), Some(&Screen::External(Editor::KirbyHats)));
+    assert!(matches!(m.screen(), Some(Screen::Grid { layout, page: 0, cell: 0 }) if layout.kind == GridKind::Roster(RosterUse::Hats) && layout.cols == 13 && layout.rows == 7 && layout.pages() == 1));
+    // A on a roster tile goes to the roster editor (the worker), with the tile and the button.
+    m.press(Button::A);
+    assert_eq!(m.take_roster_press(), Some((0, Button::A)));
+    for button in [Button::X, Button::Y, Button::R, Button::ZR] {
+        m.press(button);
+        assert_eq!(m.take_roster_press(), Some((0, button)), "roster input belongs to its editor");
+        assert!(matches!(m.screen(), Some(Screen::Grid { page: 0, cell: 0, .. })));
+    }
     m.press(Button::B);
     assert!(m.screen().is_none());
 }

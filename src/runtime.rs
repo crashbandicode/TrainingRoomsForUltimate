@@ -37,3 +37,6 @@ pub fn main() {
     boot::run();
 }
 
+
+mod native_tls;
+pub(crate) mod hook_tls;

@@ -7,8 +7,10 @@ pub fn reserve() {
     motion.reserve();
 }
 
-pub fn tick() {
+impl OtherSettings {
+pub fn tick(&self) {
     let _motion = lock_read(&MOTION);
+}
 }
 /// Must not be reported: the worker's `store(..)` is its own local function.
 pub fn store() {

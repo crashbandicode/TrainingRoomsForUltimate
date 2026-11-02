@@ -5,14 +5,17 @@
 //!       writes `<out>/target.arc` (the plugin's archive, game bytes inside: keep it private),
 //!       `<out>/info_training.tra1` (the recipe the plugin embeds: copy ranges and the changed bytes only)
 //!       and `<out>/report.json`.
+//!   layout-builder build-waiting <stock info_waiting.arc> <out dir>
+//!       adds the same panes beneath `TrModPort` and writes `info_waiting.tra1`.
 //!   layout-builder dump <bflyt> <pane>...   prints the named panes (development).
 //!
 //! The pane inventory is `src/model/ui/panes.rs`, shared with the runtime. The layout is flat: one container
 //! under `RootPane` with text boxes cloned from a stock text box and flat rectangles cloned from a stock solid
-//! picture, so no texture is added and no stock texture changes.
+//! picture. The 38 provenance-recorded item icons are appended to the stock BNTX; stock textures are retained.
 
 use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
+use nx_layout_toolbox::bntx::{read_bntx, write_bntx, pipeline::{import_png_file, ImportOptions}};
 
 #[path = "../../../src/model/archive_recipe.rs"]
 #[allow(dead_code)]
@@ -28,6 +31,7 @@ const BFLYT_MEMBER: &str = "blyt/info_training.bflyt";
 const RECT_TEMPLATE: &str = "pic_bg_mode_main_00";
 /// A stock text box in the `nintendo64` font with a plain white material.
 const TEXT_TEMPLATE: &str = "set_txt_help_00";
+const WAITING_PORT: panes::Name = panes::Name::new("TrModPort");
 const INFLUENCED_ALPHA: u8 = 0x02;
 /// 	xt1 flag bit 1: the buffer is 	ext_buf_bytes long even when the string in it is shorter.
 const FORCE_ASSIGN_TEXT_LENGTH: u16 = 0x0002;
@@ -38,26 +42,25 @@ fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> String + '_ {
     move |e| format!("{what}: {e:?}")
 }
 
-fn add_container(layout: &mut BFLYT) -> Result<()> {
-    layout
-        .clone_pane(&ClonePaneSpec {
-            template: "RootPane".into(),
-            new_name: panes::ROOT.as_str().into(),
-            parent: Some("RootPane".into()),
-            visible: Some(false),
-            ..Default::default()
-        })
-        .map_err(err("container"))?;
-    let root = layout.find_pane_mut(panes::ROOT.as_str()).ok_or("container missing")?;
-    root.flag |= INFLUENCED_ALPHA;
-    Ok(())
+fn layout_specs(waiting: bool) -> Vec<Spec> {
+    let mut specs = panes::specs();
+    if waiting {
+        // All three panel roots belong to the waiting host: menu, notices and
+        // input log. Keep their internal parent relationships unchanged.
+        for spec in &mut specs {
+            if spec.parent == panes::Name::new("RootPane") {
+                spec.parent = WAITING_PORT;
+            }
+        }
+    }
+    specs
 }
 
-fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
+fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
     let template = match spec.kind {
         Kind::Null => "RootPane",
-        Kind::Rect { .. } => RECT_TEMPLATE,
-        Kind::Text { .. } => TEXT_TEMPLATE,
+        Kind::Rect { .. } => if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE },
+        Kind::Text { .. } => if waiting { "set_txt_status" } else { TEXT_TEMPLATE },
     };
     let name = spec.name.as_str();
     layout
@@ -127,17 +130,49 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
     Ok(())
 }
 
-fn build(stock_path: &str, out: &str) -> Result<()> {
+fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let stock = std::fs::read(stock_path).map_err(err("read stock"))?;
     let mut arc = read_arc(&stock).map_err(err("read arc"))?;
     // The writer must keep what it was given: an untouched archive round-trips to the same bytes.
     let untouched = write_arc(&arc).map_err(err("write untouched"))?;
-    let index = arc.position(BFLYT_MEMBER).ok_or("info_training.bflyt not in the archive")?;
+    let member = if waiting { "blyt/info_waiting.bflyt" } else { BFLYT_MEMBER };
+    let recipe_name = if waiting { "info_waiting" } else { "info_training" };
+    let index = arc.position(member).ok_or("requested layout not in the archive")?;
     let mut layout = read_bflyt(&arc.files[index].data).map_err(err("read bflyt"))?;
-    let specs = panes::specs();
-    for spec in &specs {
-        add_pane(&mut layout, spec)?;
+    let specs = layout_specs(waiting);
+    if waiting {
+        // The waiting archive already has com_white16, a plain UV0 material and
+        // the game's text font. Build our own flat panes from those stock templates;
+        // no Training archive or upstream artwork is used; item textures are appended below.
+        layout.clone_pane(&ClonePaneSpec {
+            template: "RootPane".into(), new_name: "TrModPort".into(),
+            parent: Some("RootPane".into()), visible: Some(true),
+            ..Default::default()
+        }).map_err(err("waiting port"))?;
     }
+    for spec in &specs {
+        add_pane(&mut layout, spec, waiting)?;
+    }
+    // These are the approved owned-game item renders, not baked fighter/stage portraits.
+    // Keep the stock archive private; the distributed recipe contains only the delta.
+    let textures = arc.position("timg/__Combined.bntx").ok_or("stock combined texture missing")?;
+    let mut bntx = read_bntx(&arc.files[textures].data).map_err(err("read stock textures"))?;
+    let options = ImportOptions { srgb: true, ..Default::default() };
+    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/item-icons");
+    for i in 0..panes::ITEM_ICONS {
+        let name = panes::name_of(panes::IDX_ITEM_ICON + i);
+        let texture = format!("tr_item_{i:02}");
+        import_png_file(&mut bntx, &texture, &assets.join(format!("icon-{i:02}.png")), &options)
+            .map_err(err("import owned item icon"))?;
+        let material_index = layout.find_pane(name.as_str()).and_then(|p| p.picture.as_ref())
+            .ok_or("item picture missing")?.material_index;
+        let template = layout.materials.get(usize::from(material_index)).ok_or("item template material missing")?.name.clone();
+        layout.add_texture_ref(&texture);
+        layout.add_material_from_template(&template, &texture, Some(&texture)).map_err(err("item material"))?;
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(texture), ..Default::default() })
+            .map_err(err("item picture material"))?;
+    }
+    arc.files[textures].data = write_bntx(&bntx).map_err(err("write item textures"))?;
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
     let target = write_arc(&arc).map_err(err("write arc"))?;
     let recipe = archive_recipe::make(&stock, &target);
@@ -147,7 +182,7 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
     }
     std::fs::create_dir_all(out).map_err(err("out dir"))?;
     std::fs::write(format!("{out}/target.arc"), &target).map_err(err("write target"))?;
-    std::fs::write(format!("{out}/info_training.tra1"), &recipe).map_err(err("write recipe"))?;
+    std::fs::write(format!("{out}/{recipe_name}.tra1"), &recipe).map_err(err("write recipe"))?;
     let report = serde_json::json!({
         "stock_bytes": stock.len(),
         "stock_fnv": format!("{:016x}", archive_recipe::fingerprint(&stock)),
@@ -156,7 +191,8 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
         "target_bytes": target.len(),
         "target_fnv": format!("{:016x}", archive_recipe::fingerprint(&target)),
         "recipe_bytes": recipe.len(),
-        "panes_added": specs.len(),
+        "panes_added": specs.len() + usize::from(waiting),
+        "item_icons": panes::ITEM_ICONS,
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;
@@ -164,10 +200,37 @@ fn build(stock_path: &str, out: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn waiting_host_contains_every_panel_without_changing_internal_parents() {
+        let training = layout_specs(false);
+        let waiting = layout_specs(true);
+        assert_eq!(training.len(), waiting.len());
+        let mut roots = 0;
+        for (a, b) in training.iter().zip(&waiting) {
+            assert_eq!(a.name, b.name);
+            if a.parent == panes::Name::new("RootPane") {
+                assert_eq!(b.parent, WAITING_PORT);
+                roots += 1;
+            } else {
+                assert_eq!(a.parent, b.parent);
+            }
+        }
+        assert_eq!(roots, 3, "menu, notices and input log");
+        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG] {
+            assert_eq!(waiting[root].parent, WAITING_PORT);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let result = match args.get(1).map(String::as_str) {
-        Some("build") if args.len() == 4 => build(&args[2], &args[3]),
+        Some("build") if args.len() == 4 => build(&args[2], &args[3], false),
+        Some("build-waiting") if args.len() == 4 => build(&args[2], &args[3], true),
         Some("dump") if args.len() >= 4 => {
             let layout = read_bflyt(&std::fs::read(&args[2]).expect("read bflyt")).expect("parse");
             for name in &args[3..] {
@@ -175,7 +238,7 @@ fn main() {
             }
             Ok(())
         }
-        _ => Err("usage: layout-builder build <stock.arc> <out dir> | dump <bflyt> <pane>...".into()),
+        _ => Err("usage: layout-builder build|build-waiting <stock.arc> <out dir> | dump <bflyt> <pane>...".into()),
     };
     if let Err(message) = result {
         eprintln!("layout-builder: {message}");

@@ -47,7 +47,6 @@ fn place(index: usize) -> (f32, f32) {
 pub unsafe fn tick(panes: &Panes) {
     let Some(mut s) = STATE.try_lock() else { return };
     s.ticks += 1;
-    texture::tick();
     let now = s.ticks;
     match s.phase {
         0 if now - s.phase_at >= START_TICK => {

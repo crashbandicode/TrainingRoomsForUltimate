@@ -57,6 +57,7 @@ pub(crate) mod input_delay {
 /// Every per-session state the plugin keeps ends with the departure from the practice scene (recorder, chords, notices, input
 /// display and the menu session: package 4's `session_clear` runs all of them).
 pub(crate) fn clear_session_state() {
+    crate::runtime::features::states::clear_session();
     crate::runtime::features::recorder::session_clear();
 }
 

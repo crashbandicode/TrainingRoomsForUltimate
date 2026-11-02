@@ -186,6 +186,20 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
         Ok(())
     }
 
+    /// Complete an explicit return-to-native load without publishing it as a
+    /// plugin resource. Caller has verified the original descriptor/body ready
+    /// on this exact entry's callback. This is not a destructor notification.
+    pub fn returned_native(&mut self, load: LoadToken) -> Result<(), Error> {
+        let state = self.exact(load.0)?;
+        if state.phase == Phase::Departed { return Err(Error::Departed); }
+        if !self.is_current(load.0.epoch) { return Err(Error::StaleToken); }
+        if state.phase != Phase::Loading { return Err(Error::NotReady); }
+        if self.pinned(load.0.slot) { return Err(Error::Pinned); }
+        let generation = state.generation;
+        self.slots[load.0.slot] = Slot { generation, ..Slot::EMPTY };
+        Ok(())
+    }
+
     /// Every acquire owns a distinct lease, even when holder values are equal.
     /// Keep it until the actual consumer ends, not merely until the UI finishes.
     pub fn acquire(&mut self, ready: ReadyToken, holder: Holder) -> Result<LeaseToken, Error> {
@@ -288,6 +302,33 @@ mod tests {
     const COPY_P1: Holder = Holder { category: 1, id: 100 };
     const COPY_CPU: Holder = Holder { category: 1, id: 200 };
     const ITEM: Holder = Holder { category: 2, id: 300 };
+
+    #[test]
+    fn returning_native_requires_drained_leases_and_never_publishes_a_source() {
+        let mut book = SourceBook::<1, 2>::new();
+        let ready = book.register_ready(0, book.epoch(), NativeEntry(17), A).unwrap();
+        let hat = book.acquire(ready, COPY_P1).unwrap();
+        let item = book.acquire(ready, ITEM).unwrap();
+        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));
+        assert!(book.release(hat));
+        assert_eq!(book.begin_install(0, book.epoch(), NativeEntry(17), B), Err(Error::Pinned));
+        assert!(book.release(item));
+        let restore = book.begin_install(0, book.epoch(), NativeEntry(17), B).unwrap();
+        assert_eq!(book.ready(0), Err(Error::NotReady));
+        // Native-ready receipt arrives on a later callback, not a timeout.
+        assert_eq!(book.returned_native(restore), Ok(()));
+        assert_eq!(book.phase(0), Ok(Phase::Empty));
+        assert_eq!(book.key(0), Ok(None));
+        assert_eq!(book.acquire(ready, COPY_P1), Err(Error::StaleToken));
+        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));
+        let reuse = book.begin_install(0, book.epoch(), NativeEntry(17), A).unwrap();
+        assert_ne!(restore, reuse);
+        assert_eq!(book.returned_native(restore), Err(Error::StaleToken));
+        book.depart_scene().unwrap();
+        assert_eq!(book.returned_native(reuse), Err(Error::Departed));
+        assert_eq!(book.phase(0), Ok(Phase::Departed));
+        assert_eq!(book.native_destroyed(reuse.source()), Ok(0));
+    }
 
     #[test]
     fn normal_load_ready_lease_release_reuse() {

@@ -218,7 +218,7 @@ unsafe fn idle() -> Result<(), Refusal> {
         return Err((3, "native install active", 0, 0));
     }
     let busy = STATES.iter().any(|state| {
-        let state = state.lock().unwrap();
+        let state = state.lock();
         state.active.is_some() || state.pending.is_some()
     });
     if busy {

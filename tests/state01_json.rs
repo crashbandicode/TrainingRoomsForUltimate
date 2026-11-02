@@ -18,6 +18,81 @@ use model::state::persist::{self, Outcome};
 use model::state::record::{Charge, Marker, Robin, SavedState, Steve};
 use serde_json::Value;
 
+#[test]
+fn writer_identity_encoding_is_fault_atomic() {
+    struct Refused;
+    impl serde::Serialize for Refused {
+        fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+            Err(serde::ser::Error::custom("injected identity encoding failure"))
+        }
+    }
+    let mut state = SavedState::never_saved();
+    let identity = serde_json::json!({"charinfo": [7, 19, 3], "tags": [42, 81, 90]});
+    state.attach_mii(Some(&identity)).unwrap();
+    assert_eq!(state.mii.as_ref(), Some(&identity));
+    assert!(state.attach_mii(Some(Refused)).is_err());
+    assert_eq!(state.mii.as_ref(), Some(&identity));
+    state.attach_mii(None::<Value>).unwrap();
+    assert_eq!(state.mii, None);
+}
+
+#[test]
+fn state01_mii_writer_survives_fresh_process_continuation() {
+    const PHASE: &str = "TR_STATE_MII_PROCESS_PHASE";
+    const ROOT: &str = "TR_STATE_MII_PROCESS_ROOT";
+    let original = serde_json::json!({"opaque_future_identity": [7, 19, "original"]});
+    let captured = serde_json::json!({"opaque_future_identity": [8, 23, "captured"]});
+    if let Ok(phase) = std::env::var(PHASE) {
+        let path = PathBuf::from(std::env::var_os(ROOT).unwrap()).join("save_states.json");
+        if phase == "save" {
+            let mut file = SaveFile::default();
+            file.player[2].fighter_kind = 0x48;
+            file.player[2].percent = 33.0;
+            file.player[2].attach_mii(Some(original)).unwrap();
+            persist::save(&path, &file).unwrap();
+        } else {
+            assert_eq!(phase, "continue");
+            let (mut writer, outcome) = persist::load(&path);
+            assert_eq!(outcome, Outcome::Read);
+            assert_eq!(writer.player[2].percent, 33.0);
+            assert_eq!(writer.player[2].mii.as_ref(), Some(&original));
+            let game = writer.clone().into_game_records();
+            assert_eq!(game.player[2].mii, None);
+            let mut next = game.player[2].clone();
+            next.percent = 61.0;
+            next.attach_mii(Some(captured)).unwrap();
+            writer.player[2] = next;
+            persist::save(&path, &writer).unwrap();
+        }
+        return;
+    }
+    let root = TempDir::new();
+    let exe = std::env::current_exe().unwrap();
+    // Wait for the successful saver exit BEFORE launching a fresh restorer.
+    let mut launches = Vec::new();
+    for phase in ["save", "continue"] {
+        let started = std::time::SystemTime::now();
+        let child = std::process::Command::new(&exe)
+            .args(["--exact", "state01_mii_writer_survives_fresh_process_continuation", "--nocapture"])
+            .env(PHASE, phase)
+            .env(ROOT, &root.0)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn().unwrap();
+        let pid = child.id();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success(), "{phase}: {} {}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        launches.push((phase, pid, started, std::time::SystemTime::now()));
+    }
+    assert!(launches[0].3 <= launches[1].2);
+    let (file, outcome) = persist::load(&root.0.join("save_states.json"));
+    assert_eq!(outcome, Outcome::Read);
+    assert_eq!(file.player[2].fighter_kind, 0x48);
+    assert_eq!(file.player[2].percent, 61.0);
+    assert_eq!(file.player[2].mii, Some(captured));
+    assert!(file.cpu.iter().all(|record| !record.is_saved()));
+}
+
 struct TempDir(PathBuf);
 
 impl TempDir {

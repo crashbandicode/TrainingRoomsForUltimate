@@ -21,10 +21,10 @@ pub(crate) struct Registry {
     visible: [Option<Committed>;8],
     pub(crate) helpers: helpers::View,
 }
-static COMMITTED: std::sync::Mutex<Registry> = std::sync::Mutex::new(Registry {
+static COMMITTED: hos_lock::Mutex<Registry> = hos_lock::Mutex::new(Registry {
     visible: [None;8], helpers: helpers::View::EMPTY,
 });
-pub(crate) fn registry()->std::sync::MutexGuard<'static,Registry> { COMMITTED.lock().unwrap() }
+pub(crate) fn registry()->hos_lock::MutexGuard<'static,Registry> { COMMITTED.lock() }
 pub(crate) fn helper_snapshot()->Result<helpers::View,&'static str> {
     let layout=super::super::mii_backend::current().ok_or("Mii backend unavailable")?;
     let mut r=registry();
@@ -43,9 +43,9 @@ pub(crate) fn check_helpers_for(view:helpers::View,source:Option<crate::engine::
     check(guard.helpers==view,"source provenance changed during native read")
 }
 pub(crate) fn final_registry(view:helpers::View,token:Option<super::InstallToken>)
-    ->Result<std::sync::MutexGuard<'static,Registry>,&'static str> {final_registry_for(view,token,None)}
+    ->Result<hos_lock::MutexGuard<'static,Registry>,&'static str> {final_registry_for(view,token,None)}
 pub(crate) fn final_registry_for(view:helpers::View,token:Option<super::InstallToken>,source:Option<crate::engine::swap::source_lifetime::SourceToken>)
-    ->Result<std::sync::MutexGuard<'static,Registry>,&'static str> {
+    ->Result<hos_lock::MutexGuard<'static,Registry>,&'static str> {
     let guard=registry();
     match token {
         Some(token)=>check(super::INSTALL.owns(token),"exact INSTALL owner changed")?,
@@ -68,7 +68,7 @@ pub(crate) fn authority(b:Binding,thread:usize,map:[usize;3],entries:[usize;8],i
 /// Called with freshly rederived current authority and G held. Original E identity
 /// remains fixed; only changed Mii kinds need an exact committed registration.
 pub(crate) fn foreign_kind(now:Authority,original_kind:u32,row_kind:i8,kind:u32)->bool {
-    let registry=COMMITTED.lock().unwrap();
+    let registry=COMMITTED.lock();
     role_owner::foreign_kind(now,original_kind,row_kind,kind,
         registry.visible.get(now.binding.owner as usize).copied().flatten())
 }
@@ -85,7 +85,7 @@ pub(crate) unsafe fn owner_header_matches(entry:usize,id:u32,object:usize,kind:u
     rd::<u32>(object,0x58)==kind
 }
 pub(crate) fn retire_authority(id:usize,entry:usize) {
-    let mut registry=COMMITTED.lock().unwrap();
+    let mut registry=COMMITTED.lock();
     if registry.visible[id].is_some_and(|c|c.authority.binding.entry==entry) {registry.visible[id]=None;}
 }
 /// lobby-preload A: a visible exact Mii as extra-capacity creation proved it: the owner's
@@ -103,7 +103,7 @@ pub(crate) struct VisibleMii {
 /// original row kind and committed Mii kind. A native or uncommitted Mii never qualifies.
 #[cfg(all(feature="mii-ordinary-cpu-alpha",feature="managed-third-source-alpha"))]
 pub(crate) fn visible_committed(now:Authority,original_kind:u32,kind:u32)->bool {
-    COMMITTED.lock().unwrap().visible.get(now.binding.owner as usize).copied().flatten()
+    COMMITTED.lock().visible.get(now.binding.owner as usize).copied().flatten()
         .is_some_and(|c|c.permits(now,original_kind,kind))
 }
 /// lobby-preload A: Player0's visible exact Mii, proven from a fresh snapshot. Reads only.
@@ -484,7 +484,7 @@ pub(super) unsafe fn publish_same_class(track:&super::Track,selected:usize)
     let update=proof.prepare_write(observed,&track.descriptor,rows,&now.record)?;
     let record=values::record_address(b,b).map_err(|_|"same-class record changed")?;
     let targets=Targets {e:b.row,fe:entry,d:observed.owner.information,o:observed.owner.object};
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let fresh=state.track.as_mut().ok_or("same-class ticket retired")?;
     check(fresh.ticket==track.ticket && fresh.same_class==Some(proof)
         && fresh.gate.may_publish(track.ticket,6) && super::epoch()==track.ticket.epoch,
@@ -534,7 +534,7 @@ pub(super) unsafe fn publish(track:&super::Track, selected:usize) -> Result<(),&
         check(rd::<u8>(o.information,0x94)==0,"native Mii rebuild gate is closed")?;
     }
     // State/epoch is checked again immediately at the publication linearization point.
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let fresh=state.track.as_mut().ok_or("ticket retired")?;
     check(fresh.ticket==track.ticket && fresh.gate.may_publish(track.ticket,6)
         && super::epoch()==track.ticket.epoch,"phase ticket/epoch changed")?;
@@ -617,7 +617,7 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
         destination_index:b.record_index,original_index:before.binding.record_index,
         descriptor:&bank.descriptor,payload:Some(c),
     }.validate_bank(group_hat)?;
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token && !now.departed)
         && super::epoch()==bank.ticket.epoch,"bank publication ticket/epoch changed")?;
     let record=values::record_address(b,b).map_err(|_|"record changed")?;
@@ -646,7 +646,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
     target_rows(c).map_err(publish_refusal)?;
     let (expected,original_kind)={
-        let s=super::STATE.lock().unwrap();
+        let s=super::STATE.lock();
         if s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
         let o=s.owner.as_ref().ok_or(PublishRefusal::Permanent("Mii group publication without an owner"))?;
         if o.origin.binding.entry!=entry || o.origin.binding.epoch!=super::epoch() {
@@ -680,7 +680,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
     check(rd::<u8>(entry,0x5920)==6 && rd::<u8>(entry,0x591c)==14 && rd::<u8>(entry,0x591a)==0xff
         && rd::<u8>(entry,0x5934)==0 && rd::<u8>(entry,0x5935)==0,
         "Mii group publication needs the native loader idle at 6/14").map_err(PublishRefusal::Race)?;
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     if state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}
     let registry=final_registry(helpers,None).map_err(publish_refusal)?;
     let owner=state.owner.as_mut().filter(|o|o.expected==expected)
@@ -731,7 +731,7 @@ pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,publish
         "bank rollback state is not the published state")?;
     let record=values::record_address(b,b).map_err(|_|"record changed")?;
     // The ticket/epoch/scene proof `bank_publish` made before it wrote (G -> STATE -> COMMITTED).
-    let state=super::STATE.lock().unwrap();
+    let state=super::STATE.lock();
     check(state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token && !now.departed)
         && super::epoch()==bank.ticket.epoch,"bank rollback ticket/epoch changed or the scene departed")?;
     let registry=final_registry(helpers,Some(bank.token))?;
@@ -785,7 +785,7 @@ pub(super) unsafe fn completed(track:&super::Track) -> Result<Snapshot,&'static 
         let proof=track.same_class.ok_or("same-class completion proof absent")?;
         proof.completed(same_class_values(&now)?,&track.descriptor)?;
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(state.track.as_ref().is_some_and(|t|t.ticket==track.ticket
         && t.gate.can_complete(track.ticket)) && super::epoch()==track.ticket.epoch,
         "ready ticket/epoch changed before commit")?;
@@ -877,7 +877,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
         if let Some(reason)=outcome.diverged_reason() {drop(lock);return Err(BankRefusal::Diverged(reason));}
         exact=outcome.active(bank.publish);
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let current=state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==before.binding.epoch;
     let owner=match state.owner.as_mut().filter(|o|current && same_owned(&o.expected,before) && o.active.is_none()) {
@@ -944,7 +944,7 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32) -> Result<Sna
     // descriptor publishes its proven live member. Every other receipt keeps +0x18.
     let published=super::bank_live(before.binding.entry as *const u8,&now.descriptor)
         .filter(|live|*live==kind).unwrap_or_else(||super::descriptor_kind(&now.descriptor));
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let transaction_busy=state.busy() || state.request.is_some()
         || super::epoch()!=before.binding.epoch;
     let owner=state.owner.as_mut().filter(|o|o.expected==g.expected)
@@ -966,11 +966,11 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32) -> Result<Sna
 /// Row getters run outside G; the final full snapshot is rederived before installing an owner.
 pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,opening:u64)
     ->Result<(),helpers::CaptureError> {
-    let previous=super::STATE.lock().unwrap().owner.as_ref().map(|o|o.expected);
+    let previous=super::STATE.lock().owner.as_ref().map(|o|o.expected);
     if let Some(expected)=previous {
         let now=snapshot(entry,epoch,kind)?;
         check(same_owned(&now,&expected),"menu current owner changed")?;
-        let mut state=super::STATE.lock().unwrap();
+        let mut state=super::STATE.lock();
         check(super::super::mii_saved_alpha::menu_epoch()==opening
             && state.capture && !state.busy() && super::epoch()==epoch
             && state.owner.as_ref().is_some_and(|o|o.expected==expected),"menu owner retired")?;
@@ -1000,7 +1000,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
     if let (Some(c),Some(rows))=(c,rows) {
         role_owner::validate_saved(c,0,mirrors(now.owners[0].unwrap()),rows,&now.record)?;
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(super::super::mii_saved_alpha::menu_epoch()==opening
         && state.capture && state.owner.is_none() && !state.busy()
         && super::epoch()==epoch,"origin capture retired")?;
