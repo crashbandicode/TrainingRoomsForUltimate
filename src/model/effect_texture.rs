@@ -121,7 +121,7 @@ pub trait Memory {
 
 /// A pointer value the walk may follow: in user space and aligned to 4 (every structure the walk follows is at least word aligned).
 pub fn plausible(address: usize) -> bool {
-    in_range(address) && address % 4 == 0
+    in_range(address) && address.is_multiple_of(4)
 }
 
 /// An address a read may start at (a field of a structure the walk entered may sit at any byte, e.g. the resource's valid byte at `+9`).
