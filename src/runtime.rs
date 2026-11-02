@@ -6,6 +6,7 @@
 
 mod alloc;
 mod boot;
+mod clock;
 mod diag_log;
 mod features;
 mod game;

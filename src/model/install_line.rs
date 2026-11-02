@@ -4,11 +4,16 @@
 //! nothing.
 //!
 //! ```text
-//! <tick> plugin=training_rooms/0.1.0 game=13.0.5 build=21450c64… <site>=<entry>/<outcome> …
-//!   <feature>=on|off … migration=<…> result=installed heap_allocations=0
-//! <tick> plugin=training_rooms/0.1.0 game=13.0.4 build=none result=unsupported_version
+//! <ms> plugin=training_rooms/0.1.0 game=13.0.5 build=21450c64… <site>=<found>/<written> …
+//!   <feature>=installed|not_installed … settings: input_delay=5 lra_reset=on stage_hazards=off
+//!   migration=<…> result=installed heap_allocations=0
+//! <ms> plugin=training_rooms/0.1.0 game=13.0.4 build=none result=unsupported_version
 //!   reason=display_version heap_allocations=0
 //! ```
+//!
+//! The first token is milliseconds since the console booted (`tick_to_ms` of the system tick). A
+//! feature is `installed` when every site it needs passed its guard and its hook was written; the
+//! `settings:` group is what the player had chosen at boot, which is a different thing.
 //!
 //! The playbook's form puts `result=` last before `heap_allocations=`; SPEC-core-01 §7 lists
 //! `result=` first. This follows the playbook (the lead's brief: the playbook wins).
@@ -54,11 +59,28 @@ pub struct SiteReport {
     pub written: Written,
 }
 
-/// One feature's result (`off` when a site it needs was refused, or the setting is not wired yet).
+/// One feature's install result: `installed` when every site it needs passed its guard and the hook
+/// was written, `not_installed` otherwise. Not the player's setting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FeatureReport {
     pub feature: &'static str,
-    pub on: bool,
+    pub installed: bool,
+}
+
+/// The settings values in force at boot (what the player chose, after the file was read).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SettingsReport {
+    pub input_delay: u8,
+    pub lra_reset: bool,
+    pub stage_hazards: bool,
+}
+
+/// The console's system tick rate (`nn::os::GetSystemTickFrequency`, 19.2 MHz).
+pub const SYSTEM_TICK_HZ: u64 = 19_200_000;
+
+/// System ticks to milliseconds since boot.
+pub const fn tick_to_ms(tick: u64) -> u64 {
+    tick / (SYSTEM_TICK_HZ / 1000)
 }
 
 /// Everything the install line says.
@@ -74,6 +96,8 @@ pub struct InstallLine<'a> {
     /// Empty on an unsupported game (nothing is installed).
     pub sites: &'a [SiteReport],
     pub features: &'a [FeatureReport],
+    /// `None` leaves the `settings:` group out.
+    pub settings: Option<SettingsReport>,
     /// `none`, `done`, `partial` or `skipped` (SPEC-core-08 §2); `None` leaves the token out.
     pub migration: Option<&'a str>,
     /// The counting allocator's count since boot; `None` prints `unmetered`.
@@ -95,7 +119,16 @@ impl Display for InstallLine<'_> {
                 write!(f, " {}={}/{}", site.site, site.found.code(), site.written.word())?;
             }
             for feature in self.features {
-                write!(f, " {}={}", feature.feature, if feature.on { "on" } else { "off" })?;
+                write!(f, " {}={}", feature.feature, if feature.installed { "installed" } else { "not_installed" })?;
+            }
+            if let Some(s) = self.settings {
+                write!(
+                    f,
+                    " settings: input_delay={} lra_reset={} stage_hazards={}",
+                    s.input_delay,
+                    if s.lra_reset { "on" } else { "off" },
+                    if s.stage_hazards { "on" } else { "off" },
+                )?;
             }
             if let Some(migration) = self.migration {
                 write!(f, " migration={migration}")?;
@@ -117,6 +150,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ticks_convert_to_milliseconds() {
+        assert_eq!(tick_to_ms(0), 0);
+        assert_eq!(tick_to_ms(SYSTEM_TICK_HZ), 1000);
+        assert_eq!(tick_to_ms(SYSTEM_TICK_HZ * 3600 + 19_199), 3_600_000);
+    }
+
+    #[test]
     fn an_unsupported_game_line_has_no_sites() {
         let line = InstallLine {
             tick: 1,
@@ -126,6 +166,7 @@ mod tests {
             verdict: Verdict::UnsupportedVersion,
             sites: &[],
             features: &[],
+            settings: None,
             migration: None,
             heap_allocations: Some(0),
         };

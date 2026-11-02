@@ -4,25 +4,22 @@
 //! `diag_ring::SHIPPED_TAGS`; a `diag` build writes every line. Formatting happens on the caller's
 //! stack and the ring is a fixed array, so a log call allocates nothing.
 //!
-//! NOT YET SWITCH-COMPILED. Lines 1-265 below the imports come from the earlier fork's
-//! `src/logging.rs` lines 20-284 (stage m5o, fork-only, ours); CARRY-OVER.md lists the edits and
-//! what was written new here (the end of `append`, `sync`, `report_drops`, the drain thread).
+//! Lines 1-265 below the imports come from the earlier fork's `src/logging.rs` lines 20-284 (stage
+//! m5o, fork-only, ours); CARRY-OVER.md lists the edits. The file is no longer held open: each drain
+//! opens it in append mode, writes the lines and closes it, the way `events.log` is written (a failure
+//! of either is written to `events.log` with its error text, so it cannot stay silent).
 
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::model::diag_ring::{self, ByteRing, StackLine};
 use crate::model::storage;
+use crate::runtime::clock;
 
-const DIAGNOSTIC_PATH: &str = storage::DIAGNOSTICS_PATH;
-const PREVIOUS_PATH: &str = storage::DIAGNOSTICS_PREVIOUS_PATH;
 const DIAGNOSTIC_LIMIT: u64 = storage::DIAGNOSTIC_LIMIT;
-
 /// Ring and per-line limits. The diag build keeps every oracle line whole (the longest seen in
 /// Eden logs is about 8 KiB); the shipped build keeps sparse breadcrumbs, whole up to 9 KiB
 /// (a Preload Samples snapshot reaches 8 KiB).
@@ -38,19 +35,24 @@ const LINE_MAX: usize = 9 * 1024;
 const LOCK_SPINS: u32 = 4096;
 
 struct DiagnosticLog {
-    file: Option<File>,
+    /// The current file, the previous one, and the file failures are reported to.
+    current: String,
+    previous: String,
+    failures: String,
     bytes: u64,
+    /// The file exists and can be appended to; false after a failure.
+    ready: bool,
     initialized: bool,
-    sync_warning: bool,
 }
 
 static DIAGNOSTICS: Mutex<DiagnosticLog> = Mutex::new(DiagnosticLog {
-    file: None,
+    current: String::new(),
+    previous: String::new(),
+    failures: String::new(),
     bytes: 0,
+    ready: false,
     initialized: false,
-    sync_warning: false,
 });
-
 /// One spin-locked cell. The lock is only ever held for a copy into or out of the ring.
 struct Locked<T> {
     busy: AtomicBool,
@@ -99,41 +101,62 @@ static WRITER: AtomicBool = AtomicBool::new(false);
 static REPORTED_DROPS: AtomicU64 = AtomicU64::new(0);
 static REPORTING: AtomicBool = AtomicBool::new(false);
 
+/// Write one failure line to the failures file (open, append, close). Used where the diagnostics file
+/// itself cannot be trusted; never panics.
+fn report_failure(failures: &str, what: &str, error: &io::Error) {
+    if failures.is_empty() {
+        return;
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(failures) {
+        let _ = writeln!(file, "{} diag_log {what}: {error}", clock::uptime_ms());
+    }
+}
+
+/// Start a new current file: the old one becomes the previous one, and an empty current file is
+/// created.
 fn rotate_diagnostics(log: &mut DiagnosticLog) -> io::Result<()> {
-    log.file.take();
-    if fs::metadata(DIAGNOSTIC_PATH).is_ok() {
-        match fs::remove_file(PREVIOUS_PATH) {
+    if fs::metadata(&log.current).is_ok() {
+        match fs::remove_file(&log.previous) {
             Ok(()) => {}
             Err(e) if e.kind() == io::ErrorKind::NotFound => {}
             Err(e) => return Err(e),
         }
-        fs::rename(DIAGNOSTIC_PATH, PREVIOUS_PATH)?;
+        fs::rename(&log.current, &log.previous)?;
     }
-    log.file = Some(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(DIAGNOSTIC_PATH)?,
-    );
+    OpenOptions::new().create(true).append(true).open(&log.current)?;
     log.bytes = 0;
     Ok(())
+}
+
+/// Use these files from now on (rotating the current one) and report a failure to `failures`.
+/// `init_diagnostics` passes the files on the card; the host test passes temporary ones.
+pub fn init_at(current: &str, previous: &str, failures: &str) {
+    let Ok(mut log) = DIAGNOSTICS.lock() else {
+        return;
+    };
+    log.current = current.to_owned();
+    log.previous = previous.to_owned();
+    log.failures = failures.to_owned();
+    log.initialized = true;
+    log.ready = match rotate_diagnostics(&mut log) {
+        Ok(()) => true,
+        Err(e) => {
+            report_failure(failures, "start", &e);
+            false
+        }
+    };
 }
 
 /// Sparse, persistent breadcrumbs for console crash investigation. At most two
 /// 128 KiB files; no per-frame writes. Failures never abort game initialization.
 pub fn init_diagnostics() {
-    if let Ok(mut log) = DIAGNOSTICS.lock() {
-        if log.initialized {
-            return;
-        }
-        log.initialized = true;
-        if let Err(e) = fs::create_dir_all(storage::ROOT)
-            .and_then(|_| rotate_diagnostics(&mut log))
-        {
-            diagnostic(format_args!("[PracticeDiagnostics] SD log unavailable: {}", e));
-        }
+    if DIAGNOSTICS.lock().is_ok_and(|log| log.initialized) {
+        return;
     }
+    if let Err(e) = fs::create_dir_all(storage::ROOT) {
+        report_failure(storage::EVENTS_LOG_PATH, "data folder", &e);
+    }
+    init_at(storage::DIAGNOSTICS_PATH, storage::DIAGNOSTICS_PREVIOUS_PATH, storage::EVENTS_LOG_PATH);
     // The game identity is not known yet here: the version guard logs it next, and the install
     // line carries it.
     diagnostic(format_args!(
@@ -144,7 +167,6 @@ pub fn init_diagnostics() {
         LINE_MAX
     ));
 }
-
 /// Record one diagnostic line. Never blocks on I/O, never allocates, never panics.
 pub fn diagnostic(args: fmt::Arguments<'_>) {
     let mut line = StackLine::new();
@@ -152,7 +174,7 @@ pub fn diagnostic(args: fmt::Arguments<'_>) {
     if !cfg!(feature = "diag") && !diag_ring::shipped(line.text()) {
         return;
     }
-    let ts = now_ms();
+    let ts = clock::uptime_ms();
     let text = whole.then_some(line.text());
     if RING.with(|ring| ring.push(ts, text, args, LINE_MAX)).is_none() {
         LOCK_MISSES.fetch_add(1, Ordering::Relaxed);
@@ -160,13 +182,6 @@ pub fn diagnostic(args: fmt::Arguments<'_>) {
     if !WRITER.load(Ordering::Acquire) {
         drain();
     }
-}
-
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64
 }
 
 /// Ring counters plus lock misses, for the install line and drop reports (`ring_dropped=…`).
@@ -203,7 +218,6 @@ pub fn flush() {
 /// thread, and by callers until it runs. Concurrent calls skip: one drainer at a time.
 pub fn drain() {
     let _ = DRAIN.with(|chunk| {
-        let mut wrote = false;
         loop {
             let n = RING.with(|ring| ring.drain_into(&mut chunk[..])).unwrap_or(0);
             if n == 0 {
@@ -211,10 +225,7 @@ pub fn drain() {
             }
             let bytes = &chunk[..n];
             console_write(bytes);
-            wrote |= append(bytes);
-        }
-        if wrote {
-            sync();
+            append(bytes);
         }
     });
     report_drops();
@@ -246,48 +257,31 @@ fn console_write(bytes: &[u8]) {
 #[cfg(not(target_arch = "aarch64"))]
 fn console_write(_bytes: &[u8]) {}
 
-/// Append whole lines to the current file, rotating at `DIAGNOSTIC_LIMIT` as before.
+/// Append whole lines to the current file, rotating at `DIAGNOSTIC_LIMIT`: open in append mode, write,
+/// close. The first failure turns the file off and is reported to the failures file.
 fn append(bytes: &[u8]) -> bool {
     let Ok(mut log) = DIAGNOSTICS.try_lock() else {
         return false;
     };
-    if log.file.is_none() {
+    if !log.ready {
         return false;
     }
     if storage::should_rotate(log.bytes, bytes.len()) {
         if let Err(e) = rotate_diagnostics(&mut log) {
-            diagnostic(format_args!("[PracticeDiagnostics] rotation failed: {}", e));
-            log.file = None;
+            report_failure(&log.failures, "rotation", &e);
+            log.ready = false;
             return false;
         }
     }
-    let file = log.file.as_mut().unwrap();
-    if let Err(e) = file.write_all(bytes) {
-        diagnostic(format_args!("[PracticeDiagnostics] write failed: {}", e));
-        log.file = None;
+    let written = OpenOptions::new().append(true).open(&log.current).and_then(|mut file| file.write_all(bytes));
+    if let Err(e) = written {
+        report_failure(&log.failures, "write", &e);
+        log.ready = false;
         return false;
     }
     log.bytes += bytes.len() as u64;
     true
 }
-
-/// Flush the file's data to the card once per drain that wrote something (one `sync` per drain,
-/// SPEC-core-01 §7). A failure is reported once.
-fn sync() {
-    let Ok(mut log) = DIAGNOSTICS.try_lock() else {
-        return;
-    };
-    let failed = match log.file.as_mut() {
-        Some(file) => file.sync_data().is_err(),
-        None => false,
-    };
-    if failed && !log.sync_warning {
-        log.sync_warning = true;
-        drop(log);
-        diagnostic(format_args!("[PracticeDiagnostics] sync failed"));
-    }
-}
-
 /// Report lines lost to a full ring or a busy lock, once per change (`ring_dropped=<n>` in the file).
 fn report_drops() {
     let dropped = ring_stats().0.dropped;

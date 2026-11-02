@@ -7,11 +7,10 @@
 
 use std::fs;
 use std::io::Read;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
-use crate::model::install_line::{FeatureReport, InstallLine, SiteReport, Written};
+use crate::model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
@@ -20,13 +19,9 @@ use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::runtime::features::{input_delay, lra_reset, reset_hub, stage_hazards as hazards};
-use crate::runtime::{game, install, published};
+use crate::runtime::{clock, game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
-
-fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64
-}
 
 pub fn run() {
     diag_log::init_diagnostics();
@@ -39,13 +34,14 @@ pub fn run() {
     let verdict = version::verdict(display, build_id);
     if verdict != Verdict::Supported {
         let line = InstallLine {
-            tick: now_ms(),
+            tick: clock::uptime_ms(),
             version: env!("CARGO_PKG_VERSION"),
             display,
             build_id,
             verdict,
             sites: &[],
             features: &[],
+            settings: None,
             migration: None,
             heap_allocations: Some(hook_allocations()),
         };
@@ -118,19 +114,24 @@ pub fn run() {
     let reports: [SiteReport; SITE_COUNT] =
         std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
     let features = [
-        FeatureReport { feature: Feature::InputDelay.name(), on: input_delay_on },
-        FeatureReport { feature: Feature::LraReset.name(), on: lra_on },
-        FeatureReport { feature: Feature::StageHazards.name(), on: hazards_on },
-        FeatureReport { feature: Feature::ResetHub.name(), on: hub_on },
+        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
+        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
+        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on },
+        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on },
     ];
     let line = InstallLine {
-        tick: now_ms(),
+        tick: clock::uptime_ms(),
         version: env!("CARGO_PKG_VERSION"),
         display,
         build_id,
         verdict,
         sites: &reports,
         features: &features,
+        settings: Some(SettingsReport {
+            input_delay: loaded.menu.input_delay(),
+            lra_reset: loaded.menu.lra_reset(),
+            stage_hazards: loaded.menu.stage_hazards(),
+        }),
         migration: None,
         heap_allocations: Some(hook_allocations()),
     };

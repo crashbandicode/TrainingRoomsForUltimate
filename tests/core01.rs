@@ -9,7 +9,7 @@ mod common;
 mod model;
 
 use model::guard::{GuardOutcome, HookForm, Placement, SeamKind, GUARD_BYTES};
-use model::install_line::{FeatureReport, InstallLine, SiteReport, Written};
+use model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use model::sites::{self, Feature, Phase, SITES};
 use model::storage::{self, FixedPath};
 use model::version::{self, Verdict};
@@ -60,6 +60,7 @@ fn core01_unsupported_logs_and_returns() {
             verdict,
             sites: &[],
             features: &[],
+            settings: None,
             migration: None,
             heap_allocations: Some(0),
         };
@@ -79,9 +80,10 @@ fn core01_install_line_format() {
         SiteReport { site: "reset_check", found: GuardOutcome::Foreign { first_diff: 8 }, written: Written::Skipped },
     ];
     let features = [
-        FeatureReport { feature: "input_delay", on: true },
-        FeatureReport { feature: "lra_reset", on: false },
+        FeatureReport { feature: "input_delay", installed: true },
+        FeatureReport { feature: "lra_reset", installed: false },
     ];
+    let settings = SettingsReport { input_delay: 5, lra_reset: false, stage_hazards: true };
     let line = InstallLine {
         tick: 123456,
         version: "0.1.0",
@@ -90,6 +92,7 @@ fn core01_install_line_format() {
         verdict: Verdict::Supported,
         sites: &sites,
         features: &features,
+        settings: Some(settings),
         migration: Some("none"),
         heap_allocations: Some(0),
     };
@@ -97,7 +100,8 @@ fn core01_install_line_format() {
         line.to_string(),
         "123456 plugin=training_rooms/0.1.0 game=13.0.5 build=21450c647b8c5940ed5b68218ea128fd3c5d597d \
          final_input_mapping=stock/far hazard_flag=other/checked reset_check=foreign/skipped \
-         input_delay=on lra_reset=off migration=none result=installed heap_allocations=0"
+         input_delay=installed lra_reset=not_installed settings: input_delay=5 lra_reset=off stage_hazards=on \
+         migration=none result=installed heap_allocations=0"
     );
     let unmetered = InstallLine { heap_allocations: None, ..line };
     assert!(unmetered.to_string().ends_with(" result=installed heap_allocations=unmetered"));
