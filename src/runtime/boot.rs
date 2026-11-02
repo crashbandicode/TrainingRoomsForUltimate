@@ -125,7 +125,7 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
-    let ui_install = ui::install();
+    let ui_install = ui::install(&loaded, input_delay_on);
 
     // 6. The install line.
     let mut reports: Vec<SiteReport> =
@@ -141,7 +141,7 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
-        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.archive_hook },
+        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),

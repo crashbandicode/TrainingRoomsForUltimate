@@ -37,6 +37,10 @@ pub fn stage_hazards() -> bool {
 
 /// Decision N1: whether `developer.ini` said `developer_page=on` at boot (the menu reads it in a
 /// later package).
+pub fn developer_page() -> bool {
+    DEVELOPER_PAGE.load(Ordering::Acquire)
+}
+
 pub fn set_developer_page(on: bool) {
     DEVELOPER_PAGE.store(on, Ordering::Release);
 }

@@ -67,6 +67,10 @@ fn no_ui_site_window_overlaps_another_or_a_pilot_site() {
         for b in UI_SITES.iter().skip(i + 1) {
             assert!(!a.overlaps(b), "{} overlaps {}", a.name, b.name);
         }
+        // A function we only call may be a site of the pilot too (both call it; either may be hooked by others).
+        if matches!(a.kind, model::guard::SeamKind::Called) {
+            continue;
+        }
         for pilot in PILOT_SITES {
             // The pilot's `ui_pass` word at 0x375ef8c is 0x1c before the pass anchor and outside its window.
             assert!(!(a.offset..a.window_end()).contains(&pilot), "{} window holds the pilot site {pilot:#x}", a.name);

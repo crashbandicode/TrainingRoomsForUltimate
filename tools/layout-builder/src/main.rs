@@ -29,6 +29,8 @@ const RECT_TEMPLATE: &str = "pic_bg_mode_main_00";
 /// A stock text box in the `nintendo64` font with a plain white material.
 const TEXT_TEMPLATE: &str = "set_txt_help_00";
 const INFLUENCED_ALPHA: u8 = 0x02;
+/// 	xt1 flag bit 1: the buffer is 	ext_buf_bytes long even when the string in it is shorter.
+const FORCE_ASSIGN_TEXT_LENGTH: u16 = 0x0002;
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -78,6 +80,7 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
     match spec.kind {
         Kind::Rect { color } => {
             let picture = pane.picture.as_mut().ok_or("not a picture")?;
+            let color = panes::linear(color);
             for vertex in &mut picture.vertex_colors {
                 vertex.r = color[0];
                 vertex.g = color[1];
@@ -97,6 +100,9 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
             text.text_alignment = alignment;
             text.font_size.x = font.0;
             text.font_size.y = font.1;
+            let color = panes::linear(color);
+            // The string buffer keeps the length the layout gives it, not the length of the empty string it starts with.
+            text.text_box_flag |= FORCE_ASSIGN_TEXT_LENGTH;
             for c in &mut text.text_cols {
                 c.r = color[0];
                 c.g = color[1];
@@ -107,11 +113,13 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec) -> Result<()> {
             let buffer = usize::from(chars) * 2;
             let padded = buffer.next_multiple_of(4);
             text.text_buf_bytes = buffer as u16;
-            text.text_str_bytes = 2;
-            text.text_id_offset = text.text_str_offset + padded as u32;
-            let mut trailing = vec![0u8; padded];
-            trailing.extend_from_slice(&[b'@', 0, 0, 0]);
-            text.trailing = trailing;
+            // The string is declared as long as the buffer (all NULs, so it reads as empty): the game sizes the live
+            // buffer from the string it was given.
+            text.text_str_bytes = buffer as u16;
+            // No text id: with one the game takes the live text from its message tables and sizes the buffer
+            // from that (empty) result.
+            text.text_id_offset = 0;
+            text.trailing = vec![0u8; padded];
         }
     }
     Ok(())

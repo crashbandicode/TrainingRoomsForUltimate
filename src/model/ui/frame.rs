@@ -147,6 +147,21 @@ impl Default for Frame {
 }
 
 pub const TITLE: &str = "TrainingRooms";
+
+/// Real frames of discarded input and fade after the menu closes (SPEC-core-03 §2.3).
+pub const CLOSE_FRAMES: u32 = 15;
+
+/// The panel's alpha count real frames after a close: 255 / log10(16) * log10(remaining + 1) with remaining = 15 - count (saturating), 255 before the first frame, 0 when none is left (SPEC-core-03 §5).
+pub fn fade_alpha(count: u32) -> u8 {
+    let remaining = CLOSE_FRAMES.saturating_sub(count);
+    if remaining >= CLOSE_FRAMES {
+        255
+    } else if remaining == 0 {
+        0
+    } else {
+        (255.0 / 16f32.log10() * ((remaining + 1) as f32).log10()).clamp(0.0, 255.0) as u8
+    }
+}
 const HINT_PAGE: &str = "L/R page   Up/Down move   Left/Right change   A open   B close   X reset page";
 
 fn group_of(entry: Entry) -> usize {
@@ -406,6 +421,16 @@ mod tests {
                 m.press(Button::R);
             }
         }
+    }
+
+    #[test]
+    fn the_fade_is_logarithmic_from_255_to_0_over_15_frames() {
+        assert_eq!(fade_alpha(0), 255);
+        assert_eq!(fade_alpha(15), 0);
+        assert_eq!(fade_alpha(99), 0);
+        let curve: Vec<u8> = (1..15).map(fade_alpha).collect();
+        assert!(curve.windows(2).all(|w| w[0] >= w[1]), "{curve:?}");
+        assert!(curve[0] > 240 && curve[13] < 70);
     }
 
     #[test]

@@ -138,32 +138,83 @@ pub const fn group_y(group: usize) -> f32 {
 }
 
 // ---- names ---------------------------------------------------------------------------------------------
+//
+// The panes in tree (draw) order, back to front. An index is stable: the builder adds the panes in this
+// order and the runtime keeps its resolved pointers in an array of the same order.
 
-pub const BG: Name = Name::new("tr_bg");
-pub const TITLE: Name = Name::new("tr_title");
-pub const TAB_HI: Name = Name::new("tr_tab_hi");
-pub const CRUMB: Name = Name::new("tr_crumb");
-pub const GROUP_HI: Name = Name::new("tr_grp_hi");
-pub const DIVIDER: Name = Name::new("tr_div");
-pub const ROW_HI: Name = Name::new("tr_row_hi");
-pub const SEP: Name = Name::new("tr_sep");
-pub const HELP: [Name; 2] = [Name::new("tr_help_0"), Name::new("tr_help_1")];
-pub const HINT: Name = Name::new("tr_hint");
+pub const IDX_BG: usize = 0;
+pub const IDX_TAB_HI: usize = 1;
+pub const IDX_TAB: usize = 2;
+pub const IDX_TITLE: usize = IDX_TAB + TABS;
+pub const IDX_SEP: usize = IDX_TITLE + 1;
+pub const IDX_CRUMB: usize = IDX_SEP + 1;
+pub const IDX_DIVIDER: usize = IDX_CRUMB + 1;
+pub const IDX_GROUP_HI: usize = IDX_DIVIDER + 1;
+pub const IDX_GROUP: usize = IDX_GROUP_HI + 1;
+pub const IDX_ROW_HI: usize = IDX_GROUP + GROUPS;
+/// Row `i`'s label is `IDX_ROW + 2 * i` and its value `IDX_ROW + 2 * i + 1`.
+pub const IDX_ROW: usize = IDX_ROW_HI + 1;
+pub const IDX_SEP_HELP: usize = IDX_ROW + 2 * ROWS;
+pub const IDX_HELP: usize = IDX_SEP_HELP + 1;
+pub const IDX_HINT: usize = IDX_HELP + 2;
+/// How many panes the menu adds under the container.
+pub const COUNT: usize = IDX_HINT + 1;
 
-pub const fn tab(i: usize) -> Name {
-    Name::indexed("tr_tab_", i)
+pub const fn tab_index(i: usize) -> usize {
+    IDX_TAB + i
 }
-pub const fn group(i: usize) -> Name {
-    Name::indexed("tr_grp_", i)
+pub const fn group_index(i: usize) -> usize {
+    IDX_GROUP + i
 }
-pub const fn row_label(i: usize) -> Name {
-    Name::indexed("tr_rl_", i)
+pub const fn row_label_index(i: usize) -> usize {
+    IDX_ROW + 2 * i
 }
-pub const fn row_value(i: usize) -> Name {
-    Name::indexed("tr_rv_", i)
+pub const fn row_value_index(i: usize) -> usize {
+    IDX_ROW + 2 * i + 1
+}
+
+/// The name of pane `index` (`< COUNT`).
+pub const fn name_of(index: usize) -> Name {
+    match index {
+        IDX_BG => Name::new("tr_bg"),
+        IDX_TAB_HI => Name::new("tr_tab_hi"),
+        IDX_TITLE => Name::new("tr_title"),
+        IDX_SEP => Name::new("tr_sep"),
+        IDX_CRUMB => Name::new("tr_crumb"),
+        IDX_DIVIDER => Name::new("tr_div"),
+        IDX_GROUP_HI => Name::new("tr_grp_hi"),
+        IDX_ROW_HI => Name::new("tr_row_hi"),
+        IDX_SEP_HELP => Name::new("tr_sep_help"),
+        i if i == IDX_HELP => Name::new("tr_help_0"),
+        i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
+        IDX_HINT => Name::new("tr_hint"),
+        i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
+        i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
+        i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
+            if (i - IDX_ROW) % 2 == 0 {
+                Name::indexed("tr_rl_", (i - IDX_ROW) / 2)
+            } else {
+                Name::indexed("tr_rv_", (i - IDX_ROW) / 2)
+            }
+        }
+        _ => panic!("no such pane"),
+    }
 }
 
 // ---- colours (RGBA) ------------------------------------------------------------------------------------
+//
+// The layout engine treats vertex and text colours as linear light and encodes them for the screen, so the
+// sRGB colours below are converted with linear before they are written (builder and runtime alike).
+
+/// The linear-light bytes that show as srgb on the screen (alpha is unchanged).
+pub fn linear(srgb: [u8; 4]) -> [u8; 4] {
+    let channel = |v: u8| {
+        let s = f32::from(v) / 255.0;
+        let l = if s <= 0.04045 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) };
+        (l * 255.0 + 0.5) as u8
+    };
+    [channel(srgb[0]), channel(srgb[1]), channel(srgb[2]), srgb[3]]
+}
 
 pub const PANEL: [u8; 4] = [8, 10, 14, 236];
 pub const ACCENT: [u8; 4] = [176, 48, 40, 255];
@@ -178,39 +229,48 @@ const fn rect(name: Name, x: f32, y: f32, w: f32, h: f32, color: [u8; 4], visibl
     Spec { name, kind: Kind::Rect { color }, x, y, w, h, visible }
 }
 
+#[allow(clippy::too_many_arguments)]
 const fn text(name: Name, x: f32, y: f32, w: f32, h: f32, align: Align, font: (f32, f32), chars: u16, color: [u8; 4]) -> Spec {
     Spec { name, kind: Kind::Text { align, font, chars, color }, x, y, w, h, visible: true }
 }
 
-/// Every pane of the menu, in tree (draw) order: back to front.
-pub fn specs() -> Vec<Spec> {
-    let mut all = Vec::new();
-    all.push(rect(BG, 0.0, 0.0, PANEL_W, PANEL_H, PANEL, true));
-    all.push(rect(TAB_HI, -840.0 + 100.0, TAB_Y, 200.0, TAB_H, ACCENT, true));
-    for i in 0..TABS {
-        all.push(text(tab(i), -840.0 + TAB_BOX_W / 2.0, TAB_Y, TAB_BOX_W, TAB_H, Align::Left, FONT, 40, TEXT_DIM));
+/// Pane `index`'s kind and place.
+pub const fn spec(index: usize) -> Spec {
+    let name = name_of(index);
+    match index {
+        IDX_BG => rect(name, 0.0, 0.0, PANEL_W, PANEL_H, PANEL, true),
+        IDX_TAB_HI => rect(name, -740.0, TAB_Y, 200.0, TAB_H, ACCENT, true),
+        IDX_TITLE => text(name, 600.0, TAB_Y, 560.0, TAB_H, Align::Right, FONT_SMALL, 40, TEXT_DIM),
+        IDX_SEP => rect(name, 0.0, TAB_Y - 52.0, 1760.0, 3.0, RULE, true),
+        IDX_CRUMB => text(name, 0.0, CRUMB_Y, 1760.0, 56.0, Align::Left, FONT, 120, TEXT),
+        IDX_DIVIDER => rect(name, DIVIDER_X, 20.0, 3.0, 650.0, RULE, true),
+        IDX_GROUP_HI => rect(name, GROUP_X, group_y(0), GROUP_W, GROUP_ROW_H, HIGHLIGHT, true),
+        IDX_ROW_HI => rect(name, (ROW_LEFT + ROW_RIGHT) / 2.0, row_y(0), ROW_RIGHT - ROW_LEFT + 30.0, ROW_H, HIGHLIGHT, true),
+        IDX_SEP_HELP => rect(name, 0.0, HELP_Y[0] + 48.0, 1760.0, 3.0, RULE, true),
+        IDX_HINT => text(name, HELP_X, HINT_Y, HELP_W, 44.0, Align::Left, FONT_SMALL, 160, TEXT_DIM),
+        i if i == IDX_HELP => text(name, HELP_X, HELP_Y[0], HELP_W, 48.0, Align::Left, FONT_SMALL, 160, TEXT),
+        i if i == IDX_HELP + 1 => text(name, HELP_X, HELP_Y[1], HELP_W, 48.0, Align::Left, FONT_SMALL, 160, TEXT),
+        i if i >= IDX_TAB && i < IDX_TAB + TABS => {
+            text(name, -840.0 + TAB_BOX_W / 2.0, TAB_Y, TAB_BOX_W, TAB_H, Align::Left, FONT, 40, TEXT_DIM)
+        }
+        i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => {
+            text(name, GROUP_X, group_y(i - IDX_GROUP), GROUP_W, GROUP_ROW_H, Align::Left, FONT, 48, TEXT_DIM)
+        }
+        i => {
+            let row = (i - IDX_ROW) / 2;
+            if (i - IDX_ROW) % 2 == 0 {
+                text(name, ROW_LEFT + ROW_LABEL_W / 2.0, row_y(row), ROW_LABEL_W, ROW_H, Align::Left, FONT, 80, TEXT)
+            } else {
+                text(name, ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(row), ROW_VALUE_W, ROW_H, Align::Right, FONT, 72, TEXT)
+            }
+        }
     }
-    all.push(text(TITLE, 600.0, TAB_Y, 560.0, TAB_H, Align::Right, FONT_SMALL, 40, TEXT_DIM));
-    all.push(rect(SEP, 0.0, TAB_Y - 52.0, 1760.0, 3.0, RULE, true));
-    all.push(text(CRUMB, 0.0, CRUMB_Y, 1760.0, 56.0, Align::Left, FONT, 120, TEXT));
-    all.push(rect(DIVIDER, DIVIDER_X, 20.0, 3.0, 650.0, RULE, true));
-    all.push(rect(GROUP_HI, GROUP_X, group_y(0), GROUP_W, GROUP_ROW_H, HIGHLIGHT, true));
-    for i in 0..GROUPS {
-        all.push(text(group(i), GROUP_X, group_y(i), GROUP_W, GROUP_ROW_H, Align::Left, FONT, 48, TEXT_DIM));
-    }
-    all.push(rect(ROW_HI, (ROW_LEFT + ROW_RIGHT) / 2.0, row_y(0), ROW_RIGHT - ROW_LEFT + 30.0, ROW_H, HIGHLIGHT, true));
-    for i in 0..ROWS {
-        all.push(text(row_label(i), ROW_LEFT + ROW_LABEL_W / 2.0, row_y(i), ROW_LABEL_W, ROW_H, Align::Left, FONT, 80, TEXT));
-        all.push(text(row_value(i), ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(i), ROW_VALUE_W, ROW_H, Align::Right, FONT, 72, TEXT));
-    }
-    all.push(rect(Name::new("tr_sep_help"), 0.0, HELP_Y[0] + 48.0, 1760.0, 3.0, RULE, true));
-    for (i, name) in HELP.iter().enumerate() {
-        all.push(text(*name, HELP_X, HELP_Y[i], HELP_W, 48.0, Align::Left, FONT_SMALL, 160, TEXT));
-    }
-    all.push(text(HINT, HELP_X, HINT_Y, HELP_W, 44.0, Align::Left, FONT_SMALL, 160, TEXT_DIM));
-    all
 }
 
+/// Every pane of the menu, in tree (draw) order: back to front.
+pub fn specs() -> Vec<Spec> {
+    (0..COUNT).map(spec).collect()
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,13 +284,20 @@ mod tests {
                 assert_ne!(a.name, b.name, "{:?} is listed twice", a.name);
             }
         }
-        assert_ne!(ROOT, BG);
+        assert_ne!(ROOT, name_of(IDX_BG));
+        assert_eq!(all.len(), COUNT);
+    }
+
+    #[test]
+    fn the_linear_conversion_darkens_and_keeps_alpha() {
+        assert_eq!(linear([0, 255, 128, 77]), [0, 255, 55, 77]);
+        assert!(linear([8, 10, 14, 236])[0] <= 1);
     }
 
     #[test]
     fn indexed_names_have_two_digits() {
-        assert_eq!(tab(3).as_str(), "tr_tab_03");
-        assert_eq!(row_value(11).as_str(), "tr_rv_11");
+        assert_eq!(name_of(tab_index(3)).as_str(), "tr_tab_03");
+        assert_eq!(name_of(row_value_index(11)).as_str(), "tr_rv_11");
     }
 
     #[test]

@@ -12,6 +12,8 @@ pub const UI_ARCHIVE_ALLOC_OFFSET: usize = 0x377_4704;
 pub const UI_PASS_CALCULATE_OFFSET: usize = 0x375_efa8;
 pub const UI_REGISTER_CALCULATE_OFFSET: usize = 0x378_4ad4;
 pub const UI_MANAGER_GLOBAL_OFFSET: usize = 0x375_e280;
+/// The game's pane text setter (pane, text, units, flags).
+pub const UI_SET_TEXT_OFFSET: usize = 0x37a_2270;
 
 /// The five words the two anchors pin (SPEC-core-05 §4.1): the instructions the hook sits on and the
 /// four after it, up to the holder layout's virtual Calculate (`blr x8`).
@@ -23,7 +25,7 @@ pub const UI_MANAGER_SLOT_OFFSET: usize = 0x593_ba90;
 /// `ui_manager_global`'s two words.
 pub const UI_MANAGER_ADRP_LDR: [u32; 2] = [0xb001_0efc, 0xf945_4b88];
 
-pub static UI_SITES: [Site; 4] = [    Site {
+pub static UI_SITES: [Site; 5] = [    Site {
         name: "ui_archive_alloc",
         feature: Feature::Ui,
         offset: 0x3774704,
@@ -75,6 +77,19 @@ pub static UI_SITES: [Site; 4] = [    Site {
         ],
         note: "Relied-on `adrp x28, ...; ldr x8, [x28, #0xa90]` in the UI manager's per-frame pass: the plugin decodes the manager's global slot (`main+0x593ba90`) from these two words (position independent) and never writes it. The pass's own entry words are not relied on: another plugin may have hooked them (SPEC-core-05 §6).",
     },
+    Site {
+        name: "ui_set_text",
+        feature: Feature::Ui,
+        offset: 0x37a2270,
+        kind: SeamKind::Called,
+        guard: [
+            0xfc, 0x57, 0xbd, 0xa9, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,
+            0xff, 0x0b, 0x40, 0xd1, 0xff, 0x43, 0x00, 0xd1, 0xf4, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x00, 0xaa,
+            0xbf, 0x83, 0x1d, 0xf8, 0xe3, 0x0b, 0x00, 0x36, 0xbf, 0x83, 0x1d, 0xf8, 0x74, 0x0f, 0x00, 0xb4,
+            0x8a, 0x02, 0x40, 0x79, 0x2a, 0x0f, 0x00, 0x34, 0xe8, 0x03, 0x1f, 0x2a, 0xe9, 0x07, 0x00, 0x32,
+        ],
+        note: "The game's pane text setter `(pane, text, units, flags)`, called never hooked (other plugins' hooks anywhere in its bytes are fine): it grows the text box's buffer to fit, then sets the text, so the plugin never sizes a game buffer itself. The same function the CPU pilot and gsp-visualizer call.",
+    },
 ];
 
 /// The absolute address an `adrp xN, page` followed by `ldr xM, [xN, #off]` (64-bit, unsigned offset)
@@ -125,5 +140,6 @@ mod tests {
             assert_eq!(site.feature, Feature::Ui);
         }
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).count(), 3);
+        assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 1);
     }
 }
