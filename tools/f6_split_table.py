@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """F6: the group build's game-thread time, from the diag log (`[BuildSplit]` and `[GroupSwap]` lines of `practice-diagnostics*.log`).
 
-    python3 -I tools/f6_split_table.py <log> [<log> ...] [--json out.json]
+    python3 -I tools/f6_split_table.py <log> [<log> ...] [--json out.json] [--stalls-json stalls.json]
 
 Prints one Markdown row per asynchronous group build, in log order: build index since boot, owner, group kinds, the carried
 `setup_us`, the split's steps (each native call and the plugin's own code), the swap's `max_tick_gap_us` and the largest gaps with
 the work of the tick before each (`setup`, `settle`, `poll`). Then the first-of-boot build next to the median of the later ones per
-step, which is where a first-use cost shows. Numbers are copied from the log lines; nothing is estimated.
+step, which is where a first-use cost shows. Thresholded entry-tick stalls are also reported independently of bank builds.
+Numbers are copied from the log lines; nothing is estimated.
 """
 import json
 import re
@@ -21,6 +22,35 @@ SWAP = re.compile(r"\[GroupSwap\] swap owner=(\d+) kind=(0x[0-9a-f]+) request_to
 STEP = re.compile(r"([a-z_0-9]+)=(\d+)/(\d+)")
 SUMMARY = re.compile(r"setup_us=(\d+) total_us=(\d+) largest=(\S+)")
 GAP = re.compile(r"t(\d+):(\d+):(\w+)")
+STALL = re.compile(r"\[BuildSplit\] stall owner=(\d+) gap_us=(\d+) loader=(\d+) outer=(\d+) installed=(\d+) changing=(\d+) count=(\d+) kinds=\[([0-9a-f, ]*)\] flags=(0x[0-9a-f]+)")
+
+
+def parse_stalls(lines):
+    """Thresholded entry-tick observations, also emitted when bank builds are off.
+
+    Absence is not a zero-duration measurement or proof that the meter ran.
+    """
+    out = []
+    for line in lines:
+        if (m := STALL.search(line)):
+            row = dict(zip(("owner", "gap_us", "loader", "outer", "installed", "changing", "count"),
+                           map(int, m.groups()[:7])))
+            row["kinds"] = [int(k, 16) for k in m.group(8).replace(" ", "").split(",") if k]
+            row["flags"] = int(m.group(9), 16)
+            out.append(row)
+    return out
+
+
+def stall_table(stalls):
+    if not stalls:
+        return "No thresholded entry-tick stall observations; this is not a zero-gap measurement."
+    out = ["| owner | gap_us | loader | outer | installed | changing | kinds |",
+           "| --- | ---: | --- | --- | --- | --- | --- |"]
+    for s in stalls:
+        kinds = ", ".join(f"{k:x}" for k in s["kinds"])
+        out.append(f"| {s['owner']} | {s['gap_us']} | {s['loader']} | {s['outer']} | "
+                   f"{s['installed']} | {s['changing']} | [{kinds}] |")
+    return "\n".join(out)
 
 
 def parse_steps(text):
@@ -100,11 +130,13 @@ def table(builds):
 
 
 def main(argv):
-    paths, out = [], None
+    paths, out, stalls_out = [], None, None
     it = iter(argv)
     for a in it:
         if a == "--json":
             out = next(it)
+        elif a == "--stalls-json":
+            stalls_out = next(it)
         else:
             paths.append(a)
     lines = []
@@ -113,9 +145,14 @@ def main(argv):
             lines += f.read().splitlines()
     builds = parse(lines)
     print(table(builds))
+    stalls = parse_stalls(lines)
+    print("\n" + stall_table(stalls))
     if out:
         with open(out, "w", encoding="utf-8") as f:
             json.dump(builds, f, indent=1)
+    if stalls_out:
+        with open(stalls_out, "w", encoding="utf-8") as f:
+            json.dump(stalls, f, indent=1)
 
 
 if __name__ == "__main__":
