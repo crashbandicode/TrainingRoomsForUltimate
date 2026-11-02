@@ -9,3 +9,6 @@ pub mod mii;
 pub mod roster;
 #[cfg(any(test, target_os = "switch"))]
 pub mod stages;
+
+#[cfg(any(test, target_os = "switch"))]
+pub mod setups;
