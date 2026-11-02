@@ -75,7 +75,7 @@ fn core01_unsupported_logs_and_returns() {
 #[test]
 fn core01_install_line_format() {
     let sites = [
-        SiteReport { site: "input_mapping_begin", found: GuardOutcome::Stock, written: Written::Near },
+        SiteReport { site: "input_caller_a_note", found: GuardOutcome::Stock, written: Written::Near },
         SiteReport { site: "hazard_flag", found: GuardOutcome::HookedByOther { at: 4, usable: true }, written: Written::Checked },
         SiteReport { site: "reset_check", found: GuardOutcome::Foreign { first_diff: 8 }, written: Written::Skipped },
     ];
@@ -99,7 +99,7 @@ fn core01_install_line_format() {
     assert_eq!(
         line.to_string(),
         "123456 plugin=training_rooms/0.1.0 game=13.0.5 build=21450c647b8c5940ed5b68218ea128fd3c5d597d \
-         input_mapping_begin=stock/near hazard_flag=other/checked reset_check=foreign/skipped \
+         input_caller_a_note=stock/near hazard_flag=other/checked reset_check=foreign/skipped \
          input_delay=installed lra_reset=not_installed settings: input_delay=5 lra_reset=off stage_hazards=on \
          migration=none result=installed heap_allocations=0"
     );
@@ -130,7 +130,7 @@ fn core01_site_table_guards_present() {
     assert!(sites::find("is_training_mode").is_some());
     // A feature is usable only when all of its sites and the predicate are.
     assert!(sites::feature_usable(Feature::InputDelay, |_| true));
-    assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "input_mapping_end"));
+    assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "input_caller_b_apply"));
     assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "is_training_mode"));
     assert!(sites::feature_usable(Feature::StageHazards, |s| s.feature != Feature::InputDelay));
 }
@@ -138,8 +138,10 @@ fn core01_site_table_guards_present() {
 #[test]
 fn core01_site_offsets_named_by_hooks_are_table_rows() {
     for (name, offset) in [
-        ("input_mapping_begin", sites::INPUT_MAPPING_BEGIN_OFFSET),
-        ("input_mapping_end", sites::INPUT_MAPPING_END_OFFSET),
+        ("input_caller_a_note", sites::INPUT_CALLER_A_NOTE_OFFSET),
+        ("input_caller_a_apply", sites::INPUT_CALLER_A_APPLY_OFFSET),
+        ("input_caller_b_note", sites::INPUT_CALLER_B_NOTE_OFFSET),
+        ("input_caller_b_apply", sites::INPUT_CALLER_B_APPLY_OFFSET),
         ("reset_check", sites::RESET_CHECK_OFFSET),
         ("on_init_slot", sites::ON_INIT_SLOT_OFFSET),
         ("on_init", sites::ON_INIT_OFFSET),
@@ -172,9 +174,9 @@ fn core01_overlapping_windows_checked_first() {
 
 #[test]
 fn core01_chain_entry_classification() {
-    // The inline hook after the prologue of the final input mapping: stock, another plugin's
+    // The inline hook after the call to the final input mapping: stock, another plugin's
     // one-word branch, and a far jump (Skyline's two forms, HOOK-SHARING) over its first word.
-    let site = sites::find("input_mapping_begin").unwrap();
+    let site = sites::find("input_caller_a_apply").unwrap();
     assert!(matches!(site.kind, SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }));
     assert_eq!(site.outcome(&site.guard), GuardOutcome::Stock);
     let mut branch = site.guard;

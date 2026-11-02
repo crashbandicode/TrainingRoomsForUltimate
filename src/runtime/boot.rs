@@ -95,10 +95,13 @@ pub fn run() {
 
     let input_delay_on = sites::feature_usable(Feature::InputDelay, usable);
     if input_delay_on {
-        skyline::install_hook!(input_delay::mapping_begin);
-        skyline::install_hook!(input_delay::mapping_end);
-        mark("input_mapping_begin", Written::Near);
-        mark("input_mapping_end", Written::Near);
+        skyline::install_hook!(input_delay::caller_a_note);
+        skyline::install_hook!(input_delay::caller_a_apply);
+        skyline::install_hook!(input_delay::caller_b_note);
+        skyline::install_hook!(input_delay::caller_b_apply);
+        for name in ["input_caller_a_note", "input_caller_a_apply", "input_caller_b_note", "input_caller_b_apply"] {
+            mark(name, Written::Near);
+        }
     }
     let lra_on = sites::feature_usable(Feature::LraReset, usable);
     if lra_on {

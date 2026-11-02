@@ -47,7 +47,7 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | Clear on owner change; save-state load; reset (B8) | §5.1 | `delay::clear_on_input_owner_change` | IN03-E04 | host pass; owners and the reset hub are not wired in the runtime (see progress file) |
 | Chords not delayed; display and recorder see delayed input | §5.2 | `delay::ordering_with_chords_display_recorder` | IN03-E05 | host pass |
 | Zero allocations | §8 | `delay::ring_allocates_nothing` | - | host pass |
-| Hooks inside the final input mapping (after the prologue at `main+0x1750dfc`, at the one epilogue `main+0x1751ce8`; no entry hook) | §4 | `input_mapping_sites::input_mapping_sites_are_after_the_prologue_and_at_the_one_epilogue`, `core01_sites_match_owned_elf` | IN03-E02 | host pass; Switch-built |
+| Hooks in the two callers of the final input mapping (note before each call, apply right after it returns; no hook in or on the function, whose inner points are the CPU pilot's) | §4 | `input_mapping_callers::the_sites_are_in_the_callers_and_not_near_the_pilot`, `input_mapping_callers::the_function_has_two_callers_and_the_registers_are_still_ours_at_the_sites`, `core01_sites_match_owned_elf` | IN03-E02 (run with and without the pilot NRO, both load orders) | host pass; Switch-built |
 
 ## SPEC-state-06 (L+R+A Reset)
 
