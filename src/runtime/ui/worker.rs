@@ -17,7 +17,7 @@ use crate::model::menu::{Env, Menu};
 use crate::model::settings::Settings;
 use crate::model::screens::frame_of;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{chords, input_delay, notices, writer};
+use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, OPEN};
 
@@ -267,6 +267,5 @@ fn close(menu: &mut Menu) {
     crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
-    let _ = input_delay::clear;
 }
 

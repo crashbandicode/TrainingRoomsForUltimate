@@ -32,7 +32,14 @@ hook-lock treatment, so integrator-3 merges it first and every stream picks it u
    drop when full. Nothing in a hook waits.
 2. The kernel-waiting locks (`hos_lock::Mutex`/`RwLock`) remain for rare contention between non-game threads, and for game-thread-only
    state.
-3. Audit table below; enforcement: `tests/hook_locks.rs` follows the runtime call graph from every plugin-thread entry (menu worker, writer threads, loaders, the publishing path) and fails if a reached function names a lock a game-thread hook takes (exceptions listed with their reason).
+3. Audit table below; enforcement: `tests/hook_locks.rs` follows the runtime call graph from every plugin-thread entry (menu worker, writer threads,
+   loaders, the publishing path) and fails if a reached function takes a lock a game-thread hook takes (exceptions listed with their reason).
+   Lock sites: the static followed by `.lock/.read/.write/.try_*(`, or handed by reference to a call (the carried helpers), matched in its
+   file, by `module::NAME`, or through listed re-exports. Edges: path calls, plus method calls whose name is unique among runtime functions;
+   ambiguous method names are listed (`AMBIGUOUS`), not dropped. Limits stated in the test: `dyn`/trait calls, stored closures, function
+   pointers in data, unlisted re-exports. A fixture (`tests/fixtures/hook_locks/`) seeds one violation per lock-site form and an ambiguous
+   name; `the_scan_catches_a_seeded_violation` requires all three to be reported. `report_locks_reached_from_plugin_threads` prints every
+   static lock (ours and carried package-6 code) a plugin thread reaches: the raw material for the rows below.
 4. Eden: many menu-close cycles, named-macro load, frame-time evidence that the game thread never waits.
 
 ### Slice 1 (the hang fix; first commit)

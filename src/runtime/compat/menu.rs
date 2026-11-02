@@ -183,8 +183,8 @@ pub fn apply_kept(settings: &Settings) {
         stage: kept(settings, "stage_preferences"),
         mii: kept(settings, "mii_preferences"),
     };
-    let old = KEPT.write().replace(kept);
-    drop(old);
+    // The previous value is dropped after the guard (end of this statement), outside the lock.
+    let _previous = KEPT.write().replace(kept);
 }
 
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
