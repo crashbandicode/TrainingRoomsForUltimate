@@ -1,11 +1,10 @@
 # r1fix stream: the five findings of the Astra review of package 1
 
 Stream `r1fix` (claude-sonnet-5-5, high), lead `0caa72b8`. Worktree
-`/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-r1fix`, branch `stream/r1fix`, base `4895ea3`
-(pkg2 core `fa8b77d` + the shared Store). Review: `artifacts/trainingrooms-reviews/R1-astra-pkg1/REVIEW.md`
-(locations there are at `473da26`).
+`/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-r1fix`, branch `stream/r1fix`, base `4895ea3`, merged with
+`work/implementation` `c5863bd` (merge `ffc93e4`). Review: `artifacts/trainingrooms-reviews/R1-astra-pkg1/REVIEW.md`.
 
-## Commits (one per finding; test, clippy -D warnings and `build --no-default-features` green after each)
+## Commits (one per finding; gates green after each)
 
 | Finding | Commit |
 | --- | --- |
@@ -13,35 +12,35 @@ Stream `r1fix` (claude-sonnet-5-5, high), lead `0caa72b8`. Worktree
 | R3 delay 0 | `949a373` |
 | R1 settings recovery transaction | `a449e33` |
 | R5 diag hook observation | `aa69d2b` |
-| R2 native pause owner | `009f6c8` |
-| docs and Eden harness | see `git log` |
+| R2 native pause owner (first attempt: scene `StatePause` hooks) | `009f6c8` |
+| scene wrapper consumers (lead order) | `ba67245` |
+| merge of work/implementation and reconciliation | `ffc93e4` |
+| R2 by the lead ruling (UI flag producer; `StatePause` hooks removed) | `e2effe9` |
 
-Spec text (SPEC-input-03 section 4 native pause row, section 5 step 0, 5.1, 6.7, 9, question 3) is on
-`review/menu-proposal` in `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate`, commit `251fec2`
-(docs only, not pushed).
+Spec text on `review/menu-proposal` (docs only, not pushed): `251fec2` (first), `c3c8a7b` (Eden correction), `9fe08d0` (the
+`L_staying_help` flag as the authoritative source).
 
 ## Where things are
 
-- R1 `src/model/settings_file.rs` (runtime keeps `boot::load_settings`); `Store::write_synced` and
-  `replace_file` are now `pub` for the reuse.
-- R2 (revised by the lead ruling): the producer is `InputAdapter::pause_flag` (`src/model/input_adapter.rs`), fed from the UI tick (`runtime/ui/tick.rs`) by `PAUSE_ACTIVE`; the first attempt (scene `StatePause` hooks) was removed after Eden showed the Training menu does not run it.
-  `src/model/input_adapter.rs` (what the hooks do), `src/runtime/features/pause_owner.rs` (two inline hooks),
-  `boot.rs` installs both or neither; `published::input_owners()` was removed (nothing read it any more).
+- R1 `src/model/settings_file.rs` (runtime keeps `boot::load_settings`); one transactional write: `Store::write_replace`.
+- R2 `InputAdapter::pause_flag` / `pause_begin` / `pause_end` / `poll` in `src/model/input_adapter.rs`; the runtime calls
+  them from `features/input_delay.rs` (poll, `pause_flag`) and from the UI tick (`runtime/ui/tick.rs`, the edge of
+  `PAUSE_ACTIVE`). `published::input_owners()` is kept for the other packages.
 - R3 `DelayQueue::step` step 0.
-- R4 `src/model/developer_ini.rs` (`load`, `read`, `parse`, `Reason`); install line `developer=...`.
-- R5 `src/model/hook_stats.rs` (allocator, `HookScope::enter(HookId)`, `Observer`), diag line from the
-  heartbeat thread in `src/runtime/diag_log.rs`; gate `eden/hook_stats.py`.
-- Install line buffer raised to 4096 bytes (`install.rs`): 49 site tokens no longer risk the 2048 cut.
+- R4 `src/model/developer_ini.rs` (`load`, `read`, `parse`, `Reason`); install line `developer=on|off reason=...`.
+- R5 `src/model/hook_stats.rs` (allocator, `HookScope::enter()` unnamed / `enter_hook(HookId)` named, `Observer`), diag line
+  from the heartbeat thread in `src/runtime/diag_log.rs`; gate `eden/hook_stats.py`.
 
 ## Gates, builds, Eden
 
-Host gates: `$env:CARGO_TARGET_DIR='/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-r1fix'`, one cargo call
-each under `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`. Switch builds on the Surface with
-`/tmp/r2/sk.ps1`-style launcher (docs/BUILD.md: campaign rustup home, no override); NROs in `dist/` (gitignored).
-Eden: Yoga, harness `/home/intpa/trainingrooms-eden-r1` (deployed from `eden/` with `tr_eden.r1fix.config.json`
-as `tr_eden.config.json`), profile `r1`, display `:97`, labels `r1-NN`, results in `eden/EDEN-PACKAGE-1.md`
-("R1-fix" section).
+Host gates: `$env:CARGO_TARGET_DIR='/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-r1fix'`, one cargo call each
+under `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`. All test binaries pass except `tests/input_sites.rs`
+`every_row_matches_the_owned_elf` (pre-existing on work: `work_get_int` is a row of both `sites_pkg2` and `sites_pkg4`; the
+wire stream fixes it). Switch builds on the Surface with the campaign rustup home (docs/BUILD.md). NROs (gitignored `dist/`):
+release `11f74916...` 778,240 B resident, diag `9c4ea584...` 933,888 B.
+Eden: Yoga, `/home/intpa/trainingrooms-eden-r1`, profile `r1`, display `:98`, labels `r1-NN`, results in
+`eden/EDEN-PACKAGE-1.md` ("R1-fix").
 
 ## Open
 
-- Resident size grew by 16 KiB over `4895ea3` (233,472 to 249,856 B release): see EDEN-PACKAGE-1.md R1-fix section.
+- Nothing from the review. Not done here: `tools/check/compliance.py` (no READY claimed).
