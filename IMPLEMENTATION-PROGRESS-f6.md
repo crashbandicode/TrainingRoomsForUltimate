@@ -34,6 +34,24 @@ evidence `R/stages/m5q/eden/{A,S}/RESULT.md`, `R/c1162/group-build-offthread/{RE
 - Plan (queue file, Surface #3): one Eden claim, two launches: `f6-01` with `cfe67ff9` (measure), and only if `control_64f820`
   carries the first-use cost, `f6-02` with the fix diag NRO (proof: first build of the boot, ordinary and Kirby-first, `setup_us` ≤
   plain-lap tick gap). Fix NRO: Yoga compile line, else one incremental Surface compile at the start of the slot.
+- **Eden so far (Surface, display :97, muted, own profile f6; claims 11:49-11:55Z and 11:58-12:12Z):**
+  - `f6-01` (split `cfe67ff9`): precondition miss before Training (the integrated install line is 8,142 chars and cut before
+    `result=`; the Training reference screenshot is FD while profile g's tile 6 is Kongo Jungle). Gates changed to the install line's
+    start and `[CharacterRoster] observed owner=0`. No laps.
+  - `f6-03` (split `cfe67ff9`): **cause confirmed.** First group build of the boot, the Kirby-first `[6, b, 1f]`: carried `setup_us`
+    130,551; split: `control_64f820` 127,566 µs (98 %), Registry log 1,703, plugin 973, articles 589, unprepare 567, models 93,
+    contexts 56, memory 38, the three allocations + task queueing about 190 µs. Settlement tick 8.0 ms (verify/ack 3.3 ms, ledger 2.3 ms).
+    Gaps: setup tick 147,833 µs; the largest gap 174,665 µs follows a plain poll tick mid-construction (t49 of 108, near Kirby's body
+    settling at 1.07 s), not the plugin's setup or settle. Plain poll ticks up to 26.5 ms. 0 panic/abort/crash/Unmapped (12,072 lines),
+    memory.peak 7,323,860,992. Table: `python3 -I tools/f6_split_table.py eden/runs/f6-03/TrainingRooms/practice-diagnostics*.log`.
+  - `f6-04` (fix `3c9ff2d5`): booted with `async build enabled … control_slot=0x8149a4e0 expected=0x8149a4e0` (the new state-8 slot
+    guard passes live), then a boot-time stall before the main menu: plugin `hook_stats` at +23 s (2 calls) and +37 s (844), nothing
+    for the next ~40 s; NVDEC (opening movie) at 58.6 s against 31.6 s in `f6-03`. Black screen. No group code ran. Reported to the
+    lead (the tree lacked stream/sync; F8 lock livelock plausible, not attributed). Precondition miss → next labels.
+- `8c8e7e9` merged `work/implementation` 97648b8 (stream/sync). `carry_pkg6 verify` reports `seam_install.rs` DIFFERS, from
+  work/implementation's 73831b8 (hand edit, no manifest entry); reported, not mine.
+- Next (Surface queue, end): one incremental diag compile of the merged tree (fix + `[BuildSplit] stall`), then one claim:
+  `f6-05` proof (fix), `f6-06` native-Reload Kirby baseline (`eden/settings/f6-native.json`: preload, bank and group swap off).
 - Found in passing (not changed, reported): on a native allocation failure mid-loop the carried path returns `Err` with earlier
   bodies' construction tasks still queued and untracked, and the rollback then destroys those bodies (latent, allocation-failure-only).
 
