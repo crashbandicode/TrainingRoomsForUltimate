@@ -416,3 +416,13 @@ fn r2_6_an_ini_shortcut_raises_the_open_menu_request_including_plus() {
     detector.poll(&set, permanent, false);
     assert!(detector.is_pending(Request::OpenMenu));
 }
+#[test]
+fn the_operator_controller_cycle_chord_reads_its_own_sample_and_touches_no_pending_flag() {
+    let set = ChordSet::factory();
+    let d = Detector::new();
+    let cycle = sample(&[logical::ZL, logical::DPAD_LEFT], &[logical::DPAD_LEFT]);
+    assert!(Detector::operator_cycle(&set, cycle));
+    assert!(!Detector::operator_cycle(&set, sample(&[logical::ZL], &[logical::ZL])));
+    assert!(!Detector::operator_cycle(&set, sample(&[logical::ZR, logical::DPAD_DOWN], &[logical::DPAD_DOWN])));
+    assert!(!d.has_pending_request());
+}

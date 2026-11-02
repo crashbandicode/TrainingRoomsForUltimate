@@ -250,9 +250,10 @@ impl Detector {
     }
 
     /// Observe without consuming (the character loader asks whether P1 is mid-request).
-    /// Any request is pending (a shortcut is being handled: the roster cycle does not start a swap then).
-    pub fn any_pending(&self) -> bool {
-        self.pending != 0
+    /// The CPU cycle chord passes in `sample`: the controller that operates the CPU (native CPU Behavior = Control) reads its own
+    /// sample. Stateless: no pending flag is touched, so this never mixes with Player 1's chord detection.
+    pub fn operator_cycle(chords: &ChordSet, sample: Sample) -> bool {
+        passes(chords.cpu_cycle, sample)
     }
 
     pub fn is_pending(&self, request: Request) -> bool {

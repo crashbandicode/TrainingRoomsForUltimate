@@ -81,6 +81,25 @@ pub(crate) unsafe fn handle_p1_input(out: *mut crate::model::input_delay::Mapped
     *out = record.into();
 }
 
+/// The mapped input record of the controller that operates the CPU under native Behavior = Control (called by the input stage for
+/// slot 1, before anything else touches it): that controller's own CPU cycle chord queues the CPU role only, and the Kirby hat
+/// shortcut of its stick clicks cycles the CPU's hat. Nothing happens unless the practice engine says this is the operator.
+///
+/// # Safety
+/// `out` is the 8-byte record the game just wrote for slot 1; `controller` is the live `Controller` pointer or 0.
+pub(crate) unsafe fn handle_operator_input(out: *mut crate::model::input_delay::MappedInputs, controller: usize) {
+    use crate::model::chords::{bit, field};
+    if !crate::runtime::lobby::training::practice::cpu_operator(1) {
+        return;
+    }
+    let held = if controller == 0 { 0 } else { ((controller + field::CURRENT_BUTTONS) as *const u32).read_volatile() };
+    let cycle = crate::runtime::features::chords::operator_cycle(controller);
+    let mut record = crate::runtime::compat::input::MappedInputs::from(*out);
+    character_roster::handle_cpu_operator_input(1, &mut record, cycle);
+    kirby_hats::handle_cpu_operator_input(&mut record, held & bit::STICK_L != 0, held & bit::STICK_R != 0);
+    *out = record.into();
+}
+
 /// Start the cycle, in the order the fork's `main` did: the preload cache first (the INI is read once, before anything asks for a
 /// snapshot), the trace recorder, the native patches (unlink guard, Lua GC guard), the lifecycle observations and last the roster
 /// itself, whose `init` installs the service callback, the sources, the body bank and the Mii gates. Each file checks its own seam
