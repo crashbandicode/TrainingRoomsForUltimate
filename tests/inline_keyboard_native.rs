@@ -18,6 +18,34 @@ mod engine {
 mod adapter;
 
 use std::ffi::c_void;
+use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
+
+thread_local! {
+    static CALLS: Cell<Option<usize>> = const { Cell::new(None) };
+}
+struct Allocator;
+fn count() {
+    let _ = CALLS.try_with(|calls| {
+        if let Some(n) = calls.get() { calls.set(Some(n + 1)); }
+    });
+}
+unsafe impl GlobalAlloc for Allocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { count(); System.alloc(layout) }
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 { count(); System.alloc_zeroed(layout) }
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        count(); System.realloc(ptr, layout, size)
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { System.dealloc(ptr, layout) }
+}
+#[global_allocator]
+static ALLOCATOR: Allocator = Allocator;
+fn allocations(f: impl FnOnce()) -> usize {
+    CALLS.with(|calls| { assert!(calls.get().is_none()); calls.set(Some(0)); });
+    f();
+    CALLS.with(|calls| calls.replace(None).unwrap())
+}
+
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst};
 static THREAD: AtomicUsize = AtomicUsize::new(1);
 static WORK: AtomicUsize = AtomicUsize::new(0);
@@ -111,7 +139,9 @@ extern "C" fn finished(_: *mut c_void, _: unsafe extern "C" fn()) {}
 fn actual_adapter_preserves_storage_and_exclusive_lifetime() {
     use adapter::{Keyboard, Lease, Text};
     let text = Text::new(&[65, 66], 2).unwrap();
-    unsafe {
+    let control = allocations(|| { drop(std::hint::black_box(vec![0u8; 1024])); });
+    assert!(control > 0, "the allocator probe must observe a real allocation");
+    let adapter_calls = allocations(|| unsafe {
         assert!(Keyboard::open(text, 2).is_none(), "wrong owner cannot acquire");
         let lease = Lease::acquire().unwrap();
         assert!(Keyboard::open(text, 1).is_none(), "synchronous owner excludes inline");
@@ -145,5 +175,6 @@ fn actual_adapter_preserves_storage_and_exclusive_lifetime() {
         assert!(adapter::active(), "orphan retains the lease and SDK-owned storage");
         assert!(Lease::acquire().is_none());
         assert_eq!(PHASE.load(SeqCst), 2, "Drop must not finalize on a foreign thread");
-    }
+    });
+    assert_eq!(adapter_calls, 0, "first use, failed init, reopen and interruption must not allocate");
 }

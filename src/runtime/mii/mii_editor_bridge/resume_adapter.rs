@@ -1,7 +1,8 @@
 //! Bridges value checkpoints to the owned native editor's current callbacks.
 use super::{connected_native as contract, cosmetic_resume, current_thread, handshake, lifecycle, name_keyboard,
     native, settings_resume, specials_resume, ui_resume, Origin, Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE, ACTIVE};
-use std::sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex};
+use std::sync::{atomic::{AtomicU64, Ordering}, Arc};
+use hos_lock::Mutex;
 
 struct Capture {
     context: usize,
@@ -19,7 +20,7 @@ static RECONSTRUCTION: Mutex<Option<Reconstruction>> = Mutex::new(None);
 static LAST_AUTO_OBSERVATION: AtomicU64 = AtomicU64::new(u64::MAX);
 
 fn note(name: &'static str, values: [u64; 4]) {
-    if let Some(s) = STATE.lock().unwrap().as_mut() { s.event(name, values); }
+    if let Some(s) = STATE.lock().as_mut() { s.event(name, values); }
 }
 
 fn auto_observation(guard: u64, flags: u64) {
@@ -31,7 +32,7 @@ fn auto_observation(guard: u64, flags: u64) {
 
 unsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {
     let (origin, owner, seed, catalog, restoring, queued) = {
-        let state = STATE.lock().unwrap();
+        let state = STATE.lock();
         let Some(s) = state.as_ref().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)
             && s.interrupted && !s.snapshot_saved && s.thread == current_thread()) else { return true; };
         (s.origin, s.owner, s.seed, Arc::clone(&s.catalog), s.restore_ticket, s.phase == Phase::Queued)
@@ -60,10 +61,10 @@ unsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {
         seed.validate().map_err(|_| "resume_confirmed_draft_invalid")?;
         ui_resume::suspend(generation, ui_resume::Checkpoint { seed, catalog, screen, focus }, restoring)
     });
-    *RECONSTRUCTION.lock().unwrap() = None;
+    *RECONSTRUCTION.lock() = None;
     settings_resume::clear();
     cosmetic_resume::clear();
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     if let Some(s) = state.as_mut() {
         // Capture failure must not trap an incoming match. It is a qualification
         // failure, emitted explicitly; never claim a partial capture was exact.
@@ -124,7 +125,7 @@ pub(super) unsafe fn capture_queued() {
 /// False lets one native update reach the Special Moves coroutine boundary.
 /// Once captured, the following callback can complete the native leaf.
 pub(super) unsafe fn before_edit(context: usize) -> bool {
-    let needed = STATE.lock().unwrap().as_ref().is_some_and(|s| s.interrupted
+    let needed = STATE.lock().as_ref().is_some_and(|s| s.interrupted
         && !s.snapshot_saved && s.thread == current_thread());
     if !needed { return true; }
     // Native output mirror only; this does not set or restore Settings focus.
@@ -186,7 +187,7 @@ pub(super) unsafe fn before_edit(context: usize) -> bool {
         },
         cosmetic_resume::Leaf::Specials => {
             let result = {
-                let mut capture = CAPTURE.lock().unwrap();
+                let mut capture = CAPTURE.lock();
                 if capture.as_ref().is_none_or(|capture| capture.context != context) {
                     *capture = Some(Capture { context, frames: 0, result: None });
                     return false;
@@ -201,17 +202,17 @@ pub(super) unsafe fn before_edit(context: usize) -> bool {
             match result {
                 None => return false,
                 Some(Ok(Some(snapshot))) => {
-                    *CAPTURE.lock().unwrap() = None;
+                    *CAPTURE.lock() = None;
                     ui_resume::Screen::Specials(snapshot)
                 }
                 Some(Ok(None)) => {
                     // The user already completed this script; let native code
                     // propagate its confirmed choices before capturing DRAFT.
-                    *CAPTURE.lock().unwrap() = None;
+                    *CAPTURE.lock() = None;
                     return false;
                 }
                 Some(Err(error)) => {
-                    *CAPTURE.lock().unwrap() = None;
+                    *CAPTURE.lock() = None;
                     note("ui_specials_capture_failed", [error.code() as u64, 0, 0, 0]);
                     ui_resume::Screen::Settings(settings_resume::Snapshot::INITIAL)
                 }
@@ -234,7 +235,7 @@ unsafe fn specials_frame(component: usize) {
     // same native main-loop thread; it is not nested in the editor frame.
     // Rebind this live component against the still-owned editor identity.
     let owned_thread = EDIT_OWNED.load(Ordering::Acquire) && context != 0
-        && STATE.lock().unwrap().as_ref().is_some_and(|s|
+        && STATE.lock().as_ref().is_some_and(|s|
             s.phase == Phase::Editing && s.thread == current_thread());
     if owned_thread {
         let holder: usize = native::read(context, 0x198);
@@ -242,7 +243,7 @@ unsafe fn specials_frame(component: usize) {
             bound = true;
         }
     }
-    let capture_needed = bound && CAPTURE.lock().unwrap().as_ref().is_some_and(|capture|
+    let capture_needed = bound && CAPTURE.lock().as_ref().is_some_and(|capture|
         capture.context == context && capture.result.is_none());
     // Age 0 creates the Lua coroutine; age 1 resumes it for the first time.
     // This hook precedes the native update, so only age >= 2 has initialized
@@ -251,7 +252,7 @@ unsafe fn specials_frame(component: usize) {
     if capture_needed && script_started {
         let result = specials_resume::capture(BASE.load(Ordering::Acquire), component);
         let completed = matches!(result, Ok(None));
-        if let Some(capture) = CAPTURE.lock().unwrap().as_mut().filter(|capture| capture.context == context) {
+        if let Some(capture) = CAPTURE.lock().as_mut().filter(|capture| capture.context == context) {
             capture.result = Some(result);
         }
         // A completed script can finish its native propagation. Otherwise hold
@@ -260,7 +261,7 @@ unsafe fn specials_frame(component: usize) {
     }
     if script_started {
         let mut reconstruction = {
-            let mut stored = RECONSTRUCTION.lock().unwrap();
+            let mut stored = RECONSTRUCTION.lock();
             if stored.as_ref().is_some_and(|r| r.context == context && r.result.is_none()) {
                 stored.take()
             } else { None }
@@ -273,14 +274,14 @@ unsafe fn specials_frame(component: usize) {
                 Err(error) => r.result = Some(Err(error)),
             }
         }
-        if reconstruction.is_some() { *RECONSTRUCTION.lock().unwrap() = reconstruction; }
+        if reconstruction.is_some() { *RECONSTRUCTION.lock() = reconstruction; }
     }
     original!()(component);
 }
 
 fn settle(restored: bool, detail: u64) {
     let ticket = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()) else { return; };
         let Some(ticket) = s.restore_ticket else { return; };
         if s.restore_screen.take().is_none() { return; }
@@ -291,7 +292,7 @@ fn settle(restored: bool, detail: u64) {
             [detail, s.restore_focus as u64, u64::from(s.restore_entered), 0]);
         ticket
     };
-    *RECONSTRUCTION.lock().unwrap() = None;
+    *RECONSTRUCTION.lock() = None;
     settings_resume::clear();
     cosmetic_resume::clear();
     if restored { ui_resume::restored(ticket); } else { ui_resume::restore_failed(ticket); }
@@ -300,7 +301,7 @@ fn settle(restored: bool, detail: u64) {
 /// Write an unfinished cosmetic page's cursor before this frame's native handler.
 pub(super) unsafe fn prepare_restore(context: usize) {
     let screen = {
-        let state = STATE.lock().unwrap();
+        let state = STATE.lock();
         let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Editing && !s.interrupted
             && s.restore_entered && s.restore_ticket.is_some() && s.thread == current_thread())
             else { return; };
@@ -313,7 +314,7 @@ pub(super) unsafe fn prepare_restore(context: usize) {
 /// which state 0 has queued Settings, before Settings has registered any input.
 pub(super) unsafe fn after_edit(context: usize) {
     let request = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing
             && s.thread == current_thread() && !s.interrupted && s.restore_ticket.is_some())
             else { return; };
@@ -338,11 +339,11 @@ pub(super) unsafe fn after_edit(context: usize) {
                     settings_resume::begin_restore(context, wanted);
                 }
                 if let ui_resume::Screen::Specials(wanted) = screen {
-                    *RECONSTRUCTION.lock().unwrap() = Some(Reconstruction {
+                    *RECONSTRUCTION.lock() = Some(Reconstruction {
                         context, restore: specials_resume::Restore::new(wanted), result: None,
                     });
                 }
-                if let Some(s) = STATE.lock().unwrap().as_mut() {
+                if let Some(s) = STATE.lock().as_mut() {
                     s.restore_entered = true;
                     s.event("ui_restore_target_queued", [current as u64, 0, 0, 0]);
                 }
@@ -378,7 +379,7 @@ pub(super) unsafe fn after_edit(context: usize) {
         },
         ui_resume::Screen::Name(_) => current == 4 && name_keyboard::restored(context),
         ui_resume::Screen::Specials(_) => {
-            let result = RECONSTRUCTION.lock().unwrap().as_mut()
+            let result = RECONSTRUCTION.lock().as_mut()
                 .filter(|r| r.context == context).and_then(|r| r.result.take());
             match result {
                 Some(Ok(())) => current == 8,
@@ -402,8 +403,8 @@ pub(super) unsafe fn after_edit(context: usize) {
 /// pointers here are comparison tokens, never read after a release callback.
 pub(super) unsafe fn before_release(context: usize) {
     name_keyboard::before_release(context);
-    *CAPTURE.lock().unwrap() = None;
-    *RECONSTRUCTION.lock().unwrap() = None;
+    *CAPTURE.lock() = None;
+    *RECONSTRUCTION.lock() = None;
     settings_resume::release();
     cosmetic_resume::clear();
     settle(false, 3);

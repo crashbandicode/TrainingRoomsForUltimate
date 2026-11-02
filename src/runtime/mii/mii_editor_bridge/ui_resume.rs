@@ -2,7 +2,8 @@
 //! contain owned values only; native UI adapters rebuild objects after return.
 use super::{cosmetic_resume, draft::Draft, inline_keyboard::Text, return_gate::ReturnGate,
     settings_resume, specials_resume, value, STATE};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use hos_lock::Mutex;
 use crate::engine::mii::inventory::Snapshot as Catalog;
 use crate::engine::mii_root::resume::{ResumeReadiness, ResumeSlot, ResumeTicket};
 
@@ -37,7 +38,7 @@ static CONTINUATION: Mutex<Continuation> = Mutex::new(Continuation {
     slot: ResumeSlot::new(), generation: None, gate: ReturnGate::new(), released: false,
 });
 
-pub(super) fn pending() -> bool { CONTINUATION.lock().unwrap().slot.ticket().is_some() }
+pub(super) fn pending() -> bool { CONTINUATION.lock().slot.ticket().is_some() }
 
 /// A resumed creation intent must acquire its complete value before editor
 /// entry. Refine that exact restoring ticket as well as Session.seed so a second
@@ -45,7 +46,7 @@ pub(super) fn pending() -> bool { CONTINUATION.lock().unwrap().slot.ticket().is_
 pub(super) fn materialized(
     ticket: ResumeTicket, class: super::inventory::MiiClass, row: value::Row,
 ) -> Result<(), &'static str> {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     let checkpoint = state.slot.restoring_snapshot_mut(ticket).ok_or("default_resume_ticket_mismatch")?;
     checkpoint.seed.materialize(class, row)
 }
@@ -55,7 +56,7 @@ pub(super) fn materialized(
 pub(super) fn suspend(
     generation: u64, checkpoint: Checkpoint, restoring: Option<ResumeTicket>,
 ) -> Result<ResumeTicket, &'static str> {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     let ticket = if let Some(ticket) = restoring {
         if state.generation != Some(generation) || !state.slot.interrupt_restore(ticket) {
             return Err("resume_ticket_mismatch");
@@ -71,32 +72,32 @@ pub(super) fn suspend(
 }
 
 pub(super) fn previous_ui_released(generation: u64) {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if state.generation == Some(generation) { state.released = true; }
 }
 
 pub(super) fn observe_session(generation: u64, current: i32, previous: i32, changed: bool) {
     let waiting = {
-        let state = CONTINUATION.lock().unwrap();
+        let state = CONTINUATION.lock();
         if state.generation != Some(generation) { return; }
         state.slot.ticket().is_some()
     };
     if waiting && changed {
-        if let Some(s) = STATE.lock().unwrap().as_mut() {
+        if let Some(s) = STATE.lock().as_mut() {
             s.event("resume_outer_transition", [generation, current as u64, previous as u64, 0]);
         }
     }
 }
 
 pub(super) fn observe_practice(generation: u64, match_received: bool, practice_ready: bool) {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     state.gate.observe(generation, match_received, practice_ready);
 }
 
 pub(super) fn begin(
     generation: u64, practice_ready: bool, another_ui_active: bool,
 ) -> Option<(ResumeTicket, Checkpoint)> {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if state.generation != Some(generation) { return None; }
     let ready = ResumeReadiness {
         session: generation,
@@ -112,7 +113,7 @@ pub(super) fn begin(
 }
 
 pub(super) fn restored(ticket: ResumeTicket) -> bool {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if !state.slot.restored(ticket) { return false; }
     if let Some(generation) = state.generation.take() { state.gate.end(generation); }
     state.released = false;
@@ -120,18 +121,18 @@ pub(super) fn restored(ticket: ResumeTicket) -> bool {
 }
 
 pub(super) fn restore_failed(ticket: ResumeTicket) -> bool {
-    CONTINUATION.lock().unwrap().slot.restore_failed(ticket)
+    CONTINUATION.lock().slot.restore_failed(ticket)
 }
 
 pub(super) fn request_refused(ticket: ResumeTicket) {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if state.slot.restore_failed(ticket) {
         if let Some(generation) = state.generation { state.gate.request_refused(generation); }
     }
 }
 
 pub(super) fn readiness_bits(generation: u64) -> u64 {
-    let state = CONTINUATION.lock().unwrap();
+    let state = CONTINUATION.lock();
     u64::from(state.generation == Some(generation))
         | (u64::from(state.released) << 1)
         | (u64::from(state.gate.ready(generation)) << 2)
@@ -140,14 +141,14 @@ pub(super) fn readiness_bits(generation: u64) -> u64 {
 
 /// Explicit editor cancellation or saving ends this unfinished interaction.
 pub(super) fn discard() {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }
     if let Some(generation) = state.generation.take() { state.gate.end(generation); }
     state.released = false;
 }
 
 pub(super) fn end_session(generation: u64) -> bool {
-    let mut state = CONTINUATION.lock().unwrap();
+    let mut state = CONTINUATION.lock();
     if state.generation == Some(generation) {
         if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }
         state.gate.end(generation);

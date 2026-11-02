@@ -4108,14 +4108,124 @@
    "dest": "src/runtime/mii/mii_editor_bridge/resume_adapter.rs",
    "crate": "root",
    "src_sha256": "3c61b782426a242d53d888a67fe2fefa48f9dfd10cea9d1e322a0063dfd0e020",
-   "dest_sha256": "43af833aa121e82dda24750f5f68d537d08ad47093234a3e8549afc6a56f02c7"
+   "dest_sha256": "d95f4265395eca154fd0f0a1ecb03916bee9ac0c37eedea4baad4b6b7282d6d2",
+   "edits": [
+    {
+     "old": "//! Bridges value checkpoints to the owned native editor's current callbacks.\nuse super::{connected_native as contract, cosmetic_resume, current_thread, handshake, lifecycle, name_keyboard,\n    native, settings_resume, specials_resume, ui_resume, Origin, Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE, ACTIVE};\nuse std::sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex};\n\nstruct Capture {\n    context: usize,\n",
+     "new": "//! Bridges value checkpoints to the owned native editor's current callbacks.\nuse super::{connected_native as contract, cosmetic_resume, current_thread, handshake, lifecycle, name_keyboard,\n    native, settings_resume, specials_resume, ui_resume, Origin, Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE, ACTIVE};\nuse std::sync::{atomic::{AtomicU64, Ordering}, Arc};\nuse hos_lock::Mutex;\n\nstruct Capture {\n    context: usize,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "static LAST_AUTO_OBSERVATION: AtomicU64 = AtomicU64::new(u64::MAX);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(s) = STATE.lock().unwrap().as_mut() { s.event(name, values); }\n}\n\nfn auto_observation(guard: u64, flags: u64) {\n",
+     "new": "static LAST_AUTO_OBSERVATION: AtomicU64 = AtomicU64::new(u64::MAX);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(s) = STATE.lock().as_mut() { s.event(name, values); }\n}\n\nfn auto_observation(guard: u64, flags: u64) {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nunsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {\n    let (origin, owner, seed, catalog, restoring, queued) = {\n        let state = STATE.lock().unwrap();\n        let Some(s) = state.as_ref().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n            && s.interrupted && !s.snapshot_saved && s.thread == current_thread()) else { return true; };\n        (s.origin, s.owner, s.seed, Arc::clone(&s.catalog), s.restore_ticket, s.phase == Phase::Queued)\n",
+     "new": "\nunsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {\n    let (origin, owner, seed, catalog, restoring, queued) = {\n        let state = STATE.lock();\n        let Some(s) = state.as_ref().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n            && s.interrupted && !s.snapshot_saved && s.thread == current_thread()) else { return true; };\n        (s.origin, s.owner, s.seed, Arc::clone(&s.catalog), s.restore_ticket, s.phase == Phase::Queued)\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        seed.validate().map_err(|_| \"resume_confirmed_draft_invalid\")?;\n        ui_resume::suspend(generation, ui_resume::Checkpoint { seed, catalog, screen, focus }, restoring)\n    });\n    *RECONSTRUCTION.lock().unwrap() = None;\n    settings_resume::clear();\n    cosmetic_resume::clear();\n    let mut state = STATE.lock().unwrap();\n    if let Some(s) = state.as_mut() {\n        // Capture failure must not trap an incoming match. It is a qualification\n        // failure, emitted explicitly; never claim a partial capture was exact.\n",
+     "new": "        seed.validate().map_err(|_| \"resume_confirmed_draft_invalid\")?;\n        ui_resume::suspend(generation, ui_resume::Checkpoint { seed, catalog, screen, focus }, restoring)\n    });\n    *RECONSTRUCTION.lock() = None;\n    settings_resume::clear();\n    cosmetic_resume::clear();\n    let mut state = STATE.lock();\n    if let Some(s) = state.as_mut() {\n        // Capture failure must not trap an incoming match. It is a qualification\n        // failure, emitted explicitly; never claim a partial capture was exact.\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// False lets one native update reach the Special Moves coroutine boundary.\n/// Once captured, the following callback can complete the native leaf.\npub(super) unsafe fn before_edit(context: usize) -> bool {\n    let needed = STATE.lock().unwrap().as_ref().is_some_and(|s| s.interrupted\n        && !s.snapshot_saved && s.thread == current_thread());\n    if !needed { return true; }\n    // Native output mirror only; this does not set or restore Settings focus.\n",
+     "new": "/// False lets one native update reach the Special Moves coroutine boundary.\n/// Once captured, the following callback can complete the native leaf.\npub(super) unsafe fn before_edit(context: usize) -> bool {\n    let needed = STATE.lock().as_ref().is_some_and(|s| s.interrupted\n        && !s.snapshot_saved && s.thread == current_thread());\n    if !needed { return true; }\n    // Native output mirror only; this does not set or restore Settings focus.\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        },\n        cosmetic_resume::Leaf::Specials => {\n            let result = {\n                let mut capture = CAPTURE.lock().unwrap();\n                if capture.as_ref().is_none_or(|capture| capture.context != context) {\n                    *capture = Some(Capture { context, frames: 0, result: None });\n                    return false;\n",
+     "new": "        },\n        cosmetic_resume::Leaf::Specials => {\n            let result = {\n                let mut capture = CAPTURE.lock();\n                if capture.as_ref().is_none_or(|capture| capture.context != context) {\n                    *capture = Some(Capture { context, frames: 0, result: None });\n                    return false;\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            match result {\n                None => return false,\n                Some(Ok(Some(snapshot))) => {\n                    *CAPTURE.lock().unwrap() = None;\n                    ui_resume::Screen::Specials(snapshot)\n                }\n                Some(Ok(None)) => {\n                    // The user already completed this script; let native code\n                    // propagate its confirmed choices before capturing DRAFT.\n                    *CAPTURE.lock().unwrap() = None;\n                    return false;\n                }\n                Some(Err(error)) => {\n                    *CAPTURE.lock().unwrap() = None;\n                    note(\"ui_specials_capture_failed\", [error.code() as u64, 0, 0, 0]);\n                    ui_resume::Screen::Settings(settings_resume::Snapshot::INITIAL)\n                }\n",
+     "new": "            match result {\n                None => return false,\n                Some(Ok(Some(snapshot))) => {\n                    *CAPTURE.lock() = None;\n                    ui_resume::Screen::Specials(snapshot)\n                }\n                Some(Ok(None)) => {\n                    // The user already completed this script; let native code\n                    // propagate its confirmed choices before capturing DRAFT.\n                    *CAPTURE.lock() = None;\n                    return false;\n                }\n                Some(Err(error)) => {\n                    *CAPTURE.lock() = None;\n                    note(\"ui_specials_capture_failed\", [error.code() as u64, 0, 0, 0]);\n                    ui_resume::Screen::Settings(settings_resume::Snapshot::INITIAL)\n                }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    // same native main-loop thread; it is not nested in the editor frame.\n    // Rebind this live component against the still-owned editor identity.\n    let owned_thread = EDIT_OWNED.load(Ordering::Acquire) && context != 0\n        && STATE.lock().unwrap().as_ref().is_some_and(|s|\n            s.phase == Phase::Editing && s.thread == current_thread());\n    if owned_thread {\n        let holder: usize = native::read(context, 0x198);\n",
+     "new": "    // same native main-loop thread; it is not nested in the editor frame.\n    // Rebind this live component against the still-owned editor identity.\n    let owned_thread = EDIT_OWNED.load(Ordering::Acquire) && context != 0\n        && STATE.lock().as_ref().is_some_and(|s|\n            s.phase == Phase::Editing && s.thread == current_thread());\n    if owned_thread {\n        let holder: usize = native::read(context, 0x198);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            bound = true;\n        }\n    }\n    let capture_needed = bound && CAPTURE.lock().unwrap().as_ref().is_some_and(|capture|\n        capture.context == context && capture.result.is_none());\n    // Age 0 creates the Lua coroutine; age 1 resumes it for the first time.\n    // This hook precedes the native update, so only age >= 2 has initialized\n",
+     "new": "            bound = true;\n        }\n    }\n    let capture_needed = bound && CAPTURE.lock().as_ref().is_some_and(|capture|\n        capture.context == context && capture.result.is_none());\n    // Age 0 creates the Lua coroutine; age 1 resumes it for the first time.\n    // This hook precedes the native update, so only age >= 2 has initialized\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if capture_needed && script_started {\n        let result = specials_resume::capture(BASE.load(Ordering::Acquire), component);\n        let completed = matches!(result, Ok(None));\n        if let Some(capture) = CAPTURE.lock().unwrap().as_mut().filter(|capture| capture.context == context) {\n            capture.result = Some(result);\n        }\n        // A completed script can finish its native propagation. Otherwise hold\n",
+     "new": "    if capture_needed && script_started {\n        let result = specials_resume::capture(BASE.load(Ordering::Acquire), component);\n        let completed = matches!(result, Ok(None));\n        if let Some(capture) = CAPTURE.lock().as_mut().filter(|capture| capture.context == context) {\n            capture.result = Some(result);\n        }\n        // A completed script can finish its native propagation. Otherwise hold\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    }\n    if script_started {\n        let mut reconstruction = {\n            let mut stored = RECONSTRUCTION.lock().unwrap();\n            if stored.as_ref().is_some_and(|r| r.context == context && r.result.is_none()) {\n                stored.take()\n            } else { None }\n",
+     "new": "    }\n    if script_started {\n        let mut reconstruction = {\n            let mut stored = RECONSTRUCTION.lock();\n            if stored.as_ref().is_some_and(|r| r.context == context && r.result.is_none()) {\n                stored.take()\n            } else { None }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "                Err(error) => r.result = Some(Err(error)),\n            }\n        }\n        if reconstruction.is_some() { *RECONSTRUCTION.lock().unwrap() = reconstruction; }\n    }\n    original!()(component);\n}\n\nfn settle(restored: bool, detail: u64) {\n    let ticket = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()) else { return; };\n        let Some(ticket) = s.restore_ticket else { return; };\n        if s.restore_screen.take().is_none() { return; }\n",
+     "new": "                Err(error) => r.result = Some(Err(error)),\n            }\n        }\n        if reconstruction.is_some() { *RECONSTRUCTION.lock() = reconstruction; }\n    }\n    original!()(component);\n}\n\nfn settle(restored: bool, detail: u64) {\n    let ticket = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()) else { return; };\n        let Some(ticket) = s.restore_ticket else { return; };\n        if s.restore_screen.take().is_none() { return; }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            [detail, s.restore_focus as u64, u64::from(s.restore_entered), 0]);\n        ticket\n    };\n    *RECONSTRUCTION.lock().unwrap() = None;\n    settings_resume::clear();\n    cosmetic_resume::clear();\n    if restored { ui_resume::restored(ticket); } else { ui_resume::restore_failed(ticket); }\n",
+     "new": "            [detail, s.restore_focus as u64, u64::from(s.restore_entered), 0]);\n        ticket\n    };\n    *RECONSTRUCTION.lock() = None;\n    settings_resume::clear();\n    cosmetic_resume::clear();\n    if restored { ui_resume::restored(ticket); } else { ui_resume::restore_failed(ticket); }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// Write an unfinished cosmetic page's cursor before this frame's native handler.\npub(super) unsafe fn prepare_restore(context: usize) {\n    let screen = {\n        let state = STATE.lock().unwrap();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Editing && !s.interrupted\n            && s.restore_entered && s.restore_ticket.is_some() && s.thread == current_thread())\n            else { return; };\n",
+     "new": "/// Write an unfinished cosmetic page's cursor before this frame's native handler.\npub(super) unsafe fn prepare_restore(context: usize) {\n    let screen = {\n        let state = STATE.lock();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Editing && !s.interrupted\n            && s.restore_entered && s.restore_ticket.is_some() && s.thread == current_thread())\n            else { return; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// which state 0 has queued Settings, before Settings has registered any input.\npub(super) unsafe fn after_edit(context: usize) {\n    let request = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && !s.interrupted && s.restore_ticket.is_some())\n            else { return; };\n",
+     "new": "/// which state 0 has queued Settings, before Settings has registered any input.\npub(super) unsafe fn after_edit(context: usize) {\n    let request = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && !s.interrupted && s.restore_ticket.is_some())\n            else { return; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "                    settings_resume::begin_restore(context, wanted);\n                }\n                if let ui_resume::Screen::Specials(wanted) = screen {\n                    *RECONSTRUCTION.lock().unwrap() = Some(Reconstruction {\n                        context, restore: specials_resume::Restore::new(wanted), result: None,\n                    });\n                }\n                if let Some(s) = STATE.lock().unwrap().as_mut() {\n                    s.restore_entered = true;\n                    s.event(\"ui_restore_target_queued\", [current as u64, 0, 0, 0]);\n                }\n",
+     "new": "                    settings_resume::begin_restore(context, wanted);\n                }\n                if let ui_resume::Screen::Specials(wanted) = screen {\n                    *RECONSTRUCTION.lock() = Some(Reconstruction {\n                        context, restore: specials_resume::Restore::new(wanted), result: None,\n                    });\n                }\n                if let Some(s) = STATE.lock().as_mut() {\n                    s.restore_entered = true;\n                    s.event(\"ui_restore_target_queued\", [current as u64, 0, 0, 0]);\n                }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        },\n        ui_resume::Screen::Name(_) => current == 4 && name_keyboard::restored(context),\n        ui_resume::Screen::Specials(_) => {\n            let result = RECONSTRUCTION.lock().unwrap().as_mut()\n                .filter(|r| r.context == context).and_then(|r| r.result.take());\n            match result {\n                Some(Ok(())) => current == 8,\n",
+     "new": "        },\n        ui_resume::Screen::Name(_) => current == 4 && name_keyboard::restored(context),\n        ui_resume::Screen::Specials(_) => {\n            let result = RECONSTRUCTION.lock().as_mut()\n                .filter(|r| r.context == context).and_then(|r| r.result.take());\n            match result {\n                Some(Ok(())) => current == 8,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// pointers here are comparison tokens, never read after a release callback.\npub(super) unsafe fn before_release(context: usize) {\n    name_keyboard::before_release(context);\n    *CAPTURE.lock().unwrap() = None;\n    *RECONSTRUCTION.lock().unwrap() = None;\n    settings_resume::release();\n    cosmetic_resume::clear();\n    settle(false, 3);\n",
+     "new": "/// pointers here are comparison tokens, never read after a release callback.\npub(super) unsafe fn before_release(context: usize) {\n    name_keyboard::before_release(context);\n    *CAPTURE.lock() = None;\n    *RECONSTRUCTION.lock() = None;\n    settings_resume::release();\n    cosmetic_resume::clear();\n    settle(false, 3);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/lifecycle.rs",
    "dest": "src/runtime/mii/mii_editor_bridge/lifecycle.rs",
    "crate": "root",
    "src_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1",
-   "dest_sha256": "1a138dab42b878b285042592ed9104fa1d59dc62e79155aba92ee436841a7173",
+   "dest_sha256": "b84d3fc4edeaea2e9ae5db091f77788a67b770042752e0fde7b2ef13ad54bb9c",
    "edits": [
     {
      "old": "use std::sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Mutex};",
@@ -4128,6 +4238,18 @@
      "new": "OWNER.lock()",
      "count": 5,
      "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    },
+    {
+     "old": "static UNBOUND_REPORTED: AtomicBool = AtomicBool::new(false);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Ok(mut state) = super::STATE.try_lock() {\n        if let Some(s) = state.as_mut().filter(|s| s.origin == super::Origin::Quickplay) {\n            s.event(name, values);\n        }\n",
+     "new": "static UNBOUND_REPORTED: AtomicBool = AtomicBool::new(false);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(mut state) = super::STATE.try_lock() {\n        if let Some(s) = state.as_mut().filter(|s| s.origin == super::Origin::Quickplay) {\n            s.event(name, values);\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nfn retire(generation: u64, reason: &'static str) {\n    if super::ui_resume::end_session(generation) {\n        if let Some(s) = super::STATE.lock().unwrap().as_mut() {\n            s.event(reason, [generation, 0, 0, 0]);\n        }\n    }\n",
+     "new": "\nfn retire(generation: u64, reason: &'static str) {\n    if super::ui_resume::end_session(generation) {\n        if let Some(s) = super::STATE.lock().as_mut() {\n            s.event(reason, [generation, 0, 0, 0]);\n        }\n    }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
     }
    ]
   },
@@ -4136,14 +4258,82 @@
    "dest": "src/runtime/mii/mii_editor_bridge/cosmetic_resume.rs",
    "crate": "root",
    "src_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31",
-   "dest_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31"
+   "dest_sha256": "b8f9a35bb1f1bbefbbbd8df3cd993098358f023ac45bd83bae73e70fe1403bce",
+   "edits": [
+    {
+     "old": "//! into the hat, outfit, or colour field when that field still holds the preview.\nuse super::{lua_vm::{Error, Value, Vm}, native, BASE};\nuse std::convert::TryFrom;\nuse std::sync::{atomic::Ordering, Mutex};\n\n/// Editor state 11 is the shared preview wait. Test pushes 10 then 11. Voice\n/// pushes 9 then 11. Any other occupant keeps the previous Test treatment.\n",
+     "new": "//! into the hat, outfit, or colour field when that field still holds the preview.\nuse super::{lua_vm::{Error, Value, Vm}, native, BASE};\nuse std::convert::TryFrom;\nuse std::sync::atomic::Ordering;\nuse hos_lock::Mutex;\n\n/// Editor state 11 is the shared preview wait. Test pushes 10 then 11. Voice\n/// pushes 9 then 11. Any other occupant keeps the previous Test treatment.\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\npub(super) fn clear() {\n    clear_wait();\n    *VOICE.lock().unwrap() = None;\n    *GEAR.lock().unwrap() = None;\n    *COLOR.lock().unwrap() = None;\n}\n\n// Capture also serves restore polling. A successful observation must not retire\n// a setter already issued while its native preview catches up on the next frame.\nfn clear_wait() { *WAIT.lock().unwrap() = None; }\n\nfn attempts(context: usize, state: i32) -> u16 {\n    let mut slot = WAIT.lock().unwrap();\n    if slot.as_ref().is_none_or(|wait| wait.context != context || wait.state != state) {\n        *slot = Some(Wait { context, state, frames: 0 });\n    }\n",
+     "new": "\npub(super) fn clear() {\n    clear_wait();\n    *VOICE.lock() = None;\n    *GEAR.lock() = None;\n    *COLOR.lock() = None;\n}\n\n// Capture also serves restore polling. A successful observation must not retire\n// a setter already issued while its native preview catches up on the next frame.\nfn clear_wait() { *WAIT.lock() = None; }\n\nfn attempts(context: usize, state: i32) -> u16 {\n    let mut slot = WAIT.lock();\n    if slot.as_ref().is_none_or(|wait| wait.context != context || wait.state != state) {\n        *slot = Some(Wait { context, state, frames: 0 });\n    }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nunsafe fn apply_gear(context: usize, holder: usize, wanted: GearSelection) {\n    let failed = {\n        let mut job = GEAR.lock().unwrap();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(GearRestore { context, wanted, wrote: false, failed: None });\n        }\n",
+     "new": "\nunsafe fn apply_gear(context: usize, holder: usize, wanted: GearSelection) {\n    let failed = {\n        let mut job = GEAR.lock();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(GearRestore { context, wanted, wrote: false, failed: None });\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        ])?;\n        Ok(())\n    })();\n    if let Some(job) = GEAR.lock().unwrap().as_mut() {\n        match result {\n            Ok(()) => job.wrote = true,\n            Err(Error::Binding) => {}\n",
+     "new": "        ])?;\n        Ok(())\n    })();\n    if let Some(job) = GEAR.lock().as_mut() {\n        match result {\n            Ok(()) => job.wrote = true,\n            Err(Error::Binding) => {}\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nunsafe fn apply_color(context: usize, wanted: ColorSelection) {\n    let called = {\n        let mut job = COLOR.lock().unwrap();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(ColorRestore { context, wanted, called: false });\n        }\n",
+     "new": "\nunsafe fn apply_color(context: usize, wanted: ColorSelection) {\n    let called = {\n        let mut job = COLOR.lock();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(ColorRestore { context, wanted, called: false });\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let published = native::read::<u32>(source, COLOR_SOURCE_HIGHLIGHT) == wanted.cursor\n        && native::read::<u32>(source, COLOR_SOURCE_DECIDED) == u32::MAX;\n    if !published { return; }\n    if let Some(job) = COLOR.lock().unwrap().as_mut() {\n        if job.context == context && job.wanted == wanted { job.called = true; }\n    }\n}\n",
+     "new": "    let published = native::read::<u32>(source, COLOR_SOURCE_HIGHLIGHT) == wanted.cursor\n        && native::read::<u32>(source, COLOR_SOURCE_DECIDED) == u32::MAX;\n    if !published { return; }\n    if let Some(job) = COLOR.lock().as_mut() {\n        if job.context == context && job.wanted == wanted { job.called = true; }\n    }\n}\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let on_page = state == 9 || (state == 11 && previous_state(context) == Some(9));\n    if !on_page { return; }\n    let failed = {\n        let mut job = VOICE.lock().unwrap();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(VoiceRestore { context, wanted, wrote: false, failed: None });\n        }\n",
+     "new": "    let on_page = state == 9 || (state == 11 && previous_state(context) == Some(9));\n    if !on_page { return; }\n    let failed = {\n        let mut job = VOICE.lock();\n        if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {\n            *job = Some(VoiceRestore { context, wanted, wrote: false, failed: None });\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        ])?;\n        Ok(())\n    })();\n    if let Some(job) = VOICE.lock().unwrap().as_mut() {\n        match result {\n            Ok(()) => job.wrote = true,\n            Err(Error::Binding) => {}\n",
+     "new": "        ])?;\n        Ok(())\n    })();\n    if let Some(job) = VOICE.lock().as_mut() {\n        match result {\n            Ok(()) => job.wrote = true,\n            Err(Error::Binding) => {}\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\npub(super) unsafe fn poll_gear(context: usize, state: i32, wanted: GearSelection) -> Poll {\n    if native::read::<i32>(context, 0x148) != state { return Poll::Pending; }\n    let (failed, wrote) = GEAR.lock().unwrap().as_ref()\n        .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));\n    if let Some(detail) = failed { return Poll::Failed(detail); }\n    if !wrote { return Poll::Pending; }\n",
+     "new": "\npub(super) unsafe fn poll_gear(context: usize, state: i32, wanted: GearSelection) -> Poll {\n    if native::read::<i32>(context, 0x148) != state { return Poll::Pending; }\n    let (failed, wrote) = GEAR.lock().as_ref()\n        .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));\n    if let Some(detail) = failed { return Poll::Failed(detail); }\n    if !wrote { return Poll::Pending; }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\npub(super) unsafe fn poll_color(context: usize, wanted: ColorSelection) -> Poll {\n    if native::read::<i32>(context, 0x148) != 7 { return Poll::Pending; }\n    if COLOR.lock().unwrap().as_ref().is_none_or(|job|\n        job.context != context || job.wanted != wanted || !job.called) { return Poll::Pending; }\n    match capture_color(context, 7) {\n        Shot::Found(seen) if seen == wanted => Poll::Ready,\n",
+     "new": "\npub(super) unsafe fn poll_color(context: usize, wanted: ColorSelection) -> Poll {\n    if native::read::<i32>(context, 0x148) != 7 { return Poll::Pending; }\n    if COLOR.lock().as_ref().is_none_or(|job|\n        job.context != context || job.wanted != wanted || !job.called) { return Poll::Pending; }\n    match capture_color(context, 7) {\n        Shot::Found(seen) if seen == wanted => Poll::Ready,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) unsafe fn poll_voice(context: usize, wanted: VoiceSelection) -> Poll {\n    let (failed, wrote) = VOICE.lock().unwrap().as_ref()\n        .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));\n    if let Some(detail) = failed { return Poll::Failed(detail); }\n    // voice_focus reconciles pitch button 1 before wrote is set. Matching\n",
+     "new": "}\n\npub(super) unsafe fn poll_voice(context: usize, wanted: VoiceSelection) -> Poll {\n    let (failed, wrote) = VOICE.lock().as_ref()\n        .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));\n    if let Some(detail) = failed { return Poll::Failed(detail); }\n    // voice_focus reconciles pitch button 1 before wrote is set. Matching\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/ldn_lifecycle.rs",
    "dest": "src/runtime/mii/mii_editor_bridge/ldn_lifecycle.rs",
    "crate": "root",
    "src_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e",
-   "dest_sha256": "b7d8db80596173f1de5f88acbe2111c38f9b9926ad95feb395bc4eb817b51141",
+   "dest_sha256": "7424e1025c7497d2a24aede78a98b05d14b51c1fa79a4cf67169f30e09b1e93c",
    "edits": [
     {
      "old": "use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};",
@@ -4156,6 +4346,18 @@
      "new": "OWNER.lock()",
      "count": 5,
      "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    },
+    {
+     "old": "static UNBOUND_REPORTED: AtomicBool = AtomicBool::new(false);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Ok(mut state) = super::STATE.try_lock() {\n        if let Some(s) = state.as_mut().filter(|s| s.origin == super::Origin::LocalWireless) {\n            s.event(name, values);\n        }\n",
+     "new": "static UNBOUND_REPORTED: AtomicBool = AtomicBool::new(false);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(mut state) = super::STATE.try_lock() {\n        if let Some(s) = state.as_mut().filter(|s| s.origin == super::Origin::LocalWireless) {\n            s.event(name, values);\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nfn retire(generation: u64, reason: &'static str) {\n    if super::ui_resume::end_session(generation) {\n        if let Some(s) = super::STATE.lock().unwrap().as_mut() {\n            s.event(reason, [generation, 0, 0, 0]);\n        }\n    }\n",
+     "new": "\nfn retire(generation: u64, reason: &'static str) {\n    if super::ui_resume::end_session(generation) {\n        if let Some(s) = super::STATE.lock().as_mut() {\n            s.event(reason, [generation, 0, 0, 0]);\n        }\n    }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
     }
    ]
   },
@@ -4232,7 +4434,51 @@
    "dest": "src/runtime/mii/mii_editor_bridge/settings_resume.rs",
    "crate": "root",
    "src_sha256": "f1c4d34b2513d591adff5cd660a3a07155c219874e6b528c5d855eaa9bfea4d1",
-   "dest_sha256": "8c47d06cbcb3a27c47e71031b75ceaf47d685a76adebab063069dc47d182ab4a"
+   "dest_sha256": "d9e2265446884798c9e733b3ab7993caac17aa31e7f3bdcc5c231885f158ef16",
+   "edits": [
+    {
+     "old": "//! The pane coordinate mirrored into the editor context is not a button id.\nuse super::{current_thread, lua_vm::{Error, Value, Vm}, native, Origin, Phase, BASE,\n    EDIT_CONTEXT, EDIT_OWNED, STATE};\nuse std::sync::{atomic::Ordering, Mutex};\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(super) struct Snapshot {\n",
+     "new": "//! The pane coordinate mirrored into the editor context is not a button id.\nuse super::{current_thread, lua_vm::{Error, Value, Vm}, native, Origin, Phase, BASE,\n    EDIT_CONTEXT, EDIT_OWNED, STATE};\nuse std::sync::atomic::Ordering;\nuse hos_lock::Mutex;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(super) struct Snapshot {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nstatic JOB: Mutex<Option<Job>> = Mutex::new(None);\n\npub(super) fn clear() { *JOB.lock().unwrap() = None; }\n\n/// Editor release: the next owned Settings component is a new entry.\npub(super) fn release() {\n    clear();\n    *POLICY.lock().unwrap() = None;\n    *WRAP.lock().unwrap() = None;\n}\n\npub(super) fn capture(context: usize) -> Option<Result<Option<Snapshot>, Error>> {\n    let mut stored = JOB.lock().unwrap();\n    if stored.as_ref().is_none_or(|job| job.context != context\n        || !matches!(job.operation, Operation::Capture)) {\n        *stored = Some(Job { context, operation: Operation::Capture, frames: 0, result: None });\n",
+     "new": "\nstatic JOB: Mutex<Option<Job>> = Mutex::new(None);\n\npub(super) fn clear() { *JOB.lock() = None; }\n\n/// Editor release: the next owned Settings component is a new entry.\npub(super) fn release() {\n    clear();\n    *POLICY.lock() = None;\n    *WRAP.lock() = None;\n}\n\npub(super) fn capture(context: usize) -> Option<Result<Option<Snapshot>, Error>> {\n    let mut stored = JOB.lock();\n    if stored.as_ref().is_none_or(|job| job.context != context\n        || !matches!(job.operation, Operation::Capture)) {\n        *stored = Some(Job { context, operation: Operation::Capture, frames: 0, result: None });\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) fn begin_restore(context: usize, wanted: Snapshot) {\n    *JOB.lock().unwrap() = Some(Job { context,\n        operation: Operation::Restore { wanted, applied: false }, frames: 0, result: None });\n}\n\npub(super) fn restore_result(context: usize) -> Option<Result<Option<Snapshot>, Error>> {\n    let mut stored = JOB.lock().unwrap();\n    let result = stored.as_mut().filter(|job| job.context == context\n        && matches!(job.operation, Operation::Restore { .. })).and_then(|job| job.result.take());\n    if result.is_some() { *stored = None; }\n",
+     "new": "}\n\npub(super) fn begin_restore(context: usize, wanted: Snapshot) {\n    *JOB.lock() = Some(Job { context,\n        operation: Operation::Restore { wanted, applied: false }, frames: 0, result: None });\n}\n\npub(super) fn restore_result(context: usize) -> Option<Result<Option<Snapshot>, Error>> {\n    let mut stored = JOB.lock();\n    let result = stored.as_mut().filter(|job| job.context == context\n        && matches!(job.operation, Operation::Restore { .. })).and_then(|job| job.result.take());\n    if result.is_some() { *stored = None; }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nunsafe fn apply_policy(context: usize, component: usize) {\n    let age: u32 = native::read(component, 0xe4);\n    if !Policy::due(&mut POLICY.lock().unwrap(), context, component, age) { return; }\n    // Protected Lua runs without a Rust mutex held.\n    let result = install(component);\n    let event = POLICY.lock().unwrap().as_mut()\n        .filter(|policy| policy.context == context && policy.component == component)\n        .and_then(|policy| policy.record(&result));\n    if let Some((name, values)) = event {\n        if let Some(session) = STATE.lock().unwrap().as_mut() { session.event(name, values); }\n        if name == \"waiting_cosmetics_policy_failed\" {\n            // Fail open: the native rows stay as they are. Quickplay resume reads\n            // the child page itself, so a helper failure must not invent a cursor.\n",
+     "new": "\nunsafe fn apply_policy(context: usize, component: usize) {\n    let age: u32 = native::read(component, 0xe4);\n    if !Policy::due(&mut POLICY.lock(), context, component, age) { return; }\n    // Protected Lua runs without a Rust mutex held.\n    let result = install(component);\n    let event = POLICY.lock().as_mut()\n        .filter(|policy| policy.context == context && policy.component == component)\n        .and_then(|policy| policy.record(&result));\n    if let Some((name, values)) = event {\n        if let Some(session) = STATE.lock().as_mut() { session.event(name, values); }\n        if name == \"waiting_cosmetics_policy_failed\" {\n            // Fail open: the native rows stay as they are. Quickplay resume reads\n            // the child page itself, so a helper failure must not invent a cursor.\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\nunsafe fn ensure_random_wrapper(context: usize, component: usize) {\n    let age: u32 = native::read(component, 0xe4);\n    if !WrapLatch::due(&mut WRAP.lock().unwrap(), context, component, age) { return; }\n    let result = install_random_wrapper(component);\n    let event = WRAP.lock().unwrap().as_mut()\n        .filter(|entry| entry.context == context && entry.component == component)\n        .and_then(|entry| entry.record(&result));\n    if let Some((name, values)) = event {\n        if let Some(session) = STATE.lock().unwrap().as_mut() { session.event(name, values); }\n        if name == \"settings_random_wrapper_failed\" {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] random wrapper failed: {result:?}\"));\n        }\n",
+     "new": "\nunsafe fn ensure_random_wrapper(context: usize, component: usize) {\n    let age: u32 = native::read(component, 0xe4);\n    if !WrapLatch::due(&mut WRAP.lock(), context, component, age) { return; }\n    let result = install_random_wrapper(component);\n    let event = WRAP.lock().as_mut()\n        .filter(|entry| entry.context == context && entry.component == component)\n        .and_then(|entry| entry.record(&result));\n    if let Some((name, values)) = event {\n        if let Some(session) = STATE.lock().as_mut() { session.event(name, values); }\n        if name == \"settings_random_wrapper_failed\" {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] random wrapper failed: {result:?}\"));\n        }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let context = EDIT_CONTEXT.load(Ordering::Acquire);\n    // An unowned editor never reaches the session lock. An owned Settings page\n    // installs the Random wrapper once, before main enables input.\n    let pending = JOB.lock().unwrap().as_ref().is_some_and(|job|\n        job.context == context && job.result.is_none());\n    let origin = if EDIT_OWNED.load(Ordering::Acquire) && context != 0 {\n        STATE.lock().unwrap().as_ref()\n            .filter(|session| session.phase == Phase::Editing && session.thread == current_thread())\n            .map(|session| session.origin)\n    } else { None };\n",
+     "new": "    let context = EDIT_CONTEXT.load(Ordering::Acquire);\n    // An unowned editor never reaches the session lock. An owned Settings page\n    // installs the Random wrapper once, before main enables input.\n    let pending = JOB.lock().as_ref().is_some_and(|job|\n        job.context == context && job.result.is_none());\n    let origin = if EDIT_OWNED.load(Ordering::Acquire) && context != 0 {\n        STATE.lock().as_ref()\n            .filter(|session| session.phase == Phase::Editing && session.thread == current_thread())\n            .map(|session| session.origin)\n    } else { None };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    // Age 1 is the first main resume, and this hook runs before it. The\n    // method table already holds update_random. Local Wireless must finish\n    // its replacement first.\n    let policy_settled = POLICY.lock().unwrap().as_ref().is_some_and(|entry|\n        entry.settled && entry.context == context && entry.component == component);\n    if bound && wrapper_after_policy(suppress, policy_settled) {\n        ensure_random_wrapper(context, component);\n    }\n    // Age 0 starts the coroutine; wait until its default selection has run.\n    if bound && pending && native::read::<u32>(component, 0xe4) > 1 {\n        let mut job = JOB.lock().unwrap().take().unwrap();\n        let capture = matches!(job.operation, Operation::Capture);\n        let result = job.step(component);\n        let completed = matches!(result, Ok(None));\n        if capture || !completed { job.result = Some(result); }\n        *JOB.lock().unwrap() = Some(job);\n        // Freeze a captured interaction for this tick. A completed native\n        // action must propagate normally; never convert Cancel into Save.\n        if capture && !completed { return; }\n",
+     "new": "    // Age 1 is the first main resume, and this hook runs before it. The\n    // method table already holds update_random. Local Wireless must finish\n    // its replacement first.\n    let policy_settled = POLICY.lock().as_ref().is_some_and(|entry|\n        entry.settled && entry.context == context && entry.component == component);\n    if bound && wrapper_after_policy(suppress, policy_settled) {\n        ensure_random_wrapper(context, component);\n    }\n    // Age 0 starts the coroutine; wait until its default selection has run.\n    if bound && pending && native::read::<u32>(component, 0xe4) > 1 {\n        let mut job = JOB.lock().take().unwrap();\n        let capture = matches!(job.operation, Operation::Capture);\n        let result = job.step(component);\n        let completed = matches!(result, Ok(None));\n        if capture || !completed { job.result = Some(result); }\n        *JOB.lock() = Some(job);\n        // Freeze a captured interaction for this tick. A completed native\n        // action must propagate normally; never convert Cancel into Save.\n        if capture && !completed { return; }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/screen_reentry.rs",
@@ -4267,21 +4513,151 @@
    "dest": "src/runtime/mii/mii_editor_bridge/ui_resume.rs",
    "crate": "root",
    "src_sha256": "ff2007bc3608fb37f9eea716e1c311160002cc6946546c2e7f799ff86d181522",
-   "dest_sha256": "ff068ce7f858ee31dcb5c833254b853d6739575728000c490022f91d052cc1a6"
+   "dest_sha256": "344f5ef1377eb018c05c78fde8f5c5fb3824b3526751b039f4c12193ffb187a7",
+   "edits": [
+    {
+     "old": "//! contain owned values only; native UI adapters rebuild objects after return.\nuse super::{cosmetic_resume, draft::Draft, inline_keyboard::Text, return_gate::ReturnGate,\n    settings_resume, specials_resume, value, STATE};\nuse std::sync::{Arc, Mutex};\nuse crate::engine::mii::inventory::Snapshot as Catalog;\nuse crate::engine::mii_root::resume::{ResumeReadiness, ResumeSlot, ResumeTicket};\n\n",
+     "new": "//! contain owned values only; native UI adapters rebuild objects after return.\nuse super::{cosmetic_resume, draft::Draft, inline_keyboard::Text, return_gate::ReturnGate,\n    settings_resume, specials_resume, value, STATE};\nuse std::sync::Arc;\nuse hos_lock::Mutex;\nuse crate::engine::mii::inventory::Snapshot as Catalog;\nuse crate::engine::mii_root::resume::{ResumeReadiness, ResumeSlot, ResumeTicket};\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    slot: ResumeSlot::new(), generation: None, gate: ReturnGate::new(), released: false,\n});\n\npub(super) fn pending() -> bool { CONTINUATION.lock().unwrap().slot.ticket().is_some() }\n\n/// A resumed creation intent must acquire its complete value before editor\n/// entry. Refine that exact restoring ticket as well as Session.seed so a second\n",
+     "new": "    slot: ResumeSlot::new(), generation: None, gate: ReturnGate::new(), released: false,\n});\n\npub(super) fn pending() -> bool { CONTINUATION.lock().slot.ticket().is_some() }\n\n/// A resumed creation intent must acquire its complete value before editor\n/// entry. Refine that exact restoring ticket as well as Session.seed so a second\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "pub(super) fn materialized(\n    ticket: ResumeTicket, class: super::inventory::MiiClass, row: value::Row,\n) -> Result<(), &'static str> {\n    let mut state = CONTINUATION.lock().unwrap();\n    let checkpoint = state.slot.restoring_snapshot_mut(ticket).ok_or(\"default_resume_ticket_mismatch\")?;\n    checkpoint.seed.materialize(class, row)\n}\n",
+     "new": "pub(super) fn materialized(\n    ticket: ResumeTicket, class: super::inventory::MiiClass, row: value::Row,\n) -> Result<(), &'static str> {\n    let mut state = CONTINUATION.lock();\n    let checkpoint = state.slot.restoring_snapshot_mut(ticket).ok_or(\"default_resume_ticket_mismatch\")?;\n    checkpoint.seed.materialize(class, row)\n}\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "pub(super) fn suspend(\n    generation: u64, checkpoint: Checkpoint, restoring: Option<ResumeTicket>,\n) -> Result<ResumeTicket, &'static str> {\n    let mut state = CONTINUATION.lock().unwrap();\n    let ticket = if let Some(ticket) = restoring {\n        if state.generation != Some(generation) || !state.slot.interrupt_restore(ticket) {\n            return Err(\"resume_ticket_mismatch\");\n",
+     "new": "pub(super) fn suspend(\n    generation: u64, checkpoint: Checkpoint, restoring: Option<ResumeTicket>,\n) -> Result<ResumeTicket, &'static str> {\n    let mut state = CONTINUATION.lock();\n    let ticket = if let Some(ticket) = restoring {\n        if state.generation != Some(generation) || !state.slot.interrupt_restore(ticket) {\n            return Err(\"resume_ticket_mismatch\");\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) fn previous_ui_released(generation: u64) {\n    let mut state = CONTINUATION.lock().unwrap();\n    if state.generation == Some(generation) { state.released = true; }\n}\n\npub(super) fn observe_session(generation: u64, current: i32, previous: i32, changed: bool) {\n    let waiting = {\n        let state = CONTINUATION.lock().unwrap();\n        if state.generation != Some(generation) { return; }\n        state.slot.ticket().is_some()\n    };\n    if waiting && changed {\n        if let Some(s) = STATE.lock().unwrap().as_mut() {\n            s.event(\"resume_outer_transition\", [generation, current as u64, previous as u64, 0]);\n        }\n    }\n}\n\npub(super) fn observe_practice(generation: u64, match_received: bool, practice_ready: bool) {\n    let mut state = CONTINUATION.lock().unwrap();\n    state.gate.observe(generation, match_received, practice_ready);\n}\n\npub(super) fn begin(\n    generation: u64, practice_ready: bool, another_ui_active: bool,\n) -> Option<(ResumeTicket, Checkpoint)> {\n    let mut state = CONTINUATION.lock().unwrap();\n    if state.generation != Some(generation) { return None; }\n    let ready = ResumeReadiness {\n        session: generation,\n",
+     "new": "}\n\npub(super) fn previous_ui_released(generation: u64) {\n    let mut state = CONTINUATION.lock();\n    if state.generation == Some(generation) { state.released = true; }\n}\n\npub(super) fn observe_session(generation: u64, current: i32, previous: i32, changed: bool) {\n    let waiting = {\n        let state = CONTINUATION.lock();\n        if state.generation != Some(generation) { return; }\n        state.slot.ticket().is_some()\n    };\n    if waiting && changed {\n        if let Some(s) = STATE.lock().as_mut() {\n            s.event(\"resume_outer_transition\", [generation, current as u64, previous as u64, 0]);\n        }\n    }\n}\n\npub(super) fn observe_practice(generation: u64, match_received: bool, practice_ready: bool) {\n    let mut state = CONTINUATION.lock();\n    state.gate.observe(generation, match_received, practice_ready);\n}\n\npub(super) fn begin(\n    generation: u64, practice_ready: bool, another_ui_active: bool,\n) -> Option<(ResumeTicket, Checkpoint)> {\n    let mut state = CONTINUATION.lock();\n    if state.generation != Some(generation) { return None; }\n    let ready = ResumeReadiness {\n        session: generation,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) fn restored(ticket: ResumeTicket) -> bool {\n    let mut state = CONTINUATION.lock().unwrap();\n    if !state.slot.restored(ticket) { return false; }\n    if let Some(generation) = state.generation.take() { state.gate.end(generation); }\n    state.released = false;\n",
+     "new": "}\n\npub(super) fn restored(ticket: ResumeTicket) -> bool {\n    let mut state = CONTINUATION.lock();\n    if !state.slot.restored(ticket) { return false; }\n    if let Some(generation) = state.generation.take() { state.gate.end(generation); }\n    state.released = false;\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) fn restore_failed(ticket: ResumeTicket) -> bool {\n    CONTINUATION.lock().unwrap().slot.restore_failed(ticket)\n}\n\npub(super) fn request_refused(ticket: ResumeTicket) {\n    let mut state = CONTINUATION.lock().unwrap();\n    if state.slot.restore_failed(ticket) {\n        if let Some(generation) = state.generation { state.gate.request_refused(generation); }\n    }\n}\n\npub(super) fn readiness_bits(generation: u64) -> u64 {\n    let state = CONTINUATION.lock().unwrap();\n    u64::from(state.generation == Some(generation))\n        | (u64::from(state.released) << 1)\n        | (u64::from(state.gate.ready(generation)) << 2)\n",
+     "new": "}\n\npub(super) fn restore_failed(ticket: ResumeTicket) -> bool {\n    CONTINUATION.lock().slot.restore_failed(ticket)\n}\n\npub(super) fn request_refused(ticket: ResumeTicket) {\n    let mut state = CONTINUATION.lock();\n    if state.slot.restore_failed(ticket) {\n        if let Some(generation) = state.generation { state.gate.request_refused(generation); }\n    }\n}\n\npub(super) fn readiness_bits(generation: u64) -> u64 {\n    let state = CONTINUATION.lock();\n    u64::from(state.generation == Some(generation))\n        | (u64::from(state.released) << 1)\n        | (u64::from(state.gate.ready(generation)) << 2)\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\n/// Explicit editor cancellation or saving ends this unfinished interaction.\npub(super) fn discard() {\n    let mut state = CONTINUATION.lock().unwrap();\n    if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }\n    if let Some(generation) = state.generation.take() { state.gate.end(generation); }\n    state.released = false;\n}\n\npub(super) fn end_session(generation: u64) -> bool {\n    let mut state = CONTINUATION.lock().unwrap();\n    if state.generation == Some(generation) {\n        if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }\n        state.gate.end(generation);\n",
+     "new": "\n/// Explicit editor cancellation or saving ends this unfinished interaction.\npub(super) fn discard() {\n    let mut state = CONTINUATION.lock();\n    if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }\n    if let Some(generation) = state.generation.take() { state.gate.end(generation); }\n    state.released = false;\n}\n\npub(super) fn end_session(generation: u64) -> bool {\n    let mut state = CONTINUATION.lock();\n    if state.generation == Some(generation) {\n        if let Some(ticket) = state.slot.ticket() { state.slot.discard(ticket); }\n        state.gate.end(generation);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/name_keyboard.rs",
    "dest": "src/runtime/mii/mii_editor_bridge/name_keyboard.rs",
    "crate": "root",
    "src_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a",
-   "dest_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a"
+   "dest_sha256": "a8523213a7142f972ee785296840a9cbec93ca92a3ef13c342bc576f841f7c2c",
+   "edits": [
+    {
+     "old": "//! Only an explicit Enter passes an owned string through the original commit.\nuse super::{current_thread, inline_keyboard::{Decision, Keyboard, Text}, native,\n    Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE};\nuse std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};\n\nstruct Owner {\n    context: usize,\n",
+     "new": "//! Only an explicit Enter passes an owned string through the original commit.\nuse super::{current_thread, inline_keyboard::{Decision, Keyboard, Text}, native,\n    Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE};\nuse std::sync::atomic::{AtomicUsize, Ordering};\nuse hos_lock::Mutex;\n\nstruct Owner {\n    context: usize,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "static SUSPENDED: AtomicUsize = AtomicUsize::new(0);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(s) = STATE.lock().unwrap().as_mut() { s.event(name, values); }\n}\n\nfn ours(context: usize) -> bool {\n",
+     "new": "static SUSPENDED: AtomicUsize = AtomicUsize::new(0);\n\nfn note(name: &'static str, values: [u64; 4]) {\n    if let Some(s) = STATE.lock().as_mut() { s.event(name, values); }\n}\n\nfn ours(context: usize) -> bool {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\nfn on_editor_thread() -> bool {\n    STATE.lock().unwrap().as_ref().is_some_and(|s|\n        s.phase == Phase::Editing && s.thread == current_thread())\n}\n\n",
+     "new": "}\n\nfn on_editor_thread() -> bool {\n    STATE.lock().as_ref().is_some_and(|s|\n        s.phase == Phase::Editing && s.thread == current_thread())\n}\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\n/// Called with the fresh editor context before native entry into state 4.\npub(super) fn prepare_resume(context: usize, text: Text) -> bool {\n    if !ours(context) || !on_editor_thread() || OWNER.lock().unwrap().is_some() { return false; }\n    let mut pending = PREPARED.lock().unwrap();\n    if pending.is_some() { return false; }\n    *pending = Some((context, text));\n    SUSPENDED.store(0, Ordering::Release);\n",
+     "new": "\n/// Called with the fresh editor context before native entry into state 4.\npub(super) fn prepare_resume(context: usize, text: Text) -> bool {\n    if !ours(context) || !on_editor_thread() || OWNER.lock().is_some() { return false; }\n    let mut pending = PREPARED.lock();\n    if pending.is_some() { return false; }\n    *pending = Some((context, text));\n    SUSPENDED.store(0, Ordering::Release);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "}\n\npub(super) fn restored(context: usize) -> bool {\n    OWNER.lock().unwrap().as_ref().is_some_and(|owner| owner.context == context\n        && owner.resumed && owner.shown && !owner.failed)\n}\n\n",
+     "new": "}\n\npub(super) fn restored(context: usize) -> bool {\n    OWNER.lock().as_ref().is_some_and(|owner| owner.context == context\n        && owner.resumed && owner.shown && !owner.failed)\n}\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "pub(super) unsafe fn suspend(context: usize) -> Result<Text, &'static str> {\n    if !ours(context) || !on_editor_thread() { return Err(\"keyboard_owner_mismatch\"); }\n    let mut owner = {\n        let mut state = OWNER.lock().unwrap();\n        if state.as_ref().is_none_or(|owner|\n            owner.context != context || owner.thread != current_thread()) {\n            return Err(\"keyboard_not_owned\");\n",
+     "new": "pub(super) unsafe fn suspend(context: usize) -> Result<Text, &'static str> {\n    if !ours(context) || !on_editor_thread() { return Err(\"keyboard_owner_mismatch\"); }\n    let mut owner = {\n        let mut state = OWNER.lock();\n        if state.as_ref().is_none_or(|owner|\n            owner.context != context || owner.thread != current_thread()) {\n            return Err(\"keyboard_not_owned\");\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        }\n        if !keyboard.close() { owner.failed = true; }\n    }\n    *PREPARED.lock().unwrap() = None;\n    if owner.failed { Err(\"keyboard_capture_failed\") } else { Ok(owner.text) }\n}\n\n",
+     "new": "        }\n        if !keyboard.close() { owner.failed = true; }\n    }\n    *PREPARED.lock() = None;\n    if owner.failed { Err(\"keyboard_capture_failed\") } else { Ok(owner.text) }\n}\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// This must run before native editor destruction, never afterward.\npub(super) unsafe fn before_release(context: usize) {\n    let mut owner = {\n        let mut stored = OWNER.lock().unwrap();\n        if stored.as_ref().is_some_and(|owner|\n            owner.context != context || owner.thread != current_thread()) { return; }\n        stored.take()\n",
+     "new": "/// This must run before native editor destruction, never afterward.\npub(super) unsafe fn before_release(context: usize) {\n    let mut owner = {\n        let mut stored = OWNER.lock();\n        if stored.as_ref().is_some_and(|owner|\n            owner.context != context || owner.thread != current_thread()) { return; }\n        stored.take()\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if let Some(owner) = owner.as_mut() {\n        if let Some(keyboard) = owner.keyboard.as_mut() { keyboard.close(); }\n    }\n    *PREPARED.lock().unwrap() = None;\n    SUSPENDED.store(0, Ordering::Release);\n}\n\n",
+     "new": "    if let Some(owner) = owner.as_mut() {\n        if let Some(keyboard) = owner.keyboard.as_mut() { keyboard.close(); }\n    }\n    *PREPARED.lock() = None;\n    SUSPENDED.store(0, Ordering::Release);\n}\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let Some(binding) = Binding::bind(context) else { return 0; };\n    // Never take ownership of the synchronous global manager or clear its flags.\n    if !binding.manager_idle() { return 0; }\n    let mut owner = OWNER.lock().unwrap().take();\n    if owner.is_none() {\n        let pending = {\n            let mut prepared = PREPARED.lock().unwrap();\n            if prepared.as_ref().is_some_and(|(target, _)| *target == context) {\n                prepared.take().map(|(_, text)| text)\n            } else { None }\n",
+     "new": "    let Some(binding) = Binding::bind(context) else { return 0; };\n    // Never take ownership of the synchronous global manager or clear its flags.\n    if !binding.manager_idle() { return 0; }\n    let mut owner = OWNER.lock().take();\n    if owner.is_none() {\n        let pending = {\n            let mut prepared = PREPARED.lock();\n            if prepared.as_ref().is_some_and(|(target, _)| *target == context) {\n                prepared.take().map(|(_, text)| text)\n            } else { None }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    }\n    let mut owner = owner.unwrap();\n    if owner.context != context || owner.thread != current_thread() {\n        *OWNER.lock().unwrap() = Some(owner);\n        return 0;\n    }\n    if let Some(keyboard) = owner.keyboard.as_mut() {\n",
+     "new": "    }\n    let mut owner = owner.unwrap();\n    if owner.context != context || owner.thread != current_thread() {\n        *OWNER.lock() = Some(owner);\n        return 0;\n    }\n    if let Some(keyboard) = owner.keyboard.as_mut() {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        if let Some(decision) = owner.decision {\n            if let Some(keyboard) = owner.keyboard.as_mut() {\n                if !keyboard.close() {\n                    *OWNER.lock().unwrap() = Some(owner);\n                    return 0;\n                }\n            }\n",
+     "new": "        if let Some(decision) = owner.decision {\n            if let Some(keyboard) = owner.keyboard.as_mut() {\n                if !keyboard.close() {\n                    *OWNER.lock() = Some(owner);\n                    return 0;\n                }\n            }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            return result;\n        }\n    }\n    *OWNER.lock().unwrap() = Some(owner);\n    0\n}\n\n",
+     "new": "            return result;\n        }\n    }\n    *OWNER.lock() = Some(owner);\n    0\n}\n\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/connected.rs",
    "dest": "src/runtime/mii/mii_editor_bridge/connected.rs",
    "crate": "root",
    "src_sha256": "982b5cd8a1518d285d433808bca83f02fb5e8cae419e9996ad46ea0e9021c568",
-   "dest_sha256": "5ec51e205be806db162a3e9a51f416a1c2f4c947348c22f558e63063fc055673",
+   "dest_sha256": "cd937be5d513b55c8e0a47f509a7fac28b0a4d991de1d4d1ae0cb9dadb380518",
    "edits": [
     {
      "old": "            let input_baseline = native::input_snapshot(base);",
@@ -4292,6 +4668,90 @@
      "old": "            s.input_baseline = Some(input_baseline);",
      "new": "            #[cfg(feature = \"diag\")]\n            { s.input_baseline = Some(input_baseline); }",
      "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "\npub(super) unsafe fn before_parent() {\n    let queued = {\n        let mut state = STATE.lock().unwrap();\n        if let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()\n            && matches!(s.phase, Phase::Queued | Phase::Editing)) {\n            note_pending(s);\n",
+     "new": "\npub(super) unsafe fn before_parent() {\n    let queued = {\n        let mut state = STATE.lock();\n        if let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()\n            && matches!(s.phase, Phase::Queued | Phase::Editing)) {\n            note_pending(s);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "\npub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> bool {\n    let (abort, completed) = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread()) else { return false; };\n        note_pending(s);\n",
+     "new": "\npub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> bool {\n    let (abort, completed) = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread()) else { return false; };\n        note_pending(s);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    // entry reveals state 9 and Test entry reveals state 10. Capture and leaf\n    // completion follow on that page.\n    if let Some(revealed) = contract::release_preview_wait(context) {\n        if let Some(s) = STATE.lock().unwrap().as_mut() {\n            let underneath = native::read::<i32>(context, 0xf8 + revealed as usize * 4);\n            s.event(\"interrupted_preview_wait_released\", [\n                native::read::<i32>(context, 0x148) as u64,\n",
+     "new": "    // entry reveals state 9 and Test entry reveals state 10. Capture and leaf\n    // completion follow on that page.\n    if let Some(revealed) = contract::release_preview_wait(context) {\n        if let Some(s) = STATE.lock().as_mut() {\n            let underneath = native::read::<i32>(context, 0xf8 + revealed as usize * 4);\n            s.event(\"interrupted_preview_wait_released\", [\n                native::read::<i32>(context, 0x148) as u64,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        // Pending screen values have been captured separately from DRAFT.\n        // Native leaf completion releases the layouts without confirming them.\n        {\n            let mut state = STATE.lock().unwrap();\n            let s = state.as_mut().unwrap();\n            s.submenu_completed = true;\n            s.event(\"interrupted_submenu_completed\", [submenu.state as u64, 0, 0, 0]);\n",
+     "new": "        // Pending screen values have been captured separately from DRAFT.\n        // Native leaf completion releases the layouts without confirming them.\n        {\n            let mut state = STATE.lock();\n            let s = state.as_mut().unwrap();\n            s.submenu_completed = true;\n            s.event(\"interrupted_submenu_completed\", [submenu.state as u64, 0, 0, 0]);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    }\n    if let Some(event) = contract::interrupt_editor(base, context, || {\n        // Do not replace the checkpoint with teardown's confirmed DRAFT.\n        if let Some(s) = STATE.lock().unwrap().as_mut() {\n            s.event(\"interrupted_editor_ready_to_cancel\", [0; 4]);\n        }\n    }) {\n        let mut state = STATE.lock().unwrap();\n        if let Some(s) = state.as_mut() { s.event(event, [native::read::<i32>(context, 0x148) as u64,\n            native::read::<u32>(context, 0x14c) as u64, native::read::<i32>(context, 0x144) as u64, 0]); }\n    }\n",
+     "new": "    }\n    if let Some(event) = contract::interrupt_editor(base, context, || {\n        // Do not replace the checkpoint with teardown's confirmed DRAFT.\n        if let Some(s) = STATE.lock().as_mut() {\n            s.event(\"interrupted_editor_ready_to_cancel\", [0; 4]);\n        }\n    }) {\n        let mut state = STATE.lock();\n        if let Some(s) = state.as_mut() { s.event(event, [native::read::<i32>(context, 0x148) as u64,\n            native::read::<u32>(context, 0x14c) as u64, native::read::<i32>(context, 0x144) as u64, 0]); }\n    }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    context: usize, base: usize,\n) -> Drive {\n    let phase = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| s.origin == origin) else {\n            return Drive::Original;\n        };\n",
+     "new": "    context: usize, base: usize,\n) -> Drive {\n    let phase = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| s.origin == origin) else {\n            return Drive::Original;\n        };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            // Practice may have received the match before its quit completed.\n            // Its actual result takes precedence; never manufacture result3.\n            if owner.result() != 0 {\n                let mut state = STATE.lock().unwrap();\n                relinquish(state.as_mut().unwrap(), \"practice_completed_before_editor\");\n                return Drive::Original;\n            }\n            if !contract::practice_resources_released(base) {\n                let mut state = STATE.lock().unwrap();\n                relinquish(state.as_mut().unwrap(), \"practice_resources_not_released\");\n                return Drive::Original;\n            }\n",
+     "new": "            // Practice may have received the match before its quit completed.\n            // Its actual result takes precedence; never manufacture result3.\n            if owner.result() != 0 {\n                let mut state = STATE.lock();\n                relinquish(state.as_mut().unwrap(), \"practice_completed_before_editor\");\n                return Drive::Original;\n            }\n            if !contract::practice_resources_released(base) {\n                let mut state = STATE.lock();\n                relinquish(state.as_mut().unwrap(), \"practice_resources_not_released\");\n                return Drive::Original;\n            }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            EDIT_OWNER.store(owner.sequence(), Ordering::Release);\n            EDIT_OWNED.store(true, Ordering::Release);\n            let queued = native::enqueue_sequence(base, owner.sequence(), b\"CharaMakeSequenceScene\");\n            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();\n            s.inputs = inputs;\n            #[cfg(feature = \"diag\")]\n            { s.input_baseline = Some(input_baseline); }\n",
+     "new": "            EDIT_OWNER.store(owner.sequence(), Ordering::Release);\n            EDIT_OWNED.store(true, Ordering::Release);\n            let queued = native::enqueue_sequence(base, owner.sequence(), b\"CharaMakeSequenceScene\");\n            let mut state = STATE.lock(); let s = state.as_mut().unwrap();\n            s.inputs = inputs;\n            #[cfg(feature = \"diag\")]\n            { s.input_baseline = Some(input_baseline); }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        Phase::Exiting if owner.drained() => {\n            if !super::save_ready_for_return(base) { return Drive::Value(0); }\n            let (mode, inputs, interrupted, seed) = {\n                let state = STATE.lock().unwrap(); let s = state.as_ref().unwrap();\n                (s.mode, s.inputs, s.interrupted, s.seed)\n            };\n            native::register_editor_sequence(base, owner.sequence(), false);\n",
+     "new": "        Phase::Exiting if owner.drained() => {\n            if !super::save_ready_for_return(base) { return Drive::Value(0); }\n            let (mode, inputs, interrupted, seed) = {\n                let state = STATE.lock(); let s = state.as_ref().unwrap();\n                (s.mode, s.inputs, s.interrupted, s.seed)\n            };\n            native::register_editor_sequence(base, owner.sequence(), false);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            let resources_released = contract::practice_resources_released(base);\n            let catalog_clean = native::catalog_clean(base);\n            let reentered = released && idle && resources_released && catalog_clean && owner.reenter();\n            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();\n            s.phase = if reentered { Phase::Returning } else { Phase::Refused };\n            s.observe_inputs(\"after_editor_release\");\n            s.event(\"connected_reentry_barrier\", [u64::from(resources_released),\n",
+     "new": "            let resources_released = contract::practice_resources_released(base);\n            let catalog_clean = native::catalog_clean(base);\n            let reentered = released && idle && resources_released && catalog_clean && owner.reenter();\n            let mut state = STATE.lock(); let s = state.as_mut().unwrap();\n            s.phase = if reentered { Phase::Returning } else { Phase::Refused };\n            s.observe_inputs(\"after_editor_release\");\n            s.event(\"connected_reentry_barrier\", [u64::from(resources_released),\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "unsafe fn waiting_owner(context: usize, args: usize) -> usize {\n    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let base = BASE.load(Ordering::Acquire);\n    let origin = STATE.lock().unwrap().as_ref().map(|session| session.origin);\n    let driven = match origin {\n        Some(Origin::Quickplay) => {\n            let Some(owner) = contract::Owner::bind(base, context) else {\n",
+     "new": "unsafe fn waiting_owner(context: usize, args: usize) -> usize {\n    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let base = BASE.load(Ordering::Acquire);\n    let origin = STATE.lock().as_ref().map(|session| session.origin);\n    let driven = match origin {\n        Some(Origin::Quickplay) => {\n            let Some(owner) = contract::Owner::bind(base, context) else {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    }\n    let base = BASE.load(Ordering::Acquire);\n    let begin = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n            && s.thread == current_thread()) else { return result; };\n        let Some(practice) = contract::Practice::bind(base, scene, frame, s.owner) else { return result; };\n",
+     "new": "    }\n    let base = BASE.load(Ordering::Acquire);\n    let begin = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n            && s.thread == current_thread()) else { return result; };\n        let Some(practice) = contract::Practice::bind(base, scene, frame, s.owner) else { return result; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        } else { false }\n    };\n    if begin {\n        let owner = { STATE.lock().unwrap().as_ref().unwrap().owner };\n        if let Some(practice) = contract::Practice::bind(base, scene, frame, owner) {\n            if practice.request_quit(base) {\n                RETAINED.store(owner, Ordering::Release);\n                let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();\n                s.phase = Phase::Quitting; s.wait_frames = 0;\n                s.event(\"connected_practice_quit_requested\", [scene as u64, owner as u64, 0, 0]);\n                if s.origin == Origin::LocalWireless {\n",
+     "new": "        } else { false }\n    };\n    if begin {\n        let owner = { STATE.lock().as_ref().unwrap().owner };\n        if let Some(practice) = contract::Practice::bind(base, scene, frame, owner) {\n            if practice.request_quit(base) {\n                RETAINED.store(owner, Ordering::Release);\n                let mut state = STATE.lock(); let s = state.as_mut().unwrap();\n                s.phase = Phase::Quitting; s.wait_frames = 0;\n                s.event(\"connected_practice_quit_requested\", [scene as u64, owner as u64, 0, 0]);\n                if s.origin == Origin::LocalWireless {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    // session is safe: no native state has been changed yet. This base-scene\n    // callback survives the practice scene and may run several times per frame.\n    if ACTIVE.load(Ordering::Acquire) {\n        if let Ok(mut state) = STATE.try_lock() {\n            if let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n                && s.phase == Phase::Requested) {\n                let available = match s.origin {\n",
+     "new": "    // session is safe: no native state has been changed yet. This base-scene\n    // callback survives the practice scene and may run several times per frame.\n    if ACTIVE.load(Ordering::Acquire) {\n        if let Some(mut state) = STATE.try_lock() {\n            if let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)\n                && s.phase == Phase::Requested) {\n                let available = match s.origin {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
     }
    ]
   },
@@ -4321,7 +4781,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "6871288e474ef2b154c7aa7f550e15da3da739e454e729717e9705736dc0d1c4",
+   "dest_sha256": "ac84174dda75a4892cb8c7224348a517d5d9be18ce50a4e909302ac529bd838a",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -4450,6 +4910,132 @@
      "old": "    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }\n}\n\n",
      "new": "    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    drop(app);\n    match crate::runtime::ui::menu_app::publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        Ok(()) => {\n            crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n            OpenedCatalog::Shown\n        }\n        Err(publication) => OpenedCatalog::Later(publication.catalog),\n    }\n}\n\n",
      "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex};\nuse std::time::{Duration, Instant};\nuse crate::engine::mii::inventory::{self, Snapshot};\nuse crate::engine::mii_root::resume::ResumeTicket;\n",
+     "new": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc};\nuse hos_lock::Mutex;\nuse std::time::{Duration, Instant};\nuse crate::engine::mii::inventory::{self, Snapshot};\nuse crate::engine::mii_root::resume::ResumeTicket;\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": ") -> Result<(), &'static str> {\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().map_err(|_| \"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n    #[cfg(feature = \"diag\")]\n    let trace = if restore.is_some() {\n",
+     "new": ") -> Result<(), &'static str> {\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().ok_or(\"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n    #[cfg(feature = \"diag\")]\n    let trace = if restore.is_some() {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if !ACTIVE.load(Ordering::Acquire) || crate::runtime::compat::common::menu::captures_input() { return result; }\n    let base = BASE.load(Ordering::Acquire);\n    let begin = {\n        let Ok(mut state) = STATE.try_lock() else { return result; };\n        let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else { return result; };\n        if s.phase == Phase::Requested {\n            s.wait_frames = s.wait_frames.saturating_add(1);\n",
+     "new": "    if !ACTIVE.load(Ordering::Acquire) || crate::runtime::compat::common::menu::captures_input() { return result; }\n    let base = BASE.load(Ordering::Acquire);\n    let begin = {\n        let Some(mut state) = STATE.try_lock() else { return result; };\n        let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else { return result; };\n        if s.phase == Phase::Requested {\n            s.wait_frames = s.wait_frames.saturating_add(1);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if begin {\n        let accepted = native::request_quit(base, object);\n        {\n            let mut state = STATE.lock().unwrap();\n            if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Requested) {\n                if accepted {\n                    s.phase = Phase::Quitting;\n",
+     "new": "    if begin {\n        let accepted = native::request_quit(base, object);\n        {\n            let mut state = STATE.lock();\n            if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Requested) {\n                if accepted {\n                    s.phase = Phase::Quitting;\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };\n    let phase = {\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else {\n            drop(state);\n            return original!()(context, args);\n",
+     "new": "    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };\n    let phase = {\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else {\n            drop(state);\n            return original!()(context, args);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            EDIT_OWNER.store(current.sequence, Ordering::Release);\n            EDIT_OWNED.store(true, Ordering::Release);\n            let queued = native::enqueue(base, &current, b\"CharaMakeSequenceScene\");\n            let mut state = STATE.lock().unwrap();\n            let s = state.as_mut().unwrap();\n            s.inputs = inputs;\n            s.phase = if queued { Phase::Queued } else { Phase::Refused };\n",
+     "new": "            EDIT_OWNER.store(current.sequence, Ordering::Release);\n            EDIT_OWNED.store(true, Ordering::Release);\n            let queued = native::enqueue(base, &current, b\"CharaMakeSequenceScene\");\n            let mut state = STATE.lock();\n            let s = state.as_mut().unwrap();\n            s.inputs = inputs;\n            s.phase = if queued { Phase::Queued } else { Phase::Refused };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            if !save_ready_for_return(base) { return 0; }\n            let released = RELEASED_SCENE.load(Ordering::Acquire);\n            let (mode, expected) = {\n                let state = STATE.lock().unwrap(); let s = state.as_ref().unwrap();\n                (s.mode, s.inputs)\n            };\n            // At this phase the native sequence drain follows child release,\n",
+     "new": "            if !save_ready_for_return(base) { return 0; }\n            let released = RELEASED_SCENE.load(Ordering::Acquire);\n            let (mode, expected) = {\n                let state = STATE.lock(); let s = state.as_ref().unwrap();\n                (s.mode, s.inputs)\n            };\n            // At this phase the native sequence drain follows child release,\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "            // Training state call as a return rather than a new entry.\n            #[cfg(feature = \"training-stage-rotation-alpha\")]\n            if queued { crate::runtime::lobby::training_stage_rotation::reenter_requested(context); }\n            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();\n            s.phase = if queued { Phase::Returning } else { Phase::Refused };\n            if !s.interrupted { connected::forget(&s.seed); }\n            s.event(\"preview_after_release\", preview.map(|(a, k)| [1, a as u64, k as u64, released as u64]).unwrap_or([0; 4]));\n",
+     "new": "            // Training state call as a return rather than a new entry.\n            #[cfg(feature = \"training-stage-rotation-alpha\")]\n            if queued { crate::runtime::lobby::training_stage_rotation::reenter_requested(context); }\n            let mut state = STATE.lock(); let s = state.as_mut().unwrap();\n            s.phase = if queued { Phase::Returning } else { Phase::Refused };\n            if !s.interrupted { connected::forget(&s.seed); }\n            s.event(\"preview_after_release\", preview.map(|(a, k)| [1, a as u64, k as u64, released as u64]).unwrap_or([0; 4]));\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// can use a complete row. Before this point the owned intent is checkpointable.\nunsafe fn materialize_default(base: usize, context: usize, scene: usize) {\n    let (class, restoring) = {\n        let state = STATE.lock().unwrap();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued\n            && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };\n        let Draft::NativeDefault(class) = s.seed else { return; };\n",
+     "new": "/// can use a complete row. Before this point the owned intent is checkpointable.\nunsafe fn materialize_default(base: usize, context: usize, scene: usize) {\n    let (class, restoring) = {\n        let state = STATE.lock();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued\n            && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };\n        let Draft::NativeDefault(class) = s.seed else { return; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        (class, s.restore_ticket)\n    };\n    let result = native_default::materialize(base, class);\n    let mut state = STATE.lock().unwrap();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted\n        && s.thread == current_thread() && s.editor == scene\n        && s.seed == Draft::NativeDefault(class) && s.restore_ticket == restoring) else { return; };\n",
+     "new": "        (class, s.restore_ticket)\n    };\n    let result = native_default::materialize(base, class);\n    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted\n        && s.thread == current_thread() && s.editor == scene\n        && s.seed == Draft::NativeDefault(class) && s.restore_ticket == restoring) else { return; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    {\n        // No native call runs while this short value-only lock is held. A missed\n        // callback must not allow the normal saved-Mii SelectData page to open.\n        let mut state = STATE.lock().unwrap();\n        let Some(s) = state.as_mut() else { return 0; };\n        if current_thread() != s.thread { return 0; }\n        let Some(editor) = native::Editor::bind(base, context, s.owner) else { return 0; };\n",
+     "new": "    {\n        // No native call runs while this short value-only lock is held. A missed\n        // callback must not allow the normal saved-Mii SelectData page to open.\n        let mut state = STATE.lock();\n        let Some(s) = state.as_mut() else { return 0; };\n        if current_thread() != s.thread { return 0; }\n        let Some(editor) = native::Editor::bind(base, context, s.owner) else { return 0; };\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    connected::before_parent();\n    let result = original!()(scene, args);\n    materialize_default(base, context, scene);\n    let mut state = STATE.lock().unwrap();\n    let Some(s) = state.as_mut() else { return result; };\n    let Some(editor) = native::Editor::bind(base, context, s.owner) else { return result; };\n    if s.phase == Phase::Queued && s.interrupted && editor.state == 3\n",
+     "new": "    connected::before_parent();\n    let result = original!()(scene, args);\n    materialize_default(base, context, scene);\n    let mut state = STATE.lock();\n    let Some(s) = state.as_mut() else { return result; };\n    let Some(editor) = native::Editor::bind(base, context, s.owner) else { return result; };\n    if s.phase == Phase::Queued && s.interrupted && editor.state == 3\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let context = ctx.registers[19].x() as usize;\n    let scene = ctx.registers[20].x() as usize;\n    if context == 0 || scene == 0 || native::read::<usize>(scene, 0x58) != context { return; }\n    let mut state = STATE.lock().unwrap();\n    // Native scene initialization runs on the queued-init worker. Bind the\n    // current scene/context here; Decide checks the scene thread separately.\n    if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {\n",
+     "new": "    let context = ctx.registers[19].x() as usize;\n    let scene = ctx.registers[20].x() as usize;\n    if context == 0 || scene == 0 || native::read::<usize>(scene, 0x58) != context { return; }\n    let mut state = STATE.lock();\n    // Native scene initialization runs on the queued-init worker. Bind the\n    // current scene/context here; Decide checks the scene thread separately.\n    if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if !EDIT_OWNED.load(Ordering::Acquire) { return result; }\n    let context: usize = native::read(scene, 0x58);\n    if context == 0 || context != EDIT_CONTEXT.load(Ordering::Acquire) { return result; }\n    let Ok(mut state) = STATE.try_lock() else { return result; };\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing && s.thread == current_thread()) else { return result; };\n    let current: i32 = native::read(context, 0x148);\n    let observation = if current == 3 && s.observation_bits & 1 == 0 { Some((1, \"editor_main_frame\")) }\n",
+     "new": "    if !EDIT_OWNED.load(Ordering::Acquire) { return result; }\n    let context: usize = native::read(scene, 0x58);\n    if context == 0 || context != EDIT_CONTEXT.load(Ordering::Acquire) { return result; }\n    let Some(mut state) = STATE.try_lock() else { return result; };\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing && s.thread == current_thread()) else { return result; };\n    let current: i32 = native::read(context, 0x148);\n    let observation = if current == 3 && s.observation_bits & 1 == 0 { Some((1, \"editor_main_frame\")) }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    if reveal {\n        let flags = native::reveal_editor(BASE.load(Ordering::Acquire));\n        let preview = native::request_editor_preview(BASE.load(Ordering::Acquire));\n        let mut state = STATE.lock().unwrap();\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {\n            s.observe_inputs(\"editor_preview_requested\");\n            s.event(\"editor_presentation_requested\", flags.unwrap_or([u64::MAX; 4]));\n",
+     "new": "    if reveal {\n        let flags = native::reveal_editor(BASE.load(Ordering::Acquire));\n        let preview = native::request_editor_preview(BASE.load(Ordering::Acquire));\n        let mut state = STATE.lock();\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {\n            s.observe_inputs(\"editor_preview_requested\");\n            s.event(\"editor_presentation_requested\", flags.unwrap_or([u64::MAX; 4]));\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "    let mut create = None;\n    let mut reused = false;\n    {\n        let mut state = STATE.lock().unwrap();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n",
+     "new": "    let mut create = None;\n    let mut reused = false;\n    {\n        let mut state = STATE.lock();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        let flags = [u64::from(id),\n            u64::from(native::read::<u8>(base, native::DRAFT + 0x1bc)),\n            u64::from(native::read::<u8>(base, native::DRAFT + 0x1bd)), 0];\n        if let Some(s) = STATE.lock().unwrap().as_mut() {\n            s.explicit_save_finished = true;\n            s.saved_native = (id != 0).then_some((id, canonical));\n            s.event(if id == 0 { \"native_save_create_refused\" } else { \"native_save_allocated\" }, flags);\n",
+     "new": "        let flags = [u64::from(id),\n            u64::from(native::read::<u8>(base, native::DRAFT + 0x1bc)),\n            u64::from(native::read::<u8>(base, native::DRAFT + 0x1bd)), 0];\n        if let Some(s) = STATE.lock().as_mut() {\n            s.explicit_save_finished = true;\n            s.saved_native = (id != 0).then_some((id, canonical));\n            s.event(if id == 0 { \"native_save_create_refused\" } else { \"native_save_allocated\" }, flags);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        EDIT_SCENE.store(0, Ordering::Release);\n        EDIT_OWNED.store(false, Ordering::Release);\n        EDIT_OWNER.store(0, Ordering::Release);\n        if let Ok(mut state) = STATE.try_lock() {\n            if let Some(s) = state.as_mut() {\n                if let Some(generation) = s.resume_generation { ui_resume::previous_ui_released(generation); }\n                s.event(\"editor_environment_released\", flags);\n",
+     "new": "        EDIT_SCENE.store(0, Ordering::Release);\n        EDIT_OWNED.store(false, Ordering::Release);\n        EDIT_OWNER.store(0, Ordering::Release);\n        if let Some(mut state) = STATE.try_lock() {\n            if let Some(s) = state.as_mut() {\n                if let Some(generation) = s.resume_generation { ui_resume::previous_ui_released(generation); }\n                s.event(\"editor_environment_released\", flags);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// Native writer work continues in the global update while the drained\n/// editor owner waits. No filesystem work or second writer runs here.\nunsafe fn save_ready_for_return(base: usize) -> bool {\n    if STATE.lock().unwrap().as_ref().is_none_or(|s| s.saved_native.is_none()) { return true; }\n    let Some(progress) = native::save_progress(base) else {\n        if let Some(s) = STATE.lock().unwrap().as_mut() {\n            if s.writer_state != Some([u64::MAX; 4]) {\n                s.writer_state = Some([u64::MAX; 4]);\n                s.event(\"native_save_writer_unbound\", [0; 4]);\n",
+     "new": "/// Native writer work continues in the global update while the drained\n/// editor owner waits. No filesystem work or second writer runs here.\nunsafe fn save_ready_for_return(base: usize) -> bool {\n    if STATE.lock().as_ref().is_none_or(|s| s.saved_native.is_none()) { return true; }\n    let Some(progress) = native::save_progress(base) else {\n        if let Some(s) = STATE.lock().as_mut() {\n            if s.writer_state != Some([u64::MAX; 4]) {\n                s.writer_state = Some([u64::MAX; 4]);\n                s.event(\"native_save_writer_unbound\", [0; 4]);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "        }\n        return false;\n    };\n    if let Some(s) = STATE.lock().unwrap().as_mut() {\n        let values = progress.values();\n        if s.writer_state != Some(values) {\n            s.writer_state = Some(values);\n",
+     "new": "        }\n        return false;\n    };\n    if let Some(s) = STATE.lock().as_mut() {\n        let values = progress.values();\n        if s.writer_state != Some(values) {\n            s.writer_state = Some(values);\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
+    },
+    {
+     "old": "/// new native ID and canonical values there, after the writer-idle return gate.\n/// This callback uses owned values only and performs no native memory access.\npub(crate) fn catalog_read(catalog: &Snapshot) {\n    let mut state = STATE.lock().unwrap();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };\n    let Some((id, canonical)) = s.saved_native else { return; };\n    if !catalog.is_complete() { return; }\n",
+     "new": "/// new native ID and canonical values there, after the writer-idle return gate.\n/// This callback uses owned values only and performs no native memory access.\npub(crate) fn catalog_read(catalog: &Snapshot) {\n    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };\n    let Some((id, canonical)) = s.saved_native else { return; };\n    if !catalog.is_complete() { return; }\n",
+     "count": 1,
+     "reason": "Lead23:20/23:24 approved exact cold-hook owner patches21f21dc8/5888a2d7/e9a365b1: const hos-lock for identified private owners and single parentSTATE; same guard scopes, value ownership, native ordering and try-lock busy/refusal, panic=abort; TRACE boot resources unchanged."
     }
    ]
   },

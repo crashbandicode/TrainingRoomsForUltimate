@@ -14,7 +14,7 @@ static OWNER: Mutex<Option<Owner>> = Mutex::new(None);
 static UNBOUND_REPORTED: AtomicBool = AtomicBool::new(false);
 
 fn note(name: &'static str, values: [u64; 4]) {
-    if let Ok(mut state) = super::STATE.try_lock() {
+    if let Some(mut state) = super::STATE.try_lock() {
         if let Some(s) = state.as_mut().filter(|s| s.origin == super::Origin::LocalWireless) {
             s.event(name, values);
         }
@@ -23,7 +23,7 @@ fn note(name: &'static str, values: [u64; 4]) {
 
 fn retire(generation: u64, reason: &'static str) {
     if super::ui_resume::end_session(generation) {
-        if let Some(s) = super::STATE.lock().unwrap().as_mut() {
+        if let Some(s) = super::STATE.lock().as_mut() {
             s.event(reason, [generation, 0, 0, 0]);
         }
     }

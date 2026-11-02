@@ -26,7 +26,8 @@ mod fingerprints;
 #[cfg(feature = "diag")]
 use serde::Serialize;
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
-use std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex};
+use std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc};
+use hos_lock::Mutex;
 use std::time::{Duration, Instant};
 use crate::engine::mii::inventory::{self, Snapshot};
 use crate::engine::mii_root::resume::ResumeTicket;
@@ -172,7 +173,7 @@ fn begin_session(
 ) -> Result<(), &'static str> {
     seed.validate()?;
     if !catalog.is_complete() { return Err("Mii catalog is incomplete"); }
-    let mut state = STATE.try_lock().map_err(|_| "Editor request is busy")?;
+    let mut state = STATE.try_lock().ok_or("Editor request is busy")?;
     if ACTIVE.load(Ordering::Acquire) { return Err("An editor request is already active"); }
     #[cfg(feature = "diag")]
     let trace = if restore.is_some() {
@@ -296,7 +297,7 @@ unsafe fn training_ui(object: usize, args: usize) -> usize {
     if !ACTIVE.load(Ordering::Acquire) || crate::runtime::compat::common::menu::captures_input() { return result; }
     let base = BASE.load(Ordering::Acquire);
     let begin = {
-        let Ok(mut state) = STATE.try_lock() else { return result; };
+        let Some(mut state) = STATE.try_lock() else { return result; };
         let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else { return result; };
         if s.phase == Phase::Requested {
             s.wait_frames = s.wait_frames.saturating_add(1);
@@ -318,7 +319,7 @@ unsafe fn training_ui(object: usize, args: usize) -> usize {
     if begin {
         let accepted = native::request_quit(base, object);
         {
-            let mut state = STATE.lock().unwrap();
+            let mut state = STATE.lock();
             if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Requested) {
                 if accepted {
                     s.phase = Phase::Quitting;
@@ -343,7 +344,7 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
     if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }
     let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };
     let phase = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| s.origin == Origin::Training) else {
             drop(state);
             return original!()(context, args);
@@ -388,7 +389,7 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
             EDIT_OWNER.store(current.sequence, Ordering::Release);
             EDIT_OWNED.store(true, Ordering::Release);
             let queued = native::enqueue(base, &current, b"CharaMakeSequenceScene");
-            let mut state = STATE.lock().unwrap();
+            let mut state = STATE.lock();
             let s = state.as_mut().unwrap();
             s.inputs = inputs;
             s.phase = if queued { Phase::Queued } else { Phase::Refused };
@@ -409,7 +410,7 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
             if !save_ready_for_return(base) { return 0; }
             let released = RELEASED_SCENE.load(Ordering::Acquire);
             let (mode, expected) = {
-                let state = STATE.lock().unwrap(); let s = state.as_ref().unwrap();
+                let state = STATE.lock(); let s = state.as_ref().unwrap();
                 (s.mode, s.inputs)
             };
             // At this phase the native sequence drain follows child release,
@@ -426,7 +427,7 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
             // Training state call as a return rather than a new entry.
             #[cfg(feature = "training-stage-rotation-alpha")]
             if queued { crate::runtime::lobby::training_stage_rotation::reenter_requested(context); }
-            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();
+            let mut state = STATE.lock(); let s = state.as_mut().unwrap();
             s.phase = if queued { Phase::Returning } else { Phase::Refused };
             if !s.interrupted { connected::forget(&s.seed); }
             s.event("preview_after_release", preview.map(|(a, k)| [1, a as u64, k as u64, released as u64]).unwrap_or([0; 4]));
@@ -449,7 +450,7 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
 /// can use a complete row. Before this point the owned intent is checkpointable.
 unsafe fn materialize_default(base: usize, context: usize, scene: usize) {
     let (class, restoring) = {
-        let state = STATE.lock().unwrap();
+        let state = STATE.lock();
         let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued
             && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };
         let Draft::NativeDefault(class) = s.seed else { return; };
@@ -458,7 +459,7 @@ unsafe fn materialize_default(base: usize, context: usize, scene: usize) {
         (class, s.restore_ticket)
     };
     let result = native_default::materialize(base, class);
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted
         && s.thread == current_thread() && s.editor == scene
         && s.seed == Draft::NativeDefault(class) && s.restore_ticket == restoring) else { return; };
@@ -499,7 +500,7 @@ unsafe fn editor_parent(scene: usize, args: usize) -> usize {
     {
         // No native call runs while this short value-only lock is held. A missed
         // callback must not allow the normal saved-Mii SelectData page to open.
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut() else { return 0; };
         if current_thread() != s.thread { return 0; }
         let Some(editor) = native::Editor::bind(base, context, s.owner) else { return 0; };
@@ -517,7 +518,7 @@ unsafe fn editor_parent(scene: usize, args: usize) -> usize {
     connected::before_parent();
     let result = original!()(scene, args);
     materialize_default(base, context, scene);
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     let Some(s) = state.as_mut() else { return result; };
     let Some(editor) = native::Editor::bind(base, context, s.owner) else { return result; };
     if s.phase == Phase::Queued && s.interrupted && editor.state == 3
@@ -560,7 +561,7 @@ unsafe fn edit_initialized(ctx: &mut InlineCtx) {
     let context = ctx.registers[19].x() as usize;
     let scene = ctx.registers[20].x() as usize;
     if context == 0 || scene == 0 || native::read::<usize>(scene, 0x58) != context { return; }
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     // Native scene initialization runs on the queued-init worker. Bind the
     // current scene/context here; Decide checks the scene thread separately.
     if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {
@@ -587,7 +588,7 @@ unsafe fn edit_frame(scene: usize, args: usize) -> usize {
     if !EDIT_OWNED.load(Ordering::Acquire) { return result; }
     let context: usize = native::read(scene, 0x58);
     if context == 0 || context != EDIT_CONTEXT.load(Ordering::Acquire) { return result; }
-    let Ok(mut state) = STATE.try_lock() else { return result; };
+    let Some(mut state) = STATE.try_lock() else { return result; };
     let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing && s.thread == current_thread()) else { return result; };
     let current: i32 = native::read(context, 0x148);
     let observation = if current == 3 && s.observation_bits & 1 == 0 { Some((1, "editor_main_frame")) }
@@ -608,7 +609,7 @@ unsafe fn edit_frame(scene: usize, args: usize) -> usize {
     if reveal {
         let flags = native::reveal_editor(BASE.load(Ordering::Acquire));
         let preview = native::request_editor_preview(BASE.load(Ordering::Acquire));
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing) {
             s.observe_inputs("editor_preview_requested");
             s.event("editor_presentation_requested", flags.unwrap_or([u64::MAX; 4]));
@@ -632,7 +633,7 @@ unsafe fn edit_decide(context: usize) -> usize {
     let mut create = None;
     let mut reused = false;
     {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         // Every owned explicit Save starts closed; only a qualified fresh
         // draft reaches the game's native allocator. Existing IDs cannot enter.
         native::write(context, 0x168, 2i32);
@@ -664,7 +665,7 @@ unsafe fn edit_decide(context: usize) -> usize {
         let flags = [u64::from(id),
             u64::from(native::read::<u8>(base, native::DRAFT + 0x1bc)),
             u64::from(native::read::<u8>(base, native::DRAFT + 0x1bd)), 0];
-        if let Some(s) = STATE.lock().unwrap().as_mut() {
+        if let Some(s) = STATE.lock().as_mut() {
             s.explicit_save_finished = true;
             s.saved_native = (id != 0).then_some((id, canonical));
             s.event(if id == 0 { "native_save_create_refused" } else { "native_save_allocated" }, flags);
@@ -697,7 +698,7 @@ unsafe fn editor_release(scene: usize, args: usize) -> usize {
         EDIT_SCENE.store(0, Ordering::Release);
         EDIT_OWNED.store(false, Ordering::Release);
         EDIT_OWNER.store(0, Ordering::Release);
-        if let Ok(mut state) = STATE.try_lock() {
+        if let Some(mut state) = STATE.try_lock() {
             if let Some(s) = state.as_mut() {
                 if let Some(generation) = s.resume_generation { ui_resume::previous_ui_released(generation); }
                 s.event("editor_environment_released", flags);
@@ -710,9 +711,9 @@ unsafe fn editor_release(scene: usize, args: usize) -> usize {
 /// Native writer work continues in the global update while the drained
 /// editor owner waits. No filesystem work or second writer runs here.
 unsafe fn save_ready_for_return(base: usize) -> bool {
-    if STATE.lock().unwrap().as_ref().is_none_or(|s| s.saved_native.is_none()) { return true; }
+    if STATE.lock().as_ref().is_none_or(|s| s.saved_native.is_none()) { return true; }
     let Some(progress) = native::save_progress(base) else {
-        if let Some(s) = STATE.lock().unwrap().as_mut() {
+        if let Some(s) = STATE.lock().as_mut() {
             if s.writer_state != Some([u64::MAX; 4]) {
                 s.writer_state = Some([u64::MAX; 4]);
                 s.event("native_save_writer_unbound", [0; 4]);
@@ -720,7 +721,7 @@ unsafe fn save_ready_for_return(base: usize) -> bool {
         }
         return false;
     };
-    if let Some(s) = STATE.lock().unwrap().as_mut() {
+    if let Some(s) = STATE.lock().as_mut() {
         let values = progress.values();
         if s.writer_state != Some(values) {
             s.writer_state = Some(values);
@@ -734,7 +735,7 @@ unsafe fn save_ready_for_return(base: usize) -> bool {
 /// new native ID and canonical values there, after the writer-idle return gate.
 /// This callback uses owned values only and performs no native memory access.
 pub(crate) fn catalog_read(catalog: &Snapshot) {
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };
     let Some((id, canonical)) = s.saved_native else { return; };
     if !catalog.is_complete() { return; }

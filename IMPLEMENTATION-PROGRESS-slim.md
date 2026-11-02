@@ -1523,3 +1523,23 @@ Production panic=abort means no recoverable poisonpath; contention still returns
 without mutation at same checks. Prior12privateowner patches are independent,
 all3proposals stillunapplied pendingreview. This is concrete followup to23:20
 first-hook proof, not permission for unrelated/global mutex substitution.
+
+## Approved Mii owner composition 2026-11-02T23:26:56.134661+00:00
+Lead23:20 approved both21f21dc8 and5888a2d7; lead23:24 separatelyapproved
+single parentSTATEe9a365b1 afterfull inventory. Applied exact disjointchanges
+across9sourcefiles; combinedpatcha12acc9e950f3c2a06f4d6ada3ed89f60f3cda33e060729652568a469fd98705.
+All namedownerimports/unwraps, sixtrylocksuccessmatches and onebusyok_or only.
+TRACE untouched. Carry253+42PASS; exacttransforms/ledger regenerated.
+Initial character-diff composition helper hit its30s bound before ANYsourcewrite;
+confirmedonlypriornative-testfiledirty, then line-based composition finished0.5s.
+No partial source mutation or compiler existed during that helper failure.
+Enhanced actualnative-adapter fixture now has thread-local countingallocator and
+real1024-byte Vecpositivecontrol, measuring firstuse/failedinit/reopen/interruption.
+Notexecutedyet; earlierunmetered actualprotocolcasepassedb88. SDKdouble evidence
+never substitutes actualSDKfirst-use runtime.
+c035 correctedcounter remote9testsPASS log0aa53044; normalizedgate130570<=136069
+PASS log3c5695b3. Frozen1185unchanged; c035target stillEMPTY/noCargo.
+b88failedtarget retired1593420408B/721files,59executedbinaries archiveSHA
+98b9209c3da142c2c1ed5cc5198584c141574b2c21d4760fe094d2a57a16813e.
+No ownqueue/claim/compiler/Eden/profile. Next: freezecombinedsourceNEWtarget,
+freshcachecensus, ONEqueuedhost thennative+clippy/no-default/release perclaim.
