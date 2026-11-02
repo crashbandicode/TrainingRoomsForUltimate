@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;

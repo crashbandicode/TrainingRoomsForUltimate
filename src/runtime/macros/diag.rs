@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::engine::macro_ui::clip_panel::ClipAction;
 use crate::engine::macro_ui::macro_panel::Pad;
@@ -45,7 +45,7 @@ fn parse(line: &str) -> Option<Command> {
     let mut words = line.split_whitespace();
     let verb = words.next()?;
     let mut command = Command { kind: 0, number: 0, text: [0; MAX_TEXT], len: 0 };
-    let mut set_text = |text: &str, command: &mut Command| {
+    let set_text = |text: &str, command: &mut Command| {
         let bytes = text.as_bytes();
         let n = bytes.len().min(MAX_TEXT);
         command.text[..n].copy_from_slice(&bytes[..n]);

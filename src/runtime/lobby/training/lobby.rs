@@ -70,10 +70,6 @@ pub fn entry_id(role: FighterId) -> i32 {
     }
 }
 
-pub fn permits_entry(entry: i32) -> bool {
-    !is_waiting_scene() || matches!(entry, 0 | 4)
-}
-
 /// Called before input processing and UI dispatch. Cleanup only touches plugin state;
 /// do not roll Smash RNG, dereference departing fighters or request a game status here.
 pub fn update() {

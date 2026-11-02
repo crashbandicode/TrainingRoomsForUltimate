@@ -18,7 +18,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::capture_settings::{self, CaptureSettings};
 use crate::model::ini_files::{self, FileRead};

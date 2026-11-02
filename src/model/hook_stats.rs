@@ -157,27 +157,122 @@ fn count_allocation() {
     }
 }
 
-/// The counting allocator: forwards to the system allocator, counts the calls made inside a hook.
+/// The byte meter of the diag heap features (`plugin-heap-meter`, `console-practice-trace`): this NRO's requested Rust allocation
+/// sizes only (live, peak, total, call count, largest request); native game heaps, allocator metadata and other plugins are
+/// excluded. It lives in the one global allocator of the plugin so that the diag features read these counters instead of each
+/// declaring an allocator of their own (a crate has one `#[global_allocator]`). Counters are relaxed and a snapshot is not atomic
+/// across fields; a realloc's temporary copy is outside the meter. The shipped build compiles the counters away: `grow`, `shrink`
+/// and `moved` are empty and the allocator is byte-for-byte the hook counter it was.
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+mod heap {
+    use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering::Relaxed};
+
+    static LIVE: AtomicIsize = AtomicIsize::new(0);
+    static PEAK: AtomicIsize = AtomicIsize::new(0);
+    static TOTAL: AtomicUsize = AtomicUsize::new(0);
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    static LARGEST: AtomicUsize = AtomicUsize::new(0);
+
+    #[inline]
+    pub(super) fn grow(size: usize) {
+        let live = LIVE.fetch_add(size as isize, Relaxed) + size as isize;
+        PEAK.fetch_max(live, Relaxed);
+        TOTAL.fetch_add(size, Relaxed);
+        CALLS.fetch_add(1, Relaxed);
+        LARGEST.fetch_max(size, Relaxed);
+    }
+
+    #[inline]
+    pub(super) fn shrink(size: usize) {
+        LIVE.fetch_sub(size as isize, Relaxed);
+    }
+
+    /// A moved realloc briefly holds both blocks; counting only the new size understates that copy's instantaneous peak by the old
+    /// size (acceptable for sparse profiling, as the fork's meter did).
+    #[inline]
+    pub(super) fn moved(old: usize, new: usize) {
+        shrink(old);
+        grow(new);
+    }
+
+    pub(super) fn snapshot() -> super::HeapBytes {
+        super::HeapBytes {
+            live: LIVE.load(Relaxed),
+            peak: PEAK.load(Relaxed),
+            total: TOTAL.load(Relaxed),
+            calls: CALLS.load(Relaxed),
+            largest: LARGEST.load(Relaxed),
+        }
+    }
+}
+
+#[cfg(not(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace")))]
+mod heap {
+    #[inline(always)]
+    pub(super) fn grow(_size: usize) {}
+    #[inline(always)]
+    pub(super) fn shrink(_size: usize) {}
+    #[inline(always)]
+    pub(super) fn moved(_old: usize, _new: usize) {}
+}
+
+/// What the byte meter has counted since boot.
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HeapBytes {
+    /// Bytes allocated and not yet freed.
+    pub live: isize,
+    /// The highest `live` seen.
+    pub peak: isize,
+    /// Every requested byte, freed or not.
+    pub total: usize,
+    /// Allocation calls (an allocation that moved on realloc counts once more).
+    pub calls: usize,
+    /// The largest single request.
+    pub largest: usize,
+}
+
+/// Read the byte meter (the diag heap features and tests; a shipped build has no meter).
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+pub fn heap_bytes() -> HeapBytes {
+    heap::snapshot()
+}
+
+/// The counting allocator: forwards to the system allocator, counts the calls made inside a hook and (diag heap features only) the
+/// bytes this NRO requested.
 pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         count_allocation();
-        System.alloc(layout)
+        let pointer = System.alloc(layout);
+        if !pointer.is_null() {
+            heap::grow(layout.size());
+        }
+        pointer
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         count_allocation();
-        System.alloc_zeroed(layout)
+        let pointer = System.alloc_zeroed(layout);
+        if !pointer.is_null() {
+            heap::grow(layout.size());
+        }
+        pointer
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
+        System.dealloc(ptr, layout);
+        heap::shrink(layout.size());
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         count_allocation();
-        System.realloc(ptr, layout, new_size)
+        let moved = System.realloc(ptr, layout, new_size);
+        if !moved.is_null() {
+            heap::moved(layout.size(), new_size);
+        }
+        moved
     }
 }
 

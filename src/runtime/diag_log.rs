@@ -313,6 +313,8 @@ pub fn start_drain_thread() {
         writer_started();
         #[cfg(feature = "diag")]
         let (mut observer, mut ticks) = (crate::model::hook_stats::Observer::new(), 0u32);
+        #[cfg(feature = "plugin-heap-meter")]
+        let mut metered_calls = 0usize;
         loop {
             drain();
             // A step the owner of a late report registered (`set_tick`): package 6's seam installer writes the seam outcomes that
@@ -332,6 +334,18 @@ pub fn start_drain_thread() {
                     }
                     // The threads' stack high-water marks (stream/stack), on the same 10 s beat.
                     crate::runtime::threads::report();
+                    // `plugin-heap-meter`: the byte meter of the same allocator, one line when this NRO allocated since the last one.
+                    #[cfg(feature = "plugin-heap-meter")]
+                    {
+                        let heap = crate::runtime::roster::heap_metrics::snapshot();
+                        if heap.calls != metered_calls {
+                            metered_calls = heap.calls;
+                            diagnostic(format_args!(
+                                "[HeapMeter] live={} peak={} total={} calls={} largest={}",
+                                heap.live, heap.peak, heap.total, heap.calls, heap.largest
+                            ));
+                        }
+                    }
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(50));

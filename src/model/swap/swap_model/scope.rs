@@ -180,15 +180,6 @@ pub const CALLBACKS: &[CallbackContract] = &[
         exception: Exception::External("menu apply only"),
         review: "external boundary, declared without change",
     },
-    CallbackContract {
-        name: "cpu_pilot::thinking",
-        seam: "",
-        scopes: EVERYWHERE,
-        read_only: true,
-        per_frame: true,
-        exception: Exception::External("query"),
-        review: "external boundary, declared without change",
-    },
     // ---- M4 declarations (U14): WP3, WP4, WP5, WP-P and the U5 gate writer. Gated rows carry one
     // `if !scope_gate::admitted("<name>")` at the start of the operation; `MustComplete` rows and the
     // writer are declared and deliberately not gated (a refusal there would leave native the plugin's

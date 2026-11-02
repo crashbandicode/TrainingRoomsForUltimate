@@ -93,6 +93,12 @@ const fn kirby_hats_default() -> OrderedFighterRoster {
     DEFAULT_KIRBY_HATS
 }
 
+/// A top-level kept key of the settings file as a typed value; a missing or malformed one is the type's default (the fork's rule for
+/// `stage_preferences` and `mii_preferences`: a bad stored preference never blocks the menu).
+pub fn kept_or_default<T: serde::de::DeserializeOwned + Default>(extra: &serde_json::Map<String, serde_json::Value>, key: &str) -> T {
+    extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
+}
+
 /// A kept key of the snapshot (a row whose value is not a plain array) as a typed value; a missing or malformed one is `fallback`.
 fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallback: T) -> T {
     snapshot.extra().get(id).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or(fallback)
@@ -398,6 +404,42 @@ mod tests {
         let view = TrainingModpackMenu::from_snapshot(&snapshot);
         assert_eq!((view.fighter_prompt, view.macro_source), (OnOff::OFF, MacroSource::NAMED));
         assert_eq!(MacroSource::ALL_NAMES, ["Numbered Slots", "Named Library"]);
+    }
+
+    #[test]
+    fn a_committed_snapshot_and_settings_reach_every_typed_view() {
+        use crate::engine::mii::selection::Preferences as MiiPreferences;
+        use crate::engine::stages::stage_menu::Preferences as StagePreferences;
+        let mut menu = Snapshot::factory();
+        // rows
+        menu.set("trio_practice", &[1, 0]).unwrap();
+        menu.set("lobby_practice", &[1, 0]).unwrap();
+        menu.set("cycle_preload_group_swap", &[0, 1]).unwrap();
+        // kept keys of the snapshot: the rosters, the picks, the Kirby hats
+        fn value<T: serde::Serialize>(typed: &T) -> serde_json::Value {
+            serde_json::to_value(typed).unwrap()
+        }
+        menu.set_kept("player_roster", value(&DEFAULT_CPU_ROSTER)).unwrap();
+        menu.set_kept("cpu_roster", value(&DEFAULT_PLAYER_ROSTER)).unwrap();
+        menu.set_kept("player_character", value(&TrioFighter::KIRBY)).unwrap();
+        menu.set_kept("cpu_character", value(&TrioFighter::PIKACHU)).unwrap();
+        menu.set_kept("player_kirby_hats", value(&DEFAULT_CPU_ROSTER)).unwrap();
+        menu.set_kept("cpu_kirby_hats", value(&DEFAULT_PLAYER_ROSTER)).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&menu);
+        assert_eq!((view.trio_practice, view.lobby_practice, view.cycle_preload_group_swap), (OnOff::ON, OnOff::ON, OnOff::OFF));
+        assert_eq!((view.player_roster, view.cpu_roster), (DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER));
+        assert_eq!((view.player_character, view.cpu_character), (TrioFighter::KIRBY, TrioFighter::PIKACHU));
+        assert_eq!((view.player_kirby_hats, view.cpu_kirby_hats), (DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER));
+        // the settings-level kept keys (a `Snapshot` does not carry them: `apply_kept` reads them)
+        let mut extra = serde_json::Map::new();
+        extra.insert("stage_preferences".into(), serde_json::json!({ "direct_stage": 7 }));
+        extra.insert("mii_preferences".into(), serde_json::json!("not a preference object"));
+        let stage: StagePreferences = kept_or_default(&extra, "stage_preferences");
+        let mii: MiiPreferences = kept_or_default(&extra, "mii_preferences");
+        assert_eq!(stage.direct_stage, 7);
+        assert_eq!(mii, MiiPreferences::default(), "a malformed stored preference is the default");
+        let missing: StagePreferences = kept_or_default(&serde_json::Map::new(), "stage_preferences");
+        assert_eq!(missing, StagePreferences::default());
     }
 
     #[test]

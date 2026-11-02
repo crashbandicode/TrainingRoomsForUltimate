@@ -6,6 +6,7 @@ pub mod cpu_common;
 pub mod hud_draw;
 pub mod input_delay;
 pub mod input_display;
+pub mod item_bridge;
 pub mod lra_reset;
 pub mod notices;
 pub mod recorder;

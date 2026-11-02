@@ -15,7 +15,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::chords::field;
 use crate::model::input_delay::{MappedInputs, Owners};
@@ -36,7 +36,6 @@ pub fn set_enabled(on: bool) {
 
 static LOG: Mutex<Log> = Mutex::new(Log::new());
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
-static SETTINGS: Mutex<Settings> = Mutex::new(Settings::factory());
 
 /// `Controller` stick offsets (SPEC-input-04 §3.1).
 const LEFT_STICK_X: usize = 0x10;
@@ -44,8 +43,9 @@ const LEFT_STICK_Y: usize = 0x14;
 const RIGHT_STICK_X: usize = 0x20;
 const RIGHT_STICK_Y: usize = 0x24;
 
-pub fn publish(snapshot: &Snapshot) {
-    *SETTINGS.lock() = Settings::from_snapshot(snapshot);
+/// The two settings, read wait-free from `published::Live` (stream/sync); the factory values before the first publish.
+fn settings() -> Settings {
+    crate::runtime::published::live().map_or(Settings::factory(), |live| live.input_display)
 }
 
 /// One P1 poll after the delay: log the candidate (skipped while the plugin menu owns the input, when
@@ -57,7 +57,7 @@ pub unsafe fn on_p1_poll(controller: usize, out: *const MappedInputs) {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
-    let settings = *SETTINGS.lock();
+    let settings = settings();
     if settings.mode == Mode::None || controller == 0 || published::input_owners().contains(Owners::MENU) {
         return;
     }
@@ -98,7 +98,7 @@ pub fn disable() {
 /// One HUD tick: the pane writes the display needs now (the layout draw in `hud_draw` applies them).
 /// `menu_open` is the plugin menu''s flag or the vanilla pause menu''s.
 pub fn hud_tick(menu_open: bool) -> Plan {
-    let settings = *SETTINGS.lock();
+    let settings = settings();
     let log = *LOG.lock();
     RENDERER.lock().plan(&log, &settings, !menu_open)
 }

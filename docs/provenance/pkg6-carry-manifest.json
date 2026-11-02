@@ -662,7 +662,14 @@
    "dest": "src/model/swap/swap_model/scope.rs",
    "crate": "consts",
    "src_sha256": "45d14a9c5d825e1622e369d16f6af119955d609ddec5dd0fe7f06a45d144d4e7",
-   "dest_sha256": "4b81e13b0bfbc4990159cf62f54a7186cb412489e1ba67e4a3295385a1d34dae"
+   "dest_sha256": "b62a869b7cf29949941c7854e24ba252adc1dffb55c00a34809c49234496d5fe",
+   "edits": [
+    {
+     "delete_from": "    CallbackContract {\n        name: \"cpu_pilot::thinking\",",
+     "delete_to": "    // ---- M4 declarations (U14)",
+     "reason": "the contract row of `cpu_pilot::thinking`, removed with the function (see the `cpu_pilot.rs` edit: no clean-room caller; the clean-room recorder reads the mapped poll record, not the pilot's decision)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/special_articles.rs",
@@ -1211,7 +1218,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "15b1220b31154e9bbb313ae2ab3f7cdf6bed664682ec13833985253fdf30bf5a",
+   "dest_sha256": "254e88ddb315be4cab23714fcf79e285ebd42a61093c22be026127801375707c",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -1227,6 +1234,36 @@
      "old": "/// The late report (R-A0b), on the",
      "new": "/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        let rows = native_seams::COUNT;\n        let checked = rows - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { keep: listed_as_other, with_code: other_with_code },\n            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n\n/// The late report (R-A0b), on the",
      "reason": "`InstallFields`: the seam outcome as fields of package 1's one install line (`seams=<n> seams_stock=<n> seams_skipped=[..] ...`, the rows that fail, counts for the rest); rows checked or changed after the line stay in the tagged late line (`[TrainingSeams] late ...`)"
+    },
+    {
+     "delete_from": "/// Non-`main` rows as `[label:code,\u2026]`, for the install line (`images=`).",
+     "delete_to": "/// Rows whose recorded bits satisfy `keep`",
+     "reason": "removed (no caller in the clean room): `ImageLabels` was a field of the fork's own install line; the clean room has one install line (package 1's, `InstallFields` shortened to counts and failing rows)"
+    },
+    {
+     "delete_from": "/// `[group,\u2026]`, for the install line",
+     "delete_to": "struct Missing;",
+     "reason": "removed (no caller in the clean room): `Groups` was a field of the fork's own install line (`authoritative=`), see `ImageLabels`"
+    },
+    {
+     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
+     "new": "",
+     "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"diag\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"diag\"))]\nimpl fmt::Display for DrillFields",
+     "new": "#[cfg(feature = \"seam-drill\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"seam-drill\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"seam-drill\"))]\nimpl fmt::Display for DrillFields",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\npub(crate) fn bits_of(",
+     "new": "#[cfg(feature = \"seam-drill\")]\npub(crate) fn bits_of(",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "pub(crate) fn report_late() {\n",
+     "new": "pub(crate) fn report_late() {\n    // The drill's stand-in run counts (rate-limited to once a second by the drill itself).\n    #[cfg(feature = \"seam-drill\")]\n    super::seam_drill::report_counts(crate::runtime::clock::uptime_ms());\n",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS); the drill's stand-in run counts are reported from the late-report tick"
     }
    ]
   },
@@ -1258,12 +1295,27 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "771bd6208e48f047353002ec316f75e910ae0ecb4994c343e9adc3b752d1f573",
+   "dest_sha256": "36af83e1cd6bfceaffa875a8589b90fd03295db6172bfdc7754179a907e81f33",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
      "new": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n    BASE.load(Ordering::Acquire) != 0\n}\n",
      "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
+    },
+    {
+     "delete_from": "pub(crate) fn thinking() -> bool {",
+     "delete_to": "/// Whether `init` installed the pilot's hook",
+     "reason": "`thinking()` removed (lead ruling 2026-11-02: no silent dead code): the fork's input recorder asked it while the AI's decision ran so that the decision's controller writes were not taken for a player's input. The clean room's recorder (package 4) records from the input stage's mapped poll record before the delay, and the pilot writes its pad into the record after the delay (`p1::input`), so the two never meet; a recording while an AI drives P1 is refused by the recorder (SPEC-input-01 B4, `RecordRefusal::P1DrivenByAi`, `is_operation_cpu(0)`). Mapping in docs/provenance/pkg6-carry-ledger.md, \"Deleted fork functions\""
+    },
+    {
+     "old": "static THINKING: AtomicBool = AtomicBool::new(false);\n",
+     "new": "",
+     "reason": "the flag `thinking()` read (see the previous edit)"
+    },
+    {
+     "old": "    // stream; THINKING brackets it for the input recorder.\n    THINKING.store(true, Ordering::Release);\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n    THINKING.store(false, Ordering::Release);\n",
+     "new": "    // stream.\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n",
+     "reason": "the bracket's only reader is removed (see the first edit)"
     }
    ]
   },
@@ -1273,13 +1325,6 @@
    "crate": "root",
    "src_sha256": "eafd06fcb6a9017204ddafca7f7a0e922c810366a11682b38e5ed187f06bd7cc",
    "dest_sha256": "6ce81bfbc43c6158a18839e9052e236f9432bb84126ea96da8033da2da626f97"
-  },
-  {
-   "src": "src/swap_native/heap_fields.rs",
-   "dest": "src/runtime/roster/heap_fields.rs",
-   "crate": "root",
-   "src_sha256": "8d83c43a3a140b19b9fc297e6f82af469117a8c1b98738542cfb178fbbabea79",
-   "dest_sha256": "8bf4165c1a10d34ca78e8111ff5ed3e3c16f8d2591667c73fb62b0ffe8dee53d"
   },
   {
    "src": "src/swap_native/r_handle.rs",
@@ -1370,7 +1415,14 @@
    "dest": "src/runtime/roster/turnip_identity.rs",
    "crate": "root",
    "src_sha256": "561334326aa4eb2c73c713a7cba8d9defc48e2340124f15167fc39176e88649f",
-   "dest_sha256": "ac10397577f87be7f10b3fcfd1a1a00b9f77c24457a54efb83055d8728571b58"
+   "dest_sha256": "810764597d3ebaba2d32abc102961b287f4298bdbd0fe368fd881ca09d99090d",
+   "edits": [
+    {
+     "delete_from": "pub fn on_unload(",
+     "delete_to": "fn image_current(",
+     "reason": "`on_unload` removed: the nro-load provider (`libnro_hook`) has no unload callback, so nothing can call it; a stale item image is refused by the per-read ITEM_CODE check of `held_face` (its own contract) and by the generation counter at the next `on_load`"
+    }
+   ]
   },
   {
    "src": "src/native_service.rs",
@@ -1412,7 +1464,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "3d94b52d7b995a47e56b9fc598734511283969ef99cbec577be4a229da5b7c39",
+   "dest_sha256": "134f449376e9cf43e244e1fce66386975a27082d86f728e8df5ff7a7da98c6b0",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1421,8 +1473,24 @@
     },
     {
      "old": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> String {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name())\n        }\n        None => fighter.name().into(),\n    }\n}",
-     "new": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> std::borrow::Cow<'static, str> {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()).into(),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name()).into()\n        }\n        None => fighter.name().into(),\n    }\n}",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): a direct pick (no slot) names the fighter with its static name and allocates nothing; the numbered labels still format a `String` (one per completed swap, listed for the R5 row)"
+     "new": "fn notify_args(role: Role, args: std::fmt::Arguments<'_>) {\n    let title = if role == Role::Player {\n        \"Player Character\"\n    } else {\n        \"CPU Character\"\n    };\n    training::ui::notifications::notification_args(title.into(), args, 180);\n}\n\nfn notify_selection(role: Role, fighter: TrioFighter, slot: Option<usize>) {\n    match slot {\n        Some(index) => notify_args(role, format_args!(\"{}. {}\", index + 1, fighter.name())),\n        None if cycle_original(role) == Some(fighter.kind()) => notify_args(role, format_args!(\"0. {}\", fighter.name())),\n        None => notify(role, fighter.name().into()),\n    }\n}",
+     "reason": "the numbered selection labels are written into the notice's fixed buffer (`notification_args`: the text is formatted on the stack and copied into the notice queue) instead of formatting a `String` in a game callback (review R5); a direct pick still names the fighter with its static name"
+    },
+    {
+     "old": "notify(role, selection_label(role, active.target, active.slot));",
+     "new": "notify_selection(role, active.target, active.slot);",
+     "reason": "see `notify_selection`: no `String` in the completion callback"
+    },
+    {
+     "old": "notify(role, selection_label(role, target, slot));",
+     "new": "notify_selection(role, target, slot);",
+     "reason": "see `notify_selection`: no `String` in the callback"
+    },
+    {
+     "old": "unsafe { training::save_states::is_loading() }",
+     "new": "training::save_states::is_loading()",
+     "count": 2,
+     "reason": "the lobby facade's `save_states::is_loading` is a safe function (package 3's fact): the fork's `unsafe` blocks around it are unnecessary (an `unused_unsafe` warning)"
     }
    ]
   },
@@ -1478,7 +1546,19 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "ede465f0f576ea58431905abf9b4f9508a5689017de87e3569d1300b6fa3e51e"
+   "dest_sha256": "7261a8121d80490640efcc8222614725ab5851ac699a2d431c11384c9e929e0a",
+   "edits": [
+    {
+     "delete_from": "/// Skip plugin automations for an owned helper body.",
+     "delete_to": "/// Finish a load this entry already owns.",
+     "reason": "`reserved(body)` removed (lead ruling 2026-11-02: no silent dead code): the fork's per-fighter automation callbacks (mixed code) asked it to skip the helper bodies the cycle owns (entries 2, 3, 5, 6). The clean room's automations are keyed by role, never by 'every fighter': package 2's role table (`model::cpu::role`: entry 0, 1 and the lobby's 4 are roles, `Role::of_entry` / `is_cpu_role` / `FighterKey`), package 3's `Role::of_entry` and package 4's `cpu_body()` ignore every other entry, so an owned helper is skipped by construction. Mapping in docs/provenance/pkg6-carry-ledger.md, \"Deleted fork functions\""
+    },
+    {
+     "old": "pub unsafe fn legacy_training_owner_reserved(",
+     "new": "#[cfg(feature = \"source-owner-probe\")]\npub unsafe fn legacy_training_owner_reserved(",
+     "reason": "diag code out of the shipped NRO (D11): the only caller is the diag probe `source_owner_probe` (feature `source-owner-probe`); with `reserved` removed (automations are keyed by role) nothing in the release build calls it"
+    }
+   ]
   },
   {
    "src": "src/native_body_bank.rs",
@@ -1532,8 +1612,38 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "badc64a042286fa76e63b6cbf9ec294c1810808ef9cef3b6ebbf38c8896220a6",
+   "dest_sha256": "55854dce68991bb0a3e8dc42ec65394af70a76f7aa7129716bf3cd1622f8f923",
    "edits": [
+    {
+     "old": "use std::alloc::{GlobalAlloc, Layout, System};",
+     "new": "use crate::model::hook_stats::{heap_bytes, CountingAllocator};\n    use std::alloc::{GlobalAlloc, Layout};",
+     "reason": "the recorder's allocator forwards to the plugin's one counting allocator (package 1, `model::hook_stats`) instead of `System`, and its metadata reads that allocator's byte meter: a crate has one `#[global_allocator]` (lead ruling 2026-11-02, one global allocator)"
+    },
+    {
+     "delete_from": "    static LIVE: AtomicU64 = AtomicU64::new(0);\n    static PEAK: AtomicU64 = AtomicU64::new(0);\n",
+     "delete_to": "    static QUEUE: Queue = Queue::new();",
+     "reason": "the recorder's own live/peak counters are package 1's byte meter now (`hook_stats::heap_bytes`, read by `metadata`): one meter, one allocator"
+    },
+    {
+     "old": "live: LIVE.load(Ordering::Relaxed),\n            peak: PEAK.load(Ordering::Relaxed),",
+     "new": "live: heap_bytes().live.max(0) as u64,\n            peak: heap_bytes().peak.max(0) as u64,",
+     "reason": "the metadata's live and peak bytes come from the one counting allocator's byte meter"
+    },
+    {
+     "delete_from": "    struct TraceAllocator;\n    #[global_allocator]",
+     "delete_to": "    // Existing pinned observation sites only.",
+     "reason": "the fork's `#[global_allocator] TraceAllocator` over `System` (with its own LIVE/PEAK accounting) is replaced by the public `TraceAllocator` below, which `runtime::alloc` installs as the global allocator when `console-practice-trace` is on and which forwards to `CountingAllocator` (lead ruling 2026-11-02: one global allocator)"
+    },
+    {
+     "old": "    // Existing pinned observation sites only.",
+     "new": "    /// The recorder's allocator: the plugin's one global allocator when `console-practice-trace` is on (`runtime::alloc`). It records\n    /// each allocation call as a trace event (100-104) and forwards to `CountingAllocator`, which counts the hook allocations and\n    /// the live/peak bytes the recorder's metadata reads (`hook_stats::heap_bytes`). Recorded clean-room change: the fork declared\n    /// this as its own `#[global_allocator]` over `System`, which clashes with the plugin's counting allocator.\n    pub struct TraceAllocator;\n    // Only this NRO's Rust allocator, never game/other-plugin heaps. Events have opaque pointer values; callbacks never dereference\n    // them.\n    unsafe impl GlobalAlloc for TraceAllocator {\n        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {\n            let result = CountingAllocator.alloc(layout);\n            allocation_event(100, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            result\n        }\n        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {\n            let result = CountingAllocator.alloc_zeroed(layout);\n            allocation_event(101, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            result\n        }\n        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {\n            allocation_event(102, [pointer as u64, layout.size() as u64, layout.align() as u64, 0, 0]);\n            CountingAllocator.dealloc(pointer, layout);\n        }\n        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {\n            allocation_event(103, [pointer as u64, layout.size() as u64, layout.align() as u64, size as u64, 0]);\n            let result = CountingAllocator.realloc(pointer, layout, size);\n            allocation_event(104, [pointer as u64, result as u64, layout.size() as u64, size as u64, 0]);\n            result\n        }\n    }\n\n    // Existing pinned observation sites only.",
+     "reason": "the recorder's allocator, forwarding to the plugin's `CountingAllocator` (same trace events 100-104 as the fork's, same order); see the previous edit"
+    },
+    {
+     "old": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init};",
+     "new": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init, TraceAllocator};",
+     "reason": "`TraceAllocator` is the global allocator `runtime::alloc` installs under this feature"
+    },
     {
      "old": "    const STACK_BYTES: usize = 128 * 1024;\n",
      "new": "",
@@ -1591,7 +1701,29 @@
    "dest": "src/runtime/roster/heap_metrics.rs",
    "crate": "root",
    "src_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33",
-   "dest_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33"
+   "dest_sha256": "f8de31c77629bf8fea50a37b61ce96c092dc529d500af3d30721ec2039d6c8ad",
+   "edits": [
+    {
+     "old": "//! The playbook's whole-plugin `heap_allocations=0` does not apply to this product (menus,\n//! saved files, the Lua VM and Mii data allocate by design); the install line reports the\n//! call count (`heap_allocations=<calls>`) so one build can be compared with the one before\n//! it. WP-H's per-hook accounting (`in_hook=`) was never wired to a callback and the operator\n//! ruled the no-heap rule N/A for this plugin (2026-10-31), so the meter keeps no hook depth.\n",
+     "new": "//! The meter is the byte meter of the plugin's one counting allocator (`model::hook_stats`, package 1): the diag build reports\n//! it in a `[HeapMeter]` line at every `heap_profile` mark of the preload metrics and, sparsely, next to the `hook_stats` line\n//! (`runtime::diag_log`). The install line's `heap_allocations=` is package 1's hook-allocation count, not this meter's call count\n//! (the fork's `HeapFields` wrote the call count under that name; it is not carried).\n",
+     "reason": "the paragraph described the fork's own install-line field and meter state; the clean room's install line is package 1's and the meter reads package 1's allocator (see the next edit)"
+    },
+    {
+     "old": "use std::alloc::{GlobalAlloc, Layout, System};\nuse std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering::Relaxed};\n",
+     "new": "/// What the meter reads: package 1's counting allocator's byte meter (`model::hook_stats`, enabled by this feature): live, peak and\n/// total requested bytes, the call count and the largest request.\npub use crate::model::hook_stats::HeapBytes as Heap;\n\n/// The counters now.\npub fn snapshot() -> Heap {\n    crate::model::hook_stats::heap_bytes()\n}\n",
+     "reason": "the fork's `Meter` was a second `#[global_allocator]` (`plugin-heap-meter`), which cannot coexist with the plugin's counting allocator; the same counters are the byte meter of `hook_stats::CountingAllocator` (lead ruling 2026-11-02, one global allocator) and this module reads them"
+    },
+    {
+     "delete_from": "pub struct Meter;",
+     "delete_to": "// Host tests run from",
+     "reason": "`Meter`, its statics, its `GlobalAlloc` impl and its `#[global_allocator]` are `hook_stats`' byte meter now; `Heap`/`snapshot` are re-stated above, and the `heap_allocations=<calls>` Display (a field of the fork's own install line) has no clean-room caller: package 1's install line owns the name `heap_allocations` (hook allocations)"
+    },
+    {
+     "delete_from": "// Host tests run from",
+     "delete_to_last": "\n",
+     "reason": "the carried tests exercised `Meter` directly; the byte meter's host test is `tests/hook_alloc.rs::the_byte_meter_counts_what_the_one_global_allocator_serves`"
+    }
+   ]
   },
   {
    "src": "src/common/game_mode.rs",
@@ -1605,7 +1737,14 @@
    "dest": "src/runtime/mii/native_keyboard.rs",
    "crate": "root",
    "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
-   "dest_sha256": "7665ecd33d985428c5543e94401f6cfcd60ca3cd941c42b80beb609c9b950556"
+   "dest_sha256": "d9cd86a44fdad98b0f0d654742891e508a45f2cad28d9a9a86ab7aa0676084a2",
+   "edits": [
+    {
+     "old": "use parking_lot::Mutex;",
+     "new": "use hos_lock::Mutex;",
+     "reason": "stream/sync (menu-close hang, 2026-11-02): parking_lot's parker on os=switch is a pure spin loop that livelocks under Horizon's fixed priorities; the plugin's locks are hos-lock (crates/hos-lock: kernel address arbiter, no heap, same API)"
+    }
+   ]
   },
   {
    "src": "src/native_keyboard/inline_keyboard.rs",
@@ -1715,7 +1854,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "c4026a1a569f9af78d9415c5c90200c6154efd7724419582aaaae08621e10efa",
+   "dest_sha256": "ca582e25916a342413d5f9454c1d54ebbf81576a26051d432940b722f45f7356",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1729,8 +1868,8 @@
     },
     {
      "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
-     "new": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class).into());",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+     "new": "notify_args(Role::Cpu,format_args!(\"CPU {:?} choice skipped\",choice.canonical.class));",
+     "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
     },
     {
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
@@ -1801,7 +1940,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "4c104dcc8e93ecac7b18ecdabfe819516fbe6126e2ce06688d16932fceb4833d",
+   "dest_sha256": "2d0949f60cbf908144977885db5e80b3846cb47386f99ed3a6d52ef2e51a22b0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -1815,8 +1954,8 @@
     },
     {
      "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
-     "new": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class).into());",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+     "new": "notify_args(Role::Player,format_args!(\"Player {:?} choice skipped\",choice.canonical.class));",
+     "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
     },
     {
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
@@ -2328,7 +2467,7 @@
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "555f1a4673997f07fef352d6ea7726b841ce1ffad3d4b1f22f5b065252d13d77",
+   "dest_sha256": "8cccf584eb6994ad5a65bbe10bf56660af84c79a754ee925c41d6a2d3595eefa",
    "edits": [
     {
      "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -2354,6 +2493,11 @@
      "old": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        super::clear_session_state();\n",
      "new": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state();\n",
      "reason": "package 2's CPU role scene and the shared scene wrapper follow the lobby's activation (`cpu::set_lobby`, PACKAGE-6-PLAN section 6); the fork had no such coupling"
+    },
+    {
+     "old": "pub fn permits_entry(entry: i32) -> bool {\n    !is_waiting_scene() || matches!(entry, 0 | 4)\n}\n\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (permits_entry)"
     }
    ]
   },
@@ -2362,12 +2506,42 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "a5e2509155d7c8ce34329b5af3fce14496c6fdd15ce5b912f6c7a0de7ac485bd",
+   "dest_sha256": "117b9ea66701ff929a3848240e2a3ebcd8c71742d82fde1a7962a8d3fe6441fc",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
      "new": "    common::try_get_object_accessor(owner).is_some_and(|module|\n        module.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
      "reason": "the fork's `try_get_battle_object` returned its `BattleObject` struct only for the `module_accessor` field; the clean room resolves the accessor of an object id directly (guarded `sv_battle_object::module_accessor` row)"
+    },
+    {
+     "old": "pub fn waiting() -> bool { context() == Some(Context::Waiting) }\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (pub fn waiting)"
+    },
+    {
+     "delete_from": "/// Native Training panels also hold extra CPUs.",
+     "delete_to": "unsafe fn native_entry(",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (panel_entry)"
+    },
+    {
+     "delete_from": "pub unsafe fn visualizes(",
+     "delete_to": "pub fn entry_departed",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (visualizes)"
+    },
+    {
+     "delete_from": "pub unsafe fn primary_cpu(",
+     "delete_to": "/// The controller mapping that operates the Training CPU",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (primary_cpu; `role` stays: the preload planner reads it)"
+    },
+    {
+     "old": "/// FE+0x4178 is the native controller owner used by the existing CPU pilot's\n/// verified 13.0.5 entry adapter. Do not confuse its controller slot with entry 4.\npub unsafe fn owns_cpu_controls(controls: usize) -> bool {\n    entry(1).and_then(|entry| native_fields::child(entry, 0x4178)) == Some(controls)\n}\n",
+     "new": "",
+     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (owns_cpu_controls)"
+    },
+    {
+     "old": "pub fn forget() { OWNED.lock().unwrap().retire(); }\n",
+     "new": "pub fn forget() { OWNED.lock().unwrap().retire(); }\n\n/// Whether a practice session (the entry lease) is held now.\npub fn owned() -> bool { OWNED.lock().unwrap().active() }\n",
+     "reason": "`owned()` added: the clean-room callers (`runtime::lobby::frame`) acquire the lease when none is held; the fork acquired it from its save/record paths, which package 3/4 own here (lead ruling 2026-11-02: the lease and its retirement on a replaced entry stay)"
     }
    ]
   },
