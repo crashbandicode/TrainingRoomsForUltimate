@@ -316,7 +316,7 @@ fn sync_panels(s: &mut Session) {
     // Consume synchronous list/name effects before flow sees their closed panel,
     // and retire accepted jobs even after the disposable menu was reset.
     if let Some(note) = s.setups.tick() {
-        notices::post("Setup library", &note, 180, DEFAULT_COLOR);
+        notices::upsert(0x29, "Setup library", &note, 180, DEFAULT_COLOR);
         s.setup_note = Some(note);
     }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
