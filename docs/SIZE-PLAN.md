@@ -278,3 +278,5 @@ Raw sloc4:98,956 (src95,449/crates3,356/tools151); simulator1,118 excluded, test
 Normalizedf07bda2 via operator sloc-fmt.ps1:126710incltools167 =126543excltools; simulator2102excluded, tests44339excluded; rustfmt1.9.0-stable48a229cea,0failures. Reduction2870from1c0104e,9526fromauthorizedbase136069. The next-version15%target remains unmet; current RC criterion is monotone ratchet.
 
 Helper feature-scope follow-up: raw98,962 (+6 versusf07bda2; ceiling103,300 unchanged), removing the last pending module-wide dead_code allow with actual feature/test scopes. Normalized count and compiler gates pending; no claim of further line reduction for this lint root. Five large-enum ratchet rows remain pending alongside the two approved hos-lock allows.
+
+Normalized10a8232=126725includingtools167 (126558excludingtools), +15 versusf07bda2, -9511 versusauthorizedbase136069; rustfmt1.9.0-stable48a229cea,0failures. This is the explicit feature-scope cost of retiring a broad dead-code allowance; budget not raised.
