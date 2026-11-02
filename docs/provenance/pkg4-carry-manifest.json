@@ -466,7 +466,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "d9f4ca75ff8405311d72b801cd97f9ba76614a6f3082edd0eab9c038e5311a18",
+   "dest_sha256": "43d2697abfa1d7062b5e04a7cdd290a367a9961ede094811e0d6d21aca07357e",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -551,6 +551,11 @@
     {
      "append": "\n/// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).\n#[cfg(feature = \"diag\")]\npub fn diag_export_slot(slot: usize) {\n    export_record_slot(Some(slot));\n}\n",
      "reason": "named entry point of the diag request file"
+    },
+    {
+     "old": "pub fn prepare_buffers() {\n    let mut motion = lock_write(&MOTION);\n    let wanted = training_mod_macros_max_frames();\n    let (captured, played) = (motion.captured.len(), motion.play.len());\n    if motion.captured.capacity() < wanted {\n        motion.captured.reserve_exact(wanted - captured);\n    }\n    if motion.play.capacity() < wanted {\n        motion.play.reserve_exact(wanted - played);\n    }\n}\n",
+     "new": "pub fn prepare_buffers() {\n    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped\n    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.\n    let wanted = training_mod_macros_max_frames();\n    let (grow_captured, grow_play) = {\n        let motion = lock_read(&MOTION);\n        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)\n    };\n    if !grow_captured && !grow_play {\n        return;\n    }\n    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };\n    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };\n    {\n        let mut motion = lock_write(&MOTION);\n        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {\n            captured.append(&mut motion.captured);\n            std::mem::swap(&mut motion.captured, &mut captured);\n        }\n        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }\n}\n",
+     "reason": "stream/sync (menu-close hang, 2026-11-02): a hook never waits on a lock another thread holds across real work; the Named-library buffer reservation (an allocation, on the publishing thread) runs before MOTION is taken, and the write lock only swaps the buffers"
     }
    ]
   },

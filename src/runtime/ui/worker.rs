@@ -9,6 +9,7 @@ use std::thread::Thread;
 
 use hos_lock::Mutex;
 
+use crate::model::frame::Frame;
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::menu::input::Button;
@@ -167,7 +168,7 @@ fn handle(code: u8, menu: &mut Option<Menu>) {
             None => *menu = Some(Menu::new(settings, env())),
         }
         CLOSING.store(false, Ordering::Release);
-        crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(true);
+        crate::runtime::ui::menu_app::note_open();
         publish_frame(menu.as_ref());
         diagnostic(format_args!("[Ui] menu opened"));
         return;
@@ -190,10 +191,15 @@ fn stage_label(i: usize) -> &'static str {
     crate::engine::stages::catalog::STAGES.get(i).map_or("-", |(_, label)| *label)
 }
 
+/// The frame is built here, in a buffer only this thread takes; `FRAME` is held for the copy alone, so the UI tick's `try_lock` skips a
+/// draw only while a copy runs (stream/sync).
+static SCRATCH: Mutex<Frame> = Mutex::new(Frame::new());
+
 fn publish_frame(menu: Option<&Menu>) {
     let Some(menu) = menu else { return };
-    let mut frame = FRAME.lock();
-    frame_of(menu, &mut frame, stage_label);
+    let mut scratch = SCRATCH.lock();
+    frame_of(menu, &mut scratch, stage_label);
+    *FRAME.lock() = *scratch;
     FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 
@@ -258,7 +264,7 @@ fn close(menu: &mut Menu) {
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
-    crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(false);
+    crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
     let _ = input_delay::clear;

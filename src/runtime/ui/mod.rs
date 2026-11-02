@@ -87,6 +87,7 @@ pub fn clear_session_state() {
     state::CLOSE_COUNT.store(0, Ordering::Release);
     state::MENU_SHOWN.store(false, Ordering::Release);
     state::PAUSE_ACTIVE.store(false, Ordering::Release);
+    menu_app::note_open();
     crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
     input::reset_session();
     worker::push_reset();

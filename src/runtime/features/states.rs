@@ -265,6 +265,8 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
 /// generator seed.
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
+    // The writer thread keeps its own copy (boot, before any hook): Saves reach it through `hand_to_writer`.
+    *WRITER_FILE.lock() = Some(file.clone());
     *STATE.lock() = Some(State {
         machine: Machine::new(file),
         settings,
@@ -994,6 +996,8 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         saved_stage: Some(n::stage_id()),
         mii: None,
     };
+    // The writer thread gets its own copy of the record (no heap: a captured state carries no Mii value), so it never takes `STATE`.
+    hand_to_writer(role, slot, state.clone());
     let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
     // The save flash.
     let attributes = with(|s| {
@@ -1397,6 +1401,64 @@ pub fn load_file() -> SaveFile {
     file
 }
 
+/// The writer thread's own copy of the save file (stream/sync, lead decision (a)): the file boot loaded, plus every record a Save
+/// captured, applied in capture order. Taken by boot and the writer thread only; the game's hooks never wait on it.
+static WRITER_FILE: Mutex<Option<SaveFile>> = Mutex::new(None);
+
+const HANDOFF_SLOTS: usize = 8;
+const SLOT_EMPTY: u8 = 0;
+const SLOT_WRITING: u8 = 1;
+const SLOT_FULL: u8 = 2;
+const SLOT_READING: u8 = 3;
+type Captured = Option<(u64, Role, usize, SavedState)>;
+struct HandoffSlot(std::cell::UnsafeCell<Captured>);
+// SAFETY: a slot's cell is touched only by the one thread that moved its state to SLOT_WRITING or SLOT_READING.
+unsafe impl Sync for HandoffSlot {}
+/// Captured records on their way to the writer: fixed slots claimed by compare-exchange (any game thread may capture), drained by
+/// the writer; a sequence number keeps the capture order. A full mailbox drops the record and counts it.
+static HANDOFF: [HandoffSlot; HANDOFF_SLOTS] = [const { HandoffSlot(std::cell::UnsafeCell::new(None)) }; HANDOFF_SLOTS];
+static HANDOFF_STATE: [std::sync::atomic::AtomicU8; HANDOFF_SLOTS] = [const { std::sync::atomic::AtomicU8::new(SLOT_EMPTY) }; HANDOFF_SLOTS];
+static HANDOFF_SEQ: AtomicU64 = AtomicU64::new(0);
+static HANDOFF_DROPPED: AtomicU32 = AtomicU32::new(0);
+
+/// A Save captured `state` for `role` in `slot` (game thread): the writer's copy follows. Never waits, no heap.
+fn hand_to_writer(role: Role, slot: usize, state: SavedState) {
+    let seq = HANDOFF_SEQ.fetch_add(1, Ordering::AcqRel);
+    for (i, cell) in HANDOFF_STATE.iter().enumerate() {
+        if cell.compare_exchange(SLOT_EMPTY, SLOT_WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            // SAFETY: the slot is ours between SLOT_WRITING and SLOT_FULL.
+            unsafe { *HANDOFF[i].0.get() = Some((seq, role, slot, state)) };
+            cell.store(SLOT_FULL, Ordering::Release);
+            return;
+        }
+    }
+    HANDOFF_DROPPED.fetch_add(1, Ordering::Relaxed);
+}
+
+/// The writer applies the captured records to its copy, oldest first (as `Machine::capture` stores them).
+fn take_captured(file: &mut SaveFile) {
+    let mut taken: [Captured; HANDOFF_SLOTS] = [const { None }; HANDOFF_SLOTS];
+    for (i, cell) in HANDOFF_STATE.iter().enumerate() {
+        if cell.compare_exchange(SLOT_FULL, SLOT_READING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            // SAFETY: the slot is ours between SLOT_READING and SLOT_EMPTY.
+            taken[i] = unsafe { (*HANDOFF[i].0.get()).take() };
+            cell.store(SLOT_EMPTY, Ordering::Release);
+        }
+    }
+    taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |(seq, ..)| *seq));
+    for (_, role, slot, mut state) in taken.into_iter().flatten() {
+        state.marker = Marker::NoAction;
+        let records = match role {
+            Role::Player => &mut file.player,
+            Role::Cpu => &mut file.cpu,
+        };
+        records[slot.min(records.len() - 1)] = state;
+    }
+    let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
+    if dropped != 0 {
+        diagnostic(format_args!("[TrainingRooms] save-state records dropped before the writer took them: {dropped}"));
+    }
+}
 /// The writer thread: whenever a Save marked the file dirty, write the whole table through the atomic
 /// replace. A failed write keeps the old file and is retried (the file stays dirty).
 pub fn start_writer() {
@@ -1406,8 +1468,10 @@ pub fn start_writer() {
             continue;
         }
         let Some(path) = save_path() else { continue };
-        let Some(file) = STATE.lock().as_ref().map(|state| state.machine.file.clone()) else { continue };
-        if let Err(error) = persist::save(Path::new(path.as_str()), &file) {
+        let mut mirror = WRITER_FILE.lock();
+        let Some(file) = mirror.as_mut() else { continue };
+        take_captured(file);
+        if let Err(error) = persist::save(Path::new(path.as_str()), file) {
             DIRTY.store(true, Ordering::Release);
             diagnostic(format_args!("[TrainingRooms] save_states.json write failed: {error}; the old file stays"));
             std::thread::sleep(std::time::Duration::from_secs(5));
