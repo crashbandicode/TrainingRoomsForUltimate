@@ -58,6 +58,8 @@ def rewrite_path(head_crate: str, member: str, modules: dict):
 
 
 def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
+    # the storage root moved (decision S1, model::storage): every fork path under sd:/ultimate/TrainingModpack is under TrainingRooms
+    text = text.replace("sd:/ultimate/TrainingModpack", "sd:/ultimate/TrainingRooms")
     # 1. grouped `use <head>::{a, b::c, ...};` for the crate heads
     def group(m):
         head = m.group(1)

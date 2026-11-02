@@ -27,3 +27,26 @@ Stream rules: `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`.
   `cargo clippy --all-targets -- -D warnings` clean, `cargo build --no-default-features` builds. Switch builds: not run for this tranche (no runtime change; resident
   size unchanged at the package-2 value because the carried areas are test-only).
 - Not blocked. Next: C2 remainder, C3 (D3 dependency checks first: serde derive, byteflags), then C4/C5; `src/runtime/scene.rs` (D4) before C7.
+
+## Layer gates after tranche 1 (2026-11-02)
+- **C3a** `943e2a5`: Mii crate (23 files, 7 integration tests), body_bank, swap_model + fixtures, trio, ordered_roster, character_forms, identity_view, capacity_creation, mii_cycle, preload/kirby/lobby policies. D3: serde derive added (release NRO byte-identical, 233,472 B resident), serde_json pinned 1.0.151.
+- **C4** `b48ac10`: stage models (lobby_stages, stage_forms, stage_menu, lobby_stage_cycle, practice_stage_request_policy, training_stage_rotation_policy, waiting-hazards policy).
+- **D4** `cdd9438` (cherry-picked by the lead as `5fe6bbf`): `model::scene` + `runtime::scene`.
+- **C2b** `6e3f0d0`: character items model.
+- Gates at `6e3f0d0` (+ tool change): host `cargo test` 2,434 pass, clippy 0, `--no-default-features` builds, Switch release builds (NRO unchanged, 233,472 B resident, sha `d2722f4d`; carried areas are `cfg(test)`-only so there is no resident change yet).
+- Disclosures recorded in CARRY-OVER.md: fork `Cargo.toml` ranges 82-122 and 124-240 (123 not printed); an `rg` that named two mixed tui files (3 lib.rs lines printed).
+
+## In progress / next (restart-safe)
+- **cycle_preload_config.rs** (consts, 2.7k lines): not carried yet; the attempt was backed out to keep the tree green. Needs, in order: (1) `byteflags` dep
+  (`byteflags = { git = "https://github.com/asimon-1/byteflags.git", rev = "e6ac815a9d0dc4665b39fe7849e2baec8bf443cb" }`; resolves `rand` git rev `8e87ec2a` and
+  `getrandom` Raytwo `23a14191` through the fork's own manifests, no `[patch]` needed; pin `zerocopy`/`zerocopy-derive` to 0.8.62 as in the m5o lock with
+  `cargo update -p zerocopy@0.8.63 --precise 0.8.62` after a networked `cargo fetch`); (2) `engine::compat::menu` grows the typed fields `cycle_preload_{slots,sources,
+  bank_members,ready_fighters,group_swap,ic_pair_bank,original_bank,solo_popo_groups,ic_pair_groups,native_groups,pair_groups,mii_groups,measurements}` (types are the file's own
+  byteflags groups and `OnOff`), `OnOff::ALL_NAMES`, serde for `OnOff`; (3) manifest edits removing the fork's menu macros (`mod bank_submenu` / `mod ready_submenu`
+  with `impl_submenutrait!`) and the UI tests that call `create_app`; (4) `TRAINING_MODPACK_ROOT` -> `model::storage::ROOT` (the tool already rewrites the
+  `sd:/ultimate/TrainingModpack` string); (5) later, the R1/R4 adaptation of its INI writer/parser as recorded manifest edits.
+- **C7 cluster** (character_roster, cycle_preload, kirby_hats, character_items, practice_stage_{request,observer}, training/{lobby,practice}, character_lifecycle,
+  swap_native/presentation, native_unlink_install, native_service, training/ui/anchors): needs `compat::menu` for `lobby_practice`, `trio_practice`, `player_roster`...,
+  package 2's fighter/accessor natives, package 3/4 stubs (`replay_preview::occupied`, `named_macros::*`, `save_states::is_loading`) as interface modules, `skyline_smash`
+  (D3: MIT, rev 01bf583), and the `Seam` install API (`swap_native/seam_install.rs`) carried first.
+- Remaining by-path Mii tests (`quickplay_backend`, `ldn_backend`, `source_provenance`, `heap_metrics`, `ui_archive_name`, `replay185_headgear`) wait for the root files they include.
