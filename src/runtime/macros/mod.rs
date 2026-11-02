@@ -193,7 +193,9 @@ pub(crate) fn after_layout_draw() {
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.
 pub(crate) fn sync_owner() {
     use crate::model::input_delay::Owners;
-    let held = replay_capture::panel_visible() || replay_capture::browser_visible() || replay_preview::occupied();
+    let held = replay_capture::panel_visible() || replay_capture::browser_visible()
+        || replay_capture::loading()
+        || (replay_preview::occupied() && !replay_preview::recovery_available());
     if held {
         published::INPUT_OWNERS.fetch_or(Owners::REPLAY_EDITOR.bits(), std::sync::atomic::Ordering::AcqRel);
     } else {
@@ -206,9 +208,17 @@ pub(crate) fn sync_owner() {
 /// # Safety
 /// `controller` is the live `Controller` of the mapping call (or 0); `out` the record the game just mapped.
 pub(crate) unsafe fn on_p1_input(controller: usize, out: *mut crate::model::input_delay::MappedInputs) {
-    if controller == 0 || !ready() || !named_macros::hook_queries().clip_foreground {
-        return;
+    if controller == 0 || !ready() { return; }
+    let input = port::input::Controller::read(controller);
+    // The close press remains ours beyond grace until its physical release.
+    let close_owned = replay_capture::owns_close_input(crate::runtime::scene::is_training(), input.current_buttons.b());
+    let queries = named_macros::hook_queries();
+    use crate::model::macro_handoff::ClipInputRoute;
+    match queries.clip_input_route(close_owned) {
+        ClipInputRoute::Pass => return,
+        ClipInputRoute::Consume => {}
+        // A parked editor still owns B cancellation; only the worker reads RELOAD.
+        ClipInputRoute::Forward => port::post_clip_input(input),
     }
-    port::post_clip_input(port::input::Controller::read(controller));
     *out = crate::model::input_delay::MappedInputs::NEUTRAL;
 }

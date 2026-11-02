@@ -100,18 +100,6 @@ pub fn can_emit(module: &mut BattleObjectModuleAccessor) -> bool {
             && s.cpu == Some((module.battle_object_id, module as *mut _ as usize)))
         && crate::runtime::macros::named_macros::hook_queries().clip_foreground
 }
-pub fn status() -> &'static str {
-    match STATUS.load(Ordering::Relaxed) {
-        1 => "Preparing the temporary preview setup...",
-        2 => "Native input preview: attacks and effects run normally",
-        3 => "Inputs complete; native effects finish normally. Y: restart",
-        4 => "Restoring the temporary preview setup...",
-        // The editor keeps the actual failure in its full-width help strip.
-        5 => "Preview stopped. Fix the issue above, then press X.",
-        _ => "",
-    }
-}
-
 /// Both fighters and partners remain native: hits, effects and cleanup need
 /// normal simulation. P1's controls are consumed separately by the visible UI.
 pub fn needs_native_update(_module: &BattleObjectModuleAccessor) -> bool { occupied() }
