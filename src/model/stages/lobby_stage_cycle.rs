@@ -3,7 +3,7 @@
 /// The two qualified waiting families. This is scene admission, not permission
 /// to overwrite a native resource slot; the live stage policy checks ownership.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum WaitingStageFamily {
+pub(crate) enum WaitingStageFamily {
     LocalWireless,
     Quickplay,
 }
@@ -11,7 +11,7 @@ pub(super) enum WaitingStageFamily {
 // Eden and console Quickplay use different outer modes for the same verified
 // PracticeScene driver (console caller 0x2369208, slot 2). waiting() adds melee
 // 0x0d; entry_preload's caller allowlist keeps actual match preloads out.
-pub(super) fn family(mode: u32) -> Option<WaitingStageFamily> {
+pub(crate) fn family(mode: u32) -> Option<WaitingStageFamily> {
     if mode == 0x02010000 {
         Some(WaitingStageFamily::LocalWireless)
     } else if matches!(mode & 0x7fffff00, 0x07010100 | 0x07010400) {
@@ -21,14 +21,14 @@ pub(super) fn family(mode: u32) -> Option<WaitingStageFamily> {
     }
 }
 
-pub(super) fn waiting(mode: u32, melee: u8) -> bool {
+pub(crate) fn waiting(mode: u32, melee: u8) -> bool {
     melee == 0x0d && family(mode).is_some()
 }
 
 /// Return addresses from fingerprinted native slot-2 PracticeScene preloads
 /// (including Quickplay's CSS and return drivers). Match/Morph requests must not
 /// reserve or advance the entry rotation.
-pub(super) fn entry_preload(mode: u32, caller: usize) -> bool {
+pub(crate) fn entry_preload(mode: u32, caller: usize) -> bool {
     matches!((family(mode), caller),
         (Some(WaitingStageFamily::LocalWireless), 0x2335cf0)
             | (Some(WaitingStageFamily::Quickplay), 0x23684b0 | 0x2369208 | 0x236ca48 | 0x237cce0))
@@ -37,7 +37,7 @@ pub(super) fn entry_preload(mode: u32, caller: usize) -> bool {
 /// A retained Quickplay waiting owner can recreate PracticeScene without the
 /// CSS driver's preload. Its constructor runs before the generic loader, so
 /// an empty practice resource slot can still take an entry-time selection.
-pub(super) fn unprepared_quickplay_entry(mode: u32, melee: u8, native_stage: u32, empty: bool) -> bool {
+pub(crate) fn unprepared_quickplay_entry(mode: u32, melee: u8, native_stage: u32, empty: bool) -> bool {
     family(mode) == Some(WaitingStageFamily::Quickplay)
         && waiting(mode, melee) && native_stage == 311 && empty
 }

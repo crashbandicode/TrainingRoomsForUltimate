@@ -201,6 +201,7 @@ mod tests {
             verdict: Verdict::Supported,
             sites: &[],
             features: &[],
+            seams: None,
             developer: Some(DeveloperReport { on, reason }),
             settings: None,
             migration: None,

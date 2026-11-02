@@ -48,7 +48,10 @@
    "cycle_preload_config": "crate::runtime::roster::cycle_preload_config",
    "swap_native::scope_gate": "crate::runtime::roster::swap_native::scope_gate",
    "practice_trace": "crate::runtime::lobby::diag::practice_trace",
-   "hang_trace": "crate::runtime::lobby::diag::hang_trace"
+   "hang_trace": "crate::runtime::lobby::diag::hang_trace",
+   "common::filesystem": "crate::runtime::compat::filesystem",
+   "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
+   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -80,7 +83,8 @@
    "character_items": "crate::engine::items::character_items",
    "menu_json": "crate::engine::compat::menu_json",
    "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
-   "MENU": "crate::runtime::compat::menu::MENU"
+   "MENU": "crate::runtime::compat::menu::MENU",
+   "FighterId": "crate::runtime::compat::consts::FighterId"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -88,7 +92,11 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "lobby_stages": "crate::engine::stages::lobby_stages",
    "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
-   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS"
+   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS",
+   "mii_menu": "crate::engine::mii_root::mii_menu",
+   "resume": "crate::engine::mii_root::resume",
+   "AppPage": "crate::runtime::compat::menu_app::AppPage",
+   "App": "crate::runtime::compat::menu_app::App"
   },
   "mii": {
    "auto_init": "crate::engine::mii::auto_init",
@@ -120,8 +128,8 @@
   },
   "sync": {
    "read": "crate::runtime::compat::sync::read",
-   "lock_write": "crate::runtime::compat::sync::lock_write",
-   "assign": "crate::runtime::compat::sync::assign"
+   "lock_write": "crate::runtime::compat::menu_app::lock_write",
+   "assign": "crate::runtime::compat::menu_app::assign"
   },
   "macros": {
    "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS"
@@ -999,21 +1007,24 @@
    "dest": "src/model/stages/lobby_stage_cycle.rs",
    "crate": "root",
    "src_sha256": "c4a313db7890e6529419e036dbc9403a4e503f0533633438f7828df58beed3cf",
-   "dest_sha256": "78770877aaf438550213d7ede6c81606cf4f22e91696eb0f4b11545ca3749e52"
+   "dest_sha256": "89ec339a769c59f6c2a7f55100072865a126da431e5c10a2c982ea993678cf18",
+   "widen": true
   },
   {
    "src": "src/practice_stage_request_policy.rs",
    "dest": "src/model/stages/practice_stage_request_policy.rs",
    "crate": "root",
    "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-   "dest_sha256": "334962a1c9016f1000f1c9bcf7257f4a2103ee0c71c34556a663febab10727b4"
+   "dest_sha256": "2684c79324c2debe66b391a87cb729cdbb9c0f8f50a9e559c9c857ff387591b4",
+   "widen": true
   },
   {
    "src": "src/training_stage_rotation_policy.rs",
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "279498a1af78b0b9fbe5c2aa9d762ec2a07983aab4f2b79e3c34b623a03efcf4"
+   "dest_sha256": "279498a1af78b0b9fbe5c2aa9d762ec2a07983aab4f2b79e3c34b623a03efcf4",
+   "widen": true
   },
   {
    "src": "src/hazard_manager/policy.rs",
@@ -1299,7 +1310,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "dc8458ef6a22e923d0c196d86616f39f3e37e0210810ff024830ab66e4be71e0"
+   "dest_sha256": "1872cf7f529b29f04c5b85f31737d0c10b32e4c69e206c3259d569fe633cc989"
   },
   {
    "src": "src/mii_ordinary_cpu_native.rs",
@@ -1327,7 +1338,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "e61d1e05976bd876aa261151332c4de591930dbd017ac21a65e98d769f6fbc10"
+   "dest_sha256": "c987cdba7a7ca8fd00233166183a543c797a2a2baea9fa769f51f32d27789a0c"
   },
   {
    "src": "src/mii_replay.rs",
@@ -1341,7 +1352,7 @@
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "be33eb68ef758fd6ea172c61eb4a081f6c79af0f8563716eb5d281766c9deb92"
+   "dest_sha256": "74c272de4ecd93aaec2f7257f11d602a9b276ba6b503efb2b28d5045a2ac1eef"
   },
   {
    "src": "src/mii_saved_fingerprints.rs",
@@ -1411,7 +1422,29 @@
    "dest": "src/runtime/mii/mii_editor_bridge/native.rs",
    "crate": "root",
    "src_sha256": "ed5db356207918b67e65c2bb2a9414930aa12673c36a50c3968e8f707c4bc39e",
-   "dest_sha256": "1867ad9dc7f67844bbf137325ec2e814993393c66d57f1509ca8df6e95cf5ae9"
+   "dest_sha256": "23c0efb6eba1ebfd83d3d56e3db48b1016b34b5873c5cf920d0c021449f7d0e4",
+   "edits": [
+    {
+     "old": "#[derive(Clone, serde::Serialize)]\npub(super) struct InputChange {",
+     "new": "#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange {",
+     "reason": "`InputChange` is `Copy` so the fixed trace list can hold it"
+    },
+    {
+     "old": "pub(super) struct InputSnapshot([Vec<u8>; 3]);",
+     "new": "const INPUT_REGIONS: [(usize, usize); 3] = [(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)];\npub(super) struct InputSnapshot { rows: [[u8; 8 * 0x240]; 3] }",
+     "reason": "the baseline copies the three input regions into fixed rows (the largest region is 8 * 0x240 bytes) instead of three `Vec`s allocated inside a hook"
+    },
+    {
+     "old": "    pub first_changes: Vec<(usize, u8, u8)>,",
+     "new": "    pub first_changes: crate::engine::compat::fixed::FixedVec<(usize, u8, u8), 64>,",
+     "reason": "the first 64 differences are kept in a fixed list (same JSON), not a `Vec` collected inside a hook"
+    },
+    {
+     "old": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    InputSnapshot([(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)]\n        .map(|(offset, len)| std::slice::from_raw_parts((base + offset) as *const u8, len).to_vec()))\n}\n\nimpl InputSnapshot {\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        let observed = input_snapshot(base);\n        std::array::from_fn(|region| {\n            let expected = &self.0[region];\n            let actual = &observed.0[region];\n            let differences = expected.iter().zip(actual).enumerate()\n                .filter(|(_, (a, b))| a != b);\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes: differences.clone().count(),\n                first_changes: differences.take(64).map(|(i, (&a, &b))| (i, a, b)).collect(),\n            }\n        })\n    }\n}",
+     "new": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    let mut rows = [[0u8; 8 * 0x240]; 3];\n    for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {\n        row[..len].copy_from_slice(std::slice::from_raw_parts((base + offset) as *const u8, len));\n    }\n    InputSnapshot { rows }\n}\n\nimpl InputSnapshot {\n    /// Compares the baseline with the live regions in place (no second copy is made inside the hook).\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        std::array::from_fn(|region| {\n            let (offset, len) = INPUT_REGIONS[region];\n            let expected = &self.rows[region][..len];\n            let actual = std::slice::from_raw_parts((base + offset) as *const u8, len);\n            let mut first_changes = crate::engine::compat::fixed::FixedVec::new();\n            let mut changed_bytes = 0;\n            for (i, (&a, &b)) in expected.iter().zip(actual).enumerate() {\n                if a != b {\n                    changed_bytes += 1;\n                    first_changes.push((i, a, b));\n                }\n            }\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes,\n                first_changes,\n            }\n        })\n    }\n}",
+     "reason": "`input_snapshot` fills the fixed rows and `compare` reads the live regions in place (same hashes, changed-byte count and first 64 differences; the fork copied the live regions a second time, so a byte changing between the hash and the walk can now show in one and not the other, which a private qualification diagnostic tolerates)"
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/connected_native.rs",
@@ -1467,7 +1500,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/ui_resume.rs",
    "crate": "root",
    "src_sha256": "ff2007bc3608fb37f9eea716e1c311160002cc6946546c2e7f799ff86d181522",
-   "dest_sha256": "971ad7f1903f8dc69e3f404353212ec96cf19c1e19e8b32296e58c8f414ab5d4"
+   "dest_sha256": "ff068ce7f858ee31dcb5c833254b853d6739575728000c490022f91d052cc1a6"
   },
   {
    "src": "src/mii_editor_bridge/name_keyboard.rs",
@@ -1509,7 +1542,34 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "e3e18efb14ac3f47da916ea8c54cbf59db2d87bd2b9281142c34d99b04e3ec45"
+   "dest_sha256": "e7826904600aade69b602e2c892962eeee43c5a5657f441f82ac6cfc08967eeb",
+   "edits": [
+    {
+     "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
+     "new": "pub(crate) struct Trace {\n    events: crate::engine::compat::fixed::FixedVec<Event, 192>,\n    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}",
+     "reason": "the trace lives in fixed-capacity lists (same 192 events, 4 input checks, same JSON): the `Vec`s grew inside game hooks (review R5, lead ruling 3 of 2026-11-02)"
+    },
+    {
+     "old": "}.unwrap_or_else(|| Trace { events: Vec::with_capacity(192), input_checks: Vec::new() });",
+     "new": "}.unwrap_or_else(|| Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() });",
+     "reason": "a new session's trace allocated 192 events inside the request hook; the fixed list does not allocate"
+    },
+    {
+     "old": "        if self.trace.events.len() < 192 {\n            self.trace.events.push(Event { name, phase: self.phase, values });\n            crate::runtime::compat::filesystem::write_mii_editor(Box::new(self.trace.clone()));\n        }",
+     "new": "        if self.trace.events.push(Event { name, phase: self.phase, values }) {\n            // the callback only copies the newest state into the writer's slot (coalesced, no allocation, no file I/O)\n            crate::runtime::compat::filesystem::publish_mii_editor(&self.trace);\n        }",
+     "reason": "every editor event cloned the whole trace into a `Box` inside the hook and queued a write of it; now the newest trace replaces an unwritten older one in a fixed slot that the writer thread takes (lead ruling 2 and 3 of 2026-11-02)"
+    },
+    {
+     "old": "pub(crate) fn write_trace(trace: &Trace) {",
+     "new": "pub(crate) fn write_trace(trace: &Trace) -> std::io::Result<()> {",
+     "reason": "the write reports its result to the writer thread, which keeps the state for the next turn on a failure"
+    },
+    {
+     "old": "    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {\n        let path = \"sd:/ultimate/TrainingRooms/mii-editor-last.json\";\n        if let Err(error) = std::fs::write(path, bytes) {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] trace write failed: {error}\"));\n        }\n    }",
+     "new": "    crate::engine::lobby::trace_slot::write_json(std::path::Path::new(\"sd:/ultimate/TrainingRooms/mii-editor-last.json\"), trace)",
+     "reason": "the trace file is written transactionally (temporary file, sync, replace; the old file stays on a failure) instead of `std::fs::write` over the live file (review R1); host tests in `engine::lobby::trace_slot` cover two loads and a failed write; offered back to the fork's fix ledger"
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/return_gate.rs",
@@ -1733,7 +1793,14 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "55e8753c011a750ea616edfe5ea590587dae8aa94f2870ebd6ae7d1d94ddb83a"
+   "dest_sha256": "7d8ac84b4258ad163e41ddf42e280c44b689a5ac28a613e301d5ceeba7ef9618",
+   "edits": [
+    {
+     "old": "notification(\"Practice Stage\".into(), message, 180);",
+     "new": "notification(\"Practice Stage\".into(), message.into(), 180);",
+     "reason": "the notification facade takes `Cow<'static, str>` so static texts allocate nothing; the formatted message moves in as `Cow::Owned`"
+    }
+   ]
   },
   {
    "src": "src/practice_stage_request_words.rs",
@@ -1761,14 +1828,175 @@
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "4e649beef44e2d87cec164174467bbc3db5dbb7c3c44475a1c8442541a03c2b8"
+   "dest_sha256": "555f1a4673997f07fef352d6ea7726b841ce1ffad3d4b1f22f5b065252d13d77",
+   "edits": [
+    {
+     "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
+     "new": "use {crate::runtime::compat::consts::FighterId, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
+     "reason": "`Action` and `LedgeOption` are the fork's menu structs (its mixed consts crate); see the next edit"
+    },
+    {
+     "delete_from": "pub fn available_actions(mut actions: Action) -> Action {",
+     "delete_to": "/// Called before input processing and UI dispatch.",
+     "reason": "`available_actions` / `available_ledge_options` filtered the fork's menu structs (the playback choices are not offered in the waiting room); the clean-room menu model decides which rows and options a scene offers (SPEC-core-02), so they have no caller and no type to act on"
+    },
+    {
+     "old": "pub fn set_native_ui_busy(busy: bool) {\n",
+     "new": "pub fn set_native_ui_busy(busy: bool) {\n    // R2: the waiting-room native UI busy fact is one producer: the owner bit that the input-delay stage reads\n    crate::runtime::compat::common::menu::set_native_ui_owner(busy);\n",
+     "reason": "the busy fact is published as `Owners::NATIVE_UI_BUSY` in the input-owner mask through one function, so a hand-supplied owner value can never replace the producer (review R2, PACKAGE-6-PLAN section 7)"
+    },
+    {
+     "old": "            NATIVE_UI_BUSY.store(false, Ordering::Release);\n",
+     "new": "            set_native_ui_busy(false);\n",
+     "reason": "the scene departure released the busy flag by a direct store, which would leave the owner bit set (every later poll neutral); the one producer is `set_native_ui_busy` (review R2)"
+    },
+    {
+     "old": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        super::clear_session_state();\n",
+     "new": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state();\n",
+     "reason": "package 2's CPU role scene and the shared scene wrapper follow the lobby's activation (`cpu::set_lobby`, PACKAGE-6-PLAN section 6); the fork had no such coupling"
+    }
+   ]
   },
   {
    "src": "src/training/practice.rs",
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "bbf33fae575e0ac6a2c77d58a93dc3489e84c090b4dae9759f66a7b65a2a5c94"
+   "dest_sha256": "a5e2509155d7c8ce34329b5af3fce14496c6fdd15ce5b912f6c7a0de7ac485bd",
+   "edits": [
+    {
+     "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
+     "new": "    common::try_get_object_accessor(owner).is_some_and(|module|\n        module.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
+     "reason": "the fork's `try_get_battle_object` returned its `BattleObject` struct only for the `module_accessor` field; the clean room resolves the accessor of an object id directly (guarded `sv_battle_object::module_accessor` row)"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_tui/src/resume.rs",
+   "dest": "src/model/mii_root/resume.rs",
+   "crate": "tui",
+   "src_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793",
+   "dest_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793"
+  },
+  {
+   "src": "training_mod_tui/src/mii_menu.rs",
+   "dest": "src/model/mii_root/mii_menu.rs",
+   "crate": "tui",
+   "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
+   "dest_sha256": "8e72cef70c1637e753c7225eb5c012a03b5917278d28a55f9528cd170c2618ea",
+   "edits": [
+    {
+     "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
+     "new": "use crate::engine::compat::panel_view as macro_panel;",
+     "reason": "the fork's menu toolkit (`StatefulTable`, `SubMenu`, the macro panel) is not carried: the one list view the catalog fills is `compat::panel_view::View` (the same four fields)"
+    },
+    {
+     "delete_from": "pub fn launchers() -> Vec<SubMenu<'static>> {",
+     "delete_to": "/// Supplied once at menu open",
+     "reason": "`launchers` built the fork's three Mii submenu launchers; the clean-room menu table has the Mii rows (`Editor::MiiList`, SPEC-core-02)"
+    },
+    {
+     "old": "let page_size = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;",
+     "new": "let page_size = crate::model::panes::ROWS;",
+     "reason": "a page of the Mii list is as many rows as the clean-room list screen shows (package 5's `panes::ROWS`), not the fork's submenu grid"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/adapter.rs",
+   "dest": "src/model/lobby/automation/adapter.rs",
+   "crate": "root",
+   "src_sha256": "df094011e9da70957a2c7e308f5a7b761a5213b04190e7e508bfc59fe6f71940",
+   "dest_sha256": "da0ac63269277cba0494bcf716054105c586cdcd61bedff17e438aa60a234193",
+   "edits": [
+    {
+     "old": "impl Adapter {\n",
+     "new": "impl Default for Adapter {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Adapter {\n",
+     "reason": "clippy `new_without_default` on `Adapter::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/control.rs",
+   "dest": "src/model/lobby/automation/control.rs",
+   "crate": "root",
+   "src_sha256": "b32c1c5dde398e494832b1ae4f266a99368054c9c5fc2a2767fb2047797bd64f",
+   "dest_sha256": "c4802c38cd1cc345182f6cb47ece7a3fe7890e912e5aa6a996ed1a3e27d7021c",
+   "edits": [
+    {
+     "old": "impl Controls {\n",
+     "new": "impl Default for Controls {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Controls {\n",
+     "reason": "clippy `new_without_default` on `Controls::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/flow.rs",
+   "dest": "src/model/lobby/automation/flow.rs",
+   "crate": "root",
+   "src_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a",
+   "dest_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a"
+  },
+  {
+   "src": "src/automation_helper/popup.rs",
+   "dest": "src/model/lobby/automation/popup.rs",
+   "crate": "root",
+   "src_sha256": "35a9ea32b9fa302cac348caf781a556e60ef74b0fcdd45ef39b6b59e9fb3d98d",
+   "dest_sha256": "24619b0dc9762fe788fa16edb099e761f01217a09821ad95c4fa391978043014",
+   "edits": [
+    {
+     "old": "impl Popup {\n",
+     "new": "impl Default for Popup {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Popup {\n",
+     "reason": "clippy `new_without_default` on `Popup::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/pulse.rs",
+   "dest": "src/model/lobby/automation/pulse.rs",
+   "crate": "root",
+   "src_sha256": "3a4561a96f75be9cdca1705de9579c026f94039b2809350c886fefec98702563",
+   "dest_sha256": "60824c70a36487d80a640be5331593d3142850fd639ce716e09d09e18dff6a66",
+   "edits": [
+    {
+     "old": "impl Scheduler {\n",
+     "new": "impl Default for Scheduler {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Scheduler {\n",
+     "reason": "clippy `new_without_default` on `Scheduler::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    },
+    {
+     "old": "impl Slot {\n",
+     "new": "impl Default for Slot {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Slot {\n",
+     "reason": "clippy `new_without_default` on `Slot::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/recording.rs",
+   "dest": "src/model/lobby/automation/recording.rs",
+   "crate": "root",
+   "src_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29",
+   "dest_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29"
+  },
+  {
+   "src": "src/automation_helper/native.rs",
+   "dest": "src/runtime/lobby/automation_helper/native.rs",
+   "crate": "root",
+   "src_sha256": "62851fc8c4e245ae4d8f73105d732b218ed1de57dece5dd93736afb74a144eb7",
+   "dest_sha256": "62b85bef9d9a32fe862ec67c4ae39efb28970c68508daccadb01d02e90c04362"
+  },
+  {
+   "src": "src/automation_helper/observer.rs",
+   "dest": "src/runtime/lobby/automation_helper/observer.rs",
+   "crate": "root",
+   "src_sha256": "dfb1910269e9a9b6d67dd7ad5f56580fbaed1ccdf60869b009c166a3e386f21a",
+   "dest_sha256": "ca08264f8cf1cf94e1d02f6787764f2fc656a19d05867df2ab71893bdd120db8"
+  },
+  {
+   "src": "src/automation_helper/plugin.rs",
+   "dest": "src/runtime/lobby/automation_helper/plugin.rs",
+   "crate": "root",
+   "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
+   "dest_sha256": "cf5ce60065242626647bc8e5a950490b0672fc8e8dba0e1b268bdb0956d3f1a9"
   }
  ]
 }

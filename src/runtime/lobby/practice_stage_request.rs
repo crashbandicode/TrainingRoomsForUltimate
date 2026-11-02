@@ -67,7 +67,7 @@ impl State {
                 };
                 if let Some(message) = message {
                     crate::runtime::lobby::training::ui::notifications::clear_notification("Practice Stage");
-                    crate::runtime::lobby::training::ui::notifications::notification("Practice Stage".into(), message, 180);
+                    crate::runtime::lobby::training::ui::notifications::notification("Practice Stage".into(), message.into(), 180);
                 }
             }
         }

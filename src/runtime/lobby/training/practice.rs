@@ -88,8 +88,8 @@ pub unsafe fn visualizes(module: *mut BattleObjectModuleAccessor) -> bool {
     if common::get_category(module) != *BATTLE_OBJECT_CATEGORY_WEAPON { return false; }
     let owner = WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
         *WEAPON_INSTANCE_WORK_ID_INT_LINK_OWNER) as u32;
-    common::try_get_battle_object(owner).is_some_and(|body|
-        body.module_accessor.as_ref().is_some_and(|module|
+    common::try_get_object_accessor(owner).is_some_and(|module|
+        module.as_ref().is_some_and(|module|
             module.battle_object_id == owner && role(module).is_some()))
 }
 

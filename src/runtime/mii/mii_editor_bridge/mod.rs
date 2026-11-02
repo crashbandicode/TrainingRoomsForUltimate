@@ -28,7 +28,7 @@ use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex};
 use std::time::{Duration, Instant};
 use crate::engine::mii::inventory::{self, Snapshot};
-use training_mod_tui::resume::ResumeTicket;
+use crate::engine::mii_root::resume::ResumeTicket;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -53,8 +53,8 @@ struct Event { name: &'static str, phase: Phase, values: [u64; 4] }
 
 #[derive(Clone, Serialize)]
 pub(crate) struct Trace {
-    events: Vec<Event>,
-    input_checks: Vec<(&'static str, [native::InputChange; 3])>,
+    events: crate::engine::compat::fixed::FixedVec<Event, 192>,
+    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,
 }
 
 struct Session {
@@ -100,27 +100,22 @@ impl Session {
     }
 
     fn event(&mut self, name: &'static str, values: [u64; 4]) {
-        if self.trace.events.len() < 192 {
-            self.trace.events.push(Event { name, phase: self.phase, values });
-            crate::runtime::compat::common::filesystem::write_mii_editor(Box::new(self.trace.clone()));
+        if self.trace.events.push(Event { name, phase: self.phase, values }) {
+            // the callback only copies the newest state into the writer's slot (coalesced, no allocation, no file I/O)
+            crate::runtime::compat::filesystem::publish_mii_editor(&self.trace);
         }
     }
 }
 
-pub(crate) fn write_trace(trace: &Trace) {
+pub(crate) fn write_trace(trace: &Trace) -> std::io::Result<()> {
     if let Some(event) = trace.events.last() {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] {} {:?} {:?}",
             event.name, event.phase, event.values));
     }
-    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {
-        let path = "sd:/ultimate/TrainingRooms/mii-editor-last.json";
-        if let Err(error) = std::fs::write(path, bytes) {
-            crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] trace write failed: {error}"));
-        }
-    }
+    crate::engine::lobby::trace_slot::write_json(std::path::Path::new("sd:/ultimate/TrainingRooms/mii-editor-last.json"), trace)
 }
 
-pub(crate) fn request(request: training_mod_tui::mii_menu::EditorRequest) {
+pub(crate) fn request(request: crate::engine::mii_root::mii_menu::EditorRequest) {
     let result = (|| -> Result<(), &'static str> {
         if !ENABLED.load(Ordering::Acquire) { return Err("Editor adapter is unavailable"); }
         let origin = match editor_origin::admit(
@@ -134,8 +129,8 @@ pub(crate) fn request(request: training_mod_tui::mii_menu::EditorRequest) {
         };
         if !request.catalog.is_complete() { return Err("Mii catalog is incomplete"); }
         let seed = match request.seed {
-            training_mod_tui::mii_menu::EditorSeed::Saved(seed) => Draft::Ready(value::from_seed(&seed)?),
-            training_mod_tui::mii_menu::EditorSeed::NativeDefault(class) => {
+            crate::engine::mii_root::mii_menu::EditorSeed::Saved(seed) => Draft::Ready(value::from_seed(&seed)?),
+            crate::engine::mii_root::mii_menu::EditorSeed::NativeDefault(class) => {
                 if !native_default::available() { return Err("Native default adapter is unavailable"); }
                 Draft::NativeDefault(class)
             }
@@ -159,7 +154,7 @@ fn begin_session(
     if ACTIVE.load(Ordering::Acquire) { return Err("An editor request is already active"); }
     let trace = if restore.is_some() {
         state.as_ref().map(|s| s.trace.clone())
-    } else { None }.unwrap_or_else(|| Trace { events: Vec::with_capacity(192), input_checks: Vec::new() });
+    } else { None }.unwrap_or_else(|| Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() });
     let mut session = Session { origin, interrupted: false, submenu_completed: false,
         snapshot_saved: false, resume_generation: None,
         restore_ticket: restore.map(|(ticket, _, _)| ticket),
@@ -236,15 +231,15 @@ pub(crate) fn mount_opened_catalog(catalog: Snapshot, opening: u64) -> OpenedCat
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
-    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::common::menu::QUICK_MENU_APP);
+    let mut app = crate::runtime::compat::menu_app::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
-    if app.page != training_mod_tui::AppPage::SUBMENU {
+    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {
         return OpenedCatalog::Later(catalog);
     }
     if app.mount_mii_editor_catalog(catalog, opening) {
-        crate::runtime::compat::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+        crate::runtime::compat::menu_app::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
         OpenedCatalog::Shown
     } else {
         OpenedCatalog::Dropped
@@ -722,7 +717,7 @@ pub(crate) fn init() {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] unsupported native code; disabled"));
         return;
     }
-    crate::runtime::compat::common::filesystem::init();
+    crate::runtime::compat::filesystem::init();
     BASE.store(base, Ordering::Release);
     unsafe { native_default::init(base); }
     skyline::install_hooks!(training_ui, training_state, editor_parent, edit_initialized,

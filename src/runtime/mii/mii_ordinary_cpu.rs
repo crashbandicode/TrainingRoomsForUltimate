@@ -13,7 +13,7 @@ use crate::engine::mii::{
     identity::Identity as TxnIdentity,
     transition::{Outcome,ReadyReceipt,Refusal},
 };
-use training_mod_tui::mii_menu::Context as MenuContext;
+use crate::engine::mii_root::mii_menu::Context as MenuContext;
 use crate::engine::swap::mii_cycle::{self,Identity,Live};
 use crate::engine::swap::source_load::{Blocker,Waiting};
 #[path="mii_ordinary_cpu_native.rs"] mod native;

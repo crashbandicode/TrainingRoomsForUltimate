@@ -10,7 +10,7 @@ use crate::engine::mii::{
     identity::Identity as TxnIdentity,
     transition::{Outcome,ReadyReceipt,Refusal},
 };
-use training_mod_tui::mii_menu::Context as MenuContext;
+use crate::engine::mii_root::mii_menu::Context as MenuContext;
 use crate::engine::swap::mii_cycle::{self,Identity,Live};
 #[path="mii_ordinary_native.rs"] pub(super) mod native;
 #[path="mii_ordinary_gate.rs"] mod hook;

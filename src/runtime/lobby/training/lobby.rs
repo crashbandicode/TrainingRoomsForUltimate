@@ -2,7 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-use {training_mod_consts::Action, training_mod_consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};
+use {crate::runtime::compat::consts::FighterId, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};
 use crate::runtime::compat::sync::read;
 
 use crate::runtime::lobby::game_mode;
@@ -24,6 +24,8 @@ pub fn native_ui_busy() -> bool {
 
 /// Native pause/dialog ownership takes priority over an open editor or delayed input.
 pub fn set_native_ui_busy(busy: bool) {
+    // R2: the waiting-room native UI busy fact is one producer: the owner bit that the input-delay stage reads
+    crate::runtime::compat::common::menu::set_native_ui_owner(busy);
     if NATIVE_UI_BUSY.swap(busy, Ordering::AcqRel) != busy {
         if busy {
             crate::runtime::compat::common::menu::clear_session_state();
@@ -72,28 +74,6 @@ pub fn permits_entry(entry: i32) -> bool {
     !is_waiting_scene() || matches!(entry, 0 | 4)
 }
 
-pub fn available_actions(mut actions: Action) -> Action {
-    if is_waiting_scene() && !super::practice::enabled() {
-        actions.PLAYBACK_1 = 0;
-        actions.PLAYBACK_2 = 0;
-        actions.PLAYBACK_3 = 0;
-        actions.PLAYBACK_4 = 0;
-        actions.PLAYBACK_5 = 0;
-    }
-    actions
-}
-
-pub fn available_ledge_options(mut options: LedgeOption) -> LedgeOption {
-    if is_waiting_scene() && !super::practice::enabled() {
-        options.PLAYBACK_1 = 0;
-        options.PLAYBACK_2 = 0;
-        options.PLAYBACK_3 = 0;
-        options.PLAYBACK_4 = 0;
-        options.PLAYBACK_5 = 0;
-    }
-    options
-}
-
 /// Called before input processing and UI dispatch. Cleanup only touches plugin state;
 /// do not roll Smash RNG, dereference departing fighters or request a game status here.
 pub fn update() {
@@ -112,7 +92,7 @@ pub fn update() {
             // A scene switch invalidates the previous layout even if the next
             // waiting room happens to use the same allocation address.
             UI_READY.store(false, Ordering::Release);
-            NATIVE_UI_BUSY.store(false, Ordering::Release);
+            set_native_ui_busy(false);
             super::ui::native_menu::reset();
             trace!(
                 "[LobbyPractice] scene initialized={} melee=0x{:02x} mode=0x{:08x}",
@@ -130,6 +110,7 @@ pub fn update() {
     let previous = WAS_ACTIVE.swap(now, Ordering::AcqRel);
     if now != previous {
         SEEN_ENTRIES.store(0, Ordering::Relaxed);
+        crate::runtime::features::cpu::set_lobby(now);
         super::clear_session_state();
         // The CPU's cached rolls start from the live menu, as after a Training reset.
         super::cpu_rolls::request_all();

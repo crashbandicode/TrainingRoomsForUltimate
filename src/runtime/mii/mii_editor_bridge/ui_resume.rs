@@ -4,7 +4,7 @@ use super::{cosmetic_resume, draft::Draft, inline_keyboard::Text, return_gate::R
     settings_resume, specials_resume, value, STATE};
 use std::sync::{Arc, Mutex};
 use crate::engine::mii::inventory::Snapshot as Catalog;
-use training_mod_tui::resume::{ResumeReadiness, ResumeSlot, ResumeTicket};
+use crate::engine::mii_root::resume::{ResumeReadiness, ResumeSlot, ResumeTicket};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Screen {

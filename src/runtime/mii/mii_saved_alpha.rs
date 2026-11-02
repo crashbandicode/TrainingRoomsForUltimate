@@ -9,7 +9,7 @@ use crate::engine::mii::{
     role_adapter::SavedRole,
     selection::{self, Action, Active, Origin, PlayerLive, PlayerOrigin, Role as MiiRole},
 };
-use training_mod_tui::mii_menu::{Context as MenuContext, MenuCapture, PendingSelection};
+use crate::engine::mii_root::mii_menu::{Context as MenuContext, MenuCapture, PendingSelection};
 #[path = "mii_saved_native.rs"]
 mod native;
 
@@ -592,10 +592,10 @@ unsafe fn finish_saved_capture(
     drop(s);
     if let Some((catalog, context)) = publish {
         // No G/state lock remains; App contains owned values only.
-        let mut app = crate::runtime::compat::sync::lock_write(&menu::QUICK_MENU_APP);
+        let mut app = crate::runtime::compat::menu_app::lock_write(&menu::QUICK_MENU_APP);
         // Check under App: an older capture may have completed before cancellation.
         let mounted=app.publish_mii_catalog(catalog, context, menu_epoch(), || {
-            crate::runtime::compat::sync::assign(&menu::MENU_RECEIVED_INPUT, true);
+            crate::runtime::compat::menu_app::assign(&menu::MENU_RECEIVED_INPUT, true);
         });
         #[cfg(feature="mii-ordinary-cpu-alpha")]
         if mounted {app.qualify_ordinary_cpu_cycle(ordinary_cpu);}

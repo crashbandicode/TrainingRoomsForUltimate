@@ -412,36 +412,47 @@ pub(super) unsafe fn practice_inputs(base: usize) -> [u64; 3] {
 // Private qualification diagnostics only. These bytes are never restored or
 // interpreted as native objects. Capture at four transition milestones, not per
 // frame, to distinguish editor writes from online configuration updates.
-pub(super) struct InputSnapshot([Vec<u8>; 3]);
+const INPUT_REGIONS: [(usize, usize); 3] = [(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)];
+pub(super) struct InputSnapshot { rows: [[u8; 8 * 0x240]; 3] }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, Copy, serde::Serialize)]
 pub(super) struct InputChange {
     pub region: usize,
     pub expected_hash: u64,
     pub observed_hash: u64,
     pub changed_bytes: usize,
-    pub first_changes: Vec<(usize, u8, u8)>,
+    pub first_changes: crate::engine::compat::fixed::FixedVec<(usize, u8, u8), 64>,
 }
 
 pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {
-    InputSnapshot([(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)]
-        .map(|(offset, len)| std::slice::from_raw_parts((base + offset) as *const u8, len).to_vec()))
+    let mut rows = [[0u8; 8 * 0x240]; 3];
+    for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {
+        row[..len].copy_from_slice(std::slice::from_raw_parts((base + offset) as *const u8, len));
+    }
+    InputSnapshot { rows }
 }
 
 impl InputSnapshot {
+    /// Compares the baseline with the live regions in place (no second copy is made inside the hook).
     pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {
-        let observed = input_snapshot(base);
         std::array::from_fn(|region| {
-            let expected = &self.0[region];
-            let actual = &observed.0[region];
-            let differences = expected.iter().zip(actual).enumerate()
-                .filter(|(_, (a, b))| a != b);
+            let (offset, len) = INPUT_REGIONS[region];
+            let expected = &self.rows[region][..len];
+            let actual = std::slice::from_raw_parts((base + offset) as *const u8, len);
+            let mut first_changes = crate::engine::compat::fixed::FixedVec::new();
+            let mut changed_bytes = 0;
+            for (i, (&a, &b)) in expected.iter().zip(actual).enumerate() {
+                if a != b {
+                    changed_bytes += 1;
+                    first_changes.push((i, a, b));
+                }
+            }
             InputChange {
                 region,
                 expected_hash: crate::engine::mii::inventory::fnv1a64(expected),
                 observed_hash: crate::engine::mii::inventory::fnv1a64(actual),
-                changed_bytes: differences.clone().count(),
-                first_changes: differences.take(64).map(|(i, (&a, &b))| (i, a, b)).collect(),
+                changed_bytes,
+                first_changes,
             }
         })
     }
