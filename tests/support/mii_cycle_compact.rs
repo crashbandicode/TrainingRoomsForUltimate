@@ -24,6 +24,45 @@ unsafe impl GlobalAlloc for AllocationProbe {
 #[global_allocator]
 static ALLOCATOR: AllocationProbe = AllocationProbe;
 
+/// One thread-local measurement shared by the planner and preload regressions.
+/// Drop disarms a failed assertion too, so later tests cannot inherit counting.
+pub(crate) struct AllocationCount;
+impl AllocationCount {
+    pub(crate) fn start() -> Self {
+        ALLOCS.with(|count| {
+            assert!(count.get().is_none(), "nested allocation measurement");
+            count.set(Some(0));
+        });
+        Self
+    }
+    pub(crate) fn finish(self) -> usize {
+        ALLOCS.with(|count| count.replace(None).expect("active allocation measurement"))
+    }
+}
+impl Drop for AllocationCount {
+    fn drop(&mut self) { ALLOCS.with(|count| count.set(None)); }
+}
+
+#[test]
+fn shared_counter_observes_alloc_zeroed_and_realloc() {
+    let measurement = AllocationCount::start();
+    unsafe {
+        let layout = Layout::from_size_align(16, 8).unwrap();
+        let zeroed = std::alloc::alloc_zeroed(layout);
+        assert!(!zeroed.is_null());
+        assert_eq!(*std::hint::black_box(zeroed), 0);
+        let grown = std::alloc::realloc(zeroed, layout, 32);
+        assert!(!grown.is_null());
+        std::alloc::dealloc(grown, Layout::from_size_align(32, 8).unwrap());
+        let plain = std::alloc::alloc(layout);
+        assert!(!plain.is_null());
+        std::hint::black_box(plain);
+        std::alloc::dealloc(plain, layout);
+    }
+    assert_eq!(measurement.finish(), 3);
+    assert_eq!(AllocationCount::start().finish(), 0);
+}
+
 fn catalog() -> Snapshot {
     let rows = [MiiClass::Brawler, MiiClass::Swordfighter, MiiClass::Gunner]
         .into_iter().flat_map(|class| [0u8, 1].map(move |variant| (class, variant)))
@@ -196,7 +235,7 @@ fn first_and_repeated_full_roster_qualified_walks_allocate_nothing() {
     let ordered: Vec<_> = crate::engine::swap::trio::CHOICES.iter()
         .map(|(kind, _)| TrioFighter::from_kind(*kind).unwrap()).collect();
     for pass in 0..2 {
-        ALLOCS.with(|c| c.set(Some(0)));
+        let measurement = AllocationCount::start();
         let mut live = Live::Original;
         for _ in 0..ordered.len() + 2 {
             let result = next_qualified_player(&ordered, &catalog, &preferences,
@@ -209,7 +248,7 @@ fn first_and_repeated_full_roster_qualified_walks_allocate_nothing() {
                 };
             }
         }
-        let count = ALLOCS.with(|c| c.replace(None).unwrap());
+        let count = measurement.finish();
         assert_eq!(count, 0, "pass={pass}: first and repeated actual planner calls");
     }
 }

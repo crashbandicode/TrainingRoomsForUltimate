@@ -85,7 +85,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "first-boot import of the fork's captures in the background"),
     row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 13_488, "Eden st-02..st-12", "ui::worker::run",
         "the menu worker: model steps, screens, settings JSON on close"),
-    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_640, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#2}",
+    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#2}",
         "returns parked layout archives to the pool after their grace"),
     row(ThreadId::Probe, c"tr-probe", 24 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}",
         "ARCropolis mount wait and the layout file probe"),

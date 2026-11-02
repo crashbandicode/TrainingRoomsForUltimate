@@ -972,7 +972,7 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "3a323f7da6cf82d9451862fa90a4a0ee00bee29277e4121a2e59f7d56caac163",
+   "dest_sha256": "eda738c0e0000cf8a4fc125e333cab839beb36660e21b6d65883df77cc62a588",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
@@ -1036,6 +1036,11 @@
      "old": "#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
      "new": "#[cfg(all(test, not(target_os = \"switch\")))]\n#[path = \"../../../tests/support/mii_cycle_compact.rs\"]\nmod compact_regressions;\n\n#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
      "reason": "pkg4 planner stack root: original independent heap-backed ring equivalence plus first/repeated allocation probes exercise this actual implementation; host-only test allocator, never shipped."
+    },
+    {
+     "old": "mod compact_regressions;",
+     "new": "pub(crate) mod compact_regressions;",
+     "reason": "Lead22:27 approved shared host-test counter f920188: expose cfg(test) compact allocator API to preload regressions, retaining one allocator and positive alloc/zero/realloc control; no shipped code change."
     }
    ]
   },
