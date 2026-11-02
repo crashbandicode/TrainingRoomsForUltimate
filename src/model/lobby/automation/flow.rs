@@ -5,7 +5,6 @@ use super::control::{Decision, Request};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
     Waiting,
-    #[cfg_attr(not(test), expect(dead_code, reason = "The native adapter starts at cards; intro readiness is not yet connected."))]
     IntroReady,
     Cards,
     SaveConfirm,

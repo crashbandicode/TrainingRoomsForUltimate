@@ -2277,7 +2277,14 @@
    "dest": "src/model/lobby/automation/flow.rs",
    "crate": "root",
    "src_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a",
-   "dest_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a"
+   "dest_sha256": "62dc7f7f19d91d2db528acb2f8f20b6e32ddaa8072ff8ff457715bc988d8a112",
+   "edits": [
+    {
+     "old": "    #[cfg_attr(not(test), expect(dead_code, reason = \"The native adapter starts at cards; intro readiness is not yet connected.\"))]\n",
+     "new": "",
+     "reason": "the fork's `expect(dead_code)` on `Screen::IntroReady` is removed: the enum is a public item of the public `engine::lobby` area, so the dead-code lint never applies to it and the expectation was unfulfilled in every build (an `unfulfilled_lint_expectations` warning on the Switch build). Root cause, not a lint workaround: the lint attribute only existed for the fork's private module"
+    }
+   ]
   },
   {
    "src": "src/automation_helper/popup.rs",
