@@ -51,9 +51,7 @@ pub unsafe fn tick(panes: &Panes) {
     let now = s.ticks;
     match s.phase {
         0 if now - s.phase_at >= START_TICK => {
-            if s.cycle == 0 {
-                let _ = texture::install();
-            }
+            // The helper was installed by the boot (`ui::install`, before any layout tick); the proof only reads its answer.
             diagnostic(format_args!("[Texture] request cycle={} usable={} allocations={}", s.cycle, texture::usable(), hook_allocations()));
             for (i, path) in PATHS.iter().enumerate() {
                 let hash = texture::path_hash(path);
