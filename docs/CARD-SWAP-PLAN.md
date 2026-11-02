@@ -64,3 +64,44 @@ change; any such change is its own transaction, loader file last (playbook WORKF
 4. A listing of the mods folders (stage, effect, fighter mods; the Final Destination replacement): the run-time
    asset reads (`SPEC-core-07` §4.5–4.6, Q16).
 5. Free space on the card.
+
+## Answers to the swap runbook's open questions (2026-11-02, the lead)
+
+Runbook: `…/refactor/c1162/card-swap-tooling/RUNBOOK-swap.md` §6 (playbook `tools/switch/swap-ums.py`, `ae87443`).
+The swap places only `libtraining_rooms.nro` and `developer.ini`; the clean room's first boot runs the import
+(SPEC-core-08) and `check-migration.py` reads the result back.
+
+1. **The three hidden `.<id>.smd-<n>.tmp` folders in `replay_captures/`: skipped, left in place.** In the fork's
+   own code (`training_mod_macros/src/shared_capture.rs`, ours-new, stage m5o: `create_staging` makes
+   `.{id}.smd-{nonce}.tmp`; a capture becomes `<id>.smd` only through the final `fs::rename` after its manifest,
+   timeline and editor cache are complete) such a folder is the staging area of a capture whose publication never
+   happened. The fork never lists it, so it holds no replay the Replay Window could crop; importing it would carry
+   an incomplete bundle. The import skips entries whose name matches exactly `.<id>.smd-<digits>.tmp` (hidden,
+   staging suffix), copies every published `<id>.smd` bundle and `<id>.tmrc` file in full (decision S1 item 3 / N8),
+   counts the skipped folders in `migration.json` (`skipped_staging`) and the install line, and never touches the
+   originals (the fork's folder is read-only to the import). `check-migration.py` should treat them as "skipped by
+   design", not optional.
+2. **`developer.ini` on the operator's card:** exactly the 18 bytes `developer_page=on` followed by one LF (UTF-8, no
+   BOM, no other keys, no CR). The reader is fail-closed (Astra R4): a missing file, any other value or case, a
+   duplicate key, invalid UTF-8, a read error or more than 8 KiB keeps the page hidden. The file is written by the
+   swap before the first boot, so it is the only file under `TrainingRooms/` then: the import starts whenever
+   `migration.json` is absent, whatever else exists (ledger row C1). Host tests (package 3, S3-5): an import with
+   only `developer.ini` present runs completely and writes `settings.json` and `migration.json`; `developer.ini`
+   is left byte-identical; the Developer page reads on.
+3. **After an undo to the Training Modpack: nothing is carried back (recommendation; operator decision U1).** The
+   fork's folder is exactly as it was at the swap (the import only reads it), so the fork resumes from that state.
+   What was recorded under `TrainingRooms/` stays there; if the clean room is installed again, `migration.json`
+   exists, so it does not re-import and its own data is kept. The files are shape-compatible (setting ids,
+   `save_states.json` and macro files keep the fork's formats; the fork's loader ignores unknown keys), so a
+   carry-back is technically possible, but it would overwrite the fork's data on the card and is not tested. If the
+   operator wants it, the lead adds a tested converter (`tools/carry_back.py`: `settings.json` →
+   `training_modpack_menu.conf`, newer `save_states.json` / macros copied only when the fork's copies are older,
+   backups first) as its own step.
+
+```text
+ swap                        first boot (import)                  undo
+ ─────────────────────────   ──────────────────────────────────   ─────────────────────────────────
+ TrainingModpack/  (as is) ──read──▶ TrainingRooms/ (+migration.json)  TrainingModpack/ (as at swap) ◀ fork runs
+ + libtraining_rooms.nro           new data written here only          TrainingRooms/ kept, unused
+ + TrainingRooms/developer.ini                                         (U1: no carry-back unless ordered)
+```
