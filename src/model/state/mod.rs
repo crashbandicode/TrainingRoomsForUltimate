@@ -2,6 +2,8 @@
 //! machine, the placement rules, the settings the per-frame code reads, the portable setup library.
 //! Nothing here touches the game; `runtime::features::save_states` applies the machine's answers.
 
+#[path = "convert.rs"]
+pub mod convert;
 #[path = "file.rs"]
 pub mod file;
 #[path = "held_item.rs"]
@@ -20,3 +22,5 @@ pub mod place;
 pub mod record;
 #[path = "settings.rs"]
 pub mod settings;
+#[path = "setup.rs"]
+pub mod setup;

@@ -277,7 +277,7 @@ fn opt_float(object: &Map<String, Value>, key: &str) -> Option<f32> {
     object.get(key).and_then(Value::as_f64).map(|v| v as f32)
 }
 
-fn charge_from_json(value: &Value) -> Charge {
+pub fn charge_from_json(value: &Value) -> Charge {
     let Some(object) = value.as_object() else { return Charge::default() };
     Charge {
         int_x: opt_int(object, "int_x"),
@@ -305,7 +305,7 @@ fn robin_from_json(value: &Value) -> Option<Robin> {
     })
 }
 
-fn steve_from_json(value: &Value) -> Option<Steve> {
+pub fn steve_from_json(value: &Value) -> Option<Steve> {
     let object = value.as_object()?;
     let mat = |key: &str| -> Option<u32> {
         let text = object.get(key)?.as_str()?;
@@ -348,7 +348,7 @@ fn write_opt_float(out: &mut Writer, key: &str, value: Option<f32>) {
     }
 }
 
-fn write_charge(charge: &Charge, out: &mut Writer) {
+pub fn write_charge(charge: &Charge, out: &mut Writer) {
     out.begin_object();
     write_opt_int(out, "int_x", charge.int_x);
     write_opt_int(out, "int_y", charge.int_y);
@@ -379,7 +379,7 @@ fn write_charge(charge: &Charge, out: &mut Writer) {
     out.end_object();
 }
 
-fn write_steve(steve: &Steve, out: &mut Writer) {
+pub fn write_steve(steve: &Steve, out: &mut Writer) {
     out.begin_object();
     out.field_int("mat_g1", i64::from(steve.mat_g1));
     out.field_int("mat_wood", i64::from(steve.mat_wood));
