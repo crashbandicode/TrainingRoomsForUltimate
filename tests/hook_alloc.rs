@@ -104,6 +104,30 @@ fn the_byte_meter_counts_what_the_one_global_allocator_serves() {
     assert!(after.live < before.live + (1 << 19), "the freed block is not live any more");
 }
 
+/// Attribution (R5): a steady-state allocation is charged to the innermost open scope, and the enclosing scope is current again
+/// when the inner one drops; the per-scope counts sum to the total and the report names them (`allocs=`).
+#[test]
+fn an_allocation_is_charged_to_the_innermost_scope() {
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let before = snapshot();
+    {
+        let _outer = HookScope::enter_hook(HookId::CpuFrame);
+        {
+            let _inner = HookScope::enter_hook(HookId::RosterKirby);
+            std::hint::black_box(vec![0u8; 32]);
+        }
+        std::hint::black_box(vec![0u8; 32]);
+    }
+    let after = snapshot();
+    let charged = |id: HookId| after.allocs[id as usize] - before.allocs[id as usize];
+    assert!(charged(HookId::RosterKirby) >= 1, "the inner scope made one");
+    assert!(charged(HookId::CpuFrame) >= 1, "the outer scope is current again after the inner drops");
+    assert_eq!(after.allocs.iter().sum::<u64>(), after.allocations, "per-scope counts sum to the total");
+    let mut observer = Observer::new();
+    let line = observer.observe(after).expect("activity").to_string();
+    assert!(line.contains(" allocs=") && line.contains("roster_kirby:"), "{line}");
+}
+
 /// Nesting: a hook that calls another hook's code stays inside a scope until the outer one drops.
 #[test]
 fn nested_scopes_count_until_the_outermost_ends() {

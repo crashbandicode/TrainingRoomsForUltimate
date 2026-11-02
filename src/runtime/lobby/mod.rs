@@ -61,6 +61,7 @@ pub(crate) unsafe fn frame(fighter: usize) {
     if entry_id_valid(entry) && entry == 0 {
         // Entries replaced (a hot swap) retire the session first, then a session with both entries ready acquires the lease: the
         // practice session the save and record slots belong to. `entry_departed` (the roster's destruction path) retires at once.
+        let lease = crate::model::hook_stats::HookScope::enter_hook(crate::model::hook_stats::HookId::PracticeLease);
         training::practice::refresh();
         #[cfg(feature = "diag")]
         let held = training::practice::owned();
@@ -74,6 +75,21 @@ pub(crate) unsafe fn frame(fighter: usize) {
             use std::sync::atomic::{AtomicBool, Ordering};
             static LOGGED: AtomicBool = AtomicBool::new(false);
             let now = training::practice::owned();
+            // Why a session is not held (once until it changes): the practice context and the two entries the lease needs.
+            static REFUSAL: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+            if !now {
+                let (enabled, p1, cpu) =
+                    (training::practice::enabled(), training::practice::entry(0).is_some(), training::practice::entry(1).is_some());
+                let code = 1 | (u8::from(enabled) << 1) | (u8::from(p1) << 2) | (u8::from(cpu) << 3);
+                if REFUSAL.swap(code, Ordering::Relaxed) != code {
+                    crate::runtime::diag_log::diagnostic(format_args!(
+                        "[TrainingRooms] practice_session refused context={:?} enabled={enabled} p1_entry={p1} cpu_entry={cpu}",
+                        training::practice::context()
+                    ));
+                }
+            } else {
+                REFUSAL.store(0, Ordering::Relaxed);
+            }
             if held != LOGGED.load(Ordering::Relaxed) || now != held {
                 if held != LOGGED.load(Ordering::Relaxed) {
                     crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] practice_session held={held} (retired or acquired before this frame)"));
@@ -84,13 +100,22 @@ pub(crate) unsafe fn frame(fighter: usize) {
                 LOGGED.store(now, Ordering::Relaxed);
             }
         }
+        drop(lease);
         // The roster cycle's once-per-game-frame steps run on Player 1's body (each returns at once when nothing is pending): the
         // source leases, the Kirby hat requests, the item engine (a granted or restored item) and the preload planner.
         let accessor = game::natives::fighter_accessor(fighter);
         if accessor != 0 {
             let body = accessor as *mut BattleObjectModuleAccessor;
-            crate::runtime::roster::character_roster::sources::on_frame(body);
-            crate::runtime::roster::kirby_hats::on_frame(body);
+            use crate::model::hook_stats::{HookId, HookScope};
+            {
+                let _step = HookScope::enter_hook(HookId::RosterSources);
+                crate::runtime::roster::character_roster::sources::on_frame(body);
+            }
+            {
+                let _step = HookScope::enter_hook(HookId::RosterKirby);
+                crate::runtime::roster::kirby_hats::on_frame(body);
+            }
+            let _items = HookScope::enter_hook(HookId::RosterItems);
             // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).
             #[cfg(feature = "diag")]
             if let Some(choice) = crate::runtime::diag_reload::take_item_request() {
@@ -99,6 +124,8 @@ pub(crate) unsafe fn frame(fighter: usize) {
             crate::runtime::roster::character_items::on_frame(body);
             #[cfg(feature = "item-state-probe")]
             crate::runtime::roster::item_state_probe::on_frame(body);
+            drop(_items);
+            let _preload = HookScope::enter_hook(HookId::RosterPreload);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
         }
     }
