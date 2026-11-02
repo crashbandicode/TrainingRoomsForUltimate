@@ -76,6 +76,8 @@ pub enum Op {
     /// `EffectModule::req_follow(fighter, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0,
     /// 0, false, false)`; the returned handle is stored in the work int `handle`, if any.
     Follow { effect: &'static str, joint: Joint, pos: [f32; 3], rot: [f32; 3], attribute: u32, lifetime: i32, handle: Option<C> },
+    /// Kirby's copied effects, given only as raw hash40 values: `req_follow` with zero offsets, attribute 0.
+    FollowRaw { effect: u64, joint: u64, lifetime: i32, handle: Option<C> },
     /// Donkey Kong's `set_face_motion_by_priority(FIGHTER_FACIAL_SPECIAL, "special_n_max_face")`.
     FaceMotion,
 }
@@ -275,6 +277,110 @@ fn entry_for(ids: &Table, kind: i32) -> Option<&'static Entry> {
     ENTRIES.iter().find(|e| e.kinds.iter().any(|c| ids.is(*c, kind)))
 }
 
+const fn kirby_follow_raw(effect: u64, joint: u64, lifetime: i32, handle: Option<C>) -> Op {
+    Op::FollowRaw { effect, joint, lifetime, handle }
+}
+
+/// Kirby's own copied-ability table (SPEC-state-05 §4.2) for the fighters whose copied charge differs from
+/// the fighter's own: other joints and effects, fewer fields. Kirby's `has_charge` slot says whether he has a
+/// copy ability, so the copied fighter's own flag (HAD, pull/throw) lives in the record's `copy_charge`.
+static KIRBY_ENTRIES: [Entry; 8] = [
+    Entry {
+        kinds: &[C::KindSamus],
+        fields: &[int(Slot::IntX, C::SamusShotCount)],
+        rules: &[Rule {
+            when: When::IntIs(Slot::IntX, 112),
+            ops: &[Op::ChargeMax, follow("samus_cshot_max", "handr", ZERO, ZERO, 0, 0, Some(C::SamusEffectHandle))],
+        }],
+        special: Special::None,
+    },
+    Entry {
+        kinds: &[C::KindSamusD],
+        fields: &[int(Slot::IntX, C::SamusShotCount)],
+        rules: &[Rule {
+            when: When::IntIs(Slot::IntX, 112),
+            ops: &[Op::ChargeMax, follow("samusd_cshot_max", "handr", ZERO, ZERO, 0, 0, Some(C::SamusEffectHandle))],
+        }],
+        special: Special::None,
+    },
+    // Kirby has no needle article: the count alone, and the flash at six.
+    Entry {
+        kinds: &[C::KindSheik],
+        fields: &[int(Slot::IntX, C::SheikNeedleCount)],
+        rules: &[Rule { when: When::IntIs(Slot::IntX, 6), ops: &[Op::ChargeMax] }],
+        special: Special::None,
+    },
+    Entry {
+        kinds: &[C::KindMewtwo],
+        fields: &[int(Slot::IntX, C::MewtwoCharge), int(Slot::IntY, C::MewtwoPrevCharge), flag(C::MewtwoHad)],
+        rules: &[Rule {
+            when: When::IntIs(Slot::IntY, 120),
+            ops: &[
+                Op::ChargeMax,
+                kirby_follow_raw(0x1ac6d446d8, 0x5e008fd84, -1, Some(C::MewtwoEffectLeft)),
+                kirby_follow_raw(0x1ac6d446d8, 0x51a07c0e7, -1, Some(C::MewtwoEffectRight)),
+            ],
+        }],
+        special: Special::None,
+    },
+    Entry {
+        kinds: &[C::KindLucario],
+        fields: &[int(Slot::IntX, C::LucarioCharge), int(Slot::IntY, C::LucarioPrevCharge), flag(C::LucarioHad)],
+        rules: &[Rule {
+            when: When::IntIs(Slot::IntY, 90),
+            ops: &[
+                Op::ChargeMax,
+                kirby_follow_raw(0x164bf96ca1, 0x5e008fd84, -1, Some(C::LucarioEffectLeft)),
+                kirby_follow_raw(0x16b1f651c2, 0x51a07c0e7, -1, Some(C::LucarioEffectRight)),
+            ],
+        }],
+        special: Special::None,
+    },
+    // Kirby's next-Pikmin colour state (no troops manager).
+    Entry {
+        kinds: &[C::KindOlimar],
+        fields: &[int(Slot::IntX, C::OlimarPreVariation), int(Slot::IntY, C::OlimarBeforePreVariation)],
+        rules: &[],
+        special: Special::None,
+    },
+    Entry { kinds: &[C::KindRob], fields: &[float(Slot::FloatX, C::RobBeam)], rules: &[], special: Special::None },
+    Entry {
+        kinds: &[C::KindPacMan],
+        fields: &[int(Slot::IntX, C::PacManRank), flag(C::PacManPullThrow)],
+        rules: &[Rule { when: When::IntIs(Slot::IntX, 12), ops: &[Op::ChargeMax] }],
+        special: Special::PacMan,
+    },
+];
+
+/// Robin's Kirby copy: the thunder kind alone; 3 is the Levin flash on `handl`.
+static KIRBY_ROBIN: Entry = Entry {
+    kinds: &[C::KindRobin],
+    fields: &[int(Slot::IntX, C::RobinThunderKind)],
+    rules: &[Rule {
+        when: When::IntIs(Slot::IntX, 3),
+        ops: &[Op::ChargeMax, kirby_follow_raw(0x12db3e4172, 0x5eb263e0d, -1, None)],
+    }],
+    special: Special::None,
+};
+
+/// The fighters whose own entry is also Kirby's (same fields, same visuals, no flag).
+const KIRBY_SHARED: [C; 4] = [C::KindPokemonSquirtle, C::KindWiiFit, C::KindHero, C::KindSora];
+
+fn kirby_entry_for(ids: &Table, copied: i32) -> Option<&'static Entry> {
+    if ids.is(C::KindRobin, copied) {
+        return Some(&KIRBY_ROBIN);
+    }
+    KIRBY_ENTRIES
+        .iter()
+        .find(|e| e.kinds.iter().any(|c| ids.is(*c, copied)))
+        .or_else(|| ENTRIES.iter().find(|e| e.kinds.iter().any(|c| KIRBY_SHARED.contains(c) && ids.is(*c, copied))))
+}
+
+/// Whether a copied fighter has a charge entry in Kirby's table.
+pub fn has_kirby_entry(ids: &Table, copied: i32) -> bool {
+    kirby_entry_for(ids, copied).is_some()
+}
+
 /// The fighter kinds that have a charge entry here.
 pub fn has_entry(ids: &Table, kind: i32) -> bool {
     entry_for(ids, kind).is_some()
@@ -283,9 +389,39 @@ pub fn has_entry(ids: &Table, kind: i32) -> bool {
 /// What a Save reads for a fighter of `kind` (an empty `Charge` for any other kind). A field whose
 /// constant did not resolve is left absent.
 pub fn read(ids: &Table, kind: i32, work: &dyn Work) -> Charge {
+    match entry_for(ids, kind) {
+        Some(entry) => read_entry(ids, entry, work, false),
+        None => Charge::default(),
+    }
+}
+
+/// What a Save reads for a Kirby (SPEC-state-05 §5.2 step 1): the record's `charge` (`has_charge` is whether
+/// he has a copy ability, `int_z` the copied fighter kind, then the copied fighter's counters, §4.2) and,
+/// when he has a copy, the record's `copy_charge`: the copied fighter's own flag (HAD, pull/throw) in
+/// `has_charge`, present only for the copied fighters that have one.
+pub fn read_kirby(ids: &Table, has_copy: bool, copied: i32, work: &dyn Work) -> (Charge, Option<Charge>) {
+    let entry = has_copy.then(|| kirby_entry_for(ids, copied)).flatten();
+    let mut charge = match entry {
+        Some(entry) => read_entry(ids, entry, work, true),
+        None => Charge::default(),
+    };
+    charge.has_charge = Some(has_copy);
+    if has_copy {
+        charge.int_z = Some(copied);
+    }
+    let copy_charge = entry.and_then(|entry| {
+        let flag = entry.fields.iter().find(|f| f.slot == Slot::Has)?;
+        ids.resolved(flag.work).then(|| Charge { has_charge: Some(work.get_flag(ids.get(flag.work))), ..Charge::default() })
+    });
+    (charge, copy_charge)
+}
+
+fn read_entry(ids: &Table, entry: &'static Entry, work: &dyn Work, skip_flags: bool) -> Charge {
     let mut charge = Charge::default();
-    let Some(entry) = entry_for(ids, kind) else { return charge };
     for field in entry.fields {
+        if skip_flags && field.slot == Slot::Has {
+            continue;
+        }
         let id = ids.get(field.work);
         if !ids.resolved(field.work) {
             continue;
@@ -418,8 +554,28 @@ fn float_of(charge: &Charge, slot: Slot) -> Option<f32> {
 /// caller checks that, SPEC-state-01 §5.3 step 8c). A field the record does not have is skipped
 /// independently (an older save).
 pub fn plan_write(ids: &Table, kind: i32, charge: &Charge) -> Plan {
+    match entry_for(ids, kind) {
+        Some(entry) => plan_entry(entry, charge),
+        None => Plan::default(),
+    }
+}
+
+/// The copied charge a Kirby gets when his copy starts (SPEC-state-05 §5.2 step 4): the record's `int_z`
+/// kind is the copied fighter; a record without a hat, or whose copied fighter has no entry, writes nothing.
+/// The copied fighter's own flag comes from `copy_charge` (absent in an older record: the flag is not written).
+pub fn plan_kirby(ids: &Table, charge: &Charge, copy_charge: Option<&Charge>) -> Plan {
+    let Some(copied) = charge.int_z.filter(|_| charge.has_charge == Some(true)) else { return Plan::default() };
+    match kirby_entry_for(ids, copied) {
+        Some(entry) => {
+            let merged = Charge { has_charge: copy_charge.and_then(|c| c.has_charge), ..*charge };
+            plan_entry(entry, &merged)
+        }
+        None => Plan::default(),
+    }
+}
+
+fn plan_entry(entry: &'static Entry, charge: &Charge) -> Plan {
     let mut plan = Plan::default();
-    let Some(entry) = entry_for(ids, kind) else { return plan };
     if entry.special == Special::Hero {
         // The game redraws its own effect from the hold frame: clear the old one first.
         plan.push(Step::Visual(Op::RemoveChargeMax));

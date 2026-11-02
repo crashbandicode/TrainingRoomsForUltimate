@@ -107,7 +107,17 @@ CALLED_M3 = [
     ("StateRestore", "state_object_is_active", "_ZN3app16sv_battle_object9is_activeEj", "sv_battle_object::is_active: only active Pikmin contribute a colour."),
     ("StateRestore", "state_sora_change_magic", "_ZN3app24FighterSpecializer_Trail12change_magicERNS_7FighterE", "FighterSpecializer_Trail::change_magic: advances Sora's spell one step."),
 ]
+CALLED_M3 += [
+    ("StateRestore", "state_link_parent_object_id", "_ZN3app8lua_bind37LinkModule__get_parent_object_id_implEPNS_26BattleObjectModuleAccessorEi", "LinkModule::get_parent_object_id: a Pokemon's trainer."),
+    ("StateRestore", "state_set_situation_kind", "_ZN3app8lua_bind37StatusModule__set_situation_kind_implEPNS_26BattleObjectModuleAccessorENS_13SituationKindEb", "StatusModule::set_situation_kind: an airborne trainer is grounded after the switch."),
+    ("StateRestore", "state_article_set_rate", "_ZN3app8lua_bind28ArticleModule__set_rate_implEPNS_26BattleObjectModuleAccessorEif", "ArticleModule::set_rate: the trainer's Poke Ball at 1000x."),
+    ("StateRestore", "state_article_set_visibility_whole", "_ZN3app8lua_bind40ArticleModule__set_visibility_whole_implEPNS_26BattleObjectModuleAccessorEibNS_22ArticleOperationTargetE", "ArticleModule::set_visibility_whole: the trainer's Poke Ball hidden."),
+    ("StateRestore", "state_kirby_copy_setup", "_ZN3app24FighterSpecializer_Kirby10copy_setupERNS_21FighterModuleAccessorEiNS_11FighterKindEbb", "FighterSpecializer_Kirby::copy_setup (kirby, opponent entry, copied kind, true, false): gives Kirby his hat back; called, never hooked."),
+]
 REPLACE_M3 = [
+    ("StateRestore", "state_kirby_opff", 0xB971D0, "Kirby's per-frame copy routine (param, kirby fighter): the copied charge is written when the copy starts while a load runs."),
+    ("StateRestore", "state_effect_req_on_joint_hook", 0x20176F0, "EffectModule::req_on_joint: the Pokemon Trainer switch effects are made size 0 (SPEC-state-05 4.1)."),
+    ("StateRestore", "state_pokemon_decide", 0x34CEC44, "INLINE"),
     ("StateRestore", "state_pikmin_autonomy", 0x34B6CD0, "The Pikmin 'activate autonomy' routine (weapon, work module): called only for thrown or attacking Pikmin, so idle Pikmin keep their order."),
 ]
 TURNIP_PROBES = [("daisy", 0x165BE40), ("peach", 0x1668C90)]
@@ -169,7 +179,10 @@ def main():
     for feature, name, symbol, note in CALLED_M3:
         emit(name, feature, "SeamKind::Called", table[symbol], note)
     for feature, name, offset, note in REPLACE_M3:
-        emit(name, feature, replace, offset, note)
+        if note == "INLINE":
+            emit(name, feature, "SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }", offset, "Inside the game's Pokemon decide routine, at the store of the chosen Pokemon index (w8): while a load runs the register is replaced by the saved Pokemon's index (SPEC-state-05 5.1 step 3; x20 + 0x10 is the entry id).")
+        else:
+            emit(name, feature, replace, offset, note)
     for who, first in TURNIP_PROBES:
         for n in range(1, 9):
             emit(f"state_{who}_prob_{n}", "StateItems", replace, first + 0x20 * (n - 1), f"{who.capitalize()}'s turnip face {n} probability getter: certain for the chosen face while a grant is generating (SPEC-state-04 §5.3).")

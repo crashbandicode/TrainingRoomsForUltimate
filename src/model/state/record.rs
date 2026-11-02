@@ -183,6 +183,11 @@ pub struct SavedState {
     pub saved_stage: Option<i32>,
     /// Package 6 gives this a type; it is kept as read.
     pub mii: Option<Value>,
+    /// Kirby with a copy ability only: the copied fighter's own charge values, flags included (the HAD and
+    /// pull/throw flags `charge.has_charge` cannot hold, since for Kirby it is the copy flag). Same shape
+    /// as `charge`. Written only when present: a file without it is the fork's file byte for byte, and
+    /// the fork's loader ignores the key (SPEC-state-05 §4.2, lead ruling 2026-11-02).
+    pub copy_charge: Option<Charge>,
 }
 
 impl SavedState {
@@ -201,6 +206,7 @@ impl SavedState {
             held_item: None,
             saved_stage: None,
             mii: None,
+            copy_charge: None,
         }
     }
 
@@ -231,6 +237,7 @@ impl SavedState {
         record.held_item = object.get("held_item").and_then(HeldItem::from_json);
         record.saved_stage = object.get("saved_stage").and_then(Value::as_i64).and_then(|v| i32::try_from(v).ok());
         record.mii = object.get("mii").filter(|v| !v.is_null()).cloned();
+        record.copy_charge = object.get("copy_charge").filter(|v| v.is_object()).map(charge_from_json);
         record
     }
 
@@ -264,6 +271,10 @@ impl SavedState {
         match &self.mii {
             Some(mii) => out.value(mii),
             None => out.raw("null"),
+        }
+        if let Some(copied) = &self.copy_charge {
+            out.key("copy_charge");
+            write_charge(copied, out);
         }
         out.end_object();
     }

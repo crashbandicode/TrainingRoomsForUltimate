@@ -24,6 +24,8 @@ pub mod json;
 pub mod machine;
 #[path = "persist.rs"]
 pub mod persist;
+#[path = "pokemon.rs"]
+pub mod pokemon;
 #[path = "place.rs"]
 pub mod place;
 #[path = "record.rs"]

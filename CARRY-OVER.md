@@ -165,6 +165,15 @@ Carried `training_mod_consts/src/cycle_preload_config.rs` (ours-new, m5o `49c8a7
 
 Not carried (read and judged): `src/training/setup_library.rs` (ours-new, 392 lines) is glue over the named-macro keyboard draft (package 4), lobby practice (package 6), the Mii roster (package 6) and a TUI panel; its file format `practice_setup.rs` (`SetupRecord`, `FighterSetup`, validation, the `Store` instantiation) is carried by `src/model/state/setup.rs` (see below) and the glue is re-written against this plugin's interfaces. `training_mod_consts/src/menu_json.rs` holds the menu-settings reader (the package-1 reader is already written from SPEC-core-04); it has no `save_states.json` code. The `save_states.json` reader/writer is new here because the fork's lives in the mixed `save_states.rs`, which was never opened; the shape is SPEC-state-01 §7.2 plus the fork's real files (the fixtures above).
 
+### pkg3 additions (milestones S3-1 to S3-5, SPEC-state-05)
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/state/setup.rs` | `training_mod_consts/src/practice_setup.rs` (ours-new) | `4ec4abf8de44def3b5efc921d8123e82ad2cc1d8bc92e3d1f832254513e7d7a8` | `SetupRecord`, `FighterSetup`, validation, the error type, the listing row, the `Record` impl over the shared `Store` | hand-written JSON (no serde derive); this crate's `Charge` / `Steve` / `HeldItem`; the Mii identity is an opaque value (package 6 types it); the UI glue (`setup_library.rs`) is not carried. |
+| `src/model/state/items.rs`, `src/runtime/features/state_restore.rs` (item part), `held_item.rs` | `src/character_items.rs` (ours-new) | `b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933` | the mechanism: clear the hand, `ItemModule::have_item(kind, variation)`, the turnip special-init action with its power getter, the 16 probability hooks for the face override, a source fighter required for items that need one | re-expressed against the spec's tables and this crate's site rows (guarded `main+offset` calls, no allocation in hooks); the spec's grant paths A to C are superseded by this mechanism. |
+| `src/model/state/convert.rs`, `src/model/migration_run.rs` | none (new here) | | | the N6 conversion and the first-boot import are written from SPEC-state-04 and SPEC-core-08; only the fork's folder layout and file names are known from the fixtures. |
+| `src/model/state/pokemon.rs`, the `copy_charge` field | none (new here) | | | SPEC-state-05 §5.1, §5.2 only; the new optional record field `copy_charge` is this crate's (lead ruling 2026-11-02): fork-compatible, written only when present. |
+
 ## pkg4 (package 4: recording, input display, chords, notifications; stream `stream/pkg4`)
 
 Source: stage **m5o** (`.../parked-reuse175/refactor/stages/m5o/stage`, called `<stage>`). Only files whose `origin` is

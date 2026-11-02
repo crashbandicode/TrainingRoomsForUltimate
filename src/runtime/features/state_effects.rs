@@ -59,6 +59,13 @@ pub unsafe fn run_charge(accessor: usize, fighter: usize, ids: &Table, plan: &Pl
                 };
                 follow(accessor, ids, effect, joint, pos, rot, attribute, lifetime, handle);
             }
+            Step::Visual(Op::FollowRaw { effect, joint, lifetime, handle }) => {
+                let zero = n::Vector3f { x: 0.0, y: 0.0, z: 0.0 };
+                let made = n::effect_req_follow(accessor, effect, joint, &zero, &zero, 0, lifetime);
+                if let Some(slot) = handle.and_then(|c| id(ids, c)) {
+                    n::work_set_int(accessor, made as i32, slot);
+                }
+            }
             Step::SheikNeedles(count) => {
                 if let Some(article) = id(ids, C::SheikNeedleArticle) {
                     n::article_generate_enable(accessor, article);

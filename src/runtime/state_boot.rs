@@ -48,6 +48,9 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
     skyline::install_hook!(states::state_fighter_play_se_hook);
     state_restore::install_probability_hooks();
     skyline::install_hook!(state_restore::state_pikmin_autonomy_hook);
+    skyline::install_hook!(states::state_effect_req_on_joint_hook);
+    skyline::install_hook!(states::state_pokemon_decide_hook);
+    skyline::install_hook!(states::state_kirby_opff_hook);
     for site in STATE_SITES.iter().filter(|s| s.name.contains("_prob_")) {
         if let Some(i) = STATE_SITES.iter().position(|t| t.name == site.name) {
             written[i] = Written::Far;
@@ -67,10 +70,16 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
         "state_req_screen",
         "state_fighter_play_se",
         "state_pikmin_autonomy",
+        "state_effect_req_on_joint_hook",
+        "state_kirby_opff",
     ] {
         if let Some(i) = STATE_SITES.iter().position(|s| s.name == name) {
             written[i] = Written::Far;
         }
+    }
+    // The inline hook at the Pokemon decide store is a one-word branch.
+    if let Some(i) = STATE_SITES.iter().position(|s| s.name == "state_pokemon_decide") {
+        written[i] = Written::Near;
     }
     states::set_active(true);
     true
