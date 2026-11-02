@@ -100,7 +100,13 @@ BASE["cpu_roster"] = roster("pikachu", "bowser")
 
 
 def reload(menu, what):
-    body = json.dumps({"menu": {**BASE, **menu}})
+    # Overlay the live settings (the writer thread keeps settings.json current: the cycle's own picks such as `player_character`)
+    # so a reload changes only the rows it names; a reload replaces the whole snapshot.
+    try:
+        live = json.loads((SD / "settings.json").read_text(encoding="utf-8")).get("menu", {})
+    except (OSError, ValueError):
+        live = {}
+    body = json.dumps({"menu": {**live, **BASE, **menu}})
     m = mark()
     tmp = SD / "diag-settings-next.tmp"
     tmp.write_text(body, encoding="utf-8")
@@ -126,8 +132,8 @@ def cycle(role, cap=40):
     """One cycle chord (P1: ZL + D-pad Right, CPU: ZL + D-pad Left); the swap's completion line."""
     m = mark()
     tap("zl,right" if role == 0 else "zl,left", hold=200, wait=0.5)
-    queued = wait_for(m, "[CharacterRoster] queued", 8)
-    done = wait_for(m, "[CharacterRoster] complete", cap)
+    queued = wait_for(m, "[CharacterRoster] request handed", 8) or wait_for(m, "[CharacterRoster] queued", 2)
+    done = wait_for(m, f"[CharacterRoster] HUD refresh owner={role}", cap)
     return m, queued, done
 
 
@@ -160,7 +166,7 @@ def r_item():
     row("item grant through the engine (owner not in the match)", granted is not None, granted)
     saved = save_state()
     row("save state with the held item", saved is not None, saved)
-    tap("z", wait=1.0)  # drop / throw what is held, so the load has to give it back
+    tap("a", wait=1.0)  # throw what is held, so the load has to give it back
     time.sleep(3)
     m, done = load_state()
     restored = wait_for(m, "[CharacterItem] restored", 30)
@@ -220,6 +226,31 @@ def r_solo():
     row("Solo Popo: save/load ends at Popo (no NanaPosMove wait)", done is not None and not stuck, done)
 
 
+def r_solo2():
+    """Solo Popo on the cycle slots, then cycle to the Ice Climbers: Popo alone; a save/load must end at Popo."""
+    reload({"solo_popo_player_cycle": [1, 0]}, "solo popo on the cycle")
+    time.sleep(3)
+    done = None
+    for _ in range(5):
+        m, queued, done = cycle(0, cap=60)
+        if done and "kind=0x4b" in done:
+            break
+    time.sleep(4)
+    shot("solo-popo")
+    row("Solo Popo cycle slot reached (Ice Climbers descriptor)", done is not None and "kind=0x4b" in done, done)
+    save_state()
+    m, loaded = load_state(cap=20)
+    time.sleep(5)
+    shot("solo-popo-after-load")
+    after_load = after(m)
+    stuck = [x for x in after_load if "NanaPosMove" in x]
+    row("Solo Popo: save/load ends at Popo (no NanaPosMove wait)", loaded is not None and not stuck, loaded)
+    m2 = mark()
+    tap("zl,down", wait=1.0)
+    again = wait_for(m2, "saved_notice", 6)
+    row("Solo Popo: the machine is idle after the load (a new save is accepted)", again is not None, again)
+
+
 def r_pt():
     m, queued, done = cycle(0, cap=60)
     shot("swap-pt")
@@ -245,7 +276,7 @@ def r_r5():
 
 
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
 
 
 def main():
@@ -259,6 +290,10 @@ def main():
             raise
         except Exception as exc:  # one row's harness failure is that row's FAIL, never a silent pass
             row(f"{name} (harness)", False, repr(exc))
+    main_write()
+
+
+def main_write():
     path = OUT / "rows.json"
     previous = json.loads(path.read_text()) if path.exists() else []
     path.write_text(json.dumps(previous + RESULTS, indent=1))

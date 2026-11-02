@@ -27,3 +27,27 @@ Builds: merged pkg6 + pkg6b tree (`d0b6faa`) diag `cba0267a` for s6-02; the same
 **Finding, fixed (`3c5f246`):** on the first merged-tree boot (s6-02) the carried seam report's authoritative-group and unchecked-image lists made the one install line 8,188 characters and cut it before `result=` and `heap_allocations=`. The recorded edit of `seam_install.rs` now writes counts and the failing rows only (line 7,030 characters with `result=installed` and the full set of sites); the late report still names the groups and images.
 
 Not run: CP0/CP1/CP3 (hot swap while P1 is armed: needs the roster cycle), Deluxe 0.10.1 coexistence (the SDK is parked, L1), the online 1v1 scope (package 7), the release NRO row of set A. `scene.initialized` reads false in the log because the lobby `game_mode` probe is not initialised yet (the lobby half is declared with the cycle).
+## s6-04, 2026-11-02 11:30-11:45Z, Surface (display :98, muted, offline): sets A/B in one boot (third successor)
+
+Build: diag `dcf52de3` (stream/pkg6 `98d6f5b`; resident 3,158,016 B) + standalone CPU pilot `e3033426…` + tile cursor `b8313ca2…`; boot settings `eden/settings/s6-a.json` (Player Swapping on; P1 cycle Kirby, Ice Climbers, Pokemon Trainer, Palutena; CPU cycle Pikachu, Bowser). Route `eden/route_s6_cut.py` (route_s6 with the install gate on the line start, see the first finding); rows `eden/rows_s6.py`, `eden/extra_cpus_s6.py`; results `eden/runs/s6-04/rows.json`, screenshots `eden/runs/s6-04/shots/`. Stage Kongo Jungle (tile 6), P1 Steve, CPU Mythra. `console.log` 12,415 lines: 0 matches (panic, abort, crash, Unmapped); `memory.peak` 7,463,059,456 B.
+
+| Row | Result | Evidence |
+| --- | --- | --- |
+| Roster cycle started (every `CALLED_ROWS` guard passed) | pass | no `roster cycle not started` line |
+| `[ItemTable]` 38 entries, none MISSING; Peach and Daisy turnip variations | pass | `ITEM_VARIATION_{PEACH,DAISY}DAIKON_{1,6,7,8}` = 0, 5, 6, 7 (`itemtable.txt`) |
+| Item grant, owner not in the match (`diag-item.req` 11, Link's bomb to Steve) | pass | `[CharacterItem] granted choice=11 kind=120 variation=0` |
+| Save with the item, throw it, load: the engine gives it back | pass | `state done ...` then `[CharacterItem] restored choice=11 variation=0 life=-1 fuse=1777` |
+| Menu commit reaches the preload engine (`publish_applied`, ruling 2) | pass | `[CyclePreload] applied slots=2 ...` right after `diag_settings_reload` |
+| Preload on Player 1 | pass (late) | `[PreloadStatus] state=Loading planned=5 ready=2 ... text="Loading 2/5"`, later `Loaded 5/7`; the row's 60 s cap expired first (harness) |
+| P1 hot swap by the cycle chord (ZL + D-pad Right) | pass | `chords_passed bits=0x20`, `request handed ... selection=Cycle`, `HUD refresh owner=0 kind=0x6`; screenshot Kirby (the first needle was wrong, fixed) |
+| Kirby hat by the shortcut (Special + L3) | pass | `[KirbyHats] request role=0 kind=0x0 source_slot=2`, `confirmed` (Mario's hat, Mario not in the match) |
+| Save/load gives the hat back through the hat engine (ruling 2 wiring) | pass | after the load `[KirbyHats] request role=0 kind=0x0 source_slot=2` (the restore path) |
+| Swap to the Ice Climbers pair; save/load finishes (Nana hand-off) | pass | `HUD refresh owner=0 kind=0x4b`; `state done ... next=NoAction` |
+| Solo Popo: load ends at Popo | inconclusive | load done and a new save accepted, but the screenshot still shows Nana: `solo_popo_player_cycle` reached the menu, the built Ice Climbers kept both bodies. The no-Nana path is host-tested only (`state01_solo_popo_has_no_handoff`) |
+| Swap to Pokemon Trainer (native group), next fighter (Palutena), CPU cycle (ZL + D-pad Left) | pass | `kind=0x24`, `kind=0x36`, `HUD refresh owner=1 kind=0x8` |
+| Native Training with an extra CPU (pause menu: No. of CPUs 2, Behavior Walk): save/load leaves it unfrozen | pass | `state done`; three shots 2 s apart, both CPUs move (mean diffs 30.4, 30.1). **Finding:** the extra CPU (HUD: Mythra, entry 2) is drawn with Palutena's body (`shots/*-p1-visibility.png`): the cycle's helper source uses native entry 2 in Training; see the second finding |
+| Practice session retired by a hot swap | not observed | no `practice_session held=` line at all: the lease is never acquired in native Training (open, below) |
+| R5: hook allocation delta 0 | **fail** | 6,311 allocations inside hook scopes, about 20/s from entering Training with Steve, about 31/s with Mario/Kirby and preload on, 0/s after the swap to Palutena (`hook_stats` lines) |
+| Install line | **fail** (not package 6's code) | the one install line is 8,142 characters and is cut before `result=` and `heap_allocations=` (the s6-02 defect again, with the merged packages' rows) |
+
+Findings for the lead: (1) install line cut by the line limit; (2) entry-2 collision between the cycle's helper source and a native extra CPU (the fork's `legacy_training_owner_reserved`: "this feature reserves only native Training entry2"); (3) R5: allocations in hook scopes while specific fighters are active, not yet attributed to a hook (`hook_stats` has no per-scope allocation counter; next diag build splits them); (4) the practice lease is never acquired in native Training.
