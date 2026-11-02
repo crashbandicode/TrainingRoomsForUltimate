@@ -14,7 +14,7 @@ use smash::lib::lua_const::*;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
 use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle}};
 
-use crate::runtime::macros::port::common::game_mode;
+use crate::runtime::lobby::game_mode;
 
 const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 // Native calibration: all 4,222 post-frame samples exactly recovered the mapped
@@ -63,7 +63,7 @@ impl Editor {
     /// configuration is not resolved yet. Preview and Keep never need either.
     fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {
         if MiiClass::from_kind(kind as u32).is_none() {
-            if crate::runtime::macros::port::consts::TrioFighter::from_kind(kind as u32).is_none() {
+            if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {
                 return Err("Preview fighter is not available".into());
             }
             return Ok(Some(Target::fighter(kind as u32)));
@@ -85,7 +85,7 @@ impl Editor {
         let switchable=target.is_ok();
         let matches=target.ok().flatten().is_some_and(|target|
             crate::runtime::macros::named_macros::recorded_target_matches(target,current));
-        let prompt=crate::runtime::macros::port::sync::read(&crate::runtime::macros::port::common::consts::MENU).fighter_prompt==crate::runtime::macros::port::common::consts::OnOff::ON;
+        let prompt=crate::runtime::macros::port::sync::read(&crate::runtime::compat::menu::MENU).fighter_prompt==crate::engine::compat::menu::OnOff::ON;
         fighter_gate(prompt,switchable,matches)
     }
 }
@@ -105,7 +105,7 @@ pub(crate) fn selection_revision()->u64 {SELECTION_REVISION.load(Ordering::Acqui
 fn target_ready(target:Target,current:Option<i32>)->bool {
     let Some(kind)=current else {return false;};
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    { crate::runtime::macros::port::character_roster::mii_replay::ready(target,kind as u32) }
+    { crate::runtime::macros::port::roster::mii_replay::ready(target,kind as u32) }
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {target.ready(kind as u32,None)}
 }
@@ -145,10 +145,10 @@ pub fn latest() -> Option<ReplaySession> {
 fn notify(message: String) {
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
         editor.report_error(message);
-        crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
         return;
     }
-    crate::runtime::macros::port::notifications::notification("Clip Editor".into(), message, 180);
+    crate::runtime::lobby::training::ui::notifications::notification("Clip Editor".into(), message, 180);
 }
 
 pub fn open_editor() {
@@ -156,10 +156,10 @@ pub fn open_editor() {
 }
 
 fn open_browser(expected_revision: Option<u64>) {
-    if !crate::runtime::macros::port::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::macros::port::practice::acquire() }
-        || crate::runtime::macros::port::recording_or_playback()
-        || unsafe { crate::runtime::macros::port::save_states::is_loading() }
-        || crate::runtime::macros::port::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
+    if !crate::runtime::lobby::training::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::lobby::training::practice::acquire() }
+        || crate::runtime::lobby::training::recording_or_playback()
+        || unsafe { crate::training::save_states::is_loading() }
+        || crate::runtime::macros::port::roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
     {
         notify("Open the replay window in idle practice".into());
         return;
@@ -196,11 +196,11 @@ fn open_browser(expected_revision: Option<u64>) {
         // interruption while that I/O was in flight.
         if expected_revision.is_some_and(|revision|
             !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::port::practice::enabled() { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() { return; }
         *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
             revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });
     }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 fn open_capture(id: &str, revision: u64) -> Result<(), String> {
@@ -246,10 +246,10 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             if !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening()) {
                 return Ok(()); // Cancel/departure owns this result; never publish it late.
             }
-            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::port::practice::enabled() {
+            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() {
                 return Err("Practice changed before the capture could open".into());
             }
-            let cpu = crate::runtime::macros::port::common::try_get_module_accessor(crate::runtime::macros::port::consts::FighterId::CPU)
+            let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
                 .ok_or("Wait for the practice CPU before opening a capture")?;
             if !clean_statuses().contains(&unsafe { StatusModule::status_kind(cpu) }) {
                 return Err("Open the clip editor while the CPU is idle or falling".into());
@@ -266,14 +266,14 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             REVISION.fetch_add(1, Ordering::Relaxed);
             *HOLD.lock().unwrap() = (0, 0, false);
             FAILED_SELECTION.store(0, Ordering::Relaxed);
-            crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::QUICK_MENU_ACTIVE, false);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE, false);
             // The opening track is the first explicit selection. The editor stays
             // inert behind the prompt; nothing reloads the CPU unless Switch is chosen.
             gate_selection(None, Some(current));
         }
         Err(error) => return Err(error),
     }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
     Ok(())
 }
 
@@ -300,7 +300,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if let Some((entry, raw)) = unresolved {
         let revision = SELECTION_REVISION.load(Ordering::Acquire);
-        match crate::runtime::macros::port::character_roster::mii_replay::resolve(raw, revision) {
+        match crate::runtime::macros::port::roster::mii_replay::resolve(raw, revision) {
             Ok(receive) => {
                 let taken = EDITOR.lock().unwrap().take();
                 if let Some(mut editor) = taken {
@@ -308,8 +308,8 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
                     *RELOAD.lock().unwrap() = Some(Reload { editor, requested:false, ticks:0,
                         revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive) });
                     crate::runtime::macros::replay_preview::request_stop();
-                    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::QUICK_MENU_ACTIVE, false);
-                    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+                    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE, false);
+                    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
                     return true;
                 }
             }
@@ -356,7 +356,7 @@ pub fn fighter_choice(choice: Option<FighterChoice>) {
             }
         }
     }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 pub fn browser_visible() -> bool {
@@ -368,14 +368,14 @@ pub fn browser_view() -> Option<View> {
 }
 
 pub fn browser_input(pad: Pad) {
-    let waiting = crate::runtime::macros::port::practice::waiting();
+    let waiting = crate::runtime::lobby::training::practice::waiting();
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
         (browser.ui.on_pad(pad, waiting), browser.revision)
     };
     browser_effect(effect, revision);
-    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 fn browser_effect(effect: BrowserEffect, revision: u64) {
@@ -401,9 +401,9 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
 }
 
 fn capture_ready() -> bool {
-    crate::runtime::macros::port::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
-        && unsafe { Fighter::is_ready_go() && !crate::runtime::macros::port::save_states::is_loading() }
-        && !crate::runtime::macros::port::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
+    crate::runtime::lobby::training::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
+        && unsafe { Fighter::is_ready_go() && !crate::training::save_states::is_loading() }
+        && !crate::runtime::lobby::training::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
 }
 
 /// The existing browser owns this short neutral-input interval. Native controller
@@ -413,19 +413,19 @@ pub fn quiescing_capture() -> bool {
     // on that hot path. Release the browser lock before querying other owners.
     let pending = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending());
     pending && !crate::runtime::macros::named_macros::suspended()
-        && crate::runtime::macros::port::practice::waiting()
+        && crate::runtime::lobby::training::practice::waiting()
 }
 
 pub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {
-    if !quiescing_capture() || crate::runtime::macros::port::practice::role(module) != Some(1) { return false; }
+    if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }
     let clean = clean_statuses().contains(&StatusModule::status_kind(module));
     BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.release_cpu(clean))
 }
 
 unsafe fn service_browser() {
     if !BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending()) { return; }
-    let eligible = crate::runtime::macros::port::practice::waiting() && capture_ready();
-    let clean = eligible && crate::runtime::macros::port::common::try_get_module_accessor(crate::runtime::macros::port::consts::FighterId::CPU)
+    let eligible = crate::runtime::lobby::training::practice::waiting() && capture_ready();
+    let clean = eligible && crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
         .is_some_and(|cpu| clean_statuses().contains(&StatusModule::status_kind(cpu)));
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
@@ -482,7 +482,7 @@ pub fn cancel_reload() {
         *EDITOR.lock().unwrap() = pending.map(|p| p.editor);
         SELECTION_REVISION.fetch_add(1, Ordering::AcqRel);
         REVISION.fetch_add(1, Ordering::Relaxed);
-        crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
         return;
     }
     let was_loading = pending.is_some();
@@ -494,14 +494,14 @@ pub fn cancel_reload() {
 /// cleanup must finish before handing control to the existing character loader.
 pub unsafe fn service_reload() {
     if crate::runtime::macros::named_macros::suspended() { return; }
-    if !crate::runtime::macros::port::practice::scene_enabled() {
+    if !crate::runtime::lobby::training::practice::scene_enabled() {
         let had_reload=RELOAD.lock().unwrap().take().is_some();
         if had_reload || panel_visible() || browser_visible() {close_editor_inner(had_reload);}
         return;
     }
     service_browser();
     if crate::training::lobby::native_ui_busy() { return; }
-    let cpu=crate::runtime::macros::port::common::try_get_module_accessor(crate::runtime::macros::port::consts::FighterId::CPU);
+    let cpu=crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU);
     let current=cpu.map(|cpu|app::utility::get_kind(&mut *cpu));
     let mut reload=RELOAD.lock().unwrap();
     if let Some(pending)=reload.as_mut() {
@@ -533,7 +533,7 @@ pub unsafe fn service_reload() {
                 }
                 *EDITOR.lock().unwrap() = Some(pending.editor);
                 REVISION.fetch_add(1, Ordering::Relaxed);
-                crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+                crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
                 match result {
                     Ok(_) => if !gate_selection(selection.action, current) {
                         if let Some(action) = selection.action { apply_action(action); }
@@ -564,19 +564,19 @@ pub unsafe fn service_reload() {
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};
         #[cfg(feature="mii-ordinary-cpu-alpha")]
-        if let Some(reason)=target.and_then(|target|crate::runtime::macros::port::character_roster::mii_replay::refusal(target,pending.revision)) {
+        if let Some(reason)=target.and_then(|target|crate::runtime::macros::port::roster::mii_replay::refusal(target,pending.revision)) {
             failure=Some(reason.into());
         }
         let grounded_idle=cpu.is_some_and(|cpu|StatusModule::status_kind(cpu)==*FIGHTER_STATUS_KIND_WAIT
             && StatusModule::situation_kind(cpu)==*SITUATION_KIND_GROUND);
         if failure.is_none() && target.is_some_and(|target|target_ready(target,current))
-            && !crate::runtime::macros::port::character_roster::busy() && Fighter::is_ready_go() && grounded_idle {
+            && !crate::runtime::macros::port::roster::busy() && Fighter::is_ready_go() && grounded_idle {
             // The requested switch has settled; the editor stops enforcing it.
             let mut pending=reload.take().unwrap();
             pending.editor.switch=false;
             *EDITOR.lock().unwrap()=Some(pending.editor);
             REVISION.fetch_add(1,Ordering::Relaxed);
-            crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT,true);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);
         } else if failure.is_some() || pending.ticks>600 {
             let mut pending=reload.take().unwrap();
             pending.editor.switch=false;
@@ -590,7 +590,7 @@ pub unsafe fn service_reload() {
                 let raw=pending.editor.raw();
                 let revision=pending.revision;
                 drop(reload);
-                let result=raw.and_then(|raw|crate::runtime::macros::port::character_roster::mii_replay::resolve(raw,revision));
+                let result=raw.and_then(|raw|crate::runtime::macros::port::roster::mii_replay::resolve(raw,revision));
                 if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {
                     match result {Ok(receive)=>pending.resolving=Some(receive),Err(error)=>{
                         let (send,receive)=std::sync::mpsc::channel();let _=send.send(Err(error));
@@ -601,11 +601,11 @@ pub unsafe fn service_reload() {
         } else if let Some(target)=target.filter(|_|!pending.requested) {
             let revision=pending.revision;
             drop(reload);
-            if crate::runtime::macros::port::character_roster::cpu_reload_ready() {
+            if crate::runtime::macros::port::roster::cpu_reload_ready() {
                 #[cfg(feature="mii-ordinary-cpu-alpha")]
-                let requested=crate::runtime::macros::port::character_roster::mii_replay::request(target,revision);
+                let requested=crate::runtime::macros::port::roster::mii_replay::request(target,revision);
                 #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-                let requested=crate::runtime::macros::port::character_roster::request_cpu_kind(target.kind());
+                let requested=crate::runtime::macros::port::roster::request_cpu_kind(target.kind());
                 if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {
                     pending.requested=requested;
                 }
@@ -633,8 +633,8 @@ pub unsafe fn service_reload() {
             let mut pending=editor.take().unwrap();pending.pause();
             *RELOAD.lock().unwrap()=Some(Reload {editor:pending,requested:false,ticks:0,
                 revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None});
-            crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::QUICK_MENU_ACTIVE,false);
-            crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT,true);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE,false);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);
         }
         _=>{if let Some(active)=editor.as_mut() {active.switch=false;}},
     }
@@ -681,16 +681,16 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
     *HOLD.lock().unwrap() = (0, 0, false);
     if was_open || was_browsing || was_loading {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
-        crate::training::frame_counter::reset_frame_count(*crate::runtime::macros::port::common::menu::MENU_CLOSE_FRAME_COUNTER);
-        crate::training::frame_counter::start_counting(*crate::runtime::macros::port::common::menu::MENU_CLOSE_FRAME_COUNTER);
-        CLOSE_INPUT.lock().unwrap().arm(crate::runtime::macros::port::common::menu::MENU_CLOSE_WAIT_FRAMES);
+        crate::training::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);
+        crate::training::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);
+        CLOSE_INPUT.lock().unwrap().arm(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES);
         #[cfg(feature = "named-input-trace")]
         {
             CLOSE_TRACE_LEFT.store(CLOSE_TRACE_LIMIT, Ordering::Relaxed);
             let id = CLOSE_TRACE_ID.fetch_add(1, Ordering::Relaxed) + 1;
             println!("[ClipClose] arm id={}", id);
         }
-        crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
     }
     true
 }
@@ -719,10 +719,10 @@ pub fn on_action(action: ClipAction) {
     // A track or capture change is an explicit selection: a recorded fighter that is
     // not the settled CPU asks once, and nothing changes until it is answered.
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
-        let current = crate::runtime::macros::port::common::try_get_module_accessor(crate::runtime::macros::port::consts::FighterId::CPU)
+        let current = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
             .map(|cpu| unsafe { app::utility::get_kind(&mut *cpu) });
         if gate_selection(Some(action), current) {
-            crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
             return;
         }
     }
@@ -777,7 +777,7 @@ fn apply_action(action: ClipAction) {
         }
         _ => {}
     }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::macros::port::common::menu::MENU_RECEIVED_INPUT, true);
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 /// Native physical controls, independent of gameplay remapping. Clock held-repeat

@@ -496,9 +496,9 @@ unsafe fn write_record_shared(ctx: &mut InlineCtx) {
 }
 
 fn live_scene() -> bool {
-    crate::runtime::macros::port::common::game_mode::current().is_some_and(|mode|
+    crate::runtime::lobby::game_mode::current().is_some_and(|mode|
         mode.initialized && mode.melee != 0x0d && mode.mode != 0x05010100)
-        && unsafe { !crate::runtime::macros::port::common::is_native_training_mode() && Fighter::is_ready_go() }
+        && unsafe { !crate::runtime::compat::common::is_native_training_mode() && Fighter::is_ready_go() }
 }
 
 pub unsafe fn before_frame(fighter: &mut Fighter) {
@@ -568,7 +568,7 @@ pub fn init() {
     // says on. With a registered host the guarded adapter is resident from
     // startup even when off, because a later ON choice cannot install hooks.
     if !seed && !registered { return; }
-    if !crate::runtime::macros::port::common::game_mode::init() { return; }
+    if !crate::runtime::lobby::game_mode::init() { return; }
     // Owned main13.0.5 SHA0789f0a4...536c2. Guard every optional replacement before
     // installing any, including constructor/reset, record-start, copy and success.
     const GUARDS: &[(usize, [u32; 8])] = &[
@@ -620,19 +620,19 @@ pub fn init() {
         "replay.copy_record", "replay.create_save_actor", "replay.destroy_save_actor",
         "replay.update_save_actor", "replay.velocity_export"];
     let save_site = unsafe {
-        use crate::runtime::macros::port::swap_native::seam_install::{entry_or_body, gate, site, Take};
+        use crate::runtime::seams::seam_install::{entry_or_body, gate, site, Take};
         let base = getRegionAddress(Region::Text) as usize;
         let legacy = GUARDS.iter().all(|(offset, code)| {
             let stock = std::slice::from_raw_parts((base + offset) as *const u32, code.len()) == code;
             if !stock {
-                crate::runtime::macros::port::logging::diagnostic(format_args!(
+                crate::runtime::diag_log::diagnostic(format_args!(
                     "[ReplayCapture] live adapter disabled: native guard {:#x}", offset));
             }
             stock
         });
         if !gate("live_replay", LIVE_SEAMS, legacy) {
             if legacy {
-                crate::runtime::macros::port::logging::diagnostic(format_args!("[ReplayCapture] live adapter disabled: seam guard"));
+                crate::runtime::diag_log::diagnostic(format_args!("[ReplayCapture] live adapter disabled: seam guard"));
             }
             return;
         }
@@ -653,12 +653,12 @@ pub fn init() {
         // Installing our own entry hook would replace theirs, so observe from the
         // first instruction their call to the original still executes.
         let save_site = if take == Some(Take::Entry) { "entry" } else if take == Some(Take::Body) && body_open { "shared" } else {
-            crate::runtime::macros::port::logging::diagnostic(format_args!(
+            crate::runtime::diag_log::diagnostic(format_args!(
                 "[ReplayCapture] live adapter disabled: native guard {:#x}", SAVE_ENTRY));
             return;
         };
         if let Err(error) = crate::runtime::macros::replay_store::start_writer() {
-            crate::runtime::macros::port::logging::diagnostic(format_args!(
+            crate::runtime::diag_log::diagnostic(format_args!(
                 "[ReplayCapture] live adapter disabled: writer {}", error));
             return;
         }
@@ -677,7 +677,7 @@ pub fn init() {
     // Ready only after guards, writer and hooks all succeeded (R2); until then the
     // Deluxe row answers UNAVAILABLE and the host writes nothing.
     toggle().set_ready();
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[ReplayCapture] guarded live adapter ready capture={} host_registered={} save={}",
         on_off(seed), registered, save_site));
 }

@@ -19,11 +19,11 @@ use crate::engine::macro_ui::macro_panel::{
     NameContext, Pad, View, MACRO_KEYBOARD_TITLE, SETUP_KEYBOARD_TITLE,
 };
 
-use crate::runtime::macros::port::common::consts::{FighterId, MacroSource, OnOff, MENU};
-use crate::runtime::macros::port::common::input::{Buttons, MappedInputs};
-use crate::runtime::macros::port::common::{menu, try_get_module_accessor};
+use crate::runtime::compat::common::consts::{FighterId, MacroSource, OnOff, MENU};
+use crate::runtime::compat::common::input::{Buttons, MappedInputs};
+use crate::runtime::compat::common::{menu, try_get_module_accessor};
 use super::practice;
-use crate::runtime::macros::port::notifications::notification;
+use crate::runtime::lobby::training::ui::notifications::notification;
 
 static UI: RwLock<MacroUi> = RwLock::new(MacroUi::new());
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
@@ -87,8 +87,8 @@ pub fn resume_waiting() {
 }
 fn waiting_name_ready() -> bool {
     super::lobby::active() && practice::enabled()
-        && crate::runtime::macros::port::character_roster::waiting_drafts_ready()
-        && unsafe { crate::runtime::macros::port::common::is_ready_go() }
+        && crate::runtime::macros::port::roster::waiting_drafts_ready()
+        && unsafe { crate::runtime::compat::common::is_ready_go() }
         && try_get_module_accessor(FighterId::Player).is_some()
         && try_get_module_accessor(FighterId::CPU).is_some()
 }
@@ -146,20 +146,20 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
 /// manually selected exact Mii is already a match even without a replay receipt.
 pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     current.is_some_and(|kind| target.ready(kind as u32,
-        crate::runtime::macros::port::character_roster::current_mii_configuration(CPU_ROLE)))
+        crate::runtime::macros::port::roster::current_mii_configuration(CPU_ROLE)))
 }
 fn exact_target_ready(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     let Some(kind)=current else{return false;};
     if target.configuration().is_none() {return target.ready(kind as u32,None);}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    {crate::runtime::macros::port::character_roster::mii_replay::named_ready(target,kind as u32)}
+    {crate::runtime::macros::port::roster::mii_replay::named_ready(target,kind as u32)}
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {false}
 }
 fn observe_loaded() {
     let (plays_current,target)={let ui=lock_read(&UI);(ui.plays_current(),ui.loaded_target())};
     let current=cpu_kind();
-    let busy=crate::runtime::macros::port::character_roster::busy();
+    let busy=crate::runtime::macros::port::roster::busy();
     // A macro playing on the current CPU has no recorded identity to acknowledge.
     let configuration=if plays_current {None} else {
         target.filter(|target|exact_target_ready(*target,current)).and_then(|target|target.configuration())
@@ -190,7 +190,7 @@ pub(crate) fn open_clip_fighter_prompt(revision:u64, recorded:String, current:St
     opened
 }
 fn submit_loaded_character() {
-    if !crate::runtime::macros::port::character_roster::cpu_reload_ready() {return;}
+    if !crate::runtime::macros::port::roster::cpu_reload_ready() {return;}
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
@@ -203,9 +203,9 @@ fn submit_loaded_character() {
     }
     if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    let accepted=crate::runtime::macros::port::character_roster::mii_replay::request_named(target);
+    let accepted=crate::runtime::macros::port::roster::mii_replay::request_named(target);
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    let accepted=target.configuration().is_none() && crate::runtime::macros::port::character_roster::request_cpu_kind(target.kind());
+    let accepted=target.configuration().is_none() && crate::runtime::macros::port::roster::request_cpu_kind(target.kind());
     if !accepted {
         // No native request was admitted. A not-yet-qualified owner may become
         // ready after auto-init; don't consume this one submission prematurely.
@@ -231,11 +231,11 @@ fn retire_name(keep_waiting: bool) {
     } else if job.waiting && job.phase != NamePhase::Parked {
         job.phase = NamePhase::Discarding;
     } else {
-        crate::runtime::macros::port::native_keyboard::interrupt(job.id);
+        crate::runtime::mii::native_keyboard::interrupt(job.id);
         pending.take();
         return;
     }
-    crate::runtime::macros::port::native_keyboard::interrupt(job.id);
+    crate::runtime::mii::native_keyboard::interrupt(job.id);
 }
 
 /// Evaluated before opening and again after Calc, outside all keyboard locks.
@@ -248,7 +248,7 @@ fn waiting_name_allowed() -> bool {
 
 fn resume_name() {
     if !NAME_JOB.lock().unwrap().as_ref().is_some_and(|job| job.phase == NamePhase::Parked) { return; }
-    if suspended() || !waiting_name_ready() || crate::runtime::macros::port::native_keyboard::busy() { return; }
+    if suspended() || !waiting_name_ready() || crate::runtime::mii::native_keyboard::busy() { return; }
     let mut pending = NAME_JOB.lock().unwrap();
     let Some(job) = pending.as_mut().filter(|job| job.phase == NamePhase::Parked) else { return };
     let values = {
@@ -261,9 +261,9 @@ fn resume_name() {
     let Some((name, cursor, title)) = values else { pending.take(); return };
     let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);
     let opened = if job.waiting {
-        crate::runtime::macros::port::native_keyboard::request_inline(id, &name, cursor)
+        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor)
     } else {
-        crate::runtime::macros::port::native_keyboard::request(id, title, &name)
+        crate::runtime::mii::native_keyboard::request(id, title, &name)
     };
     match opened {
         Ok(()) => {
@@ -371,7 +371,7 @@ fn remember(id: &str) {
 }
 
 fn game_version() -> String {
-    crate::runtime::macros::port::common::SMASH_VERSION.clone()
+    crate::runtime::compat::common::SMASH_VERSION.clone()
 }
 
 pub fn source_is_named() -> bool {
@@ -393,13 +393,13 @@ pub fn panel_view() -> Option<View> {
 
 pub fn clip_foreground() -> bool {
     !suspended() && !lock_read(&UI).is_open() && crate::runtime::macros::replay_capture::panel_visible()
-        && !naming_pending() && !crate::runtime::macros::port::native_keyboard::busy()
+        && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()
 }
 
 pub fn naming_pending() -> bool { NAME_JOB.lock().unwrap().is_some() }
 
 fn request_native_name() {
-    if suspended() || crate::runtime::macros::port::native_keyboard::busy() || naming_pending() { return; }
+    if suspended() || crate::runtime::mii::native_keyboard::busy() || naming_pending() { return; }
     let values = {
         let ui = lock_read(&UI);
         let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);
@@ -413,8 +413,8 @@ fn request_native_name() {
         replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: super::lobby::is_waiting_scene(),
         phase: NamePhase::Active };
     *NAME_JOB.lock().unwrap() = Some(job);
-    let result = if job.waiting { crate::runtime::macros::port::native_keyboard::request_inline(id, &initial, cursor) }
-        else { crate::runtime::macros::port::native_keyboard::request(id, title, &initial) };
+    let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor) }
+        else { crate::runtime::mii::native_keyboard::request(id, title, &initial) };
     if let Err(error) = result {
         NAME_JOB.lock().unwrap().take();
         notify(&error);
@@ -424,21 +424,21 @@ fn request_native_name() {
 /// Poll outside input mapping and without holding UI/game locks across the applet.
 pub fn service_keyboard() {
     resume_name();
-    crate::runtime::macros::port::native_keyboard::service(waiting_name_allowed);
+    crate::runtime::mii::native_keyboard::service(waiting_name_allowed);
     // Every Calc checkpoints text/caret without invoking confirm_native_name.
     // A new-lobby discard cannot publish a late callback into another draft.
     {
         let mut pending = NAME_JOB.lock().unwrap();
         if let Some(job) = pending.as_mut().filter(|job| job.waiting && job.phase != NamePhase::Discarding) {
-            if let Some((text, cursor)) = crate::runtime::macros::port::native_keyboard::snapshot(job.id) {
+            if let Some((text, cursor)) = crate::runtime::mii::native_keyboard::snapshot(job.id) {
                 if !lock_write(&UI).checkpoint_native_name(&text, cursor) {
                     job.phase = NamePhase::Discarding;
-                    crate::runtime::macros::port::native_keyboard::interrupt(job.id);
+                    crate::runtime::mii::native_keyboard::interrupt(job.id);
                 }
             }
         }
     }
-    let Some((id, result)) = crate::runtime::macros::port::native_keyboard::poll() else { return };
+    let Some((id, result)) = crate::runtime::mii::native_keyboard::poll() else { return };
     // A stale completion may race a new scene's request. Never retire the newer
     // job just because the old applet finally returned.
     let ready = !suspended() && waiting_name_ready();
@@ -448,17 +448,17 @@ pub fn service_keyboard() {
         if job.phase == NamePhase::Discarding { pending.take(); return; }
         // Only an acknowledged, closed keyboard may become a value-only parked
         // request. An interruption racing the completion still wins over Enter.
-        if job.waiting && !matches!(result, crate::runtime::macros::port::native_keyboard::KeyboardResult::Cancelled)
+        if job.waiting && !matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled)
             && (job.phase == NamePhase::Closing || !ready
                 || job.generation != SESSION_GENERATION.load(Ordering::Relaxed)
-                || matches!(result, crate::runtime::macros::port::native_keyboard::KeyboardResult::Interrupted)) {
+                || matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Interrupted)) {
             job.phase = NamePhase::Parked;
             return;
         }
         pending.take()
     };
     let Some(job) = job else { return };
-    crate::runtime::macros::port::logging::diagnostic(format_args!("[NativeKeyboard] consume id={} replay={}", id, job.replay));
+    crate::runtime::diag_log::diagnostic(format_args!("[NativeKeyboard] consume id={} replay={}", id, job.replay));
     if !job.waiting && (job.generation != SESSION_GENERATION.load(Ordering::Relaxed)
         || !practice::enabled() || suspended())
     { return; }
@@ -466,22 +466,22 @@ pub fn service_keyboard() {
     super::frame_counter::reset_frame_count(*menu::MENU_CLOSE_FRAME_COUNTER);
     super::frame_counter::start_counting(*menu::MENU_CLOSE_FRAME_COUNTER);
     match result {
-        crate::runtime::macros::port::native_keyboard::KeyboardResult::Confirmed(name) => {
+        crate::runtime::mii::native_keyboard::KeyboardResult::Confirmed(name) => {
             let effect = lock_write(&UI).confirm_native_name(name);
             // Only a valid confirmation closes the clip. A failed write restores
             // the naming draft; the selected clip remains available until success.
             apply_effect(effect);
         }
-        crate::runtime::macros::port::native_keyboard::KeyboardResult::Cancelled => {
+        crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled => {
             if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }
         }
-        crate::runtime::macros::port::native_keyboard::KeyboardResult::Failed(code) => {
+        crate::runtime::mii::native_keyboard::KeyboardResult::Failed(code) => {
             notify(&format!("System keyboard failed ({code:#X}); draft kept"));
         }
-        crate::runtime::macros::port::native_keyboard::KeyboardResult::Interrupted => {}
+        crate::runtime::mii::native_keyboard::KeyboardResult::Interrupted => {}
     }
     assign(&menu::MENU_RECEIVED_INPUT, true);
-    crate::runtime::macros::port::logging::diagnostic(format_args!("[NativeKeyboard] applied id={}", id));
+    crate::runtime::diag_log::diagnostic(format_args!("[NativeKeyboard] applied id={}", id));
 }
 
 pub fn capture_active() -> bool {
@@ -516,7 +516,7 @@ pub fn init() {
 }
 
 pub fn on_pad(pad: Pad) {
-    if naming_pending() || crate::runtime::macros::port::native_keyboard::busy() { return; }
+    if naming_pending() || crate::runtime::mii::native_keyboard::busy() { return; }
     // The fighter question owns the pad until answered. An answer to a selection
     // or scene that has moved on is dropped, never applied.
     let prompt = lock_read(&UI).fighter_prompt();
@@ -607,7 +607,7 @@ pub fn export_record_slot(slot: Option<usize>) {
         notify("Choose a Record Slot first");
         return;
     };
-    let (frames, start, mii) = match crate::runtime::macros::port::input_record::export_named(slot) {
+    let (frames, start, mii) = match crate::training::input_record::export_named(slot) {
         Ok(ready) => ready,
         Err(message) => {
             notify(message);
@@ -657,7 +657,7 @@ const CPU_ROLE: usize = 1;
 pub fn mii_at_lockout(
     kind: i32,
 ) -> (MiiIdentity, Option<crate::engine::mii::lifetime::Configuration>) {
-    let observed = crate::runtime::macros::port::character_roster::current_mii_configuration(CPU_ROLE);
+    let observed = crate::runtime::macros::port::roster::current_mii_configuration(CPU_ROLE);
     let observed_kind = observed.as_ref().map(|configuration| configuration.canonical().class.kind());
     let identity = crate::engine::macro_ui::macro_panel::mii_identity(kind, observed_kind);
     let mii = match identity {
@@ -683,8 +683,8 @@ fn practice_ready() -> bool {
         notify("Wait for both practice fighters");
         return false;
     }
-    if crate::runtime::macros::port::recording_or_playback()
-        || unsafe { crate::runtime::macros::port::save_states::is_loading() }
+    if crate::runtime::lobby::training::recording_or_playback()
+        || unsafe { crate::training::save_states::is_loading() }
     {
         notify("Finish the current practice action first");
         return false;
@@ -777,7 +777,7 @@ pub fn finish_capture(crop: bool) {
         (frames, motion.start)
     };
     let version = game_version();
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_recording_complete captured_frames={} crop={}", frames.len(), crop
     ));
     let effect = lock_write(&UI).offer_save(frames, start, crop, &version);
@@ -914,9 +914,9 @@ pub fn begin_restore() {
         RESTORE_ACTION.store(0, Ordering::Relaxed);
     } else if source_is_named() && RESTORE_ACTION.load(Ordering::Relaxed) == 0 {
         let settings = read(&MENU);
-        let action = if settings.record_trigger.contains(&crate::runtime::macros::port::consts::RecordTrigger::SAVESTATE) {
+        let action = if settings.record_trigger.contains(&training_mod_consts::RecordTrigger::SAVESTATE) {
             1
-        } else if settings.save_state_playback.get_random() != crate::runtime::macros::port::consts::PlaybackSlot::empty() {
+        } else if settings.save_state_playback.get_random() != training_mod_consts::PlaybackSlot::empty() {
             2
         } else { 0 };
         RESTORE_ACTION.store(action, Ordering::Relaxed);
@@ -947,7 +947,7 @@ pub unsafe fn position_wait_timed_out(status: i32, target: i32) -> bool {
     }
     let waits = RESTORE_POSITION_WAITS.fetch_add(1, Ordering::Relaxed);
     if waits == 0 {
-        crate::runtime::macros::port::logging::diagnostic(format_args!(
+        crate::runtime::diag_log::diagnostic(format_args!(
             "[PracticeRecording] named_restore_wait phase=position status={} target={}", status, target
         ));
     }
@@ -956,7 +956,7 @@ pub unsafe fn position_wait_timed_out(status: i32, target: i32) -> bool {
     RESTORE_ACTION.store(0, Ordering::Relaxed);
     *lock_write(&RESTORE_POSE) = None;
     super::input_record::stop_playback();
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_restore_failed phase=position status={} target={}", status, target
     ));
     notify("Start position could not settle; adjust placement and retry");
@@ -1047,7 +1047,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
     if StatusModule::status_kind(module_accessor) != target_status {
         let waits = PLAYBACK_START_WAITS.fetch_add(1, Ordering::Relaxed);
         if waits == 0 {
-            crate::runtime::macros::port::logging::diagnostic(format_args!(
+            crate::runtime::diag_log::diagnostic(format_args!(
                 "[PracticeRecording] named_playback_wait status={} target={}",
                 StatusModule::status_kind(module_accessor), target_status
             ));
@@ -1066,7 +1066,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
     PLAYBACK_OBSERVATIONS.store(PLAYBACK_OBSERVATION_LIMIT, Ordering::Relaxed);
     *lock_write(&RESTORE_POSE) = None;
     let start = snapshot_start(module_accessor);
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_playback_start x={} y={} facing={} situation={} status={} speed_x={} speed_y={}",
         PostureModule::pos_x(module_accessor), PostureModule::pos_y(module_accessor),
         start.facing, start.situation, start.status, start.speed_x, start.speed_y
@@ -1087,7 +1087,7 @@ pub unsafe fn observe_playback_before(module_accessor: &mut BattleObjectModuleAc
     { return; }
     if !observation_fighter(module_accessor) { return; }
     let start = snapshot_start(module_accessor);
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_playback_before next_input={} x={} y={} status={} speed_x={} speed_y={}",
         read(&super::input_record::INPUT_RECORD_FRAME), PostureModule::pos_x(module_accessor),
         PostureModule::pos_y(module_accessor), start.status, start.speed_x, start.speed_y
@@ -1116,7 +1116,7 @@ pub unsafe fn observe_playback_start(module_accessor: &mut BattleObjectModuleAcc
     if remaining == 0 || !observation_fighter(module_accessor) { return; }
     PLAYBACK_OBSERVATIONS.store(remaining - 1, Ordering::Relaxed);
     let start = snapshot_start(module_accessor);
-    crate::runtime::macros::port::logging::diagnostic(format_args!(
+    crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_playback_observed sample={} next_input={} x={} y={} situation={} status={} speed_x={} speed_y={} buttons={} raw_x={} raw_y={}",
         PLAYBACK_OBSERVATION_LIMIT + 1 - remaining, read(&super::input_record::INPUT_RECORD_FRAME),
         PostureModule::pos_x(module_accessor), PostureModule::pos_y(module_accessor),
@@ -1228,8 +1228,8 @@ pub fn service_character() {
     {
         return;
     }
-    if crate::runtime::macros::port::recording_or_playback()
-        || unsafe { crate::runtime::macros::port::save_states::is_loading() }
+    if crate::runtime::lobby::training::recording_or_playback()
+        || unsafe { crate::training::save_states::is_loading() }
     {
         return;
     }
@@ -1242,19 +1242,19 @@ pub fn service_character() {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
-        if let Some(reason)=target.and_then(crate::runtime::macros::port::character_roster::mii_replay::named_refusal) {
+        if let Some(reason)=target.and_then(crate::runtime::macros::port::roster::mii_replay::named_refusal) {
             let revision=selection_revision();
             if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {notify(reason);}
             return;
         }
     }
     observe_loaded();
-    if crate::runtime::macros::port::character_roster::busy() {return;}
+    if crate::runtime::macros::port::roster::busy() {return;}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
         if let Some(target)=target {
-            crate::runtime::macros::port::character_roster::mii_replay::reacknowledge_named(target);
+            crate::runtime::macros::port::roster::mii_replay::reacknowledge_named(target);
         }
     }
     submit_loaded_character();
@@ -1361,7 +1361,7 @@ fn bind_to_slot(id: &str) {
         }
     };
     let label = format!("Record Slot {}", slot + 1);
-    match crate::runtime::macros::port::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {
+    match crate::training::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {
         Ok(()) => notify(&format!("Copied {} to {label}", recording.name)),
         Err(err) => notify(&err),
     }
@@ -1435,7 +1435,7 @@ pub(crate) fn fighter_label(kind: i32) -> String {
     if kind < 0 {
         return "CPU".to_owned();
     }
-    crate::runtime::macros::port::consts::TrioFighter::from_kind(kind as u32)
+    crate::engine::swap::trio::TrioFighter::from_kind(kind as u32)
         .map(|fighter| fighter.name().to_owned())
         .unwrap_or_else(|| format!("0x{kind:X}"))
 }

@@ -78,17 +78,17 @@ pub fn register_toggle() {
         Ok(handle) => {
             HOST_REGISTERED.store(true, Ordering::Release);
             let (status, build) = host_identity();
-            crate::runtime::macros::port::logging::diagnostic(format_args!(
+            crate::runtime::diag_log::diagnostic(format_args!(
                 "[ReplayCapture] deluxe register: Ok handle={} descriptor={:?} persist={} host_status={:#x} host_build={:?}",
                 handle.0, negotiated_descriptor_version(handle), persist, status, build
             ));
         }
         Err(RegisterError::HostMissing) => {
-            crate::runtime::macros::port::logging::diagnostic(format_args!("[ReplayCapture] deluxe register: HostMissing"))
+            crate::runtime::diag_log::diagnostic(format_args!("[ReplayCapture] deluxe register: HostMissing"))
         }
         Err(error) => {
             let (status, build) = host_identity();
-            crate::runtime::macros::port::logging::diagnostic(format_args!(
+            crate::runtime::diag_log::diagnostic(format_args!(
                 "[ReplayCapture] deluxe register: {:?} host_status={:#x} host_build={:?}",
                 error, status, build
             ));

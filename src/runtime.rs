@@ -17,6 +17,7 @@ mod hub;
 mod import;
 mod install;
 mod lobby;
+mod macros;
 mod mii;
 mod p1;
 mod published;
@@ -33,3 +34,4 @@ mod sync_probe;
 pub fn main() {
     boot::run();
 }
+

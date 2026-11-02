@@ -22,24 +22,28 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::macros::port::practice",
-   "training::input_record": "crate::runtime::macros::port::input_record",
-   "training::save_states": "crate::runtime::macros::port::save_states",
-   "training::ui::notifications": "crate::runtime::macros::port::notifications",
-   "training::recording_or_playback": "crate::runtime::macros::port::recording_or_playback",
-   "common": "crate::runtime::macros::port::common",
-   "native_keyboard": "crate::runtime::macros::port::native_keyboard",
-   "character_roster": "crate::runtime::macros::port::character_roster",
-   "logging": "crate::runtime::macros::port::logging",
+   "training::practice": "crate::runtime::lobby::training::practice",
+   "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
+   "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
+   "common": "crate::runtime::compat::common",
+   "common::consts::FighterId": "crate::runtime::compat::consts::FighterId",
+   "common::consts::MENU": "crate::runtime::compat::menu::MENU",
+   "common::consts::OnOff": "crate::engine::compat::menu::OnOff",
+   "common::consts::MacroSource": "crate::runtime::macros::port::MacroSource",
+   "consts": "crate::runtime::compat::consts",
+   "common::game_mode": "crate::runtime::lobby::game_mode",
+   "native_keyboard": "crate::runtime::mii::native_keyboard",
+   "character_roster": "crate::runtime::macros::port::roster",
+   "mii_editor_bridge": "crate::runtime::macros::port::editor_bridge",
+   "logging": "crate::runtime::diag_log",
    "native_fields": "crate::engine::seams::native_fields",
-   "input": "crate::runtime::macros::port::input",
-   "consts": "crate::runtime::macros::port::consts",
-   "swap_native": "crate::runtime::macros::port::swap_native"
+   "swap_native::seam_install": "crate::runtime::seams::seam_install",
+   "input": "crate::runtime::macros::port::input"
   },
   "consts": {
    "mii": "crate::engine::mii",
    "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
-   "*": "crate::runtime::macros::port::consts"
+   "TrioFighter": "crate::engine::swap::trio::TrioFighter"
   },
   "sync": {
    "*": "crate::runtime::macros::port::sync"
@@ -449,28 +453,28 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "825cc266f2d635cca8c261cb35ae0892a9bff82e89454a4979290f69ec108b38"
+   "dest_sha256": "ebbb6b0021a0cd01a1d6524c9db9da4886f86090832755b5abed9965e59d01da"
   },
   {
    "src": "src/replay_store.rs",
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "35ab66f9dc748257b13b169a93d2ea194329597f152346725254578582c53a7a"
+   "dest_sha256": "4da80c37ed166bde0b13cee0c5c2c33651013aeca19a2bc2b1314953137c647b"
   },
   {
    "src": "src/replay_capture.rs",
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "6cf1c683aad578e3bfa396ca0d61ce4e90ee5360b5871ee7f83a496fe9ea0b91"
+   "dest_sha256": "78240e9d5964cb84ed7aaa73e3fa110390054ac719531cc232ad6b349f0475c9"
   },
   {
    "src": "src/replay_preview.rs",
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "87299a2fed13497b5c81eafb8a9b4c961e32e74ff005a1beb67e41263e3e36ec"
+   "dest_sha256": "a7fcfc8f87cb2b4dcbf3e7dd3ff9e8f3aca21914a89e69ef0fb35c0e56e0204f"
   },
   {
    "src": "src/replay_move_start.rs",
@@ -484,14 +488,14 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "1f82bfbf0d6b39c9393c0150036ba7c3865d8932fb1c0db1d3924b1631f436df"
+   "dest_sha256": "86f89a3d6fb03a6aa4e310f5e1870fef3fc717d1a540c5757fb6f0bbfc3f9e2e"
   },
   {
    "src": "src/capture_plugin.rs",
    "dest": "src/runtime/macros/capture_plugin.rs",
    "crate": "root",
    "src_sha256": "abecd53b34b45b43797cd1a29ddb44e1e1a4af4acc28177e7b175c15fd4a1117",
-   "dest_sha256": "37145188ef58d662519066ab357d88882f1b58badb38cf1cb6e9f8812866b092"
+   "dest_sha256": "42f601aba4139a4cb843b04bf54dc38d724f673627b6f22b88f1d07899fb3f30"
   }
  ]
 }

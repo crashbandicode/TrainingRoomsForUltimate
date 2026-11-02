@@ -28,6 +28,8 @@ use super::settings::Snapshot;
 pub const SLOTS: usize = 5;
 /// Frames per slot: the largest Recording Duration.
 pub const SLOT_FRAMES: usize = 600;
+/// Frames of a named recording (	raining_mod_macros::MAX_FRAMES: ten minutes at 60 fps); the named capture lasts until the stop chord.
+pub const NAMED_FRAMES: u16 = 36_000;
 /// A slot's length before anything was recorded into it.
 pub const INITIAL_LENGTH: u16 = 60;
 /// Control frames of the lockout that follows the record chord (SPEC-input-01 §5.3).
@@ -338,6 +340,10 @@ pub enum Ended {
     /// The recording into `slot` finished; its stored length is `frames` (after the crop).
     Recorded { slot: u8, frames: u16 },
     Played { slot: u8 },
+    /// A named capture reached its maximum length (the layer keeps the frames).
+    NamedCaptured { frames: u16 },
+    /// A named playback (or a clip preview) played to its end.
+    NamedPlayed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -391,6 +397,8 @@ pub struct Recorder {
     status_captured: bool,
     /// Latched at the lockout: crop is read at the end, the duration was latched with `length`.
     mash_started: bool,
+    /// The frame source is the named layer's buffer (SPEC-input-01 section 9), not a numbered slot.
+    named: bool,
 }
 
 impl Default for Recorder {
@@ -419,10 +427,16 @@ impl Recorder {
             starting_status: UNRESOLVED,
             status_captured: false,
             mash_started: false,
+            named: false,
         }
     }
 
     // ---- queries (SPEC-input-01 §5.6 and the CPU specs' interface) -----------------------------
+
+    /// The frame source of the run is the named layer's buffer.
+    pub const fn is_named(&self) -> bool {
+        self.named
+    }
 
     pub const fn mode(&self) -> Mode {
         self.mode
@@ -530,6 +544,58 @@ impl Recorder {
         self.starting_status = UNRESOLVED;
         self.status_captured = false;
         self.mash_started = false;
+        self.named = false;
+    }
+
+    /// The named layer's record chord (SPEC-input-01 section 9 start_named_lockout): the same lockout, then the capture runs from
+    /// frame 0 with the CPU possessed at once (no standby) for up to NAMED_FRAMES, until the stop chord. The frames live in the
+    /// layer's buffer: poll_named hands each one out, control_named reads it back.
+    pub fn start_named_lockout(&mut self, facing: i8) {
+        self.mode = Mode::Pause;
+        self.possession = Possession::Lockout;
+        self.frame = 0;
+        self.lockout = LOCKOUT_FRAMES;
+        self.buffer = 0;
+        self.length = NAMED_FRAMES;
+        self.recorded_facing = facing;
+        self.current_facing = facing;
+        self.starting_status = UNRESOLVED;
+        self.status_captured = true;
+        self.mash_started = false;
+        self.named = true;
+    }
+
+    /// The named layer's playback (playback_named, playback_preview): rames frames from the layer's buffer, mirrored by the
+    /// recorded acing against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
+    pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
+        match self.mode {
+            Mode::Pause => return Err(PlayRefusal::Lockout),
+            Mode::Record => return Err(PlayRefusal::Recording),
+            _ => {}
+        }
+        if frames == 0 || frames > NAMED_FRAMES {
+            return Err(PlayRefusal::SlotEmpty);
+        }
+        self.length = frames;
+        self.mode = Mode::Playback;
+        self.possession = Possession::Player;
+        self.frame = 0;
+        self.buffer = 0;
+        self.current_facing = current_facing;
+        self.recorded_facing = recorded_facing;
+        self.starting_status = status;
+        self.named = true;
+        Ok(PlayStart { slot: 0, frames })
+    }
+
+    /// The named stop chord: the capture ends now; returns the frames the layer holds (the frame index of the next poll).
+    pub fn finish_named_capture(&mut self) -> Option<u16> {
+        if !(self.named && self.mode == Mode::Record) {
+            return None;
+        }
+        let frames = self.frame.min(NAMED_FRAMES);
+        self.stop();
+        Some(frames)
     }
 
     /// Begin playing `slot`; `facing` is the CPU's `lr` now.
@@ -555,6 +621,7 @@ impl Recorder {
         self.current_facing = facing;
         self.recorded_facing = self.origin[i].facing;
         self.starting_status = self.origin[i].status;
+        self.named = false;
         Ok(PlayStart { slot, frames: self.length })
     }
 
@@ -575,6 +642,7 @@ impl Recorder {
         self.buffer = 0;
         self.lockout = 0;
         self.mash_started = false;
+        self.named = false;
     }
 
     // ---- the poll stage ------------------------------------------------------------------------
@@ -609,10 +677,37 @@ impl Recorder {
         }
     }
 
+    /// The poll stage of a named run: the frame the layer stores at the returned index (the capture's, from frame 0) while P1's
+    /// output is made neutral. During the lockout only the neutralising happens.
+    pub fn poll_named(&mut self, out: &mut MappedInputs) -> Option<(u16, MappedInputs)> {
+        match (self.mode, self.possession) {
+            (Mode::Pause, _) => {
+                *out = MappedInputs::NEUTRAL;
+                None
+            }
+            (Mode::Record, Possession::Cpu) if self.named => {
+                let stored = (self.frame, *out);
+                *out = MappedInputs::NEUTRAL;
+                Some(stored)
+            }
+            _ => None,
+        }
+    }
+
     // ---- the control stage ---------------------------------------------------------------------
 
     /// One CPU control frame, after the AI wrote its controls.
     pub fn control(&mut self, c: &ControlCtx) -> ControlOut {
+        self.control_from(c, &|_| None)
+    }
+
+    /// control of a named run: the frame at an index comes from the layer's buffer (None: not captured yet, the CPU gets neutral
+    /// controls and the clock waits, SPEC-input-01 section 9 has_captured_frame).
+    pub fn control_named(&mut self, c: &ControlCtx, frame: &dyn Fn(u16) -> Option<MappedInputs>) -> ControlOut {
+        self.control_from(c, frame)
+    }
+
+    fn control_from(&mut self, c: &ControlCtx, named: &dyn Fn(u16) -> Option<MappedInputs>) -> ControlOut {
         let mut out = ControlOut { write: None, hold_cliff_timer: false };
         match self.mode {
             Mode::Pause => {
@@ -622,7 +717,8 @@ impl Recorder {
                 }
                 if self.lockout == 0 {
                     self.mode = Mode::Record;
-                    self.possession = Possession::Standby;
+                    // A named capture possesses the CPU at once: its frame 0 is the first poll after the lockout.
+                    self.possession = if self.named { Possession::Cpu } else { Possession::Standby };
                 }
             }
             Mode::Record => {
@@ -630,6 +726,15 @@ impl Recorder {
                 if self.possession == Possession::Standby {
                     out.hold_cliff_timer = true;
                     out.write = Some(self.injected(self.slots[i][0], c));
+                } else if self.named {
+                    // The poll of this frame stored it a moment ago; before the first poll there is nothing to perform.
+                    match named(self.frame) {
+                        Some(frame) => {
+                            out.write = Some(self.injected(frame, c));
+                            self.advance();
+                        }
+                        None => out.write = Some(Inject::NEUTRAL),
+                    }
                 } else {
                     out.write = Some(self.injected(self.slots[i][usize::from(self.frame.min(self.length - 1))], c));
                     self.advance();
@@ -637,7 +742,8 @@ impl Recorder {
             }
             Mode::Playback => {
                 let i = usize::from(self.play_slot);
-                let frame = self.slots[i][usize::from(self.frame.min(self.length.saturating_sub(1)))];
+                let at = self.frame.min(self.length.saturating_sub(1));
+                let frame = if self.named { named(at).unwrap_or(MappedInputs::NEUTRAL) } else { self.slots[i][usize::from(at)] };
                 out.write = Some(self.injected(frame, c));
                 if self.buffer > 0 {
                     self.buffer -= 1;
@@ -674,6 +780,15 @@ impl Recorder {
         self.possession = Possession::Player;
         out.pop_mash = c.queue_head_is_playback;
         let was = self.mode;
+        if self.named {
+            // The layer owns the frames; a capture that reached its maximum ends here like a stop chord.
+            let frames = self.frame.min(NAMED_FRAMES);
+            out.ended = Some(if was == Mode::Record { Ended::NamedCaptured { frames } } else { Ended::NamedPlayed });
+            self.frame = 0;
+            self.mode = Mode::None;
+            self.named = false;
+            return out;
+        }
         if was == Mode::Record {
             let i = usize::from(self.record_slot);
             let mut n = self.frame;
