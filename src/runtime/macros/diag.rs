@@ -91,7 +91,11 @@ pub(crate) fn start() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    let _ = std::thread::Builder::new().name("tr-macro-diag".into()).stack_size(64 * 1024).spawn(|| loop {
+    let _ = std::thread::Builder::new().name("tr-macro-diag".into()).stack_size(64 * 1024).spawn(|| {
+        // The stack this thread runs on, so a fault report (an SP below a stack bottom) can be attributed to a thread.
+        let here = 0u8;
+        diagnostic(format_args!("[NamedMacroDiag] thread tr-macro-diag stack_size=0x10000 stack_near={:p}", &here));
+        loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let Some(path) = FixedPath::<128>::in_root("diag-macro.req") else { continue };
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };
@@ -109,6 +113,7 @@ pub(crate) fn start() {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
             *PENDING.lock() = Some(command);
+        }
         }
     });
 }

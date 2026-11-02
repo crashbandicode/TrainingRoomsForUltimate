@@ -106,10 +106,23 @@ def move_to(text, tries=14):
         items = label_list(raw)
         if 0 <= sel < len(items) and text in items[sel]:
             return sel
-        cmd("pad down")
+        cmd("pad right")
         time.sleep(0.6)
         line = view()
     return None
+
+
+def ui_do(method, params, cap=6.0):
+    """A UI operation of Eden's control API, waited for: it returns a job before it runs (CLIControl.md)."""
+    res = r.call(LABEL, method, params)
+    job = res.get("job") if isinstance(res, dict) else None
+    deadline = time.time() + cap
+    while job and time.time() < deadline:
+        state = r.call(LABEL, "jobs.get", {"job": job})
+        if isinstance(state, dict) and state.get("state") not in ("queued", "running", None):
+            return state
+        time.sleep(0.3)
+    return res
 
 
 def main():
@@ -155,50 +168,6 @@ def main():
     row("Save slot to library: macros/evtest.json written with the slot's frames", ok, detail)
     ln = line_after(m, "Saved evtest", 4)
     row("saved notice posted", ln is not None or ok, ln or "no notice line (the file is the evidence)")
-
-    # the release path: the real software keyboard applet, answered through Eden's control API (ui.tree / ui.set / ui.click)
-    r.remote(f"Set-Content -Path {SD}/diag-keyboard.on -Value 'on'", 30)
-    time.sleep(1)
-    cmd("export_slot 0")
-    dialog = None
-    for _ in range(20):
-        time.sleep(1.5)
-        try:
-            tree = r.call(LABEL, "ui.tree", {})
-        except Exception as error:  # noqa: BLE001
-            print(f"ui.tree: {error}", flush=True)
-            continue
-        found = {}
-
-        def walk(node):
-            if isinstance(node, dict):
-                name = node.get("name") or node.get("object_name") or ""
-                if node.get("id") and name in ("line_edit_osk", "button_ok"):
-                    found[name] = node["id"]
-                for key, value in node.items():
-                    if key != "properties":
-                        walk(value)
-            elif isinstance(node, list):
-                for value in node:
-                    walk(value)
-
-        walk(tree)
-        if "line_edit_osk" in found and "button_ok" in found:
-            dialog = found
-            break
-    ok = False
-    detail = "keyboard dialog not found in ui.tree"
-    if dialog:
-        r.call(LABEL, "ui.set", {"target": dialog["line_edit_osk"], "property": "text", "value": "kbtest"})
-        time.sleep(0.8)
-        r.call(LABEL, "ui.click", {"target": dialog["button_ok"]})
-        time.sleep(3.0)
-        body = read_file(f"{SD}/macros/kbtest.json")
-        ok = bool(body.strip())
-        detail = f"typed kbtest through the applet; macros/kbtest.json {'present' if ok else 'missing'}"
-    row("Keyboard applet (release path): a name typed through the real applet saves the macro", ok, detail)
-    shot("after-keyboard")
-    r.remote(f"Remove-Item -Force {SD}/diag-keyboard.on", 30)
 
     # list and load from the library
     m = cmd("open_library 0")
@@ -265,38 +234,6 @@ def main():
     (OUT / "evtest2.json").write_text(body2)
     row("named capture saved to the library with the captured frames", ok2, detail2)
 
-    # roster path: load a named macro of another fighter, answer the prompt Switch, the roster cycle's real provider changes the CPU
-    try:
-        dh = json.loads(read_file(f"{SD}/macros/duck-hunt-dash.json"))["start"]["fighter_kind"]
-    except Exception:  # noqa: BLE001
-        dh = None
-    st = cmd("status")
-    before = line_after(st, "[NamedMacroDiag] status", 6) or ""
-    cmd("open_library 0")
-    time.sleep(1.0)
-    at = move_to("Duck Hunt dash")
-    cmd("pad confirm")
-    time.sleep(2.0)
-    line = view()
-    (OUT / "roster-prompt-view.txt").write_text(line or "")
-    row("Loading a macro of another fighter asks (Fighter Mismatch)", bool(line) and "Fighter Mismatch" in line, (line or "no view")[:260])
-    cmd("pad down")
-    time.sleep(0.6)
-    cmd("pad confirm")  # Switch to recorded fighter
-    switched = None
-    for _ in range(25):
-        time.sleep(3.0)
-        st = cmd("status")
-        ln = line_after(st, "[NamedMacroDiag] status", 6) or ""
-        mm = re.search(r"cpu_kind=Some\((-?\d+)\)", ln)
-        if mm and dh is not None and int(mm.group(1)) == dh:
-            switched = ln
-            break
-    roster_lines = [x for x in read_diag() if "[CharacterRoster]" in x or "[MiiOrdinaryCpu]" in x][-6:]
-    (OUT / "roster-lines.txt").write_text("\n".join(roster_lines))
-    row("Switch to recorded fighter: the roster cycle's provider changes the CPU to the macro's fighter", switched is not None, (switched or "cpu kind did not become " + str(dh) + "; before: " + before[-120:])[-260:])
-    shot("after-fighter-switch")
-
     # replay window over the seeded capture
     m = cmd("list_captures")
     ln = line_after(m, "[NamedMacroDiag] captures", 8)
@@ -341,6 +278,82 @@ def main():
     (OUT / "evcrop.json").write_text(body3)
     row("Replay Window crops a macro into the library", ok3, detail3)
     shot("after-crop")
+
+    # the release path: the real software keyboard applet, answered through Eden's control API (ui.tree / ui.set / ui.click)
+    r.remote(f"Set-Content -Path {SD}/diag-keyboard.on -Value 'on'", 30)
+    time.sleep(1)
+    cmd("export_slot 0")
+    dialog = None
+    for _ in range(20):
+        time.sleep(1.5)
+        try:
+            tree = r.call(LABEL, "ui.tree", {})
+        except Exception as error:  # noqa: BLE001
+            print(f"ui.tree: {error}", flush=True)
+            continue
+        found = {}
+
+        def walk(node):
+            if isinstance(node, dict):
+                name = node.get("name") or node.get("object_name") or ""
+                if node.get("id") and name in ("line_edit_osk", "button_ok"):
+                    found[name] = node["id"]
+                for key, value in node.items():
+                    if key != "properties":
+                        walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        walk(tree)
+        if "line_edit_osk" in found and "button_ok" in found:
+            dialog = found
+            break
+    ok = False
+    detail = "keyboard dialog not found in ui.tree"
+    if dialog:
+        set_state = ui_do("ui.set", {"target": dialog["line_edit_osk"], "property": "text", "value": "kbtest"})
+        click_state = ui_do("ui.click", {"target": dialog["button_ok"]})
+        (OUT / "keyboard-ui.json").write_text(json.dumps({"dialog": dialog, "set": set_state, "click": click_state}, indent=1))
+        time.sleep(3.0)
+        body = read_file(f"{SD}/macros/kbtest.json")
+        ok = bool(body.strip())
+        detail = f"typed kbtest through the applet; macros/kbtest.json {'present' if ok else 'missing'}"
+    row("Keyboard applet (release path): a name typed through the real applet saves the macro", ok, detail)
+    shot("after-keyboard")
+    r.remote(f"Remove-Item -Force {SD}/diag-keyboard.on", 30)
+
+    # roster path: load a named macro of another fighter, answer the prompt Switch, the roster cycle's real provider changes the CPU
+    try:
+        dh = json.loads(read_file(f"{SD}/macros/duck-hunt-dash.json"))["start"]["fighter_kind"]
+    except Exception:  # noqa: BLE001
+        dh = None
+    st = cmd("status")
+    before = line_after(st, "[NamedMacroDiag] status", 6) or ""
+    cmd("open_library 0")
+    time.sleep(1.0)
+    at = move_to("Duck Hunt dash")
+    cmd("pad confirm")
+    time.sleep(2.0)
+    line = view()
+    (OUT / "roster-prompt-view.txt").write_text(line or "")
+    row("Loading a macro of another fighter asks (Fighter Mismatch)", bool(line) and "Fighter Mismatch" in line, (line or "no view")[:260])
+    cmd("pad down")
+    time.sleep(0.6)
+    cmd("pad confirm")  # Switch to recorded fighter
+    switched = None
+    for _ in range(25):
+        time.sleep(3.0)
+        st = cmd("status")
+        ln = line_after(st, "[NamedMacroDiag] status", 6) or ""
+        mm = re.search(r"cpu_kind=Some\((-?\d+)\)", ln)
+        if mm and dh is not None and int(mm.group(1)) == dh:
+            switched = ln
+            break
+    roster_lines = [x for x in read_diag() if "[CharacterRoster]" in x or "[MiiOrdinaryCpu]" in x][-6:]
+    (OUT / "roster-lines.txt").write_text("\n".join(roster_lines))
+    row("Switch to recorded fighter: the roster cycle's provider changes the CPU to the macro's fighter", switched is not None, (switched or "cpu kind did not become " + str(dh) + "; before: " + before[-120:])[-260:])
+    shot("after-fighter-switch")
 
     # hook counts and allocations
     time.sleep(4)
