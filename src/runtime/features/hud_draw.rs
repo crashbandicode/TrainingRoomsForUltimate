@@ -13,6 +13,8 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 use std::fmt::Write;
 
+use parking_lot::Mutex;
+
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::input_delay::Owners;
@@ -30,6 +32,17 @@ const INFO_TRAINING: &[u8] = b"info_training";
 
 /// The `tick::REGISTRATIONS` value the last draw saw.
 static SEEN_REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
+
+/// The two containers of the plugin's layout part, resolved once per registration of the layout (a walk from the
+/// root visits the stock panes first and is capped, so the plugin's own panes are searched below their container).
+struct Containers {
+    layout: usize,
+    registrations: u32,
+    notice: usize,
+    column: usize,
+}
+
+static CONTAINERS: Mutex<Containers> = Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, column: 0 });
 
 /// The longest text written to one pane (the status text's 48 units, the held-frames' 4).
 const TEXT_UNITS: usize = 48;
@@ -56,9 +69,16 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     if !scene::is_training() {
         return;
     }
+    let (notice, column) = {
+        let mut c = CONTAINERS.lock();
+        if c.layout != layout as usize || c.registrations != registrations {
+            *c = Containers { layout: layout as usize, registrations, notice: find(root, p::IDX_NOTICE) as usize, column: find(root, p::IDX_LOG) as usize };
+        }
+        (c.notice as *mut Pane, c.column as *mut Pane)
+    };
     let owners = published::input_owners();
     let menu_open = owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE);
-    write_notice(root, &notices::hud_tick());
+    write_notice(notice, &notices::hud_tick());
     let plan = input_display::hud_tick(menu_open);
     if !plan.is_empty() {
         #[cfg(feature = "diag")]
@@ -67,7 +87,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
             let icons = plan.ops().iter().filter(|op| matches!(op, Op::Icons { .. })).count();
             diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));
         }
-        write_plan(root, &plan);
+        write_plan(column, &plan);
     }
 }
 
@@ -97,15 +117,14 @@ unsafe fn set_text(target: *mut Pane, text: &str) {
 
 // ---- the notice slot ----------------------------------------------------------------------------------
 
-unsafe fn write_notice(root: *mut Pane, out: &TickOut) {
-    let container = find(root, p::IDX_NOTICE);
+unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
     if container.is_null() {
         return;
     }
     pane::set_visible(container, out.visible);
     let Some(draw) = out.draw else { return };
-    let header = find(root, p::IDX_NOTICE_HEADER);
-    let text = find(root, p::IDX_NOTICE_TEXT);
+    let header = find(container, p::IDX_NOTICE_HEADER);
+    let text = find(container, p::IDX_NOTICE_TEXT);
     if !header.is_null() {
         set_text(header, draw.header);
     }
@@ -137,11 +156,12 @@ const DIRECTION: [(f32, f32); 8] = [
     (0.707_106_77, -0.707_106_77),
 ];
 
-unsafe fn write_plan(root: *mut Pane, plan: &Plan) {
+unsafe fn write_plan(column: *mut Pane, plan: &Plan) {
+    // `root` below is the log column: every pane of the log is its descendant.
+    let root = column;
     for op in plan.ops() {
         match *op {
             Op::Column { visible } => {
-                let column = find(root, p::IDX_LOG);
                 if column.is_null() {
                     missing("TrModInputLog");
                     return;
