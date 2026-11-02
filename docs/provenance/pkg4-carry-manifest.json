@@ -958,7 +958,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "8f44f4a55fb8b758723dcbad68605db3328500ec9f36f6b13f68e68c40018d8d",
+   "dest_sha256": "3dd01e33f744236dce5bd798ab4596442841aee187bf859f03da51177b89fe22",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -1019,6 +1019,31 @@
      "old": "}\n\n#[cfg(feature = \"mii-ordinary-cpu-alpha\")]\npub(crate) fn import_mii(configuration: crate::engine::mii::lifetime::Configuration,\n    native: Arc<crate::engine::mii::inventory::Snapshot>,\n    reply: mpsc::Sender<Result<Arc<crate::engine::mii::draft::Library>, String>>) -> Result<(), String> {\n    WRITER.get().ok_or(\"Mii preset owner unavailable\")?\n        .try_send(WriteJob::Import {name: None, configuration: Box::new(configuration), native, reply}).map_err(|error| error.to_string())\n}\n\n/// Called after the Training data directory and legacy migration are ready, and\n",
      "new": "}\n\n#[cfg(feature = \"mii-ordinary-cpu-alpha\")]\npub(crate) fn import_mii(\n    payload: Box<crate::runtime::roster::character_roster::mii_replay::ImportPayload>,\n    reply: crate::runtime::roster::character_roster::mii_replay::ImportReply,\n) -> crate::runtime::roster::character_roster::mii_replay::ImportQueue {\n    use crate::runtime::roster::character_roster::mii_replay::ImportQueue;\n    let Some(writer) = WRITER.get() else { return ImportQueue::Unavailable(payload, reply); };\n    match writer.try_send(WriteJob::Import(payload, reply)) {\n        Ok(()) => ImportQueue::Queued,\n        Err(mpsc::TrySendError::Full(WriteJob::Import(payload, reply))) => ImportQueue::Full(payload, reply),\n        Err(mpsc::TrySendError::Disconnected(WriteJob::Import(payload, reply))) => ImportQueue::Unavailable(payload, reply),\n        Err(_) => unreachable!(\"import submission returned another job variant\"),\n    }\n}\n\n/// Called after the Training data directory and legacy migration are ready, and\n",
      "reason": "pkg6 allocation-free Mii ownership: boot-reserved replay requests/replies and import payload; worker-only catalog construction, identity-checked native publication, bounded UI catalog handoff outside App"
+    },
+    {
+     "old": "            return Err(\"replay_capture.ini exceeds 16 KiB\".into());\n        }\n        let text = fs::read_to_string(path).map_err(|error| error.to_string())?;\n        let settings = CaptureSettings::parse(&text)?;\n        Ok((settings, CaptureSettings::persistence_compatible(&text)))\n    })();\n    match result {\n        Ok((settings, persistence)) => {\n            SEED_ENABLED.store(settings.enabled, Ordering::Release);\n            TOGGLE.seed(settings.enabled);\n            match persistence {\n                Ok(()) => {\n                    PERSISTENCE_COMPATIBLE.store(true, Ordering::Release);\n                    println!(\"[ReplayCapture] deluxe_persistence enabled\");\n                }\n                Err(reason) => println!(\"[ReplayCapture] deluxe_persistence disabled: {reason}\"),\n            }\n            crate::runtime::diag_log::diagnostic(format_args!(\"[ReplayCapture] live_enabled={}\", settings.enabled));\n        }\n        Err(error) => {\n",
+     "new": "            return Err(\"replay_capture.ini exceeds 16 KiB\".into());\n        }\n        let text = fs::read_to_string(path).map_err(|error| error.to_string())?;\n        CaptureSettings::parse(&text)\n    })();\n    match result {\n        Ok(settings) => {\n            SEED_ENABLED.store(settings.enabled, Ordering::Release);\n            TOGGLE.seed(settings.enabled);\n            crate::runtime::diag_log::diagnostic(format_args!(\"[ReplayCapture] live_enabled={}\", settings.enabled));\n        }\n        Err(error) => {\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    if let Err(error) = start_writer() { println!(\"[ReplayCapture] Mii library unavailable: {error}\"); }\n    let path = REPLAY_CAPTURE_INI;\n    let result = (|| -> Result<(CaptureSettings, Result<(), String>), String> {\n        // The host persists by rename; a crash between its renames leaves only\n        // `replay_capture.previous.ini`. Restore it before creating a default.\n        match recover_previous_ini(Path::new(path)) {\n",
+     "new": "    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    if let Err(error) = start_writer() { println!(\"[ReplayCapture] Mii library unavailable: {error}\"); }\n    let path = REPLAY_CAPTURE_INI;\n    let result = (|| -> Result<CaptureSettings, String> {\n        // The host persists by rename; a crash between its renames leaves only\n        // `replay_capture.previous.ini`. Restore it before creating a default.\n        match recover_previous_ini(Path::new(path)) {\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "/// What the INI said at startup. Runtime edits live in [`toggle`].\npub fn seed_enabled() -> bool {\n    SEED_ENABLED.load(Ordering::Acquire)\n}\n\n/// Whether the Deluxe host may rewrite the INI (see\n/// `CaptureSettings::persistence_compatible`); otherwise the row is session-only.\n/// Only the `deluxe-sdk` registration reads it; the verdict is logged regardless.\n#[cfg_attr(not(feature = \"deluxe-sdk\"), allow(dead_code))]\npub fn persistence_compatible() -> bool {\n    PERSISTENCE_COMPATIBLE.load(Ordering::Acquire)\n}\n\n/// Start once for the mod library (combined alpha) or after live-capture guards.\n",
+     "new": "/// What the INI said at startup. Runtime edits live in [`toggle`].\npub fn seed_enabled() -> bool {\n    SEED_ENABLED.load(Ordering::Acquire)\n}\n\n/// Start once for the mod library (combined alpha) or after live-capture guards.\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "\n/// INI value read at startup; `toggle()` holds the runtime preference.\nstatic SEED_ENABLED: AtomicBool = AtomicBool::new(false);\nstatic PERSISTENCE_COMPATIBLE: AtomicBool = AtomicBool::new(false);\nstatic TOGGLE: CaptureToggle = CaptureToggle::new();\nstatic WRITER: OnceLock<SyncSender<WriteJob>> = OnceLock::new();\n\n",
+     "new": "\n/// INI value read at startup; `toggle()` holds the runtime preference.\nstatic SEED_ENABLED: AtomicBool = AtomicBool::new(false);\nstatic TOGGLE: CaptureToggle = CaptureToggle::new();\nstatic WRITER: OnceLock<SyncSender<WriteJob>> = OnceLock::new();\n\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "//! The INI is the single startup authority: it seeds the runtime preference once\n//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! and the host rewrites the same INI after accepted edits when its layout is\n//! persistence-compatible. Native save success supplies the replay identity;\n//! this module never guesses it from a filename appearing on disk or a\n//! controller button press.\n\n",
+     "new": "//! The INI is the single startup authority: it seeds the runtime preference once\n//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! (`runtime::deluxe_row`); the plugin's own writer thread rewrites the INI from\n//! that preference (`features::writer`). Native save success supplies the replay identity;\n//! this module never guesses it from a filename appearing on disk or a\n//! controller button press.\n\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
     }
    ]
   },
@@ -1533,7 +1558,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "d323030e5e196f5afb04c73941e5badf5f2e2912de41ec11439ddaa33b581091",
+   "dest_sha256": "9dd196d97a09e47e115a8c43ef3154757557f5db309e0a5919fd949380bec359",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1731,15 +1756,13 @@
      "new": "crate::runtime::game::is_ready_go()",
      "count": 1,
      "reason": "Route the actual native readiness call through the existing guarded provider (READY_GO_USABLE and granted), preserving the declared NamedMacros ui_is_ready_go dependency instead of hiding external smash calls from the scanner."
+    },
+    {
+     "old": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::macros::capture_plugin::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
+     "new": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::deluxe_row::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
+     "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
     }
    ]
-  },
-  {
-   "src": "src/capture_plugin.rs",
-   "dest": "src/runtime/macros/capture_plugin.rs",
-   "crate": "root",
-   "src_sha256": "abecd53b34b45b43797cd1a29ddb44e1e1a4af4acc28177e7b175c15fd4a1117",
-   "dest_sha256": "42f601aba4139a4cb843b04bf54dc38d724f673627b6f22b88f1d07899fb3f30"
   }
  ]
 }

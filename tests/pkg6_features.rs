@@ -17,11 +17,9 @@ const RELEASE: &[&str] = &[
     "native-body-bank-alpha",
 ];
 
-/// PENDING DEVIATION from the shipped closure (operator decision L1, parked by the lead 2026-11-02): `deluxe-sdk` is left out of
-/// `default` until the Deluxe plugin SDK repository states a license (D3: a crate without a license is not added). The feature stays
-/// declared (the table is the fork's); it has no `dep:` entry and nothing to compile yet. Remove it from this list and put it back in
-/// `default` when L1 is answered.
-const PENDING_DEVIATIONS: &[&str] = &["deluxe-sdk"];
+/// Deviations from the shipped closure. None since decision L1 was answered (2026-11-02): `deluxe-sdk` is back in `default` with the
+/// MIT SDK (rev 20dd1cb, vendored under third_party/). A new deviation is added here with its decision.
+const PENDING_DEVIATIONS: &[&str] = &[];
 
 /// Product features kept under a diagnostic-looking name (external boundary).
 const PRODUCT_DESPITE_NAME: &[&str] = &["cpu-pilot-probe"];
@@ -82,21 +80,30 @@ fn default_features_are_the_shipped_release_list_minus_the_pending_deviations() 
 }
 
 #[test]
-fn the_only_deviation_from_the_shipped_closure_is_deluxe_sdk_pending_l1() {
-    // Explicit on purpose: a second deviation, or this one outliving L1, must change this test.
-    assert_eq!(PENDING_DEVIATIONS, &["deluxe-sdk"]);
+fn the_shipped_closure_is_the_m5o_closure_and_deluxe_sdk_pulls_the_vendored_mit_sdk() {
+    // Explicit on purpose: a new deviation must change this test.
+    assert!(PENDING_DEVIATIONS.is_empty());
     let map = features();
-    let shipped = closure(&map, &["default"]);
-    assert!(!shipped.contains("deluxe-sdk"), "deluxe-sdk is not in the default closure while L1 is open: {shipped:?}");
-    let full: BTreeSet<String> = closure(&map, RELEASE);
-    let missing: Vec<&String> = full.difference(&shipped).collect();
-    // `automation-results-native` is not in either closure; what differs is `deluxe-sdk` alone.
-    assert_eq!(missing, vec![&"deluxe-sdk".to_string()], "the closure of the M5o list minus the default closure");
-    assert!(map.get("deluxe-sdk").is_some_and(|deps| deps.is_empty()), "no dep: entry until the license is stated");
+    let mut shipped = closure(&map, &["default"]);
+    shipped.remove("default");
+    assert_eq!(shipped, closure(&map, RELEASE), "the default closure is the M5o release closure");
+    assert!(shipped.contains("deluxe-sdk"));
+    assert_eq!(map.get("deluxe-sdk"), Some(&vec!["dep:deluxe-plugin-sdk".to_string()]));
+    let dependency = MANIFEST
+        .lines()
+        .find(|l| l.trim_start().starts_with("deluxe-plugin-sdk"))
+        .expect("the SDK is a dependency");
     assert!(
-        !MANIFEST.lines().filter(|l| !l.trim_start().starts_with('#')).any(|l| l.contains("deluxe-plugin-sdk")),
-        "the SDK crate is not a dependency"
+        dependency.contains("path = \"third_party/deluxe-plugin-sdk/sdk\"") && dependency.contains("optional = true"),
+        "the vendored path crate, optional behind deluxe-sdk: {dependency}"
     );
+    for crate_manifest in [
+        include_str!("../third_party/deluxe-plugin-sdk/sdk/Cargo.toml"),
+        include_str!("../third_party/deluxe-plugin-sdk/abi/Cargo.toml"),
+    ] {
+        assert!(crate_manifest.contains("version = \"5.0.0\"") && crate_manifest.contains("license = \"MIT\""), "{crate_manifest}");
+    }
+    assert!(include_str!("../third_party/deluxe-plugin-sdk/LICENSE").starts_with("MIT License\n\nCopyright (c) 2026 intpa\n"));
 }
 
 #[test]
@@ -225,7 +232,8 @@ fn the_matrix_skips_exactly_the_forks_compile_error_exclusions() {
 fn every_feature_dependency_is_declared() {
     let map = features();
     for (name, deps) in &map {
-        for d in deps {
+        // `dep:<crate>` names an optional dependency, not a feature (the manifest test above checks `deluxe-sdk`'s).
+        for d in deps.iter().filter(|d| !d.starts_with("dep:")) {
             assert!(map.contains_key(d), "{name} requires undeclared feature {d}");
         }
     }

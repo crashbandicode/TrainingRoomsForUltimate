@@ -342,6 +342,8 @@ fn run_inner() {
         site: if installed || reason.is_some() { None } else { blocked(feature) },
     };
     let common_blocked = cpu_common_reason == Some("site_guard_failed");
+    // Q7 / L1: the Replay capture row on the Deluxe Plugins page (registered from the layer install above).
+    let (deluxe_on, deluxe_reason) = crate::runtime::deluxe_row::report();
     let features = [
         report(Feature::InputDelay, input_delay_on, input_delay_reason),
         report(Feature::LraReset, lra_on, None),
@@ -366,6 +368,7 @@ fn run_inner() {
         report(Feature::UiTexture, capabilities::unit_usable(Feature::UiTexture, &usable), None),
         FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") }, site: None },
         FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") }, site: None },
+        FeatureReport { feature: "deluxe_row", installed: deluxe_on, reason: deluxe_reason, site: None },
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];

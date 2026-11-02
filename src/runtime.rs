@@ -11,6 +11,7 @@ mod compat;
 pub(crate) mod diag_log;
 #[cfg(feature = "diag")]
 mod diag_reload;
+mod deluxe_row;
 mod features;
 mod game;
 mod hub;

@@ -129,7 +129,8 @@ def main():
         table = read_features(f.read())
     for name, deps in table.items():
         for dep in deps:
-            if dep not in table:
+            # `dep:<crate>` enables an optional dependency (deluxe-sdk's SDK), not a feature of this table.
+            if not dep.startswith("dep:") and dep not in table:
                 raise SystemExit(f"feature {name} requires undeclared {dep}")
     combos = [c for c in combinations(table, args.set) if args.only in c[0]]
     if args.list or not args.run:

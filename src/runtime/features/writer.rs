@@ -5,7 +5,8 @@
 //! kind (later requests replace earlier unwritten ones). The files:
 //!
 //! * `button_config.ini`: the two menu shortcuts (draft 9, N7), requested by `chords::commit_shortcut`.
-//! * `replay_capture.ini`: the Replay capture toggle (Q7), `request_replay_capture`.
+//! * `replay_capture.ini`: the Replay capture toggle (Q7), `request_replay_capture` (the menu row) and
+//!   `persist_replay_capture` (the Deluxe Plugins-page row, `runtime::deluxe_row`); this thread is the file's only writer.
 //! * `settings.json`: the menu's settings on close, `request_settings` (the menu worker thread allocates the text;
 //!   the writer only moves it to the file).
 //!
@@ -31,10 +32,13 @@ use crate::runtime::features::notices;
 const POLL: Duration = Duration::from_millis(100);
 
 static SHORTCUTS: Mutex<Option<MenuShortcuts>> = Mutex::new(None);
-static REPLAY_CAPTURE: Mutex<Option<bool>> = Mutex::new(None);
+/// A `replay_capture.ini` write is due. The value is read when the write happens ([`replay_capture`]), so the file ends at
+/// the newest preference whichever row (the menu, or the Deluxe Plugins page) changed it last.
+static REPLAY_CAPTURE_DUE: AtomicBool = AtomicBool::new(false);
 static SETTINGS: Mutex<Option<String>> = Mutex::new(None);
 
-/// The Replay capture toggle as the file holds it (boot) or as the menu last set it.
+/// The Replay capture toggle as the file holds it (boot) or as the menu last set it; the preference itself once the capture
+/// adapter is ready (see [`replay_capture`]).
 static CAPTURE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Start the writer (boot, outside any hook).
@@ -56,7 +60,13 @@ pub fn request_replay_capture(enabled: bool) {
     let result = crate::runtime::macros::replay_store::toggle().request_choice(usize::from(enabled));
     diagnostic(format_args!("[ReplayCapture] menu preference enabled={enabled} result={result:?}"));
     CAPTURE_ENABLED.store(enabled, Ordering::Release);
-    *REPLAY_CAPTURE.lock() = Some(enabled);
+    persist_replay_capture();
+}
+
+/// Queue a `replay_capture.ini` rewrite of the current preference. Lock-free and allocation-free: the Deluxe row calls it from
+/// the host's draw thread after it changed the preference.
+pub fn persist_replay_capture() {
+    REPLAY_CAPTURE_DUE.store(true, Ordering::Release);
 }
 
 /// Queue a `settings.json` rewrite with this text (the menu's close). The text is moved, not copied.
@@ -64,9 +74,15 @@ pub fn request_settings(json: String) {
     *SETTINGS.lock() = Some(json);
 }
 
-/// The Replay capture toggle now (the menu shows it; the capture layer, S4-4, will read it).
+/// The Replay capture preference now (the menu shows it, the INI is written from it): the capture layer's own preference
+/// once its adapter is ready (it may have been changed on the Deluxe page), else the value the file or the menu gave.
 pub fn replay_capture() -> bool {
-    CAPTURE_ENABLED.load(Ordering::Acquire)
+    let toggle = crate::runtime::macros::replay_store::toggle();
+    if toggle.is_ready() {
+        toggle.desired()
+    } else {
+        CAPTURE_ENABLED.load(Ordering::Acquire)
+    }
 }
 
 /// Boot: read `replay_capture.ini` (fail-closed: anything but a clean `[capture] enabled=on` reads as off).
@@ -92,9 +108,8 @@ fn run() {
         if let Some(shortcuts) = shortcuts {
             write_shortcuts(shortcuts);
         }
-        let capture = REPLAY_CAPTURE.lock().take();
-        if let Some(enabled) = capture {
-            write_replay_capture(enabled);
+        if REPLAY_CAPTURE_DUE.swap(false, Ordering::AcqRel) {
+            write_replay_capture(replay_capture());
         }
         let settings = SETTINGS.lock().take();
         if let Some(json) = settings {

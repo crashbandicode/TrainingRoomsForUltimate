@@ -20,6 +20,11 @@ serde = { version = "1", default-features = false, features = ["std", "derive"] 
 serde_json = { version = "1", default-features = false, features = ["std"] }
 # S4-4 (lead ruling): the shared match-data crate, vendored under crates/ (docs/provenance/pkg4-carry-ledger.md). Its sha2 and float_roundtrip are part of that ruling.
 smash-match-data = { path = "crates/smash-match-data" }
+# Decision L1 (operator 2026-11-02): the Online Deluxe plugin SDK, MIT from rev 20dd1cb of intpa/ssbu-online-deluxe-rewrite
+# (`sdk/LICENSE`, `license = "MIT"` in both crates). Only `sdk/abi` and `sdk/sdk` are vendored, unchanged, under third_party/
+# (CARRY-OVER.md "deluxe"). Feature `deluxe-sdk`: the Replay capture row on the Deluxe Plugins page (Q7). The host lookup is
+# runtime (`nn::ro::LookupSymbol`), so the plugin runs unchanged without Deluxe; off the console the SDK reports no host.
+deluxe-plugin-sdk = { path = "third_party/deluxe-plugin-sdk/sdk", optional = true }
 # Locks: hos-lock (crates/hos-lock, MIT: lock_api's Mutex/RwLock over the kernel address arbiter; no allocation, `const` constructors).
 # parking_lot is not used: on this target (os = "switch", no target-family) parking_lot_core's parker is a pure spin
 # loop, which livelocks under Horizon's fixed priorities (the menu-close hang, 2026-11-02). tests/no_spin_locks.rs keeps
@@ -49,10 +54,10 @@ skyline = { version = "=0.6.0" }
 nnsdk = { version = "0.6.2" }
 
 [features]
-# The shipped closure MINUS deluxe-sdk (pending deviation, operator decision L1: the SDK repository has no license, D3): the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
+# The shipped closure: the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
 # `m5o1-switch-root-full-release`), evaluated through the table below. `cargo skyline build --release`
-# (default features) therefore builds the shipped product; tests/pkg6_features.rs checks it.
-default = ["enhancements-alpha", "native-unlink-guard", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
+# (default features) therefore builds the shipped product; tests/pkg6_features.rs checks it. `deluxe-sdk` joined with L1 (MIT SDK, 20dd1cb).
+default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
 
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
@@ -134,8 +139,8 @@ source-ldn-capacity-link-probe = ["source-ldn-capacity-empty-probe"]
 source-capacity-group-probe = ["source-ldn-capacity-empty-probe"]
 source-capacity-aegis-probe = ["source-capacity-group-probe", "source-ldn-grouped-probe"]
 source-capacity-trainer-probe = ["source-capacity-group-probe", "source-ldn-grouped-probe"]
-# Runtime capture toggle on the Deluxe Plugins page. `dep:deluxe-plugin-sdk` joins with C6.
-deluxe-sdk = []
+# Runtime capture toggle on the Deluxe Plugins page (Q7): `engine::deluxe_row` (src/model/deluxe_row.rs), `runtime::deluxe_row`.
+deluxe-sdk = ["dep:deluxe-plugin-sdk"]
 # The fork's host-only replay simulator (consts feature; used by the swap-model replay tests).
 simulator = []
 [profile.release]

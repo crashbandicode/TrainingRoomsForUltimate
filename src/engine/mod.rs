@@ -6,6 +6,10 @@
 
 #[path = "../model/compat/mod.rs"]
 pub mod compat;
+// Clean room (deluxe stream, Q7 / L1): the Deluxe Plugins-page row over package 4's capture preference (`engine::macros`), hence here.
+#[cfg(all(feature = "deluxe-sdk", any(test, target_os = "switch")))]
+#[path = "../model/deluxe_row.rs"]
+pub mod deluxe_row;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/items/mod.rs"]
 pub mod items;
