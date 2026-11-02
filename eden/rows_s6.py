@@ -392,7 +392,7 @@ def r_cpu():
 def r_r5():
     lines = [x for x in read_diag() if "hook_stats allocations=" in x]
     deltas = [int(re.search(r"delta=(\d+)", x).group(1)) for x in lines]
-    row("R5: hook allocation delta 0 on every sample", lines and all(d == 0 for d in deltas[1:]), lines[-1] if lines else "none")
+    row("R5: hook allocation delta 0 on every sample", lines and all(d == 0 for d in deltas), lines[-1] if lines else "none")
 
 
 def r_r5_soak():
@@ -420,10 +420,17 @@ def r_r5_soak():
     span = max(samples) - min(samples) if samples else 0
     live = len(stats) >= 2 and all(x and int(x[3]) > 0 for x in stats)
     zero = bool(stats) and all(x and int(x[2]) == 0 for x in stats)
+    preload_calls = []
+    for line in ordered:
+        hooks = re.search(r" hooks=(\S+)", line)
+        counts = dict(re.findall(r"([^,:]+):(\d+)", hooks[1] if hooks else ""))
+        preload_calls.append(int(counts.get("roster_preload", "0")))
+    preload_live = bool(preload_calls) and preload_calls[0] > 0 and all(
+        b > a for a, b in zip(preload_calls, preload_calls[1:]))
     gaps = [b - a for a, b in zip(sorted(samples), sorted(samples)[1:])]
     row("R5 >=3 minutes live fighters+hats with every allocation delta zero",
-        span >= 180_000 and live and zero and max(gaps, default=0) <= 25_000,
-        f"samples={len(stats)} span_ms={span} live={live} all_deltas_zero={zero} max_gap_ms={max(gaps, default=0)}")
+        span >= 180_000 and live and preload_live and zero and max(gaps, default=0) <= 25_000,
+        f"samples={len(stats)} span_ms={span} live={live} preload_live={preload_live} all_deltas_zero={zero} max_gap_ms={max(gaps, default=0)}")
     # Preserve each cumulative hook counter as well; no scope is omitted from attribution.
     counters = []
     for line in ordered:
