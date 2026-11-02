@@ -113,7 +113,11 @@ pub(crate) mod input_record {
 /// `hos_lock::Mailbox` of game-thread events, the deferred effects, publishing `MacroQueries`). A game thread that posts an event calls
 /// `crate::runtime::ui::worker::wake()` after posting.
 pub(crate) fn worker_events() {
-    if super::ready() { super::named_macros::worker_lifecycle(); }
+    if super::ready() {
+        super::named_macros::worker_lifecycle();
+        super::replay_capture::worker_vault_events();
+        super::live_replay::worker_events();
+    }
 }
 
 static RELOAD_FRAME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -122,6 +126,8 @@ pub(crate) fn worker_tick() {
     worker_events();
     if !super::ready() { return; }
     slots::worker_slot_tick();
+    #[cfg(feature = "diag")]
+    super::diag::run_pending();
     super::replay_capture::worker_preview_notices();
     CLIP_EVENTS.drain(|event| {
         if event.revision != super::replay_capture::selection_revision() { return; }
@@ -180,7 +186,7 @@ pub(crate) mod slots {
     use crate::model::input_delay::MappedInputs;
     use crate::engine::macros::{InputFrame, MacroRecording, StartState};
 
-    enum Completion { Export, Import { name: String, slot: usize } }
+    enum Completion { Export { diagnostic: bool }, Import { name: String, slot: usize } }
     struct Job { request: Message, completion: Completion }
     struct Worker { queue: VecDeque<Job>, pending: Option<(u64, Completion)> }
     static WORKER: Mutex<Worker> = Mutex::new(Worker { queue: VecDeque::new(), pending: None });
@@ -195,7 +201,9 @@ pub(crate) mod slots {
         crate::runtime::ui::worker::wake();
     }
 
-    pub fn export(slot: usize) { enqueue(SlotTransfer::export(slot), Completion::Export); }
+    pub fn export(slot: usize) { enqueue(SlotTransfer::export(slot), Completion::Export { diagnostic: false }); }
+    #[cfg(feature = "diag")]
+    pub fn export_diag(slot: usize) { enqueue(SlotTransfer::export(slot), Completion::Export { diagnostic: true }); }
 
     pub fn import(slot: usize, recording: &MacroRecording) -> Result<(), String> {
         let start = recording.start;
@@ -233,9 +241,15 @@ pub(crate) mod slots {
             let Some((session, completion)) = pending else { return; };
             if message.cancelled || session != super::super::named_macros::session_revision() { return; }
             match completion {
-                Completion::Export => {
+                Completion::Export { diagnostic } => {
+                    #[cfg(not(feature = "diag"))]
+                    let _ = diagnostic;
                     match message.transfer.result {
-                        SlotResult::ExportFailed(error) => super::super::named_macros::slot_export_failed(error.message()),
+                        SlotResult::ExportFailed(error) => {
+                            super::super::named_macros::slot_export_failed(error.message());
+                            #[cfg(feature = "diag")]
+                            if diagnostic { super::super::diag::slot_export_complete(false); }
+                        },
                         SlotResult::Exported => {
                             let (frames, origin) = message.transfer.exported().unwrap();
                             let start = StartState { fighter_kind: origin.start.fighter_kind, costume: origin.start.costume,
@@ -245,6 +259,8 @@ pub(crate) mod slots {
                                 lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
                                 rstick_x: frame.rstick_x, rstick_y: frame.rstick_y }).collect();
                             super::super::named_macros::slot_exported(frames, start);
+                            #[cfg(feature = "diag")]
+                            if diagnostic { super::super::diag::slot_export_complete(true); }
                         }
                         _ => unreachable!("export reply"),
                     }

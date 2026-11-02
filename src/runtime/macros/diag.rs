@@ -1,7 +1,7 @@
 //! Eden-only control of the named-macro layer (diag build): the menu's Named library, Save slot to library and Replay window screens are
 //! package 5's to draw, so the rows that prove the layer (a slot saved to the library, a named macro loaded and played, a capture listed and
 //! cropped) are driven by one request file, `sd:/ultimate/TrainingRooms/diag-macro.req`, one command per line, read by a small thread and
-//! executed on the game thread (the CPU body's frame), with one `[NamedMacroDiag]` result line per command.
+//! executed on the menu worker through the same asynchronous slot handoff as the UI, with one `[NamedMacroDiag]` result line per command.
 //!
 //! Commands: `save_slot <n> <name>` (export slot n, offer it to the panel, confirm the name: the keyboard's confirmed path),
 //! `open_library <n>`, `pad <left|right|up|down|confirm|back|extra>`, `view`, `status`, `name <text>`, `replay_window`,
@@ -29,6 +29,7 @@ struct Command {
 }
 
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);
+static SAVE_NAME: Mutex<Option<(u64, Command)>> = Mutex::new(None);
 static STARTED: AtomicBool = AtomicBool::new(false);
 /// The layer's step in progress (`macros::step`) and the count of CPU-body frames the layer finished: the watchdog's two facts.
 pub(crate) static STEP: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
@@ -94,7 +95,7 @@ fn parse(line: &str) -> Option<Command> {
     Some(command)
 }
 
-/// The thread that reads the request file (the only thing it does): the commands run on the game thread.
+/// The request reader posts commands for the menu worker; it never calls UI or game APIs.
 pub(crate) fn start() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
@@ -128,7 +129,7 @@ pub(crate) fn start() {
                 diagnostic(format_args!("[NamedMacroDiag] unknown_command line={line:?}"));
                 continue;
             };
-            // Wait for the game thread to take the previous command.
+            // Wait for the menu worker to take the previous command.
             for _ in 0..100 {
                 if PENDING.lock().is_none() {
                     break;
@@ -136,6 +137,7 @@ pub(crate) fn start() {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
             *PENDING.lock() = Some(command);
+            crate::runtime::ui::worker::wake();
         }
         }
     });
@@ -171,20 +173,39 @@ fn clip_of(name: &str, number: i32) -> Option<ClipAction> {
     })
 }
 
-/// Run the pending command, if any (the CPU body's frame, the game thread). A command is an event (a save, a panel step): its allocations
-/// are the per-load kind of the hook counter (hook_stats::per_load), apart from the steady-state ones that must stay 0.
+/// Execute UI/file work on its production owner, without excluding any hook allocations.
 pub(crate) fn run_pending() {
+    {
+        let mut pending = SAVE_NAME.lock();
+        if pending.as_ref().is_some_and(|(session, _)| *session != named_macros::session_revision()) {
+            pending.take();
+            diagnostic(format_args!("[NamedMacroDiag] save_slot cancelled_session"));
+        }
+        if pending.is_some() { return; }
+    }
     let Some(command) = PENDING.lock().take() else { return };
-    crate::model::hook_stats::per_load(|| run(command));
+    run(command);
+}
+
+/// Called on the worker after the game-owned slot has answered its copy request.
+pub(crate) fn slot_export_complete(success: bool) {
+    let Some((session, command)) = SAVE_NAME.lock().take() else { return; };
+    if session != named_macros::session_revision() { return; }
+    if success {
+        let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
+        named_macros::diag_confirm_name(text);
+        diagnostic(format_args!("[NamedMacroDiag] save_slot slot={} name={text:?}", command.number));
+    } else {
+        diagnostic(format_args!("[NamedMacroDiag] save_slot refused slot={}", command.number));
+    }
 }
 
 fn run(command: Command) {
     let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
     match command.kind {
         SAVE_SLOT => {
-            named_macros::export_record_slot(usize::try_from(command.number).ok());
-            named_macros::diag_confirm_name(text);
-            diagnostic(format_args!("[NamedMacroDiag] save_slot slot={} name={text:?}", command.number));
+            *SAVE_NAME.lock() = Some((named_macros::session_revision(), command));
+            named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));
         }
         EXPORT_SLOT => {
             named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));

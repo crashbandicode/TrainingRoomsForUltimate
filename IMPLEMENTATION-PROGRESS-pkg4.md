@@ -4,6 +4,14 @@
 
 ## QUESTIONS
 
+- Replay ownership design note for lead: Vault capture will use Copy Begin/Sample/End events to the existing
+  menu worker, retaining its existing MAX_FRAMES and eight-entry bounds. Hook state holds only pending
+  samples/epoch; worker alone owns ReplaySession Vecs. A bounded-mailbox overflow must be counted and mark
+  the affected capture partial, never compress its timeline or pass acceptance (s4-09 requires zero drops).
+  This follows design C's event ownership; it does not add a native provider or change native simulation.
+
+- Lead: clip preview restore remains an explicit Err stub in macros::save_states::request_preview_restore. Please identify pkg3 authorized integration SHA/owner for real preview if the s4-09 playback row includes clip preview; no implementation can pass that row through this stub.
+
 - Shared-interface note: pkg4 extends ui::facts (CPU status/situation and scene/waiting snapshots) for worker ownership, without editing ui-screens editor implementations. Scene facts refresh in existing game/layout callbacks and invalidate on session retirement. Please preserve these additions in integration.
 
 - Lead: please provide the exact authorized integration SHA for pkg6's guarded `entry_active_body` F11 slice when gated. pkg4 is at `c111b81` plus progress docs, implementing independent ownership work first.
@@ -73,6 +81,35 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Additional dirty live-replay work (not compiled): hooks now retain fixed LiveTokens and native
+  owner/latch/save-actor checks, posting Copy events to existing menu worker. LiveArchive owns pool Vecs,
+  Arc snapshots, string conversion and persist dispatch. Removed both per_load calls. BoundSave deque
+  reserves its existing four-slot bound before hook install. Fixed metadata uses a separate16-slot mailbox,
+  keyed by save ID; general events4096 and Vault events4096. No extra native provider/thread.
+- Live event loss clears uncertain worker associations and discards events through the lost serial,
+  recovering on a later native record; never binds a compressed suffix. This failure path is logged;
+  acceptance requires zero event losses. No loss is being excused as an acceptable result.
+- Pure model tests added: out-of-order save bindings survive pool reset; lost event refuses stale save,
+  later incarnation recovers; bounded token retention/reuse and duplicate/sealed sample handling;
+  exact Mii codec and Unicode/title refusals. Not run.
+- Carry/ledger verifies42 and rustfmt parsing succeeds after these changes. Next freeze and queue
+  cargo test --lib --test hook_locks on own Yoga gate source/target, then Switch compile of that source.
+- Switch diag ec5d5ab: admitted Yoga15:46Z, RELEASED15:47Z, cargo exit0 in41.12s.
+  NRO SHA256 d22f4ff0e5b1ca0d77eb1383c56b187a543bbb47ad951348f3ad43b59ea3b157.
+  Yoga raw diag-ec5d5ab.log/.exit and dist/ec5d5ab/diag.nro retained. Warnings remain; no zero-warning claim.
+  Queue entry removed, no claims held, no Eden/profile changes.
+- Dirty Vault work: hooks hold only epoch/pending samples and post Copy events; existing menu worker
+  owns timeline Vecs via new pure VaultArchive model. First failed post stops sampling, logs loss,
+  and marks retained prefix partial; acceptance requires zero drops. Host model regression added, unrun.
+- hook_locks: obsolete MOTION/LEGACY rows and MOTION allowance removed; PENDING emptied now that
+  recorder access is behind slot requests. Audit expanded with named restore/capture locks,
+  preview SESSION, Vault hook state, close-input state and live capture state. Test unrun; not acceptance.
+- HEAD ec5d5ab: named playback/preview/lifecycle ownership slice committed WIP.
+  Queued one Yoga Switch diag build at ec5d5ab, after f6 and ui-screens. No active claim.
+- Subsequent dirty changes: diagnostic UI/file actions now run on menu worker; save_slot confirms
+  only after its own asynchronous slot-copy reply. Diag status reads atomically published phase/CPU fact.
+  Removed diag per_load dispatch. READY publication now follows all boot state initialization.
+  Carry verified42 after diag named export transform; full gates not run.
 - Claimed Yoga 15:21Z, released 15:22Z: frozen191ec5b cargo test --lib macro_handoff
   passed 6 / failed 0 / filtered 1166. Raw host-191ec5b.log and .exit under Yoga build root.
   Own queue entry removed; no claim remains. Preflight: 241GiB available, campaign targets25GiB.

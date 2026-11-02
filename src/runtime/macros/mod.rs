@@ -75,7 +75,6 @@ pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
     if !rows_ok {
         return (false, false);
     }
-    READY.store(true, Ordering::Release);
     replay_store::init();
     named_macros::init();
     replay_capture::init();
@@ -83,6 +82,9 @@ pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
         named_macros::prepare_buffers();
     }
     live_replay::init();
+    // Publish only after boot has finished mutating the worker-owned layer state.
+    READY.store(true, Ordering::Release);
+    crate::runtime::ui::worker::wake();
     #[cfg(feature = "diag")]
     diag::start();
     (true, replay_store::toggle().is_ready())
@@ -153,7 +155,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             #[cfg(feature = "diag")]
             {
                 step(32);
-                diag::run_pending();
                 diag::frame_done();
             }
             named_macros::service_character_request();

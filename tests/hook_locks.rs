@@ -43,8 +43,14 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
-    ("macros/named_macros.rs", "MOTION"),
-    ("macros/named_macros.rs", "LEGACY"),
+    ("macros/named_macros.rs", "CAPTURE_ORIGIN"),
+    ("macros/named_macros.rs", "RESTORE_ANCHOR"),
+    ("macros/named_macros.rs", "RESTORE_POSE"),
+    ("macros/named_macros.rs", "PANEL_STOPS"),
+    ("macros/replay_preview.rs", "SESSION"),
+    ("macros/replay_capture.rs", "VAULT_HOOK"),
+    ("macros/replay_capture.rs", "CLOSE_INPUT"),
+    ("macros/live_replay.rs", "CAPTURE"),
 ];
 
 #[path = "../src/model/thread_stacks.rs"]
@@ -79,21 +85,12 @@ fn plugin_thread_entries() -> Vec<String> {
     out
 }
 /// `(function key, lock)` reached from a plugin thread on purpose, with the reason it is not a hook waiting on real work.
-const ALLOWED: &[(&str, &str, &str)] = &[
-    // Macro Source = Named Library reserves the layer's buffers on the publishing thread: the allocation runs before `MOTION` is
-    // taken, and the write lock only swaps the reserved buffers in (pkg4 manifest edit, stream/sync).
-    ("named_macros::prepare_buffers", "MOTION", "write lock held for a buffer swap only; the allocation is outside"),
-];
+const ALLOWED: &[(&str, &str, &str)] = &[];
 
 /// A ratchet, not a tolerance (lead, 2026-11-02): violations whose fix is in progress elsewhere, each (function key, file::lock, owner,
 /// the fix that removes it). The test fails on any violation not listed here, AND on a row that no longer occurs (delete it the moment the
 /// fix lands), and prints the table every run. The release-candidate gate requires this table to be empty.
-const PENDING: &[(&str, &str, &str, &str)] = &[(
-    "recorder::rec",
-    "features/recorder.rs::REC",
-    "package 4 (a93ab192186b224a5)",
-    "design C: the named layer's recorder calls on the menu worker (recorder::with_recorder) move to its published MacroQueries and mailbox",
-)];
+const PENDING: &[(&str, &str, &str, &str)] = &[];
 
 const LOCK_METHODS: &[&str] = &["lock", "read", "write", "try_lock", "try_read", "try_write"];
 

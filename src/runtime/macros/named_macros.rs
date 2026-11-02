@@ -1525,5 +1525,9 @@ pub fn diag_confirm_name(name: &str) {
 /// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).
 #[cfg(feature = "diag")]
 pub fn diag_export_slot(slot: usize) {
-    export_record_slot(Some(slot));
+    if practice_ready() {
+        crate::runtime::macros::port::slots::export_diag(slot);
+    } else {
+        crate::runtime::macros::diag::slot_export_complete(false);
+    }
 }

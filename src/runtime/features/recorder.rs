@@ -52,6 +52,8 @@ static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 /// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static PLAYBACK: AtomicBool = AtomicBool::new(false);
+#[cfg(feature = "diag")]
+static DIAG_PHASE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
 
 /// `REC`, held; dropping it publishes `ACTIVE` while the lock is still held, so the flag never trails the recorder.
 struct RecGuard(hos_lock::MutexGuard<'static, Recorder>);
@@ -73,6 +75,11 @@ impl Drop for RecGuard {
     fn drop(&mut self) {
         ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
         PLAYBACK.store(self.0.is_playback(), Ordering::Release);
+        #[cfg(feature = "diag")]
+        DIAG_PHASE.store(match self.0.phase() {
+            Phase::Idle => 0, Phase::Lockout => 1, Phase::Standby => 2,
+            Phase::Recording => 3, Phase::Playback => 4,
+        }, Ordering::Release);
     }
 }
 
@@ -640,15 +647,17 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
 /// The CPU's fighter kind now (diag lines of the named layer's roster row).
 #[cfg(feature = "diag")]
 pub fn cpu_kind() -> Option<i32> {
-    // SAFETY: the natives answer only once their guards passed; the read is of the live body.
-    unsafe { cpu_body() }.map(|body| unsafe { ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read() })
+    crate::runtime::ui::facts::fact_cpu_kind()
 }
 
 /// The recorder's phase (diag lines: its one caller is the diag build's named-layer harness, `macros::diag`, so the function is not in
 /// the shipped NRO).
 #[cfg(feature = "diag")]
 pub fn phase() -> Phase {
-    rec().phase()
+    match DIAG_PHASE.load(Ordering::Acquire) {
+        1 => Phase::Lockout, 2 => Phase::Standby, 3 => Phase::Recording,
+        4 => Phase::Playback, _ => Phase::Idle,
+    }
 }
 
 /// The recorder's frame index (the named layer's diag lines).

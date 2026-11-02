@@ -11,7 +11,7 @@ use std::convert::TryFrom;
 
 use smash::app::{self, lua_bind::*, BattleObjectModuleAccessor, Fighter};
 use smash::lib::lua_const::*;
-use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
+use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
 use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle}};
 
 use crate::runtime::lobby::game_mode;
@@ -110,18 +110,38 @@ fn target_ready(target:Target,current:Option<i32>)->bool {
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {target.ready(kind as u32,None)}
 }
-static CAPTURE: Mutex<Capture> = Mutex::new(Capture {
-    recording: false,
-    session: ReplaySession { tracks: Vec::new(), truncated: false },
-    previous: None,
-    pending: [None; 8],
-});
+use crate::model::macro_handoff::{VaultArchive as Capture, VaultEvent};
+static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
 
-struct Capture {
-    recording: bool,
-    session: ReplaySession,
-    previous: Option<ReplaySession>,
+// Only native callbacks own the in-flight pair and native replay epoch.
+struct VaultHook {
+    epoch: u64, recording: bool, truncated: bool, counts: [usize; 8],
     pending: [Option<ReplayFrame>; 8],
+}
+static VAULT_HOOK: Mutex<VaultHook> = Mutex::new(VaultHook {
+    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
+});
+static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();
+static VAULT_DROPPED_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+fn post_vault(epoch: u64, event: VaultEvent) -> bool {
+    let posted = VAULT_EVENTS.post(event);
+    if !posted { VAULT_DROPPED_EPOCH.store(epoch, Ordering::Release); }
+    crate::runtime::ui::worker::wake();
+    posted
+}
+
+/// Worker entry, before UI commands may open the captured timeline.
+pub fn worker_vault_events() {
+    VAULT_EVENTS.drain(|event| {
+        CAPTURE.lock().unwrap().apply(event, VAULT_DROPPED_EPOCH.load(Ordering::Acquire));
+    });
+    let dropped = VAULT_EVENTS.take_dropped();
+    if dropped != 0 {
+        let epoch = VAULT_DROPPED_EPOCH.load(Ordering::Acquire);
+        CAPTURE.lock().unwrap().note_loss(epoch);
+        println!("[MacroHandoff] vault_events_dropped={dropped} epoch={epoch}");
+    }
 }
 
 pub fn init() {
@@ -978,31 +998,29 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
 
 pub unsafe fn before_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::before_frame(fighter);
-    let replay = in_replay();
-    if !replay || !Fighter::is_ready_go() {
-        CAPTURE.lock().unwrap().recording = false;
+    if !in_replay() || !Fighter::is_ready_go() {
+        let mut hook = VAULT_HOOK.lock().unwrap();
+        if hook.recording {
+            post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: hook.truncated });
+            hook.recording = false;
+            hook.pending = [None; 8];
+        }
         return;
     }
     let Some(module) = fighter.battle_object.module_accessor.as_mut() else { return };
-    // Nana shares Popo's entry/controller; she must not double that fighter's clock.
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
-    if !capture.recording {
-        capture.recording = true;
-        let previous = std::mem::replace(&mut capture.session,
-            ReplaySession { tracks: Vec::new(), truncated: false });
-        if previous.tracks.iter().any(|track| !track.frames.is_empty()) {
-            capture.previous = Some(previous);
-        }
-        capture.pending = [None; 8];
+    let mut hook = VAULT_HOOK.lock().unwrap();
+    if !hook.recording {
+        hook.epoch += 1;
+        hook.recording = true;
+        hook.truncated = false;
+        hook.counts = [0; 8];
+        hook.pending = [None; 8];
+        if !post_vault(hook.epoch, VaultEvent::Begin { epoch: hook.epoch }) { hook.truncated = true; }
     }
-    let tracks = &mut capture.session.tracks;
-    if !tracks.iter().any(|t| t.entry == entry) {
-        tracks.push(ReplayTrack { entry, frames: Vec::new(), quantized_analog: false });
-    }
-    capture.pending[entry as usize] = Some(state(module));
+    if !hook.truncated { hook.pending[entry as usize] = Some(state(module)); }
 }
 
 pub unsafe fn after_frame(fighter: &mut Fighter) {
@@ -1012,22 +1030,19 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
-    if capture.session.truncated { return; }
-    let Some(mut sample) = capture.pending[entry as usize].take() else { return };
-    let Some(track) = capture.session.tracks.iter_mut().find(|t| t.entry == entry) else { return };
-    if track.frames.len() >= MAX_FRAMES {
-        capture.session.truncated = true;
+    let mut hook = VAULT_HOOK.lock().unwrap();
+    if !hook.recording || hook.truncated { return; }
+    let Some(mut sample) = hook.pending[entry as usize].take() else { return };
+    let observed = observed_input(module);
+    if hook.counts[entry as usize] >= MAX_FRAMES || observed.is_none() {
+        hook.truncated = true;
+        post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: true });
         return;
     }
-    let Some(observed) = observed_input(module) else {
-        capture.session.truncated = true;
-        return;
-    };
-    let (input, quantized) = observed.project();
-    track.quantized_analog |= quantized;
+    let (input, quantized) = observed.unwrap().project();
     sample.input = input;
-    track.frames.push(sample);
+    hook.counts[entry as usize] += 1;
+    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; }
 }
 
 pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> Option<LiveInput> {

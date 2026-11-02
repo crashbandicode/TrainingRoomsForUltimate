@@ -9,17 +9,18 @@
 //! matching that owner. A preference edited mid-record applies at that release.
 
 use std::collections::VecDeque;
-use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex};
+use std::sync::{atomic::{AtomicU64, AtomicUsize, Ordering}, Mutex};
+use crate::model::macro_handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use smash::{app::{self, lua_bind::WorkModule, Fighter}, lib::lua_const::*};
-use {crate::engine::macros::CaptureToggle, crate::engine::macros::LiveCapturePool, crate::engine::macros::LiveFrame, crate::engine::macros::LiveSession, crate::engine::macros::NativeRecordKey, crate::engine::macros::RecordOwner, crate::engine::macros::RecordOwnership, crate::engine::macros::MAX_RETAINED_CAPTURES};
+use {crate::engine::macros::CaptureToggle, crate::engine::macros::LiveFrame, crate::engine::macros::NativeRecordKey, crate::engine::macros::RecordOwner, crate::engine::macros::RecordOwnership, crate::engine::macros::MAX_RETAINED_CAPTURES};
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "named-input-trace")]
 static CLOCK_TRACE_LEFT: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE: Mutex<Capture> = Mutex::new(Capture {
-    native_state: 0, epoch: 0, clock: None, pool: LiveCapturePool::new(), owner: RecordOwnership::new(),
+    native_state: 0, epoch: 0, clock: None, pool: HookPool::new(), owner: RecordOwnership::new(),
     pending: [None; 8], saves: VecDeque::new(),
 });
 
@@ -27,7 +28,7 @@ struct Capture {
     native_state: usize,
     epoch: u64,
     clock: Option<u32>,
-    pool: LiveCapturePool,
+    pool: HookPool,
     /// Accepted native record, armed or not, independent of the pool (R1).
     owner: RecordOwnership,
     pending: [Option<Pending>; 8],
@@ -35,6 +36,95 @@ struct Capture {
 }
 
 fn toggle() -> &'static CaptureToggle { crate::runtime::macros::replay_store::toggle() }
+
+static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();
+static EVENT_SERIAL: AtomicU64 = AtomicU64::new(1);
+static LOST_SERIAL: AtomicU64 = AtomicU64::new(0);
+static SAVE_SERIAL: AtomicU64 = AtomicU64::new(1);
+static ARCHIVE: Mutex<LiveArchive> = Mutex::new(LiveArchive::new());
+static MII_EVENTS: hos_lock::Mailbox<(u64, FixedReplayMiis), 16> = hos_lock::Mailbox::new();
+static MII_VALUES: Mutex<VecDeque<(u64, FixedReplayMiis)>> = Mutex::new(VecDeque::new());
+
+fn post_miis(save: u64, miis: FixedReplayMiis) -> bool {
+    let accepted = MII_EVENTS.post((save, miis));
+    if !accepted {
+        let lost = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);
+        LOST_SERIAL.fetch_max(lost, Ordering::Release);
+    }
+    crate::runtime::ui::worker::wake();
+    accepted
+}
+
+fn take_miis(save: u64) -> Option<crate::engine::mii::replay::ReplayMiis> {
+    let mut values = MII_VALUES.lock().unwrap();
+    MII_EVENTS.drain(|value| {
+        values.push_back(value);
+    });
+    let at = values.iter().position(|(id, _)| *id == save)?;
+    values.remove(at)?.1.owned()
+}
+
+fn post(event: LiveEvent) -> bool {
+    let serial = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);
+    let accepted = EVENTS.post((serial, event));
+    if !accepted { LOST_SERIAL.fetch_max(serial, Ordering::Release); }
+    crate::runtime::ui::worker::wake();
+    accepted
+}
+
+/// Only the existing menu worker calls this; no native pointer is read here.
+pub fn worker_events() {
+    EVENTS.drain(|(serial, event)| {
+        let committed = ARCHIVE.lock().unwrap().apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));
+        if let Some(mut commit) = committed {
+            if commit.needs_miis {
+                commit.miis = take_miis(commit.save);
+                if commit.miis.is_none() {
+                    println!("[MacroHandoff] committed_mii_handoff_missing save={}", commit.save);
+                    return;
+                }
+            }
+            crate::runtime::macros::replay_store::persist_committed(commit.id, commit.title, commit.session, commit.miis);
+        }
+    });
+    let dropped = EVENTS.take_dropped();
+    if dropped != 0 { println!("[MacroHandoff] live_events_dropped={dropped}"); }
+    let dropped = MII_EVENTS.take_dropped();
+    if dropped != 0 { println!("[MacroHandoff] live_mii_events_dropped={dropped}"); }
+}
+
+/// Game-owned fixed tokens. Every operation on frame storage is a worker event.
+struct HookPool { tokens: LiveTokens }
+impl HookPool {
+    const fn new() -> Self { Self { tokens: LiveTokens::new() } }
+    fn clear(&mut self) { self.tokens.clear(); post(LiveEvent::Clear); }
+    fn active_key(&self) -> Option<NativeRecordKey> { self.tokens.active_key() }
+    fn key_for_index(&self, index: u32) -> Option<NativeRecordKey> { self.tokens.key_for_index(index) }
+    fn has_samples(&self, key: NativeRecordKey) -> bool { self.tokens.has_samples(key) }
+    fn start_record(&mut self, index: u32) -> NativeRecordKey {
+        let key = self.tokens.start_record(index);
+        post(LiveEvent::Start { key });
+        key
+    }
+    fn invalidate_record(&mut self, index: u32) {
+        self.tokens.invalidate_record(index); post(LiveEvent::Invalidate { index });
+    }
+    fn finish_record(&mut self) { self.tokens.finish(); post(LiveEvent::Finish { partial: false }); }
+    fn finish_partial(&mut self) { self.tokens.finish(); post(LiveEvent::Finish { partial: true }); }
+    fn wants_sample(&self, key: NativeRecordKey, entry: i32, tick: u32) -> bool {
+        self.tokens.wants_sample(key, entry, tick)
+    }
+    fn seal_entry(&mut self, key: NativeRecordKey, entry: i32) {
+        self.tokens.seal(key, entry); post(LiveEvent::Seal { key, entry });
+    }
+    fn push(&mut self, key: NativeRecordKey, entry: i32, tick: u32, sample: LiveFrame) -> bool {
+        if !self.tokens.wants_sample(key, entry, tick) { return false; }
+        let posted = post(LiveEvent::Sample { key, entry, tick, sample });
+        if posted { self.tokens.sampled(key, entry, tick); } else { self.tokens.seal(key, entry); }
+        posted
+    }
+}
+
 
 fn on_off(on: bool) -> &'static str { if on { "on" } else { "off" } }
 
@@ -51,7 +141,7 @@ struct BoundSave {
     payload: usize,
     index: u64,
     queued: bool,
-    session: Arc<LiveSession>,
+    save: u64,
     miis: Option<crate::engine::mii::replay::ReplayMiis>,
 }
 
@@ -153,6 +243,9 @@ impl Capture {
     }
 
     fn forget_actor(&mut self, actor: usize) {
+        for save in &self.saves {
+            if save.actor == actor { post(LiveEvent::Forget { save: save.save }); }
+        }
         self.saves.retain(|save| save.actor != actor);
     }
 }
@@ -217,7 +310,7 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
         let displaced = capture.owner.begin(RecordOwner { state, index: native.index, epoch });
         capture.release(displaced, "restart");
         if toggle().begin_record() {
-            let key = crate::model::hook_stats::per_load(|| capture.pool.start_record(native.index));
+            let key = capture.pool.start_record(native.index);
             capture.clock = Some(native.tick);
             #[cfg(feature = "named-input-trace")]
             CLOCK_TRACE_LEFT.store(10_000, Ordering::Relaxed);
@@ -363,9 +456,13 @@ unsafe fn copy_record(actor: usize) {
     // Copying a still-active record only captures a prefix. Never label that
     // prefix complete merely because no explicit stop callback was observed.
     if capture.pool.active_key() == Some(key) { capture.pool.finish_partial(); }
-    let Some(session) = capture.pool.snapshot(key) else { return };
-    while capture.saves.len() >= MAX_RETAINED_CAPTURES { capture.saves.pop_front(); }
-    capture.saves.push_back(BoundSave { actor, payload, index, queued: false, session, miis });
+    if !capture.pool.has_samples(key) { return; }
+    while capture.saves.len() >= MAX_RETAINED_CAPTURES {
+        if let Some(old) = capture.saves.pop_front() { post(LiveEvent::Forget { save: old.save }); }
+    }
+    let save = SAVE_SERIAL.fetch_add(1, Ordering::Relaxed);
+    post(LiveEvent::Bind { save, key });
+    capture.saves.push_back(BoundSave { actor, payload, index, queued: false, save, miis });
     println!("[ReplayCapture] save_bound generation={} index={}", key.generation, key.index);
 }
 
@@ -393,7 +490,7 @@ unsafe fn update_save_actor(actor: usize) -> u32 {
 
 /// Native libc++ string layout is proven at this actor's path producer/consumer.
 /// Copy only the bounded replay basename; a title is deliberately not an identity.
-unsafe fn replay_id(actor: usize) -> Option<String> {
+unsafe fn replay_id(actor: usize) -> Option<FixedReplayId> {
     let at = actor + 0x170;
     let tag: u8 = read(at);
     let (ptr, len) = if tag & 1 == 0 { (at + 1, (tag >> 1) as usize) }
@@ -404,15 +501,13 @@ unsafe fn replay_id(actor: usize) -> Option<String> {
     if id.is_empty() || id.len() > 96 || id.chars().any(|c| c.is_control() || c == '/' || c == '\\') {
         return None;
     }
-    Some(id.to_owned())
+    FixedReplayId::new(id)
 }
 
-unsafe fn replay_title(payload: usize) -> Option<String> {
-    // 40 UTF16 units plus NUL, copied in the native 944-byte metadata prefix.
+unsafe fn replay_title(payload: usize) -> Option<FixedReplayTitle> {
     let units = std::slice::from_raw_parts((payload + 0x0c) as *const u16, 41);
     let end = units.iter().position(|unit| *unit == 0)?;
-    let title = String::from_utf16(&units[..end]).ok()?;
-    (!title.is_empty() && !title.chars().any(char::is_control)).then_some(title)
+    FixedReplayTitle::new(&units[..end])
 }
 
 /// 13.0.5 replay-save entry. The first four words are the prologue Skyline
@@ -439,7 +534,7 @@ const _: () = assert!(
 );
 
 /// Read the save actor before the native function consumes status 1.
-unsafe fn observe_save(actor: usize) -> Option<(String, String, Arc<LiveSession>, Option<crate::engine::mii::replay::ReplayMiis>)> {
+unsafe fn observe_save(actor: usize) -> Option<LiveEvent> {
     if read::<u32>(actor + 0xfc) == 0 {
         // Entry queues operation8 and resets its status; an older operation's
         // status1 must never be accepted without seeing this exact queue boundary.
@@ -468,12 +563,16 @@ unsafe fn observe_save(actor: usize) -> Option<(String, String, Arc<LiveSession>
             let miis=if saved.miis==current {saved.miis} else {
                 println!("[ReplayCapture] committed Mii metadata changed; exact association unavailable");None
             };
-            return Some((id, title, saved.session, miis));
+            if let Some(value) = miis.as_ref() {
+                if !post_miis(saved.save, FixedReplayMiis::copied(value)) { return None; }
+            }
+            return Some(LiveEvent::Commit { save: saved.save, id, title, miis: miis.is_some() });
         }
         println!("[ReplayCapture] committed identity/title unavailable");
     } else {
         println!("[ReplayCapture] save not committed or association changed status={}", status);
     }
+    post(LiveEvent::Forget { save: saved.save });
     None
 }
 
@@ -482,17 +581,13 @@ unsafe fn write_record(actor: usize) {
     const _: () = assert!(SAVE_ENTRY == 0x143e2a0);
     let committed = observe_save(actor);
     original!()(actor);
-    if let Some((id, title, session, miis)) = committed {
-        crate::runtime::macros::replay_store::persist_committed(id, title, session, miis);
-    }
+    if let Some(committed) = committed { post(committed); }
 }
 
 #[skyline::hook(offset = 0x143e2b0, inline)]
 unsafe fn write_record_shared(ctx: &mut InlineCtx) {
     const _: () = assert!(SAVE_BODY == 0x143e2b0);
-    if let Some((id, title, session, miis)) = observe_save(ctx.registers[0].x() as usize) {
-        crate::runtime::macros::replay_store::persist_committed(id, title, session, miis);
-    }
+    if let Some(committed) = observe_save(ctx.registers[0].x() as usize) { post(committed); }
 }
 
 fn live_scene() -> bool {
@@ -547,8 +642,8 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
         capture.pool.seal_entry(pending.key, entry); return;
     };
     pending.sample.input = input;
-    // A track's Vec grows by doubling: counted as a per-load allocation (hook_stats::per_load), not a steady-state one.
-    let accepted = crate::model::hook_stats::per_load(|| capture.pool.push(pending.key, entry, pending.tick, pending.sample));
+    // Only a fixed observation crosses the callback; the worker grows frame storage.
+    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);
     #[cfg(feature = "named-input-trace")]
     if entry == 1 && pending.tick < 600 {
         println!("[LiveCapture] sample generation={} index={} tick={} accepted={} buttons={:#x} lx={} ly={}",
@@ -662,6 +757,7 @@ pub fn init() {
                 "[ReplayCapture] live adapter disabled: writer {}", error));
             return;
         }
+        CAPTURE.lock().unwrap().saves.reserve_exact(MAX_RETAINED_CAPTURES);
         BASE.store(base, Ordering::Release);
         skyline::install_hooks!(construct_records, clear_records, destroy_records, delete_records,
             reset_current_record, import_record, replace_record, start_recording, serialize_frame,
