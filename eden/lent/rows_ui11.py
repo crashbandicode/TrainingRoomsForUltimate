@@ -51,6 +51,15 @@ def main():
     w.keys("w10")
     w.open()
     w.page("Fighters & Stages")
+    # The 38 pictures are recipe textures, so they have no asynchronous native
+    # upload to await. Retain the grid and the page after leaving it for visual
+    # review: pictures must appear beside labels and disappear on B. These
+    # screenshots alone are not an automatic visual acceptance assertion.
+    w.focus("Give item")
+    w.keys("a w8")
+    r6.shot("item-pictures-grid")
+    w.keys("b w8")
+    r6.shot("item-pictures-left-grid")
     w.focus("Character Cycles")
     w.keys("a w15")
     r6.shot("roster-cycles-open")
