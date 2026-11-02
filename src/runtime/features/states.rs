@@ -341,6 +341,10 @@ pub fn cancel_pending() {
     for slot in &BUFF_ACC {
         slot.store(0, Ordering::Release);
     }
+    // A hat restore the hat engine queued for the load that was cancelled does not apply later (SPEC-state-05 §5.2 step 6).
+    if crate::runtime::roster::running() {
+        crate::runtime::roster::kirby_hats::cancel_pending();
+    }
 }
 
 /// A save-state load is in progress: the load machine's own flag, published each fighter frame. The one source
@@ -492,7 +496,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 diagnostic(format_args!("[TrainingRooms] state olimar entry={} line={:?}", raw.entry, state_restore::olimar_line(accessor, &ids)));
             }
             if raw.entry == 0 && !nana {
-                diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", state_restore::item_snapshot(accessor, &ids)));
+                diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", crate::runtime::features::item_bridge::snapshot(accessor)));
             }
             diagnostic(format_args!(
                 "[TrainingRooms] state charge entry={} {:?}",
@@ -586,7 +590,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         let input = FrameIn {
             entry: raw.entry,
             nana,
-            popo: ids.is(C::KindPopo, raw.kind),
+            popo: ids.is(C::KindPopo, raw.kind) && !nana_removed(raw.entry),
             kind: raw.kind,
             dead,
             status: if ids.is(C::StatusWait, raw.status) {
@@ -621,6 +625,32 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     counts::report_if_due();
 }
 
+/// Solo Popo (the roster cycle's feature) has removed Nana from this role: there is no second body to hand the record to, so a load
+/// must not wait for her (SPEC-state-01 §5.3 step 9: the fork skips the hand-off then; `character_roster::solo_popo_active` is the
+/// fact it published for exactly this). Lock-free reads, safe inside the machine's lock.
+fn nana_removed(entry: i32) -> bool {
+    crate::runtime::roster::running() && crate::runtime::roster::character_roster::solo_popo_active(entry != 0)
+}
+
+/// The per-role "state load started / completed" notification of the Mii HUD portrait (SPEC-state-01 section 9): the roster cycle's
+/// presentation check observes the role's HUD card when a load starts and compares it when that role's restore completes (a load must
+/// change no card). Only while the cycle runs and its install recorded the main image base.
+#[cfg(feature = "mii-hud-portrait-alpha")]
+unsafe fn hud_load(role: usize, started: bool) {
+    let base = if crate::runtime::roster::running() { crate::runtime::roster::character_roster::main_base() } else { 0 };
+    if base == 0 {
+        return;
+    }
+    if started {
+        crate::runtime::roster::presentation::state_load_started(base, role);
+    } else {
+        crate::runtime::roster::presentation::state_load_completed(base, role);
+    }
+}
+
+#[cfg(not(feature = "mii-hud-portrait-alpha"))]
+unsafe fn hud_load(_role: usize, _started: bool) {}
+
 /// Do what the frame asked, with no lock held.
 unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     let accessor = raw.accessor;
@@ -628,6 +658,9 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         // A new load: no buff carries over.
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
         recorder::on_load_request();
+        // The Mii HUD portrait's state-load check (SPEC-state-01 section 9: the per-role "load started" notification): both records load.
+        hud_load(0, true);
+        hud_load(1, true);
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
     if out.pokemon_predeath {
@@ -747,6 +780,9 @@ unsafe fn place(accessor: usize, placing: &Placing) {
 /// buffs, the item snapshot, the fighter-specific restores).
 unsafe fn finish(raw: &Raw, done: &Done) {
     let accessor = raw.accessor;
+    if let Some(role) = Role::of_entry(raw.entry) {
+        hud_load(role.index(), false);
+    }
     if let Some(target) = done.damage {
         n::heal(accessor, -natives::damage(accessor, 0));
         n::add_damage(accessor, target);
@@ -771,10 +807,7 @@ unsafe fn finish(raw: &Raw, done: &Done) {
     }
     // The player's held-item snapshot (SPEC-state-04 §5.1): the player record only, never Nana.
     if let Some(item) = &done.item {
-        if let Some(ids) = with(|s| s.ids.clone()) {
-            let other = with(|s| s.last_kinds).unwrap_or([-1, -1]);
-            state_restore::restore_item(accessor, &ids, item, other);
-        }
+        crate::runtime::features::item_bridge::restore(accessor, item);
     }
     // Pokemon Trainer (SPEC-state-05 §5.1 step 4): the trainer may switch again.
     if done.pokemon_switch {
@@ -874,8 +907,14 @@ unsafe fn pt_wait(raw: &Raw, role: Role) {
 }
 
 /// Kirby's hat (SPEC-state-05 §5.2 step 2): give the copy routine the opponent's entry id and the saved kind
-/// when the opponent is the fighter the hat came from, or in its family.
+/// when the opponent is the fighter the hat came from, or in its family. While the roster cycle runs, the hat engine takes the
+/// restore instead (step 6: it services the hat asynchronously from its own sources, does not need the opponent in the match and
+/// waits for this load to finish, `kirby_hats::on_frame`).
 unsafe fn kirby_copy(accessor: usize, role: Role, copied: i32) {
+    if let Some(kind) = u32::try_from(copied).ok().filter(|_| crate::runtime::roster::running()) {
+        crate::runtime::roster::kirby_hats::restore(accessor as *mut smash::app::BattleObjectModuleAccessor, kind);
+        return;
+    }
     let opponent = 1 - role.index();
     let opponent_accessor = FIGHTER_ACC[opponent].load(Ordering::Acquire);
     if opponent_accessor == 0 {
@@ -973,7 +1012,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         copy_charge,
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
-        held_item: ids.as_ref().filter(|_| role == Role::Player).map(|ids| state_restore::item_snapshot(accessor, ids)),
+        held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
         saved_stage: Some(n::stage_id()),
         mii: None,
     };

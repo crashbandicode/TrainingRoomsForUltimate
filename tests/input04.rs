@@ -417,6 +417,16 @@ fn r2_6_an_ini_shortcut_raises_the_open_menu_request_including_plus() {
     assert!(detector.is_pending(Request::OpenMenu));
 }
 #[test]
+fn the_operator_controller_cycle_chord_reads_its_own_sample_and_touches_no_pending_flag() {
+    let set = ChordSet::factory();
+    let d = Detector::new();
+    let cycle = sample(&[logical::ZL, logical::DPAD_LEFT], &[logical::DPAD_LEFT]);
+    assert!(Detector::operator_cycle(&set, cycle));
+    assert!(!Detector::operator_cycle(&set, sample(&[logical::ZL], &[logical::ZL])));
+    assert!(!Detector::operator_cycle(&set, sample(&[logical::ZR, logical::DPAD_DOWN], &[logical::DPAD_DOWN])));
+    assert!(!d.has_pending_request());
+}
+#[test]
 fn the_button_set_reads_the_dpad_and_both_sticks_digital_directions() {
     use model::chords::{bit, Buttons};
     let b = Buttons(bit::L_LEFT | bit::R_UP | bit::DPAD_RIGHT | bit::ZR);

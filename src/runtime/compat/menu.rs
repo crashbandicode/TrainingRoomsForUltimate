@@ -133,7 +133,7 @@ impl Lockable for Menu {
 /// A kept key of the settings file as a typed value; a missing or malformed one is the type's default (the fork's rule for these
 /// two keys: a bad stored preference never blocks the menu).
 fn kept<T: serde::de::DeserializeOwned + Default>(settings: &Settings, key: &str) -> T {
-    settings.extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
+    crate::engine::compat::menu::kept_or_default(&settings.extra, key)
 }
 
 /// The settings-only part of the typed view, after `published::publish` fed the rows: the saved defaults and the two kept keys
@@ -153,12 +153,38 @@ pub fn apply_kept(settings: &Settings) {
 /// The typed menu view of a published snapshot (`published::publish`: boot, every commit, the diag reload): the one path that feeds the
 /// rows the carried code reads (Macro Source, Ask before switching fighter, the Solo Popo and preload rows) into `MENU`. The saved
 /// defaults and the kept stage and Mii preferences stay as they were ([`apply_kept`] refreshes them).
+///
+/// The roster cycle re-plans here and nowhere else: when a menu was already live, `character_roster::settings_changed` compares it with
+/// the published one (a changed roster, hat order, pick or Solo Popo row re-plans the cycle and may queue a swap; an unrelated change
+/// does nothing). The first publish of a run (boot) has nothing to compare with and queues nothing.
 pub fn apply_snapshot(menu: &Snapshot) {
-    let mut current = CURRENT.write();
-    let (defaults, stage, mii) =
-        current.take().map_or_else(|| (BASE_MENU, StagePreferences::default(), MiiPreferences::default()), |c| (c.defaults, c.stage, c.mii));
-    *current = Some(Current { menu: TrainingModpackMenu::from_snapshot(menu), defaults, stage, mii });
+    let published = TrainingModpackMenu::from_snapshot(menu);
+    let mut next = published;
+    // A normal menu apply (a menu was live: the first publish is the boot, which `cycle_preload_config::init` reconciles with the INI)
+    // goes through the preload engine first (decision D1, `preload::apply`): it persists the 13 `cycle_preload_*` rows in its INI
+    // boot cache (D7), caches them, re-plans its requests and canonicalises the rows (a choice it cannot store stays as it was).
+    // Outside the typed view's lock: the engine reads the typed menu and writes a file.
+    if crate::runtime::roster::running() && CURRENT.read().is_some() {
+        crate::runtime::roster::cycle_preload_config::publish_applied(&mut next);
+    }
+    let (previous, next) = {
+        let mut current = CURRENT.write();
+        let previous = current.as_ref().map(|c| c.menu);
+        let (defaults, stage, mii) =
+            current.take().map_or_else(|| (BASE_MENU, StagePreferences::default(), MiiPreferences::default()), |c| (c.defaults, c.stage, c.mii));
+        *current = Some(Current { menu: next, defaults, stage, mii });
+        (previous, next)
+    };
+    if next != published {
+        // The engine changed rows (the stored choice won): the settings the menu opens on take them too.
+        PENDING.lock()[0] = Some(next);
+        crate::runtime::ui::worker::request_writeback();
+    }
+    if let Some(previous) = previous.filter(|previous| *previous != next) {
+        crate::runtime::roster::character_roster::settings_changed(&previous, None);
+    }
 }
+
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
 pub fn stage_preferences() -> StagePreferences {
     CURRENT.read().as_ref().map_or_else(StagePreferences::default, |current| current.stage)

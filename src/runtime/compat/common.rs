@@ -7,7 +7,7 @@ use smash::lib::lua_const::FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID;
 use crate::model::lra_reset::{entry_id_valid, FIGHTER_MANAGER_SLOT_OFFSET};
 use crate::runtime::compat::sync::Readable;
 use crate::runtime::game::natives;
-use crate::runtime::{game, scene, state_natives};
+use crate::runtime::{game, scene};
 
 pub(crate) use crate::runtime::lobby::game_mode;
 
@@ -62,14 +62,6 @@ pub unsafe fn is_fighter(module: &BattleObjectModuleAccessor) -> bool {
     natives::is_fighter(module as *const BattleObjectModuleAccessor as usize)
 }
 
-/// `utility::get_category` of the accessor's battle object id.
-///
-/// # Safety
-/// `module` is a live battle object's module accessor.
-pub unsafe fn get_category(module: &BattleObjectModuleAccessor) -> i32 {
-    state_natives::object_category(module.battle_object_id)
-}
-
 /// The fighter entry id of a fighter's accessor (`FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID`).
 unsafe fn entry_of(module: &BattleObjectModuleAccessor) -> i32 {
     natives::get_int(module as *const BattleObjectModuleAccessor as usize, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
@@ -88,13 +80,6 @@ pub fn operation_cpu(module: &mut BattleObjectModuleAccessor) -> Option<bool> {
 /// `operation_cpu`, with an unknown entry reading as "not an AI CPU".
 pub fn is_operation_cpu(module: &mut BattleObjectModuleAccessor) -> bool {
     operation_cpu(module) == Some(true)
-}
-
-/// The module accessor of the battle object with `object_id` (`sv_battle_object::module_accessor`), `None` for an unknown id.
-pub fn try_get_object_accessor(object_id: u32) -> Option<*mut BattleObjectModuleAccessor> {
-    // SAFETY: a guarded called function; a null answer is an unknown id.
-    let accessor = unsafe { state_natives::object_accessor(object_id) };
-    (accessor != 0).then_some(accessor as *mut BattleObjectModuleAccessor)
 }
 
 /// The fork's `common::menu`: what the plugin's own menu and the native UI own, read from the input-owner mask (SPEC-input-03: one

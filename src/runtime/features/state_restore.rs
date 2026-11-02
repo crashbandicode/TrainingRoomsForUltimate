@@ -7,9 +7,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::model::sites_pkg3 as s;
 use crate::model::state::charge;
-use crate::model::state::held_item::HeldItem;
 use crate::model::state::ids::{Table, C, UNRESOLVED};
-use crate::model::state::items::{self, Restore, Turnip, Variation};
+use crate::model::state::items;
 use crate::model::state::record::Steve;
 use crate::model::state::steve as steve_layout;
 use crate::runtime::alloc::HookScope;
@@ -198,114 +197,6 @@ fn face() -> Option<u32> {
     match TURNIP_CHOSEN.load(Ordering::Acquire) {
         0 => None,
         face => Some(face),
-    }
-}
-
-/// The player's held item as a snapshot (SPEC-state-01 §5.5 step 2).
-///
-/// # Safety
-/// The item sites passed their guards; `accessor` is the player's.
-pub unsafe fn item_snapshot(accessor: usize, ids: &Table) -> HeldItem {
-    let Some(item) = held(accessor, ids) else {
-        return if n::is_have_item(accessor) { HeldItem::Unsupported } else { HeldItem::Empty };
-    };
-    let kind = n::object_kind(item.1);
-    let work = |c: C| id(ids, c).map(|slot| n::work_get_int(item.1, slot));
-    let (Some(variation), Some(lifetime), Some(lifetime_max), Some(fuse), Some(fuse_max)) = (
-        work(C::ItemWorkVariation),
-        work(C::ItemWorkLifeTime),
-        work(C::ItemWorkLifeTimeMax),
-        work(C::ItemWorkBombCounter),
-        work(C::ItemWorkBombCounterMax),
-    ) else {
-        return HeldItem::Unsupported;
-    };
-    let Some(choice) = items::choice_of(kind, variation, |c| ids.get(c)) else { return HeldItem::Unsupported };
-    HeldItem::Item { choice, variation, lifetime, lifetime_max, fuse, fuse_max }
-}
-
-/// The held item's object id and accessor, when the player holds an item object.
-unsafe fn held(accessor: usize, ids: &Table) -> Option<(u32, usize)> {
-    if !n::is_have_item(accessor) {
-        return None;
-    }
-    let object = u32::try_from(n::get_have_item_id(accessor)).ok()?;
-    if !n::object_is_active(object) {
-        return None;
-    }
-    let item = n::object_accessor(object);
-    if item == 0 || n::object_category(object) != id(ids, C::CategoryItem)? {
-        return None;
-    }
-    Some((object, item))
-}
-
-fn fighter_present(ids: &Table, source: C, kinds: [i32; 2]) -> bool {
-    kinds.iter().any(|k| ids.is(source, *k))
-}
-
-/// Restore a snapshot onto the player's hand (SPEC-state-04 §5.1 draft 9). `kinds` are the player's and
-/// the CPU's fighter kinds (an item that needs a fighter's data is granted only when one is in the match).
-///
-/// # Safety
-/// As `item_snapshot`.
-pub unsafe fn restore_item(accessor: usize, ids: &Table, snapshot: &HeldItem, kinds: [i32; 2]) {
-    match items::restore_for(snapshot) {
-        Restore::Nothing => {}
-        Restore::Clear => {
-            if n::is_have_item(accessor) {
-                n::remove_item(accessor);
-            }
-        }
-        Restore::Grant { spec, variation, timers } => {
-            if let Some(source) = spec.source {
-                if !fighter_present(ids, source, kinds) {
-                    return;
-                }
-            }
-            let Some(kind) = id(ids, spec.kind) else { return };
-            let base = match spec.variation {
-                Variation::Number(v) => v,
-                Variation::Constant(c) => id(ids, c).unwrap_or(0),
-            };
-            // R.O.B.'s gyros and the turnips take the snapshot's own variation.
-            let variation = if spec.turnip.is_some() || spec.kind == C::ItemGyro {
-                if spec.kind == C::ItemGyro { id(ids, C::ItemGyro1p).unwrap_or(0) + variation } else { variation }
-            } else {
-                base
-            };
-            let previous = TURNIP_CHOSEN.load(Ordering::Acquire);
-            if spec.turnip.is_some() {
-                TURNIP_CHOSEN.store(items::turnip_face(variation), Ordering::Release);
-            }
-            if n::is_have_item(accessor) {
-                n::remove_item(accessor);
-            }
-            n::have_item(accessor, kind, variation);
-            let granted = held(accessor, ids).filter(|(_, item)| n::object_kind(*item) == kind);
-            if let (Some(who), Some(_)) = (spec.turnip, granted) {
-                let action = id(ids, if who == Turnip::Daisy { C::DaisyTurnipInit } else { C::PeachTurnipInit });
-                let power = n::turnip_power(who == Turnip::Peach, (variation + 1) as u8);
-                if let Some(action) = action {
-                    if power.is_finite() && power > 0.0 {
-                        n::set_have_item_action(accessor, action, power);
-                    }
-                }
-            }
-            TURNIP_CHOSEN.store(previous, Ordering::Release);
-            // The special-init action is a native boundary: resolve the live object again.
-            if let Some((_, item)) = held(accessor, ids).filter(|(_, item)| n::object_kind(*item) == kind) {
-                let live = |c: C| id(ids, c).map(|slot| n::work_get_int(item, slot));
-                if let (Some(life_max), Some(fuse_max), Some(life_slot), Some(fuse_slot)) =
-                    (live(C::ItemWorkLifeTimeMax), live(C::ItemWorkBombCounterMax), id(ids, C::ItemWorkLifeTime), id(ids, C::ItemWorkBombCounter))
-                {
-                    if items::timers_apply(&timers, life_max, fuse_max) {
-                        n::work_set_int(item, timers.lifetime, life_slot);
-                        n::work_set_int(item, timers.fuse, fuse_slot);
-                    }
-                }
-            }
-        }
     }
 }
 
