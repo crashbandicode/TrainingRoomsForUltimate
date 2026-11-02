@@ -541,7 +541,9 @@ fn count(code: u8) -> usize {
 /// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,
 /// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the
 /// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written
-/// appears in both rather than in neither.
+/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the
+/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the
+/// first Eden boot showed the full lists cut the one line before `result=`).
 pub(crate) struct InstallFields;
 
 impl fmt::Display for InstallFields {
@@ -551,7 +553,7 @@ impl fmt::Display for InstallFields {
         let checked = rows - count(UNCHECKED);
         write!(
             f,
-            "seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_authoritative={} seams_images={} seams_authoritative_images={}{}",
+            "seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}",
             checked,
             count(STOCK),
             Labels { keep: listed_as_other, with_code: other_with_code },
@@ -560,9 +562,7 @@ impl fmt::Display for InstallFields {
             Missing,
             Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },
             count(UNCHECKED),
-            Groups(AUTHORITATIVE),
-            ImageLabels,
-            Groups(AUTHORITATIVE_IMAGES),
+            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),
             DrillFields,
         )
     }
