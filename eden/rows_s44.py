@@ -125,7 +125,12 @@ def ui_do(method, params, cap=6.0):
     return res
 
 
+START = 0
+
+
 def main():
+    global START
+    START = mark()
     events = read_file(f"{SD}/events.log")
     (OUT / "events.log").write_text(events)
     last = events.strip().splitlines()[-1] if events.strip() else ""
@@ -196,6 +201,11 @@ def main():
     tap("zr,up", wait=0.1)
     ln = line_after(m, "named_playback frames", 20)
     row("named playback chord: restore, then the named macro plays", ln is not None, ln or "no named_playback line; " + " | ".join(x[:140] for x in lines_after(m)[-6:]))
+    # input 0 reached: the restore pose was remembered (sync-01 refused every named playback with "Restore the Training setup again")
+    ln0 = line_after(m, "named_playback_start", 10)
+    refused = [x for x in lines_after(m) if "Restore the Training setup again" in x or "idle/fall saved setup" in x]
+    row("named playback reaches input 0 at the restored pose (no restore refusal)", ln0 is not None and not refused,
+        (ln0 or "no named_playback_start") + (" | refused: " + refused[0][-120:] if refused else ""))
     ln2 = line_after(m, "named_playback_complete", 20)
     row("named playback completes", ln2 is not None, ln2 or "none")
     shot("after-named-playback")
@@ -354,6 +364,12 @@ def main():
     (OUT / "hook-counts.txt").write_text("\n".join(lines))
     last_counts = lines[-1] if lines else ""
     row("hook allocation counter after the layer ran (R5)", "heap_allocations=0" in last_counts, last_counts[-200:] or "no report")
+    # R5 steady state from the first named row on: every hook_stats report since then has delta=0 (the match load's per-load and earlier
+    # packages' counts are before START); a nonzero one names its innermost scope in allocs=.
+    stats = [x for x in lines_after(START) if "hook_stats allocations=" in x]
+    grew = [x for x in stats if not re.search(r" delta=0 ", x)]
+    row("R5: no hook allocation while the layer ran (every hook_stats delta=0 after the first row)", bool(stats) and not grew,
+        (f"{len(stats)} reports, all delta=0" if stats and not grew else " | ".join(re.sub(r" hook_calls=.*?(?= allocs=|$)", "", x)[-160:] for x in grew[:4]) or "no hook_stats report"))
     (OUT / "results.json").write_text(json.dumps(RESULTS, indent=1))
     print(f"ROWS {sum(1 for x in RESULTS if x[1])}/{len(RESULTS)} pass", flush=True)
 

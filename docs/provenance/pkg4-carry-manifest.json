@@ -22,7 +22,7 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::lobby::training::practice",
+   "training::practice": "crate::runtime::macros::practice",
    "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
    "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
    "common": "crate::runtime::compat::common",
@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "9b3a46eae270a87e3c765e4d75d60ec9c81d9d5bf63d4fe7bf71fef603fb61eb",
+   "dest_sha256": "3c12673f1caf1228bf6880ab58433eb34673f0c858c13e7cdebcfbce6df438ce",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -563,6 +563,26 @@
      "old": "notification(\"Named Macro\".to_owned(), message.to_owned(), 180);",
      "new": "notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
      "reason": "package 6's notification facade takes Cow arguments (static text allocates nothing)"
+    },
+    {
+     "old": "use crate::runtime::lobby::training::ui::notifications::notification;",
+     "new": "use crate::runtime::lobby::training::ui::notifications::upsert;",
+     "reason": "R5: the layer's notices are copied into the fixed notice queue (upsert), never an owned String inside a hook"
+    },
+    {
+     "old": "    notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
+     "new": "    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);",
+     "reason": "R5 (sync-01: +1 per named-playback refusal notice): allocation-free notice"
+    },
+    {
+     "old": "pub fn init() {\n    let path = format!(\"{}/selected.txt\", macros_dir());",
+     "new": "pub fn init() {\n    // R5: the panel-hold list is reserved at boot so hold_panel_fighter (a hook) never grows it (sync-01: +1 at the first library open).\n    lock_write(&PANEL_STOPS).reserve(PANEL_STOPS_CAPACITY);\n    let path = format!(\"{}/selected.txt\", macros_dir());",
+     "reason": "R5: prepare the panel-hold list at boot (boot thread), not on its first push in the fighter-frame hook"
+    },
+    {
+     "old": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());",
+     "new": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());\n/// Boot reservation of `PANEL_STOPS`: one entry per held fighter body, more than a match has (8 entries and their partners).\nconst PANEL_STOPS_CAPACITY: usize = 16;",
+     "reason": "R5: the reservation's size, named"
     }
    ]
   },
@@ -578,7 +598,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "363a779e4511ac8c0e341aab4e116ae6e17895f4ac08eba90da8e26ab82fe0be",
+   "dest_sha256": "1408b6f540693f4c9184199fc16964b08948984d1c4a407bcd38d7824266725a",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",

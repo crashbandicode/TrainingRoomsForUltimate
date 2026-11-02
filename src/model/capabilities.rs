@@ -97,7 +97,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 8] = [
     (Feature::InputDisplay, &["fighter_manager_get_entry", "status_kind"]),
     (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),
-    (Feature::Recording, &["fighter_information", "is_operation_cpu", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
+    (Feature::Recording, &["fighter_information", "is_operation_cpu", "pos_x", "pos_y", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
     (Feature::StateCore, &["change_status_force", "damage_of", "effect_req", "effect_req_on_joint", "fighter_information", "is_operation_cpu", "lua_const_lookup", "pos_x", "prev_status_kind", "situation_kind", "status_kind", "work_get_param_float", "work_is_flag", "work_set_flag", "work_set_float"]),
 ];
 

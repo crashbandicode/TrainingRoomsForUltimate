@@ -156,7 +156,7 @@ pub fn open_editor() {
 }
 
 fn open_browser(expected_revision: Option<u64>) {
-    if !crate::runtime::lobby::training::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::lobby::training::practice::acquire() }
+    if !crate::runtime::macros::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::macros::practice::acquire() }
         || crate::runtime::lobby::training::recording_or_playback()
         || crate::runtime::macros::save_states::is_loading()
         || crate::runtime::roster::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
@@ -196,7 +196,7 @@ fn open_browser(expected_revision: Option<u64>) {
         // interruption while that I/O was in flight.
         if expected_revision.is_some_and(|revision|
             !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::practice::enabled() { return; }
         *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
             revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });
     }
@@ -246,7 +246,7 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             if !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening()) {
                 return Ok(()); // Cancel/departure owns this result; never publish it late.
             }
-            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() {
+            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::practice::enabled() {
                 return Err("Practice changed before the capture could open".into());
             }
             let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
@@ -368,7 +368,7 @@ pub fn browser_view() -> Option<View> {
 }
 
 pub fn browser_input(pad: Pad) {
-    let waiting = crate::runtime::lobby::training::practice::waiting();
+    let waiting = crate::runtime::macros::practice::waiting();
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
@@ -401,7 +401,7 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
 }
 
 fn capture_ready() -> bool {
-    crate::runtime::lobby::training::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
+    crate::runtime::macros::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
         && unsafe { Fighter::is_ready_go() && !crate::runtime::macros::save_states::is_loading() }
         && !crate::runtime::lobby::training::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
 }
@@ -413,18 +413,18 @@ pub fn quiescing_capture() -> bool {
     // on that hot path. Release the browser lock before querying other owners.
     let pending = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending());
     pending && !crate::runtime::macros::named_macros::suspended()
-        && crate::runtime::lobby::training::practice::waiting()
+        && crate::runtime::macros::practice::waiting()
 }
 
 pub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {
-    if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }
+    if !quiescing_capture() || crate::runtime::macros::practice::role(module) != Some(1) { return false; }
     let clean = clean_statuses().contains(&StatusModule::status_kind(module));
     BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.release_cpu(clean))
 }
 
 unsafe fn service_browser() {
     if !BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending()) { return; }
-    let eligible = crate::runtime::lobby::training::practice::waiting() && capture_ready();
+    let eligible = crate::runtime::macros::practice::waiting() && capture_ready();
     let clean = eligible && crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
         .is_some_and(|cpu| clean_statuses().contains(&StatusModule::status_kind(cpu)));
     let (effect, revision) = {
@@ -494,7 +494,7 @@ pub fn cancel_reload() {
 /// cleanup must finish before handing control to the existing character loader.
 pub unsafe fn service_reload() {
     if crate::runtime::macros::named_macros::suspended() { return; }
-    if !crate::runtime::lobby::training::practice::scene_enabled() {
+    if !crate::runtime::macros::practice::scene_enabled() {
         let had_reload=RELOAD.lock().unwrap().take().is_some();
         if had_reload || panel_visible() || browser_visible() {close_editor_inner(had_reload);}
         return;

@@ -26,8 +26,44 @@ pub(crate) mod replay_store;
 
 // The fork's `training` names the carried files reach through `super::`: package 6's practice session and lobby facade, the recorder
 // (`port::input_record`) and the save-state flag of package 3.
-pub(crate) use crate::runtime::lobby::training::{lobby, practice};
+pub(crate) use crate::runtime::lobby::training::lobby;
 pub(crate) use port::input_record;
+
+/// The fork's `training::practice` as the carried files call it: package 6's practice session (`runtime::lobby::training::practice`), and
+/// the three fork functions package 6 deleted there as single-owner duplicates (pkg6 carry ledger, "Deleted fork functions"), composed
+/// here from what package 6 kept, because this layer still calls them.
+pub(crate) mod practice {
+    pub(crate) use crate::runtime::lobby::training::practice::*;
+
+    use crate::engine::lobby::practice_policy::Context;
+    use crate::runtime::compat::{common, consts::FighterId};
+    use smash::app::{utility, BattleObjectModuleAccessor};
+    use smash::lib::lua_const::FIGHTER_KIND_NANA;
+
+    /// The practice is the lobby waiting room's.
+    pub(crate) fn waiting() -> bool {
+        context() == Some(Context::Waiting)
+    }
+
+    /// `module` is the practice CPU's own body: the CPU role, the game's current CPU accessor, never Nana (the second body of the entry).
+    ///
+    /// # Safety
+    /// `module` is a live fighter's accessor.
+    pub(crate) unsafe fn primary_cpu(module: &mut BattleObjectModuleAccessor) -> bool {
+        role(module) == Some(1)
+            && utility::get_kind(module) != *FIGHTER_KIND_NANA
+            && common::try_get_module_accessor(FighterId::CPU).is_some_and(|current| std::ptr::eq(current, module))
+    }
+
+    /// The practice entry `module` belongs to, for the named panel's hold (the entry releases its hold when it departs): P1 and the
+    /// practice CPU. Package 6 found no owner for the fork's other case, the extra CPUs of native Training, so they are not held.
+    ///
+    /// # Safety
+    /// `module` is a live fighter's accessor.
+    pub(crate) unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {
+        entry(role(module)?)
+    }
+}
 
 /// The fork's `save_states` as the named layer and the clip preview call it: package 3's own functions, and the preview restore, which
 /// package 3 does not provide yet (`install_report` names it).
@@ -131,7 +167,10 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
     replay_capture::after_frame(fighter);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
         step(23);
-        named_macros::hold_panel_fighter(module);
+        {
+            let _scope = HookScope::enter_hook(HookId::NamedService);
+            named_macros::hold_panel_fighter(module);
+        }
         step(24);
         if practice::primary_cpu(module) {
             step(25);
@@ -142,6 +181,7 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             named_macros::preview(module);
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
             step(28);
+            let _scope = HookScope::enter_hook(HookId::NamedService);
             named_macros::service_keyboard();
             step(29);
             named_macros::service_character();

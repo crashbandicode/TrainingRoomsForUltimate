@@ -23,7 +23,7 @@ use crate::runtime::macros::port::consts::{FighterId, MacroSource, OnOff, MENU};
 use crate::runtime::macros::port::input::MappedInputs;
 use crate::runtime::compat::common::{menu, try_get_module_accessor};
 use super::practice;
-use crate::runtime::lobby::training::ui::notifications::notification;
+use crate::runtime::lobby::training::ui::notifications::upsert;
 
 static UI: RwLock<MacroUi> = RwLock::new(MacroUi::new());
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
@@ -276,6 +276,8 @@ fn resume_name() {
 }
 // Only flags set by this panel are released, and only on the same live object.
 static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());
+/// Boot reservation of `PANEL_STOPS`: one entry per held fighter body, more than a match has (8 entries and their partners).
+const PANEL_STOPS_CAPACITY: usize = 16;
 
 pub fn forget_stopped_entry(entry: usize) {
     lock_write(&PANEL_STOPS).retain(|&(_, _, owner)| owner != entry);
@@ -351,7 +353,8 @@ pub struct PlaybackStart {
 }
 
 fn notify(message: &str) {
-    notification(std::borrow::Cow::Borrowed("Named Macro"), std::borrow::Cow::Owned(message.to_owned()), 180);
+    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.
+    upsert("Named Macro", message, 180);
 }
 
 fn macros_dir() -> String {
@@ -503,6 +506,8 @@ pub fn using_frames() -> bool {
 }
 
 pub fn init() {
+    // R5: the panel-hold list is reserved at boot so hold_panel_fighter (a hook) never grows it (sync-01: +1 at the first library open).
+    lock_write(&PANEL_STOPS).reserve(PANEL_STOPS_CAPACITY);
     let path = format!("{}/selected.txt", macros_dir());
     let Ok(text) = std::fs::read_to_string(path) else {
         return;

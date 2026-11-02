@@ -39,7 +39,7 @@ use crate::model::recording::{
 };
 use crate::model::settings::Snapshot;
 use crate::model::sites_pkg4;
-use crate::runtime::alloc::HookScope;
+use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
 use crate::runtime::macros::{named_macros, replay_preview};
@@ -235,6 +235,8 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
+    // Nested in the input hook that calls it, so an allocation of the poll stage is charged here (R5 attribution).
+    let _scope = HookScope::enter_hook(HookId::RecorderPoll);
     bump(COUNT_POLL);
     if SWALLOW.load(Ordering::Relaxed) > 0 {
         SWALLOW.fetch_sub(1, Ordering::Relaxed);
@@ -285,7 +287,7 @@ unsafe fn on_named_poll(out: *mut MappedInputs) {
 /// controller it just wrote.
 #[skyline::hook(offset = sites_pkg4::AI_EPILOGUE_OFFSET, inline)]
 pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::RecorderAi);
     on_ai_frame(ctx.registers[19].x() as usize);
 }
 
@@ -642,8 +644,12 @@ pub fn on_state_restored(saved_on_ledge: bool) {
     }
     if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
         // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
+        let _scope = HookScope::enter_hook(HookId::NamedRestore);
         // SAFETY: both fighters were just restored.
-        unsafe { named_macros::service_restore() };
+        unsafe {
+            remember_named_pose();
+            named_macros::service_restore();
+        }
         return;
     }
     let settings = settings();
@@ -672,6 +678,31 @@ pub fn on_state_restored(saved_on_ledge: bool) {
             LoadAction::Play(slot) => begin_playback(slot, facing, false),
         }
     }
+}
+
+/// The CPU's restored pose for the named layer's input 0 (SPEC-input-01 section 9). Package 3's restore has placed both fighters when
+/// `on_state_restored` runs, so the CPU's position now is the saved anchor: the loaded macro's placement offset applies to it, the
+/// facing is the restored one, and the situation decides the start status (ground: Wait, or Fall for a macro recorded in the air; air:
+/// Fall; any other situation, a ledge, has no pose and the layer refuses with its idle/fall notice). Without this the layer has no pose
+/// at input 0 and refuses every named playback ("Restore the Training setup again", sync-01).
+///
+/// # Safety
+/// Both fighters were just restored.
+unsafe fn remember_named_pose() {
+    use smash::lib::lua_const::{SITUATION_KIND_AIR, SITUATION_KIND_GROUND};
+    let Some(body) = cpu_body() else { return };
+    let (x, y) = (game::natives::pos_x(body.accessor), game::natives::pos_y(body.accessor));
+    let (x, y) = named_macros::restored_target(x, y).unwrap_or((x, y));
+    let situation = game::natives::situation_kind(body.accessor);
+    let air = if situation == *SITUATION_KIND_GROUND {
+        Some(named_macros::restore_in_air())
+    } else if situation == *SITUATION_KIND_AIR {
+        Some(true)
+    } else {
+        None
+    };
+    let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
+    named_macros::remember_restore_pose(module, x, y, natives::lr(body.accessor), air);
 }
 
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
@@ -722,6 +753,7 @@ pub fn stop() {
 /// playback after both fighters are back).
 pub fn on_load_request() {
     stop();
+    let _scope = HookScope::enter_hook(HookId::NamedRestore);
     named_macros::begin_restore();
 }
 

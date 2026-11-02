@@ -169,3 +169,27 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
   roster provider, hook counts), `tr_eden4.py down s4-08`, `scan`, `restore`, results into eden/EDEN-PACKAGE-4.md S4-4.
 - Then: host gates (`cargo test`, clippy `--all-targets -D warnings`, `--no-default-features`), Switch release+diag, `nro_size.py`, `compliance.py <worktree> --nro <release>`,
   final report to the lead.
+
+### R5 attribution and fixes (sync-01 finding, 2026-11-02 ~13:xxZ)
+- sync-01 (`TrainingRoomsForUltimate-ui-screens/eden/runs/sync-01`) counted +1 between #438 and #446 (the first named-library open) and +2 around each named
+  playback (#848, #947), inside hook scopes of this layer. Attribution: `model::hook_stats` takes package 6's per-innermost-scope counter (stream/pkg6 `ec2115f`,
+  the file and `tests/hook_alloc.rs` verbatim) plus four package-4 ids: `recorder_ai` (AI epilogue), `recorder_poll` (P1 poll stage, nested in the input hook),
+  `named_service` (panel hold, keyboard / character / clip-reload services in the fighter frame), `named_restore` (`on_load_request`, the named branch of
+  `on_state_restored`). The `hook_stats` line names them in `allocs=`.
+- Roots found and fixed: (1) `named_macros::hold_panel_fighter` grew `PANEL_STOPS` on its first push (the +1 at the first library open): reserved at boot
+  in `named_macros::init` (16 entries; recorded edit). (2) `named_macros::notify` built `Cow::Owned(message.to_owned())` per notice: now `upsert` copies the
+  text into the fixed notice queue (recorded edit). (3) The named playback notice itself: nothing remembered the CPU's restore pose (the fork did it in its
+  save_states, not carried), so `prepare_playback_start` refused every named playback with "Restore the Training setup again before playback" (sync-01 #854,
+  #953). `recorder::remember_named_pose` now records it at `on_state_restored` (package 3's restore placed both fighters): position plus the macro's
+  placement offset (`restored_target`), restored facing, ground = Wait (Fall for a macro recorded in the air), air = Fall, ledge = no pose (the layer's
+  idle/fall notice). CROSS_NEEDS: Recording gains `pos_x`, `pos_y`.
+- Merge fallout fixed: package 6 deleted `practice::{waiting, primary_cpu, panel_entry}` (e86f991, single owner); the merged tree did not build for Switch.
+  `macros::practice` re-exports package 6's practice and composes the three from what it kept (`context`, `role`, `entry`, compat accessor); the carry map
+  `training::practice` now names `crate::runtime::macros::practice`. `panel_entry` holds P1 and the practice CPU only (package 6 found no owner for native
+  Training's extra CPUs).
+- Gates (local, this tree): host tests pass except `capabilities` (ui_tex_find_handle, integrator-3), `carry_pkg6` (seam_install.rs, fixed on stream/pkg6 cd76fad)
+  and `hook_alloc::the_byte_meter_counts_what_the_one_global_allocator_serves` (package 1's: the meter is `cfg(test)`-gated, an integration test links the lib
+  without it) — all three fail identically at 97648b8. Clippy `--all-targets -D warnings` 0, `--no-default-features` builds, local Switch release and diag build.
+- Release dead-code warnings in this layer: 37 (named_macros 22, replay_capture 10, port 3, replay_preview 2): the screen entry points package 5's screens call
+  (on_pad, open_library, export_record_slot, browser_view, clip_view ...), the fork's legacy pair (remember_legacy/take_legacy) and position_wait_timed_out
+  (package 3's position retry would call it).
