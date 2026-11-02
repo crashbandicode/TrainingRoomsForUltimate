@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::input_delay::Owners;
 use crate::model::adapter::{Adapter, Style};
