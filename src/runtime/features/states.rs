@@ -377,6 +377,19 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             raw.status,
             raw.situation
         ));
+        if let Some(ids) = with(|s| s.ids.clone()) {
+            if ids.is(C::KindSteve, raw.kind) {
+                if let Some(steve) = state_restore::steve_read(accessor, &ids) {
+                    diagnostic(format_args!("[TrainingRooms] state steve entry={} {:?}", raw.entry, steve));
+                }
+            }
+            if ids.is(C::KindOlimar, raw.kind) {
+                diagnostic(format_args!("[TrainingRooms] state olimar entry={} line={:?}", raw.entry, state_restore::olimar_line(accessor, &ids)));
+            }
+            if raw.entry == 0 && !nana {
+                diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", state_restore::item_snapshot(accessor, &ids)));
+            }
+        }
         if raw.entry == 1 && !nana {
             DUMP.store(false, Ordering::Release);
         }
