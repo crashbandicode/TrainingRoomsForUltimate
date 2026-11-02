@@ -149,8 +149,8 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Requirement | Tag | Result | Evidence |
 | --- | --- | --- | --- |
 | `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | unverified | Acceptance pending; no pass claimed. |
-| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | unverified | Acceptance pending; no pass claimed. |
-| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | unverified | Acceptance pending; no pass claimed. |
+| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml; release NRO d1e5392, build-release.log; compliance-d1e5392-release.md machine rows pass. |
+| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; host cargo test exit0 at98f9ab0; compliance machine row pass. |
 | Gates pass, one cargo call each: `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`, `cargo skyline build --release`, and the diag build on its own. Evidence: the outputs. | M | unverified | Acceptance pending; no pass claimed. |
 | No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | unverified | Acceptance pending; no pass claimed. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
@@ -160,7 +160,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Card scan before the site is chosen: `tools/build/scan-offsets.py` over the card copy, for the site and, for a virtual function, its vtable slot. Evidence: the scan's output and the copy's date. | M | unverified | Acceptance pending; no pass claimed. |
 | (another plugin hooks or may hook the site) Sharing v1 or the chain rules ([HOOK-SHARING](HOOK-SHARING.md)); the owner election runs before the byte guard; both stand-in modes (`foreign=inline`, `foreign=far`) and both load orders tested in Eden. N/A only when the scan showed nobody at the site, with the scan cited. | C | unverified | Acceptance pending; no pass claimed. |
 | Hook after the prologue, or call the game function instead of hooking it; hook the most specific instruction. | M | unverified | Acceptance pending; no pass claimed. |
-| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | unverified | Acceptance pending; no pass claimed. |
+| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | compliance-d1e5392-release.md: no diag markers in release NRO8140cab97427. |
 | The shipped NRO writes its install line and nothing per frame. **C** (a logging plugin whose product is the log) its data files too, but no per-frame diagnostics. | M | unverified | Acceptance pending; no pass claimed. |
 | Read-only rules reviewed in the code, hook by hook: no checked random number drawn, no native code that draws one skipped or reordered, no simulated state written (ssbu-desync-detector `docs/WHAT-IS-CHECKED.md`). Evidence: the review in the evidence doc. | C | unverified | Acceptance pending; no pass claimed. |
 | Replay A/B with the desync detector: the same replay with and without the plugin, identical check values and positions. | C | unverified | Acceptance pending; no pass claimed. |
@@ -181,12 +181,12 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | (the evidence cites numbers computed from logs) every such number comes from a committed script over the logged files, with host tests, and the command is named next to the numbers. | C | unverified | Acceptance pending; no pass claimed. |
 | No operator quotes, no claims beyond the tests. | M | unverified | Acceptance pending; no pass claimed. |
 | The handoff file current at each checkpoint: branch, commit, evidence, live state, next commands; no secrets. | M | unverified | Acceptance pending; no pass claimed. |
-| Minor version bumped, annotated tag, Forgejo release with the NRO, `manifest.json` and `SHA256SUMS.txt`; every asset verified by anonymous download. | C | unverified | Acceptance pending; no pass claimed. |
-| A rebuild of the tagged commit is byte-identical to the released NRO. | C | unverified | Acceptance pending; no pass claimed. |
-| Install over DBI MTP (or the mounted card with `upgrade2-ums.py`; a swap of one plugin for another with `swap-ums.py`; Skyline's `exefs/subsdk9` with `replace-exefs.py`): preflight (card listing, local copies, `old` sha256 matches), a rollback copy on the card, readback of the new NRO, every other plugin and the protected files; receipts kept; a phase with an existing receipt is not re-run. | C | unverified | Acceptance pending; no pass claimed. |
-| The user connects and disconnects the Switch. The agent never mounted, unmounted, ejected or remounted the card and never started or stopped DBI or hekate UMS; it read and wrote the SD only through what the user exposed (MTP, or the mount point), and its report told the user when the card could be disconnected. `compliance.py` fails scripts that carry a mount, unmount, eject or power-off command. | M | unverified | Acceptance pending; no pass claimed. |
-| Without the order: nothing pushed, tagged or written to the card, and the report says so. | M | unverified | Acceptance pending; no pass claimed. |
-| Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | unverified | Acceptance pending; no pass claimed. |
+| Minor version bumped, annotated tag, Forgejo release with the NRO, `manifest.json` and `SHA256SUMS.txt`; every asset verified by anonymous download. | C | N/A | Worker brief explicitly forbids tags/releases; integration owner handles release separately. |
+| A rebuild of the tagged commit is byte-identical to the released NRO. | C | N/A | No tag/release authorized for this stream. |
+| Install over DBI MTP (or the mounted card with `upgrade2-ums.py`; a swap of one plugin for another with `swap-ums.py`; Skyline's `exefs/subsdk9` with `replace-exefs.py`): preflight (card listing, local copies, `old` sha256 matches), a rollback copy on the card, readback of the new NRO, every other plugin and the protected files; receipts kept; a phase with an existing receipt is not re-run. | C | N/A | Worker brief forbids Switch/card/DBI/USB; no physical installation performed. |
+| The user connects and disconnects the Switch. The agent never mounted, unmounted, ejected or remounted the card and never started or stopped DBI or hekate UMS; it read and wrote the SD only through what the user exposed (MTP, or the mount point), and its report told the user when the card could be disconnected. `compliance.py` fails scripts that carry a mount, unmount, eject or power-off command. | M | N/A | No physical Switch/card access in this stream, explicitly forbidden. |
+| Without the order: nothing pushed, tagged or written to the card, and the report says so. | M | pass | No push/tag/release/card action; only local stream commits and owned host builds. |
+| Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | pass | Origin is Forgejo per compliance; local commits use mandated identity and UTF-8 message files; no pushes. |
 | The model and effort gate and the per-thread watcher follow the routing authority (`/home/intpa/.codex/DELEGATION_ROUTING.md`); they are not restated here. | M | unverified | Acceptance pending; no pass claimed. |
 | Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | unverified | Acceptance pending; no pass claimed. |
 
@@ -237,6 +237,21 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+- Surface queue coordination (15:4xZ): slim no-default is now the first TrainingRooms line, but
+  imgui-nvn-sol retains the literal queue head while replacing its request from e09 to e10 to
+  subsequent gates/e11. The ledger helper sometimes reports free after grace, yet queue reports
+  NOT this stream. I am honoring both checks. Please reconcile the completed parallel request or
+  clarify whether the first TrainingRooms line may claim after the parallel turn/grace is satisfied;
+  I will not remove or reorder the foreign line myself. Yoga diag remains separately queued.
+
+
+- Normalized budget coordination (15:3xZ): current operator tool reports 133508 including scripts
+  at98f9ab0 (133341 excluding scripts); existing size-budget.toml ceiling107900 is raw sloc4 plus
+  pending additions. I retained that monotone raw gate and report normalized counts alongside it.
+  Please identify the approved normalized ceiling/pending addition basis if the gate itself must
+  move to normalized units now; no unapproved budget conversion or counting semantics change made.
+
 
 - Admission coordination: Surface has been reported free since ~14:41Z, but pkg6 remains queue head
   ahead of slim. I am honoring that line, not removing or bypassing it. If pkg6 has deferred its test,
@@ -340,3 +355,50 @@ engine::macros::ui_anchor::tests::elf_pins_match_owned_13_0_5_dump passed agains
 This is separate from the 9259 suite total and does not turn its six ignored rows into six passes.
 Yoga archive hash matches local; 241G free. No held claim or active owned compiler/Eden.
 Both next jobs queued: Surface clippy d1e5392; Yoga Switch release d1e5392.
+
+Process disclosure: the post-compaction MY_MODEL.md/routing reads and a Get-Command cargo-count
+availability query ran through required PowerShell but without systemd/time wrappers. These were
+short read-only commands; the bounded-command checklist is not claimed fully satisfied historically.
+Subsequent local operations use explicit memory/time guards. No compile/Eden admission was bypassed.
+The aggregate test count above was an ad hoc sum of Cargo summaries, not an independently certified
+cargo-count receipt; raw suite logs and exit0 are authoritative. Do not upgrade it to a certified
+all-target count. The supplied bounded-validation evidence skill was inspected for its existing count
+helper; its all-target job/list receipt inputs do not exist for this earlier cargo test run.
+
+### Clippy active — 2026-11-02 15:29Z
+Surface fresh free/queue checks passed, slim at head; CLAIMED 15:29Z Codex 01a19c9f/slim.
+cargo clippy --all-targets -- -D warnings on fac9cf7 (docs only since d1e5392), progress-only dirt.
+Session 22042; /tmp/slim/astra-clippy-first.log; own target, incremental0, 6G/1800s.
+Preflight 241G free, aggregate targets19G. Release/remove own Surface queue line immediately on exit.
+Yoga Switch release remains queued behind f6; no Yoga claim or compiler owned.
+Completed SPEC-cpu-02 and shared harness route.py reads.
+
+Clippy passed, zero warnings, exit0, 51.80s (raw log above). Surface RELEASED 15:31Z.
+Removed own queue row; appended no-default-features build at tail. Yoga release still queued.
+
+Harness used read-only at exact 225d16bd9d7f7645f2c18058373f3331624b6c94; params, ledger, gv, solo and route read completely. Retained host logs: artifacts/trainingrooms-nro-archive/slim/astra-host-gates/inventory.json (retrospective inventory explicitly labeled).
+
+### Yoga release active — 2026-11-02 15:38Z
+CLAIMED Codex 01a19c9f/slim on Yoga after head/free/interleave checks.
+Frozen source d1e5392 under /home/intpa/trainingrooms-build-slim-astra/d1e5392;
+archive hash matched; disk240G. Conservative complete build-tree totals across hosts <47G
+(target-only total necessarily lower); own target starts empty.
+Command: systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800
+/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -File
+/home/intpa/trainingrooms-build-slim-astra/d1e5392/yoga-build-d1e5392.ps1 -Mode release.
+SSH exec session95826, local bounded scope; remote scope run-p1055687-i9432476.scope.
+Log remote frozen root/build-release.log. On completion verify result, release Yoga claim,
+remove own Yoga row, copy NRO/log on success; next separately queued diag build.
+Surface no-default-features remains queued, no local compiler/Eden owned.
+
+Yoga release d1e5392 exited0, 52.50s; RELEASED 15:41Z, own row removed, diag appended at tail.
+NRO SHA256 8140cab974270cc890779725d809e9008b111308799a12a903c923323fcbd057.
+Playbook nro_size.py: file3026944, text1921024, ro557056, data548864, bss413696,
+resident3440640 B. Raw/ANSI-stripped logs, warning-location table, NRO and inventory retained under
+artifacts/trainingrooms-nro-archive/slim/d1e5392-release/.
+Post-build archive comparison: all1119 source files unchanged, no extras; remote source-after-release.json.
+41 warning headers with source locations (ad hoc extraction; raw log authoritative), all dead-code.
+No compile errors; not a zero-warning gate. Shared UI/Mii/macros entry points await integration.
+Compliance with this release NRO: exit1, five machine failures unchanged (guard initializer scanner,
+README/GIF, docs/media, HANDOFF, progress dirt), no diagnostic strings in shipped NRO.
+Exact report retained beside NRO. No final pass claimed; agent rows still pending.
