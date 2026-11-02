@@ -80,6 +80,11 @@ unsafe fn archive_alloc(ctx: &mut InlineCtx) {
 /// The plugin's archive for the one the game just decompressed: from the stock archive, or (B3: another mod replaced
 /// it) from the vanilla archive read through arc:/. None leaves the game's archive in place (the menu then cannot open).
 fn rebuilt(stock: &[u8], size: usize) -> Option<(Vec<u8>, usize, &'static str)> {
+    #[cfg(feature = "diag")]
+    if refusal_forced() {
+        diagnostic(format_args!("[LayoutArchive] refusal forced by refuse-archive.flag (diag): stock info_training kept (layout_arc=skipped)"));
+        return None;
+    }
     match archive_recipe::build(stock, RECIPE) {
         Ok(built) => Some((built, size, "stock")),
         Err(reason) => {
@@ -168,4 +173,11 @@ fn dump_stock(stock: &[u8]) {
         )),
         Err(error) => diagnostic(format_args!("[LayoutArchive] dump failed: {error}")),
     }
+}
+
+/// Diag only: the Eden row of review R2-2 (a refused archive) creates `refuse-archive.flag` in the plugin's folder.
+#[cfg(feature = "diag")]
+fn refusal_forced() -> bool {
+    use crate::model::storage::FixedPath;
+    FixedPath::<128>::in_root("refuse-archive.flag").is_some_and(|path| std::fs::metadata(path.as_str()).is_ok())
 }
