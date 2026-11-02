@@ -307,3 +307,9 @@ scalar/cursor validation remove temporary Vec/String allocation. Raw98877 (+12
 versus a6e4d07), normalized126470excludingtools (+18), rustfmt1.9.0-stable
 48a229ceae/0failures. Ceiling103200 unchanged; raw+4318pending=103195.
 This is an explicit root-fix cost, not a source-size saving or native-stack pass.
+
+5b40bac adds the omitted CPU helper arm feature condition and uses existing
+hos_lock storage for keyboard Signals. Raw98879 (+2vs78), normalized126463
+excludingtools (-7vs78), rustfmt0failures. Combined cost vs gateda6 is +14raw/
++11normalized; pending4318 yields103197 within unchanged103200 ceiling.
+Compiled/native acceptance is tracked separately; no line-budget increase.

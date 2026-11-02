@@ -1,33 +1,32 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
-## Current worker checkpoint — 2026-11-02 21:50Z
+## Current worker checkpoint — 2026-11-02T22:05:20.581438+00:00
 Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
-Branch stream/slim; source78f440d, docsHEADc7efbd1 plus current notes.
-Lead tr-lead-astra-4 scoped keyboard authorization21:18 applied; no other native
-refactor or moving merge. Only authorized merge remains ebfcb98 via dae0787.
-Actual pure keyboard implementation extractedf7b8f4a; before-fix actual allocation
-probe FAIL14first/896repeated, control1. Fix78f440d uses fixedUTF16/streaming
-validation/checkedu8 metadata. Hostzeroalloc/boundary/frozenEnter testsPASS.
-Raw98877 normalized126470excltools; ceiling103200 unchanged (4318pending=103195).
-Allfive78gatesPASS: fullhost70.121s,clippy20.753s0warnings,nodefault3.125s,
-Switchrelease52.614s/diag37.207s;1112frozenfilesunchanged.
-Release17d0877e resident3440640;diag5ee38f2e resident3780608 (-4096eachvs a6).
-Three stale/exceeded table rowsFAIL; Menu49392 requires81920>allocated57344;
-fiber25104>16384. No budget increase. Retained keyboarddrop2176→2000 and
-Signalsmutex976→816; opening/registration/callback symbols ABSENT in BOTHa6/78
-shippingELFs, so nativecallbackstack proof awaits fixed consumer composition.
-Independent leadreview requested21:38; exactroute question in QUESTIONS/inbox.
-CORE9 native matrix PASS; extraeditor-alone FAIL E0599 missingReadycfg.
-One-arm exactcfg fix staged; rerun owed. SMD/hos-lockcratePASS. No ownedclaim.
-PreparedSignals const-mutex patch awaiting leadscopeapproval; no application.
-SameownedYoga source/target78 idle; noSurfaceclaim/Eden/profile. Lastfreshcache21:43:
-57,665,437,885B TrainingRooms; foreignfork8.894GB explicitly excluded.
-Own a6targets previously retired with manifests; f7hosttarget moved/reused78.
-HelperpathEdenhold andsl02allocationFAIL818/delta100on10remainopen. No78runtime.
-Artifacts slim/78f440d-*; beforeprobe slim/f7b8f4a-before-allocation.
-Latestcompliance remainsa6/fourmachinefails/29agentrows; rerunexact78releasepending.
-Watcher2674699 sameownerboundalive/noalert; exactmodel confirmed aftercompaction.
-No READY; continue gates and lead integration coordination.
+Branch stream/slim; HEAD/source5b40bac, previoussource78f440d fully5-gated.
+Lead21:18 authorized actual keyboard model/representation+streamingUTF16 root;
+21:59 authorized exact Signals hos_lock constant-mutex root (3684a52f patch).
+Both applied; b4c8b56 also fixes missingReady-armcfg found by extraeditor-only
+matrix. No other native refactor/moving merge. Only merge ebfcb98 via dae0787.
+5b raw98879/normalized126463excludingtools; ceiling103200 unchanged:
+98879+4318pending=103197. NativeABI9blocks byte-identicaltoa6. Carry253PASS.
+Previous78 hostfull/clippyzero/nodefault/release/diag andnativeCORE9PASS;
+extraeditor-alone FAIL E0599 retained, corrected in5b. SMD24/0/0; hos20/0/0.
+5b frozen1112files onYoga; extraeditor-alone PASS, fullhost80.344sPASS,
+clippy21.055sPASS0warnings, nodefault2.185sPASS. Diag CLAIMED22:13(exec12354);
+release/compiledstack/compliance pending. NoSurfaceclaim/Eden/profile.
+78 release17d0877e resident3440640;diag5ee38f2e3780608 (-4096eachvsa6).
+78 stack3tableFAIL; Menu49392 requires81920>57344; fiber25104>16384.
+78 Keyboarddrop2176→2000/Signalsmutex976→816; constructor/registration/callback
+paths absentbotha6/78shippingELFs, so integratedcallback proof remains open.
+78Signalscoldlock confirmed5d6b4→OnceBox1ca1ac→count_allocation→calloc40;
+5b must prove this is removed. No puretextzeroalloc→SDK/runtime inference.
+Independent78source review queued bylead; fixedconsumerroute question open.
+Old78hostdebug retired1735785219B withSHAmanifest+keyboardbinarypreserved.
+CurrentoneYoga target moved/reused5b; b4stage hadnojob/noownremainingtarget.
+Freshcache22:01 global56571381361B; archiveb4c8b56-preflight/cache2-*.
+All oldclaimsreleased; currenteditorclaim only. HelperEdenhold/sl02allocFAIL
+818delta100on10stillopen. Latestcompliancea6/fourmachinefails29agentrows.
+Watcher2674699 sameownerbound; no READY. Continue gates, leadreview/integration.
 
 Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
 
@@ -1132,3 +1131,51 @@ keyboardbinary. Fresh global56571381361B. Next freeze combinedfix, reuse idle
 target, first extraeditor matrix then host/native gates and compiledcoldlock.
 SMD24passed/0failed/0ignored; hos-lock20/0/0 on78; crate sources unchanged.
 Allclaimsreleased21:58; noEden/profile. Futureleadrequests appended at END.
+
+## Slim combined fixed source — 2026-11-02T22:07:00.819507+00:00
+Read21:59 approval, applied exactSignals patch3684a52f via carry transforms.
+Current5b40bac includes b4c8b56 missingReadycfg correction; carry253PASS,
+ABI9blocks identical, raw98879 normalized126463excltools, ceiling103200 unchanged.
+Extra editor-only Switch check nowPASS15.676s, raw291856004f858910e48ba0cbbd5aa64ef37cb3c7fb885c3955d31598740cfe33,
+1112sourcesunchanged; beforeE0599 retained. FullhostnowclaimedYoga22:06.
+Retiredownoldhostdebug1.736GB withmanifest/keyboardbinary; freshglobal56.571GB
+beforeadmission. Sameoneownedtarget reused; noEden/profile.
+Crate gates78 SMD24/0/0 andhos20/0/0 retained with all27cratefilehashes identical.
+Next exacthost/native/compiledcoldlock; first-use callback and integratednative
+runtime remainOPEN asrequested. Independent78review queued; no READY.
+
+
+## Slim next representation proposal, NOT applied — 2026-11-02T22:11:45.806649+00:00
+Two remaining large-enum allowances carry Configuration, which stores both
+canonical.appearance.charinfo_masked[88] and full charinfo[88]; constructors
+already prove the masked copy derives from full bytes. Prepared exact
+/tmp/slim/configuration-no-masked-copy.patch SHAcb5af6f2119507c9fc8a3da54b8f718b172ffe89c513a7b18677c6c7cde489f2
+for lead/owner review: retain fullcharinfo, Tokens, class, all3stablehashes;
+canonical() already returns by value, so reconstruct the masked view there.
+Preserve public APIs, Copy/Eq, validation/error order and StoredConfiguration
+serialized shape/bytes. No box, pool, index handle or capacity restriction.
+Would need independent canonical/serde golden and invalid/private-state probes,
+first/repeat allocation tests, actual size and compiledstack evidence; no saving
+or removed lint claimed yet. Current projection has source-line cost and only3
+lines pending-budget headroom; do not raise budget silently.
+Request scope/ownership decision before implementation (shared lifetime.rs,
+two enum consumers and carry transforms). Other native refactors remain held.
+
+
+## Live restart checkpoint — 2026-11-02T22:14:24.532101+00:00
+Source5b40bac onstream/slim; docs changes only sincefreeze. Yoga ownsONEdiag
+job exec12354, log /home/intpa/trainingrooms-build-slim-astra/5b40bac/diag.log.
+Poll/reap before release. After reaping, bounded local pwsh command runs
+/usr/bin/python3 -I /tmp/slim/yoga-release.py diag (archivesjob/source/log,
+releasesYoga and removesonlyownedqueue). Fetch diag/{libtraining_rooms.nro,
+libtraining_rooms.so,binaries.json}; verifySHA againstreceipt. Then claim
+Switchrelease via /tmp/slim/yoga-admit.py Switch-release and run ONE
+ssh memento-claw-yoga-ubuntu systemd-run --user --scope -p MemoryMax=6G
+timeout 1800 python3 -I /home/intpa/trainingrooms-build-slim-astra/5b40bac/build-5b40bac.py
+/home/intpa/trainingrooms-build-slim-astra/5b40bac/release.log skyline build --release.
+Everylocal command through mandated /usr/bin/pwsh flags; normalboundsandqueue.
+CompiledcoldSignals proof must compare78 ELF37f502ac andnewexact5b ELF.
+Currentglobalfresh58266022490B, 1GB reserve; receipts5b40bac-preflight/cache1-*.
+Crates27filesidenticalto78: SMD24/0/0 andhos20/0/0 retained; source-delta.json.
+Unapplied next Configuration proposal cb5af6f2 exists only/tmp; no authorization
+yet, do not apply. Independent keyboard review/integratedconsumerroute pending.
