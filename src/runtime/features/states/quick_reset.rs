@@ -26,10 +26,13 @@ unsafe fn entries() -> Option<[usize; 2]> {
 }
 
 pub(super) unsafe fn observe(raw: &Raw, nana: bool) {
-    if nana || LOADING.load(Ordering::Acquire) || !QUICK.lock().needs_pose(raw.role.index()) {
+    if nana || LOADING.load(Ordering::Acquire) {
         return;
     }
     let Some(entries) = entries() else { return };
+    if !QUICK.lock().needs_pose(entries, raw.role.index()) {
+        return;
+    }
     let waiting = super::with(|s| {
         s.ids
             .is(crate::model::state::ids::C::StatusWait, raw.status)

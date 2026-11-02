@@ -53,10 +53,7 @@ impl QuickReset {
     /// but cannot fill the fresh pair. Destruction also calls `clear`, including
     /// when a later allocator reuses exactly the same entry addresses.
     pub fn observe(&mut self, entries: [usize; 2], role: usize, waiting: bool, pose: Pose) {
-        if self.entries != Some(entries) {
-            self.clear();
-            self.entries = Some(entries);
-        }
+        self.observe_entries(entries);
         if waiting {
             if let Some(slot) = self.poses.get_mut(role) {
                 slot.get_or_insert(pose);
@@ -69,7 +66,17 @@ impl QuickReset {
         Some([self.poses[0]?, self.poses[1]?])
     }
 
-    pub fn needs_pose(&self, role: usize) -> bool {
+    fn observe_entries(&mut self, entries: [usize; 2]) {
+        if self.entries != Some(entries) {
+            self.clear();
+            self.entries = Some(entries);
+        }
+    }
+
+    /// Check the live entry pair before skipping native pose reads. A filled
+    /// cache for retired entries must not prevent observing their replacements.
+    pub fn needs_pose(&mut self, entries: [usize; 2], role: usize) -> bool {
+        self.observe_entries(entries);
         self.poses.get(role).is_some_and(Option::is_none)
     }
 
@@ -126,6 +133,45 @@ mod tests {
             None,
             "same addresses do not revive a retired pair"
         );
+    }
+
+    #[test]
+    fn cached_pair_does_not_skip_replacement_entry_observation() {
+        for replacement in [[24, 16], [8, 24]] {
+            let mut q = QuickReset::new();
+            for role in [0, 1] {
+                assert!(q.needs_pose(ENTRIES, role));
+                q.observe(ENTRIES, role, true, POSE);
+            }
+            assert!(!q.needs_pose(ENTRIES, 0));
+            assert_eq!(q.pair(ENTRIES), Some([POSE; 2]));
+
+            // The runtime's early check sees the new identities before WAIT.
+            assert!(q.needs_pose(replacement, 1));
+            assert_eq!(q.pair(ENTRIES), None);
+            assert_eq!(q.pair(replacement), None);
+            let fresh = Pose {
+                x: -7.0,
+                percent: 43.0,
+                ..POSE
+            };
+            q.observe(replacement, 1, false, fresh);
+            assert!(q.needs_pose(replacement, 1));
+            q.observe(replacement, 1, true, fresh);
+            assert!(!q.needs_pose(replacement, 1));
+            assert!(q.needs_pose(replacement, 0));
+            q.observe(replacement, 0, true, POSE);
+            assert_eq!(q.pair(replacement), Some([POSE, fresh]));
+
+            // A same-entry fighter swap preserves the first WAIT; retirement
+            // explicitly clears even when the allocator later reuses addresses.
+            q.observe(replacement, 1, true, POSE);
+            assert_eq!(q.pair(replacement), Some([POSE, fresh]));
+            assert!(!q.needs_pose(replacement, 2));
+            q.clear();
+            assert!(q.needs_pose(replacement, 1));
+            assert_eq!(q.pair(replacement), None);
+        }
     }
 
     #[test]

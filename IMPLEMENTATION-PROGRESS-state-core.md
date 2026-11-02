@@ -61,3 +61,23 @@ Review the new lifetime and completion paths, run tests, integrate only exact
 gated commits in the lead merge order, and retain final0alloc/0Unmapped proof.
 Worker pkg4 owns recorder/panels; pkg6 owns roster/Mii; UI owns screens. Preserve
 their independent changes when composing this slice.
+
+## Successor lead review and root correction 2026-11-02 18:22Z
+Lead tr-lead-astra-3, thread01a19d62, read SPEC-state-06 and bounded-behavior-fix.
+Frozen d74cc83 passed targeted host suites (hook_alloc141, hook_locks3,
+state01_machine161), all-target clippy -D warnings and no-default build;
+all1111 sourcefiles unchanged. Exact jobs/log hashes are under parent artifacts/
+trainingrooms-state-core/d74cc83/host-{targeted,clippy,nodefault}. No Switch or
+runtime acceptance is inferred.
+Review then found the runtime needs_pose shortcut occurred before live entries
+were read: a full old cache prevented the model's entry-change invalidation.
+The pure needs_pose API now requires the live pair and reconciles identity before
+returning whether native pose reads are needed. Runtime reads entries before this
+call; native reads remain outside QUICK, no new lock or allocation. Existing
+explicit retirement clears reused addresses; same-entry swaps retain first WAIT.
+Regression calls this production early-check API with either role replaced,
+non-WAIT then WAIT, partial pair, same-entry continuation, invalid role and
+retirement/address reuse. These temporary poses are intentionally not serialized;
+fresh-process restore evidence is inapplicable to this cache and gameplay remains
+unverified. New candidate gates pending, primary independent review requested;
+no integration acceptance or preview/setup closure.
