@@ -95,4 +95,4 @@ pub fn lua_bind_hash(name: &str) -> u64 {
 
 /// The game's `phx::Hash40` of a name (the CRC-32 in the low 32 bits, the length in bits 32..40): one
 /// implementation, `model::hash40`.
-pub use crate::model::hash40::{crc32, hash40};
+pub use crate::model::hash40::hash40;

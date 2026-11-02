@@ -12,7 +12,8 @@ use std::cell::Cell;
 
 use model::cpu::counter::{CounterId, Counters};
 use model::cpu::facts::FrameFacts;
-use model::cpu::hash::{crc32, hash40, lua_bind_hash, xxh64, SEED};
+use model::cpu::hash::{hash40, lua_bind_hash, xxh64, SEED};
+use model::hash40::crc32;
 use model::cpu::ids::{self, Table, C, UNRESOLVED};
 use model::cpu::mash::{effective, Action, BufferContext, Buffered, Mash};
 use model::cpu::playback::{covered_setting_applies, PlaybackState};
