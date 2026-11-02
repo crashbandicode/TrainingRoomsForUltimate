@@ -31,6 +31,8 @@ pub mod settings;
 pub mod sites;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
+#[path = "model/store.rs"]
+pub mod store;
 #[path = "model/storage.rs"]
 pub mod storage;
 #[path = "model/version.rs"]
