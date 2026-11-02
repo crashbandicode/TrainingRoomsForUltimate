@@ -70,3 +70,57 @@ the game keep their shapes and what would drawing them cost? Read from the owned
   pass_ticks_avg=` (Eden hb rows).
 - Known defect from the lead (not this stream's): the integrated tree hangs when the TrainingRooms menu is closed; settings go through `settings.json` before boot,
   menu rows run last in a boot.
+
+## Playbook checklist (docs/CHECKLIST.md; playbook `ae87443c`, pulled 2026-11-02 ~11:45Z: no newer commit)
+
+Status at commit `64d439f` + this file. M = mandatory, C = conditional. "open" = not yet evidenced.
+
+| Item | Tag | Result | Evidence |
+| --- | --- | --- | --- |
+| cdylib only | M | pass | `Cargo.toml` `[lib] crate-type = ["cdylib"]` (unchanged by this stream) |
+| Release profile s / lto / cgu 1 / abort; skyline =0.6.0; toolchain 1.98.1 | M | pass | `Cargo.toml`, `rust-toolchain.toml` (unchanged) |
+| Pure logic in model with host tests; runtime Switch-only | M | pass | `src/model/hitbox.rs`, `src/model/sites_hitbox.rs`; `tests/core06_hitbox.rs` (124 tests incl. ELF facts); runtime under `src/runtime/features/hitbox.rs` |
+| Gates: test, clippy -D warnings, no-default-features, release, diag | M | pass at `099ae93` / open at `64d439f` | 7767 tests 0 failed, clippy clean, nodefault ok (Surface 11:05-11:08Z); Switch release `c49afc40` / diag `193ec03b`. `64d439f`: host core06 + capabilities pass; Yoga diag `19c74e53`, release `fe6630f8` built; full clippy/test re-run open |
+| No heap in hooks (counting allocator, delta 0) | M | pass (hb-01) | `eden/runs/hb-01/practice-diagnostics.log`: `hook_stats ... delta=0` on every line while the pass ran (the 7 + 15 allocations happen at scene load before the first pass line; attribution open, not hitbox code paths) |
+| Fixed buffers, writer thread, stack-built paths | M | pass | the pass, sets and Lua reads are fixed storage; diag lines go to the existing ring |
+| Root-cause fixes only; workarounds approved | M | pass | effect-pool exhaustion → persistent spheres (lead ruling on Q3, 2026-11-02); install line cut → heap String at boot (to be replaced by `27d84f4`) |
+| Version guard | M | pass | inherited boot (`result=unsupported_version` path unchanged) |
+| 64-byte guard on every hooked / called / relied site | M | pass | 17 rows in `sites_hitbox.rs`, generated from the ELF (`tools/gen_hitbox_sites.py`), `core06_rows_match_the_owned_elf`; Eden hb-01 install line: all `stock` |
+| Card scan before choosing sites | M | pass | `scan-offsets.py` over the 2026-11-01 10:19 MTP preflight copy (16 plugins): only `libtraining_modpack.nro` (the fork) references the hook sites; `docs/test-provenance/core-06.md` § Card scan. Re-run for `2017840 2017a20 203db10 469af0 468490`: open |
+| Hook sharing (another plugin hooks the site) | C | N/A | the scan shows nobody but the fork (never installed with this plugin) at `2284b20 22ac290 2027bb0`; Called rows tolerate others' hooks |
+| Hook after prologue / call instead of hook / most specific | M | pass with note | the three hooks are replace hooks at the entry as the spec names them (`hitbox_visualizer.*` rows); everything else is called |
+| No diag code in the shipped NRO | M | open | compliance.py on the release NRO |
+| Shipped NRO writes only its install line | M | pass | all `[Hitbox]` lines are `#[cfg(feature = "diag")]` |
+| Online read-only rules | C | N/A | the visualizer acts only in Training / lobby practice (`visualizes`), never online; hb row "Quickplay with the setting On" open |
+| Replay A/B, online-only paths | C | N/A | as above |
+| Claim before Up / release after Down | M | pass | ledger lines 11:10Z CLAIMED / RELEASED for hb-01 (`tr_eden_hb.py`) |
+| One Eden per host, 10 GiB, never profile a / :61 | M | pass | `tr_eden_hb.py up` asserts; display :96, profile `trainingrooms-eden-hb/profiles/hb` |
+| Hard-linked profile copy | M | pass | `tr_eden_hb.py prep` (copytree with os.link for game content); du 6.4G |
+| One target per source copy, df >= 40 GB | M | pass | targets `trainingrooms-hitbox`, `-hitbox-switch`, Yoga `trainingrooms-build-hitbox/{proof,main}/target`; df 187/254 GB free |
+| Waits gated on a log line or screenshot | M | pass | `route_hb.py` gates (install line, menu, SSS, tile 41, CSS, ready); `hb_drive.py wait` on diag lines |
+| Abort and retry a run whose precondition never comes | M | pass | hb-01 route stopped at the training gate (dist 31.2 vs 30: the spheres changed the reference), screenshot looked at, run continued by hand |
+| Shortest ruleset | M | N/A | Training mode, no match |
+| Profile restored after the run | M | open | `tr_eden_hb.py restore` after the last hb run |
+| console.log searched (panic / abort / crash / Unmapped) | M | pass (hb-01) | `tr_eden_hb.py scan hb-01`: 5690 lines, 0 matching |
+| Every local command under memory/time guard | M | pass | cargo via `systemd-run ... MemoryMax=6G timeout 1800`; Eden via `eden-run.py` bounds |
+| Each run's outputs under its label | M | pass | `eden/runs/hb-01/` (shots, logs, run.json, memory.peak) |
+| README with GIF | M | N/A for this stream | repository-level release item (lead, package 7) |
+| Dated evidence doc | M | open | `eden/EDEN-HITBOX.md` after hb-02/hb-03 |
+| Numbers from a committed script | C | open | the cost and pool numbers come from `[Hitbox] stats` lines; a parser in `eden/` with a host test is open |
+| No operator quotes, no claims beyond tests | M | pass | |
+| Handoff current | M | pass | this file + `docs/test-provenance/core-06.md` |
+| Release / card | C | not authorized | no push, tag or card |
+| Forgejo only, no push without order, commit messages from a file | M | pass | local commits only, `git commit -F` |
+| Model gate and watcher | M | pass | watcher `/tmp/hitbox-re/watch.py` (PID 1079962) logs `claude-opus-5-5 / high` |
+| Workers read the playbook | M | N/A | no worker spawned |
+
+## Tools written by this stream (playbook reuse, operator order)
+
+| Tool | Status |
+| --- | --- |
+| `eden/tr_eden_hb.py` | kept: the TrainingRooms adaptation of the playbook's `tools/eden-solo/gv.py` + `solo.ps1` (copied from the r2fix stream's `tr_eden_r2.py`): own profile/display/owner, `settings.json` into the copy, mute via the CLI before boot, Yoga ledger claims. The playbook's `solo.ps1` is pinned to gsp-visualizer's profile `y` and display :68 and writes no plugin settings |
+| `eden/route_hb.py` | kept: the r2 route (playbook MACROS hybrid: macro segment + screenshot gates + TILE-CURSOR steps), only the work root changed |
+| `eden/hb_drive.py` | kept: a few lines over `route_hb.py` for `shot` / `wait` / `call` / `speed`; `gv.py shot/press/call` do the same on the Yoga but cannot gate on the plugin's diag log from the Surface |
+| `tools/gen_hitbox_sites.py`, `tools/re_hitbox_layout.py` | kept: reverse-engineering evidence (64-byte rows, vtable from relocations); the playbook has no such tool |
+| `/tmp` helpers (`hb-ledger.py`, `hb-cargo.ps1`, `hb-switch.ps1`, `yoga-build.ps1`) | not in the repo; `hb-ledger.py` = `eden/ally/ledger.py` with this stream's owner; the build helpers wrap the documented commands of `docs/BUILD.md` |
+| playbook tools used as is | `tools/build/nro_size.py`, `tools/build/scan-offsets.py`, `tools/check/compliance.py` (before READY) |
