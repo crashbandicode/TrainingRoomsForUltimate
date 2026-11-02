@@ -29,6 +29,8 @@ pub mod lra_reset;
 pub mod menu;
 #[path = "model/migration.rs"]
 pub mod migration;
+#[path = "model/scene.rs"]
+pub mod scene;
 #[path = "model/settings.rs"]
 pub mod settings;
 #[path = "model/settings_file.rs"]
