@@ -144,3 +144,13 @@ bound the stack: such sites are marked by `kind=` from the next build and are no
 - **Cleanup:** after integrator-3's build: delete `cargo-targets/trainingrooms-stack`, the Ally target
   `/home/intpa/c1161-targets/TrainingRoomsForUltimate-stack-ally` and `C:\Users\intpa\stack-pack`, with a manifest; NROs, logs and
   receipts stay under `eden/runs/st-NN/` and `/tmp/stack-a2594031/b*/`.
+
+## stream/stack2 (2026-11-02 ~13:1xZ, from 48eebe1)
+
+- integrator-3's merged build (48eebe1): `boot::run` 43,792 B static on Skyline's 64 KiB boot thread (rule 39,321 B), the deep leg`n  `published::publish -> compat::menu::after_publish -> character_roster::settings_changed -> queue_request -> preload/Mii cycle`.
+- 1982e99 (lead order): a publish only notes the roster re-plan (`ROSTER_CHANGE`, earliest previous menu, coalesced) and wakes the
+  menu worker; `ui::worker::run` runs it (a thread, never a game hook: pkg6 A's R5 hook deltas stay 0). Table statics refreshed
+  from the 48eebe1 diag ELF. Host tests capabilities, native_wrappers, thread_stacks, core04_settings pass; Switch gates and the
+  three `stack_depth.py` checks in integrator-3's next merged build. Merged-tree release resident (48eebe1): 3,240 KiB.
+- Target `trainingrooms-stack2` deleted with `artifacts/trainingrooms-nro-archive/DELETED-TARGETS-stack2-20261102T131419Z.json`.
+
