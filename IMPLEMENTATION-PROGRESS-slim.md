@@ -151,7 +151,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | unverified | Acceptance pending; no pass claimed. |
 | Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml; release NRO d1e5392, build-release.log; compliance-d1e5392-release.md machine rows pass. |
 | Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; host cargo test exit0 at98f9ab0; compliance machine row pass. |
-| Gates pass, one cargo call each: `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`, `cargo skyline build --release`, and the diag build on its own. Evidence: the outputs. | M | unverified | Acceptance pending; no pass claimed. |
+| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for initial slice; final rerun after changes | All five exited0; separate admitted claims/logs below. Switch dead-code warnings remain41/40; not accepted as warning-free. |
 | No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | unverified | Acceptance pending; no pass claimed. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
 | Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
@@ -187,7 +187,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | The user connects and disconnects the Switch. The agent never mounted, unmounted, ejected or remounted the card and never started or stopped DBI or hekate UMS; it read and wrote the SD only through what the user exposed (MTP, or the mount point), and its report told the user when the card could be disconnected. `compliance.py` fails scripts that carry a mount, unmount, eject or power-off command. | M | N/A | No physical Switch/card access in this stream, explicitly forbidden. |
 | Without the order: nothing pushed, tagged or written to the card, and the report says so. | M | pass | No push/tag/release/card action; only local stream commits and owned host builds. |
 | Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | pass | Origin is Forgejo per compliance; local commits use mandated identity and UTF-8 message files; no pushes. |
-| The model and effort gate and the per-thread watcher follow the routing authority (`/home/intpa/.codex/DELEGATION_ROUTING.md`); they are not restated here. | M | unverified | Acceptance pending; no pass claimed. |
+| Model/effort gate and owner-bound watcher per routing authority. | M | pass | Exact thread01a19c9f-18c1-7832-9236-a14dcebafa3b, live Astra/medium; hidden watcher11182, checked after compaction. |
 | Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | unverified | Acceptance pending; no pass claimed. |
 
 ### Restart checkpoint — first compile, 2026-11-02 14:26Z
@@ -237,6 +237,16 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+- Yoga queue coordination16:2xZ: SMD released16:16Z, pkg4 is now literal head and my oracle test follows. Fresh ledger free check passes after fairness, but pkg4 has not claimed yet. I continue honoring its place; if the frozen gate is deferred, please have its owner withdraw/requeue. No foreign queue row changed.
+
+- Shared harness admission parser finding: Yoga has no real imgui-nvn/Terra queue job, but
+  ledger.py parallel_turns considers the parenthesized historical notes from queue_items as
+  waiting requests. It reports both owners after every Yoga TrainingRooms release until180s.
+  queue_head correctly skips parenthesized notes; parallel_turns does not. Evidence: the Yoga
+  section says imgui has no Yoga line and Terra is ended/withdrawn. I honor the conservative
+  wait; lead/harness owner can add an actual-request filter and regressions separately.
+
 
 - Surface queue coordination (15:4xZ): slim no-default is now the first TrainingRooms line, but
   imgui-nvn-sol retains the literal queue head while replacing its request from e09 to e10 to
@@ -402,3 +412,48 @@ No compile errors; not a zero-warning gate. Shared UI/Mii/macros entry points aw
 Compliance with this release NRO: exit1, five machine failures unchanged (guard initializer scanner,
 README/GIF, docs/media, HANDOFF, progress dirt), no diagnostic strings in shipped NRO.
 Exact report retained beside NRO. No final pass claimed; agent rows still pending.
+
+### Yoga diagnostic build active — 2026-11-02 15:58Z
+Fresh queue head/free/fairness checks passed. CLAIMED Codex 01a19c9f/slim on Yoga.
+Frozen d1e5392, same own source/target; disk239G. One cargo skyline build --release --features diag,
+6G/1800s, incremental0. Remote wrapper yoga-build-d1e5392.ps1 -Mode diag.
+SSH exec session39778; remote log /home/intpa/trainingrooms-build-slim-astra/d1e5392/build-diag.log.
+Release/remove only own Yoga row on completion, preserve NRO/log, next one crate test queued there.
+No Surface compiler/Eden owned; no profile created. Surface no-default remains queued.
+
+Yoga diagnostic build d1e5392 exited0; RELEASED 16:00Z. NRO
+5030f68f93bf27c5fbe1692fc620dcb7485401160e7fd6bdc7478c8f02acadab.
+Playbook nro_size.py: file3108864, text1970176, ro577536, data561152, bss671744,
+resident3780608 B. Raw logs/NRO/warning table retained under
+artifacts/trainingrooms-nro-archive/slim/d1e5392-diag/.
+All1119 frozen source files unchanged after diagnostic build; no extras.
+No owned compiler/Eden. Yoga match-data crate test queued next; wrapper yoga-host-d1e5392.ps1
+is prepared outside frozen source, single cargo call, exact exit propagated, own shared source target.
+Surface no-default still queued. Eden config /tmp/slim/harness.json validated, root not yet created;
+display109 was unused at inspection (must recheck at admission), CPU pilot asset present.
+
+## Milestone for lead — initial compile coverage (partial)
+- Code/fixture commit d1e5392; current HEAD abd0714 adds only notes. No new runtime edits after e237f0f.
+- Root cargo test exited0 at98f9ab0; clippy --all-targets -- -D warnings exited0 atfac9cf7.
+- Golden fixture inspected and fresh-process unblessed repeat passed, bytes unchanged.
+- Switch release d1e5392: 8140cab97427, resident3440640 B, build succeeded with41 source-located warning headers.
+- Switch diag d1e5392: 5030f68f93bf, resident3780608 B, build succeeded with40 warning headers.
+- Both complete logs/NROs/warning lists in artifacts/trainingrooms-nro-archive/slim/d1e5392-{release,diag}/.
+- Raw sloc4=104350; normalized133341 excluding scripts, -2728 versus authorized base.
+- Remaining initial gates: no-default, SMD/oracle/hos-lock own tests, seam Eden row; no READY claim.
+- Approved probe removals await completion of initial gates; exact touched-file census is above.
+- No claim/compiler/Eden currently owned; Surface no-default and Yoga SMD test queued.
+
+Surface no-default build abd0714 (docs-only since d1e5392, progress dirt) passed, zero warnings,
+3.45s, /tmp/slim/astra-no-default.log. CLAIMED16:05Z / RELEASED16:06Z.
+Removed own row and queued hos-lock crate test at tail. Yoga SMD test stays queued.
+No owned compiler/Eden or profile changes. Root host test/clippy/no-default now complete;
+standalone crate tests and runtime evidence still pending.
+
+### Standalone SMD gate — 2026-11-02 16:16Z
+Exact live worker pair reverified after compaction, gpt-6-astra/medium; watcher11182 alive.
+Yoga CLAIMED/RELEASED16:16Z; standalone SMD cargo test at frozen d1e5392 exited0:24 passed,0 failed,0 ignored, no warnings.
+Raw log /tmp/slim/astra-smd.log; generated subcrate Cargo.lock is expected new build output, not a source change.
+Oracle tests queued at Yoga tail; hos-lock remains queued on Surface. No owned compiler/Eden.
+
+Queue correction after source inspection: oracle crate has zero unit/doc tests; its public API is compiled and exercised by the24 SMD integration tests and root parity/golden tests. A standalone oracle cargo test adds no coverage, so its queued call was withdrawn before claiming. Hos-lock moved to Yoga tail (own Surface row withdrawn); Surface seam/Training Eden row appended at tail. This avoids a redundant compile. No claims held.
