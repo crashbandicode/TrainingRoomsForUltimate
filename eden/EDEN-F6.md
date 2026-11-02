@@ -50,3 +50,71 @@ live check of the state-8 functor slot passes). Then the game stalled before the
 +37 s (844 calls) after the install line, nothing for the next ~40 s; the opening movie's NVDEC line at 58.6 s console time (31.6 s in
 f6-03), which is also the console's last line; screenshots black. No group code ran. The tree lacked stream/sync (the F8 lock livelock
 fix); not attributed further. Reported; the next launch runs on the merged tree.
+
+## 2026-11-02 Astra continuation: frozen `7bdeacf`
+
+Plugin source is frozen at `7bdeacf`; diagnostic NRO SHA256
+`fd6a78bcfb54372bf082b0e9119a40447e760a29e52990120b58ffc9653bc59f`.
+Shared harness is `225d16b`; driver fixes are `ca2ab5c` (initial bank bootstrap)
+and `4f9f585` (native configuration and exact-owner completion gates).
+These Python changes do not change the plugin. All runs use muted Surface
+profile `f6`, display `:97`, under the lead's 16:09Z claim. Runtime receipts,
+console hashes, screenshots and raw diagnostic logs are retained per run.
+
+### f6-05: Kirby-first group
+
+Both initial bank entries completed, followed by eight P1 and four CPU laps.
+The first asynchronous group `[6,b,1f]` reports carried setup 4,046 us and
+split setup 4,723 us, including control scheduling 55 us. Queue work is
+1,087 us; the setup-following gap is 23,392 us. The largest gap, 146,094 us,
+follows a poll tick. The second (CPU) group `[1,7,2]` reports split setup
+81 us and largest gap 22,316 us. See `runs/f6-05/builds.json`,
+`split-table.md`, `stalls.json` and `laps.jsonl`. The Kirby screenshot was
+visually checked: Kirby/Pikachu bodies and HUD are present.
+
+**Failed health gate:** 2,072 Unmapped Read8 lines at console 75.380563–80.098743 s,
+addresses `0x50494c468b..0x50494c4692`; attribution remains open. Console SHA256
+`a54fab0e8a06cd4f6fc86a262a0dac5a0f0c1666190a1dd343704c9ff173d26f`.
+Peak observed memory 6,892,797,952 B within the 8 GiB unit. Hook allocations
+remain nonzero on this pre-R5-integration binary. This is timing evidence,
+not RC acceptance.
+
+### f6-06: rejected native baseline configuration
+
+The JSON asked for preload and bank Off, but runtime `cycle_preload_config`
+wrote defaults and overlaid the JSON: slots5/bank3/groupsOn/ready8. The model
+`boot_cache` implementing D7 has no runtime caller. The lane stopped on its
+first completion gate, preserving the failed receipt. Console Unmapped=0.
+Pkg6 owns fixing this production wiring; seeding an INI below is only a
+controlled experiment on the frozen binary, not a product fix.
+
+### f6-08: native reload, explicit Off JSON and INI
+
+The startup line confirms slots0/bank0/groupsOff. The first reload physically
+completed at diagnostic #307 through `MiiOrdinaryPlayer`, but the old driver
+expected `CharacterRoster complete` and retained a failed receipt. After
+checking the exact-owner adapter's readiness/publication/release boundary,
+`4f9f585` accepts its role-matched ready event only with `released=true`.
+The same boot then completed seven P1 and four CPU continuation laps; the
+original failed attempt remains in `laps.jsonl`, and the two driver logs
+are separate. No claim that the original driver attempt passed.
+
+Kirby native loading has a 273,654 us P1 entry-tick stall at loader11, with
+the CPU simultaneously reporting 273,682 us. This demonstrates a loading
+stall with asynchronous bank construction disabled; it does not attribute
+every poll gap to one native function. Console Unmapped=0. The run was
+stopped and collected before the next boot. Final F6 acceptance still needs
+ordinary-first evidence, R5 zero, zero-Unmapped proof and integrated gates.
+
+### f6-07: ordinary-first precondition failure
+
+The route's early owner-observation gate passed before the initial Training
+reset and startup notice. The immediately sent first bootstrap chord did not
+start a reload; no queued/ready event followed, so the driver stopped. The
+notice was delivered later at diagnostic #254, after both owners and the reset
+hub. Bootstrap now requires that delivery before any input; a regression
+rejects owner-observed-but-notice-absent fixtures. All nine driver tests pass.
+No timing acceptance from this run. Console Unmapped=0. It was stopped and
+collected, then the profile's single original NRO was restored and its full
+SHA256 set compared to source g. Surface released 16:38Z with zero Eden
+processes remaining. The ordinary-first row requeues behind existing work.

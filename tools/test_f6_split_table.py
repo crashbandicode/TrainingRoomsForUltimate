@@ -23,6 +23,20 @@ LOG = """\
 
 
 class SplitTable(unittest.TestCase):
+    def test_native_reload_stalls_do_not_require_a_bank_build(self):
+        lines = ["12 [BuildSplit] stall owner=0 gap_us=174700 loader=10 outer=3 installed=0 changing=1 count=3 kinds=[6, b, 1f] flags=0x4",
+                 "13 [BuildSplit] stall owner=1 gap_us=60000 loader=11 outer=3 installed=1 changing=0 count=1 kinds=[8] flags=0x0"]
+        self.assertEqual(t.parse(lines), [])
+        stalls = t.parse_stalls(lines)
+        self.assertEqual(stalls[0], dict(owner=0, gap_us=174700, loader=10, outer=3,
+                                        installed=0, changing=1, count=3, kinds=[6, 11, 31], flags=4))
+        self.assertEqual(stalls[1]["owner"], 1)
+        self.assertIn("| 0 | 174700 | 10 | 3 | 0 | 1 | [6, b, 1f] |", t.stall_table(stalls))
+
+    def test_absent_stall_line_is_not_reported_as_zero_gap(self):
+        self.assertEqual(t.parse_stalls(LOG.splitlines()), [])
+        self.assertIn("not a zero-gap measurement", t.stall_table([]))
+
     def setUp(self):
         self.builds = t.parse(LOG.splitlines())
 

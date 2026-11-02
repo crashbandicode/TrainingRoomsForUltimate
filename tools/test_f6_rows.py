@@ -14,25 +14,38 @@ spec.loader.exec_module(rows)
 
 
 class Rows(unittest.TestCase):
-    def run_rows(self, native, complete, prefetch=True):
+    def run_rows(self, native, complete, prefetch=True, bootstrap=False, observed=True, native_off=True, delivered=True):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "route.py").touch()
             diag = root / "practice-diagnostics.log"
             diag.write_text("[GroupSwap] prefetched\n" if prefetch else "")
+            if native and native_off:
+                with diag.open("a") as stream:
+                    stream.write("[CyclePreload] loaded slots=0 fighters=true bank_members=0 group_swap=false\n")
+            if bootstrap and observed:
+                with diag.open("a") as stream:
+                    stream.write("[CharacterRoster] observed owner=0\n[CharacterRoster] observed owner=1\n")
+            if bootstrap and delivered:
+                with diag.open("a") as stream:
+                    stream.write('[PreloadStatus] delivered text=Some("Swap both once to load")\n')
             presses = []
 
             def press(buttons, hold):
                 presses.append(buttons)
                 if complete:
                     with diag.open("a") as stream:
-                        stream.write("[CharacterRoster] queued owner=0\n[CharacterRoster] complete owner=0 kind=0x6\n")
+                        role = 0 if buttons == "zl,right" else 1
+                        stream.write(f"[CharacterRoster] queued owner={role}\n")
+                        event = "[CharacterRoster] complete" if native else "[BodyBank] ready"
+                        stream.write(f"{event} owner={role} kind=0x6\n")
 
             session = types.SimpleNamespace(press=press, t=types.SimpleNamespace(shot=lambda name: root / (name + ".png")))
             modules = {"params": types.SimpleNamespace(load=lambda: types.SimpleNamespace(data_dir=root)),
                        "route": types.SimpleNamespace(session=lambda *_: session)}
             args = argparse.Namespace(harness=str(root), label="f6-99", native_reload=native,
-                                      settle=15, p1=2, cpu=0, gap=6)
+                                      settle=15, p1=1 if bootstrap else 2, cpu=1 if bootstrap else 0,
+                                      gap=6, bootstrap=bootstrap)
             ticks = iter(range(0, 10000, 5))
             error = None
             with patch.dict("sys.modules", modules), patch.object(rows, "HERE", root), \
@@ -42,7 +55,7 @@ class Rows(unittest.TestCase):
                     rows.laps(args)
                 except SystemExit as exc:
                     error = str(exc)
-            receipt = root / "runs/f6-99/laps.jsonl"
+            receipt = root / "runs/f6-99" / ("bootstrap.jsonl" if bootstrap else "laps.jsonl")
             records = [json.loads(line) for line in receipt.read_text().splitlines()] if receipt.exists() else []
             return presses, records, error
 
@@ -50,6 +63,29 @@ class Rows(unittest.TestCase):
         presses, records, error = self.run_rows(False, False, prefetch=False)
         self.assertEqual((presses, records), ([], []))
         self.assertIn("no prefetched group", error)
+
+    def test_bootstrap_requires_observed_roles_and_bank_completion_before_laps(self):
+        presses, records, error = self.run_rows(False, True, prefetch=False, bootstrap=True)
+        self.assertIsNone(error)
+        self.assertEqual(presses, ["zl,right", "zl,left"])
+        self.assertEqual([r["phase"] for r in records], ["bootstrap", "bootstrap"])
+        self.assertEqual([r["role"] for r in records], [0, 1])
+
+    def test_bootstrap_stops_on_missing_body_without_sending_cpu_cycle(self):
+        presses, records, error = self.run_rows(False, False, prefetch=False, bootstrap=True)
+        self.assertEqual(presses, ["zl,right"])
+        self.assertIsNone(records[0]["done"])
+        self.assertIn("GATE FAIL", error)
+
+    def test_bootstrap_refuses_an_unobserved_role(self):
+        presses, records, error = self.run_rows(False, True, prefetch=False, bootstrap=True, observed=False)
+        self.assertEqual((presses, records), ([], []))
+        self.assertIn("was not observed", error)
+
+    def test_bootstrap_waits_for_training_notice_not_just_early_owner_observation(self):
+        presses, records, error = self.run_rows(False, True, bootstrap=True, delivered=False)
+        self.assertEqual((presses, records), ([], []))
+        self.assertIn("notice was not delivered", error)
 
     def test_missing_completion_retains_failure_and_stops(self):
         presses, records, error = self.run_rows(False, False)
@@ -64,6 +100,18 @@ class Rows(unittest.TestCase):
         self.assertEqual(len(presses), 2)
         self.assertEqual(len(records), 2)
         self.assertTrue(all("[CharacterRoster] complete owner=0" in row["done"] for row in records))
+
+    def test_native_baseline_refuses_unproved_off_configuration(self):
+        presses, records, error = self.run_rows(True, True, native_off=False)
+        self.assertEqual((presses, records), ([], []))
+        self.assertIn("Off was not observed", error)
+
+    def test_native_owner_ready_requires_matching_role_and_released_lease(self):
+        line = "536782616 #307 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 2, entry: 76769632256, sequence: 1 } target=0x2d index=0 resource=[00] released=true saved_files_written=false"
+        self.assertTrue(rows.native_complete(line, 0))
+        self.assertFalse(rows.native_complete(line, 1))
+        self.assertFalse(rows.native_complete(line.replace("released=true", "released=false"), 0))
+        self.assertFalse(rows.native_complete(line.replace("] ready ticket=", "] bank ready ticket="), 0))
 
 
 if __name__ == "__main__":
