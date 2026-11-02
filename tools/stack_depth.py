@@ -165,9 +165,83 @@ def check_table(funcs, rows):
     return lines, bad
 
 
+HOOK_RE = re.compile(r"#\[(?:skyline::)?hook\(")
+
+
+def hook_names(src_root):
+    """(fn name, file stem) of every `#[skyline::hook]` function under src/runtime."""
+    import os
+    out = []
+    for d, _, files in os.walk(os.path.join(src_root, "src/runtime")):
+        for name in sorted(files):
+            if not name.endswith(".rs"):
+                continue
+            lines = open(os.path.join(d, name), encoding="utf-8").read().split("\n")
+            for i, line in enumerate(lines):
+                # A C-ABI function the game or another plugin calls (callbacks, the native service dispatch, functors).
+                m = re.search(r'extern\s+"C"\s+fn\s+([A-Za-z_]\w*)\s*\(', line)
+                if m and "fn(" not in line.replace(" ", "")[:line.replace(" ", "").find("fn" + m.group(1))]:
+                    out.append((m.group(1), name[:-3]))
+                if HOOK_RE.search(line):
+                    for nxt in lines[i + 1:i + 8]:
+                        m = re.search(r"\bfn\s+([A-Za-z_]\w*)", nxt)
+                        if m:
+                            out.append((m.group(1), name[:-3]))
+                            break
+    return out
+
+
+def hook_roots(funcs, hooks):
+    """Function addresses of the hooks: Skyline's hook macro exports each under its bare name (`T cpu_sdi_hook`)."""
+    by_name = {f["name"]: f["addr"] for f in funcs.values()}
+    roots = {}
+    for fn, stem in hooks:
+        if fn in by_name:
+            roots.setdefault(by_name[fn], (fn, stem))
+    return roots
+
+
+def reachable(funcs, roots):
+    """Every function a direct path from a root reaches, with one root that reaches it."""
+    seen = {}
+    for r in roots:
+        stack = [r]
+        while stack:
+            a = stack.pop()
+            if a in seen:
+                continue
+            seen[a] = r
+            stack.extend(funcs[a]["calls"])
+    return seen
+
+
+def hook_budget(funcs, hooks, limit):
+    """Lines and failures: every function reachable from a hook whose own frame exceeds `limit`."""
+    roots = hook_roots(funcs, hooks)
+    seen = reachable(funcs, roots)
+    over = sorted((a for a in seen if funcs[a]["frame"] > limit), key=lambda a: -funcs[a]["frame"])
+    lines = [f"{len(roots)} hook functions, {len(seen)} reachable functions, limit {limit} B"]
+    for a in over:
+        lines.append(f"{funcs[a]['frame']:7d} {funcs[a]['name'][:150]}  (from hook {roots[seen[a]][0]})")
+    return lines, len(over)
+
+
 def main():
     elf, cmd = sys.argv[1], sys.argv[2]
     funcs = analyse(elf)
+    if cmd == "hooks":
+        # python3 -I tools/stack_depth.py <elf> hooks [--limit N] [--deepest K]: frames over N reachable from a hook (exit 1),
+        # and the K deepest hooks.
+        limit = int(sys.argv[sys.argv.index("--limit") + 1]) if "--limit" in sys.argv else 8192
+        hooks = hook_names(".")
+        lines, bad = hook_budget(funcs, hooks, limit)
+        print("\n".join(lines))
+        if "--deepest" in sys.argv:
+            k = int(sys.argv[sys.argv.index("--deepest") + 1])
+            depths = sorted(((deepest(funcs, a)[0], n) for a, (n, _) in hook_roots(funcs, hooks).items()), reverse=True)
+            for d, n in depths[:k]:
+                print(f"deepest {d:7d} {n}")
+        sys.exit(1 if bad else 0)
     if cmd == "frames":
         n = int(sys.argv[sys.argv.index("--min") + 1]) if "--min" in sys.argv else 4096
         for f in sorted(funcs.values(), key=lambda f: -f["frame"]):

@@ -122,6 +122,7 @@ unsafe fn r68_on_continuation(payload:Option<([u8;0x70],bool)>,selected:usize) {
 }
 #[no_mangle]
 unsafe extern "C" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {
+    crate::runtime::threads::headroom("mii_ordinary_gate_decide");
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if super::super::mii_ordinary_cpu::tracked(entry) {
         let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);

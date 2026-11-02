@@ -28,7 +28,12 @@ where
 }
 
 #[cfg(feature = "diag")]
-pub use diag::{boot_begin, boot_end, report};
+pub use diag::{boot_begin, boot_end, headroom, report};
+
+/// Diag builds: record the stack room left at a hook or callback entry (`[HookStack]` lines). The shipped build: nothing.
+#[cfg(not(feature = "diag"))]
+#[inline(always)]
+pub fn headroom(_site: &'static str) {}
 
 #[cfg(feature = "diag")]
 mod diag {
@@ -163,22 +168,84 @@ mod diag {
         ));
     }
 
-    /// The heartbeat's step: one `high_water` line per live thread whose mark grew since its last line.
+    /// The heartbeat's step: one `high_water` line per live thread whose mark grew since its last line, then one
+    /// `[HookStack]` line per hook or callback site whose smallest entry room shrank since its last line.
     pub fn report() {
-        let mut live = LIVE.lock();
-        for slot in live.iter_mut().flatten() {
-            let used = thread_stacks::used(slot.size, untouched(slot.base, slot.base + slot.size));
-            if used > slot.reported {
-                slot.reported = used;
-                line("high_water", slot, used);
+        {
+            let mut live = LIVE.lock();
+            for slot in live.iter_mut().flatten() {
+                let used = thread_stacks::used(slot.size, untouched(slot.base, slot.base + slot.size));
+                if used > slot.reported {
+                    slot.reported = used;
+                    line("high_water", slot, used);
+                }
             }
+        }
+        let mut heads = HEADS.lock();
+        for head in heads.iter_mut().flatten() {
+            if head.min_free < head.reported {
+                head.reported = head.min_free;
+                diagnostic(format_args!(
+                    "[HookStack] site={} calls={} min_free={} stack={:#x} base={:#x}",
+                    head.name, head.calls, head.min_free, head.stack, head.base
+                ));
+            }
+        }
+    }
+
+    /// One hook or callback site: how often it ran and the least stack room it found at entry (SP minus the bottom of the
+    /// region holding SP), with that region.
+    #[derive(Clone, Copy)]
+    struct Head {
+        name: &'static str,
+        calls: u64,
+        min_free: usize,
+        stack: usize,
+        base: usize,
+        reported: usize,
+    }
+
+    const HEAD_SLOTS: usize = 96;
+    static HEADS: Mutex<[Option<Head>; HEAD_SLOTS]> = Mutex::new([None; HEAD_SLOTS]);
+
+    /// Record the room left below the stack pointer at the entry of `site` (a game thread's stack, or a fiber's).
+    pub fn headroom(site: &'static str) {
+        let here = sp();
+        let mut heads = HEADS.lock();
+        let index = match heads.iter().position(|h| h.is_some_and(|h| h.name == site)) {
+            Some(i) => i,
+            None => match heads.iter().position(Option::is_none) {
+                Some(i) => {
+                    heads[i] = Some(Head { name: site, calls: 0, min_free: usize::MAX, stack: 0, base: 0, reported: usize::MAX });
+                    i
+                }
+                None => return,
+            },
+        };
+        let Some(head) = heads[index].as_mut() else { return };
+        head.calls += 1;
+        // The region of the last minimum is reused while SP lies in it; another stack (thread, fiber) is queried.
+        let (base, size) = if head.base <= here && here < head.base + head.stack {
+            (head.base, head.stack)
+        } else {
+            match region(here) {
+                Some((base, size, _)) => (base, size),
+                None => return,
+            }
+        };
+        let free = here - base;
+        if free < head.min_free {
+            head.min_free = free;
+            head.base = base;
+            head.stack = size;
         }
     }
 
     static BOOT: Mutex<Option<Slot>> = Mutex::new(None);
 
-    /// `boot::run`'s first step: measure the thread Skyline runs `main` on.
+    /// `boot::run`'s first step: measure the thread Skyline runs `main` on, and register the hook-entry probe.
     pub fn boot_begin() {
+        let _ = crate::model::hook_stats::ENTRY_PROBE.set(headroom);
         *BOOT.lock() = start("boot", 0);
     }
 

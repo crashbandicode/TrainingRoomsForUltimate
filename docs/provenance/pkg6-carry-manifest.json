@@ -1377,7 +1377,14 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "22718f1f019e6106de8ce88cf4daa53abebf8a69fa9f8f0b9d8802d2d80003ee"
+   "dest_sha256": "0282b287309623abd29a9dc1132f339962133fb313e357db81d7dc042943311b",
+   "edits": [
+    {
+     "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
+     "new": "    context: &ServiceEntryContext,\n) -> u64 {\n    crate::runtime::threads::headroom(\"native_service\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/native_unlink_install.rs",
@@ -1391,7 +1398,14 @@
    "dest": "src/runtime/roster/character_lifecycle.rs",
    "crate": "root",
    "src_sha256": "d3dc2989eabad2608dfa0841828103b3f8c32ce709426c57b6b9197d0a3af453",
-   "dest_sha256": "374796ae64082db4e925e88986c15829f77d243959bab34dacb3bf81e0f7d672"
+   "dest_sha256": "3a22de13ecf4536d73bfced0bdc28f6ebe61de16b4761917eee9ed73ac060eac",
+   "edits": [
+    {
+     "old": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"destruction_trace\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/character_roster.rs",
@@ -1471,14 +1485,33 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "fdd8959105a2044865a0e4c7214ddc1cc7e3358ea363c0ca72d8a6985d71c916"
+   "dest_sha256": "9f98de93c21def149c577ff438609fdb689bee955667245679f14fdc08193750",
+   "edits": [
+    {
+     "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
+     "new": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n    crate::runtime::threads::headroom(\"finalize_entry\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/native_source_capacity.rs",
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "09d353f9631a27b058b3869da23d167ec28fc06de6666b6331bd1cf18d897fbb"
+   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "edits": [
+    {
+     "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn listener_removed(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"listener_removed\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/effect_hook_chain.rs",
@@ -1642,7 +1675,19 @@
    "dest": "src/runtime/mii/mii_hud_portrait.rs",
    "crate": "root",
    "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
-   "dest_sha256": "5832ced6c12f6efe582ec72f9a4258947e670c0362fab2b9e42ee366dd237210"
+   "dest_sha256": "c851ef702240c0a8900b88715091d0cdaccd3673e0d8fa6dc86fb3ea00b085cc",
+   "edits": [
+    {
+     "old": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_before_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_after_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/mii_ldn_qualification.rs",
@@ -1708,7 +1753,14 @@
    "dest": "src/runtime/mii/mii_ordinary_gate.rs",
    "crate": "root",
    "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
-   "dest_sha256": "ce2644f46ccf0ef9b36d16ba90051baaf6e4ba29ed471b193267836eb2d72418"
+   "dest_sha256": "a173c7a5b9aa12c2689339b4fcf66eaaeb17d85b076f2f49290155f3471fb718",
+   "edits": [
+    {
+     "old": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n",
+     "new": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_native.rs",

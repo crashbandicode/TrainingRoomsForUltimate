@@ -129,6 +129,7 @@ unsafe fn reload_trace(ctx: &mut InlineCtx) {
 
 #[skyline::hook(offset = 0x652174, inline)]
 unsafe fn destruction_trace(ctx: &mut InlineCtx) {
+    crate::runtime::threads::headroom("destruction_trace");
     crate::runtime::roster::practice_trace::event(32, [ctx.registers[0].x(), ctx.registers[30].x(), 0, 0, 0]);
     crate::runtime::roster::hang_trace::DESTROY.hit();
     let entry = ctx.registers[0].x() as *const u8;

@@ -194,9 +194,18 @@ impl HookScope {
     pub fn enter_hook(id: HookId) -> Self {
         ENTRIES[id as usize].fetch_add(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
+        #[cfg(feature = "diag")]
+        if let Some(probe) = ENTRY_PROBE.get() {
+            probe(id.name());
+        }
         HookScope
     }
 }
+
+/// Diag builds: called with the hook's name at every `HookScope` entry (the runtime registers its stack-room probe,
+/// `runtime::threads::headroom`; stream/stack). Absent from the shipped build.
+#[cfg(feature = "diag")]
+pub static ENTRY_PROBE: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
 impl Drop for HookScope {
     fn drop(&mut self) {
