@@ -480,9 +480,16 @@ pub struct Image {
 }
 
 #[cfg(test)]
+impl Default for Image {
+    fn default() -> Image {
+        Image { regions: Vec::new() }
+    }
+}
+
+#[cfg(test)]
 impl Image {
     pub fn new() -> Image {
-        Image { regions: Vec::new() }
+        Image::default()
     }
     pub fn region(&mut self, base: usize) -> &mut Vec<u8> {
         self.regions.push((base, Vec::new()));
