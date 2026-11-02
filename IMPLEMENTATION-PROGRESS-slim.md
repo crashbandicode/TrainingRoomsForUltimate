@@ -1568,3 +1568,94 @@ Canonical predecessor RELEASED23:43Z on Yoga; own old queue row removed. No clai
 Read PRIMARY critical-path/rabbit-hole rules and queue PRIORITY OVERRIDE. Continuing remaining owned
 native/clippy/no-default gates on frozen4b86500; no duplicate host run or new counter tooling.
 Lead23:40 fixed4b86500 integration acknowledged; no main edits. Shared runtime rows remain integration-bound.
+
+## tr-w-slim-2 restart-safe checkpoint 2026-11-02T23:49:24.9390919+00:00
+Objective remains ACTIVE: complete slim stream and mark READY only after all done criteria.
+Branch stream/slim, product4b86500, prior docs commit3999c12. No product changes by successor.
+Inherited single uncommitted progress file was fully diff-reviewed, preserved and committed in3999c12.
+Authoritative current criteria: TRAININGROOMS-RC-ACCEPTANCE.md; normalized RC ratchet,
+next-version111400 target is not RC blocker, exactly two hos-lock L2 allows approved.
+Remaining three large_enum_variant allowances are NOT approved. Configuration proposal cb5af6f2
+remains DEFERRED; successor asked lead for bounded ownership at23:45:51 in LEAD-INBOX.
+No subdelegation under stream brief; do not independently spawn workers.
+
+Model gate: exact thread01a19ea3-9209-72e3-a32c-a2cfd6953ac0 Astra/medium.
+Owner1369096 watcher1371483 stayed armed, will be reaped before yield; rearm one after rechecking model.
+Playbook ae87443 ff-only pull current; personally read README, all7docs, PROVENANCE.
+Routing/MY_MODEL/streambrief/STREAM-RULES/queue PRIORITY OVERRIDE and latest PRIMARY rabbit-hole
+request read. Handoff/progress large reads had truncation: before PRODUCT edits finish/recheck omitted
+progress chunks around lines300-330 and640-665 and handover initial part. BUILD/DECISIONS/MENU-DRAFT/
+implementation-packages/TEMPLATE/RC-ACCEPTANCE read fully. CARRY-OVER and applicable specs still need
+successor personal read before new product edits; do not substitute predecessor read.
+Initial bootstrap reads/watcher setup preceded discovery of command memory/time rule and were unbounded;
+all subsequent commands bounded. No compile admission bypass. Large outputs caused context pressure;
+next continuation should read bounded small ranges and avoid dumping histories.
+
+Recovered predecessor Yoga host:
+- scope run-p2156000-i10533692.scope inactive/dead; cargo/rustc and predecessor SSH controller absent.
+- cargo test --all-targets0,23:28:21..23:29:57Z,96.635s,1185 sourcefiles unchanged.
+- raw a96cfda42331262e65db0651f6cf5cd7e22822bec7407325854fe88b5404a26a;75executedbinaries hashed.
+- actual_adapter_preserves_storage_and_exclusive_lifetime PASS host.log4891. This is SDK-double
+  protocol/allocation evidence, NOT actual SDK first-use runtime.
+- collected rawlog/job/source manifests; canonical predecessor RELEASED23:43Z, old queue row removed.
+Fresh gates on SAME immutable4b86500 source/unique originally-empty target:
+- diag0,54.025s, raw84b9a89eca70ab358fd5aac7ef85965ee0105932a611f188b389c11d2c4a9f30,
+  NRO3025915dab0a36d2f68a5385621f2d7244249d6a7bd559f6ac114cec563302a2,
+  ELF8d97e1013165792102fad334268927110953dcc3af1494c194c6465b3126cf4d.
+  Both fetched and hashverified;31ANSI-stripped warningheaders retained, NOT zero-warning.
+- clippy --all-targets -- -D warnings0,23.236s,raw2f4a8ac84465584c764cd021daa045f1396bc27e2bae162c5ad8b0e55a3afe32;zero warnings.
+- build --no-default-features0,2.131s,rawf6b64ac018d2ae3ae3e359bfb8fc42f61bcf9c8b6c6ab937215d2ea9367b9cc5.
+Every gate1185sourcefiles unchanged, cgrouppeak and ordered logs in job receipts.
+Each ONE cargo per claim,6G1800/incremental0/ext4TMPDIR, reaped before release.
+Archive root /home/intpa/smash-training-lobby/artifacts/trainingrooms-nro-archive/slim/4b86500-{host,diag,clippy,no-default}.
+Latest own canonical Yoga RELEASED23:47Z. No claim/compiler/Eden/profile held.
+Release admission refused twice BEFORECLAIM because pkg6 104ffef was ahead; raw assertion available
+in tool output. No release build ran. Own unclaimedrelease queue row withdrawn before yield.
+
+Static exact4b diag: stack/table.txt exit0; Menu32384/57344. budget.txt134roots0over.
+MiiCatalog stale table symbol yields no-shim despite real catalog code; do not claim fully covered.
+stack/keyboard.txt explicit SDKcallback roots: changed544,moved544,entered768,cancel/init/finished0;
+open1200,poll496,close32, direct static lowerbounds ONLY (SDK/indirect not followed).
+Whole cold-owner graph, actual SDK/runtime zero allocation and integrated acceptance still owed.
+No new gate tooling or source audits beyond acceptance checks; existing stack_depth.py read/reused.
+
+Live source locations:
+Yoga /home/intpa/trainingrooms-build-slim-astra/4b86500/src, target sibling target.
+Remote host-4b86500.py/build-4b86500.py/matrix-4b86500.py retain ordered receipts and source hashes.
+Local ext4 /home/intpa/smash-training-lobby/tmp-slim/successor-yoga-admit.py and successor-yoga-release.py
+are existing predecessor adapters with owner01a19ea3 and updated census label.
+Read fully before reuse; admission text contains census56.591GB from23:44 and MUST refresh before
+futuregrowth. Fresh census receipts4b86500-preflight/successor-cache-*.json:
+Surface17178468961 +Yoga13342630919 +Ally26069881398 =56590981278B,2GBreserve.
+Existing /tmp/slim/census-all.py and cache-census-linux.py read fully; use only for required admission,
+not repeated rearchive. Preserve current target while gates ongoing; retire once work finishes withmanifest.
+Scratch/TMPDIR ext4; watcher is tiny native-temp bootstrap artifact, next arm should use ext4TMPDIR.
+
+Exact next steps:
+1. Model/routing recheck; one owner-bound hidden watcher; read latest LEAD-INBOX and queue.
+2. Finish personal source/spec read gaps before product changes; keep Configuration held unless lead routes it.
+3. Fresh census/admission then ONE release: bounded local pwsh invokes
+   /usr/bin/python3 -I /home/intpa/smash-training-lobby/tmp-slim/successor-yoga-admit.py release
+   and ssh memento-claw-yoga-ubuntu systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout1800
+   /usr/bin/python3 -I /home/intpa/trainingrooms-build-slim-astra/4b86500/build-4b86500.py
+   /home/intpa/trainingrooms-build-slim-astra/4b86500/release.log skyline build --release
+   (spell timeout and1800 as separate arguments). Reap then successor-yoga-release.py release;
+   fetch release binaries to4b86500-release/binaries and verify against binaries.json.
+4. COREmatrix/editor-only and crate continuity/gates as required; use existing matrix runner
+   after reading it; no new tool. Required release compliance.py and nro_size.py read before execution.
+5. Continue approved lint roots through exact carry transforms. Lead main efa5b26 already integrated4b;
+   never editmain or merge movingheads. UI/pkg4 own shared warnings/stackcandidate, pkg6 F9.
+6. Coordinate actual Mii/keyboard + seam/install/all-hook-zero/0Unmapped rows on fixed integrated candidate.
+   Do not repeat old helper boots while held or infer SDK/runtime success from host/static checks.
+7. Resolve every compliance row honestly and mark READY ONLY when all required scope gates close.
+No push/tag/release/card/DBI/USB/OpenCode. Goal not complete; no READY written.
+
+### Watcher correction at checkpoint
+Stop-Process1371483 reported Cannot find a process with the process identifier1371483.
+The saved status remained armed, but that is not proof of continuous liveness. Earlier checkpoint
+wording stayed armed refers only to the saved status, NOT verified live polling. Lifetime coverage
+is unverified; no process remains to reap. Exact-thread final live-turn recheck still Astra/medium.
+Next continuation must launch via an owner-bound hidden systemd user service (not a short-lived
+tool process tree), verify actual PID liveness, and stop it before yield. Do not repeat the failed
+Start-Process lifetime assumption. No model drift was observed, but continuous watcher compliance
+cannot be claimed for this turn.
