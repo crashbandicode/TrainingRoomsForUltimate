@@ -15,7 +15,6 @@ pub mod kirby;
 #[cfg(test)]
 #[path = "../model/lobby/mod.rs"]
 pub mod lobby;
-#[cfg(test)]
 #[path = "../model/mii/mod.rs"]
 pub mod mii;
 #[cfg(test)]
