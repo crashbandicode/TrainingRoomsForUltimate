@@ -14,7 +14,7 @@ use crate::model::developer_ini;
 use crate::model::capabilities::{self, Granted};
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
-use crate::model::settings::{self, Settings};
+use crate::model::settings::Settings;
 use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;

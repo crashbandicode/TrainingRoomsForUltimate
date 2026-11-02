@@ -34,7 +34,6 @@ use crate::model::cpu::settings::CpuSettings;
 use crate::model::cpu::state::Cpu;
 use crate::model::cpu::status::Situation;
 use crate::model::lra_reset::{self, HubStep};
-use crate::model::settings::Snapshot;
 use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::{HookId, HookScope};
