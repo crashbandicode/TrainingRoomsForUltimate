@@ -29,7 +29,7 @@ def main():
     tail = r6.ps(f"$l = (Get-Content '{r6.SD}\\events.log' | Select-String -Pattern 'result=' | Select-Object -Last 1).Line; "
                  "$l.Substring([Math]::Max(0, $l.Length - 160))").strip()
     r6.row("install line whole: ends result=installed heap_allocations=0", "result=installed heap_allocations=0" in tail, tail[-120:] or "none")
-    w = r6.W.Walk(PHASE, pilot_present=True)
+    w = r6.W.Walk(PHASE, pilot_present=True, developer=True)
     # Character Cycles: Mario then Donkey Kong into the Player list, then ZR and Mario into the CPU list.
     w.keys("w10")
     w.open()
