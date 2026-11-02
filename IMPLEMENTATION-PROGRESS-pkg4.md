@@ -193,3 +193,11 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
 - Release dead-code warnings in this layer: 37 (named_macros 22, replay_capture 10, port 3, replay_preview 2): the screen entry points package 5's screens call
   (on_pad, open_library, export_record_slot, browser_view, clip_view ...), the fork's legacy pair (remember_legacy/take_legacy) and position_wait_timed_out
   (package 3's position retry would call it).
+### Lead items 1-5 (2026-11-02 ~13:1xZ), commit 708647b
+- Merged work/implementation 566780a. Byte meter test: a child process of the test binary (exact; the meter is process-wide and the binary runs the
+  model's unit tests on other threads). practice: one owner each, agreed with pkg6 A (stream/pkg6 5e0fab3): waiting -> scene::current()==Lobby,
+  primary_cpu -> recorder::is_primary_cpu_body, panel_entry back in pkg6's practice.rs (every live entry in native Training, as the fork). Deleted:
+  Legacy/remember_legacy/take_legacy, position_wait_timed_out (recorded edits).
+- BLOCKED: the Switch build lacks practice::panel_entry until 5e0fab3 is in this tree; asked the lead: merge stream/pkg6 (conflicts in the pkg4
+  manifest/ledger, hook_stats.rs, macros/diag.rs, from stream/stack) or wait for the integrator. Queue line on the Yoga is marked NOT READY.
+- Next after that: local Switch release+diag, then the Yoga turn (build + s4-08) as in the handoff above.
