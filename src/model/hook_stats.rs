@@ -60,6 +60,12 @@ pub enum HookId {
     RosterPreload,
     PracticeLease,
     StateFrame,
+    /// Package 4 S4-4, nested the same way: the recorder's AI epilogue and P1 poll stages, the named layer's once-per-frame services
+    /// (keyboard, character request, panel hold, clip reload) and its save-state restore follow-up.
+    RecorderAi,
+    RecorderPoll,
+    NamedService,
+    NamedRestore,
     /// ui-screens, nested in the UI and input hooks so the menu's own allocations are charged to the step that made them (the lead's
     /// menu-open attribution, 2026-11-02): the menu's input adapter (open, close, presses), the tick's menu draw (panes, text), the stage
     /// grid's thumbnails, and any call a hook still makes into package 4's named-macro panel model (design C: none should remain).
@@ -108,6 +114,10 @@ impl HookId {
         HookId::RosterPreload,
         HookId::PracticeLease,
         HookId::StateFrame,
+        HookId::RecorderAi,
+        HookId::RecorderPoll,
+        HookId::NamedService,
+        HookId::NamedRestore,
         HookId::MenuInput,
         HookId::MenuDraw,
         HookId::MenuThumbs,
@@ -149,6 +159,10 @@ impl HookId {
             HookId::RosterPreload => "roster_preload",
             HookId::PracticeLease => "practice_lease",
             HookId::StateFrame => "state_frame",
+            HookId::RecorderAi => "recorder_ai",
+            HookId::RecorderPoll => "recorder_poll",
+            HookId::NamedService => "named_service",
+            HookId::NamedRestore => "named_restore",
             HookId::MenuInput => "menu_input",
             HookId::MenuDraw => "menu_draw",
             HookId::MenuThumbs => "menu_thumbs",

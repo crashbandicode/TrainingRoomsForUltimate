@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use smash::app::{utility, BattleObjectModuleAccessor, Fighter};
 
 use crate::runtime::clock;
-use crate::runtime::features::recorder;
 
 /// A fact older than this is stale (two UI polls of the menu worker, a few frames of the game).
 pub const FRESH_MS: u64 = 250;
@@ -27,7 +26,9 @@ static CPU_KIND: AtomicI32 = AtomicI32::new(NO_KIND);
 /// Called from the frame wrapper of the primary CPU body (`cpu` is that body's live accessor), the game thread.
 pub unsafe fn publish_frame_facts(cpu: &mut BattleObjectModuleAccessor) {
     READY_GO.store(Fighter::is_ready_go(), Ordering::Release);
-    PRESENT.store(recorder::body_of(0).is_some(), Ordering::Release);
+    // Package 6's provider is the one implementation of practice is acquired (both practice bodies present, native Training or lobby
+    // practice): it reads the game here, on the game thread, and the worker reads the answer (lead, 2026-11-02 merge ruling).
+    PRESENT.store(crate::runtime::lobby::training::practice::acquire(), Ordering::Release);
     CPU_KIND.store(utility::get_kind(cpu), Ordering::Release);
     STAMP_MS.store(clock::uptime_ms().max(1), Ordering::Release);
 }

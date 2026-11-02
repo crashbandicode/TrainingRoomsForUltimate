@@ -1,0 +1,10 @@
+{
+ "root": "/home/intpa/trainingrooms-eden-u4b",
+ "profile": "u4b",
+ "owner": "Claude 0caa72b8/u4b",
+ "display": ":95",
+ "label_re": "u4b-\\d{2}",
+ "unit": "tru4b",
+ "aside": "plugins-set-aside-trainingrooms-u4b",
+ "desc": "u4b (resident effect textures on picture panes)"
+}

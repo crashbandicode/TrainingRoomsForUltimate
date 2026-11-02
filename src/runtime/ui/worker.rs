@@ -9,6 +9,7 @@ use std::thread::Thread;
 
 use hos_lock::Mutex;
 
+use crate::model::frame::Frame;
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::editors::clip::clip_frame;
@@ -20,7 +21,7 @@ use crate::model::menu::{Env, Menu, Screen};
 use crate::model::settings::Settings;
 use crate::model::screens::{frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{chords, input_delay, notices, writer};
+use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{external, requests};
@@ -177,6 +178,9 @@ fn run() {
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
+        // A settings publish (this thread's commit, or the diag reload) noted a roster re-plan: it runs here, on a thread, not in the
+        // publish and never in a game hook (stream/stack).
+        crate::runtime::compat::menu::run_roster_change();
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
         sync_panels(&mut session);
@@ -212,7 +216,7 @@ fn handle(code: u8, s: &mut Session) {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
-        crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(true);
+        crate::runtime::ui::menu_app::note_open();
         publish_frame(s);
         diagnostic(format_args!("[Ui] menu opened"));
         return;
@@ -442,9 +446,8 @@ fn close(menu: &mut Menu) {
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
-    crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(false);
+    crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
-    let _ = input_delay::clear;
 }
 

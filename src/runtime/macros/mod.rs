@@ -24,8 +24,32 @@ pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
 pub(crate) mod replay_store;
 
-// The fork's `training` names the carried files reach through `super::`.
-pub(crate) use port::{input_record, lobby, practice, save_states};
+// The fork's `training` names the carried files reach through `super::`: package 6's practice session and lobby facade, the recorder
+// (`port::input_record`) and the save-state flag of package 3.
+pub(crate) use crate::runtime::lobby::training::{lobby, practice};
+pub(crate) use port::input_record;
+
+/// The fork's `save_states` as the named layer and the clip preview call it: package 3's own functions, and the preview restore, which
+/// package 3 does not provide yet (`install_report` names it).
+pub(crate) mod save_states {
+    pub(crate) use crate::runtime::features::states::cancel_pending;
+    pub(crate) use crate::runtime::lobby::training::save_states::is_loading;
+
+    /// Restore the saved state; the restore's completion calls `recorder::on_state_restored`, which starts the named macro.
+    pub(crate) fn request_macro_restore() -> Result<(), &'static str> {
+        crate::runtime::features::states::request_load();
+        Ok(())
+    }
+
+    /// The clip preview's temporary setup restore (a restore of the clip's own start state, then the saved state again).
+    pub(crate) fn request_preview_restore(_start: bool) -> Result<(), &'static str> {
+        Err("Native preview is unavailable until the preview restore is provided")
+    }
+
+    pub(crate) fn finish_preview_restore() {}
+
+    pub(crate) fn end_preview_restore() {}
+}
 
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::published;
@@ -75,14 +99,20 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    step(11);
     live_replay::before_frame(fighter);
+    step(12);
     replay_capture::before_frame(fighter);
+    step(13);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
-        if practice::primary_cpu(module) {
+        if crate::runtime::features::recorder::is_primary_cpu_body(module) {
+            step(14);
             named_macros::observe_playback_before(module);
+            step(15);
             replay_preview::before_frame(module);
         }
     }
+    step(0);
 }
 
 /// The same fighter's frame, after the game's on-frame function.
@@ -95,25 +125,53 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    step(21);
     live_replay::after_frame(fighter);
+    step(22);
     replay_capture::after_frame(fighter);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
-        named_macros::hold_panel_fighter(module);
-        if practice::primary_cpu(module) {
+        step(23);
+        {
+            let _scope = HookScope::enter_hook(HookId::NamedService);
+            named_macros::hold_panel_fighter(module);
+        }
+        step(24);
+        if crate::runtime::features::recorder::is_primary_cpu_body(module) {
+            step(25);
             named_macros::observe_playback_start(module);
+            step(26);
             replay_preview::after_frame(module);
+            step(27);
             named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
             crate::runtime::ui::facts::publish_frame_facts(module);
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
+            step(28);
+            let _scope = HookScope::enter_hook(HookId::NamedService);
             named_macros::service_keyboard();
+            step(29);
             named_macros::service_character();
+            step(30);
             replay_capture::service_reload();
+            step(31);
             sync_owner();
             #[cfg(feature = "diag")]
-            diag::run_pending();
+            {
+                step(32);
+                diag::run_pending();
+                diag::frame_done();
+            }
         }
     }
+    step(0);
+}
+
+/// Diag build: the step of the layer's per-fighter work in progress (0: none), so the diag thread's watchdog can say where a stalled
+/// game thread stopped (s4-07: a stall after a cross-fighter macro load).
+#[inline(always)]
+fn step(_n: u8) {
+    #[cfg(feature = "diag")]
+    diag::STEP.store(_n, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// After the Training layout drew (the UI tick, once per drawn frame): the clip editor's held scrub repeats (the layer's `after_draw`).

@@ -95,6 +95,18 @@ pub struct RowLine {
     pub value_tone: Tone,
 }
 
+/// The effect visual of the direction chips.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChipVisual {
+    /// The clean room's own arrow chips (Airdodge Direction, Shield Tilt; and DI / SDI while the game's visual is not available).
+    #[default]
+    None,
+    /// DI Direction: the game's `sys_vector`.
+    Di,
+    /// SDI Direction: the game's `sys_hitstop_spark`.
+    Sdi,
+}
+
 /// What fills the area right of the divider.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum View {
@@ -148,6 +160,8 @@ pub struct Frame {
     /// Weight of each chip (array index order of options::DIRECTIONS) and the focused chip.
     pub chip_weights: [u8; super::panes::CHIPS],
     pub chip_focus: u8,
+    /// Which of the game's own effect visuals the chips draw (SPEC-core-07 section 4.6): DI and SDI only, the other grids keep the arrows.
+    pub chip_visual: ChipVisual,
     /// The tile grid: its geometry, the labels of the tiles on this page and the focused tile.
     pub tile_cols: u8,
     pub tile_rows: u8,
@@ -191,6 +205,7 @@ impl Frame {
             view: View::List,
             chip_weights: [0; super::panes::CHIPS],
             chip_focus: 0,
+            chip_visual: ChipVisual::None,
             tile_cols: 0,
             tile_rows: 0,
             tiles: [Text::new(); super::panes::TILES],
