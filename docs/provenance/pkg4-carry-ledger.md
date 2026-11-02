@@ -7,7 +7,7 @@ file in this repository. Rows with root `smd` come from the standalone `smash-ma
 
 | Here | Fork path | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |
 | --- | --- | --- | --- | --- |
-| `src/model/macros/capture_archive.rs` | `training_mod_macros/src/capture_archive.rs` | `dbfdf217e08fe142` | `fef476e670524caa` | path rewrite only |
+| `src/model/macros/capture_archive.rs` | `training_mod_macros/src/capture_archive.rs` | `dbfdf217e08fe142` | `11367d7e007dd4fa` | clippy 1.98 chunks_exact_to_as_chunks (zero warnings without an allow): the same pairs through as_chunks |
 | `src/model/macros/capture_toggle.rs` | `training_mod_macros/src/capture_toggle.rs` | `aa0f6a4b6440d708` | `ba76aa883c4b2dcc` | path rewrite only |
 | `src/model/macros/live_capture.rs` | `training_mod_macros/src/live_capture.rs` | `61ae1a33ce4e7880` | `166b7619197e057e` | path rewrite only |
 | `src/model/macros/live_frame.rs` | `training_mod_macros/src/live_frame.rs` | `a4f6894336d120ba` | `d1da961f019dc3af` | path rewrite only |
@@ -15,7 +15,7 @@ file in this repository. Rows with root `smd` come from the standalone `smash-ma
 | `src/model/macros/recording.rs` | `training_mod_macros/src/recording.rs` | `7f611cd67f13b8c4` | `0f101398a5f56c52` | path rewrite only |
 | `src/model/macros/replay.rs` | `training_mod_macros/src/replay.rs` | `b04adf37bf6ab0c2` | `db396b5d2d7bd0c5` | path rewrite only |
 | `src/model/macros/shared_capture.rs` | `training_mod_macros/src/shared_capture.rs` | `46093f8256ff444e` | `f5a43c2d99d21a44` | path rewrite only |
-| `src/model/macros/ui_anchor.rs` | `training_mod_macros/src/ui_anchor.rs` | `3e4118ca933404e4` | `3e4118ca933404e4` | path rewrite only |
+| `src/model/macros/ui_anchor.rs` | `training_mod_macros/src/ui_anchor.rs` | `3e4118ca933404e4` | `71e828686eb57061` | clippy 1.98 chunks_exact_to_as_chunks: the same words through as_chunks |
 | `src/model/macros/window.rs` | `training_mod_macros/src/window.rs` | `a2318a537296bac6` | `67c037aff31049b9` | path rewrite only |
 | `src/model/macros/test_util.rs` | `training_mod_macros/src/test_util.rs` | `84136e6677ec3bd0` | `1fc1c266a299cc34` | path rewrite only |
 | `src/model/macros/recording/tests.rs` | `training_mod_macros/src/recording/tests.rs` | `d08afc313059da5a` | `2b3e2272db2d832e` | path rewrite only |
@@ -42,3 +42,10 @@ file in this repository. Rows with root `smd` come from the standalone `smash-ma
 | `crates/smash-match-data/tests/review_correctness.rs` | `tests/review_correctness.rs` | `a41ec6c0f09f90e8` | `a41ec6c0f09f90e8` | copied unchanged |
 | `crates/smash-match-data/tests/review_precision.rs` | `tests/review_precision.rs` | `a0c731af298c9231` | `a0c731af298c9231` | copied unchanged |
 | `crates/smash-match-data/tests/review_selection.rs` | `tests/review_selection.rs` | `f7b3cc06f2be605d` | `f7b3cc06f2be605d` | copied unchanged |
+| `src/runtime/macros/named_macros.rs` | `src/training/named_macros.rs` | `737474479d5f05b0` | `825cc266f2d635cc` | path rewrite only |
+| `src/runtime/macros/replay_store.rs` | `src/replay_store.rs` | `2324718b32e3b8dc` | `35ab66f9dc748257` | path rewrite only |
+| `src/runtime/macros/replay_capture.rs` | `src/replay_capture.rs` | `f8966f890350ab12` | `6cf1c683aad578e3` | path rewrite only |
+| `src/runtime/macros/replay_preview.rs` | `src/replay_preview.rs` | `5f07d12a75122ef2` | `87299a2fed13497b` | path rewrite only |
+| `src/runtime/macros/replay_move_start.rs` | `src/replay_move_start.rs` | `6928d6d9c4f28092` | `92b663f6ef4dedb2` | path rewrite only |
+| `src/runtime/macros/live_replay.rs` | `src/live_replay.rs` | `fd955747dc9d40bc` | `1f82bfbf0d6b39c9` | path rewrite only |
+| `src/runtime/macros/capture_plugin.rs` | `src/capture_plugin.rs` | `abecd53b34b45b43` | `37145188ef58d662` | path rewrite only |

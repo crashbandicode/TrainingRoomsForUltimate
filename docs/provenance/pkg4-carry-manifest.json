@@ -13,6 +13,36 @@
   },
   "mii": {
    "*": "crate::engine::mii"
+  },
+  "root": {
+   "replay_store": "crate::runtime::macros::replay_store",
+   "replay_capture": "crate::runtime::macros::replay_capture",
+   "replay_preview": "crate::runtime::macros::replay_preview",
+   "replay_move_start": "crate::runtime::macros::replay_move_start",
+   "live_replay": "crate::runtime::macros::live_replay",
+   "capture_plugin": "crate::runtime::macros::capture_plugin",
+   "training::named_macros": "crate::runtime::macros::named_macros",
+   "training::practice": "crate::runtime::macros::port::practice",
+   "training::input_record": "crate::runtime::macros::port::input_record",
+   "training::save_states": "crate::runtime::macros::port::save_states",
+   "training::ui::notifications": "crate::runtime::macros::port::notifications",
+   "training::recording_or_playback": "crate::runtime::macros::port::recording_or_playback",
+   "common": "crate::runtime::macros::port::common",
+   "native_keyboard": "crate::runtime::macros::port::native_keyboard",
+   "character_roster": "crate::runtime::macros::port::character_roster",
+   "logging": "crate::runtime::macros::port::logging",
+   "native_fields": "crate::engine::seams::native_fields",
+   "input": "crate::runtime::macros::port::input",
+   "consts": "crate::runtime::macros::port::consts",
+   "swap_native": "crate::runtime::macros::port::swap_native"
+  },
+  "consts": {
+   "mii": "crate::engine::mii",
+   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
+   "*": "crate::runtime::macros::port::consts"
+  },
+  "sync": {
+   "*": "crate::runtime::macros::port::sync"
   }
  },
  "files": [
@@ -21,7 +51,14 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "fef476e670524caafdc1c28a6bd89af00d9e40cd26a38b9c5f240385c7098acf"
+   "dest_sha256": "11367d7e007dd4faabb03fc4c3ff007f81e509becdfe4370caedc531686fc70b",
+   "edits": [
+    {
+     "old": "file_id.as_bytes().chunks_exact(2) {",
+     "new": "file_id.as_bytes().as_chunks::<2>().0 {",
+     "reason": "clippy 1.98 chunks_exact_to_as_chunks (zero warnings without an allow): the same pairs through as_chunks"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/capture_toggle.rs",
@@ -77,7 +114,14 @@
    "dest": "src/model/macros/ui_anchor.rs",
    "crate": "macros",
    "src_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684",
-   "dest_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684"
+   "dest_sha256": "71e828686eb57061dc83d0ae5d64f331c0fe05950f4896af064157710995f0e6",
+   "edits": [
+    {
+     "old": "        .chunks_exact(4)\n        .map(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]))",
+     "new": "        .as_chunks::<4>()\n        .0\n        .iter()\n        .map(|w| u32::from_le_bytes(*w))",
+     "reason": "clippy 1.98 chunks_exact_to_as_chunks: the same words through as_chunks"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/window.rs",
@@ -399,6 +443,55 @@
    "root": "smd",
    "src_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db",
    "dest_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db"
+  },
+  {
+   "src": "src/training/named_macros.rs",
+   "dest": "src/runtime/macros/named_macros.rs",
+   "crate": "root",
+   "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
+   "dest_sha256": "825cc266f2d635cca8c261cb35ae0892a9bff82e89454a4979290f69ec108b38"
+  },
+  {
+   "src": "src/replay_store.rs",
+   "dest": "src/runtime/macros/replay_store.rs",
+   "crate": "root",
+   "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
+   "dest_sha256": "35ab66f9dc748257b13b169a93d2ea194329597f152346725254578582c53a7a"
+  },
+  {
+   "src": "src/replay_capture.rs",
+   "dest": "src/runtime/macros/replay_capture.rs",
+   "crate": "root",
+   "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
+   "dest_sha256": "6cf1c683aad578e3bfa396ca0d61ce4e90ee5360b5871ee7f83a496fe9ea0b91"
+  },
+  {
+   "src": "src/replay_preview.rs",
+   "dest": "src/runtime/macros/replay_preview.rs",
+   "crate": "root",
+   "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
+   "dest_sha256": "87299a2fed13497b5c81eafb8a9b4c961e32e74ff005a1beb67e41263e3e36ec"
+  },
+  {
+   "src": "src/replay_move_start.rs",
+   "dest": "src/runtime/macros/replay_move_start.rs",
+   "crate": "root",
+   "src_sha256": "6928d6d9c4f28092707a7d3eaa7de71a3b544b087bf04cc3f49bdc6d13ff9534",
+   "dest_sha256": "92b663f6ef4dedb2aa3ee557d9f805756bf6bf35ab59f38e4bb881834637377b"
+  },
+  {
+   "src": "src/live_replay.rs",
+   "dest": "src/runtime/macros/live_replay.rs",
+   "crate": "root",
+   "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
+   "dest_sha256": "1f82bfbf0d6b39c9393c0150036ba7c3865d8932fb1c0db1d3924b1631f436df"
+  },
+  {
+   "src": "src/capture_plugin.rs",
+   "dest": "src/runtime/macros/capture_plugin.rs",
+   "crate": "root",
+   "src_sha256": "abecd53b34b45b43797cd1a29ddb44e1e1a4af4acc28177e7b175c15fd4a1117",
+   "dest_sha256": "37145188ef58d662519066ab357d88882f1b58badb38cf1cb6e9f8812866b092"
   }
  ]
 }

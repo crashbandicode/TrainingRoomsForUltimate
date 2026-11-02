@@ -764,7 +764,7 @@ pub(crate) fn decode_file_id(file_id: &str) -> Result<String, &'static str> {
         return Err("capture file id must be even-length lowercase hex for 1..=96 bytes");
     }
     let mut decoded = Vec::with_capacity(file_id.len() / 2);
-    for pair in file_id.as_bytes().chunks_exact(2) {
+    for pair in file_id.as_bytes().as_chunks::<2>().0 {
         let high = hex_nibble(pair[0]).ok_or("capture file id is not lowercase hex")?;
         let low = hex_nibble(pair[1]).ok_or("capture file id is not lowercase hex")?;
         decoded.push((high << 4) | low);
