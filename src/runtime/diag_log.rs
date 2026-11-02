@@ -294,13 +294,31 @@ fn report_drops() {
     }
 }
 
+/// Drain ticks (50 ms each) between two `hook_stats` samples in a diag build: 10 seconds.
+#[cfg(feature = "diag")]
+const HOOK_STATS_TICKS: u32 = 200;
+
 /// The drain thread: every 50 ms it moves buffered lines to the card. A 64 KiB stack, named. If it
 /// cannot be created, callers keep writing synchronously (SPEC-core-01 §7).
 pub fn start_drain_thread() {
     let spawned = std::thread::Builder::new().name("tr-heartbeat".into()).stack_size(64 * 1024).spawn(|| {
         writer_started();
+        #[cfg(feature = "diag")]
+        let (mut observer, mut ticks) = (crate::model::hook_stats::Observer::new(), 0u32);
         loop {
             drain();
+            // Diag builds only (review R5): every `HOOK_STATS_TICKS` drains, one `hook_stats` line if
+            // any hook ran or allocated since the previous line. This thread is not a hook, so its own
+            // work is never counted. The shipped build has no such line.
+            #[cfg(feature = "diag")]
+            {
+                ticks += 1;
+                if ticks % HOOK_STATS_TICKS == 0 {
+                    if let Some(observation) = observer.observe(crate::model::hook_stats::snapshot()) {
+                        diagnostic(format_args!("{observation}"));
+                    }
+                }
+            }
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     });

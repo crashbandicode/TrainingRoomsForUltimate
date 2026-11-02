@@ -15,6 +15,8 @@ pub mod diag_ring;
 pub mod factory;
 #[path = "model/guard.rs"]
 pub mod guard;
+#[path = "model/hook_stats.rs"]
+pub mod hook_stats;
 #[path = "model/input_delay.rs"]
 pub mod input_delay;
 #[path = "model/install_line.rs"]

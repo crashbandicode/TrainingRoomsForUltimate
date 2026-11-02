@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use skyline::hooks::InlineCtx;
 
 use crate::model::stage_hazards::{self, HOOK_SITE_OFFSET};
-use crate::runtime::alloc::HookScope;
+use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::{game, published};
 
 /// Absolute address of the rule byte, set at boot from the guarded instruction pair.
@@ -18,7 +18,7 @@ pub fn set_flag_address(address: usize) {
 
 #[skyline::hook(offset = HOOK_SITE_OFFSET, inline)]
 pub unsafe fn hazard_rule(_ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter(HookId::HazardRule);
     let flag = FLAG.load(Ordering::Acquire);
     if flag == 0 {
         return;
