@@ -82,11 +82,14 @@ def ledger(line):
 
 
 def open_claims():
+    """Open claims of other owners on this host. The ledger is shared by every host's owners: a claim whose
+    line names the Surface or the Ally and not the Yoga holds another host (their own Eden, no effect here)."""
     state = {}
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
         if m:
-            state[m.group(2)] = m.group(1) == "CLAIMED"
+            elsewhere = bool(re.search(r"Surface|Ally|dreamland-ally", line)) and "Yoga" not in line
+            state[m.group(2)] = m.group(1) == "CLAIMED" and not elsewhere
     return [k for k, v in state.items() if v and k != OWNER]
 
 

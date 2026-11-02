@@ -2,7 +2,7 @@
  "root": "/home/intpa/trainingrooms-eden-r1",
  "profile": "r1",
  "owner": "Claude 0caa72b8/r1fix-eden",
- "display": ":97",
+ "display": ":98",
  "label_re": "r1-\\d{2}",
  "unit": "trr1",
  "aside": "plugins-set-aside-trainingrooms-r1",
