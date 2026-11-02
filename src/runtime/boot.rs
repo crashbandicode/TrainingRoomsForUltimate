@@ -280,6 +280,10 @@ fn run_inner() {
     let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
     let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
     let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
+    // F9: the No. of CPUs field the cycle's Training sources depend on is read only when the game's own root load, reader and pause
+    // menu writer are the 13.0.5 instructions (the rows name it in the install line otherwise; then Training admits no source: the
+    // shipped preload-off path).
+    roster::set_cpu_quantity_guarded(roster::CPU_QUANTITY_ROWS.iter().all(|name| own_row_usable(name)));
     if roster_on {
         init_roster_cycle();
     } else {

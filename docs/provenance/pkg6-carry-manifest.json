@@ -1426,7 +1426,14 @@
    "dest": "src/runtime/roster/native_source.rs",
    "crate": "root",
    "src_sha256": "d2032bebfb4f473403e59ba25632d2000ba80efb17de006d9d13bff2dad4767b",
-   "dest_sha256": "fe28b0dbb5a3b96a40e91f36d00365f506cd7d98c3314707d6de11bd1c94ebb6"
+   "dest_sha256": "fad462e82528a32a4c84b5f2c3bdb4d28d953f0b33f8d48724a033a29b125c31",
+   "edits": [
+    {
+     "old": "pub unsafe fn training_cpu_quantity() -> Option<u32> {\n    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {",
+     "new": "pub unsafe fn training_cpu_quantity() -> Option<u32> {\n    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0\n        || !crate::runtime::roster::cpu_quantity_guarded() {",
+     "reason": "F9 (lead ruling 2026-11-02): the pointer path from main+0x52c3420 to the pause menu's No. of CPUs (+0xb40) is a relied-on game layout; it is read only when the game's own root load (main+0x1416c70), reader (main+0x1417030) and the pause menu's writer (main+0x13e8648) passed their 64-byte guards (sites_pkg6 `roster_cpu_quantity_*`). Without them the count is unknown, which every caller already treats as 'not one visible CPU' (no Training source: the preload-off path)"
+    }
+   ]
   },
   {
    "src": "src/native_gc_guard.rs",
@@ -1596,7 +1603,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "7261a8121d80490640efcc8222614725ab5851ac699a2d431c11384c9e929e0a",
+   "dest_sha256": "ef6111c7990dd71487cc9de4f77e735d50ea0e9df267fdd304cf3a686d199195",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -1607,6 +1614,11 @@
      "old": "pub unsafe fn legacy_training_owner_reserved(",
      "new": "#[cfg(feature = \"source-owner-probe\")]\npub unsafe fn legacy_training_owner_reserved(",
      "reason": "diag code out of the shipped NRO (D11): the only caller is the diag probe `source_owner_probe` (feature `source-owner-probe`); with `reserved` removed (automations are keyed by role) nothing in the release build calls it"
+    },
+    {
+     "old": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    let is_capacity=is_capacity_entry(entry,slot);\n",
+     "new": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an\n    // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).\n    #[cfg(feature = \"diag\")]\n    {\n        static SEEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);\n        let quantity = native_source::training_cpu_quantity().unwrap_or(u32::MAX - 1);\n        if SEEN.swap(quantity, Ordering::Relaxed) != quantity {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[CharacterSources] cpu_quantity={quantity} seen_by_service slot={slot}\"));\n        }\n    }\n    let is_capacity=is_capacity_entry(entry,slot);\n",
+     "reason": "diag only (F9 research, lead ruling 2026-11-02): proves whether the native loader callback runs while the pause menu is open, i.e. whether the give-back can run there before the game activates a parked CPU entry"
     }
    ]
   },
