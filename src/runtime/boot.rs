@@ -6,13 +6,12 @@
 //! the provider plugins, the menu, the notifications.
 
 use std::fs;
-use std::io::Read;
 
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
-use crate::model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
@@ -43,6 +42,7 @@ pub fn run() {
             verdict,
             sites: &[],
             features: &[],
+            developer: None,
             settings: None,
             migration: None,
             heap_allocations: Some(hook_allocations()),
@@ -62,7 +62,8 @@ pub fn run() {
     if let Err(error) = fs::create_dir_all(storage::ROOT) {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
-    published::set_developer_page(read_developer_ini().developer_page);
+    let developer = read_developer_ini();
+    published::set_developer_page(developer.developer_page);
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
@@ -148,6 +149,7 @@ pub fn run() {
         verdict,
         sites: &reports,
         features: &features,
+        developer: Some(DeveloperReport { on: developer.developer_page, reason: developer.reason.text() }),
         settings: Some(SettingsReport {
             input_delay: loaded.menu.input_delay(),
             lra_reset: loaded.menu.lra_reset(),
@@ -230,16 +232,13 @@ fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&
     }
 }
 
+/// `developer.ini` through the one validated loader (`developer_ini::load`): it fails closed, and the
+/// install line reports the outcome (`developer=on|off reason=…`).
 fn read_developer_ini() -> developer_ini::DeveloperIni {
-    let Some(path) = FixedPath::<128>::in_root(storage::file::DEVELOPER_INI) else {
-        return developer_ini::DeveloperIni::default();
-    };
-    let Ok(file) = fs::File::open(path.as_str()) else {
-        return developer_ini::DeveloperIni::default();
-    };
-    let mut bytes = Vec::new();
-    let _ = file.take(developer_ini::MAX_BYTES as u64).read_to_end(&mut bytes);
-    developer_ini::parse(&bytes)
+    match FixedPath::<128>::in_root(storage::file::DEVELOPER_INI) {
+        Some(path) => developer_ini::load(path.as_str()),
+        None => developer_ini::DeveloperIni::default(),
+    }
 }
 
 /// Read `settings.json` (or the fork's file name, once) on a thread with a 128 KiB stack, joined here
