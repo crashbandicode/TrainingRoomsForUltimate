@@ -1292,3 +1292,15 @@ retainedremote5b/final-retirement; localmanifest/receipt5b40bac-final-retirement
 NextfreezeMERGEDsourceintoNEWownsource+EMPTYtarget; native diag first, audit
 actualKeyboardopening reachability withoutforcedretention; thenallgates.
 NoEden/profile/helperboot. Constructorpath issue remainsinvestigation, notfixclaim.
+
+
+## First composed native failure / rect adapter correction22:48Z
+8201cd4diagFAILcargo101/27.301s,1184sourcehashesunchanged, rawSHA
+202a0966a3aa587d975147752f5671690b375ce579bd0e6fc85885debc18fa66.
+Verbatim error: error[E0061]: this function takes 4 arguments but 7 arguments were supplied
+--> src/model/ui/panes.rs:366:70
+IncomingITEM_ICON armcallsrect(name,0.0,0.0,64.0,64.0,[255;4],false);
+slim'sexistinghelperaccepts [x,y,w,h]. Adaptedonecalltoarray [0.0,0.0,64.0,64.0],
+allvalues/color/visibilityunchanged. No layout/newbehavior orlintallow.
+Claimreleased22:47, nojob/Eden/profile. NewsourcewillgetNEWemptytarget;
+failed820targetretirewithmanifest first. Existinglogandfrozencopyretained.

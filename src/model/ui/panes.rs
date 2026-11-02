@@ -363,7 +363,7 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
-        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, 0.0, 0.0, 64.0, 64.0, [255; 4], false),
+        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
