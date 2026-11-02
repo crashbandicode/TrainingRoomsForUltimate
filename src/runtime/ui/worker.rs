@@ -220,10 +220,12 @@ fn handle(code: u8, s: &mut Session) {
         return;
     }
     s.refusal = None;
+    probe_close(10);
     let panel = s.phase == Phase::Panel;
     let closed = {
         let Some(m) = s.menu.as_mut() else { return };
         m.set_console(console_mode());
+        probe_close(11);
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
             external::press_panel(button);
@@ -236,6 +238,7 @@ fn handle(code: u8, s: &mut Session) {
                 stage_press(m, tile, button, &mut s.refusal);
             }
         }
+        probe_close(12);
         m.is_closed()
     };
     if closed {
@@ -406,7 +409,7 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
 #[inline]
 fn probe_close(step: u8) {
     #[cfg(feature = "diag")]
-    diagnostic(format_args!("[Ui] probe close {step}"));
+    crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe close {step}"));
     let _ = step;
 }
 

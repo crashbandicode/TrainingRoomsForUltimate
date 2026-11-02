@@ -79,6 +79,8 @@ pub fn on_p1_poll(holder: usize) {
     }
     let mut any = false;
     for button in step.presses() {
+        #[cfg(feature = "diag")]
+        crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe input push {button:?}"));
         worker::push_press(button);
         any = true;
     }

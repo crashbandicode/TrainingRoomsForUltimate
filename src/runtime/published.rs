@@ -17,7 +17,7 @@ static HUD: AtomicBool = AtomicBool::new(true);
 #[inline]
 fn probe(step: u8) {
     #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!("[Ui] probe publish {step}"));
+    crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe publish {step}"));
     let _ = step;
 }
 

@@ -101,6 +101,10 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let mut showing = open || ext;
     if CLOSING.load(Ordering::Acquire) {
         let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
+        #[cfg(feature = "diag")]
+        if count <= 2 || count == CLOSE_FRAMES {
+            crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe tick closing count={count}"));
+        }
         if count >= CLOSE_FRAMES {
             CLOSING.store(false, Ordering::Release);
             INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
