@@ -12,8 +12,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use parking_lot::Mutex;
 
 use crate::model::input_delay::Owners;
-use crate::model::menu::chord::Chord;
 use crate::model::adapter::{Adapter, Style};
+use crate::runtime::features::chords;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{CLOSING, OPEN, PAUSE_ACTIVE};
 use crate::runtime::ui::worker;
@@ -56,7 +56,7 @@ pub fn on_p1_poll(holder: usize) {
     let open = OPEN.load(Ordering::Acquire);
     let closing = CLOSING.load(Ordering::Acquire);
     let allowed = !PAUSE_ACTIVE.load(Ordering::Acquire) && !closing;
-    let shortcuts = [Chord::DEFAULT_SHORTCUT_1, Chord::NONE];
+    let shortcuts = chords::shortcuts();
     let step = adapter.poll(buttons, style, open, allowed, shortcuts);
     if step.open {
         adapter.resync(buttons, style);

@@ -33,19 +33,17 @@ use crate::model::cpu::rng::Rng;
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
-use crate::model::lra_reset;
 use crate::model::recording::{
-    ChordAction, ControlCtx, Ended, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ChordAction, ControlCtx, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
-#[cfg(feature = "diag")]
-use crate::model::recording::LoadAction;
 use crate::model::settings::Snapshot;
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::features::{chords, cpu, input_display, notices};
+use crate::runtime::features::{chords, cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
 use crate::runtime::published;
+use crate::runtime::scene;
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 static SETTINGS: Mutex<RecorderSettings> = Mutex::new(RecorderSettings::factory());
@@ -237,7 +235,8 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 }
 
 unsafe fn on_ai_frame(ai: usize) {
-    if ai == 0 || !game::is_training_mode() {
+    // Native Training or an active lobby practice (the hot swap check below stops the recorder).
+    if ai == 0 || !(scene::is_native_training() || scene::lobby_active()) {
         return;
     }
     let controller = ((ai + AI_CONTROLLER_FIELD) as *const usize).read();
@@ -318,11 +317,9 @@ unsafe fn on_ai_frame(ai: usize) {
     let state = REC.lock().playback_state(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
-    // Interim HUD tick (package 5 moves these two calls to the layout's tick).
+    // The input log's in-game frame counters tick here, with the CPU body's frame; the HUD tick is the layout's
+    // (`features::hud_draw`).
     input_display::tick_frame();
-    let owners = published::input_owners();
-    input_display::hud_tick(owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE));
-    notices::hud_tick();
     report_counts();
 }
 
@@ -364,21 +361,9 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 
 /// The record and playback chords (SPEC-input-01 §2.2): consumed on the CPU body's frame.
 unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
-    // Eden stand-ins (diag build only, removed when packages 3 and 5 own these): the save-state chords stand
-    // for "a save state was restored" and for the menu's shortcut edit.
-    #[cfg(feature = "diag")]
-    {
-        if chords::consume(Request::SaveState) {
-            on_state_restored(false);
-        }
-        if chords::consume(Request::LoadState) {
-            let result = chords::commit_shortcut(1, crate::model::menu::chord::Chord((1 << 2) | (1 << 3)));
-            crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] standin shortcut_edit slot=2 chord=X+Y result={result:?}"));
-        }
-    }
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
-    if cpu::save_loading() {
+    if states::is_loading() {
         // Both chords are consumed and ignored while a save state loads (§6.4).
         return;
     }
@@ -415,7 +400,7 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
         Some(RecordRefusal::P1DrivenByAi)
     } else if natives::fighter_entry(0) == 0 {
         Some(RecordRefusal::FightersMissing)
-    } else if cpu::save_loading() {
+    } else if states::is_loading() {
         Some(RecordRefusal::SaveStateLoading)
     } else {
         None
@@ -454,9 +439,7 @@ pub fn request_playback(start: PlaybackStart) {
 }
 
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
-/// settings. `saved_on_ledge` is the saved situation. Package 3 will call it once per restore; until that
-/// caller exists the Eden stand-in below does (diag build only), so the release build has no dead code.
-#[cfg(feature = "diag")]
+/// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
 pub fn on_state_restored(saved_on_ledge: bool) {
     let settings = *SETTINGS.lock();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
@@ -489,6 +472,15 @@ pub fn replay_editor_occupied() -> bool {
 /// A replay capture is loading (S4-4's clip loader; false until that layer exists).
 pub fn replay_capture_loading() -> bool {
     false
+}
+
+/// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
+/// recording in progress is not touched.
+pub fn interrupt_playback() {
+    if REC.lock().mode() == Mode::Playback {
+        stop();
+        event("playback_interrupt", "mash", 1, "", 0);
+    }
 }
 
 /// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset

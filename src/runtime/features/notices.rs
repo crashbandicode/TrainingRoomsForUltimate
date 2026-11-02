@@ -1,10 +1,9 @@
 //! HUD notifications, the runtime half (SPEC-input-05): the queue every feature posts to, the Combo
 //! Display copy, and the stale-moves toggle. The queue itself is `model::notify`.
 //!
-//! Where the panes are written: the notice slot `TrModDisp0` lives in the plugin's own layout
-//! (package 5, SPEC-core-05). Until that anchor exists, `hud_tick` is called once per CPU frame by the
-//! recorder's hook (`interim tick`) and the draw goes to the diagnostics only; package 5 moves the call
-//! to the layout's tick and fills `draw`. Nothing else changes.
+//! Where the panes are written: the notice slot `TrModDisp0` lives in the plugin's own layout (package 5,
+//! SPEC-core-05). `hud_tick` runs once per tick of that layout (`features::hud_draw`, a draw package 5's tick
+//! calls), which writes the answer into the panes.
 //!
 //! * `Combo Display` is copied at the game's own two load sites (`combo_display_a`, `combo_display_b`):
 //!   the value only, no pointer is kept (SPEC-input-05 §6.1). It resets to "enabled" on session clear.
@@ -17,13 +16,17 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use parking_lot::Mutex;
 use skyline::hooks::InlineCtx;
 
-use crate::model::notify::{Body, Draw, Queue, TickOut, DEFAULT_COLOR};
+use crate::model::cpu::advantage::{format_advantage, Tint, NOTIFICATION_FRAMES};
+use crate::model::notify::{Body, Queue, TickOut, DEFAULT_COLOR};
 use crate::model::recording::{Phase, NOTICE_HEADER};
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::{game, published};
+use crate::runtime::{published, scene};
 
 static QUEUE: Mutex<Queue> = Mutex::new(Queue::new());
+
+/// The frame-advantage notification's title.
+const FRAME_ADVANTAGE_HEADER: &str = "Frame Advantage";
 
 /// 0 / 1 as copied from the game, 2 = not seen (enabled).
 static COMBO_DISPLAY: AtomicU8 = AtomicU8::new(2);
@@ -59,7 +62,7 @@ pub unsafe fn combo_display_b(ctx: &mut InlineCtx) {
 pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
     let menu = ctx.registers[22].x() as usize;
-    if menu != 0 && game::is_training_mode() {
+    if menu != 0 && scene::is_native_training() {
         ((menu + 0xb60) as *mut u8).write(1);
     }
 }
@@ -126,22 +129,21 @@ pub fn hud_tick() -> TickOut {
             crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] notice_visible={} menu_open={menu_open}", out.visible));
         }
     }
-    if let Some(draw) = out.draw {
-        write_panes(&draw);
-    }
     out
 }
 
-/// Write the notice's header, body and colour into `TrModDisp0Header` / `TrModDisp0Txt`. The panes are
-/// package 5's layout (SPEC-core-05); until then the draw is logged by the diag build.
-fn write_panes(draw: &Draw) {
-    #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!(
-        "[TrainingRooms] notice_draw header={:?} body={:?} color={:?}",
-        draw.header,
-        draw.body.as_str(),
-        draw.color
-    ));
-    #[cfg(not(feature = "diag"))]
-    let _ = draw;
+/// The plugin's layout was registered again: the notice showing is written to the panes again.
+pub fn on_layout_registered() {
+    QUEUE.lock().on_layout_registered();
+}
+
+/// The frame-advantage notification (SPEC-cpu-07 §2): it clears every other notification, then shows the signed
+/// number for 60 frames in its colour class.
+pub fn post_frame_advantage(advantage: i32) {
+    let mut text = [0u8; 12];
+    let len = format_advantage(advantage, &mut text);
+    let (r, g, b, a) = Tint::of(advantage).rgba();
+    let mut queue = QUEUE.lock();
+    queue.clear();
+    queue.post(FRAME_ADVANTAGE_HEADER, Body::copied(std::str::from_utf8(&text[..len]).unwrap_or("")), NOTIFICATION_FRAMES as u16, [r, g, b, a]);
 }
