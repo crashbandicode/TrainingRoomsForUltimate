@@ -1,92 +1,143 @@
-//! F9 (fix ledger; lead ruling 2026-11-02): Training's parked CPU entries and the roster cycle's helper sources.
-//!
-//! Native Training keeps CPU entries 2 and 3 parked beside the visible 0 and 1; the cycle's source book admits a helper fighter into
-//! a parked entry only while the pause menu's No. of CPUs is 1 (the fork's rule, `qualified_backend`). Raising the count makes the
-//! game activate entries 2..=count with whatever body they hold, so a helper left there showed as the extra CPU (Eden s6-04). This
-//! is the decision the source book takes on each entry's native loader callback: an owned helper in an entry the count makes live is
-//! given back (the entry is reinstalled with the native fighter it held before the helper, captured at admission), unless a consumer
-//! still leases it (then it waits for the release). Pure and host-tested; the runtime half is in `runtime::roster::character_sources`.
+//! F9 operator decision B (2026-11-02): delay the native count store while a
+//! newly included parked seat still belongs to the helper loader. This model
+//! owns intent only. Cancelling it must never cancel an already-started reload.
 
-/// The Training entries the cycle may use as helpers (the fork's `CALLBACK_SLOTS` for Training).
 pub const PARKED: [u32; 2] = [2, 3];
 
-/// What the loader callback of a parked entry does with an owned helper.
+/// Fresh observations, not retained authority to dereference a native address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EntryAction {
-    /// Nothing to do: not Training, not a parked entry, no helper, or the entry stays parked.
-    Keep,
-    /// The count made this entry live: reinstall the native fighter before the game shows the helper.
-    GiveBack,
-    /// The entry is live but the helper is leased (a Kirby hat or an item uses it) or its native fighter is unknown: retry on the
-    /// next callback.
-    Wait,
+pub struct Observation<E> {
+    pub epoch: E,
+    pub menu: usize,
+    pub count: u32,
+    pub open: bool,
 }
 
-/// Whether the source book may admit a new helper in Training: exactly one visible CPU (the fork's rule; an unknown count, e.g. its
-/// guards failed, admits nothing: the preload-off path).
-pub fn admits(quantity: Option<u32>) -> bool {
-    quantity == Some(1)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Request<E> {
+    before: Observation<E>,
+    desired: u32,
 }
 
-/// Whether the count makes `slot` a live CPU entry (CPU entries are 1..=count).
-pub fn live(quantity: Option<u32>, slot: u32) -> bool {
-    quantity.is_some_and(|count| slot >= 1 && slot <= count)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Setter {
+    /// Let the complete native feedback/store/pane path execute once.
+    Continue,
+    /// Return through the native epilogue before any of those effects.
+    Defer,
 }
 
-/// The decision for `slot` on its loader callback.
-pub fn action(training: bool, quantity: Option<u32>, slot: u32, owned: bool, leased: bool, native_kind: Option<u32>) -> EntryAction {
-    if !training || !PARKED.contains(&slot) || !owned || !live(quantity, slot) {
-        return EntryAction::Keep;
+/// One coalesced request; no heap, timer, retained pointer or polling loop.
+pub struct Pending<E> {
+    request: Option<Request<E>>,
+}
+
+impl<E: Copy + Eq> Default for Pending<E> {
+    fn default() -> Self { Self::new() }
+}
+
+impl<E: Copy + Eq> Pending<E> {
+    pub const fn new() -> Self { Self { request: None } }
+
+    /// Called at the pre-store gate with the native clamped desired count.
+    /// `occupied` includes helper loads and native restores until their receipts.
+    pub fn setter(&mut self, now: Observation<E>, desired: u32, occupied: u8) -> Setter {
+        self.request = None;
+        if !now.open || now.menu == 0 || !(1..=3).contains(&now.count)
+            || !(1..=3).contains(&desired) || desired <= now.count
+            || seats(now.count, desired) & occupied == 0
+        {
+            return Setter::Continue;
+        }
+        self.request = Some(Request { before: now, desired });
+        Setter::Defer
     }
-    if leased || native_kind.is_none() {
-        return EntryAction::Wait;
+
+    /// Seats the cleanup service should return. A stale observation cancels
+    /// intent immediately; ownership of any in-flight restore lives elsewhere.
+    pub fn returning(&mut self, now: Observation<E>) -> u8 {
+        let Some(request) = self.current(now) else { return 0; };
+        seats(request.before.count, request.desired)
     }
-    EntryAction::GiveBack
+
+    /// Consume only after every newly included seat is native-ready. The caller
+    /// rechecks native identity and invokes the complete setter with this value.
+    /// Clearing before replay makes re-entry one-shot.
+    pub fn replay(&mut self, now: Observation<E>, occupied: u8) -> Option<u32> {
+        let request = self.current(now)?;
+        if seats(now.count, request.desired) & occupied != 0 { return None; }
+        self.request = None;
+        Some(request.desired)
+    }
+
+    pub fn cancel(&mut self) { self.request = None; }
+
+    fn current(&mut self, now: Observation<E>) -> Option<Request<E>> {
+        if self.request.is_some_and(|request| request.before != now) {
+            self.cancel();
+        }
+        self.request
+    }
+}
+
+fn seats(old: u32, desired: u32) -> u8 {
+    PARKED.into_iter().filter(|slot| *slot > old && *slot <= desired)
+        .fold(0, |mask, slot| mask | (1 << slot))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const MYTHRA: Option<u32> = Some(0x5b);
+    const MENU: Observation<u64> = Observation { epoch: 7, menu: 0x1000, count: 1, open: true };
 
     #[test]
-    fn a_helper_admitted_at_one_is_given_back_when_the_count_makes_its_entry_live() {
-        // Admitted at 1 (entry 2 holds the helper, the native kind was captured).
-        assert!(admits(Some(1)));
-        assert_eq!(action(true, Some(1), 2, true, false, MYTHRA), EntryAction::Keep);
-        // Count 2: entry 2 goes live, entry 3 stays parked.
-        assert_eq!(action(true, Some(2), 2, true, false, MYTHRA), EntryAction::GiveBack);
-        assert_eq!(action(true, Some(2), 3, true, false, MYTHRA), EntryAction::Keep);
-        assert!(!admits(Some(2)), "no new helper while more than one CPU is visible");
-        // Count 3: both parked entries are live.
-        assert_eq!(action(true, Some(3), 3, true, false, MYTHRA), EntryAction::GiveBack);
-        // Back to 1: nothing owned any more, and admission is allowed again.
-        assert_eq!(action(true, Some(1), 2, false, false, None), EntryAction::Keep);
-        assert!(admits(Some(1)));
+    fn leased_loading_and_restoring_seats_all_hold_the_count_until_receipt() {
+        let mut pending = Pending::new();
+        assert_eq!(pending.setter(MENU, 3, 0b1100), Setter::Defer);
+        // Hat lease drains, helper load finishes, restore begins: still occupied.
+        for occupied in [0b1100, 0b1100, 0b1000, 0b1000] {
+            assert_eq!(pending.returning(MENU), 0b1100);
+            assert_eq!(pending.replay(MENU, occupied), None);
+        }
+        assert_eq!(pending.replay(MENU, 0), Some(3));
+        assert_eq!(pending.replay(MENU, 0), None);
+        assert_eq!(pending.setter(MENU, 3, 0), Setter::Continue);
     }
 
     #[test]
-    fn a_leased_helper_or_an_unknown_native_fighter_waits() {
-        assert_eq!(action(true, Some(2), 2, true, true, MYTHRA), EntryAction::Wait);
-        assert_eq!(action(true, Some(2), 2, true, false, None), EntryAction::Wait);
+    fn latest_click_coalesces_and_decrease_cancels() {
+        let mut pending = Pending::new();
+        assert_eq!(pending.setter(MENU, 2, 0b1100), Setter::Defer);
+        assert_eq!(pending.returning(MENU), 0b0100);
+        assert_eq!(pending.setter(MENU, 3, 0b1100), Setter::Defer);
+        assert_eq!(pending.returning(MENU), 0b1100);
+        assert_eq!(pending.setter(MENU, 2, 0b1000), Setter::Continue);
+        assert_eq!(pending.replay(MENU, 0), None);
+        assert_eq!(pending.setter(MENU, 3, 0b1100), Setter::Defer);
+        assert_eq!(pending.setter(MENU, 1, 0b1100), Setter::Continue);
+        assert_eq!(pending.returning(MENU), 0);
     }
 
     #[test]
-    fn the_maximum_count_leaves_no_helper_entry_and_falls_back_to_preload_off() {
-        // Count 3 (the pause menu's maximum): every parked entry is live and nothing may be admitted: the source book is empty,
-        // swaps load synchronously (the shipped preload-off path) and hats/items keep the engine's existing refusal notice.
-        assert!(PARKED.iter().all(|slot| live(Some(3), *slot)));
-        assert!(!admits(Some(3)));
-        // An unknown count (the F9 guards failed) admits nothing either.
-        assert!(!admits(None));
-        assert_eq!(action(true, None, 2, true, false, MYTHRA), EntryAction::Keep);
+    fn early_close_reopen_scene_root_or_count_change_never_replays_old_intent() {
+        for changed in [Observation { open: false, ..MENU }, Observation { epoch: 8, ..MENU },
+            Observation { menu: 0x2000, ..MENU }, Observation { count: 2, ..MENU }]
+        {
+            let mut pending = Pending::new();
+            assert_eq!(pending.setter(MENU, 3, 0b1100), Setter::Defer);
+            assert_eq!(pending.returning(changed), 0);
+            assert_eq!(pending.replay(MENU, 0), None, "reopening cannot resurrect a cancelled click");
+        }
     }
 
     #[test]
-    fn outside_training_and_outside_the_parked_entries_nothing_changes() {
-        assert_eq!(action(false, Some(3), 2, true, false, MYTHRA), EntryAction::Keep);
-        assert_eq!(action(true, Some(3), 5, true, false, MYTHRA), EntryAction::Keep);
-        assert_eq!(action(true, Some(3), 1, true, false, MYTHRA), EntryAction::Keep);
+    fn only_newly_live_native_cpu_seats_delay_and_reverse_is_immediate() {
+        let mut pending = Pending::new();
+        assert_eq!(pending.setter(MENU, 2, 0b1000_1000), Setter::Continue);
+        let two = Observation { count: 2, ..MENU };
+        assert_eq!(pending.setter(two, 3, 0b1000), Setter::Defer);
+        assert_eq!(pending.returning(two), 0b1000);
+        assert_eq!(pending.setter(two, 1, 0b1100), Setter::Continue);
+        assert_eq!(pending.setter(Observation { count: 3, ..MENU }, 2, 0b1100), Setter::Continue);
     }
 }
