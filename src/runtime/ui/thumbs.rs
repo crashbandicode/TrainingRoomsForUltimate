@@ -15,6 +15,7 @@ use parking_lot::Mutex;
 use crate::model::frame::Frame;
 use crate::model::panes as p;
 use crate::model::stage_textures;
+use crate::runtime::diag_log::diagnostic;
 use crate::runtime::ui::texture::{self, Readiness, Texture};
 use crate::runtime::ui::view::Panes;
 
@@ -54,6 +55,11 @@ static STATE: Mutex<State> = Mutex::new(State {
 /// Bit `i` set: tile `i` shows its picture (the view reads it).
 pub static BOUND: AtomicU64 = AtomicU64::new(0);
 
+/// One log line (the page-level events are once per page, counted as per-load, not steady-state, allocations).
+fn log(args: core::fmt::Arguments<'_>) {
+    crate::model::hook_stats::per_load(|| diagnostic(args));
+}
+
 /// Whether tile `i` shows a picture now.
 pub fn is_bound(i: usize) -> bool {
     BOUND.load(Ordering::Acquire) & (1 << i) != 0
@@ -92,6 +98,8 @@ pub unsafe fn run(panes: &Panes) -> bool {
             changed |= release_all(&mut s, Some(panes));
             if s.active && texture::usable() {
                 request(&mut s);
+                let loading = s.slots.iter().take(s.count).filter(|slot| matches!(slot, Slot::Loading { .. })).count();
+                log(format_args!("[Thumbs] page sig={:#x} tiles={} requested={loading}", s.sig, s.count));
             }
         }
         for i in 0..s.count {
@@ -117,6 +125,14 @@ pub unsafe fn run(panes: &Panes) -> bool {
                 }
                 _ => {}
             }
+        }
+    }
+    if changed {
+        if let Some(s) = STATE.try_lock() {
+            let bound = s.slots.iter().filter(|slot| matches!(slot, Slot::Bound { .. })).count();
+            let loading = s.slots.iter().filter(|slot| matches!(slot, Slot::Loading { .. })).count();
+            let failed = s.slots.iter().take(s.count).filter(|slot| matches!(slot, Slot::Failed)).count();
+            log(format_args!("[Thumbs] bound={bound} loading={loading} failed={failed} retire_waiting={} allocations={}", texture::retired_waiting(), crate::runtime::alloc::hook_allocations()));
         }
     }
     texture::tick();
