@@ -81,6 +81,71 @@ maps to a named install-line reason.
 - The TrainingRooms menu reads the preference when it opens (`ui::worker::env`); a change made on the Deluxe page while the
   TrainingRooms menu is open shows at its next opening.
 
+## Playbook
+
+Playbook followed: `ae87443` (`git -C ~/ssbu-mod-playbook pull --ff-only`: already up to date, 2026-11-02 ~11:4xZ). Read
+completely before work: README.md, docs/{WORKFLOW,EDEN,MACROS,TILE-CURSOR,GIFS,HOOK-SHARING,CHECKLIST}.md,
+tools/PROVENANCE.md; tools read before running them: build/nro_size.py, build/scan-offsets.py, check/compliance.py,
+eden-solo/{gv.py,solo.ps1,step.ps1}, eden-pair/solo_surface.ps1.
+
+### Checklist (docs/CHECKLIST.md; M mandatory, C conditional)
+
+| Item | Tag | State | Evidence |
+| --- | --- | --- | --- |
+| cdylib only | M | pass | `Cargo.toml` `crate-type = ["cdylib"]`; the SDK is an `rlib` dependency (LTO applies) |
+| Release profile s/lto/cgu 1/abort; skyline =0.6.0; toolchain 1.98.1 | M | pass | `Cargo.toml`, `rust-toolchain.toml` unchanged |
+| Pure logic in model with host tests; runtime only for the Switch | M | pass | `src/model/deluxe_row.rs` (9 tests), `src/runtime/deluxe_row.rs` under `runtime` (`cfg(target_os = "switch")`) |
+| Gates: test, clippy -D warnings, no-default-features, release, diag | M | partial | host gates 2026-11-02 11:23–11:27Z: test 7706 passed 0 failed, clippy 0, no-default-features ok (`/tmp/dx-work/{test,clippy,nodefault}.log`); release + diag: **open** (queued) |
+| No heap in hooks (`heap_allocations=0`) | M | open | no hook added; draw-thread callbacks are atomics only; Eden install line pending |
+| Fixed buffers, writer thread, stack paths | M | pass | the INI write stays on the existing writer thread (`features::writer`), the row only sets an atomic flag |
+| Root cause or approved workaround | M | pass | no workaround; host persistence dropped for one writer (R5), the fork's 2.0.0 file superseded (CARRY-OVER "deluxe"); the menu-row adapter gap is reported, not worked around (Open items) |
+| Version guard 13.0.5 | M | pass | unchanged boot guard (`runtime::boot` step 1); registration runs after it |
+| 64-byte guard per site | M | N/A | no hooked, called or relied-on game site is added: the host is reached through its exported symbol (`nn::ro::LookupSymbol`) |
+| Card scan for the site | M | N/A | no game offset is used; the card's Deluxe NRO was analysed for its export and `register` instead (section 2) |
+| Hook sharing / chaining, stand-ins, load orders | C | N/A | no hook; this is HOOK-SHARING's provider pattern (exported registration API, plugin runs without the provider) |
+| Hook after the prologue / call instead | M | N/A | no hook |
+| No diag code/strings in the shipped NRO | M | open | `compliance.py --nro <release>` after the release build |
+| Shipped NRO writes its install line and nothing per frame | M | pass (code) | the row adds an install-line field and one boot `diagnostic` line (`[TrainingRooms]`, shipped tag, once) |
+| Online: read-only rules hook by hook | C | open → pkg7 | the Deluxe row is also reachable online; package 7 owns the online rows |
+| Online: replay A/B with the desync detector | C | open → pkg7 | |
+| Online: two consoles past the changed path | C | open → pkg7 | no LDN here (brief) |
+| Eden: claim before Up, release after Down | M | open | dx-01/dx-02 queued (Surface) |
+| Eden: one per host, ≥ 10 GiB, not profile a / :61 | M | open | harness asserts both (`eden/dx_eden.py` `up`/`launch`), display :94 |
+| Eden: hard-linked profile copy, only the copy changed | M | open | `dx_eden.py prep` (gv.py's copy rule) |
+| Copies: identical linked, written-in-place copied | M | open | same |
+| Disk: one target per copy, shared cargo home, df ≥ 40 GB, products deleted with manifest | M | partial | Surface target `cargo-targets/trainingrooms-deluxe`, Yoga target `/home/intpa/trainingrooms-build-deluxe/target`; df 178 GB (Surface) / 248 GB (Yoga); deletion at stream end: open |
+| Eden: waits gated on a log line or screenshot | M | open | `route_dx.py` (gated route), row waits on the diag lines |
+| Eden: failed precondition aborted and retried | M | open | |
+| Ruleset short | M | N/A | Training mode only, no match to finish |
+| Eden: profile restored, host released | M | open | `dx_eden.py restore` / `down` |
+| console.log scan, run.json, memory.peak kept | M | open | `dx_eden.py scan` / `collect` |
+| Every local command under memory/time guard | M | pass | cargo under `systemd-run --scope -p MemoryMax=6G timeout 1800` (`/tmp/dx-work/gate.ps1`); Eden under `eden-run.py` (8 GiB, bounded) |
+| Each run's outputs kept under its label | M | open | `eden/runs/dx-NN/` |
+| README GIF / license / disclaimer | M | N/A here | the repo README is the lead's; one third-party line is a lead decision (CARRY-OVER "deluxe" records the licence) |
+| Dated evidence doc | M | partial | this file and `eden/EDEN-DELUXE.md` (with the runs) |
+| Numbers from tested scripts | C | N/A | no numbers computed from logs are cited |
+| No operator quotes, no claims beyond tests | M | pass | |
+| Handoff current | M | pass | this file (branch, commit, evidence, next steps); the lead keeps TRAININGROOMS-HANDOFF.md |
+| Release: bump, tag, assets | C | N/A | no release ordered |
+| Release: rebuild byte-identical | C | N/A | no release |
+| Card: MTP preflight, rollback, readbacks | C | N/A | no card work (hard limit); the card copy used is the 2026-11-01 install's local copy |
+| Card: never mounted/ejected | M | pass | the card was not touched |
+| Nothing pushed/tagged/written to the card | M | pass | commits only on `stream/deluxe` |
+| Forgejo, push only on order, messages from a file | M | pass | commit `166d3cd` from `/tmp/dx-work/commit1.txt`; no push |
+| Model/effort gate and watcher | M | pass | own transcript `agent-a458ac493fbd2f302.jsonl`: claude-opus-5-5 / high; watcher `/tmp/deluxe-watcher-a458ac/` (owner pid 1069629) |
+| Every worker read the playbook | M | N/A | no subagent spawned |
+
+### Scripts written here (not playbook tools)
+
+| Script | Why the playbook does not cover it |
+| --- | --- |
+| `/tmp/dx-rea-scripts/nro2elf.py`, `table.py` | ABI reading of the host NRO (export, table, relocations): REA's `open_binary` refuses NRO; the playbook has no NRO disassembly tool (`nro_size.py` reads the header only) |
+| `/tmp/dx-work/manifest_edit.py`, `manifest_reasons.py`, `manifest_show.py` | one-off edits of package 4's carry manifest; the repo's `tools/carry_pkg4.py` then derives the files (repo tooling, not a playbook concern) |
+| `/tmp/dx-work/gate.ps1` | one cargo call under the playbook's memory/time guard with this copy's target (the playbook gives the rule, not a script) |
+| `/tmp/dx-work/switch.ps1` | the Surface Switch recipe of docs/BUILD.md; **replaced by** the Yoga `build.ps1` copy (`/tmp/dx-work/build-deluxe.ps1`, the stream rules' recipe) while the Surface is held |
+| `/tmp/dx-work/surface_free.ps1`, `host_free.ps1` | read the shared ledger for open claims per host; `solo.ps1`'s check is tied to its own owner and the Yoga, and the stream rules require all owners per host |
+| `/tmp/dx-work/mk_dx.py` → `eden/dx_eden.py`, `eden/route_dx.py` | Eden driver: the repo's harness lineage is the playbook's `gv.py` + `solo.ps1` adapted (pkg6's `s6_eden.py`); `gv.py`/`solo.ps1` hard-code gsp-visualizer's root, profile `y`, display `:68`, owner, labels `e\d+` and LAN Online on, and `solo_surface.ps1` is elite-rematch's remote-Surface wrapper. Same commands (`up`/`down`/`shot`/`press`/`stick`/`call`/`macro`), claims per EDEN.md, tile cursor per TILE-CURSOR.md, macro segments per MACROS.md |
+
 ## Gates
 
-(filled in at the gate)
+Host gates: above. Switch release + diag, `nro_size.py`, `compliance.py --nro`: open (queued for a compile slot).
