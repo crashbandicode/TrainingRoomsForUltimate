@@ -200,3 +200,31 @@ tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, t
 - 40 tiles: target 529,300 B, recipe 55,540 B (reproduces the committed `assets/info_training.tra1`, sha 225fdfd0). 88 tiles: target 549,780 B, recipe 64,700 B.
 - Resident delta at 88: archive +20,480 x 2 boot buffers = +40,960; recipe .rodata +9,160; Frame +~2.9 KB x 4 static copies = +~11.7 KB; total ~+61.8 KB (> 40 KB: lead decides; options (a) paged on 40 tiles 0 KB, (b) 88 tiles, (c) 88 with tile text out of Frame ~54 KB). Nothing committed for it.
 
+
+## Handover (2026-11-02 ~14:08Z, operator order: lead role to the Codex GPT-6 Astra lead)
+- Branch `stream/ui-screens`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-ui-screens`, head = the "WIP: handover to Astra lead"
+  commit on `237b857` (roster grid gated). Everything before it is gated; the handover commit adds only this section.
+- Targets (incremental dirs deleted): Ally WSL `/home/intpa/c1161-targets/TrainingRoomsForUltimate-ui-screens-ally` 1.5 GB (the gate target);
+  local `cargo-targets/trainingrooms-ui-screens` 1.1 GB, `-sw` 0.3 GB. Evidence NROs: `/tmp/ui-screens-watch/ui-out3/` (roster slice: release
+  c4205a5b, diag 1eaa4619), `ui-out1/` (slice 1: 57bc5127 / 45860626).
+- Proven:
+  - menu-close hang fixed at the root (stream/sync, hos-lock + published Live): Eden sync-01/sync-02 (46 + 45 closes, named macro load and
+    playback, publish from the diag thread, 13 saves + load through the writer mailbox, 60 fps, hook allocations unchanged):
+    `TrainingRoomsForUltimate-sync/eden/EDEN-SYNC.md`, runs under `eden/runs/sync-0{1,2}`;
+  - ui-10 (slice 1): menu adds 0 hook allocations per open (growth is `roster_preload`), Give item, Lobby Stages, Save slot, 0 Unmapped:
+    `eden/runs/ui-10/`, report in this file;
+  - roster grid: host-tested (`editors/roster.rs` tests, `tests/core02_menu.rs`), gated (tests 9256 + core02 203/0, hook_locks green with
+    one PENDING row, clippy 0, no-default-features, Switch release/diag 0 warnings). NOT yet Eden-proven.
+- Handed to integrator-3: `71ba1f7` (slice 1 + merge 8b73694 + sync slice 3). After it: `237b857` (roster grid) is ready for the next merge.
+- NEXT:
+  1. Eden ui-11 on the lent Ally rig when the queue allows (tm-f8-sol held the Ally at 14:05Z; interleave rule for tm-f8-terra*/sol*):
+     `ui_lent.py stage ui11-diag /tmp/ui-screens-watch/ui-out3/libtraining_rooms.diag.nro`; `python3 -c "import ui_lent as u; u.stage_mode('-Mode','setaside')"`;
+     `ui_lent.py boot ui11-diag`; `ui_lent.py launch live-ui-11` (wait for run.json state ready); `ui_lent.py route live-ui-11`;
+     `rows_ui11.py live-ui-11` (roster rows + the install line read whole); then kill, `ui_lent.py restore` (mismatches []), release.
+  2. Fighter portraits on the roster tiles through u4's texture path (one texture path; text tiles are the Q16 fallback meanwhile).
+  3. Y = Solo Popo on the roster grid (not implemented; pkg6's Solo Popo kept rows).
+  4. Mii lists; waiting-room recipe + tick (set_ui_ready / set_native_ui_busy); B3 stack path Eden proof + the archive-hook allocation +
+     the 5 s grace measurement (lead: one-buffer option only if no normal flow reloads within the grace).
+  5. pkg4 design C lands on top (its PENDING hook_locks row must then disappear; the RC gate needs PENDING empty).
+- Blockers: none of mine. Open claims: none (Ally released 14:02Z). Queue lines: deleted. Lent rig: restored 13:32Z (`mismatches: []`),
+  untouched since. Watcher `/tmp/ui-screens-watch/watch-opus.ps1` stopped.
