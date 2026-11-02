@@ -208,7 +208,7 @@ The file is read once, lazily, on first use of the slots (upstream notes that re
 | `situation_kind` | i32 | the game's situation constant (GROUND / AIR / CLIFF / other) |
 | `state` | enum string: `Save`, `NoAction`, `KillPlayer`, `WaitForAlive`, `PosMove`, `ApplyBuff`, `NanaPosMove`, `WaitForPokemonSwitch`, `WaitForCopyAbility` | step marker; forced to `NoAction` on read |
 | `fighter_kind` | i32 | saved fighter kind, −1 when never saved |
-| `charge` | object | SPEC-state-02 §7: `int_x`, `int_y`, `int_z` (i32), `float_x`, `float_y`, `float_z` (f32), `has_charge` (bool), `robin_charges` (object) — every field optional and omitted when absent |
+| `charge` | object | SPEC-state-02 §7: `int_x`, `int_y`, `int_z` (i32), `float_x`, `float_y`, `float_z` (f32), `has_charge` (bool), `robin_charges` (object) — every field optional; the writer emits explicit `null` for an absent field, as the fork's real files do (byte compatibility; lead correction 2026-11-02), and the reader accepts both `null` and a missing key |
 | `steve_state` | object or null | SPEC-state-05 §7 |
 | `held_item` | object, optional (fork) | `{"state": "item", choice, variation, lifetime, lifetime_max, fuse, fuse_max}` or `{"state": "empty"}` / `{"state": "unsupported"}`; absent in older saves |
 | `saved_stage` | i32, optional (fork) | stage id at capture |

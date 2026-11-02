@@ -27,7 +27,7 @@ The player records up to 600 frames of their own controller inputs into one of f
 | Playback Mash Interrupt | `playback_mash` | On/Off | | On |
 | Playback Loop | `playback_loop` | On/Off | | Off |
 | **Settings override playback** (draft 9, N4; advanced) | `settings_override_playback` | On/Off | | Off |
-| **Replay capture** (draft 9, menu question 7; Named macros group) | `replay_capture` (writes `replay_capture.ini` `enabled=on/off`; the Deluxe Plugins page row stays in sync) | On/Off | | On |
+| **Replay capture** (draft 9, menu question 7; Named macros group) | `replay_capture` (writes `replay_capture.ini` `enabled=on/off`; the Deluxe Plugins page row stays in sync) | On/Off | | Off — the INI is the file of record and an absent INI means off, as the fork's `DEFAULT_CAPTURE_INI` (lead correction 2026-11-02; an imported INI keeps its value) |
 
 Help texts (one line each, shown under the item): "Choose which slot to record into"; "Whether to begin recording via button combination or upon loading a Save State"; "How long an input recording should last in frames"; "Remove neutral input frames at the end of your recording"; "Choose which slots to playback input recording upon pressing button combination"; "When to begin playing back inputs when a hitstun mash trigger occurs"; "Choose which slots to playback input recording upon loading a save state"; "End input playback when a mash trigger occurs"; "Repeat triggered input playbacks indefinitely".
 

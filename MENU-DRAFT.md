@@ -281,7 +281,7 @@ outside the menu.
 | (hidden) | — | Player Cycle Solo Popo | toggle | On, Off | Off | ours | red S on the grid |
 | (hidden) | — | CPU Solo Popo | toggle | On, Off | Off | ours | blue S on the grid |
 | (outside the menu) | — | Menu shortcuts | INI | `button_config.ini`: `shortcut_1`, `shortcut_2`; permanent B + D-pad Up | Minus / disabled | ours | restart to apply |
-| (outside the menu) | — | Replay capture | INI + Deluxe page | `replay_capture.ini` `enabled=on/off`; a toggle on the Deluxe Plugins page when Deluxe is present | on | ours | |
+| (outside the menu) | — | Replay capture | INI + Deluxe page | `replay_capture.ini` `enabled=on/off`; a toggle on the Deluxe Plugins page when Deluxe is present | off (absent INI = off; corrected 2026-11-02 from the fork's code `DEFAULT_CAPTURE_INI`) | ours | |
 | (outside the menu) | — | Cycle preload INI | INI | `cycle_preload.ini` caches the preload/group choices for the next boot | as saved | ours | written once by the plugin |
 
 ## 2. Proposed layout: five pages, grouped, dropdowns for single choices
@@ -359,7 +359,7 @@ change, so existing settings files load as they are (the retired
 | Recording | Named macros | Save slot to library… | editor | | — | ours | |
 | Recording | Named macros | Edit placement | editor | | — | ours | |
 | Recording | Named macros | Replay window | editor | | — | ours | |
-| Recording | Named macros | Replay capture | toggle | On, Off | On | ours | **new in menu**: writes `replay_capture.ini`; Deluxe page toggle stays in sync; question 7 (decided) |
+| Recording | Named macros | Replay capture | toggle | On, Off | Off (follows the INI; absent = off, as the fork's code) | ours | **new in menu**: writes `replay_capture.ini`; Deluxe page toggle stays in sync; question 7 (decided) |
 | Fighters & Stages | Player 1 and CPU | Player Swapping | toggle | On, Off | Off | ours | |
 | Fighters & Stages | Player 1 and CPU | Player Character | editor (portrait grid) | all fighters | Mr. Game & Watch | ours | row shows the chosen portrait |
 | Fighters & Stages | Player 1 and CPU | CPU Character | editor (portrait grid) | all fighters | Pikachu | ours | row shows the chosen portrait |
