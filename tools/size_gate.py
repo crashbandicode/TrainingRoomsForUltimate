@@ -5,9 +5,11 @@ as "src/runtime/roster"), `ceiling`, `date` (YYYY-MM-DD), `reason` and, where ne
 of a scope is its ceiling. The first entry of a scope, and every entry that raises its scope's ceiling, must name
 the lead's approval in `approved_by`; lowering a ceiling (the ratchet) needs only a reason. Dates never go back.
 
-Prints the per-module table (depth 3) and each budgeted scope. Exit status: 0 within budget, 1 over a ceiling,
+Prints the per-module table (depth 3) and each budgeted scope. The budget gates the as-measured count (the
+operator's rules); the test-fixed count and, with --normalize, the rustfmt-normalized + test-fixed count are printed
+for the milestone reports until the operator rules on the method. Exit status: 0 within budget, 1 over a ceiling,
 2 when the budget file breaks the rules above.
-usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N]"""
+usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N] [--normalize]"""
 import argparse
 import collections
 import pathlib
@@ -62,7 +64,7 @@ def scope_count(per_file, scope):
     return sum(n for name, n in per_file.items() if name == scope or name.startswith(scope + '/'))
 
 
-def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
+def run(repo, budget_path, rev=None, depth=3, out=sys.stdout, normalize=False):
     if tomllib is None:
         print('size_gate: Python 3.11 or newer is required (tomllib)', file=out)
         return 2
@@ -83,6 +85,11 @@ def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
         print(f'  {name:44s} {n:8d}  {100 * n / max(total, 1):5.1f}%', file=out)
     print(f'  {"TOTAL":44s} {total:8d}', file=out)
     print(f'  {"third_party/ (vendored, not counted)":44s} {vendored:8d}', file=out)
+    fixed = sum(sloc.totals(items, 1, test_fixed=True)[0].values())
+    print(f'  {"test-fixed (report only)":44s} {fixed:8d}', file=out)
+    if normalize:
+        norm = sum(sloc.totals(sloc.items_normalized(repo, rev or 'HEAD'), 1, test_fixed=True)[0].values())
+        print(f'  {"rustfmt-normalized + test-fixed (report only)":44s} {norm:8d}  ({rev or "HEAD"})', file=out)
     over = []
     print('Budget (size-budget.toml):', file=out)
     for scope in sorted(ceilings, key=lambda s: (s != 'total', s)):
@@ -109,8 +116,11 @@ def main(argv=None):
     parser.add_argument('--budget', default=None, help='default: <repo>/size-budget.toml')
     parser.add_argument('--rev', default=None, help='count a git revision instead of the working tree')
     parser.add_argument('--depth', type=int, default=3)
+    parser.add_argument('--normalize', action='store_true',
+                        help='also report the rustfmt-normalized, test-fixed count of --rev (default HEAD); needs rustfmt')
     args = parser.parse_args(argv)
-    return run(args.repo, args.budget or str(pathlib.Path(args.repo) / 'size-budget.toml'), args.rev, args.depth)
+    return run(args.repo, args.budget or str(pathlib.Path(args.repo) / 'size-budget.toml'), args.rev, args.depth,
+               normalize=args.normalize)
 
 
 if __name__ == '__main__':

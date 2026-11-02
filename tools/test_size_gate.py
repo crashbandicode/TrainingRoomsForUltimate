@@ -55,6 +55,29 @@ class Counting(unittest.TestCase):
             self.assertEqual(vendored, 4)
 
 
+class TestFixed(unittest.TestCase):
+    def test_gated_module_files_and_all_test_blocks_leave_only_in_the_fixed_count(self):
+        lib = ('fn a() {}\n#[cfg(test)]\nmod tests;\n#[cfg(test)]\n#[path = "extra_tests.rs"]\nmod extra;\n'
+               '#[cfg(all(test, feature = "x"))]\nmod inline {\n    fn t() {}\n}\nmod live;\n')
+        items = [('src/lib.rs', lib), ('src/tests.rs', 'fn t() {}\n'), ('src/extra_tests.rs', 'fn u() {}\n'),
+                 ('src/live.rs', 'fn v() {}\n')]
+        self.assertEqual(sloc.test_module_files(items), {'src/tests.rs', 'src/extra_tests.rs'})
+        measured, _ = sloc.totals(items, 0)
+        fixed, _ = sloc.totals(items, 0, test_fixed=True)
+        # The operator's rule keeps the cfg(all(test, ...)) block (4 lines) and every file: lib 6 + three files.
+        self.assertEqual(dict(measured), {'src/lib.rs': 6, 'src/tests.rs': 1, 'src/extra_tests.rs': 1, 'src/live.rs': 1})
+        self.assertEqual(dict(fixed), {'src/lib.rs': 2, 'src/live.rs': 1})
+
+    def test_edition_comes_from_the_nearest_manifest(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            (root / 'crates/c/src').mkdir(parents=True)
+            (root / 'Cargo.toml').write_text('[package]\nedition = "2021"\n')
+            (root / 'crates/c/Cargo.toml').write_text('[package]\nedition = "2018"\n')
+            self.assertEqual(sloc.edition_of(root, 'crates/c/src/lib.rs'), '2018')
+            self.assertEqual(sloc.edition_of(root, 'src/lib.rs'), '2021')
+
+
 class Budget(unittest.TestCase):
     def check(self, text):
         import tomllib
