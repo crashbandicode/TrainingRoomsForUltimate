@@ -81,7 +81,7 @@ CALLED_M2 = [
     ("StateBuff", "state_motion_add_partial", "_ZN3app8lua_bind37MotionModule__add_motion_partial_implEPNS_26BattleObjectModuleAccessorEiN3phx6Hash40Effbbfbbb", "MotionModule::add_motion_partial: Min Min's dragon arm motion."),
 ]
 OFFSETS_M2 = [
-    ("StateBuff", "state_cloud_add_limit", 0x8DC160, "SeamKind::Called", "The game's add-limit routine (f32 limit, Fighter*, int): called to give Cloud his Limit; never hooked here."),
+    ("StateBuff", "state_cloud_add_limit", 0x8DC160, "SeamKind::Called", "The game's add-limit routine (f32 limit, module accessor, int; it reads the work module at accessor + 0x50): called to give Cloud his Limit; never hooked here."),
     ("StateBuff", "state_joker_summon", 0xB308D0, "REPLACE", "FighterSpecializer_Jack::check_doyle_summon_dispatch: no summon cutscene while buffing (returns 0xFFFFFFFF)."),
     ("StateBuff", "state_mac_meter", 0x68CDA0, "REPLACE", "The shared UI-update routine (entry data pointer, int value): Little Mac's KO meter reads 100 while a load with KO runs."),
     ("StateBuff", "state_wiifit_heal", 0x3FF9C0, "REPLACE", "The damage module's add-damage routine (module pointer, f32 amount, int kind): Wii Fit does not heal while buffing."),
