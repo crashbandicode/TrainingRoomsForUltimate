@@ -37,17 +37,21 @@ def main():
     w.focus("Character Cycles")
     w.keys("a w15")
     r6.shot("roster-cycles-open")
-    w.keys("a w8 right w8 a w8")
+    # Reset through the visible All tile (cell 86), then select Mario/DK.
+    w.keys(" ".join(["down"] * 6 + ["right"] * 8) + " a w8")
+    w.keys(" ".join(["up"] * 6 + ["left"] * 8) + " a w8 right w8 a w8")
     r6.shot("roster-cycles-two-ranked")
-    w.keys("zr w8 a w8")
+    w.keys("zr w8")
+    w.keys(" ".join(["down"] * 6 + ["right"] * 7) + " a w8")
+    w.keys(" ".join(["up"] * 6 + ["left"] * 8) + " a w8")
     r6.shot("roster-cycles-cpu-list")
     w.keys("b w10 b w20")
     player, cpu = kept("player_roster"), kept("cpu_roster")
     ranks = [(i, r) for i, r in enumerate((player or [1])[1:]) if r]
-    r6.row("Character Cycles: Player list ranked in order (player_roster)", player is not None and player[0] == 0 and len(ranks) == 2,
+    r6.row("Character Cycles: Player list ranked in order (player_roster)", player is not None and player[0] == 0 and ranks == [(0, 1), (1, 2)],
            f"all={player[0] if player else None} ranks={ranks}")
     cpu_ranks = [(i, r) for i, r in enumerate((cpu or [1])[1:]) if r]
-    r6.row("Character Cycles: ZR edits the CPU list (cpu_roster)", cpu is not None and len(cpu_ranks) >= 1, f"ranks={cpu_ranks[:4]}")
+    r6.row("Character Cycles: ZR edits the CPU list (cpu_roster)", cpu is not None and cpu[0] == 0 and cpu_ranks == [(0, 1)], f"ranks={cpu_ranks[:4]}")
     # Player Character: three steps right from Mario is Samus.
     w.open()
     w.page("Fighters & Stages")
@@ -57,7 +61,32 @@ def main():
     w.keys("b w10 b w20")
     pick = kept("player_character")
     picked = [i for i, v in enumerate(pick or []) if v == 1]
-    r6.row("Player Character: one fighter picked (player_character one-hot)", len(picked) == 1, f"index={picked}")
+    r6.row("Player Character: one fighter picked (player_character one-hot)", picked == [3], f"index={picked}; expected Samus index 3")
+    # Ice Climbers is row 1, column 3 of the carried 13-column roster.
+    # Each reopening starts at Mario / Player; check the other role is preserved.
+    before_player, before_cpu = kept("solo_popo_player_cycle"), kept("solo_popo_cpu")
+    player_on = before_player == [1, 0]
+    w.open()
+    w.focus("Character Cycles")
+    w.keys("a w15 down right right right y w8")
+    r6.shot("solo-player-toggled")
+    w.keys("zr w8")
+    r6.shot("solo-cpu-before-toggle")
+    w.keys("b w8 b w20")
+    after_player, after_cpu = kept("solo_popo_player_cycle"), kept("solo_popo_cpu")
+    r6.row("Y Solo Popo changes Player only", after_player == ([0, 1] if player_on else [1, 0]) and after_cpu == before_cpu,
+           f"player={after_player} cpu={after_cpu}")
+    cpu_on = after_cpu == [1, 0]
+    w.open()
+    w.focus("Character Cycles")
+    w.keys("a w15 down right right right zr y w8")
+    r6.shot("solo-cpu-toggled")
+    w.keys("zr w8")
+    r6.shot("solo-player-preserved")
+    w.keys("b w8 b w20")
+    final_player, final_cpu = kept("solo_popo_player_cycle"), kept("solo_popo_cpu")
+    r6.row("Y Solo Popo changes CPU only", final_player == after_player and final_cpu == ([0, 1] if cpu_on else [1, 0]),
+           f"player={final_player} cpu={final_cpu}")
     # Read whole lines from the retained file: the plug transport truncates each
     # line, which can hide coverage and the per-hook allocation attribution.
     stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]' | ForEach-Object {{ $_.Line }}")
@@ -68,6 +97,10 @@ def main():
     ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
     r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
            "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
+    console = u.get(PHASE, "console.log", r6.OUT)
+    unmapped = [line for line in console.read_text(errors="replace").splitlines() if "unmapped" in line.lower()]
+    (r6.OUT / "unmapped-lines.log").write_text("\n".join(unmapped), encoding="utf-8")
+    r6.row("console has zero Unmapped errors", not unmapped, f"{len(unmapped)} lines; full console retained")
     (r6.OUT / "rows-roster.json").write_text(json.dumps(r6.ROWS, indent=1))
     print("ROWS DONE", flush=True)
     if not all(row["ok"] for row in r6.ROWS):

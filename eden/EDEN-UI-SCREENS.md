@@ -73,3 +73,9 @@ The freezes of ui-02/ui-04/ui-05 were first read as the firewall prompt of that 
   `thread_parker/generic.rs`, whose `park()` is a pure `spin_loop()`. Under Horizon's fixed priorities, a waiter that spins on the
   holder's core keeps the holder from ever running again, and the guest livelocks. Fix: the `sync` stream (kernel address-arbitration
   locks, no hook waits).
+
+## ui-12: failed diagnostic batch, restored 2026-11-02 16:30Z
+- Rust cd09454, diag NRO935f95c656d9ad837fc3da362c489f35b40d57d617d5a21a65cc3691a90d0fed. Existing lent Ally rig; muted before load, offline Training, pilot/provider coexistence.
+- Menu worker exhausted its56KiB stack. Spawn base0x10e76b5000; first unmapped write0x10e76b487c below that base; high-water57344/free0. Game continued near60fps but the menu blanked. Static direct path71680B; candidate008b564 removes nested Frame construction/copies and awaits gates.
+-18167 Unmapped lines; hook total408. Single training archive load0/release5007ms is narrow evidence, not a reload/lifetime pass. Roster/Solo/portrait acceptance FAILED; unchanged pre-existing settings made two permissive row checks false-positive. Driver now selects All before deterministic ranks, requires exact Mario/DK/Samus choices, and checks both Solo role transitions.
+- Raw console/diagnostics, run.json, memory.peak5232082944B, screenshots, row JSON, restore receipt, static trace and SHA manifest retained in runs/ui-12. Restore mismatches[] and kept-tree changes[], original rig CLAIM restored; ledger released. No final acceptance inferred.
