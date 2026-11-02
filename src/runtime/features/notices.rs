@@ -72,60 +72,46 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
-    // Any thread (the menu worker, the writer thread, a hook): the notice goes into a lock-free mailbox that the HUD tick, on the
-    // game's UI thread, moves into the queue (stream/sync: no thread but the game's takes `QUEUE`). A full mailbox drops the notice
-    // and counts it.
-    for (slot, state) in MAILBOX_STATE.iter().enumerate() {
-        if state.compare_exchange(EMPTY, WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
-            // SAFETY: the slot is ours between WRITING and FULL (claimed by the exchange above).
-            unsafe { *MAILBOX[slot].0.get() = Some((header, body, length, color)) };
-            state.store(FULL, Ordering::Release);
-            return;
-        }
-    }
-    MAILBOX_DROPPED.fetch_add(1, Ordering::Relaxed);
-}
-
-const MAILBOX_SLOTS: usize = 8;
-const EMPTY: u8 = 0;
-const WRITING: u8 = 1;
-const FULL: u8 = 2;
-const READING: u8 = 3;
-type Posted = Option<(&'static str, &'static str, u16, [u8; 4])>;
-struct MailSlot(std::cell::UnsafeCell<Posted>);
-// SAFETY: a slot's cell is touched only by the one thread that moved its state to WRITING or READING.
-unsafe impl Sync for MailSlot {}
-static MAILBOX: [MailSlot; MAILBOX_SLOTS] = [const { MailSlot(std::cell::UnsafeCell::new(None)) }; MAILBOX_SLOTS];
-static MAILBOX_STATE: [std::sync::atomic::AtomicU8; MAILBOX_SLOTS] = [const { std::sync::atomic::AtomicU8::new(EMPTY) }; MAILBOX_SLOTS];
-/// Notices dropped because the mailbox was full (diagnostics).
-static MAILBOX_DROPPED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-
-/// Move the posted notices into the queue (the HUD tick, under `QUEUE`).
-fn take_mail(queue: &mut Queue) {
-    for (slot, state) in MAILBOX_STATE.iter().enumerate() {
-        if state.compare_exchange(FULL, READING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
-            // SAFETY: the slot is ours between READING and EMPTY.
-            let posted = unsafe { (*MAILBOX[slot].0.get()).take() };
-            state.store(EMPTY, Ordering::Release);
-            if let Some((header, body, length, color)) = posted {
-                queue.post_static(header, body, length, color);
-            }
-        }
-    }
+    send(Mail::Post { header, body, length, color });
 }
 
 /// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
 /// updated in place with this text, colour and a full `length`. `body` is copied (at most `BODY_MAX` bytes).
-/// Allocation-free.
+/// Allocation-free; any thread (it goes through the mailbox, see `post`).
 pub fn upsert(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
-    QUEUE.lock().upsert(id, header, Body::copied(body), length, color);
+    send(Mail::Upsert { id, header, body: Body::copied(body), length, color });
 }
 
-/// Remove the standing notice `id` (queued or on screen) and its delivery record.
+/// Remove the standing notice `id` (queued or on screen) and its delivery record. Any thread (through the mailbox).
 pub fn clear(id: u8) {
-    QUEUE.lock().clear_id(id);
+    send(Mail::Clear(id));
 }
 
+/// What a thread asks of the notification queue. Any thread posts it (the menu worker, the writer thread, package 4's and 6's
+/// notifications, a hook); the HUD tick, on the game's UI thread, applies it under `QUEUE` (stream/sync: no thread but the game's
+/// takes `QUEUE`).
+#[derive(Clone, Copy)]
+enum Mail {
+    Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
+    Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
+    Clear(u8),
+}
+
+static MAILBOX: hos_lock::Mailbox<Mail, 16> = hos_lock::Mailbox::new();
+
+fn send(mail: Mail) {
+    // A full mailbox drops the request and counts it (`take_dropped`, reported by the HUD tick).
+    let _ = MAILBOX.post(mail);
+}
+
+/// Apply the posted requests to the queue, in posting order (the HUD tick, under `QUEUE`).
+fn take_mail(queue: &mut Queue) {
+    MAILBOX.drain(|mail| match mail {
+        Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
+        Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
+        Mail::Clear(id) => queue.clear_id(id),
+    });
+}
 /// The standing notice `id` is queued (not yet shown for its whole time, not cleared).
 pub fn is_queued(id: u8) -> bool {
     QUEUE.lock().is_queued(id)

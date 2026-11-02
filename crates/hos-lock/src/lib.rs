@@ -10,10 +10,14 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+pub mod mailbox;
 pub mod snapshot;
+pub mod triple;
 pub mod word;
 
+pub use mailbox::Mailbox;
 pub use snapshot::Published;
+pub use triple::TripleBuffer;
 
 #[cfg(all(target_os = "switch", target_arch = "aarch64"))]
 pub mod horizon;

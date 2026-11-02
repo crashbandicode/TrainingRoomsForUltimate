@@ -184,6 +184,7 @@ pub fn diagnostic(args: fmt::Arguments<'_>) {
     }
 }
 
+
 /// Ring counters plus lock misses, for the install line and drop reports (`ring_dropped=…`).
 #[derive(Clone, Copy, Debug)]
 pub struct RingStats(pub diag_ring::Stats);

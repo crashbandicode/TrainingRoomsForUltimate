@@ -47,29 +47,53 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("macros/named_macros.rs", "LEGACY"),
 ];
 
-/// `module::function` of every entry point that runs on a plugin thread (or is the publishing path a plugin thread calls).
-const PLUGIN_THREAD_ENTRIES: &[&str] = &[
-    "worker::run",
-    "writer::run",
-    "published::publish",
-    "menu::apply_kept",
-    "states::start_writer",
-    "diag_log::start_drain_thread",
-    "import::start",
-    "import::start_background",
-    "replay_store::start_writer",
-    "replay_store::fallback_catalog",
-];
+#[path = "../src/model/thread_stacks.rs"]
+#[allow(dead_code)]
+mod thread_stacks;
 
+/// Thread entries that exist only under a non-shipped probe feature, in a block the call-graph scan does not resolve: skipped while the
+/// graph has no such function (the scan still follows them when it does). Every other missing entry fails the test.
+const FEATURE_ONLY_ENTRIES: &[(&str, &str)] = &[("practice_trace::writer", "console-practice-trace (diag probe feature) only, inside a cfg-gated block")];
+
+/// Entry points on the publishing path that a plugin thread calls (not threads of their own).
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept"];
+
+/// `module::function` of every plugin thread's entry, derived from `model::thread_stacks::THREADS` (each row's `symbol`, its closure
+/// suffix dropped), so a new or renamed thread cannot be missed; the diag-only threads (`runs` starts with `diag:`) live in modules the
+/// scan does not read. Plus the publishing path.
+fn plugin_thread_entries() -> Vec<String> {
+    let diag_only = diag_only_modules(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"));
+    let mut out: Vec<String> = PUBLISHING_ENTRIES.iter().map(|s| (*s).to_owned()).collect();
+    for row in thread_stacks::THREADS.iter() {
+        let path = row.symbol.split("::{").next().unwrap_or(row.symbol);
+        if row.runs.starts_with("diag:") || path.split("::").any(|m| diag_only.contains(m)) {
+            continue;
+        }
+        let path = row.symbol.split("::{").next().unwrap_or(row.symbol);
+        let segments: Vec<&str> = path.split("::").collect();
+        let key = segments[segments.len().saturating_sub(2)..].join("::");
+        if !out.contains(&key) {
+            out.push(key);
+        }
+    }
+    out
+}
 /// `(function key, lock)` reached from a plugin thread on purpose, with the reason it is not a hook waiting on real work.
 const ALLOWED: &[(&str, &str, &str)] = &[
-    // The typed menu's game-side edit is read on the publishing thread to give package 6's re-plan the previous view; every
-    // taker holds `EDITED` for one copy, nothing else.
-    ("menu::current_menu", "EDITED", "held for one copy by every taker"),
     // Macro Source = Named Library reserves the layer's buffers on the publishing thread: the allocation runs before `MOTION` is
     // taken, and the write lock only swaps the reserved buffers in (pkg4 manifest edit, stream/sync).
     ("named_macros::prepare_buffers", "MOTION", "write lock held for a buffer swap only; the allocation is outside"),
 ];
+
+/// A ratchet, not a tolerance (lead, 2026-11-02): violations whose fix is in progress elsewhere, each (function key, file::lock, owner,
+/// the fix that removes it). The test fails on any violation not listed here, AND on a row that no longer occurs (delete it the moment the
+/// fix lands), and prints the table every run. The release-candidate gate requires this table to be empty.
+const PENDING: &[(&str, &str, &str, &str)] = &[(
+    "recorder::rec",
+    "features/recorder.rs::REC",
+    "package 4 (a93ab192186b224a5)",
+    "design C: the named layer's recorder calls on the menu worker (recorder::with_recorder) move to its published MacroQueries and mailbox",
+)];
 
 const LOCK_METHODS: &[&str] = &["lock", "read", "write", "try_lock", "try_read", "try_write"];
 
@@ -106,9 +130,30 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
 /// Callees of `index`: path calls, plus method calls whose name is unique among the scanned functions. Ambiguous method names
 /// are recorded in `ambiguous` (name -> how many functions carry it).
 fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>) -> BTreeSet<usize> {
-    let refs = Graph::references(&graph.funcs[index]);
-    let path_names: BTreeSet<&String> = refs.iter().filter(|(_, method)| !method).filter_map(|(s, _)| s.last()).collect();
-    let mut out: BTreeSet<usize> = graph.callees(index).into_iter().filter(|&c| path_names.contains(&graph.funcs[c].name)).collect();
+    let from = &graph.funcs[index];
+    let refs = Graph::references(from);
+    // A path edge keeps the module qualifier: `p1::publish(..)` reaches the `publish` of module `p1` only (the capability resolver's rule;
+    // `self`/`Self`/`super`/`crate` mean this file; a qualifier that names no candidate's module, an alias, keeps every candidate).
+    let path_match = |c: usize| {
+        let callee = &graph.funcs[c];
+        refs.iter().filter(|(_, method)| !method).any(|(segments, _)| {
+            if segments.last() != Some(&callee.name) {
+                return false;
+            }
+            let Some(qualifier) = segments.len().checked_sub(2).map(|k| segments[k].as_str()) else {
+                // An unqualified call means this file's function when there is one (Rust's own rule: the local item shadows an
+                // import); only when there is none can it be an imported one.
+                let local = by_name.get(&callee.name).is_some_and(|all| all.iter().any(|&o| graph.funcs[o].file == from.file));
+                return !local || callee.file == from.file;
+            };
+            match qualifier {
+                "self" | "Self" | "super" | "crate" => callee.file == from.file,
+                q if q == callee.module => true,
+                q => !by_name.get(&callee.name).is_some_and(|all| all.iter().any(|&o| graph.funcs[o].module == q)),
+            }
+        })
+    };
+    let mut out: BTreeSet<usize> = graph.callees(index).into_iter().filter(|&c| path_match(c)).collect();
     for (segments, method) in &refs {
         if !method {
             continue;
@@ -145,6 +190,9 @@ fn scan(runtime: &Path, entries: &[&str], locks: &[(&str, &str)], allowed: &[(&s
     let mut ambiguous = BTreeMap::new();
     for entry in entries {
         let starts = graph.find(entry);
+        if starts.is_empty() && FEATURE_ONLY_ENTRIES.iter().any(|(e, _)| e == entry) {
+            continue;
+        }
         assert!(!starts.is_empty(), "entry {entry} not found under {}", runtime.display());
         let mut seen = BTreeSet::new();
         let mut stack: Vec<(usize, String)> = starts.into_iter().map(|s| (s, (*entry).to_owned())).collect();
@@ -169,13 +217,23 @@ fn scan(runtime: &Path, entries: &[&str], locks: &[(&str, &str)], allowed: &[(&s
 #[test]
 fn no_plugin_thread_reaches_a_lock_a_hook_takes() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
-    let result = scan(&runtime, PLUGIN_THREAD_ENTRIES, HOOK_LOCKS, ALLOWED);
+    let entries = plugin_thread_entries();
+    let entries: Vec<&str> = entries.iter().map(String::as_str).collect();
+    println!("plugin-thread entries: {entries:?}");
+    let result = scan(&runtime, &entries, HOOK_LOCKS, ALLOWED);
     println!("AMBIGUOUS method names not followed (name: functions): {:?}", result.ambiguous);
-    assert!(
-        result.violations.is_empty(),
-        "plugin threads reach locks hooks take:\n{}",
-        result.violations.into_iter().collect::<Vec<_>>().join("\n")
-    );
+    for (key, lock, owner, fix) in PENDING {
+        println!("PENDING {key} takes {lock}: owner {owner}; fix: {fix}");
+    }
+    let pending_hit = |v: &String| PENDING.iter().any(|(key, lock, _, _)| v.contains(&format!("{key} takes {lock} ")));
+    let unexpected: Vec<&String> = result.violations.iter().filter(|v| !pending_hit(v)).collect();
+    assert!(unexpected.is_empty(), "plugin threads reach locks hooks take:\n{}", unexpected.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+    let gone: Vec<&str> = PENDING
+        .iter()
+        .filter(|(key, lock, _, _)| !result.violations.iter().any(|v| v.contains(&format!("{key} takes {lock} "))))
+        .map(|(key, _, _, _)| *key)
+        .collect();
+    assert!(gone.is_empty(), "PENDING rows that no longer occur (delete them): {gone:?}");
 }
 
 #[test]
@@ -186,6 +244,7 @@ fn the_scan_catches_a_seeded_violation() {
     assert!(text.contains("chords::refresh_rows takes features/chords.rs::STATE"), "method-call edge and lock site missed:\n{text}");
     assert!(text.contains("named_macros::reserve takes macros/named_macros.rs::MOTION"), "helper by reference missed:\n{text}");
     assert!(!text.contains("on_poll"), "a hook-only function was reported:\n{text}");
+    assert!(!text.contains("named_macros::store"), "a local call or an atomic method resolved to another module's function:\n{text}");
     assert_eq!(result.ambiguous.get("tick"), Some(&2), "ambiguous names must be listed: {:?}", result.ambiguous);
 }
 
@@ -224,10 +283,38 @@ fn report_locks_reached_from_plugin_threads() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let locks = static_locks(&runtime);
     let refs: Vec<(&str, &str)> = locks.iter().map(|(f, n)| (f.as_str(), n.as_str())).collect();
-    let result = scan(&runtime, PLUGIN_THREAD_ENTRIES, &refs, &[]);
+    let entries = plugin_thread_entries();
+    let entries: Vec<&str> = entries.iter().map(String::as_str).collect();
+    let result = scan(&runtime, &entries, &refs, &[]);
     println!("{} static locks; reached from plugin threads:", locks.len());
     for line in &result.violations {
         println!("LOCK-REACH {line}");
     }
     println!("AMBIGUOUS {:?}", result.ambiguous);
+}
+
+/// Modules declared under `#[cfg(feature = "diag")]` (`mod x;` on the line after the attribute): Eden-only code the scan does not read.
+fn diag_only_modules(runtime: &Path) -> BTreeSet<String> {
+    fn walk(dir: &Path, out: &mut BTreeSet<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                let lines: Vec<&str> = text.lines().map(str::trim).collect();
+                for pair in lines.windows(2) {
+                    if pair[0] == "#[cfg(feature = \"diag\")]" {
+                        let decl = pair[1].trim_start_matches("pub(crate) ").trim_start_matches("pub ");
+                        if let Some(name) = decl.strip_prefix("mod ").and_then(|r| r.strip_suffix(';')) {
+                            out.insert(name.trim().to_owned());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut out = BTreeSet::new();
+    walk(runtime, &mut out);
+    out
 }

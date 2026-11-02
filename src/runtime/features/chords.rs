@@ -78,6 +78,7 @@ pub unsafe fn on_poll(controller: usize) {
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
         let passed = detector.poll(set, sample, block);
+        PENDING.store(detector.has_pending_request(), Ordering::Release);
         #[cfg(feature = "diag")]
         {
             if passed != 0 {
@@ -98,7 +99,10 @@ pub unsafe fn on_poll(controller: usize) {
 
 /// `combo_passes`: the request is pending; clears it.
 pub fn consume(request: Request) -> bool {
-    STATE.lock().detector.consume(request)
+    let mut state = STATE.lock();
+    let consumed = state.detector.consume(request);
+    note_pending(&state);
+    consumed
 }
 
 /// The CPU cycle chord passes on the controller that operates the CPU (package 6: native Behavior = Control): its own raw sample,
@@ -118,18 +122,31 @@ pub unsafe fn operator_cycle(controller: usize) -> bool {
 
 /// Some shortcut request is pending (package 6's roster cycle waits for it to be handled).
 pub fn any_pending() -> bool {
-    STATE.lock().detector.has_pending_request()
+    // Published (stream/sync slice 3): package 6's roster asks from the menu worker too, which must not take `STATE`.
+    PENDING.load(Ordering::Acquire)
+}
+
+/// Whether any shortcut request is pending, kept by every taker of `STATE` before it lets go (a game thread).
+static PENDING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn note_pending(state: &State) {
+    PENDING.store(state.detector.has_pending_request(), Ordering::Release);
 }
 
 /// The menu shortcut chord passed since the last call (the INI shortcuts, detected from the raw controller before
 /// the Plus bits are cleared for an accepted Plus shortcut): package 5's input adapter opens the menu from it.
 pub fn take_open_menu() -> bool {
-    STATE.lock().detector.consume(Request::OpenMenu)
+    let mut state = STATE.lock();
+    let consumed = state.detector.consume(Request::OpenMenu);
+    note_pending(&state);
+    consumed
 }
 
 /// Session clear: all pending requests go.
 pub fn session_clear() {
-    STATE.lock().detector.clear_session();
+    let mut state = STATE.lock();
+    state.detector.clear_session();
+    note_pending(&state);
 }
 
 /// The last published settings generation the detector adopted (only read and written under `STATE`). A publish replaces the six

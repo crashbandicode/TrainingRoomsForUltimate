@@ -103,6 +103,8 @@ pub mod state;
 pub mod storage;
 #[path = "model/ui/hash40.rs"]
 pub mod hash40;
+#[path = "model/ui/flow.rs"]
+pub mod flow;
 #[path = "model/ui/frame.rs"]
 pub mod frame;
 #[path = "model/ui/screens.rs"]

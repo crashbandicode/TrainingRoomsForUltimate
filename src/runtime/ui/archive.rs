@@ -16,8 +16,6 @@
 //! The diag build also writes the stock archive to `sd:/ultimate/TrainingRooms/stock/` so the host
 //! builder can derive the recipe from the player's own copy (never shipped in the release NRO).
 
-use std::fs::File;
-use std::io::Read;
 use std::sync::{Mutex, OnceLock};
 use std::thread::Thread;
 use std::time::Duration;
@@ -173,7 +171,7 @@ fn rebuilt(stock: &[u8], size: usize) -> Option<(Vec<u8>, usize, &'static str)> 
 
 /// The archive path of the Training HUD layout (found 2026-11-02 from `data.arc`: the one `layout.arc` entry of the stock
 /// size 451,604 B, path hash40 `0x3575fbb045`, which this string reproduces).
-const VANILLA_PATH: &str = "arc:/ui/layout/info/info_training/info_training/layout.arc";
+const VANILLA_PATH_C: &[u8] = b"arc:/ui/layout/info/info_training/info_training/layout.arc\0";
 
 /// Rebuild into `out` from the vanilla file; its length when it worked. The file is read once, front to back, into a second
 /// working buffer (one `read` loop, no `seek` and no `fstat`: Eden s5-21 and s5-22 saw the game's file layer read null pointers,
@@ -194,16 +192,32 @@ fn read_vanilla(buffer: &mut Vec<u8>, len: usize) -> Result<(), &'static str> {
     if len > buffer.capacity() {
         return Err("vanilla base larger than the boot buffer");
     }
-    let mut file = File::open(VANILLA_PATH).map_err(|_| "vanilla base not readable")?;
-    buffer.resize(len, 0);
-    let mut filled = 0;
-    while filled < len {
-        match file.read(&mut buffer[filled..]) {
-            Ok(0) | Err(_) => return Err("vanilla base not readable"),
-            Ok(n) => filled += n,
-        }
+    // Opened through the SDK with a static NUL-terminated path: `File::open` on the Switch std builds its own path copy on the heap
+    // (Eden s5-23: `load_allocations=1`), this call allocates nothing. Sequential reads at increasing offsets, no size query.
+    let mut handle = skyline::nn::fs::FileHandle { handle: 0 };
+    // SAFETY: `VANILLA_PATH_C` is NUL-terminated and static; mode 1 is read.
+    let opened = unsafe { skyline::nn::fs::OpenFile(&mut handle, VANILLA_PATH_C.as_ptr(), 1) };
+    if opened != 0 || handle.handle == 0 {
+        return Err("vanilla base not readable");
     }
-    Ok(())
+    buffer.resize(len, 0);
+    let mut filled = 0usize;
+    let mut result = Ok(());
+    while filled < len {
+        let mut got = 0u64;
+        // SAFETY: the destination is the unfilled tail of `buffer` (`len - filled` bytes).
+        let read = unsafe {
+            skyline::nn::fs::ReadFile1(&mut got, handle, filled as i64, buffer[filled..].as_mut_ptr(), (len - filled) as u64)
+        };
+        if read != 0 || got == 0 {
+            result = Err("vanilla base not readable");
+            break;
+        }
+        filled += usize::try_from(got).unwrap_or(len - filled).min(len - filled);
+    }
+    // SAFETY: `handle` was opened above and is closed once.
+    unsafe { skyline::nn::fs::CloseFile(handle) };
+    result
 }
 
 /// Park the rebuilt archive until its grace is over. No allocation: the list's room and the retire thread were made at
