@@ -1,4 +1,4 @@
-"""Package-6 Eden harness (a copy of pkg2's s2_eden.py: own root, profile s6, owner, display :98, labels s6-NN) for TrainingRoomsForUltimate (runs ON the Yoga).
+"""Package-6 Eden harness (copy of pkg2's host-aware s2_eden.py: own root, profile s6, owner, display :98, labels s6-NN; the ledger lives on the Yoga; hosts surface|yoga|ally)  # was: Package-1 Eden harness for TrainingRoomsForUltimate (runs ON the Yoga).
 
 Adapted from the playbook's tools/eden-solo/gv.py + solo.ps1 (playbook 53fd1f2): the private profile
 is a hard-linked copy of the Yoga source profile b (read-only game content hard-linked, everything
@@ -10,10 +10,10 @@ else copied; never a profile named a); only the copy is modified. Differences fr
     rule 2026-10-09) and is also kept in the profile's qt-config.ini;
   * claim before Up and release after Down (also after a failed Up) in the Yoga claim ledger.
 
-Usage: s6_eden.py up <label> [--nro p ...] [--settings json-file] [--diag-txt file]
-       s6_eden.py down <label>
-       s6_eden.py shot|press|stick|call|tree <label> ...
-       s6_eden.py scan <label>        (console.log: panic/abort/crash/Unmapped)
+Usage: tr_eden.py up <label> [--nro p ...] [--settings json-file] [--diag-txt file]
+       tr_eden.py down <label>
+       tr_eden.py shot|press|stick|call|tree <label> ...
+       tr_eden.py scan <label>        (console.log: panic/abort/crash/Unmapped)
 """
 import argparse
 import calendar
@@ -109,7 +109,9 @@ def open_claims():
         if not m:
             continue
         stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
-        names_hosts = re.findall(r"\b(surface|yoga)\b", line, re.I)
+        # The host a claim is ON ("... on the Ally"); a line that only mentions another host in passing ("pkg6's plan is the Surface")
+        # does not claim it. A line without an "on <host>" phrase falls back to every host it names (conservative).
+        names_hosts = re.findall(r"\bon (?:the )?(surface|yoga|ally)\b", line, re.I) or re.findall(r"\b(surface|yoga|ally)\b", line, re.I)
         concerns = not names_hosts or HOST.lower() in {h.lower() for h in names_hosts}
         state[m.group(3)] = m.group(2) == "CLAIMED" and (now - stamped) / 3600 < STALE_CLAIM_HOURS and concerns
     return [k for k, v in state.items() if v and k != OWNER]
@@ -277,23 +279,23 @@ def up(args):
         print(json.dumps({"active_claims": busy}))
         sys.exit(3)
     nro_hashes = {n.partition(":")[2] or Path(n).name: digest(n.partition(":")[0]) for n in args.nro}
-    ledger(f"CLAIMED: {OWNER} TrainingRooms package-2 Eden rows (CPU behaviours), "
+    ledger(f"CLAIMED: {OWNER} TrainingRooms package-6 Eden rows (sync_all probe, CPU-as-P1, hot swap), "
            f"solo run {label} on the {HOST}, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"{SOURCE.parent.parent.name}/profiles/{SOURCE.name}), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
         print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
                                   if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
-                        "-Action", "Start", "-Unit", f"trp1-{label}-display", "-Socket", f"wayland-trp1-{label}",
+                        "-Action", "Start", "-Unit", f"trp6-{label}-display", "-Socket", f"wayland-trp6-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
                        check=True, stdout=subprocess.DEVNULL)
         if not SURFACE:  # the Yoga's GPU reservation lock; the Surface has none
-            subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit=trp1-{label}-gpu-lock",
+            subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit=trp6-{label}-gpu-lock",
                             "--property=RuntimeMaxSec=3600", "--property=TimeoutStopSec=5", "/usr/bin/flock",
                             "--nonblock", "/tmp/opencode/yoga-gpu-reservation.lock", "/usr/bin/sleep", "3600"],
                            check=True)
             time.sleep(1)
-            active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"trp1-{label}-gpu-lock"],
+            active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"trp6-{label}-gpu-lock"],
                                     capture_output=True, text=True).stdout.strip()
             assert active == "active", "Yoga GPU lock is held by someone else"
         print("launch", json.dumps(launch(label)))
@@ -344,13 +346,13 @@ def down(args, failed=False):
         note = {"pid": pid, "alive": alive(), "state": s.get("state"), "reason": s.get("reason"),
                 "exit_code": s.get("exit_code")}
     subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
-                    "-Action", "Stop", "-Unit", f"trp1-{label}-display", "-Socket", f"wayland-trp1-{label}",
+                    "-Action", "Stop", "-Unit", f"trp6-{label}-display", "-Socket", f"wayland-trp6-{label}",
                     "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"], check=False,
                    stdout=subprocess.DEVNULL)
-    subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"trp1-{label}-gpu-lock"], check=False,
+    subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"trp6-{label}-gpu-lock"], check=False,
                    stderr=subprocess.DEVNULL)
     left = eden_processes()
-    ledger(f"RELEASED: {OWNER} TrainingRooms package-2 Eden run {label} stopped on the {HOST} (display {DISPLAY} "
+    ledger(f"RELEASED: {OWNER} TrainingRooms package-6 Eden run {label} stopped on the {HOST} (display {DISPLAY} "
            f"stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
            f"No physical Switch writes.")
     print("down", json.dumps({"label": label, "failed_up": failed, **note, "left": left}))
