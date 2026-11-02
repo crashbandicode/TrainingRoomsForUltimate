@@ -95,9 +95,24 @@ pub fn consume(request: Request) -> bool {
     STATE.lock().detector.consume(request)
 }
 
+/// The CPU cycle chord passes on the controller that operates the CPU (package 6: native Behavior = Control): its own raw sample,
+/// no pending flag.
+///
+/// # Safety
+/// `controller` is the live `Controller` pointer of the operator's poll, or 0.
+pub unsafe fn operator_cycle(controller: usize) -> bool {
+    if controller == 0 {
+        return false;
+    }
+    let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
+    let sample = Sample::of(read(field::STYLE), read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
+    let state = STATE.lock();
+    !blocked() && Detector::operator_cycle(&state.chords, sample)
+}
+
 /// Some shortcut request is pending (package 6's roster cycle waits for it to be handled).
 pub fn any_pending() -> bool {
-    STATE.lock().detector.any_pending()
+    STATE.lock().detector.has_pending_request()
 }
 
 /// The menu shortcut chord passed since the last call (the INI shortcuts, detected from the raw controller before

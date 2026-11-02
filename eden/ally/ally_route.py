@@ -1,9 +1,9 @@
 """Package-2 route on the Ally, from the Surface: mute, load, title -> main menu -> Training stage select -> Final Destination
 (tile 4) -> character select (P1 Steve, tile 78, the CPU a random fighter) -> Training. The route is the one walked by hand on
-2026-11-02 (s5-01); every wait is gated on the tile cursor's log (`ssbu-tile-cursor/events.log`) or the plugin's own lines, with a
+2026-11-02 (s2-01, s5-01); every wait is gated on the tile cursor's log (`ssbu-tile-cursor/events.log`) or the plugin's own lines, with a
 cap, and a miss stops the route (it never presses on onto a screen it has not seen).
 
-    ally_route.py <phase>            e.g. live-s5-02 (Eden already launched with wa_s5.py)
+    ally_route.py <phase>            e.g. live-s2-02 / live-s5-02 (Eden already launched with the stream's adapter, ally_launch.py)
 """
 import json
 import sys
@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ally_conf as conf
 import ally_ops as ao
 
 TILE = "ssbu-tile-cursor/events.log"
@@ -45,7 +46,7 @@ def shot_png(phase, name):
     """One frame of the game through Eden's recorder (renderer read-back; the desktop does not matter)."""
     from PIL import Image
     run(phase, [["gshot", name, 2, 960, 700]])
-    gif = ao.get(phase, f"shots/{name}.gif", "/tmp/tr-pkg5/shots")
+    gif = ao.get(phase, f"shots/{name}.gif", f"{conf.local(conf.stream(phase))}/shots")
     image = Image.open(gif)
     image.seek(image.n_frames - 1)
     return image.convert("RGB")
@@ -88,7 +89,8 @@ def main():
     run(phase, [["sleep", 2], ["hold", ["lstick", "up"], 150, 1.0], ["button", "a", 150, 1.5]])
     wait_count(phase, TILE, "settled screen=css at=78 ", 1, 10, "Steve (tile 78)")
     run(phase, [["button", "a", 150, 1]])
-    wait_count(phase, DIAG, "cpu_hook_counts frames=", 1, 120, "Training: the match runs (cpu hook counts)")
+    # Package 5 gated on the hook counts, package 2 on the CPU body's role line: either shows the match runs.
+    wait_count(phase, DIAG, "cpu_event role entry=1|cpu_hook_counts frames=", 1, 120, "Training: the match runs (CPU role or hook counts)")
     print("ROUTE DONE", flush=True)
 
 

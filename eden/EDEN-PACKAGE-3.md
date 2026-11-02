@@ -25,22 +25,37 @@ NRO libtraining_rooms `a9ddf957dd2006c104ace90b6c96ecbf69fbc83e4f87120c412590ab0
 restored. The `training scene` screenshot gate missed its threshold (31.4 against 30); verified by dump and
 screenshot, not a plugin defect.
 
-## Planned s3-03 (diag NRO `e4912885c2cd7fa6c9eb8b4eebdd38a5683c1bab9369e889d2eceb07799755ed`, boot with the pilot)
+## Batch s3-03 to s3-07 (2026-11-02, Yoga, pilot and tile cursor installed, `core.volume=0`, console.log scan 0 matches except s3-03)
 
-1. Cloud buff Limit (`s3-cloud-states.json`, slot 3, kind 62): after Load the Limit gauge is full, no summon or
-   cutscene, the silence holds (`buff_done` line).
-2. Pilot coexistence: install line with the pilot, `req_on_joint` hooked by this plugin and called by the pilot.
-3. Pokemon Trainer (`s3-pt-states.json`: saved Ivysaur, slot 3; P1 starts with Squirtle): Load; expect the trainer
-   not to throw a ball, Ivysaur out at x -20, no flying plate, no switch sound (`se_silenced` > 0, `se_passed` = 0),
-   `decide=1`, `pt_switch_done` line, trainer grounded. If `pt_decide_rejected` appears, log the descriptor and
-   root-cause it.
-4. Kirby: `diag-copy.req` (opponent's hat via the game's own routine), `diag-pos.req` (dump: copy flag, chara,
-   module kind; report which of `INT_COPY_CHARA` and `+0x17398` matched the copied kind), Save, Load, dump again:
-   the hat returns, `copy_hook` = 1; the saved file has `copy_charge` only for a copied fighter that has a flag.
-5. Sound check: no `state se ... silenced=false` line during a load, `se_passed` = 0.
+| Run | NRO (sha256) | Source commit | Result |
+| --- | --- | --- | --- |
+| s3-03 | diag `e4912885c2cd7fa6c9eb8b4eebdd38a5683c1bab9369e889d2eceb07799755ed` | 4fdf560 | install line `result=installed` with the new rows (`state_pokemon_decide=stock/near`, `state_kirby_opff=stock/far`, `state_effect_req_on_joint_hook=stock/far`, pilot present). **FAIL**: Cloud Load with Limit crashed after `done ... next=ApplyBuff` (`ExceptionRaised ... unmapped address 0x0`, PC=4, LR main+0x8dc1b0; `runs/s3-03/console-excerpt.txt`). Root cause: the game's add-limit routine reads the work module at `x0 + 0x50`, only a module accessor has one; `cloud_add_limit` passed the fighter object. Fixed in 1076ddc (site note too). |
+| s3-04 | diag `d36dd4f4d8dc11e6baa121226950975f7e3c1cf1bccefc109481b4774c41089d` | 1076ddc | **Pass**: Cloud Load with Limit: `buff_done entry=0 kind=Cloud`, `restored`, Limit gauge full with the glow (`shots/062351-cloud-after-load.png`); the CPU Wii Fit Trainer also buffed and done. |
+| s3-05 | same | 1076ddc | **Pass with two findings**: Pokemon Trainer (P1 Squirtle, saved Ivysaur): `pt_decide entry=0 saved=37 descriptor=Descriptor { count: 3, kinds: [36, 37, 38] }` (accepted, no rejection), three trainer-switch sounds `silenced=true`, the change-light effect hidden for the Pokemon (kind 36), `pt_switch_done grounded=true`, Ivysaur at x -20 (`shots/062629-pt-after.png`). Findings: `heap_allocations=1` after the load: `decide_index` built a `Vec` in the hook (root cause, fixed in 13be87c); the position dump printed only the CPU because a switched Pokemon runs after the CPU (dump bug, fixed). |
+| s3-06 | diag `e39444a8d39d98f0942bcacfa3f401e5cd8a93370bcf78a0f283d28f5c4a90f2` | 13be87c | **Pass**: Kirby vs CPU kind 11: `diag-copy.req` gave the hat by the game's own routine; dump `copy_flag=true chara=11 module_kind=11` (both sources matched the copied kind, spec open question 5); Save wrote `has_charge true, int_z 11`; Load: `kirby_copy ... accepted=true`, the copy sound `0x14bdd3e7c8` `silenced=true`, `kirby_copy_started`, hat back (`copy_flag=true chara=11`), `copy_hook=1`, `heap_allocations=0`. (The copied charge of Samus and the other fighters is host-tested; the CPU was random.) |
+| s3-07 | same | 13be87c | **Pass**: Pokemon Trainer again: `heap_allocations=0`, both bodies dumped (P1 kind 37 at x -20), `se_silenced=3 se_passed=0 decide=1`; then Down+B switched Ivysaur to Charizard (kind 38) and a Load of the saved Ivysaur brought out Ivysaur (kind 37, spec edge case 1) with no rejection and the same three silenced sounds. |
 
-## Planned s3-04 (first-boot import on a copy of the fork folder)
+Evidence: `eden/runs/s3-03` to `s3-07` (`diag.log`, `events.log`, `run.json`, `memory.peak`, `save_states.json`,
+`shots/`). The Kirby and Sora load-time silences showed `se_passed=0` in every run (spec open question 4 holds
+on these rows; Sora's jingle was not exercised).
 
-Copy of the fork-folder fixture including a `developer.ini` of exactly `developer_page=on` plus one LF; run the
-checker `check-migration.py verify`: imported files hashed, originals untouched, the marker written last, the
-staging folder skipped and counted, the item setting converted once on the copy.
+## Runs s3-08 to s3-10 (first-boot import on a copy of the fork folder, release NRO)
+
+NRO release `aefbcad56be10d8fa16c39b3ae2be7e9a2a874b3984235f1788489d4a2685948` (13be87c) with the pilot and the tile
+cursor; no `settings.json` or `save_states.json` placed, `developer.ini` = `developer_page=on` plus one LF placed in
+`TrainingRooms/` (as the card swap does), the fork folder `TrainingModpack/` in the profile replaced by a fixture:
+`training_modpack_menu.conf` (the real one), `training_modpack.toml` (legacy, not imported), a ported fork-written
+`save_states.json`, `button_config.ini`, `replay_capture.ini`, `mii-presets.json`, `setups/one.json`,
+`macros/one.json`, `replay_captures/cap-1.bin`, a staging folder `replay_captures/.cap-2.smd-12345.tmp/part`, and a
+fork trace file `practice-trace-1.log` (not imported).
+
+| Run | What | Result |
+| --- | --- | --- |
+| s3-08 | first attempt | not run: the harness wrote CLAIMED while the foreign `m5qo1` claim was open and the GPU lock refused; released at once (process slip, see IMPLEMENTATION-PROGRESS-pkg3.md) |
+| s3-09 | fixture as above (character item setting None) | **Pass**: install line `migration=done captures=running skipped_staging=1 result=installed`; `migration.json` `result=done`, `converted_item_snapshots=0`; `check-migration.py verify` `MIGRATION CHECK PASS` (fork folder unchanged, every planned file present with the planned bytes and the receipt hashes, the staging folder not copied and counted, nothing from the not-imported list, `developer.ini` untouched and not taken as the marker). Scan 0 matches. |
+| s3-10 | same, with the conf's `character_item` = Player 1st Var. and a `save_states.json` whose player records are Daisy without a snapshot | **Pass**: `converted_item_snapshots=5`; the copied `save_states.json` has the Smile Turnip snapshot (`choice 2, variation 0`) on the five player records and none on the CPU records; the fork's own file is unchanged; `verify` PASS. Scan 0 matches. |
+
+Evidence: `eden/runs/s3-09`, `s3-10` (`rooms/`, `fork-after/`, `verify-report.json`, `diag.log`, `events.log`,
+`run.json`, `memory.peak`; gitignored). Not run: the I/O-error and interrupted-background cases, which are covered by the
+13 filesystem host tests (`tests/migration_run.rs`).
+

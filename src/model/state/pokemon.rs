@@ -43,7 +43,8 @@ pub fn decide_index(saved_kind: i32, descriptor: Option<Descriptor>, kinds: Kind
         return None;
     }
     let cycle = kinds.cycle();
-    let found: Vec<i32> = descriptor.kinds.iter().map(|k| *k as i32).collect();
+    // An array, not a `Vec`: this runs inside a game hook, which must not allocate.
+    let found = [descriptor.kinds[0] as i32, descriptor.kinds[1] as i32, descriptor.kinds[2] as i32];
     let rotation = (0..3).any(|start| (0..3).all(|i| found[i] == cycle[(start + i) % 3]));
     if !rotation {
         return None;

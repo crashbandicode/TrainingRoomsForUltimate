@@ -872,7 +872,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                     if let mii_cycle::Target::Saved(choice)=step.target {
                         trace!("[MiiOrdinaryCpu] skipped unqualified cycle choice class={:?} slot={:?} reason={}",
                             choice.canonical.class,choice.slot_id,reason);
-                        notify(Role::Cpu,format!("CPU {:?} choice skipped",choice.canonical.class).into());
+                        notify_args(Role::Cpu,format_args!("CPU {:?} choice skipped",choice.canonical.class));
                     }
                     None
                 }

@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import ally_conf as conf  # noqa: E402
 import ally_log as al  # noqa: E402
 import ally_ops as ao  # noqa: E402
 import mk_settings as mk  # noqa: E402
@@ -34,17 +35,19 @@ def names_by_id(lines):
 def main():
     label, actions = sys.argv[1], sys.argv[2:] or DEFAULT
     phase = f"live-{label}"
-    gen = Path("/tmp/tr-pkg5/gen")
+    stream = conf.stream(label)
+    gen = Path(conf.local(stream)) / "gen"
+    settings = f"{conf.work(stream)}/settings"
     gen.mkdir(parents=True, exist_ok=True)
     results = []
     for action in actions:
         body = mk.settings(mash_state=mk.row("mash_state", action, names=mk.ACTIONS), mash_triggers=mk.row("mash_triggers", "Always", names=mk.TRIGGERS))
         name = "m-" + re.sub(r"[^a-z0-9]+", "-", action.lower()) + ".json"
         (gen / name).write_text(json.dumps(body, separators=(",", ":")))
-        subprocess.run(["/usr/bin/scp", "-q", *al.KEY, str(gen / name), f"intpa@dreamland-ally:C:/Eden/trainingrooms-pkg5/settings/{name}"], check=True)
+        subprocess.run(["/usr/bin/scp", "-q", *al.KEY, str(gen / name), f"{conf.HOST}:{settings}/{name}"], check=True)
         al.fetch(label)
-        before = len((al.LIVE / f"{label}.practice-diagnostics.log").read_text(errors="replace").splitlines())
-        ao.ops(phase, [["settings", f"C:\\Eden\\trainingrooms-pkg5\\settings\\{name}"], ["waitplug", "TrainingRooms/practice-diagnostics.log", "diag_settings_reload", 20], ["hold", ["l", "r", "a"], 400, 1.0], ["sleep", 4]], 120)
+        before = len((al.live(label) / f"{label}.practice-diagnostics.log").read_text(errors="replace").splitlines())
+        ao.ops(phase, [["settings", conf.win(f"{settings}/{name}")], ["waitplug", "TrainingRooms/practice-diagnostics.log", "diag_settings_reload", 20], ["hold", ["l", "r", "a"], 400, 1.0], ["sleep", 4]], 120)
         log = al.fetch(label)
         text = log.read_text(errors="replace").splitlines()
         ids = names_by_id(text)

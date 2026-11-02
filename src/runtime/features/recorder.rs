@@ -363,7 +363,7 @@ unsafe fn on_ai_frame(ai: usize) {
             && game::natives::status_kind(body.accessor) == STATUS_CLIFF_WAIT.load(Ordering::Acquire)
             && natives::get_int(body.accessor, rest) < crate::model::recording::CLIFF_REST_TIMER_LOW
         {
-            natives::set_int(body.accessor, rest, crate::model::recording::CLIFF_REST_TIMER);
+            natives::set_int(body.accessor, crate::model::recording::CLIFF_REST_TIMER, rest);
         }
     }
 
@@ -591,14 +591,16 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
     }
 }
 
-/// P1's next `frames` polls read as neutral (see `SWALLOW`).
 /// The CPU's fighter kind now (diag lines of the named layer's roster row).
+#[cfg(feature = "diag")]
 pub fn cpu_kind() -> Option<i32> {
     // SAFETY: the natives answer only once their guards passed; the read is of the live body.
     unsafe { cpu_body() }.map(|body| unsafe { ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read() })
 }
 
-/// The recorder's phase (diag lines).
+/// The recorder's phase (diag lines: its one caller is the diag build's named-layer harness, `macros::diag`, so the function is not in
+/// the shipped NRO).
+#[cfg(feature = "diag")]
 pub fn phase() -> Phase {
     REC.lock().phase()
 }
@@ -613,6 +615,7 @@ pub fn set_current_facing(facing: f32) {
     REC.lock().set_current_facing(facing_of(facing));
 }
 
+/// P1's next `frames` polls read as neutral (see `SWALLOW`).
 pub fn swallow_p1(frames: u8) {
     SWALLOW.store(frames, Ordering::Release);
 }

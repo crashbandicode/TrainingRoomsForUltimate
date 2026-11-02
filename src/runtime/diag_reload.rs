@@ -38,7 +38,29 @@ pub fn start() {
     }
 }
 
+/// `diag-item.req`: one line, a choice of the item table (`ITEM_NAMES`). The Give item screen is not built yet, so Eden asks the item
+/// engine for a grant through this file; the game thread takes the request (`lobby::frame`, `take_item_request`) and calls
+/// `character_items::request` exactly as the screen's A press will.
+const ITEM_NAME: &str = "diag-item.req";
+
+static ITEM_REQUEST: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// The item choice Eden asked for, once.
+pub fn take_item_request() -> Option<usize> {
+    usize::try_from(ITEM_REQUEST.swap(-1, std::sync::atomic::Ordering::AcqRel)).ok()
+}
+
+fn poll_item_request() {
+    let Some(path) = FixedPath::<128>::in_root(ITEM_NAME) else { return };
+    let Ok(bytes) = fs::read(path.as_str()) else { return };
+    let _ = fs::remove_file(path.as_str());
+    let choice = String::from_utf8_lossy(&bytes).trim().parse::<i32>().unwrap_or(-1);
+    diagnostic(format_args!("[TrainingRooms] diag_item_request choice={choice}"));
+    ITEM_REQUEST.store(choice, std::sync::atomic::Ordering::Release);
+}
+
 fn poll() {
+    poll_item_request();
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());
