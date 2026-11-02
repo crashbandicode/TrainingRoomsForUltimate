@@ -448,3 +448,7 @@ ACTIVE17:44:28Z Yoga CLAIM one diag164dc3e, session75102 remote scope run-p12494
 - StopJobeden-win-9b7a4dc65bd9, freshEden0. Restore5plugins/2exefs/87files/qt mismatches[] keptchanges[] originalCLAIM. Manifestfilename175843 (receiptat175844); initialguessed175844fetchfailed, fetchedactualnamedmanifestandverifiedreceipt. Rawlogs/screens/run/settings/rows/evidence/memory.peak5288398848 retainededen/runs/ui-14. Ledgerreleased17:59Z, ownAllyqueue removed. Surfacehost164 stillqueued.
 
 - Hostgate relocated18:02Z: removed ownUNRUN Surface164queue, appendedYogaEND sameRust164dc3e. Existing ownsrc/target reused, no duplicatecache. Copiedowned ELF from pkg6retainedartifact into ownroot/research/game-13.0.5/main-13.0.5.elf, source/dest SHA0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2 verified. build.ps1 test now --no-fail-fast, ordered164dc3e-test.log/json; noSKIP. No ownclaim.
+
+### Owned warning wiring / new host priority18:0xZ
+- Read bindingoperator PRIORITYOVERRIDE atqueuehead: TrainingRoomsfirst; fork1turnafter2TrainingRooms oridle; imguiidleonly, runningclaimsfinishnormally. Supersedesoldinterleave; ledger/process/mute/singlecargo rulesunchanged.
+- Removed ownUNRUN Yoga164hostqueue before Rustedit. Rendererloss nowcalls existingmenu_app::captures_input(), whosebody is exactlythe duplicatedreadiness_facts(0).owns_input predicate. Resolvesoneowneddeadcodewarning byusingintendedAPI; no featuredeletion/lintallow/nativeownershipchange. Freshsource/gatesnext; ui14evidence remains164dc3e.

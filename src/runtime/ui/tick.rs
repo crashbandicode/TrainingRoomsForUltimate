@@ -200,7 +200,7 @@ fn renderer_lost(reason: &str) {
         chips::lose_layout();
     }
     let was_ready = LAYOUT_READY.swap(false, Ordering::AcqRel);
-    if state::readiness_facts(0).owns_input {
+    if super::menu_app::captures_input() {
         state::release_menu();
         log(format_args!("[Ui] menu released: renderer lost ({reason})"));
     } else if was_ready {
