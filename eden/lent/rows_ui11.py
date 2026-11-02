@@ -4,6 +4,7 @@ Player and CPU lists, Player Character), the install line read whole, and the ho
     rows_ui11.py live-ui-11
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -91,7 +92,7 @@ def main():
            f"player={final_player} cpu={final_cpu}")
     # Read whole lines from the retained file: the plug transport truncates each
     # line, which can hide coverage and the per-hook allocation attribution.
-    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]|\\[ThreadStack\\]' | ForEach-Object {{ $_.Line }}")
+    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]|\\[ThreadStack\\]|\\[Thumbs\\]' | ForEach-Object {{ $_.Line }}")
     (r6.OUT / "roster-hook-stats.log").write_text(stats, encoding="utf-8")
     ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
     r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
@@ -99,6 +100,10 @@ def main():
     ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
     r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
            "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
+    requests = [int(n) for n in re.findall(r"\[Thumbs\] page .* requested=(\d+)", stats)]
+    bound = [int(n) for n in re.findall(r"\[Thumbs\] bound=(\d+)", stats)]
+    r6.row("roster requests and binds runtime portrait textures",
+           any(requests) and any(bound), f"requested={requests} bound={bound}")
     threads, _, spawns = stack_table.collect(stats.splitlines())
     menu_stack = threads.get("tr-menu")
     # The approved table uses 25% headroom plus 16 KiB SDK reserve,
