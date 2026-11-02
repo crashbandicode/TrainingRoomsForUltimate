@@ -32,6 +32,13 @@ pub(crate) fn init() {
 /// Once per game frame, before the input processing (the input poll's note for Player 1).
 pub(crate) fn update() {
     training::lobby::update();
+    // A practice session starts (or ends) with the lobby practice: a lease left from before is dropped silently, the next frame
+    // acquires a fresh one (`frame`). Training's session starts with the scene (the lease is empty then).
+    static WAS_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let active = training::lobby::active();
+    if active != WAS_ACTIVE.swap(active, std::sync::atomic::Ordering::AcqRel) {
+        training::practice::forget();
+    }
 }
 
 /// A fighter's on-init has run (the reset hub's wrapper): the practice engine records the entry.
@@ -52,7 +59,12 @@ pub(crate) unsafe fn observe(fighter: usize) {
 pub(crate) unsafe fn frame(fighter: usize) {
     let entry = ((fighter + FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     if entry_id_valid(entry) && entry == 0 {
+        // Entries replaced (a hot swap) retire the session first, then a session with both entries ready acquires the lease: the
+        // practice session the save and record slots belong to. `entry_departed` (the roster's destruction path) retires at once.
         training::practice::refresh();
+        if !training::practice::owned() && training::practice::enabled() {
+            training::practice::acquire();
+        }
         // The roster cycle's once-per-game-frame steps run on Player 1's body (each returns at once when nothing is pending): the
         // source leases, the Kirby hat requests, the item engine (a granted or restored item) and the preload planner.
         let accessor = game::natives::fighter_accessor(fighter);

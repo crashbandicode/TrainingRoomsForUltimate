@@ -38,6 +38,18 @@ unsafe fn entries() -> Option<Entries> {
     Some(Entries { context: context()?, player: entry(0)?, cpu: entry(1)? })
 }
 
+pub unsafe fn acquire() -> bool {
+    let Some(current) = entries() else { return false; };
+    if common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::Player).is_none()
+        || common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU).is_none() { return false; }
+    OWNED.lock().unwrap().acquire(current)
+}
+
+pub fn forget() { OWNED.lock().unwrap().retire(); }
+
+/// Whether a practice session (the entry lease) is held now.
+pub fn owned() -> bool { OWNED.lock().unwrap().active() }
+
 /// Invoked before consumer callbacks and before native entry destruction.
 pub fn retire() {
     let owned = OWNED.lock().unwrap().retire();
