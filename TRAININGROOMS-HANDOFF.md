@@ -54,6 +54,19 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 - READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
   pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
+### 2026-11-02 ~05:0xZ — autonomous build-out (operator order via the primary)
+
+- Order: build every remaining package end to end (all designed and agreed features, N1–N10, carried fork features,
+  fix-ledger rows as the fork lands them), gated and pushed fast-forward; online rows on the Surface + Yoga pair;
+  an RC (gates + size statement + provenance matrix + illustrated summary) → tell the primary, then Fable 5.1 and
+  Codex Astra review it and their findings are fixed at the root before the card swap (the primary's order).
+  Blockers go to `TRAININGROOMS-STATUS.md` "## BLOCKED"; non-root workarounds are parked as operator decisions.
+- Streams (Sonnet 5.5 high), rules `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`: pkg2 CPU,
+  pkg3 save states, pkg4 recording/input, pkg5 menu rendering/layout/assets, pkg6 carry-over (plan first). Each on
+  `stream/<name>` in `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-<name>`, target
+  `cargo-targets/trainingrooms-<name>`, Yoga folder `/home/intpa/trainingrooms-build-<name>`, Eden labels `s<N>-NN`.
+  The lead merges into `work/implementation` at each gate (integration worktree `TrainingRoomsForUltimate-work`,
+  lead only) and deletes stream branches at the end.
 ### 2026-11-02 ~04:4xZ — standing push order; package 1 complete on origin
 
 - Operator (via the primary): general push permission until the first version ships to the card — fast-forward
