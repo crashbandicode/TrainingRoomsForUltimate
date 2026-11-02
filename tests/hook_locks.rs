@@ -56,7 +56,7 @@ const PLUGIN_THREAD_ENTRIES: &[&str] = &[
     "states::start_writer",
     "diag_log::start_drain_thread",
     "import::start",
-    "import::spawn_background",
+    "import::start_background",
     "replay_store::start_writer",
     "replay_store::fallback_catalog",
 ];
