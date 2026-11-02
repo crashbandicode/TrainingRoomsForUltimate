@@ -390,11 +390,11 @@ impl Panes {
     }
 }
 
-// ---- the situation overrides screen (mockup 06): two columns of action boxes under the situation line -------
-const OVERRIDE_COL_W: f32 = 640.0;
-const OVERRIDE_COL_X: [f32; 2] = [-120.0, 560.0];
-const OVERRIDE_FIRST_Y: f32 = 230.0;
-const OVERRIDE_PITCH: f32 = 60.0;
+// ---- the situation overrides screen (mockup 06): columns of action boxes under the situation line -------
+const OVERRIDE_COL_W: f32 = 420.0;
+const OVERRIDE_COL_X: [f32; 3] = [-230.0, 210.0, 650.0];
+const OVERRIDE_FIRST_Y: f32 = 250.0;
+const OVERRIDE_PITCH: f32 = 54.0;
 
 impl Panes {
     unsafe fn draw_overrides(&self, frame: &Frame) {
@@ -402,7 +402,7 @@ impl Panes {
             return;
         }
         let rows = usize::from(frame.tile_rows.max(1));
-        let at = |i: usize| (OVERRIDE_COL_X[(i / rows).min(1)], OVERRIDE_FIRST_Y - (i % rows) as f32 * OVERRIDE_PITCH);
+        let at = |i: usize| (OVERRIDE_COL_X[(i / rows).min(2)], OVERRIDE_FIRST_Y - (i % rows) as f32 * OVERRIDE_PITCH);
         for i in 0..p::TILES {
             if i >= usize::from(frame.tile_count) {
                 continue; // draw_tiles hid it

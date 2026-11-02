@@ -344,14 +344,14 @@ fn swap_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     let _ = frame.hint.write_str("Up/Down move   A switch   B back");
 }
 
-/// Situation overrides (mockup 06): the situation dropdown line, then the 13 actions as boxes in two columns (7 and 6);
+/// Situation overrides (mockup 06): the situation dropdown line, then the actions as boxes in columns of 10;
 /// a ticked action is on the accent. Left / Right on the situation line change it, on a box they step a column.
 fn overrides_frame(menu: &Menu, screen: &Screen, situation: usize, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
     let (name, id) = SITUATIONS[situation];
     let current = menu.settings().menu.get(id).map(<[u8]>::to_vec).unwrap_or_default();
     frame.view = View::Overrides;
-    frame.tile_cols = 2;
+    frame.tile_cols = ACTIONS.len().div_ceil(OVERRIDE_COLUMN) as u8;
     frame.tile_rows = OVERRIDE_COLUMN as u8;
     frame.tile_count = ACTIONS.len() as u8;
     for (i, action) in ACTIONS.iter().enumerate() {
@@ -527,27 +527,26 @@ mod tests {
         assert_eq!(frame(&m).tile_state[28], 1, "a tick shows");
     }
     #[test]
-    fn the_overrides_screen_is_two_columns_of_boxes_and_left_right_step_a_column() {
+    fn the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column() {
         let mut m = menu();
         open(&mut m, "Situation overrides");
         let f = frame(&m);
-        assert_eq!((f.view, f.tile_count, f.tile_rows, f.tile_cols), (View::Overrides, 13, 7, 2));
+        assert_eq!((f.view, f.tile_count, f.tile_rows, f.tile_cols), (View::Overrides, 30, 10, 3));
         assert_eq!(f.tile_focus, 255, "the cursor starts on the situation line");
         assert_eq!(f.focus, Some(0));
         m.press(Button::Down);
         assert_eq!(frame(&m).tile_focus, 0);
         m.press(Button::Right);
-        assert_eq!(frame(&m).tile_focus, 7, "the other column, same row");
+        m.press(Button::Right);
+        assert_eq!(frame(&m).tile_focus, 20, "two columns right, same row");
+        m.press(Button::Right);
+        assert_eq!(frame(&m).tile_focus, 20, "no step past the last column");
+        m.press(Button::Left);
         m.press(Button::Left);
         m.press(Button::Left);
         assert_eq!(frame(&m).tile_focus, 0, "no step past the first column");
-        for _ in 0..6 {
-            m.press(Button::Down);
-        }
-        m.press(Button::Right);
-        assert_eq!(frame(&m).tile_focus, 6, "the second column holds 6: row 7 has no right neighbour");
         m.press(Button::A);
-        assert_eq!(frame(&m).tile_state[6], 1);
+        assert_eq!(frame(&m).tile_state[0], 1);
     }
     #[test]
     fn the_swap_groups_overrides_chords_and_chord_editor_have_frames() {

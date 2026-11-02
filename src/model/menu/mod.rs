@@ -210,8 +210,8 @@ pub enum Screen {
 /// The delay popup's checklist is drawn as columns of this many boxes (mockup 19).
 pub const DELAY_ROWS: usize = 4;
 
-/// The situation overrides screen draws its 13 actions in two columns: the first holds this many (mockup 06).
-pub const OVERRIDE_COLUMN: usize = 7;
+/// The situation overrides screen draws its 30 actions in three columns of this many boxes (mockup 06 shows 13 in two).
+pub const OVERRIDE_COLUMN: usize = 10;
 
 /// The menu.
 #[derive(Clone, Debug)]
@@ -1153,7 +1153,7 @@ impl Menu {
                 self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0));
             }
             Button::Right if cursor == 0 => self.top(screen((situation + 1) % SITUATIONS.len(), 0)),
-            // The actions are drawn in two columns of OVERRIDE_COLUMN (mockup 06): Left / Right step to the other column.
+            // The actions are drawn in columns of OVERRIDE_COLUMN (mockup 06): Left / Right step a column.
             Button::Left | Button::Right if cursor > 0 => {
                 let at = cursor - 1;
                 let next = if button == Button::Right { at + OVERRIDE_COLUMN } else { at.wrapping_sub(OVERRIDE_COLUMN) };
