@@ -34,3 +34,9 @@ Playbook followed: `53fd1f2`. Host only; no Eden, no Switch, no push.
 
 ## Eden fixes D1-D4 (2026-11-02)
 New NROs (same launcher): release sha256 `9bad6541a3b1d7497724e6c1db108083017b4a1aef3c9df49ea39a7786cc0ac5` (file 126,976 B, resident 172,032 B), diag `db7a4dd980b17b275ee439e0e644b6090b3ed6aede297f165fd8c1e93423e475` (122,880 B, 270,336 B). They replace the hashes of the first builds above.
+
+## Review round 2 (2026-11-02)
+- Input Delay hooks left the function entry (cfd6f4b): inline at main+0x1750dfc (`mov x19, x2`, after the prologue and the player-index checks) and main+0x1751ce8 (the function's one epilogue, after the call that completes the record). **Finding:** the CPU pilot plugin hooks the same two instructions (its `fim_valid` 0x1750df0 and `fim_exit` 0x1751ce8), so on a card with the pilot the second installer is refused (W5 in docs/compliance-package-1.md). Needs a lead decision (keep the entry hook, chain, or share).
+- is_training_mode (main+0x1671650): no plugin hooks it. elite_stages_counterpick, smash_gamepad_overlay, smash_replay_to_mp4 and online_deluxe_rewrite compare the looked-up symbol with main+0x1671650 and check the function's first words (capstone disassembly of the 2026-11-01 10:19 preflight copy); the pilot keeps a guarded called-function record for it.
+- Host tests for the Eden analysis scripts (tests/eden/test_analyze.py, run by cargo test); review/menu-proposal ecb574d merged (59a159b).
+- New NROs at this HEAD: release sha256 `e6736713a0c2c8c4f16cede9d5679e399545aa3c6202680ba04898522c2a2f05` (126,976 B file, 172,032 B resident), diag `2b9f0828ecb8ef275aaa732c598278bf06b68b02eabc0327c6a370fe0897f30d` (122,880 B, 270,336 B).
