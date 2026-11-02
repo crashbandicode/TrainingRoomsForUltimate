@@ -33,6 +33,20 @@ def main():
                  "$l.Substring([Math]::Max(0, $l.Length - 160))").strip()
     r6.row("install line whole: ends result=installed heap_allocations=0", "result=installed heap_allocations=0" in tail, tail[-120:] or "none")
     w = r6.W.Walk(PHASE, pilot_present=True, developer=True)
+    # Exercise the effect-picture path whose old stack exceeded the UI fiber
+    # budget. Gate on native texture binding, then retain each rendered grid.
+    w.open()
+    for title, visual in [("DI Direction", "Di"), ("SDI Direction", "Sdi")]:
+        w.focus(title)
+        ready = rf"\[Chips\] visual={visual} bound=10 texture=\d+x\d+"
+        before_ready = u.count(PHASE, r6.DIAG, ready)
+        w.keys("a")
+        u.wait_count(PHASE, r6.DIAG, ready, before_ready + 1, 15, f"{visual} effect pointers bound")
+        r6.shot(f"effect-chips-{visual.lower()}")
+        r6.row(f"{visual} grid binds ten resident effect pointers", True,
+               u.plug(PHASE, r6.DIAG, ready, 1)["lines"][-1])
+        w.keys("b w8")
+    w.keys("b w20")
     # Character Cycles: Mario then Donkey Kong into the Player list, then ZR and Mario into the CPU list.
     w.keys("w10")
     w.open()
