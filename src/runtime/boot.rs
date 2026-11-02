@@ -21,7 +21,7 @@ use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
-use crate::runtime::{clock, game, install, published};
+use crate::runtime::{clock, game, install, published, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -125,10 +125,12 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    let ui_install = ui::install();
 
     // 6. The install line.
-    let reports: [SiteReport; SITE_COUNT] =
-        std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
+    let mut reports: Vec<SiteReport> =
+        (0..SITE_COUNT).map(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] }).collect();
+    reports.extend(ui::reports(&ui_install));
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
@@ -139,6 +141,7 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
+        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.archive_hook },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),

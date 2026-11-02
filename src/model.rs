@@ -5,6 +5,14 @@
 //! submodule file relative to `src/`, which resolves the same whether this file is the crate's own
 //! module or is included by path from a test.
 
+#[path = "model/ui/adapter.rs"]
+pub mod adapter;
+#[path = "model/archive_name.rs"]
+pub mod archive_name;
+#[path = "model/archive_recipe.rs"]
+pub mod archive_recipe;
+#[path = "model/archive_retire.rs"]
+pub mod archive_retire;
 #[path = "model/cpu/mod.rs"]
 pub mod cpu;
 #[path = "model/developer_ini.rs"]
@@ -27,11 +35,17 @@ pub mod menu;
 pub mod migration;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/sites_ui.rs"]
+pub mod sites_ui;
 #[path = "model/sites.rs"]
 pub mod sites;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
 #[path = "model/storage.rs"]
 pub mod storage;
+#[path = "model/ui/frame.rs"]
+pub mod frame;
+#[path = "model/ui/panes.rs"]
+pub mod panes;
 #[path = "model/version.rs"]
 pub mod version;
