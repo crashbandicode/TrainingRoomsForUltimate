@@ -183,6 +183,62 @@ macro_rules! cpu_event {
     }};
 }
 
+/// Diag build: log an answer only when it differs from the last one logged for the same hook and body, so a
+/// per-frame hook costs one line per change. `None` (the hook gave no answer) re-arms the line.
+macro_rules! cpu_event_on_change {
+    ($hook:expr, $body:expr, $value:expr, $($arg:tt)*) => {{
+        #[cfg(feature = "diag")]
+        {
+            if seen($hook, $body, $value) {
+                cpu_event!($($arg)*);
+            }
+        }
+    }};
+}
+
+/// Diag build: the hook gave no answer for this body; the next answer is logged again.
+macro_rules! cpu_event_rearm {
+    ($hook:expr, $body:expr) => {{
+        #[cfg(feature = "diag")]
+        {
+            let _ = seen($hook, $body, None);
+        }
+    }};
+}
+
+/// The hooks that log on change (an index into `LAST_SEEN`).
+#[cfg(feature = "diag")]
+mod ev {
+    pub const AIRDODGE: usize = 0;
+    pub const SDI_NONE: usize = 1;
+    pub const TECH: usize = 2;
+    pub const CMD1: usize = 4;
+    pub const CMD2: usize = 5;
+    pub const AIR_KIND: usize = 6;
+    pub const STICK_DIR: usize = 7;
+    pub const CROUCH: usize = 8;
+    pub const GUARD_ON: usize = 9;
+    pub const GUARD_OFF: usize = 10;
+    pub const FULL_HOP: usize = 11;
+    pub const TILT: usize = 12;
+    pub const SHIELD_PARAM: usize = 13;
+    pub const CLIMB_DENIED: usize = 14;
+    pub const STATUS: usize = 15;
+    pub const ROLE: usize = 16;
+    pub const COUNT: usize = 17;
+}
+
+#[cfg(feature = "diag")]
+static LAST_SEEN: [[AtomicU64; 16]; ev::COUNT] = [const { [const { AtomicU64::new(u64::MAX) }; 16] }; ev::COUNT];
+
+/// True when `value` is an answer and differs from the one logged last for (`hook`, `body`).
+#[cfg(feature = "diag")]
+fn seen(hook: usize, body: usize, value: Option<u64>) -> bool {
+    let new = value.unwrap_or(u64::MAX);
+    let old = LAST_SEEN[hook][body & 15].swap(new, Ordering::Relaxed);
+    value.is_some() && old != new
+}
+
 #[cfg(feature = "diag")]
 fn bump(which: usize) {
     counts::bump(which);
@@ -306,6 +362,23 @@ fn ensure_consts() -> bool {
             let _ = std::fmt::Write::write_fmt(&mut names, format_args!("{name} "));
         }
         diagnostic(format_args!("[TrainingRooms] cpu constants missing={missing}: {}", names.as_str()));
+    }
+    #[cfg(feature = "diag")]
+    {
+        // The resolved table by name, so a log's status, term and work ids can be read by name.
+        let mut line = FixedPath::<700>::new();
+        let mut count = 0;
+        for (name, value) in table.resolved_entries() {
+            let _ = std::fmt::Write::write_fmt(&mut line, format_args!("{name}={value} "));
+            count += 1;
+            if count % 6 == 0 {
+                diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
+                line = FixedPath::new();
+            }
+        }
+        if count % 6 != 0 {
+            diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
+        }
     }
     with(|cpu| cpu.ids = table);
     CONSTS_READY.store(true, Ordering::Release);
@@ -449,6 +522,22 @@ unsafe fn fighter_frame(fighter: usize) {
         }
         cpu.frame(key, &facts)
     });
+    cpu_event_on_change!(
+        ev::ROLE,
+        key.index(),
+        Some(accessor as u64),
+        "role entry={} partner={} kind={kind} lobby={lobby}",
+        key.entry,
+        key.partner
+    );
+    cpu_event_on_change!(
+        ev::STATUS,
+        key.index(),
+        Some((u64::from(status as u32) << 32) | u64::from(situation as u32)),
+        "status entry={} partner={} status={status} prev={prev_status} situation={situation} motion_frame={motion_frame}",
+        key.entry,
+        key.partner
+    );
     if let Some(out) = out {
         apply(accessor, out);
     }
@@ -481,8 +570,10 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
         if flag != UNRESOLVED {
             natives::set_flag(accessor, value, flag);
         }
+        cpu_event!("stale_flag value={value} resolved={}", flag != UNRESOLVED);
     }
     if let Some(delta) = out.clatter {
+        cpu_event!("clatter delta={delta:.3} status={}", natives::status_kind(accessor));
         natives::add_clatter_time(accessor, delta);
         let attributes = CLATTER_EFFECT_ATTRIBUTES.load(Ordering::Acquire);
         if attributes != 0 {
@@ -490,9 +581,11 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
         }
     }
     if let Some(status) = out.request_status {
+        cpu_event!("request_status status={status} from={}", natives::status_kind(accessor));
         natives::change_status_request(accessor, status);
     }
     if out.fast_fall {
+        cpu_event!("fast_fall from={}", natives::status_kind(accessor));
         let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
         if dive != UNRESOLVED {
             natives::set_flag(accessor, true, dive);
@@ -504,16 +597,20 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
         }
     }
     if let Some(status) = out.force_status {
+        cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
         natives::change_status_force(accessor, status);
     }
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if let (Some(value), true) = (out.hide.cursor, cursor != UNRESOLVED) {
+        cpu_event!("hide cursor={value:.1}");
         natives::set_float(accessor, value, cursor);
     }
     if let Some(visible) = out.hide.model_visible {
+        cpu_event!("hide model_visible={visible}");
         natives::set_whole(accessor, visible);
     }
     if out.hide.hide_effects {
+        cpu_event!("hide effects status={}", natives::status_kind(accessor));
         for effect in &TECH_EFFECTS {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
@@ -548,9 +645,14 @@ pub unsafe fn cpu_sdi_hook(accessor: usize, out: *mut [f32; 2]) -> u64 {
         match with(|cpu| cpu.sdi_query(key, player_x(), cpu_x)) {
             Some(SdiAnswer::Input(x, y)) => {
                 *out = [x, y];
+                cpu_event_rearm!(ev::SDI_NONE, key.index());
+                cpu_event!("sdi_input entry={} x={x:.3} y={y:.3}", key.entry);
                 return 1;
             }
-            Some(SdiAnswer::NoInput) => return 0,
+            Some(SdiAnswer::NoInput) => {
+                cpu_event_on_change!(ev::SDI_NONE, key.index(), Some(0), "sdi_none entry={}", key.entry);
+                return 0;
+            }
             Some(SdiAnswer::Native) | None => {}
         }
     }
@@ -561,7 +663,20 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
     let key = role_of(accessor)?;
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
-    with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten()
+    let answer = with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten();
+    #[cfg(feature = "diag")]
+    match answer {
+        Some((x, y)) => cpu_event_on_change!(
+            ev::AIRDODGE,
+            key.index(),
+            Some((u64::from(x.to_bits()) << 32) | u64::from(y.to_bits())),
+            "airdodge_stick entry={} x={x:.3} y={y:.3} player_x={:.1} cpu_x={cpu_x:.1}",
+            key.entry,
+            player_x()
+        ),
+        None => cpu_event_rearm!(ev::AIRDODGE, key.index()),
+    }
+    answer
 }
 
 /// `ControlModule::get_stick_x(accessor)`: the air-dodge direction out of hitstun.
@@ -584,7 +699,14 @@ pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
         return y;
     }
     // Crouch answers when the air-dodge direction does not (SPEC-cpu-06 section 4).
-    role_of(accessor).and_then(|key| with(|cpu| cpu.crouch_stick(key)).flatten()).unwrap_or(original)
+    let Some(key) = role_of(accessor) else { return original };
+    let crouch = with(|cpu| cpu.crouch_stick(key)).flatten();
+    #[cfg(feature = "diag")]
+    match crouch {
+        Some(y) => cpu_event_on_change!(ev::CROUCH, key.index(), Some(u64::from(y.to_bits())), "crouch entry={} y={y:.3}", key.entry),
+        None => cpu_event_rearm!(ev::CROUCH, key.index()),
+    }
+    crouch.unwrap_or(original)
 }
 
 /// `ControlModule::start_clatter(accessor, initial, auto, manual, a, b, c, d)`: remember the manual
@@ -604,6 +726,7 @@ pub unsafe fn cpu_clatter_start_hook(
     bump(counts_index::CLATTER_START);
     if let Some(key) = role_of(accessor) {
         with(|cpu| cpu.clatter_start(key, manual_rate));
+        cpu_event!("clatter_start entry={} manual_rate={manual_rate:.3} initial={initial:.1}", key.entry);
     }
     call_original!(accessor, initial, auto_rate, manual_rate, a, b, c, d)
 }
@@ -622,7 +745,13 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     }
     let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
-    with(|cpu| cpu.ledge_transition_term(key, status, term, original)).unwrap_or(original)
+    let answer = with(|cpu| cpu.ledge_transition_term(key, status, term, original)).unwrap_or(original);
+    if answer {
+        cpu_event_rearm!(ev::CLIMB_DENIED, key.index());
+    } else {
+        cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(1), "climb_denied entry={} status={status}", key.entry);
+    }
+    answer
 }
 
 // ---- SPEC-cpu-04 hooks ----------------------------------------------------------------------------------
@@ -638,7 +767,11 @@ pub fn set_tech_on(on: bool) {
 pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f32, c: bool, d: f32, e: bool, f: bool) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::MOTION_CHANGE);
+    let asked = motion;
     let motion = role_of(accessor).and_then(|key| with(|cpu| cpu.substitute_motion(key, motion))).unwrap_or(motion);
+    if motion != asked {
+        cpu_event!("motion_substitute from={asked:#x} to={motion:#x} status={}", natives::status_kind(accessor));
+    }
     call_original!(accessor, motion, a, b, c, d, e, f)
 }
 
@@ -653,6 +786,7 @@ pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3
         Some(_) if none != UNRESOLVED => {
             let status = natives::status_kind(accessor);
             if with(|cpu| cpu.quake_suppressed(status)).unwrap_or(false) {
+                cpu_event!("quake_suppressed status={status} kind={kind}");
                 none
             } else {
                 kind
@@ -681,12 +815,30 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
     }
     let key = role_of(accessor)?;
     if guard {
-        match with(|cpu| cpu.guard_button(key, on_query))? {
+        let answer = match with(|cpu| cpu.guard_button(key, on_query))? {
             ButtonAnswer::Held(value) => Some(value),
             ButtonAnswer::Original => None,
+        };
+        #[cfg(feature = "diag")]
+        match answer {
+            Some(value) => cpu_event_on_change!(
+                if on_query { ev::GUARD_ON } else { ev::GUARD_OFF },
+                key.index(),
+                Some(u64::from(value)),
+                "guard_button entry={} on_query={on_query} held={value}",
+                key.entry
+            ),
+            None => cpu_event_rearm!(if on_query { ev::GUARD_ON } else { ev::GUARD_OFF }, key.index()),
         }
+        answer
     } else {
-        with(|cpu| cpu.full_hop_button(key, on_query)).flatten()
+        let answer = with(|cpu| cpu.full_hop_button(key, on_query)).flatten();
+        #[cfg(feature = "diag")]
+        match answer {
+            Some(value) => cpu_event_on_change!(ev::FULL_HOP, key.index(), Some(u64::from(value)), "full_hop_button entry={} on_query={on_query} held={value}", key.entry),
+            None => cpu_event_rearm!(ev::FULL_HOP, key.index()),
+        }
+        answer
     }
 }
 
@@ -711,7 +863,20 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
     let key = role_of(accessor)?;
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
-    with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten()
+    let tilt = with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten();
+    #[cfg(feature = "diag")]
+    match tilt {
+        Some((x, y)) => cpu_event_on_change!(
+            ev::TILT,
+            key.index(),
+            Some((u64::from(x.to_bits()) << 32) | u64::from(y.to_bits())),
+            "shield_tilt entry={} x={x:.3} y={y:.3} player_x={:.1} cpu_x={cpu_x:.1}",
+            key.entry,
+            player_x()
+        ),
+        None => cpu_event_rearm!(ev::TILT, key.index()),
+    }
+    tilt
 }
 
 /// `ControlModule::get_stick_x_no_clamp(accessor)`: the shield tilt.
@@ -744,7 +909,20 @@ pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f3
     if !decay && name != PARAM_HASHES[2].load(Ordering::Acquire) {
         return original;
     }
-    role_of(accessor).and_then(|key| with(|cpu| cpu.shield_param(key, decay)).flatten()).unwrap_or(original)
+    let Some(key) = role_of(accessor) else { return original };
+    let value = with(|cpu| cpu.shield_param(key, decay)).flatten();
+    #[cfg(feature = "diag")]
+    match value {
+        Some(v) => cpu_event_on_change!(
+            ev::SHIELD_PARAM,
+            key.index(),
+            Some((u64::from(decay) << 32) | u64::from(v.to_bits())),
+            "shield_param entry={} decay={decay} value={v:.4} original={original:.4}",
+            key.entry
+        ),
+        None => cpu_event_rearm!(ev::SHIELD_PARAM, key.index()),
+    }
+    value.unwrap_or(original)
 }
 
 // ---- the `common` script module's hooks (called from `cpu_common`) -------------------------------------
@@ -771,6 +949,7 @@ pub(crate) unsafe fn di_before(accessor: usize) {
     if let Some(Some((vx, vy))) = with(|cpu| cpu.di_correction(key, player_x(), cpu_x)) {
         natives::set_float(accessor, vx, x);
         natives::set_float(accessor, vy, y);
+        cpu_event!("di entry={} x={vx:.3} y={vy:.3} player_x={:.1} cpu_x={cpu_x:.1}", key.entry, player_x());
     }
 }
 
@@ -794,8 +973,29 @@ pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl
         script_passive_enabled: passive(),
     };
     match with(|cpu| cpu.tech_status_change(key, &request))? {
-        TechChange::Status(status) => Some(status),
-        TechChange::Unchanged => None,
+        TechChange::Status(status) => {
+            cpu_event!(
+                "tech requested={requested} answer={status} passive={} wall={} ceil={} script_passive={}",
+                request.passive,
+                request.passive_wall,
+                request.passive_ceil,
+                request.script_passive_enabled
+            );
+            Some(status)
+        }
+        TechChange::Unchanged => {
+            cpu_event_on_change!(
+                ev::TECH,
+                key.index(),
+                Some(requested as u32 as u64),
+                "tech_unchanged requested={requested} passive={} wall={} ceil={} script_passive={}",
+                request.passive,
+                request.passive_wall,
+                request.passive_ceil,
+                request.script_passive_enabled
+            );
+            None
+        }
     }
 }
 
@@ -808,7 +1008,7 @@ pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
     let term = TERM_CONT_ESCAPE.load(Ordering::Acquire);
     let cont_escape = term != UNRESOLVED && natives::is_enable_transition_term(accessor, term);
     let parry = PARRY_MOTION.load(Ordering::Acquire);
-    with(|cpu| {
+    let escape = with(|cpu| {
         let facts = OosFacts {
             left_shieldstun: cpu.ids.is(C::StatusGuardDamage, prev),
             shielding: status::shielding(&cpu.ids, status_now),
@@ -817,7 +1017,12 @@ pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
         };
         cpu.out_of_shield(key, &facts).escape_status
     })
-    .flatten()
+    .flatten();
+    #[cfg(feature = "diag")]
+    if let Some(status) = escape {
+        cpu_event!("oos_escape entry={} status={status} from={status_now} prev={prev}", key.entry);
+    }
+    escape
 }
 
 // ---- SPEC-cpu-01 and SPEC-cpu-06 hooks ------------------------------------------------------------------
@@ -884,11 +1089,23 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
     let facts = command_facts(accessor, key);
     let Some(out) = with(|cpu| cpu.command_flags(key, cat2, &facts)) else { return original };
     if let Some(status) = out.request_status {
+        cpu_event!("command_request_status entry={} status={status} from={}", key.entry, natives::status_kind(accessor));
         natives::change_status_request(accessor, status);
     }
     if out.stop_playback {
+        cpu_event!("playback_stop entry={}", key.entry);
         published::CPU_STOP_PLAYBACK.store(true, Ordering::Release);
     }
+    cpu_event_on_change!(
+        if cat2 { ev::CMD2 } else { ev::CMD1 },
+        key.index(),
+        if out.bits != 0 { Some(u64::from(out.bits)) } else { None },
+        "command_flags entry={} cat={} bits={:#x} status={}",
+        key.entry,
+        if cat2 { 2 } else { 1 },
+        out.bits,
+        natives::status_kind(accessor)
+    );
     original | out.bits
 }
 
@@ -898,7 +1115,14 @@ pub unsafe fn cpu_attack_air_kind_hook(accessor: usize) -> i32 {
     let _scope = HookScope::enter();
     bump(counts_index::AIR_KIND);
     let original = call_original!(accessor);
-    role_of(accessor).and_then(|key| with(|cpu| cpu.attack_air_kind(key)).flatten()).unwrap_or(original)
+    let Some(key) = role_of(accessor) else { return original };
+    let kind = with(|cpu| cpu.attack_air_kind(key)).flatten();
+    #[cfg(feature = "diag")]
+    match kind {
+        Some(k) => cpu_event_on_change!(ev::AIR_KIND, key.index(), Some(k as u32 as u64), "attack_air_kind entry={} kind={k} original={original}", key.entry),
+        None => cpu_event_rearm!(ev::AIR_KIND, key.index()),
+    }
+    kind.unwrap_or(original)
 }
 
 /// `ControlModule::get_stick_dir(accessor)`: the attack angle of a CPU body.
@@ -907,7 +1131,14 @@ pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_DIR);
     let original = call_original!(accessor);
-    role_of(accessor).and_then(|key| with(|cpu| cpu.attack_angle(key)).flatten()).unwrap_or(original)
+    let Some(key) = role_of(accessor) else { return original };
+    let angle = with(|cpu| cpu.attack_angle(key)).flatten();
+    #[cfg(feature = "diag")]
+    match angle {
+        Some(a) => cpu_event_on_change!(ev::STICK_DIR, key.index(), Some(u64::from(a.to_bits())), "stick_dir entry={} angle={a:.3} original={original:.3}", key.entry),
+        None => cpu_event_rearm!(ev::STICK_DIR, key.index()),
+    }
+    angle.unwrap_or(original)
 }
 
 /// Whether a fighter can act now: any of the five transition terms or a cancel (SPEC-cpu-07 §3).
@@ -934,5 +1165,6 @@ unsafe fn frame_advantage(player: usize) {
     if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
         published::FRAME_ADVANTAGE_VALUE.store(value, Ordering::Release);
         published::FRAME_ADVANTAGE_SEQ.fetch_add(1, Ordering::AcqRel);
+        cpu_event!("frame_advantage value={value} seq={}", published::FRAME_ADVANTAGE_SEQ.load(Ordering::Acquire));
     }
 }

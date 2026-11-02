@@ -350,6 +350,12 @@ impl Table {
         self.resolved(first) && self.resolved(end) && self.get(first) <= value && value < self.get(end)
     }
 
+    /// Every resolved constant as `(name, value)`, in list order (the diag build prints them so a log can be
+    /// read by name).
+    pub fn resolved_entries(&self) -> impl Iterator<Item = (&'static str, i32)> + '_ {
+        self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v != UNRESOLVED).map(|(v, n)| (*n, *v))
+    }
+
     /// The names that stayed unresolved, in list order.
     pub fn missing(&self) -> impl Iterator<Item = &'static str> + '_ {
         self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v == UNRESOLVED).map(|(_, n)| *n)
