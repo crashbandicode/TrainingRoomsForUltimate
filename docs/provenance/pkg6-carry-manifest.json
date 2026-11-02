@@ -1223,7 +1223,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "abf12f1f3059dfc2a2366c5625fab066da60577e40f6dfc1670f311cd40a9f77",
+   "dest_sha256": "254e88ddb315be4cab23714fcf79e285ebd42a61093c22be026127801375707c",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -1254,6 +1254,21 @@
      "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
      "new": "",
      "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"diag\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"diag\"))]\nimpl fmt::Display for DrillFields",
+     "new": "#[cfg(feature = \"seam-drill\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"seam-drill\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"seam-drill\"))]\nimpl fmt::Display for DrillFields",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\npub(crate) fn bits_of(",
+     "new": "#[cfg(feature = \"seam-drill\")]\npub(crate) fn bits_of(",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "pub(crate) fn report_late() {\n",
+     "new": "pub(crate) fn report_late() {\n    // The drill's stand-in run counts (rate-limited to once a second by the drill itself).\n    #[cfg(feature = \"seam-drill\")]\n    super::seam_drill::report_counts(crate::runtime::clock::uptime_ms());\n",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS); the drill's stand-in run counts are reported from the late-report tick"
     }
    ]
   },
