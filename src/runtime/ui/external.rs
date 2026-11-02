@@ -3,10 +3,12 @@
 //! when the menu's row is pressed, hands the player's buttons to it as the layer's pads, and says what is on screen so the worker can
 //! draw it (`model::screens::panel_frame`, the clip editor's `editors::clip_frame`).
 //!
-//! Threads (lead ruling 2026-11-02): everything here runs on the menu worker and reads no game state. What the layer's entry points need
-//! from the game is the fact the frame wrapper published (`ui::facts`); file I/O (the library listing, the capture archive) is the
-//! worker's job. The clip editor's own controls (scrub, preview) stay on the P1 mapping hook (`macros::on_p1_input`) and the UI tick
-//! (`replay_capture::after_draw`), the game-synchronized contexts the layer was written for.
+//! Threads (lead rulings 2026-11-02, design C): the layer's panel model has one owner, the menu worker. Everything here runs on the worker:
+//! presses arrive over the input hook's lock-free ring, the worker runs the layer's entry points (they may allocate and do file I/O here,
+//! never in a hook) and builds the menu frame from the layer's `View`; the UI tick draws that frame from a wait-free triple buffer
+//! (`ui::state::FRAME`). Game-thread events reach the layer through its own `hos_lock::Mailbox`, drained in `macros::port::worker_tick`;
+//! hooks read the layer's published queries, never the model (package 4's side of design C). What the entry points need from the game is
+//! the fact the frame wrapper published (`ui::facts`).
 
 use crate::engine::macro_ui::macro_panel::{Pad, View};
 use crate::model::menu::input::Button;

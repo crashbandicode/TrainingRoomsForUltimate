@@ -159,3 +159,24 @@ tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, t
 - `/tmp/ui-screens-watch/{cg,sw,cgs,sws}.ps1` kept: the playbook's memory/time guard for cargo (no playbook tool for it).
 - `pack/ally-switch.sh` kept: Ally WSL Switch build (lead-authorised host); no playbook remote-build tool.
 - NRO size: replaced by playbook `tools/build/nro_size.py` from the next build on.
+
+## 2026-11-02 ~13:30Z: merged work/implementation 48eebe1; design C; first slice in progress
+- Merge `90341d2` (lead's order): sync slice 1, stack, the install line (fixed-buffer `render_into` replaces this branch's `render`),
+  pkg6 5e0fab3. carry_pkg4 verify 42 files, carry_pkg6 verify 264.
+- Menu-close hang: root cause and fix are stream/sync (hos-lock, `published::Live`), Eden-proven sync-01/sync-02 (46 + 45 closes). The
+  diag probes of this branch went with the merge (published.rs); the worker/tick/input probes go in this slice.
+- Design C (lead): the named-macro panel model has one owner, the menu worker. This branch: presses over the input ring (single
+  producer), the worker runs the layer's entry points and builds the frame; `ui::state::FRAME` is now a `hos_lock::TripleBuffer`
+  (worker writes, UI tick reads by reference: no lock, no skip); the worker calls `macros::port::worker_tick()` every wake (package 4
+  points it at its layer service). pkg4 (a93ab): `MacroQueries` via `hos_lock::Published`, its own `hos_lock::Mailbox` for game-thread
+  events and clip controls, playback buffers swapped by index. New hos-lock primitives here: `TripleBuffer`, `Mailbox` (host tests).
+- Attribution (lead, u4b: 30-40 allocations per menu open): `HookId::{MenuInput, MenuDraw, MenuThumbs, MacroPanel}` nested scopes in the
+  P1 menu adapter, the UI tick's menu part and the thumbnails; the `hook_stats ... allocs=` field names the step. Eden ui-10 measures it.
+
+### Audit rows (ui-screens' part of the stream/sync table)
+| Game-thread entry | Lock / wait | Other thread | Treatment |
+| --- | --- | --- | --- |
+| UI tick menu draw | `ui::state::FRAME` | menu worker (frame build) | `TripleBuffer`: worker writes, tick reads by reference; neither waits |
+| P1 menu adapter | worker press ring | menu worker | lock-free SPSC ring (single producer: the P1 hook), counted drop |
+| Give item (tick) | `ui::requests::GIVE_ITEM` atomic | menu worker | atomic handoff; the tick calls `character_items::request` |
+| named-macro hooks (pkg4) | `UI`, `RECORD_SLOT`, `MOTION`, ... | menu worker (panel entry points) | design C: pkg4 moves hooks to published queries + mailbox; until then the worker holds them only for model steps |

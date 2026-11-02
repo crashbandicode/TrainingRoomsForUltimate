@@ -373,3 +373,11 @@ pub(crate) mod input_record {
         refusal.message()
     }
 }
+
+/// Design C (lead, 2026-11-02): the named-macro layer's model has one owner, the menu worker. This is the worker's tick for it, called
+/// on the worker thread at every wake (`ui::worker::run`): package 4 points it at its layer's worker service (draining the layer's
+/// `hos_lock::Mailbox` of game-thread events, the deferred effects, publishing `MacroQueries`). A game thread that posts an event calls
+/// `crate::runtime::ui::worker::wake()` after posting.
+pub(crate) fn worker_tick() {
+    crate::runtime::macros::named_macros::run_deferred();
+}

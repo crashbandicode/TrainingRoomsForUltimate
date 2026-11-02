@@ -184,15 +184,6 @@ pub fn diagnostic(args: fmt::Arguments<'_>) {
     }
 }
 
-/// Diag build only: one line straight to the kernel debug output (Eden's console log), bypassing the ring and the drain thread, for a
-/// probe that must be seen even when every other plugin thread stops right after it (the menu-close hang, 2026-11-02).
-#[cfg(feature = "diag")]
-pub fn diagnostic_now(args: fmt::Arguments<'_>) {
-    let mut line = StackLine::new();
-    let _ = line.format(args);
-    console_write(line.text());
-    diagnostic(args);
-}
 
 /// Ring counters plus lock misses, for the install line and drop reports (`ring_dropped=…`).
 #[derive(Clone, Copy, Debug)]

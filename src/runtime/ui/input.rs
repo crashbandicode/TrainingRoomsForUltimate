@@ -48,6 +48,8 @@ pub fn reset_session() {
 
 /// One P1 poll in Training.
 pub fn on_p1_poll(holder: usize) {
+    // Attribution (lead, 2026-11-02): the menu's own allocations inside the P1 hook are charged here.
+    let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuInput);
     // SAFETY: `holder` is the controller-holder argument of the game's call; the reads are the record's
     // own fields, guarded against null and misalignment.
     let Some((buttons, style)) = (unsafe { read_record(holder) }) else { return };
@@ -79,8 +81,6 @@ pub fn on_p1_poll(holder: usize) {
     }
     let mut any = false;
     for button in step.presses() {
-        #[cfg(feature = "diag")]
-        crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe input push {button:?}"));
         worker::push_press(button);
         any = true;
     }

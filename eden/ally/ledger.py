@@ -27,7 +27,8 @@ def open_claims(host):
     state = {}
     now = time.time()
     for line in text().splitlines():
-        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        # Stamps come with or without seconds (`13:07Z`, `13:07:05Z`): a line the pattern misses would hide an open claim.
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?::\d{2})?Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
         if not m:
             continue
         stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))

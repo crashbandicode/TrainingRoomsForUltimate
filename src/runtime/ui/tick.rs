@@ -63,6 +63,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if name != INFO_TRAINING {
         return;
     }
+    // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
+    let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuDraw);
     if registration {
         INVALIDATE.store(true, Ordering::Release);
         REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
@@ -101,10 +103,6 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let mut showing = open || ext;
     if CLOSING.load(Ordering::Acquire) {
         let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
-        #[cfg(feature = "diag")]
-        if count <= 2 || count == CLOSE_FRAMES {
-            crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe tick closing count={count}"));
-        }
         if count >= CLOSE_FRAMES {
             CLOSING.store(false, Ordering::Release);
             INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
@@ -126,13 +124,15 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     *shown = visible;
     let seq = FRAME_SEQ.load(Ordering::Acquire);
     if visible && (seq != *drawn_seq || !was_shown) {
-        if let Some(frame) = FRAME.try_lock() {
-            panes.draw(&frame);
-            thumbs::note_frame(&frame);
-            *drawn_seq = seq;
-            if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
-                log(format_args!("[Ui] first draw seq={seq}"));
-            }
+        // Wait-free (stream/sync): the worker hands frames over through a triple buffer; the tick reads its own slot.
+        FRAME.with_latest(|frame, _| {
+            // SAFETY: as the draw this tick made before (the panes were resolved from the live layout this tick).
+            unsafe { panes.draw(frame) };
+            thumbs::note_frame(frame);
+        });
+        *drawn_seq = seq;
+        if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
+            log(format_args!("[Ui] first draw seq={seq}"));
         }
     }
     // What the menu worker asked of the game (the Give item grid's item): made here, where the game is.

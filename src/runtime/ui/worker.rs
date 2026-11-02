@@ -177,6 +177,8 @@ fn run() {
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
+        // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
+        crate::runtime::macros::port::worker_tick();
         sync_panels(&mut session);
         if session.watching() {
             std::thread::park_timeout(POLL);
@@ -220,12 +222,10 @@ fn handle(code: u8, s: &mut Session) {
         return;
     }
     s.refusal = None;
-    probe_close(10);
     let panel = s.phase == Phase::Panel;
     let closed = {
         let Some(m) = s.menu.as_mut() else { return };
         m.set_console(console_mode());
-        probe_close(11);
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
             external::press_panel(button);
@@ -238,7 +238,6 @@ fn handle(code: u8, s: &mut Session) {
                 stage_press(m, tile, button, &mut s.refusal);
             }
         }
-        probe_close(12);
         m.is_closed()
     };
     if closed {
@@ -254,7 +253,6 @@ fn handle(code: u8, s: &mut Session) {
 /// of a panel that closed, and publish the frame when it changed.
 fn sync_panels(s: &mut Session) {
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
-    named_macros::run_deferred();
     if s.menu.is_none() {
         return;
     }
@@ -370,12 +368,17 @@ fn publish_frame(s: &Session) {
             let _ = core::fmt::Write::write_str(&mut next.help[1], reason);
         }
     }
-    let mut frame = FRAME.lock();
-    if *frame != next {
-        *frame = next;
+    // The last frame handed over (only this thread takes it): an unchanged frame is not handed over again.
+    let mut last = LAST_FRAME.lock();
+    if *last != next {
+        *last = next;
+        FRAME.write(next);
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }
 }
+
+/// The frame last handed to the tick (the worker's own copy; the tick reads `FRAME`).
+static LAST_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 
 /// The write-back of decision D1: the carried engines changed their typed view of the menu (`compat::menu`, a roster pick the
 /// cycle made, the preload rows after the INI overlay). The rows and kept keys that differ from the stored settings replace them, and
@@ -405,27 +408,16 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
-/// Diag build only: which step of the close ran (the menu-close hang, 2026-11-02).
-#[inline]
-fn probe_close(step: u8) {
-    #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe close {step}"));
-    let _ = step;
-}
 
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu) {
     let outbox = menu.take_outbox();
     let settings = menu.commit().clone();
-    probe_close(1);
     published::publish(&settings.menu, outbox.rerolls);
-    probe_close(2);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
-    probe_close(3);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
-    probe_close(4);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
     if outbox.changed {
         writer::request_settings(json);
@@ -447,12 +439,10 @@ fn close(menu: &mut Menu) {
     if let Some(on) = outbox.replay_capture {
         writer::request_replay_capture(on);
     }
-    probe_close(5);
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
     crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(false);
-    probe_close(6);
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
     let _ = input_delay::clear;
