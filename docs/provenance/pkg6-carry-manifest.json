@@ -1607,7 +1607,7 @@
    "dest": "src/runtime/roster/r_handle.rs",
    "crate": "root",
    "src_sha256": "8587dbd71d79f9fa17e0d1593bea86ab349b38b673e634a810081c9382bf7781",
-   "dest_sha256": "56c6fb5c21206318688ef20c0f2a06d89026e6fd99fc89c3d44239b3e57a56f0",
+   "dest_sha256": "2ccad0464bf4744014acb76df849790caa157ab32d1b485ba50bbfd645228f21",
    "edits": [
     {
      "old": "//! `[Ledger] retained owner={} kind={:#x} reason={}`, `[Ledger] reset deferred owner={} batch={}\n//! others={:?}`, `[Ledger] reconcile owner={} phase={} predicted={:x?} actual={:x?} residual={:x?}\n//! missing={:x?}` (WP2's format).\n\nuse super::observe;\nuse crate::engine::seams::native_fields as fields;\nuse std::sync::{Mutex, MutexGuard};\nuse crate::engine::swap::swap_model::request_bit as bit0;\nuse crate::engine::swap::swap_model::ledger::{\n    AcqToken, BatchId, Holder, Ledger, LedgerRefusal, LiveConsumers, NativeCall, NativeRequest, RFlags,\n",
@@ -1668,6 +1668,16 @@
      "old": "}\n\nstatic LEDGERS: [Mutex<Option<RHandle>>; 2] = [Mutex::new(None), Mutex::new(None)];\n\nfn lock(role: Role) -> MutexGuard<'static, Option<RHandle>> {\n    LEDGERS[role.index()].lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\nimpl RHandle {\n    fn batch(&mut self, group: usize) -> BatchId {\n        if let Some((_, batch)) = self.batches.iter().find(|(g, _)| *g == group) { return *batch; }\n",
      "new": "}\n\nstatic LEDGERS: [Mutex<Option<RHandle>>; 2] = [Mutex::new(None), Mutex::new(None)];\n\nfn lock(role: Role) -> MutexGuard<'static, Option<RHandle>> {\n    LEDGERS[role.index()].lock()\n}\n\nimpl RHandle {\n    fn batch(&mut self, group: usize) -> BatchId {\n        if let Some((_, batch)) = self.batches.iter().find(|(g, _)| *g == group) { return *batch; }\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "    occupancy: &dyn LiveConsumers, reason: &str) -> ReleaseReceipt {\n    let mut receipt = ReleaseReceipt::default();\n    let (r, owner, plan) = {\n        let mut slot = lock(role);\n        let Some(handle) = slot.as_mut() else { return receipt; };\n        let selected: Vec<usize> = handle.held.iter().enumerate()\n            .filter(|(_, (g, token))| group.is_none_or(|x| *g == x) && kinds.is_none_or(|ks| ks.contains(&token.kind())))\n            .map(|(i, _)| i).collect();\n        let mut plan: Vec<(u32, ReleaseCalls)> = Vec::new();\n        for i in selected.into_iter().rev() {\n            let (_, token) = handle.held.remove(i);\n            let kind = token.kind();\n            match handle.ledger.release_fixed(token, occupancy, role) {\n                Ok(calls) => plan.push((kind, calls)),\n                Err((token, why)) => {\n",
+     "new": "    occupancy: &dyn LiveConsumers, reason: &str) -> ReleaseReceipt {\n    let mut receipt = ReleaseReceipt::default();\n    let (r, owner, plan) = {\n        let mut slot = lock(role);\n        let Some(handle) = slot.as_mut() else { return receipt; };\n        let mut plan: Vec<(u32, ReleaseCalls)> = Vec::new();\n        // Descending removal leaves every earlier index unchanged. Preserve the\n        // old selection/release order without allocating a second index list.\n        for i in (0..handle.held.len()).rev() {\n            let (g, token) = &handle.held[i];\n            if !group.is_none_or(|x| *g == x) || !kinds.is_none_or(|ks| ks.contains(&token.kind())) {\n                continue;\n            }\n            let (_, token) = handle.held.remove(i);\n            let kind = token.kind();\n            match handle.ledger.release_fixed(token, occupancy, role) {\n                Ok(calls) => plan.push((kind, calls)),\n                Err((token, why)) => {\n",
+     "reason": "R5 remove temporary release-index allocation by identical descending scan; stream pre-reload held-key diagnostics under existing ledger guard instead of Vec copies. Preserve all-decision-before-native-call order, token multiplicity and exact sorted diagnostic keys; no capacity bound or release-plan change."
+    },
+    {
+     "old": "            Err(others)\n        }\n    }\n}\n\n/// Nothing held by us and nothing recorded for native: a canonical Reload may be issued.\npub(crate) fn expect_free(role: Role) -> Result<(), Vec<u32>> {\n    match lock(role).as_ref() {\n        Some(handle) => handle.ledger.expect_free().map_err(|keys| keys.iter().map(|k| k.value()).collect()),\n        None => Ok(()),\n    }\n}\n\n/// Compare the ledger's prediction with the owner's actual `(key, refs)` pairs (WP2's observer walk)\n/// and log one `[Ledger] reconcile` line; diagnostics only.\n",
+     "new": "            Err(others)\n        }\n    }\n}\n\n/// Diagnose the same sorted held keys before Reload, without collecting a copy.\n/// This is observation only: it neither refuses nor performs native cleanup.\npub(crate) fn expect_free(role: Role, owner: u32, phase: &str) {\n    let slot = lock(role);\n    if let Some(handle) = slot.as_ref() {\n        let keys = handle.ledger.predicted_iter().map(|(key, _)| key);\n        if keys.clone().next().is_some() {\n            trace!(\"[Ledger] expect_free owner={} phase={} keys_held={:x?}\", owner, phase, DebugIter(keys));\n        }\n    }\n}\n\n/// Compare the ledger's prediction with the owner's actual `(key, refs)` pairs (WP2's observer walk)\n/// and log one `[Ledger] reconcile` line; diagnostics only.\n",
+     "reason": "R5 remove temporary release-index allocation by identical descending scan; stream pre-reload held-key diagnostics under existing ledger guard instead of Vec copies. Preserve all-decision-before-native-call order, token multiplicity and exact sorted diagnostic keys; no capacity bound or release-plan change."
     }
    ]
   },
@@ -2695,7 +2705,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "b7189c4d3f7315f2a04752eba2bf0ce095569c7c8cadbf385f60ff5c51239ae5",
+   "dest_sha256": "dbc9f2a349c8b9033af22ce54365c016600955b513f9d6f29c19a261006d8bc1",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -3191,6 +3201,11 @@
      "old": "    if !gate(SEAM_GROUP, BANK_SEAMS, legacy) {\n        if legacy { trace!(\"[BodyBank] seam guard refused; disabled\"); }\n        return;\n    }\n    for storage in &BANK_STORAGE {\n        let mut storage = storage.lock().unwrap();\n        if storage.is_none() { *storage = Some(BankStorage::new()); }\n    }\n    skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);\n    ENABLED.store(true, Ordering::Release);\n    // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).\n",
      "new": "    if !gate(SEAM_GROUP, BANK_SEAMS, legacy) {\n        if legacy { trace!(\"[BodyBank] seam guard refused; disabled\"); }\n        return;\n    }\n    for storage in &BANK_STORAGE {\n        let mut storage = storage.lock();\n        if storage.is_none() { *storage = Some(BankStorage::new()); }\n    }\n    skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);\n    ENABLED.store(true, Ordering::Release);\n    // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "    retire_groups(entry, owner, \"mod reload\");\n    // WP4: state 6 of the Reload needs `R+0x18 == 0` (`0x17e4700`); after the teardown the ledger\n    // must hold nothing. A key left here names the quirk the recipes miss (diagnostic, no cleanup;\n    // it replaces WP2's `before reload` observation, U13).\n    if let Some(role) = role(owner) {\n        if let Err(keys) = r_handle::expect_free(ledger_role(role)) {\n            trace!(\"[Ledger] expect_free owner={} phase=mod reload keys_held={:x?}\", owner, keys);\n        }\n    }\n}\n\n/// Teardown assertion for a pair-lead window (Ready or Changing): `651660` frees\n/// `+0x4188/90/98` only on its bit-2 path, so bit 2 must be set whenever a\n",
+     "new": "    retire_groups(entry, owner, \"mod reload\");\n    // WP4: state 6 of the Reload needs `R+0x18 == 0` (`0x17e4700`); after the teardown the ledger\n    // must hold nothing. A key left here names the quirk the recipes miss (diagnostic, no cleanup;\n    // it replaces WP2's `before reload` observation, U13).\n    if let Some(role) = role(owner) {\n        r_handle::expect_free(ledger_role(role), owner, \"mod reload\");\n    }\n}\n\n/// Teardown assertion for a pair-lead window (Ready or Changing): `651660` frees\n/// `+0x4188/90/98` only on its bit-2 path, so bit 2 must be set whenever a\n",
+     "reason": "R5 remove temporary release-index allocation by identical descending scan; stream pre-reload held-key diagnostics under existing ledger guard instead of Vec copies. Preserve all-decision-before-native-call order, token multiplicity and exact sorted diagnostic keys; no capacity bound or release-plan change."
     }
    ]
   },
@@ -3199,7 +3214,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "dest_sha256": "1f8129d6ff65f8273dd6047fefeb7424801271fa45e59e59f40810802f75abb3",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -3210,6 +3225,16 @@
      "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
      "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
      "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "use crate::engine::swap::source_descriptor as source_descriptor;\n\n#[cfg(feature = \"managed-third-source-alpha\")]\npub(super) mod managed {\n    use super::*;\n    use std::sync::Mutex;\n    use crate::engine::swap::capacity_creation::{self as creation, ExactMiiProof, OwnerAdmission, OwnerFacts, Refusal};\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    use super::super::mii_ordinary_player::native::VisibleMii;\n    /// Without the ordinary Mii adapters there is no visible exact-Mii witness.\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n",
+     "new": "use crate::engine::swap::source_descriptor as source_descriptor;\n\n#[cfg(feature = \"managed-third-source-alpha\")]\npub(super) mod managed {\n    use super::*;\n    use hos_lock::Mutex;\n    use crate::engine::swap::capacity_creation::{self as creation, ExactMiiProof, OwnerAdmission, OwnerFacts, Refusal};\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    use super::super::mii_ordinary_player::native::VisibleMii;\n    /// Without the ordinary Mii adapters there is no visible exact-Mii witness.\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n",
+     "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "        descriptor_selector: u32,\n    }\n    type CreatedSlots = [Option<Created>; ALL_EXTRA_SLOTS.len()];\n    static CREATED: Mutex<CreatedSlots> = Mutex::new([None; ALL_EXTRA_SLOTS.len()]);\n\n    /// A poisoned table reads as empty, so every ownership check fails closed.\n    fn created() -> CreatedSlots {\n        CREATED.lock().map(|created| *created).unwrap_or([None; ALL_EXTRA_SLOTS.len()])\n    }\n\n    fn register(index: usize, record: Created) -> bool {\n        let Ok(mut created) = CREATED.lock() else {\n            return false;\n        };\n        created[index] = Some(record);\n        true\n    }\n\n    /// Native owner cleanup only; never scene departure.\n    pub(super) fn unregister(index: usize) {\n        if let Ok(mut created) = CREATED.lock() {\n            created[index] = None;\n        }\n    }\n\n    /// Registered creations as the one value Mii owner checks may accept. An\n    /// inconsistent registry (order or claim/owner) yields no extras, so any live\n    /// created entry stays unknown and every Mii shape check refuses it.\n",
+     "new": "        descriptor_selector: u32,\n    }\n    type CreatedSlots = [Option<Created>; ALL_EXTRA_SLOTS.len()];\n    static CREATED: Mutex<CreatedSlots> = Mutex::new([None; ALL_EXTRA_SLOTS.len()]);\n\n    /// Copy only registered native roots; the guard never spans native work.\n    fn created() -> CreatedSlots {\n        *CREATED.lock()\n    }\n\n    fn register(index: usize, record: Created) -> bool {\n        let mut created = CREATED.lock();\n        created[index] = Some(record);\n        true\n    }\n\n    /// Native owner cleanup only; never scene departure.\n    pub(super) fn unregister(index: usize) {\n        CREATED.lock()[index] = None;\n    }\n\n    /// Registered creations as the one value Mii owner checks may accept. An\n    /// inconsistent registry (order or claim/owner) yields no extras, so any live\n    /// created entry stays unknown and every Mii shape check refuses it.\n",
+     "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
     }
    ]
   },

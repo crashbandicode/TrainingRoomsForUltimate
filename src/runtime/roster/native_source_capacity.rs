@@ -875,7 +875,7 @@ use crate::engine::swap::source_descriptor as source_descriptor;
 #[cfg(feature = "managed-third-source-alpha")]
 pub(super) mod managed {
     use super::*;
-    use std::sync::Mutex;
+    use hos_lock::Mutex;
     use crate::engine::swap::capacity_creation::{self as creation, ExactMiiProof, OwnerAdmission, OwnerFacts, Refusal};
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     use super::super::mii_ordinary_player::native::VisibleMii;
@@ -903,24 +903,20 @@ pub(super) mod managed {
     type CreatedSlots = [Option<Created>; ALL_EXTRA_SLOTS.len()];
     static CREATED: Mutex<CreatedSlots> = Mutex::new([None; ALL_EXTRA_SLOTS.len()]);
 
-    /// A poisoned table reads as empty, so every ownership check fails closed.
+    /// Copy only registered native roots; the guard never spans native work.
     fn created() -> CreatedSlots {
-        CREATED.lock().map(|created| *created).unwrap_or([None; ALL_EXTRA_SLOTS.len()])
+        *CREATED.lock()
     }
 
     fn register(index: usize, record: Created) -> bool {
-        let Ok(mut created) = CREATED.lock() else {
-            return false;
-        };
+        let mut created = CREATED.lock();
         created[index] = Some(record);
         true
     }
 
     /// Native owner cleanup only; never scene departure.
     pub(super) fn unregister(index: usize) {
-        if let Ok(mut created) = CREATED.lock() {
-            created[index] = None;
-        }
+        CREATED.lock()[index] = None;
     }
 
     /// Registered creations as the one value Mii owner checks may accept. An

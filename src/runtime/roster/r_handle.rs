@@ -171,11 +171,14 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
     let (r, owner, plan) = {
         let mut slot = lock(role);
         let Some(handle) = slot.as_mut() else { return receipt; };
-        let selected: Vec<usize> = handle.held.iter().enumerate()
-            .filter(|(_, (g, token))| group.is_none_or(|x| *g == x) && kinds.is_none_or(|ks| ks.contains(&token.kind())))
-            .map(|(i, _)| i).collect();
         let mut plan: Vec<(u32, ReleaseCalls)> = Vec::new();
-        for i in selected.into_iter().rev() {
+        // Descending removal leaves every earlier index unchanged. Preserve the
+        // old selection/release order without allocating a second index list.
+        for i in (0..handle.held.len()).rev() {
+            let (g, token) = &handle.held[i];
+            if !group.is_none_or(|x| *g == x) || !kinds.is_none_or(|ks| ks.contains(&token.kind())) {
+                continue;
+            }
             let (_, token) = handle.held.remove(i);
             let kind = token.kind();
             match handle.ledger.release_fixed(token, occupancy, role) {
@@ -329,11 +332,15 @@ pub(crate) unsafe fn set_pair_refs(role: Role, r: usize, group: usize, reference
     }
 }
 
-/// Nothing held by us and nothing recorded for native: a canonical Reload may be issued.
-pub(crate) fn expect_free(role: Role) -> Result<(), Vec<u32>> {
-    match lock(role).as_ref() {
-        Some(handle) => handle.ledger.expect_free().map_err(|keys| keys.iter().map(|k| k.value()).collect()),
-        None => Ok(()),
+/// Diagnose the same sorted held keys before Reload, without collecting a copy.
+/// This is observation only: it neither refuses nor performs native cleanup.
+pub(crate) fn expect_free(role: Role, owner: u32, phase: &str) {
+    let slot = lock(role);
+    if let Some(handle) = slot.as_ref() {
+        let keys = handle.ledger.predicted_iter().map(|(key, _)| key);
+        if keys.clone().next().is_some() {
+            trace!("[Ledger] expect_free owner={} phase={} keys_held={:x?}", owner, phase, DebugIter(keys));
+        }
     }
 }
 

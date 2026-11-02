@@ -3635,9 +3635,7 @@ pub(super) unsafe fn before_reload(entry: *const u8) {
     // must hold nothing. A key left here names the quirk the recipes miss (diagnostic, no cleanup;
     // it replaces WP2's `before reload` observation, U13).
     if let Some(role) = role(owner) {
-        if let Err(keys) = r_handle::expect_free(ledger_role(role)) {
-            trace!("[Ledger] expect_free owner={} phase=mod reload keys_held={:x?}", owner, keys);
-        }
+        r_handle::expect_free(ledger_role(role), owner, "mod reload");
     }
 }
 
