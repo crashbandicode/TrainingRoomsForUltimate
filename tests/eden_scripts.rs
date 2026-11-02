@@ -25,3 +25,16 @@ fn the_eden_analysis_scripts_pass_their_host_tests() {
         }
     }
 }
+
+/// SPEC-core-06: the hitbox visualizer's stats summary (`eden/hitbox_stats.py`, the numbers `eden/EDEN-HITBOX.md` cites).
+#[test]
+fn the_hitbox_stats_script_passes_its_host_tests() {
+    let script = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/eden/test_hitbox_stats.py");
+    match Command::new("/usr/bin/python3").args(["-I", script]).output() {
+        Ok(out) => assert!(out.status.success(), "python tests failed:\n{}", String::from_utf8_lossy(&out.stderr)),
+        Err(error) => {
+            assert!(std::env::var_os("SKIP_EDEN_SCRIPT_TESTS").is_some(), "no /usr/bin/python3: {error}");
+            println!("SKIPPED the_hitbox_stats_script_passes_its_host_tests: {error}");
+        }
+    }
+}
