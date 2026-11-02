@@ -103,6 +103,8 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             named_macros::observe_playback_start(module);
             replay_preview::after_frame(module);
             named_macros::preview(module);
+            // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
+            crate::runtime::ui::facts::refresh(module);
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
             named_macros::service_keyboard();
             named_macros::service_character();

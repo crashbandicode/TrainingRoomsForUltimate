@@ -13,7 +13,7 @@ use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
+use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::thumbs;
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
@@ -94,8 +94,10 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         }
     }
     let open = OPEN.load(Ordering::Acquire);
+    // A panel the menu does not own (the clip editor) is drawn with the menu closed.
+    let ext = EXT_SHOWN.load(Ordering::Acquire);
     let mut alpha = 255;
-    let mut showing = open;
+    let mut showing = open || ext;
     if CLOSING.load(Ordering::Acquire) {
         let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
         if count >= CLOSE_FRAMES {
@@ -103,7 +105,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
         } else {
             showing = true;
-            alpha = fade_alpha(count);
+            alpha = if ext { 255 } else { fade_alpha(count) };
         }
     }
     let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire);
@@ -127,6 +129,11 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
                 log(format_args!("[Ui] first draw seq={seq}"));
             }
         }
+    }
+    // The clip editor's held scrub repeats once per drawn frame of the Training layout (the layer's fter_draw, a no-op unless the
+    // editor is in the foreground).
+    if crate::runtime::macros::ready() {
+        crate::runtime::macros::replay_capture::after_draw();
     }
     // The stage grid's thumbnails (SPEC-core-07 section 4.5): requested when a stage page shows, released when it changes or
     // the menu closes; `thumbs::run` also lets the helper retire released textures, once per UI frame.

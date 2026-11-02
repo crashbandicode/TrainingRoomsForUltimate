@@ -9,6 +9,9 @@ pub mod model;
 // The carried fork engines (package 6): each area is test-only until its consumer lands, except those engine/mod.rs leaves open.
 pub mod engine;
 
+// The menu's editors that read the engines' types (clip editor, roster grid, Mii lists): pure, host-tested.
+pub mod editors;
+
 #[cfg(target_os = "switch")]
 mod runtime;
 

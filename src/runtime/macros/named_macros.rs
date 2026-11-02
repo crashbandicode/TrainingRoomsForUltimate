@@ -475,7 +475,7 @@ pub fn service_keyboard() {
             let effect = lock_write(&UI).confirm_native_name(name);
             // Only a valid confirmation closes the clip. A failed write restores
             // the naming draft; the selected clip remains available until success.
-            apply_effect(effect);
+            defer_effect(effect);
         }
         crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled => {
             if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }
@@ -1332,6 +1332,23 @@ unsafe fn draw_cross(module_accessor: &mut BattleObjectModuleAccessor, x: f32, y
     }
 }
 
+/// The effect of a confirmed keyboard name, waiting for the menu worker (one at a time: a second keyboard cannot open before the first
+/// was applied). Handing it over allocates nothing.
+static DEFERRED: std::sync::Mutex<Option<Effect>> = std::sync::Mutex::new(None);
+
+fn defer_effect(effect: Effect) {
+    *DEFERRED.lock().unwrap() = Some(effect);
+    crate::runtime::ui::worker::wake();
+}
+
+/// Apply the deferred effect, on the menu worker (the library write and the loads are file I/O).
+pub fn run_deferred() {
+    let effect = DEFERRED.lock().unwrap().take();
+    if let Some(effect) = effect {
+        apply_effect(effect);
+    }
+}
+
 fn apply_effect(effect: Effect) {
     match effect {
         Effect::None => {}
@@ -1430,10 +1447,7 @@ fn request_kind(kind: i32) {
 }
 
 fn cpu_kind() -> Option<i32> {
-    unsafe {
-        let cpu = try_get_module_accessor(FighterId::CPU)?;
-        Some(utility::get_kind(&mut *cpu))
-    }
+    crate::runtime::ui::facts::cpu_kind()
 }
 
 pub(crate) fn fighter_label(kind: i32) -> String {

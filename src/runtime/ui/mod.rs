@@ -10,6 +10,8 @@
 
 pub mod anchors;
 pub mod archive;
+pub mod external;
+pub mod facts;
 pub mod hud;
 pub mod input;
 pub mod menu_app;
@@ -89,6 +91,7 @@ pub fn clear_session_state() {
     state::PAUSE_ACTIVE.store(false, Ordering::Release);
     crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
     input::reset_session();
+    facts::clear();
     worker::push_reset();
     state::FRAME_SEQ.fetch_add(1, Ordering::Release);
 }

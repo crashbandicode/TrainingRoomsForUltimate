@@ -149,7 +149,7 @@ impl MacroSource {
 
 /// What the install line says about this layer's dependency boundary.
 pub(crate) fn install_report() -> &'static str {
-    "roster=unavailable_until_cycle_lands menu_app=unavailable_until_pkg5_screens"
+    "roster=unavailable_until_cycle_lands menu_app=screens_installed"
 }
 
 /// The fork's `training::practice` as the named layer reads it: the clean room's scene and body facts. Lobby practice (the waiting room)
@@ -171,12 +171,13 @@ pub(crate) mod practice {
         scene::is_training()
     }
 
-    /// Both practice fighters are present now (nothing is retained).
+    /// Both practice fighters were present at the last frame (nothing is retained). The panels' entry points run on the menu worker, which
+    /// never reads the game: the answer is the frame wrapper's published fact (`ui::facts`), at most a frame old.
     ///
     /// # Safety
-    /// The natives' guards decide; every read is of the live game.
+    /// None needed; kept `unsafe` because the carried callers name it so.
     pub(crate) unsafe fn acquire() -> bool {
-        recorder::body_of(0).is_some() && recorder::cpu_accessor().is_some()
+        crate::runtime::ui::facts::fighters_present()
     }
 
     /// The waiting room's practice session (lobby practice, package 6).

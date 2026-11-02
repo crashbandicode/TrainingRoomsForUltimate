@@ -11,14 +11,20 @@ use parking_lot::Mutex;
 
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
+use crate::editors::clip::clip_frame;
+use crate::model::flow::{self, Phase, Seen, Step};
+use crate::model::frame::Frame;
 use crate::model::menu::input::Button;
-use crate::model::menu::{Env, Menu};
+use crate::model::menu::table::Editor;
+use crate::model::menu::{Env, Menu, Screen};
 use crate::model::settings::Settings;
-use crate::model::screens::frame_of;
+use crate::model::screens::{frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, input_delay, notices, writer};
 use crate::runtime::published;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, OPEN};
+use crate::runtime::macros::{named_macros, replay_capture};
+use crate::runtime::ui::external;
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, OPEN};
 
 const RING: usize = 64;
 static SLOTS: [AtomicU8; RING] = [const { AtomicU8::new(0) }; RING];
@@ -139,50 +145,168 @@ fn env() -> Env {
     }
 }
 
+/// What the worker owns: the menu model and which screen has the buttons (`model::flow`).
+#[derive(Default)]
+struct Session {
+    menu: Option<Menu>,
+    phase: Phase,
+    /// The panel row the menu is on while `phase` is `Panel`.
+    panel: Option<Editor>,
+    /// Why the last panel refused to open, shown on the row's help line until the next press.
+    refusal: Option<&'static str>,
+}
+
+impl Session {
+    /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
+    fn watching(&self) -> bool {
+        self.phase != Phase::Menu
+    }
+}
+
+/// How often the worker looks at a panel the layer may change on its own (a keyboard that returned, a clip's preview).
+const POLL: std::time::Duration = std::time::Duration::from_millis(33);
+
 fn run() {
     let _ = WORKER.set(std::thread::current());
-    let mut menu: Option<Menu> = None;
+    let mut session = Session::default();
     loop {
         // Drain first: an event pushed before this thread registered has no unpark waiting for it.
         while let Some(code) = pop() {
-            handle(code, &mut menu);
+            handle(code, &mut session);
         }
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
-        std::thread::park();
+        sync(&mut session);
+        if session.watching() {
+            std::thread::park_timeout(POLL);
+        } else {
+            std::thread::park();
+        }
     }
 }
 
-fn handle(code: u8, menu: &mut Option<Menu>) {
+fn handle(code: u8, s: &mut Session) {
     if code == EV_RESET {
-        *menu = None;
+        s.menu = None;
+        s.panel = None;
+        s.refusal = None;
+        if s.phase == Phase::Clip {
+            EXT_SHOWN.store(false, Ordering::Release);
+        }
+        s.phase = Phase::Menu;
         diagnostic(format_args!("[Ui] menu session cleared"));
         return;
     }
     if code == EV_OPEN {
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
-        match menu {
+        match &mut s.menu {
             Some(m) => m.reopen(settings, env()),
-            None => *menu = Some(Menu::new(settings, env())),
+            None => s.menu = Some(Menu::new(settings, env())),
+        }
+        s.panel = None;
+        s.refusal = None;
+        if s.phase == Phase::Panel {
+            s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
         crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(true);
-        publish_frame(menu.as_ref());
+        publish_frame(s);
         diagnostic(format_args!("[Ui] menu opened"));
         return;
     }
-    let (Some(button), Some(m)) = (decode(code), menu.as_mut()) else { return };
-    if !OPEN.load(Ordering::Acquire) {
+    let Some(button) = decode(code) else { return };
+    if s.menu.is_none() || !OPEN.load(Ordering::Acquire) || s.phase == Phase::Clip {
         return;
     }
-    m.set_console(console_mode());
-    m.press(button);
-    if m.is_closed() {
-        close(m);
+    s.refusal = None;
+    let panel = s.phase == Phase::Panel;
+    let closed = {
+        let Some(m) = s.menu.as_mut() else { return };
+        m.set_console(console_mode());
+        if panel {
+            // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
+            external::press(button);
+        } else {
+            m.press(button);
+        }
+        m.is_closed()
+    };
+    if closed {
+        if let Some(m) = s.menu.as_mut() {
+            close(m);
+        }
     } else {
-        publish_frame(Some(m));
+        sync(s);
     }
+}
+
+/// Follow the layer's panels (`model::flow`): open the one the menu just entered, hand the menu over to the clip editor, step back out
+/// of a panel that closed, and publish the frame when it changed.
+fn sync(s: &mut Session) {
+    // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
+    named_macros::run_deferred();
+    if s.menu.is_none() {
+        return;
+    }
+    let open = OPEN.load(Ordering::Acquire);
+    if open && s.phase == Phase::Menu {
+        let entered = s.menu.as_ref().and_then(|m| match m.screen() {
+            Some(Screen::External(editor)) if external::is_panel(*editor) => Some(*editor),
+            _ => None,
+        });
+        if let Some(editor) = entered {
+            let slot = s.menu.as_ref().and_then(record_slot);
+            if external::open(editor, slot) {
+                s.phase = Phase::Panel;
+                s.panel = Some(editor);
+            } else {
+                s.refusal = Some(external::refusal(editor, slot));
+                if let Some(m) = s.menu.as_mut() {
+                    m.press(Button::B);
+                }
+            }
+        }
+    }
+    let seen = Seen { menu_open: open, panel_visible: external::visible(), clip_visible: external::clip_visible() };
+    let (phase, step) = flow::next(s.phase, seen);
+    s.phase = phase;
+    match step {
+        Step::Nothing => {}
+        Step::CloseLayer => {
+            // The menu lost its renderer or the session ended: the layer's panel goes with it.
+            external::close();
+            s.panel = None;
+        }
+        Step::PopRow => {
+            s.panel = None;
+            if let Some(m) = s.menu.as_mut() {
+                m.press(Button::B);
+            }
+        }
+        Step::HandOverToClip => {
+            // The capture browser opened a clip: the editor reads Player 1 itself, so the menu closes and the editor draws alone.
+            s.panel = None;
+            if let Some(m) = s.menu.as_mut() {
+                m.press(Button::B);
+                close(m);
+            }
+        }
+        Step::HideClip => {
+            EXT_SHOWN.store(false, Ordering::Release);
+            FRAME_SEQ.fetch_add(1, Ordering::Release);
+        }
+    }
+    if s.phase == Phase::Clip {
+        EXT_SHOWN.store(true, Ordering::Release);
+    }
+    if open || s.phase == Phase::Clip {
+        publish_frame(s);
+    }
+}
+/// The page's Record Slot (the row `recording_slot`, one-hot over the five slots).
+fn record_slot(menu: &Menu) -> Option<usize> {
+    menu.settings().menu.get("recording_slot")?.iter().position(|v| *v != 0)
 }
 
 /// Package 6's stage list (the lobby's 117 selectable stages), by catalog index.
@@ -190,11 +314,30 @@ fn stage_label(i: usize) -> &'static str {
     crate::engine::stages::catalog::STAGES.get(i).map_or("-", |(_, label)| *label)
 }
 
-fn publish_frame(menu: Option<&Menu>) {
-    let Some(menu) = menu else { return };
+/// Build the frame of what is on screen (the clip editor, a layer panel, or the menu's own page and sub-screen) and hand it to the tick
+/// when it differs from the last one.
+fn publish_frame(s: &Session) {
+    let Some(menu) = s.menu.as_ref() else { return };
+    let mut next = Frame::new();
+    if s.phase == Phase::Clip {
+        let Some(view) = replay_capture::clip_view() else { return };
+        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
+    } else if s.phase == Phase::Panel {
+        // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
+        let Some(view) = external::view() else { return };
+        panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+    } else {
+        frame_of(menu, &mut next, stage_label);
+        if let Some(reason) = s.refusal {
+            next.help[1].clear();
+            let _ = core::fmt::Write::write_str(&mut next.help[1], reason);
+        }
+    }
     let mut frame = FRAME.lock();
-    frame_of(menu, &mut frame, stage_label);
-    FRAME_SEQ.fetch_add(1, Ordering::Release);
+    if *frame != next {
+        *frame = next;
+        FRAME_SEQ.fetch_add(1, Ordering::Release);
+    }
 }
 
 /// The write-back of decision D1: the carried engines changed their typed view of the menu (`compat::menu`, a roster pick the
