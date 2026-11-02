@@ -107,3 +107,6 @@ pub mod panes;
 pub mod version;
 #[path = "model/thread_stacks.rs"]
 pub mod thread_stacks;
+/// F9: Training's parked CPU entries and the roster cycle's helper sources (the give-back decision).
+#[path = "model/parked_entries.rs"]
+pub mod parked_entries;
