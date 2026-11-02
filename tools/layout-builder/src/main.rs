@@ -5,6 +5,8 @@
 //!       writes `<out>/target.arc` (the plugin's archive, game bytes inside: keep it private),
 //!       `<out>/info_training.tra1` (the recipe the plugin embeds: copy ranges and the changed bytes only)
 //!       and `<out>/report.json`.
+//!   layout-builder build-waiting <stock info_waiting.arc> <out dir>
+//!       adds the same panes beneath `TrModPort` and writes `info_waiting.tra1`.
 //!   layout-builder dump <bflyt> <pane>...   prints the named panes (development).
 //!
 //! The pane inventory is `src/model/ui/panes.rs`, shared with the runtime. The layout is flat: one container
@@ -28,6 +30,7 @@ const BFLYT_MEMBER: &str = "blyt/info_training.bflyt";
 const RECT_TEMPLATE: &str = "pic_bg_mode_main_00";
 /// A stock text box in the `nintendo64` font with a plain white material.
 const TEXT_TEMPLATE: &str = "set_txt_help_00";
+const WAITING_PORT: panes::Name = panes::Name::new("TrModPort");
 const INFLUENCED_ALPHA: u8 = 0x02;
 /// 	xt1 flag bit 1: the buffer is 	ext_buf_bytes long even when the string in it is shorter.
 const FORCE_ASSIGN_TEXT_LENGTH: u16 = 0x0002;
@@ -36,6 +39,20 @@ type Result<T> = std::result::Result<T, String>;
 
 fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> String + '_ {
     move |e| format!("{what}: {e:?}")
+}
+
+fn layout_specs(waiting: bool) -> Vec<Spec> {
+    let mut specs = panes::specs();
+    if waiting {
+        // All three panel roots belong to the waiting host: menu, notices and
+        // input log. Keep their internal parent relationships unchanged.
+        for spec in &mut specs {
+            if spec.parent == panes::Name::new("RootPane") {
+                spec.parent = WAITING_PORT;
+            }
+        }
+    }
+    specs
 }
 
 fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
@@ -121,7 +138,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let recipe_name = if waiting { "info_waiting" } else { "info_training" };
     let index = arc.position(member).ok_or("requested layout not in the archive")?;
     let mut layout = read_bflyt(&arc.files[index].data).map_err(err("read bflyt"))?;
-    let mut specs = panes::specs();
+    let specs = layout_specs(waiting);
     if waiting {
         // The waiting archive already has com_white16, a plain UV0 material and
         // the game's text font. Build our own flat panes from those stock templates;
@@ -131,8 +148,6 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
             parent: Some("RootPane".into()), visible: Some(true),
             ..Default::default()
         }).map_err(err("waiting port"))?;
-        let root = specs.iter_mut().find(|spec| spec.name == panes::ROOT).ok_or("menu root missing")?;
-        root.parent = panes::Name::new("TrModPort");
     }
     for spec in &specs {
         add_pane(&mut layout, spec, waiting)?;
@@ -161,6 +176,32 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         .map_err(err("write report"))?;
     println!("{}", serde_json::to_string_pretty(&report).unwrap());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn waiting_host_contains_every_panel_without_changing_internal_parents() {
+        let training = layout_specs(false);
+        let waiting = layout_specs(true);
+        assert_eq!(training.len(), waiting.len());
+        let mut roots = 0;
+        for (a, b) in training.iter().zip(&waiting) {
+            assert_eq!(a.name, b.name);
+            if a.parent == panes::Name::new("RootPane") {
+                assert_eq!(b.parent, WAITING_PORT);
+                roots += 1;
+            } else {
+                assert_eq!(a.parent, b.parent);
+            }
+        }
+        assert_eq!(roots, 3, "menu, notices and input log");
+        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG] {
+            assert_eq!(waiting[root].parent, WAITING_PORT);
+        }
+    }
 }
 
 fn main() {

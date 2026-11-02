@@ -4,12 +4,13 @@ Player and CPU lists, Player Character), the install line read whole, and the ho
     rows_ui11.py live-ui-11
 """
 import json
-import re
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
+import hook_stats  # noqa: E402
 PHASE = sys.argv[1]
 sys.argv = [sys.argv[0], PHASE]
 import ui_lent as u  # noqa: E402
@@ -28,7 +29,6 @@ def main():
     tail = r6.ps(f"$l = (Get-Content '{r6.SD}\\events.log' | Select-String -Pattern 'result=' | Select-Object -Last 1).Line; "
                  "$l.Substring([Math]::Max(0, $l.Length - 160))").strip()
     r6.row("install line whole: ends result=installed heap_allocations=0", "result=installed heap_allocations=0" in tail, tail[-120:] or "none")
-    before = r6.hook_stats()
     w = r6.W.Walk(PHASE, pilot_present=True)
     # Character Cycles: Mario then Donkey Kong into the Player list, then ZR and Mario into the CPU list.
     w.keys("w10")
@@ -58,12 +58,17 @@ def main():
     pick = kept("player_character")
     picked = [i for i, v in enumerate(pick or []) if v == 1]
     r6.row("Player Character: one fighter picked (player_character one-hot)", len(picked) == 1, f"index={picked}")
-    after = r6.hook_stats()
-    a = re.search(r"allocations=(\d+)", before or "")
-    b = re.search(r"allocations=(\d+)", after or "")
-    r6.row("hook allocations over the roster rows", bool(a and b), f"before={a.group(1) if a else '?'} after={b.group(1) if b else '?'}")
+    # Read whole lines from the retained file: the plug transport truncates each
+    # line, which can hide coverage and the per-hook allocation attribution.
+    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=' | ForEach-Object {{ $_.Line }}")
+    (r6.OUT / "roster-hook-stats.log").write_text(stats, encoding="utf-8")
+    ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
+    r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
+           "; ".join(reasons) if reasons else f"{len(hook_stats.parse(stats))} complete samples")
     (r6.OUT / "rows-roster.json").write_text(json.dumps(r6.ROWS, indent=1))
     print("ROWS DONE", flush=True)
+    if not all(row["ok"] for row in r6.ROWS):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
