@@ -147,6 +147,24 @@ def r_install():
     row("roster cycle started (every CALLED_ROWS guard passed)", started, "no 'roster cycle not started' line" if started else "not started")
 
 
+
+def r_boot_cache():
+    """Run before any reload: explicit JSON Off survives the boot/cache path."""
+    lines = [line for line in read_diag() if "[CyclePreload] loaded " in line]
+    loaded = lines[-1] if lines else ""
+    menu = json.loads((SD / "settings.json").read_text())["menu"]
+    cache = (SD / "cycle_preload.ini").read_text()
+    (OUT / "boot-cycle-preload.ini").write_text(cache)
+    (OUT / "boot-settings.json").write_text(json.dumps({"menu": menu}, indent=2))
+    active_off = bool(re.search(r"\bslots=0(?:\s|$)", loaded) and
+                      re.search(r"\bbank_members=0(?:\s|$)", loaded))
+    cache_off = bool(re.search(r"^slots=0$", cache, re.M) and
+                     re.search(r"^bank_members=0$", cache, re.M))
+    json_off = menu.get("cycle_preload_slots") == [1, 0, 0, 0, 0, 0] and \
+        menu.get("cycle_preload_bank_members") == [1, 0, 0]
+    row("boot JSON Off remains active and is mirrored to INI", active_off and cache_off and json_off, loaded)
+
+
 def r_itemtable():
     lines = [x for x in read_diag() if "[ItemTable]" in x]
     (OUT / "itemtable.txt").write_text("\n".join(lines) + "\n")
@@ -175,7 +193,7 @@ def r_item():
 
 
 def r_preload():
-    m, _ = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, "preload on")
+    m, _ = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0]}, "preload on")
     applied = wait_for(m, "[CyclePreload] applied", 10)
     row("menu commit reaches the preload engine (publish_applied)", applied is not None, applied)
     status = wait_for(m, "[PreloadStatus]", 60)
@@ -186,9 +204,8 @@ def r_swap():
     m, queued, done = cycle(0)
     shot("swap-p1-1")
     row("P1 hot swap by the cycle chord", done is not None, f"{queued} | {done}")
-    session = [x for x in after(m) if "practice_session held=" in x]
-    row("the hot swap retires the practice session and a fresh one is acquired", any("held=false" in x for x in session)
-        and any("held=true" in x for x in session), session[-4:])
+    # Native Training hot swaps need not retire the practice context. Lobby
+    # lease ownership is a separate paired-run row coordinated with the lead.
 
 
 def r_kirby():
@@ -198,7 +215,7 @@ def r_kirby():
     req = wait_for(m, "[KirbyHats] request", 20)
     conf = wait_for(m, "[KirbyHats] confirmed", 40)
     shot("kirby-hat")
-    row("Kirby hat by the shortcut", req is not None, f"{req} | {conf}")
+    row("Kirby hat by the shortcut", req is not None and conf is not None, f"{req} | {conf}")
     saved = save_state()
     m2 = mark()
     load_state()
@@ -210,7 +227,7 @@ def r_kirby():
 def r_ic():
     m, queued, done = cycle(0, cap=60)
     shot("swap-ice-climbers")
-    row("P1 hot swap to the Ice Climbers pair", done is not None, done)
+    row("P1 hot swap to the Ice Climbers pair", done is not None and "kind=0x4b " in done, done)
     save_state()
     m2, done2 = load_state(cap=20)
     row("save/load with the Ice Climbers pair finishes (Nana hand-off)", done2 is not None, done2)
@@ -331,7 +348,7 @@ def r_popo_path():
 
 def r_reload_alive():
     """A diag settings reload, then the log must keep going (stack st-11 went silent after one)."""
-    m, line = reload({"cycle_preload_slots": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0]}, "reload liveness")
+    m, line = reload({"cycle_preload_slots": [0, 0, 0, 1, 0, 0]}, "reload liveness")
     time.sleep(12)
     later = [x for x in after(m) if "hook_stats" in x or "hook_counts" in x]
     row("diag settings reload: the log keeps going afterwards", line is not None and len(later) >= 1, f"{line} | {len(later)} periodic lines after")
@@ -374,7 +391,7 @@ def r_menu_cycles():
 def r_pt():
     m, queued, done = cycle(0, cap=60)
     shot("swap-pt")
-    row("P1 hot swap to Pokemon Trainer (native group)", done is not None, done)
+    row("P1 hot swap to Pokemon Trainer (native group)", done is not None and "kind=0x24 " in done, done)
 
 
 def r_mii():
@@ -401,10 +418,11 @@ def r_r5():
 
 def r_r5_soak():
     """R5 acceptance: explicit fighters+hats, >=180 s of live zero-allocation samples."""
-    m, applied = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-                         "cycle_preload_sources": [0, 0, 1]}, "R5 fighters+hats soak")
+    m, applied = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0],
+                         "cycle_preload_sources": [0, 0, 1],
+                         "cycle_preload_bank_members": [0, 0, 1]}, "R5 fighters+hats soak")
     plan = wait_for(m, "[CyclePreload] applied", 15)
-    configured = applied is not None and plan is not None and "slots=2 fighters=true hats=true" in plan
+    configured = applied is not None and plan is not None and "slots=2 fighters=true hats=true" in plan and "bank_members=3" in plan
     row("R5 fighters+hats settings applied", configured, plan)
     if not configured:
         return
@@ -452,7 +470,7 @@ def r_r5_soak():
     row("R5 every named hook counter unchanged throughout soak", live and all(v == 0 for v in deltas.values()), deltas)
 
 
-ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
+ROWS = {"install": r_install, "bootcache": r_boot_cache, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
         "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "f9": r_f9, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5, "r5soak": r_r5_soak}
 
 

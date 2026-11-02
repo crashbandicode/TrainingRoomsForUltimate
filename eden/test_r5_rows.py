@@ -10,7 +10,7 @@ from pathlib import Path
 SOURCE = Path(__file__).with_name("rows_s6.py")
 TREE = ast.parse(SOURCE.read_text())
 FUNCTIONS = ast.Module(body=[n for n in TREE.body if isinstance(n, ast.FunctionDef)
-                            and n.name in ("r_r5", "r_r5_soak")], type_ignores=[])
+                            and n.name in ("r_r5", "r_r5_soak", "r_boot_cache")], type_ignores=[])
 CODE = compile(FUNCTIONS, str(SOURCE), "exec")
 
 
@@ -24,7 +24,7 @@ def samples(count=19, gap=10000, allocation=None, preload=True, stalled=False):
 
 
 class Rows(unittest.TestCase):
-    def run_row(self, name, lines, plan="slots=2 fighters=true hats=true"):
+    def run_row(self, name, lines, plan="slots=2 fighters=true hats=true bank_members=3"):
         rows = []
         ticks = iter(range(1000))
         with tempfile.TemporaryDirectory(prefix="pkg6-r5-fixture-") as directory:
@@ -39,6 +39,23 @@ class Rows(unittest.TestCase):
             scope[name]()
         return rows
 
+    def test_boot_cache_requires_json_native_and_cache_agreement(self):
+        for native_slots, cache_slots, json_slots in [(0, 0, 0), (5, 0, 0), (0, 5, 0), (0, 0, 5)]:
+            with self.subTest(native=native_slots, cache=cache_slots, menu=json_slots):
+                with tempfile.TemporaryDirectory(prefix="pkg6-boot-fixture-") as directory:
+                    root = Path(directory)
+                    choice = [int(i == json_slots) for i in range(6)]
+                    (root / "settings.json").write_text(json.dumps({"menu": {
+                        "cycle_preload_slots": choice, "cycle_preload_bank_members": [1, 0, 0]}}))
+                    (root / "cycle_preload.ini").write_text(f"[cycle_preload]\nslots={cache_slots}\nbank_members=0\n")
+                    rows = []
+                    scope = dict(re=re, json=json, SD=root, OUT=root,
+                        read_diag=lambda: [f"1000 [CyclePreload] loaded slots={native_slots} bank_members=0"],
+                        row=lambda _, ok, __: rows.append(bool(ok)))
+                    exec(CODE, scope)
+                    scope["r_boot_cache"]()
+                    self.assertEqual(rows, [native_slots == cache_slots == json_slots == 0])
+
     def test_accepts_live_zero_soak(self):
         self.assertTrue(all(ok for _, ok in self.run_row("r_r5_soak", samples())))
 
@@ -49,7 +66,10 @@ class Rows(unittest.TestCase):
                 self.assertTrue(any(not ok for _, ok in self.run_row("r_r5_soak", lines)))
 
     def test_requires_fighters_and_hats(self):
-        self.assertFalse(self.run_row("r_r5_soak", samples(), "slots=2 fighters=true hats=false")[0][1])
+        self.assertFalse(self.run_row("r_r5_soak", samples(), "slots=2 fighters=true hats=false bank_members=3")[0][1])
+
+    def test_requires_live_three_member_bank(self):
+        self.assertFalse(self.run_row("r_r5_soak", samples(), "slots=2 fighters=true hats=true bank_members=0")[0][1])
 
     def test_full_scan_never_skips_first_allocation_sample(self):
         self.assertFalse(self.run_row("r_r5", samples(allocation=0))[0][1])
