@@ -22,9 +22,9 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::macros::port::practice",
-   "training::ui::notifications": "crate::runtime::macros::port::notifications",
-   "training::recording_or_playback": "crate::runtime::macros::port::recording_or_playback",
+   "training::practice": "crate::runtime::lobby::training::practice",
+   "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
+   "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
    "common": "crate::runtime::compat::common",
    "common::consts::FighterId": "crate::runtime::compat::consts::FighterId",
    "common::consts::MENU": "crate::runtime::compat::menu::MENU",
@@ -33,14 +33,14 @@
    "consts": "crate::runtime::compat::consts",
    "common::game_mode": "crate::runtime::lobby::game_mode",
    "native_keyboard": "crate::runtime::mii::native_keyboard",
-   "character_roster": "crate::runtime::macros::port::roster",
-   "mii_editor_bridge": "crate::runtime::macros::port::editor_bridge",
+   "character_roster": "crate::runtime::roster::character_roster",
+   "mii_editor_bridge": "crate::runtime::mii::mii_editor_bridge",
    "logging": "crate::runtime::diag_log",
    "native_fields": "crate::engine::seams::native_fields",
    "swap_native::seam_install": "crate::runtime::seams::seam_install",
    "input": "crate::runtime::macros::port::input",
    "training::input_record": "crate::runtime::macros::port::input_record",
-   "training::save_states": "crate::runtime::macros::port::save_states",
+   "training::save_states": "crate::runtime::macros::save_states",
    "common::input": "crate::runtime::macros::port::input",
    "common::menu": "crate::runtime::compat::common::menu",
    "training": "crate::runtime::macros",
@@ -359,7 +359,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1",
-   "dest_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1"
+   "dest_sha256": "52da75eb9204cd93c1e73efccf5bdab46c4a9af33eaf657c58040e9b999a7d98",
+   "edits": [
+    {
+     "old": "serde_json::from_str(text)",
+     "new": "serde_json::from_slice(text.as_bytes())",
+     "reason": "size: the manifest is read with from_slice; reading the timeline lines through the same reader type shares one monomorphised deserializer per format type instead of a second copy for the string reader (the line was already valid UTF-8, a String); results are identical"
+    }
+   ]
   },
   {
    "src": "src/capture.rs",
@@ -466,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "43d2697abfa1d7062b5e04a7cdd290a367a9961ede094811e0d6d21aca07357e",
+   "dest_sha256": "386e275d0f1cb7d1875553816be093697d064ca525832a1d609d9c82953a71b5",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -534,8 +541,8 @@
      "reason": "keep the reserved playback buffer (moving the recording's Vec in would drop it)"
     },
     {
-     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
-     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "old": "unsafe { crate::runtime::macros::save_states::is_loading() }",
+     "new": "crate::runtime::macros::save_states::is_loading()",
      "count": 2,
      "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
     },
@@ -556,6 +563,51 @@
      "old": "pub fn prepare_buffers() {\n    let mut motion = lock_write(&MOTION);\n    let wanted = training_mod_macros_max_frames();\n    let (captured, played) = (motion.captured.len(), motion.play.len());\n    if motion.captured.capacity() < wanted {\n        motion.captured.reserve_exact(wanted - captured);\n    }\n    if motion.play.capacity() < wanted {\n        motion.play.reserve_exact(wanted - played);\n    }\n}\n",
      "new": "pub fn prepare_buffers() {\n    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped\n    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.\n    let wanted = training_mod_macros_max_frames();\n    let (grow_captured, grow_play) = {\n        let motion = lock_read(&MOTION);\n        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)\n    };\n    if !grow_captured && !grow_play {\n        return;\n    }\n    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };\n    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };\n    {\n        let mut motion = lock_write(&MOTION);\n        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {\n            captured.append(&mut motion.captured);\n            std::mem::swap(&mut motion.captured, &mut captured);\n        }\n        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }\n}\n",
      "reason": "stream/sync (menu-close hang, 2026-11-02): a hook never waits on a lock another thread holds across real work; the Named-library buffer reservation (an allocation, on the publishing thread) runs before MOTION is taken, and the write lock only swaps the buffers"
+     },
+     {
+     "old": "notification(\"Named Macro\".to_owned(), message.to_owned(), 180);",
+     "new": "notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
+     "reason": "package 6's notification facade takes Cow arguments (static text allocates nothing)"
+    },
+    {
+     "old": "use crate::runtime::lobby::training::ui::notifications::notification;",
+     "new": "use crate::runtime::lobby::training::ui::notifications::upsert;",
+     "reason": "R5: the layer's notices are copied into the fixed notice queue (upsert), never an owned String inside a hook"
+    },
+    {
+     "old": "    notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
+     "new": "    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);",
+     "reason": "R5 (sync-01: +1 per named-playback refusal notice): allocation-free notice"
+    },
+    {
+     "old": "pub fn init() {\n    let path = format!(\"{}/selected.txt\", macros_dir());",
+     "new": "pub fn init() {\n    // R5: the panel-hold list is reserved at boot so hold_panel_fighter (a hook) never grows it (sync-01: +1 at the first library open).\n    lock_write(&PANEL_STOPS).reserve(PANEL_STOPS_CAPACITY);\n    let path = format!(\"{}/selected.txt\", macros_dir());",
+     "reason": "R5: prepare the panel-hold list at boot (boot thread), not on its first push in the fighter-frame hook"
+    },
+    {
+     "old": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());",
+     "new": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());\n/// Boot reservation of `PANEL_STOPS`: one entry per held fighter body, more than a match has (8 entries and their partners).\nconst PANEL_STOPS_CAPACITY: usize = 16;",
+     "reason": "R5: the reservation's size, named"
+    },
+    {
+     "old": "practice::primary_cpu(module_accessor)",
+     "new": "crate::runtime::features::recorder::is_primary_cpu_body(module_accessor)",
+     "reason": "package 6 retired practice::primary_cpu (single owner; agreed with pkg6 5e0fab3): package 2's primary CPU entry is the owner (recorder::is_primary_cpu_body: a practice scene, the first body of cpu::primary_entry_now)"
+    },
+    {
+     "delete_from": "struct Legacy {",
+     "delete_to": "pub struct PlaybackStart {",
+     "reason": "deleted (lead 2026-11-02, dead code): the shared facing/status pair the fork parked around named runs; SPEC-input-01 section 9 calls it unnecessary once the pair is per slot, and the clean-room recorder keeps it per slot (Origin)"
+    },
+    {
+     "delete_from": "pub fn remember_legacy(facing: f32, status: i32) {",
+     "delete_to": "/// Close the panel and stop playback.",
+     "reason": "deleted (lead 2026-11-02, dead code): the shared facing/status pair the fork parked around named runs; SPEC-input-01 section 9 calls it unnecessary once the pair is per slot, and the clean-room recorder keeps it per slot (Origin)"
+    },
+    {
+     "delete_from": "/// Bound the earlier CPU position/status retry too",
+     "delete_to": "/// Run after the CPU's restore callback.",
+     "reason": "deleted (lead 2026-11-02, dead code): the fork called it from its own save_states position retry, which is not carried; package 3's restore has no such retry and SPEC-input-01 names no position-wait entry point"
     }
    ]
   },
@@ -564,7 +616,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "ee5407ea9be3edef32a84953bc7e3f545ee43a2f4b6ae41c64e1aa5a36a1798b",
+   "dest_sha256": "eb804532131f6cca282bfa061a21c3febde78b8f60cd7410b7372da1e37ce094",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -583,7 +635,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "024fb7305eb598c0762be789fe100dae3fbe97315712149fb20af755e3e901b4",
+   "dest_sha256": "b868365fec5ed142ad1723218e300f631b264da8530cca55703dcaf0ccfb4e96",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -596,10 +648,21 @@
      "reason": "the game's pause menu is an input owner of the clean-room mask (SPEC-input-03), not the fork's VANILLA_MENU_ACTIVE flag"
     },
     {
-     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
-     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "old": "unsafe { crate::runtime::macros::save_states::is_loading() }",
+     "new": "crate::runtime::macros::save_states::is_loading()",
      "count": 1,
      "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
+    },
+    {
+     "old": "notification(\"Clip Editor\".into(), message, 180);",
+     "new": "notification(\"Clip Editor\".into(), message.into(), 180);",
+     "reason": "package 6's notification facade takes Cow arguments"
+    },
+    {
+     "old": "crate::runtime::lobby::training::practice::waiting()",
+     "new": "crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)",
+     "count": 3,
+     "reason": "package 6 retired practice::waiting (single owner, pkg6 carry ledger 'Deleted fork functions'; agreed with pkg6 5e0fab3): package 2's scene is the owner, the waiting room's practice is Scene::Lobby"
     }
    ]
   },
@@ -608,7 +671,14 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "3c8437de822c275c6aa225440b172da97924afef6b4f9b3bc5acb33976aa2895"
+   "dest_sha256": "d4b0669d76675c1945304ca8a537e65c6325ef30cd0412684bfe388a052d4ccc",
+   "edits": [
+    {
+     "old": "practice::primary_cpu(module)",
+     "new": "crate::runtime::features::recorder::is_primary_cpu_body(module)",
+     "reason": "package 6 retired practice::primary_cpu (single owner; agreed with pkg6 5e0fab3): package 2's primary CPU entry is the owner (recorder::is_primary_cpu_body: a practice scene, the first body of cpu::primary_entry_now)"
+    }
+   ]
   },
   {
    "src": "src/replay_move_start.rs",

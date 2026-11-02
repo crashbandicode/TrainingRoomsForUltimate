@@ -76,35 +76,53 @@ fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
 /// The byte meter of the diag heap features (`plugin-heap-meter`, `console-practice-trace`) lives in the same allocator, so those
 /// features read this plugin's one global allocator instead of declaring their own. A block's size shows in `live` and `total`
 /// while it is held, `live` returns when it is freed, `peak` keeps the high-water mark, and a realloc counts the new size.
+///
+/// The meter is process-wide by design (it measures the whole NRO), and this binary also runs the model's unit tests (`#[path] mod
+/// model` brings ~110 of them) on other harness threads: their frees moved `live` between two readings, so the earlier in-process
+/// version failed intermittently ("live holds the block"). The test therefore runs its measurement in a child process of this same
+/// binary that runs this one test alone on one thread (`--exact`, `--test-threads=1`): every delta there is the measurement's own,
+/// so the checks are exact.
 #[test]
 fn the_byte_meter_counts_what_the_one_global_allocator_serves() {
+    const CHILD: &str = "TRAININGROOMS_HEAP_METER_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        measure_the_byte_meter_alone();
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().expect("the test binary"))
+        .args(["--exact", "the_byte_meter_counts_what_the_one_global_allocator_serves", "--test-threads=1", "--nocapture"])
+        .env(CHILD, "1")
+        .output()
+        .expect("the child test process starts");
+    let text = String::from_utf8_lossy(&output.stdout).into_owned() + &String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success() && text.contains("heap_meter exact"), "{text}");
+}
+
+/// The child's measurement: the only thread allocating is this one.
+fn measure_the_byte_meter_alone() {
     use std::alloc::{GlobalAlloc, Layout};
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
-    // Other test threads (the harness) allocate too: measure with blocks far larger than anything they make and compare deltas
-    // that only this thread's calls can explain, by holding the turn (the other test also holds it).
-    // The block (64 MiB) dwarfs what the harness threads allocate or free meanwhile; `SLACK` absorbs their traffic.
-    const BLOCK: usize = 64 << 20;
-    const SLACK: isize = 4 << 20;
     let before = model::hook_stats::heap_bytes();
-    let first = Layout::from_size_align(BLOCK, 8).unwrap();
+    let first = Layout::from_size_align(1 << 20, 8).unwrap();
     // SAFETY: the layouts are valid and every block is freed with the layout it was allocated or reallocated with.
     unsafe {
         let pointer = ALLOCATOR.alloc(first);
         assert!(!pointer.is_null());
         let held = model::hook_stats::heap_bytes();
-        assert!(held.live >= before.live + BLOCK as isize - SLACK, "live holds the block: {before:?} -> {held:?}");
+        assert_eq!(held.live, before.live + (1 << 20), "live holds the block");
         assert!(held.peak >= held.live);
-        assert!(held.total >= before.total + BLOCK && held.calls > before.calls && held.largest >= BLOCK);
+        assert_eq!((held.total, held.calls), (before.total + (1 << 20), before.calls + 1));
+        assert!(held.largest >= 1 << 20);
         let moved = ALLOCATOR.realloc(pointer, first, 1 << 10);
         assert!(!moved.is_null());
         let shrunk = model::hook_stats::heap_bytes();
-        assert!(shrunk.live <= held.live - BLOCK as isize + SLACK, "the old block left `live` at the realloc");
-        assert!(shrunk.total >= held.total + (1 << 10), "the new size counts as requested");
-        assert!(shrunk.peak >= held.peak, "peak never falls");
+        assert_eq!(shrunk.live, before.live + (1 << 10), "the old block left `live` at the realloc, the new size is live");
+        assert_eq!(shrunk.total, held.total + (1 << 10), "the new size counts as requested");
+        assert_eq!(shrunk.peak, held.peak, "peak never falls");
         ALLOCATOR.dealloc(moved, Layout::from_size_align(1 << 10, 8).unwrap());
     }
     let after = model::hook_stats::heap_bytes();
-    assert!(after.live < before.live + SLACK, "the freed block is not live any more");
+    assert_eq!(after.live, before.live, "the freed block is not live any more");
+    println!("heap_meter exact");
 }
 
 /// Attribution (R5): a steady-state allocation is charged to the innermost open scope, and the enclosing scope is current again

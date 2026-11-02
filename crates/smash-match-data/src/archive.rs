@@ -402,7 +402,7 @@ impl TimelineReader {
         let line = self.lines;
         let partial = !self.buf.ends_with('\n');
         let text = self.buf.trim_end_matches(['\n', '\r']);
-        let event: Event = match serde_json::from_str(text) {
+        let event: Event = match serde_json::from_slice(text.as_bytes()) {
             Ok(event) => event,
             Err(_) if partial => {
                 self.problems

@@ -23,7 +23,7 @@ use crate::runtime::macros::port::consts::{FighterId, MacroSource, OnOff, MENU};
 use crate::runtime::macros::port::input::MappedInputs;
 use crate::runtime::compat::common::{menu, try_get_module_accessor};
 use super::practice;
-use crate::runtime::macros::port::notifications::notification;
+use crate::runtime::lobby::training::ui::notifications::upsert;
 
 static UI: RwLock<MacroUi> = RwLock::new(MacroUi::new());
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
@@ -87,7 +87,7 @@ pub fn resume_waiting() {
 }
 fn waiting_name_ready() -> bool {
     super::lobby::active() && practice::enabled()
-        && crate::runtime::macros::port::roster::waiting_drafts_ready()
+        && crate::runtime::roster::character_roster::waiting_drafts_ready()
         && crate::runtime::compat::common::is_ready_go()
         && try_get_module_accessor(FighterId::Player).is_some()
         && try_get_module_accessor(FighterId::CPU).is_some()
@@ -146,20 +146,20 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
 /// manually selected exact Mii is already a match even without a replay receipt.
 pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     current.is_some_and(|kind| target.ready(kind as u32,
-        crate::runtime::macros::port::roster::current_mii_configuration(CPU_ROLE)))
+        crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE)))
 }
 fn exact_target_ready(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     let Some(kind)=current else{return false;};
     if target.configuration().is_none() {return target.ready(kind as u32,None);}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    {crate::runtime::macros::port::roster::mii_replay::named_ready(target,kind as u32)}
+    {crate::runtime::roster::character_roster::mii_replay::named_ready(target,kind as u32)}
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {false}
 }
 fn observe_loaded() {
     let (plays_current,target)={let ui=lock_read(&UI);(ui.plays_current(),ui.loaded_target())};
     let current=cpu_kind();
-    let busy=crate::runtime::macros::port::roster::busy();
+    let busy=crate::runtime::roster::character_roster::busy();
     // A macro playing on the current CPU has no recorded identity to acknowledge.
     let configuration=if plays_current {None} else {
         target.filter(|target|exact_target_ready(*target,current)).and_then(|target|target.configuration())
@@ -190,7 +190,7 @@ pub(crate) fn open_clip_fighter_prompt(revision:u64, recorded:String, current:St
     opened
 }
 fn submit_loaded_character() {
-    if !crate::runtime::macros::port::roster::cpu_reload_ready() {return;}
+    if !crate::runtime::roster::character_roster::cpu_reload_ready() {return;}
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
@@ -203,9 +203,9 @@ fn submit_loaded_character() {
     }
     if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    let accepted=crate::runtime::macros::port::roster::mii_replay::request_named(target);
+    let accepted=crate::runtime::roster::character_roster::mii_replay::request_named(target);
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    let accepted=target.configuration().is_none() && crate::runtime::macros::port::roster::request_cpu_kind(target.kind());
+    let accepted=target.configuration().is_none() && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
     if !accepted {
         // No native request was admitted. A not-yet-qualified owner may become
         // ready after auto-init; don't consume this one submission prematurely.
@@ -276,6 +276,8 @@ fn resume_name() {
 }
 // Only flags set by this panel are released, and only on the same live object.
 static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());
+/// Boot reservation of `PANEL_STOPS`: one entry per held fighter body, more than a match has (8 entries and their partners).
+const PANEL_STOPS_CAPACITY: usize = 16;
 
 pub fn forget_stopped_entry(entry: usize) {
     lock_write(&PANEL_STOPS).retain(|&(_, _, owner)| owner != entry);
@@ -334,16 +336,6 @@ static MOTION: RwLock<Motion> = RwLock::new(Motion {
     },
 });
 
-struct Legacy {
-    facing: Option<f32>,
-    status: Option<i32>,
-}
-
-static LEGACY: RwLock<Legacy> = RwLock::new(Legacy {
-    facing: None,
-    status: None,
-});
-
 pub struct PlaybackStart {
     pub facing: f32,
     pub status: i32,
@@ -351,7 +343,8 @@ pub struct PlaybackStart {
 }
 
 fn notify(message: &str) {
-    notification("Named Macro".to_owned(), message.to_owned(), 180);
+    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.
+    upsert("Named Macro", message, 180);
 }
 
 fn macros_dir() -> String {
@@ -503,6 +496,8 @@ pub fn using_frames() -> bool {
 }
 
 pub fn init() {
+    // R5: the panel-hold list is reserved at boot so hold_panel_fighter (a hook) never grows it (sync-01: +1 at the first library open).
+    lock_write(&PANEL_STOPS).reserve(PANEL_STOPS_CAPACITY);
     let path = format!("{}/selected.txt", macros_dir());
     let Ok(text) = std::fs::read_to_string(path) else {
         return;
@@ -662,7 +657,7 @@ const CPU_ROLE: usize = 1;
 pub fn mii_at_lockout(
     kind: i32,
 ) -> (MiiIdentity, Option<crate::engine::mii::lifetime::Configuration>) {
-    let observed = crate::runtime::macros::port::roster::current_mii_configuration(CPU_ROLE);
+    let observed = crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE);
     let observed_kind = observed.as_ref().map(|configuration| configuration.canonical().class.kind());
     let identity = crate::engine::macro_ui::macro_panel::mii_identity(kind, observed_kind);
     let mii = match identity {
@@ -688,8 +683,8 @@ fn practice_ready() -> bool {
         notify("Wait for both practice fighters");
         return false;
     }
-    if crate::runtime::macros::port::recording_or_playback()
-        || crate::runtime::macros::port::save_states::is_loading()
+    if crate::runtime::lobby::training::recording_or_playback()
+        || crate::runtime::macros::save_states::is_loading()
     {
         notify("Finish the current practice action first");
         return false;
@@ -867,26 +862,6 @@ pub fn cancel_motion() {
     motion.playing = false;
 }
 
-pub fn remember_legacy(facing: f32, status: i32) {
-    let mut legacy = lock_write(&LEGACY);
-    if legacy.facing.is_none() {
-        legacy.facing = Some(facing);
-        legacy.status = Some(status);
-    }
-}
-
-pub fn take_legacy() -> Option<(f32, i32)> {
-    let mut legacy = lock_write(&LEGACY);
-    match (legacy.facing.take(), legacy.status.take()) {
-        (Some(facing), Some(status)) => Some((facing, status)),
-        _ => {
-            legacy.facing = None;
-            legacy.status = None;
-            None
-        }
-    }
-}
-
 /// Close the panel and stop playback. The loaded recording stays, because a
 /// character install calls session cleanup as part of the swap this macro asked for.
 pub fn clear_session() {
@@ -939,33 +914,6 @@ pub unsafe fn request_playback() {
         Ok(()) => RESTORE_ACTION.store(2, Ordering::Relaxed),
         Err(message) => notify(message),
     }
-}
-
-/// Bound the earlier CPU position/status retry too: preparation cannot run while
-/// this phase is pending. On failure, suppress playback and let the save-state
-/// caller finish its normal charge/buff/partner cleanup without further re-pins.
-pub unsafe fn position_wait_timed_out(status: i32, target: i32) -> bool {
-    if !source_is_named() || !RESTORING.load(Ordering::Relaxed)
-        || RESTORE_ACTION.load(Ordering::Relaxed) != 2
-    {
-        return false;
-    }
-    let waits = RESTORE_POSITION_WAITS.fetch_add(1, Ordering::Relaxed);
-    if waits == 0 {
-        crate::runtime::diag_log::diagnostic(format_args!(
-            "[PracticeRecording] named_restore_wait phase=position status={} target={}", status, target
-        ));
-    }
-    if waits < 60 { return false; }
-    RESTORING.store(false, Ordering::Relaxed);
-    RESTORE_ACTION.store(0, Ordering::Relaxed);
-    *lock_write(&RESTORE_POSE) = None;
-    super::input_record::stop_playback();
-    crate::runtime::diag_log::diagnostic(format_args!(
-        "[PracticeRecording] named_restore_failed phase=position status={} target={}", status, target
-    ));
-    notify("Start position could not settle; adjust placement and retry");
-    true
 }
 
 /// Run after the CPU's restore callback. No inputs start while either fighter
@@ -1080,7 +1028,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
 }
 
 unsafe fn observation_fighter(module_accessor: &mut BattleObjectModuleAccessor) -> bool {
-    practice::primary_cpu(module_accessor)
+    crate::runtime::features::recorder::is_primary_cpu_body(module_accessor)
 }
 
 /// Pair the pre-original boundary with the post-original observations below.
@@ -1233,8 +1181,8 @@ pub fn service_character() {
     {
         return;
     }
-    if crate::runtime::macros::port::recording_or_playback()
-        || crate::runtime::macros::port::save_states::is_loading()
+    if crate::runtime::lobby::training::recording_or_playback()
+        || crate::runtime::macros::save_states::is_loading()
     {
         return;
     }
@@ -1247,19 +1195,19 @@ pub fn service_character() {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
-        if let Some(reason)=target.and_then(crate::runtime::macros::port::roster::mii_replay::named_refusal) {
+        if let Some(reason)=target.and_then(crate::runtime::roster::character_roster::mii_replay::named_refusal) {
             let revision=selection_revision();
             if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {notify(reason);}
             return;
         }
     }
     observe_loaded();
-    if crate::runtime::macros::port::roster::busy() {return;}
+    if crate::runtime::roster::character_roster::busy() {return;}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
         if let Some(target)=target {
-            crate::runtime::macros::port::roster::mii_replay::reacknowledge_named(target);
+            crate::runtime::roster::character_roster::mii_replay::reacknowledge_named(target);
         }
     }
     submit_loaded_character();

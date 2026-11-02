@@ -109,7 +109,7 @@ pub fn start_writer() -> Result<(), String> {
                                     outcome.id, saved.replay_name);
                                 #[cfg(feature = "mii-ordinary-cpu-alpha")]
                                 if let Some(miis) = saved.miis {
-                                    crate::runtime::macros::port::roster::mii_replay::committed(miis);
+                                    crate::runtime::roster::character_roster::mii_replay::committed(miis);
                                 }
                             }
                             Err(error) => println!("[ReplayCapture] persistence_failed id={:?}: {}",
@@ -122,7 +122,7 @@ pub fn start_writer() -> Result<(), String> {
                         // on this writer, after any import already queued ahead of this job.
                         let mut native = read_saved_mii_catalog();
                         #[cfg(feature = "mii-editor-alpha")]
-                        crate::runtime::macros::port::editor_bridge::catalog_read(&native);
+                        crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                         match &presets {
                             Ok(store) => native = native.with_library(store.library()),
                             Err(error) => native.findings.push(crate::engine::mii::inventory::Finding::PresetSource {
@@ -209,7 +209,7 @@ fn fallback_catalog(
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
                     #[cfg(feature = "mii-editor-alpha")]
-                    crate::runtime::macros::port::editor_bridge::catalog_read(&native);
+                    crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                     #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     let native = {
                         let mut native = native;
