@@ -1,7 +1,7 @@
 //! What the menu's three actors share: the input hook (game thread), the menu worker and the layout tick
 //! (UI job thread). Atomics and one mutex-guarded frame; nothing here allocates.
 
-use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use parking_lot::Mutex;
 
@@ -24,3 +24,39 @@ pub static PAUSE_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// The frame the worker last built, and its sequence number (the tick draws when it changed).
 pub static FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 pub static FRAME_SEQ: AtomicU32 = AtomicU32::new(0);
+
+/// The UI anchors and the menu worker are installed (the guards passed): set once at boot (review R2-2).
+pub static INSTALLED: AtomicBool = AtomicBool::new(false);
+/// The tick resolved the menu's panes in the Training HUD layout now registered (the injected archive was accepted).
+pub static LAYOUT_READY: AtomicBool = AtomicBool::new(false);
+/// `input::POLLS` at the layout tick's last run: the input hook compares it to tell that the layout is gone.
+pub static POLLS_AT_TICK: AtomicU32 = AtomicU32::new(0);
+/// How many times the menu's ownership was released because its renderer was lost.
+pub static RELEASES: AtomicU32 = AtomicU32::new(0);
+
+/// The facts `model::readiness` decides on.
+pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {
+    use crate::model::input_delay::Owners;
+    let closing = CLOSING.load(Ordering::Acquire);
+    let owner = crate::runtime::published::INPUT_OWNERS.load(Ordering::Acquire) & Owners::MENU.bits() != 0;
+    crate::model::readiness::Facts {
+        installed: INSTALLED.load(Ordering::Acquire),
+        layout_ready: LAYOUT_READY.load(Ordering::Acquire),
+        pause_active: PAUSE_ACTIVE.load(Ordering::Acquire),
+        closing,
+        owns_input: owner || closing || OPEN.load(Ordering::Acquire),
+        polls_since_tick: polls.wrapping_sub(POLLS_AT_TICK.load(Ordering::Acquire)),
+    }
+}
+
+/// The menu lost its renderer: give Player 1 back at once. Nothing is committed (as when every controller is
+/// unplugged, SPEC-core-03 §2.3); the worker's model is rebuilt from the committed settings at the next opening.
+pub fn release_menu() {
+    use crate::model::input_delay::Owners;
+    OPEN.store(false, Ordering::Release);
+    CLOSING.store(false, Ordering::Release);
+    CLOSE_COUNT.store(0, Ordering::Release);
+    MENU_SHOWN.store(false, Ordering::Release);
+    crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
+    RELEASES.fetch_add(1, Ordering::Relaxed);
+}

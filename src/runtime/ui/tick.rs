@@ -13,7 +13,7 @@ use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, MENU_SHOWN, OPEN, PAUSE_ACTIVE};
+use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
@@ -62,6 +62,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         INVALIDATE.store(true, Ordering::Release);
     }
     if !game::is_training_mode() {
+        renderer_lost("not in Training");
         return;
     }
     TICKS.fetch_add(1, Ordering::Relaxed);
@@ -71,7 +72,13 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     let r = &mut *r;
     let Resolved { panes, status_r, help, drawn_seq, shown, .. } = r;
-    let Some(panes) = panes.as_ref() else { return };
+    let Some(panes) = panes.as_ref() else {
+        // The injected archive was refused or the panes are absent: no renderer, so the menu cannot own input (R2-2).
+        renderer_lost("panes unresolved");
+        return;
+    };
+    LAYOUT_READY.store(true, Ordering::Release);
+    POLLS_AT_TICK.store(crate::runtime::ui::input::POLLS.load(Ordering::Relaxed), Ordering::Release);
 
     if !help.is_null() {
         let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
@@ -114,6 +121,17 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
                 diagnostic(format_args!("[Ui] first draw seq={seq}"));
             }
         }
+    }
+}
+
+/// The layout cannot draw the menu now: drop the readiness and, if the menu owns Player 1's input, give it back.
+fn renderer_lost(reason: &str) {
+    let was_ready = LAYOUT_READY.swap(false, Ordering::AcqRel);
+    if state::readiness_facts(0).owns_input {
+        state::release_menu();
+        diagnostic(format_args!("[Ui] menu released: renderer lost ({reason})"));
+    } else if was_ready {
+        diagnostic(format_args!("[Ui] renderer lost ({reason})"));
     }
 }
 

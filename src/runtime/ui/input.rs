@@ -15,7 +15,8 @@ use crate::model::input_delay::Owners;
 use crate::model::menu::chord::Chord;
 use crate::model::adapter::{Adapter, Style};
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{CLOSING, OPEN, PAUSE_ACTIVE};
+use crate::model::readiness;
+use crate::runtime::ui::state::{self, OPEN};
 use crate::runtime::ui::worker;
 
 static ADAPTER: Mutex<Adapter> = Mutex::new(Adapter::new());
@@ -45,9 +46,16 @@ pub fn on_p1_poll(holder: usize) {
     POLLS.fetch_add(1, Ordering::Relaxed);
     LAST_BUTTONS.store(buttons, Ordering::Relaxed);
     let Some(mut adapter) = ADAPTER.try_lock() else { return };
+    let facts = state::readiness_facts(POLLS.load(Ordering::Relaxed));
+    if readiness::must_release(facts) {
+        // The renderer is gone (guard failed, archive refused, layout lost): never trap Player 1's input.
+        state::release_menu();
+        adapter.resync(buttons, style);
+        return;
+    }
     let open = OPEN.load(Ordering::Acquire);
-    let closing = CLOSING.load(Ordering::Acquire);
-    let allowed = !PAUSE_ACTIVE.load(Ordering::Acquire) && !closing;
+    // A chord opens the menu only while a renderer exists (R2-2, SPEC-core-05 question 1).
+    let allowed = readiness::may_open(facts);
     let shortcuts = [Chord::DEFAULT_SHORTCUT_1, Chord::NONE];
     let step = adapter.poll(buttons, style, open, allowed, shortcuts);
     if step.open {
