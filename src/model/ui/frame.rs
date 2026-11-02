@@ -42,7 +42,7 @@ impl<const N: usize> Text<N> {
         }
     }
 
-    pub fn to_string_lossy(&self) -> String {
+    pub fn to_string_lossy(self) -> String {
         String::from_utf16_lossy(self.units())
     }
 }
