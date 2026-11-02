@@ -46,3 +46,33 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 - Save-state playback and record-on-load need package 3's restore completion; the diag build's stand-in (the save-state chord) calls
   `on_state_restored`.
 - S4-4 (named macros, replay import, record-slot export, clip editor, live replay) waits for `training_mod_mii` (package 6).
+
+## Online review (read-only rules, hook by hook; SPEC-input-01 §4, playbook CHECKLIST "Online")
+
+The package's hooks act only when `is_training_mode()` is true and, for the recorder, only on the CPU entry's own controller; in an online match every hook
+returns before it reads or writes anything beyond that predicate.
+
+| Hook | Reads | Writes | Draws game RNG / skips native code |
+| --- | --- | --- | --- |
+| P1 poll note (`input_caller_*_note`, shared with Input Delay) | the player's `Controller` | Plus bits of that controller only for a modal owner or an accepted Plus shortcut (never in an online match: no Training) | no |
+| P1 poll apply (`input_caller_*_apply`) | the mapped record | the record (delay, recorder neutralising) in Training only | no |
+| `ai_epilogue` (`main+0x2dbc38`) | AI object, CPU entry, status, facing | the CPU entry's own controller fields (buttons, stick, clamped stick), the cliff rest timer, the model colour blend: Training only, CPU entry only | no (the plugin's own generator picks slots) |
+| `combo_display_a/b` | w20 / w8 (the byte the game just loaded) | the plugin's own atomic | no |
+| `stale_moves_toggle` | the menu object pointer | one byte at `PauseMenu+0xb60` in Training only | no |
+
+Replay A/B with the desync detector and the two-console online rows are not run (lead's to schedule); the plugin never writes simulated state outside Training.
+
+## Checklist rows (package 4)
+
+| Requirement | Result | Evidence |
+| --- | --- | --- |
+| cdylib only, release profile, skyline =0.6.0, toolchain 1.98.1, `model`/`runtime` split | pass | `compliance.py` machine rows |
+| Gates: `cargo test` (24 binaries, 1,227 tests, 0 failed, Surface), clippy `--all-targets -D warnings` (0 warnings, Yoga gate folder with `SKIP_OWNED_ELF_FACT=1` because the owned ELF lives on the Surface; the ELF tests ran on the Surface), `cargo build --no-default-features`, Switch release and diag builds warning-free | pass | commands in `IMPLEMENTATION-PROGRESS-pkg4.md` |
+| 64-byte guard on every site, card scan | pass | `tests/input_sites.rs`; scan over the 2026-11-01 10:19 preflight copy: only the fork NRO and the CPU pilot (`0x2da180`, the AI function's entry, not our site) reference our offsets; the Combo Display / stale-moves sites and the natives are referenced by the fork only |
+| Hook placement (after the prologue / most specific instruction) | pass | `ai_epilogue` is the function's only return path, not its entry; the poll hooks are the caller-side sites of package 1 |
+| Hook sharing with the CPU pilot (the pilot owns the AI function's entry) | pass | both load orders in Eden (s4-01, s4-02); no foreign hook at our rows (`stock`) |
+| Shipped NRO writes only its install line | pass | `strings` of the release NRO: no `PracticeRecording` / `standin`; per-event lines and the writer thread exist only in the diag build; the INI is written only on a confirmed shortcut change and created once when absent |
+| No heap in hooks | pass | `heap_allocations=0` at install and after 600-frame reports (s4-01, s4-02) |
+| Eden: claim/release, one per host, profile copy, waits gated, console scan, run.json/memory.peak kept, profile restored | pass | `eden/EDEN-PACKAGE-4.md` |
+| Workarounds | none shipped; open decisions: status names (SPEC-input-02 question 1), `CONT_SPECIAL_S` placeholder (kept by the lead's ruling for parity) |
+| Slip | seven builds on the Yoga beside pkg5's Eden (disclosed in `IMPLEMENTATION-PROGRESS-pkg4.md`) |
