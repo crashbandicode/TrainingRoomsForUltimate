@@ -30,6 +30,46 @@ pub fn merge<T: Copy + Eq, const N:usize>(lanes: [[Option<T>; N]; 4], slots: u8)
     result
 }
 
+/// Lanes of `merge`, in its order: Player hats, CPU hats, Player fighters, CPU fighters.
+pub const PLAYER_HATS: usize = 0;
+pub const CPU_FIGHTERS: usize = 3;
+
+/// `merge` for a Player Kirby whose cycle has hats: every Player hat look-ahead ranks above the
+/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat
+/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s
+/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next
+/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.
+pub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {
+    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);
+    for depth in 0..N {
+        for (lane, targets) in lanes.iter().enumerate() {
+            if let Some(target) = targets[depth] {
+                order.push((lane, target));
+            }
+        }
+    }
+    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {
+        let (head, tail) = order.split_at(last_hat + 1);
+        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();
+        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));
+        ranked.extend_from_slice(tail);
+        order = ranked;
+    }
+    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);
+    let mut result = [None; N];
+    let mut count = 0;
+    for (_, target) in order {
+        if count >= limit {
+            break;
+        }
+        if !result.contains(&Some(target)) {
+            result[count] = Some(target);
+            count += 1;
+        }
+    }
+    result
+}
+
 /// Sources include ready and in-flight entries. Protected/leased entries still
 /// satisfy a target but can never be selected as a replacement by this policy.
 pub fn missing<T: Copy + Eq, const N:usize>(
@@ -98,12 +138,14 @@ pub enum Progress {
     /// Preload is Off, the backend has no spare helper, or there is nothing to load.
     Hidden,
     Loading,
-    /// Planned loads are waiting on an accepted visible operation, native UI, or replay.
+    /// Owed fighter loads are deferred by an accepted visible operation, native UI, or replay.
+    /// The preloader's own helper and hat loads never pause it, and nothing pauses a swap the
+    /// user still owes (`Waiting`).
     Paused,
     /// Nothing more will load, but a planned target failed: never reported Ready.
     Partial,
-    /// Fighters only: no load runs, yet planned fighters have no window and wait for the swap
-    /// that builds it.
+    /// Fighters only: no fighter load is owed, yet planned fighters have no window and wait for
+    /// the swap of the role that builds it (`BuiltFighters::swap`).
     Waiting,
     /// Fighters only: no more background work. Every planned fighter is built or prefetched
     /// (reachable without a reload) and none failed, but a prefetched group is not built.
@@ -133,9 +175,13 @@ pub struct Readiness {
 ///
 /// `planned == ready + prefetched + failed + pending + unstarted()`. `ready` is built (the next
 /// switch is instant, ~50 ms), `prefetched` is a loaded group that is not built (reachable without
-/// a reload; its first switch takes ~0.35-1.0 s), `pending` is work still owed (a window building
+/// a reload; its first switch constructs the bodies: an ordinary group through the game's queued
+/// construction with the fighter absent about a second while the game runs (Phase B′), a Mii,
+/// native or pair group synchronously, ~0.35-1.0 s), `pending` is work still owed (a window building
 /// or switching, a group planned or prefetching) and `unstarted()` the planned fighters whose
-/// window does not exist yet, which the first swap builds.
+/// window does not exist yet, which the first swap builds. `swap` names the roles with such
+/// fighters (`body_bank::SWAP_PLAYER`/`SWAP_CPU`, from `RoleCounts::swap_owed`): only that
+/// role's swap builds them.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BuiltFighters {
     pub planned: u8,
@@ -143,6 +189,7 @@ pub struct BuiltFighters {
     pub prefetched: u8,
     pub failed: u8,
     pub pending: u8,
+    pub swap: u8,
 }
 
 impl BuiltFighters {
@@ -150,6 +197,19 @@ impl BuiltFighters {
         let accounted = u16::from(self.ready) + u16::from(self.prefetched)
             + u16::from(self.failed) + u16::from(self.pending);
         u16::from(self.planned).saturating_sub(accounted) as u8
+    }
+
+    /// Who the Waiting text asks to swap; empty when the receipts name no role.
+    fn swap_who(self) -> &'static str {
+        use crate::engine::swap::body_bank::{SWAP_CPU, SWAP_PLAYER};
+        let player = (self.swap & SWAP_PLAYER) != 0;
+        let cpu = (self.swap & SWAP_CPU) != 0;
+        match (player, cpu) {
+            (true, false) => "P1",
+            (false, true) => "the CPU",
+            (true, true) => "both",
+            (false, false) => "",
+        }
     }
 
     /// Fighters a switch reaches without a reload: built or prefetched.
@@ -164,6 +224,9 @@ impl BuiltFighters {
 pub struct CacheStatus {
     pub assets: Readiness,
     pub fighters: BuiltFighters,
+    /// An accepted visible operation, native UI, a save-state load or a replay holds the loader
+    /// (`character_roster::notice_blocked` and the UI gates); never the preloader's own helper,
+    /// hat or group-prefetch loads.
     pub blocked: bool,
 }
 
@@ -172,19 +235,20 @@ impl CacheStatus {
         Self { assets, fighters, blocked }
     }
 
-    /// Hidden: Off or nothing planned. Loading/Paused: work is owed. Waiting: nothing runs, but a
-    /// window is not built (the first swap builds it). Otherwise nothing is owed and the plan is
-    /// settled: Partial (a failure), Done (a prefetched group remains unbuilt), Ready (all built).
+    /// Hidden: Off or nothing planned. Loading: fighter work is owed and runs; Paused: it is owed
+    /// and a visible operation defers it. Waiting: no fighter work is owed, but a window is not
+    /// built and only that role's swap builds it, so a blocked loader cannot pause it. Otherwise
+    /// the plan is settled: Partial (a failure), Done (a prefetched group remains unbuilt), Ready
+    /// (all built).
     pub fn progress(self) -> Progress {
         let fighters = self.fighters;
         if self.assets.configured == 0 || fighters.planned == 0 {
             return Progress::Hidden;
         }
-        if fighters.pending > 0 || fighters.unstarted() > 0 {
-            if self.blocked { Progress::Paused }
-            else if fighters.pending > 0 { Progress::Loading }
-            else { Progress::Waiting }
+        if fighters.pending > 0 {
+            if self.blocked { Progress::Paused } else { Progress::Loading }
         }
+        else if fighters.unstarted() > 0 { Progress::Waiting }
         else if fighters.failed > 0 { Progress::Partial }
         else if fighters.prefetched > 0 { Progress::Done }
         else { Progress::Ready }
@@ -197,8 +261,14 @@ impl CacheStatus {
             Progress::Hidden => return String::new(),
             Progress::Loading => format!("Loading {}/{}", loaded, planned),
             Progress::Paused => format!("Paused {}/{}", loaded, planned),
-            Progress::Waiting if loaded == 0 && failed == 0 => return "Swap once to load".to_string(),
-            Progress::Waiting => format!("Loaded {}/{}, swap to load {} more", loaded, planned, fighters.unstarted()),
+            Progress::Waiting if loaded == 0 && failed == 0 => return match fighters.swap_who() {
+                "" => "Swap once to load".to_string(),
+                who => format!("Swap {} once to load", who),
+            },
+            Progress::Waiting => match fighters.swap_who() {
+                "" => format!("Loaded {}/{} · swap to load {} more", loaded, planned, fighters.unstarted()),
+                who => format!("Loaded {}/{} · swap {} to load {} more", loaded, planned, who, fighters.unstarted()),
+            },
             Progress::Partial => format!("Loaded {}/{}", loaded, planned),
             Progress::Done => return format!("All loaded ({}/{}, {} instant)", loaded, planned, fighters.ready),
             Progress::Ready => return format!("Ready {}/{}", fighters.ready, planned),
@@ -221,15 +291,16 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8) {
-        let class = match self.progress() {
-            Progress::Hidden => 0,
-            Progress::Loading => 1,
-            Progress::Paused => 2,
-            Progress::Waiting => 3,
-            Progress::Partial | Progress::Done | Progress::Ready => 4,
+    fn shown_key(self) -> (u8, u8, u8, u8, u8) {
+        let (class, swap) = match self.progress() {
+            Progress::Hidden => (0, 0),
+            Progress::Loading => (1, 0),
+            Progress::Paused => (2, 0),
+            // The Waiting text names who must swap, so a change of role is a change shown.
+            Progress::Waiting => (3, self.fighters.swap),
+            Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
-        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed)
+        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap)
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {
@@ -380,25 +451,40 @@ mod tests {
         let empty = CacheStatus::new(readiness(5, 5, false, [None::<i32>], NONE, [None; 8]),
             BuiltFighters::default(), false);
         assert_eq!(empty.progress(), Progress::Hidden);
-        let paused = CacheStatus::new(assets, BuiltFighters { planned: 2,
+        // Only an owed load can be paused, and only after the debounce.
+        let paused = CacheStatus::new(assets, BuiltFighters { planned: 2, pending: 2,
             ..BuiltFighters::default() }, true);
         assert_eq!(paused.progress(), Progress::Paused);
         assert!(!paused.announce(None, 1));
         assert!(paused.announce(None, PAUSE_POLLS));
+        // Nothing owed, only a swap: a blocked loader defers nothing, so it stays Waiting.
+        let unstarted = CacheStatus::new(assets, BuiltFighters { planned: 2,
+            ..BuiltFighters::default() }, true);
+        assert_eq!(unstarted.progress(), Progress::Waiting);
     }
 
     fn fighters(planned: u8, ready: u8, prefetched: u8, failed: u8, pending: u8) -> BuiltFighters {
-        BuiltFighters { planned, ready, prefetched, failed, pending }
+        BuiltFighters { planned, ready, prefetched, failed, pending, swap: 0 }
     }
 
     fn status(fighters: BuiltFighters) -> CacheStatus {
         CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])), fighters, false)
     }
 
-    /// The two roles' receipts as `native_body_bank::progress` adds them.
+    /// The two roles' receipts as `native_body_bank::progress` adds them, with each role's
+    /// `RoleCounts::swap_owed` bit.
     fn both_roles(player: BuiltFighters, cpu: BuiltFighters) -> BuiltFighters {
-        fighters(player.planned + cpu.planned, player.ready + cpu.ready, player.prefetched + cpu.prefetched,
-            player.failed + cpu.failed, player.pending + cpu.pending)
+        use crate::engine::swap::body_bank::RoleCounts;
+        let mut total = BuiltFighters::default();
+        for (role, f) in [player, cpu].iter().enumerate() {
+            let counts = RoleCounts { planned: f.planned, ready: f.ready, prefetched: f.prefetched,
+                failed: f.failed, pending: f.pending };
+            assert_eq!(counts.unstarted(), f.unstarted());
+            total = BuiltFighters { planned: total.planned + f.planned, ready: total.ready + f.ready,
+                prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,
+                pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role) };
+        }
+        total
     }
 
     #[test]
@@ -434,16 +520,100 @@ mod tests {
         // One role loaded, the other's window not built yet: honest, and not Done.
         let half = status(fighters(5, 3, 0, 0, 0));
         assert_eq!((half.progress(), half.text()),
-            (Progress::Waiting, "Loaded 3/5, swap to load 2 more".to_string()));
+            (Progress::Waiting, "Loaded 3/5 · swap to load 2 more".to_string()));
         let half_prefetched = status(fighters(5, 1, 2, 0, 0));
-        assert_eq!(half_prefetched.text(), "Loaded 3/5, swap to load 2 more");
+        assert_eq!(half_prefetched.text(), "Loaded 3/5 · swap to load 2 more");
         // Windows being built read as progress, not as a hint.
         let building = status(fighters(5, 0, 0, 0, 2));
         assert_eq!((building.progress(), building.text()), (Progress::Loading, "Loading 0/5".to_string()));
-        // A busy native UI pauses the hint like any other load.
+        // A busy native UI does not pause the hint: nothing is deferred, the swap is still the user's
+        // (C116.2 console: "Paused 2/3" stood for a CPU swap that nothing would ever resume).
         let blocked = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
             fighters(3, 0, 0, 0, 0), true);
-        assert_eq!((blocked.progress(), blocked.text()), (Progress::Paused, "Paused 0/3".to_string()));
+        assert_eq!((blocked.progress(), blocked.text()), (Progress::Waiting, "Swap once to load".to_string()));
+        // It does pause a window that is still building.
+        let deferred = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
+            fighters(3, 0, 0, 0, 2), true);
+        assert_eq!((deferred.progress(), deferred.text()), (Progress::Paused, "Paused 0/3".to_string()));
+    }
+
+    #[test]
+    fn the_waiting_text_names_the_role_that_must_swap() {
+        // C116.2 console: P1 Kirby's window built (2), the CPU's next window not built (1).
+        let kirby = fighters(2, 2, 0, 0, 0);
+        let cpu = fighters(1, 0, 0, 0, 0);
+        let total = both_roles(kirby, cpu);
+        assert_eq!(total.swap, crate::engine::swap::body_bank::SWAP_CPU);
+        for blocked in [false, true] {
+            let now = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])), total, blocked);
+            assert_eq!((now.progress(), now.text()),
+                (Progress::Waiting, "Loaded 2/3 · swap the CPU to load 1 more".to_string()));
+        }
+        let player = status(both_roles(fighters(2, 0, 0, 0, 0), fighters(1, 1, 0, 0, 0)));
+        assert_eq!(player.text(), "Loaded 1/3 · swap P1 to load 2 more");
+        let both = status(both_roles(fighters(2, 0, 0, 0, 0), fighters(1, 0, 0, 0, 0)));
+        assert_eq!(both.text(), "Swap both once to load");
+        let first = status(both_roles(fighters(2, 0, 0, 0, 0), BuiltFighters::default()));
+        assert_eq!(first.text(), "Swap P1 once to load");
+        let failed = status(both_roles(fighters(3, 1, 0, 1, 0), fighters(1, 0, 0, 0, 0)));
+        assert_eq!(failed.text(), "Loaded 1/4 · swap both to load 2 more (1 failed)");
+        // Another role now owes the swap: the text changes, so it is shown again.
+        assert!(player.announce(Some(status(total)), 0));
+        assert!(!player.announce(Some(player), 0));
+        // A role owing a swap while the other's load is still owed reads as that load.
+        let mixed = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
+            both_roles(fighters(2, 0, 0, 0, 2), fighters(1, 0, 0, 0, 0)), true);
+        assert_eq!((mixed.progress(), mixed.text()), (Progress::Paused, "Paused 0/3".to_string()));
+    }
+
+    #[test]
+    fn player_kirby_hats_rank_above_the_cpu_fighter_lookahead() {
+        let (mario, sephiroth, steve, dk, ics, ridley) = (0, 0x59, 0x53, 1, 0x10, 0x2e);
+        // C116.2 console: P1 Kirby cycling three hats, the CPU's next fighters DK and ICs, one P1
+        // fighter beyond the Kirby window.
+        let lanes = [
+            [Some(sephiroth), Some(steve), Some(mario), None, None],
+            [None; 5],
+            [None, None, Some(ridley), None, None],
+            [Some(dk), Some(ics), None, None, None],
+        ];
+        // Today's order gave DK the second of three slots.
+        assert_eq!(merge(lanes, 3), [Some(sephiroth), Some(dk), Some(steve), None, None]);
+        assert_eq!(merge_player_hats_first(lanes, 3), [Some(sephiroth), Some(steve), Some(mario), None, None]);
+        // The CPU's fighters follow the last hat in their own order, still ahead of the later P1
+        // fighter as in today's order.
+        assert_eq!(merge_player_hats_first(lanes, 5), [Some(sephiroth), Some(steve), Some(mario), Some(dk), Some(ics)]);
+        let all = merge_player_hats_first::<i32, 6>([
+            [Some(sephiroth), Some(steve), Some(mario), None, None, None], [None; 6],
+            [None, None, Some(ridley), None, None, None], [Some(dk), Some(ics), None, None, None, None]], 255);
+        assert_eq!(all.iter().flatten().count(), crate::engine::preload::cycle_preload_capacity::MAX_TARGETS.min(6));
+        assert_eq!(merge(lanes, 5), [Some(sephiroth), Some(dk), Some(steve), Some(ics), Some(mario)]);
+        // Every other order is today's: P1 hats keep interleaving with CPU hats and P1 fighters.
+        let mixed = [
+            [Some(10), Some(11), None, None, None],
+            [Some(20), None, None, None, None],
+            [Some(30), Some(31), None, None, None],
+            [Some(40), Some(41), None, None, None],
+        ];
+        assert_eq!(merge(mixed, 5), [Some(10), Some(20), Some(30), Some(40), Some(11)]);
+        assert_eq!(merge_player_hats_first(mixed, 5), [Some(10), Some(20), Some(30), Some(11), Some(40)]);
+        assert_eq!(merge_player_hats_first(mixed, 255), [Some(10), Some(20), Some(30), Some(11), Some(40)]);
+        // A CPU fighter that is also a coming hat keeps the earlier, hat position.
+        let shared = [
+            [Some(mario), Some(steve), None, None, None],
+            [None; 5],
+            [None; 5],
+            [Some(steve), Some(dk), None, None, None],
+        ];
+        assert_eq!(merge_player_hats_first(shared, 5), [Some(mario), Some(steve), Some(dk), None, None]);
+        // No Player hat: exactly `merge`.
+        let plain = [[None; 5], [Some(20), None, None, None, None], [Some(30), None, None, None, None],
+            [Some(40), Some(41), None, None, None]];
+        for slots in 0..=6 {
+            assert_eq!(merge_player_hats_first(plain, slots), merge(plain, slots));
+            assert_eq!(merge_player_hats_first(lanes, slots).iter().flatten().count(),
+                merge(lanes, slots).iter().flatten().count());
+        }
     }
 
     #[test]
@@ -459,7 +629,7 @@ mod tests {
         // The same CPU with a cycle that has not been swapped yet is waiting for that swap.
         let waiting = status(both_roles(player, fighters(2, 0, 0, 0, 0)));
         assert_eq!(waiting.progress(), Progress::Waiting);
-        assert_eq!(waiting.text(), "Loaded 3/5, swap to load 2 more");
+        assert_eq!(waiting.text(), "Loaded 3/5 · swap the CPU to load 2 more");
         // Nothing planned anywhere stays hidden.
         assert_eq!(status(both_roles(cpu, cpu)).progress(), Progress::Hidden);
     }

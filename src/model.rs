@@ -75,6 +75,8 @@ pub mod sites;
 pub mod sites_pkg3;
 #[path = "model/sites_pkg4.rs"]
 pub mod sites_pkg4;
+#[path = "model/sites_pkg6.rs"]
+pub mod sites_pkg6;
 #[path = "model/sites_pkg2.rs"]
 pub mod sites_pkg2;
 #[path = "model/stage_hazards.rs"]

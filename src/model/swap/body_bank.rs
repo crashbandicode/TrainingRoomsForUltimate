@@ -687,6 +687,91 @@ impl GroupState {
     }
 }
 
+/// Phase B′ (operator decision 2026-11-02, W20 FINDINGS §2b′): an ordinary group's bodies are
+/// constructed the way the game's own Reload constructs them at loader state 10, on the task
+/// worker (`0x3ae5f0` allocation on the game thread, then init `0x6079d0` + construct `0x60b6b0`
+/// as a queued task), instead of the synchronous `0x658af0` loop that stops the game thread for
+/// the whole construction (console C116.2: 1.01 s). Three classes keep the synchronous build for
+/// now, an operator-approved restriction dated 2026-11-02 (a follow-up covers them): a Mii group
+/// (`R` carries its identity through the construction, after the Phase B Mii setup), a native
+/// group (`0x658af0`'s PT/Aegis branches create the `+0x5a88` object) and the pair group or a
+/// pair-lead window (the `R+0x50` batch rule under an exclusive reset batch). `Err` names the
+/// reason the adapter logs with `mode=sync`.
+pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'static str> {
+    match members.special() {
+        Special::Mii => Err("mii group"),
+        Special::Native(_) => Err("native group"),
+        Special::Pair => Err("pair group"),
+        Special::None if members.is_pair() => Err("pair window"),
+        Special::None if identity => Err("identity"),
+        Special::None if members.actor_count() != 1 => Err("actors"),
+        Special::None => Ok(()),
+    }
+}
+
+/// The game's construction task object (`native_entry_dispatch_6556b0.c:215-250`, loader state
+/// 10): 0x90 bytes from the heap `0x392e290(0x10, 0x90)`; `+0x00` the body `0x3ae5f0` returned;
+/// `+0x10` the scheduler handle passed to `0x3549720(task+0x10, 0x3cb190, 2, 1)`; `+0x20` the
+/// pending count the loader polls at state 0xb (`*(int*)(task+0x20) == 0`); `+0x24` the queue id
+/// (`1`, the index into `0x5333f58` the wait `0x354ccd0` uses); `+0x50` the functor's in-place
+/// storage (`0x3cb050` swaps `{vtable 0x4f69bb8, task}` into it); `+0x70` the functor pointer the
+/// callback reads (`task+0x10+0x60`); `+0x80` the cancel byte (`task+0x10+0x70`). State 10 zeroes
+/// `+0x10`, `+0x18`, `+0x20..+0x27` (then `+0x24 = 1`), `+0x70` and `+0x80` before the swap.
+pub mod construction_task {
+    pub const SIZE: usize = 0x90;
+    pub const ALIGN: usize = 0x10;
+    pub const BODY: usize = 0x00;
+    pub const HANDLE: usize = 0x10;
+    pub const PENDING: usize = 0x20;
+    pub const QUEUE: usize = 0x24;
+    pub const QUEUE_ID: u32 = 1;
+    pub const FUNCTOR: usize = 0x50;
+    pub const FUNCTOR_PTR: usize = 0x70;
+    pub const CANCEL: usize = 0x80;
+    /// The two scheduler arguments state 10 passes after the callback.
+    pub const SCHEDULE_ARGS: (u32, u32) = (2, 1);
+    /// Every queued construction ran its init and construct: the callback cleared each pending count.
+    pub fn settled(pending: &[i32]) -> bool {
+        pending.iter().all(|p| *p <= 0)
+    }
+}
+
+/// P3-0 tick-gap meter over one swap (request → the bank's Ready): the largest gap between two
+/// consecutive entry pre-service ticks is the stall the game thread took. A synchronous build
+/// shows its whole `us=` as one gap; the asynchronous build must show about one frame. The
+/// console's `[PreloadMetrics] … frames=0 max_gap_us=na` cannot see it (frame callbacks are not
+/// counted while a roster request suspends practice), so the meter lives on the entry tick.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TickGap {
+    pub last_us: u64,
+    pub max_gap_us: u64,
+    pub ticks: u32,
+    pub armed: bool,
+}
+
+impl TickGap {
+    /// Arm at the request; the first tick after it already counts.
+    pub fn arm(now_us: u64) -> Self {
+        Self { last_us: now_us, max_gap_us: 0, ticks: 0, armed: true }
+    }
+
+    pub fn observe(&mut self, now_us: u64) {
+        if !self.armed {
+            return;
+        }
+        let gap = now_us.saturating_sub(self.last_us);
+        if gap > self.max_gap_us {
+            self.max_gap_us = gap;
+        }
+        self.last_us = now_us;
+        self.ticks = self.ticks.saturating_add(1);
+    }
+
+    pub fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
 // `swap_commit_index`, `swap_commit_index_in`: `swap_model::capabilities` (re-exported above),
 // derived from the window's `ExitRule` (a one-member window commits to its own cell);
 // `Members::swap_commit_index_for` is the same rule seen from the window.
@@ -973,6 +1058,26 @@ pub struct RoleCounts {
     pub prefetched: u8,
     pub failed: u8,
     pub pending: u8,
+}
+
+/// The Fighters notice's `swap` mask: the roles whose own next swap builds their unstarted fighters.
+pub const SWAP_PLAYER: u8 = 1;
+pub const SWAP_CPU: u8 = 2;
+
+impl RoleCounts {
+    /// Planned fighters that neither the role's window nor its groups account for (a role
+    /// without a bank, or a plan beyond its window): only that role's next swap builds them.
+    pub fn unstarted(self) -> u8 {
+        let accounted = u16::from(self.ready) + u16::from(self.prefetched)
+            + u16::from(self.failed) + u16::from(self.pending);
+        u16::from(self.planned).saturating_sub(accounted) as u8
+    }
+
+    /// This role's bit of the notice's `swap` mask (role 0 Player, 1 CPU), or 0 when its own
+    /// swap is not what its fighters wait for.
+    pub fn swap_owed(self, role: usize) -> u8 {
+        if self.unstarted() == 0 { 0 } else if role == 0 { SWAP_PLAYER } else { SWAP_CPU }
+    }
 }
 
 /// `planned_targets` is the planner's receipt of what the role should hold, `extra` the window
@@ -1291,6 +1396,63 @@ mod tests {
         after.descriptor[0x18..0x24].copy_from_slice(&[10,0,0,0,11,0,0,0,21,0,0,0]);
         after.bodies = [(0x6000,393216),(0x7000,458752),(0x8000,524288)];
         (before, after, Members::new(&[10,11,21]).unwrap())
+    }
+
+    /// Phase B′: only an ordinary group without a Mii identity builds asynchronously; the three
+    /// excluded classes (operator decision 2026-11-02) and a pair-lead window name their reason.
+    #[test]
+    fn async_build_admits_ordinary_groups_and_names_each_exclusion() {
+        let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
+        assert_eq!(async_build_eligible(ordinary, false), Ok(()));
+        assert_eq!(async_build_eligible(Members::new(&[0x2d, 0x2c]).unwrap(), false), Ok(()));
+        assert_eq!(async_build_eligible(Members::new(&[0x1c]).unwrap(), false), Ok(()));
+        assert_eq!(async_build_eligible(ordinary, true), Err("identity"));
+        assert_eq!(async_build_eligible(Members::mii_group(0x4a).unwrap(), true), Err("mii group"));
+        assert_eq!(async_build_eligible(Members::mii_group(0x48).unwrap(), false), Err("mii group"));
+        assert_eq!(async_build_eligible(Members::native_group(0x24).unwrap(), false), Err("native group"));
+        assert_eq!(async_build_eligible(Members::native_group(0x5a).unwrap(), false), Err("native group"));
+        assert_eq!(async_build_eligible(Members::pair_group(), false), Err("pair group"));
+        assert_eq!(async_build_eligible(Members::pair_lead(0x08).unwrap(), false), Err("pair window"));
+    }
+
+    /// The construction task layout the adapter replicates and the settlement rule state 0xb applies.
+    #[test]
+    fn construction_task_layout_and_settlement_follow_state_10() {
+        use construction_task::*;
+        assert_eq!((SIZE, ALIGN), (0x90, 0x10));
+        assert_eq!((BODY, HANDLE, PENDING, QUEUE, QUEUE_ID), (0x00, 0x10, 0x20, 0x24, 1));
+        assert_eq!((FUNCTOR, FUNCTOR_PTR, CANCEL), (0x50, 0x70, 0x80));
+        assert_eq!(FUNCTOR_PTR, HANDLE + 0x60);
+        assert_eq!(CANCEL, HANDLE + 0x70);
+        assert_eq!(SCHEDULE_ARGS, (2, 1));
+        assert!(settled(&[0, 0, 0]));
+        assert!(settled(&[]));
+        assert!(!settled(&[0, 1, 0]));
+        assert!(!settled(&[2]));
+    }
+
+    /// The tick-gap meter reports the one stalled tick of a synchronous build and stays quiet
+    /// for an asynchronous one; disarmed it ignores later ticks.
+    #[test]
+    fn tick_gap_reports_the_largest_stall_between_ticks() {
+        let mut gap = TickGap::arm(1_000);
+        gap.observe(17_000);
+        gap.observe(34_000);
+        gap.observe(1_050_000);
+        gap.observe(1_067_000);
+        assert_eq!(gap.max_gap_us, 1_016_000);
+        assert_eq!(gap.ticks, 4);
+        let mut quiet = TickGap::arm(0);
+        for tick in 1..=60u64 {
+            quiet.observe(tick * 16_667);
+        }
+        assert_eq!(quiet.max_gap_us, 16_667);
+        assert_eq!(quiet.ticks, 60);
+        quiet.disarm();
+        quiet.observe(10_000_000);
+        assert_eq!(quiet.max_gap_us, 16_667);
+        assert_eq!(quiet.ticks, 60);
+        assert!(!TickGap::default().armed);
     }
 
     #[test]

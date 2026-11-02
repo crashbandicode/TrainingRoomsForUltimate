@@ -118,6 +118,12 @@ pub fn session_clear() {
     COMBO_DISPLAY.store(2, Ordering::Release);
 }
 
+/// The Combo Display copy is forgotten (reads as enabled again) without touching the queue: a scene boundary of the lobby practice
+/// (package 6; the waiting room has no Combo Display option, so a value copied in Training must not hide its notices).
+pub fn reset_combo_display() {
+    COMBO_DISPLAY.store(2, Ordering::Release);
+}
+
 /// One HUD tick. `menu_open` is the plugin menu's flag (package 5; the owner bit meanwhile).
 pub fn hud_tick() -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);

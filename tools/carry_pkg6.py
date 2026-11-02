@@ -24,7 +24,9 @@ import argparse, hashlib, json, os, posixpath, re, sys
 
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
-EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags"}
+EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags",
+            "training_mod_sync": "sync", "training_mod_macros": "macros"}
+HEADS = "crate|" + "|".join(EXTERNAL)
 
 
 def sha(data: bytes) -> str:
@@ -79,7 +81,7 @@ def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
                 out.append(new + alias)
         return "use {" + ", ".join(out) + "};"
 
-    text = re.sub(r"\buse\s+(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags)::\{((?:[^{}]|\{[^{}]*\})*)\}\s*;", group, text)
+    text = re.sub(r"\buse\s+(" + HEADS + r")::\{((?:[^{}]|\{[^{}]*\})*)\}\s*;", group, text)
 
     # 2. plain paths
     def plain(m):
@@ -90,8 +92,44 @@ def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
             return m.group(0)
         return new
 
-    text = re.sub(r"\b(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags)::([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)", plain, text)
+    text = re.sub(r"\b(" + HEADS + r")::([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)", plain, text)
     return text
+
+
+def rewrite_paths(text: str, entry: dict, dest_by_src: dict) -> str:
+    """`#[path = "x.rs"]` module declarations: the path is resolved against the stage file, mapped to the destination the
+    manifest gives that file and written relative to this file's destination (so the children of a carried module keep
+    resolving wherever the manifest puts them). A target the manifest does not hold yet is left as written (and reported):
+    it resolves once the file that carries it joins the manifest (the cycle's other worker, or a later tranche)."""
+    def engine_path(dest):
+        # a pure file the manifest carries under src/model/ is the module crate::engine::<dir>::<name> (src/engine/mod.rs declares each area)
+        if not dest.startswith("src/model/") or not dest.endswith(".rs"):
+            return None
+        parts = dest[len("src/model/"):-3].split("/")
+        if parts[-1] == "mod":
+            parts = parts[:-1]
+        return "crate::engine::" + "::".join(parts) if parts else None
+
+    def use_form(m):
+        # `#[path = "x.rs"] mod name;` of a pure carried file becomes `use crate::engine::<area>::x as name;` (one module, not two copies)
+        rel = m.group(1)
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(entry["src"]), rel))
+        path = engine_path(dest_by_src.get(target, ""))
+        if path is None:
+            return m.group(0)
+        return f"{m.group(2) or ''}use {path} as {m.group(4)};"
+    if entry["dest"].startswith("src/runtime/"):  # a Switch-only file reaches the pure engine area; a pure file's own test modules stay `mod`
+        text = re.sub(r'#\[path\s*=\s*"([^"]+)"\s*\]\s*(pub(\([a-z]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;', use_form, text)
+
+    def one(m):
+        rel = m.group(2)
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(entry["src"]), rel))
+        if target not in dest_by_src:
+            print(f"note: {entry['src']}: #[path = \"{rel}\"] names {target}, not in the manifest (left as written)", file=sys.stderr)
+            return m.group(0)
+        new = posixpath.relpath(dest_by_src[target], posixpath.dirname(entry["dest"]))
+        return f'{m.group(1)}"{new}"]'
+    return re.sub(r'(#\[path\s*=\s*)"([^"]+)"\s*\]', one, text)
 
 
 def rewrite_includes(text: str, entry: dict, dest_by_src: dict) -> str:
@@ -114,6 +152,11 @@ def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict)
         text = stage_bytes.decode("utf-8")
         text = rewrite_source(text, entry["crate"], modules, entry["src"])
         text = rewrite_includes(text, entry, dest_by_src)
+        text = rewrite_paths(text, entry, dest_by_src)
+        if entry.get("widen"):
+            # the fork's file sat directly under the crate root (or was the #[path] child of a root file), so `pub(super)` meant "the
+            # whole crate"; in the engine tree it would stop at the area, so it becomes `pub(crate)` (an entry flag, a ledger row)
+            text = re.sub(r"\bpub\(super\)", "pub(crate)", text)
         if entry.get("prepend"):
             # after the file's leading inner doc comments (`//!`), which must stay first
             lines = text.split("\n")
@@ -215,7 +258,10 @@ def write_ledger(root, manifest):
         f.write("file in this repository.\n\n")
         f.write("| Here | Fork path (stage) | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
-            edits = "; ".join(x["reason"] for x in e.get("edits", [])) or "path rewrite only"
+            parts = [x["reason"] for x in e.get("edits", [])]
+            if e.get("widen"):
+                parts.insert(0, "`pub(super)` widened to `pub(crate)` (the fork's parent was the crate root)")
+            edits = "; ".join(parts) or "path rewrite only"
             f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16]}` | {edits} |\n")
 
 

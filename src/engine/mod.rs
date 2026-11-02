@@ -6,27 +6,26 @@
 
 #[path = "../model/compat/mod.rs"]
 pub mod compat;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/items/mod.rs"]
 pub mod items;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/kirby/mod.rs"]
 pub mod kirby;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/lobby/mod.rs"]
 pub mod lobby;
 #[path = "../model/mii/mod.rs"]
 pub mod mii;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
-#[cfg(test)]
 #[path = "../model/seams/mod.rs"]
 pub mod seams;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;
 #[path = "../model/stages/mod.rs"]
@@ -35,3 +34,8 @@ pub mod stages;
 pub mod macro_ui;
 #[path = "../model/macros/mod.rs"]
 pub mod macros;
+// CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
+// from tests/p1_core.rs (the playbook's by-path include).
+#[cfg(target_os = "switch")]
+#[path = "../model/p1_session/mod.rs"]
+pub mod p1_session;
