@@ -295,3 +295,13 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 - Before F9 coding: read owned roster lifecycle/native source paths, explain activation/reload ordering in lead inbox; release hat lease before give-back; no waits/rejected count/new restrictions. Independently attribute scene-load Read16 bursts. Slim owns inline probe deletions: get exact committed slice first; harness absent from345c6e3, adoption needs lead-authorized slice, do not merge moving branch.
 - Remaining reading tracked above: all baseline required docs and playbook complete for this thread; detailed applicable specs, full used tools, and runtime/model interfaces to read before changing code. No fork/upstream source exposure.
 - Context milestone: developer requested a persisted handoff after context threshold. Goal remains active and incomplete; this is not an operator blocker and not a readiness claim.
+
+## F11 native-reader regression slice (in progress)
+- src/model/entry_cells.rs now owns the memory-read selection path used directly by game::natives::entry_active_body (injected word/byte reads, zero retained pointers/allocations). Fake native bank tests cover active indices0/1/2 and return0, sentinel-adjacent byte width, null entry no reads, failed-layout guard reading only legacy cell0, invalid count/index never addressing beyond three cells.
+- Preserves the explicit fix-ledger fallback contract unchanged. No-body alternative remains a lead question, not implemented. Source edits only entry_cells.rs and game.rs; no carried files or slim probe sites changed. Not compiled/tested yet.
+- Owned reader census: native_source_capacity and native_body_bank enumerate cells or manipulate window records, so those are not active-fighter readers. character_roster ready_single_mii requires forms.count==1; complete trace and diag Mii probes still directly read cell0, to coordinate with slim before edits. No blanket replacement of structural cell operations.
+- Full clippy queued at end of Surface queue behind slim/f6 and interleave. No current claim. Model reverified Astra medium; watcher exec6380, bounded no-TTY, no alert. Next gate must name this F11 candidate, not b7b4c6c baseline.
+
+## QUESTIONS
+- F11: newest review/menu-proposal fix ledger row147 specifies fallback to cell0 for invalid index/guard. This slice preserves it while testing the actual reader. Confirm whether a no-body policy is wanted; predecessor's intent above is superseded until answered.
+- Need exact committed slim inline-deletion slice before editing character_roster/Mii manifest; exact authorized harness slice before adoption. No moving-branch merge is authorized.

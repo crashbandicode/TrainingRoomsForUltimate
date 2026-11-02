@@ -142,7 +142,7 @@ pub mod natives {
     use crate::runtime::features::cpu;
 
     /// `FighterEntry` (the entry object): its first body (the fighter object) pointer.
-    pub const ENTRY_BODY_FIELD: usize = 0x4160;
+    pub const ENTRY_BODY_FIELD: usize = crate::model::entry_cells::BODY_FIELD;
     /// The fighter object: its `BattleObjectModuleAccessor` pointer.
     pub const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
     /// The accessor: its battle object id (`utility::get_kind`'s `ldr w0, [x0, #8]`, guarded by the
@@ -362,15 +362,12 @@ pub mod natives {
     /// is the body the fighter actually is. Without the guarded layout (`sites_pkg6::entry_active_cell`, checked at boot) it is the
     /// first body, as `entry_body`. Game thread only: it reads the live entry; worker and menu threads read published facts.
     pub(crate) unsafe fn entry_active_body(entry_ptr: usize) -> usize {
-        if entry_ptr == 0 {
-            return 0;
-        }
-        let cell = if ACTIVE_CELL_GUARDED.load(Ordering::Acquire) {
-            crate::model::entry_cells::active_cell(((entry_ptr + 0x5918) as *const u8).read(), ((entry_ptr + 0x4150) as *const u64).read())
-        } else {
-            0
-        };
-        ((entry_ptr + ENTRY_BODY_FIELD + 8 * cell) as *const usize).read()
+        crate::model::entry_cells::read_active_body(
+            entry_ptr,
+            ACTIVE_CELL_GUARDED.load(Ordering::Acquire),
+            |address| (address as *const u64).read(),
+            |address| (address as *const u8).read(),
+        )
     }
 
     /// F11: the layout `entry_active_body` relies on passed its guard (set once at boot).
