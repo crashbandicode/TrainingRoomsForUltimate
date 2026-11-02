@@ -31,7 +31,7 @@ unsafe fn animation_flag(hud: usize, owner: u32) -> Option<usize> {
 /// must stay live through `refresh`; that closure invokes only this listener's
 /// native event functor, not a scene transition or arbitrary user callback.
 /// Null structural checks do not themselves establish that lifetime.
-pub(super) unsafe fn without_roster_animation(hud: usize, owner: u32, refresh: impl FnOnce()) {
+pub(crate) unsafe fn without_roster_animation(hud: usize, owner: u32, refresh: impl FnOnce()) {
     let idle = animation_flag(hud, owner)
         .filter(|&flag| native_fields::read::<u8>(flag, 0) == Some(0));
     refresh();

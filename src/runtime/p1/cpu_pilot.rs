@@ -575,9 +575,9 @@ unsafe fn ai_process_begin(svc: usize) {
 
 fn menu_busy() -> bool {
     crate::runtime::compat::common::menu::captures_input()
-        || crate::runtime::compat::sync::read(&crate::runtime::p1::compat::training::ui::menu::VANILLA_MENU_ACTIVE)
+        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)
         || crate::runtime::compat::replay_preview::occupied()
-        || crate::runtime::p1::compat::training::recording_or_playback()
+        || crate::runtime::lobby::training::recording_or_playback()
 }
 
 pub(crate) fn thinking() -> bool {
@@ -720,7 +720,7 @@ unsafe fn pair(
 ) -> Result<(Binding, Entry, Entry), &'static str> {
     // Preserve the practice loader exclusion used by the original common
     // accessor; a valid-looking old object is not permission to race a swap.
-    if crate::runtime::p1::compat::character_roster::busy() {
+    if crate::runtime::roster::character_roster::busy() {
         return Err("character_roster_loading");
     }
     let (local, peer, slot) = if scene.scope == Scope::OfflineTraining {

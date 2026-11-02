@@ -36,7 +36,7 @@
    "swap_native::body_graph": "crate::runtime::roster::body_graph",
    "swap_native::copy_packages": "crate::runtime::roster::copy_packages",
    "swap_native::identity_view": "crate::runtime::roster::identity_view",
-   "swap_native::scope_gate": "crate::runtime::roster::swap_native::scope_gate",
+   "swap_native::scope_gate": "crate::runtime::roster::scope_gate",
    "swap_native::presentation": "crate::runtime::roster::presentation",
    "swap_native::mii_setup": "crate::runtime::roster::mii_setup",
    "swap_native::observe": "crate::runtime::roster::observe",
@@ -109,7 +109,9 @@
    "menu_json": "crate::engine::compat::menu_json",
    "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
    "FighterId": "crate::runtime::compat::consts::FighterId",
-   "MENU": "crate::runtime::compat::menu::MENU"
+   "MENU": "crate::runtime::compat::menu::MENU",
+   "cycle_preload_config": "crate::engine::preload::cycle_preload_config",
+   "DEFAULTS_MENU": "crate::runtime::compat::menu::DEFAULTS_MENU"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -153,11 +155,17 @@
   },
   "sync": {
    "read": "crate::runtime::compat::sync::read",
-   "assign": "crate::runtime::compat::menu_app::assign",
-   "lock_write": "crate::runtime::compat::menu_app::lock_write"
+   "assign": "crate::runtime::compat::sync::assign",
+   "lock_write": "crate::runtime::compat::sync::lock_write"
   },
   "macros": {
-   "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS"
+   "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS",
+   "MAX_RETAINED_CAPTURES": "crate::runtime::compat::replay_store::MAX_RETAINED_CAPTURES"
+  },
+  "log": {
+   "info": "crate::engine::compat::logging::log_info",
+   "warn": "crate::engine::compat::logging::log_warn",
+   "error": "crate::engine::compat::logging::log_error"
   }
  },
  "files": [
@@ -293,7 +301,8 @@
    "dest": "src/model/swap/source_descriptor.rs",
    "crate": "root",
    "src_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce",
-   "dest_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce"
+   "dest_sha256": "ce9a7d5a497f67dbc2da0c9c9657f851c6e349550f60bb14fd6c7a225b6127e8",
+   "widen": true
   },
   {
    "src": "src/source_lifetime.rs",
@@ -307,14 +316,16 @@
    "dest": "src/model/swap/source_visible_forms.rs",
    "crate": "root",
    "src_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885",
-   "dest_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885"
+   "dest_sha256": "ae11483d51d0f432eeaf5ae28c67396c560f88e25932a3961b00a50678938d68",
+   "widen": true
   },
   {
    "src": "src/native_hud_refresh.rs",
    "dest": "src/model/swap/native_hud_refresh.rs",
    "crate": "root",
    "src_sha256": "b92d55d6aaed20764d3f98aa45ef152464c52d139e97d074ea91d821e2233bbb",
-   "dest_sha256": "84dcce25e3ca35c5c53dc87a3af95cad91b54c63c01db55845f16bf869265259"
+   "dest_sha256": "4791d4a01814ab4b8486aa2f08c7a11f2390aee1eb007a38b422d6ee5c5ef4e6",
+   "widen": true
   },
   {
    "src": "training_mod_consts/src/source_load.rs",
@@ -1246,23 +1257,12 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "26beaadecd06d436c4b5a0d38db9d3cb6bb3059ba6880c709fc0a268b0f02150",
+   "dest_sha256": "771bd6208e48f047353002ec316f75e910ae0ecb4994c343e9adc3b752d1f573",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
      "new": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n    BASE.load(Ordering::Acquire) != 0\n}\n",
      "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
-    },
-    {
-     "old": "crate::runtime::roster::character_roster::busy()",
-     "new": "crate::runtime::p1::compat::character_roster::busy()",
-     "reason": "TEMPORARY until the roster cycle is declared (`runtime::swap::character_roster` is carried but not compiled yet): the roster's busy flag is answered by `compat::character_roster` (HOT_SWAP_IN_PROGRESS); removed with the declaration commit"
-    },
-    {
-     "old": "crate::runtime::lobby::training::",
-     "new": "crate::runtime::p1::compat::training::",
-     "count": 2,
-     "reason": "TEMPORARY until the joint declaration commit: the lobby `training` facade (worker B) is carried but not declared yet, so `recording_or_playback` and the vanilla-pause flag are answered by `p1::compat::training`; removed with the declaration"
     }
    ]
   },
@@ -1397,35 +1397,66 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "6dd249eed59c841538e90b940e6ba29bac8d5c87b271a97bd4465afb8c1e841d"
+   "dest_sha256": "3d94b52d7b995a47e56b9fc598734511283969ef99cbec577be4a229da5b7c39",
+   "edits": [
+    {
+     "old": "fn notify(role: Role, message: String) {",
+     "new": "fn notify(role: Role, message: std::borrow::Cow<'static, str>) {",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the callers' static texts (`\"..\".into()`) then allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> String {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name())\n        }\n        None => fighter.name().into(),\n    }\n}",
+     "new": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> std::borrow::Cow<'static, str> {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()).into(),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name()).into()\n        }\n        None => fighter.name().into(),\n    }\n}",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): a direct pick (no slot) names the fighter with its static name and allocates nothing; the numbered labels still format a `String` (one per completed swap, listed for the R5 row)"
+    }
+   ]
   },
   {
    "src": "src/cycle_preload.rs",
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "b24d72292d9cb0a26d8c6aa7e6a169222dff4f7b85c92f18fb7cabd2e70d78c6"
+   "dest_sha256": "777ff33e518a3196dd68fa30d33d4007bdb77dfbdf1eae12592a88b279f26da0"
   },
   {
    "src": "src/cycle_preload_config.rs",
    "dest": "src/runtime/roster/cycle_preload_config.rs",
    "crate": "root",
    "src_sha256": "c53891e68084204802add8d19aae87e0f32c37882d34a736ec63ea037e5dccb5",
-   "dest_sha256": "0b474ddec8a4995c7987f4e36f5022ca4a9557b29bfbfec2cf3c0e844493d252"
+   "dest_sha256": "4ea8a4831abb8837649c8da3eeee663bed2b34587d39b23b662712bde3ac1f0e"
   },
   {
    "src": "src/kirby_hats.rs",
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "80349f7688bf24f8d9adb250c868c23a7adaf568bfa8fa5ef2667e0e90cb5833"
+   "dest_sha256": "a2e2f8df43383b61341ad8fe0c98af8a18bf3bd1299c7531e5226e683476e485",
+   "edits": [
+    {
+     "old": "fn notice(role: usize, text: String) {",
+     "new": "fn notice(role: usize, text: std::borrow::Cow<'static, str>) {",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    }
+   ]
   },
   {
    "src": "src/character_items.rs",
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "ff8314f58a70bf79d5bf4dc660865a2d193d6b1ac7c1240a250fcc556daa8541"
+   "dest_sha256": "2c35f72b17fd644f31f8c59eac5937a00109d3ce42bb111eb49fa317850553d6",
+   "edits": [
+    {
+     "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
+     "new": "const LEGACY_INDICES: [usize; 38] = [\n    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,\n];",
+     "reason": "the item table is the clean room's own (`training::character_specific::items::ALL_CHAR_ITEMS`, SPEC-state-04 section 2.1, in the order of `ITEM_NAMES`), so a saved choice indexes it directly: the fork's table position map (its table had gaps for Snake's box and others) is the identity"
+    },
+    {
+     "old": "fn notice(text: impl Into<String>) {",
+     "new": "fn notice(text: impl Into<std::borrow::Cow<'static, str>>) {",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    }
+   ]
   },
   {
    "src": "src/character_sources.rs",
@@ -1439,7 +1470,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "6d7cc2f29941559d2b8c3146b7c162cfe26734ba01cb5a1b2bd22beb8a3f383e"
+   "dest_sha256": "fdd8959105a2044865a0e4c7214ddc1cc7e3358ea363c0ca72d8a6985d71c916"
   },
   {
    "src": "src/native_source_capacity.rs",
@@ -1481,7 +1512,14 @@
    "dest": "src/runtime/roster/hang_trace.rs",
    "crate": "root",
    "src_sha256": "5144b709285b3c2ed01d4bfa0c98e327430385e83433348b8d36c8878e97dce5",
-   "dest_sha256": "0f70e34d47b53b426b1299a92a9d7a56b75558f86ce1dfd3b25addeedf64fa99"
+   "dest_sha256": "71bb09a5363de91d2388f471a03e28ddbf0527e3fb8037b0c09686e98e09e879",
+   "edits": [
+    {
+     "old": "/// Start archive retirement in every build, with optional diagnostic heartbeat output.\npub fn start() {\n    let started = if TRACE_ENABLED { now_ms() } else { 0 };\n    let spawned = std::thread::Builder::new()\n        .name(\"practice-heartbeat\".into())\n        .stack_size(0x10000)\n        .spawn(move || {\n            crate::engine::compat::logging::writer_started();\n            let drains_per_beat = (HEARTBEAT_INTERVAL.as_millis() / DRAIN_INTERVAL.as_millis()) as u64;\n            let mut beat = 0u64;\n            let mut drains = 0u64;\n            loop {\n                std::thread::sleep(DRAIN_INTERVAL);\n                // R-A0b: seam outcomes resolved after the install line (runtime-only rows, late NROs).\n                crate::runtime::seams::seam_install::report_late();\n                // Diagnostic build: the hook-sharing drill's stand-in run counts, when they change.\n                #[cfg(feature = \"diag\")]\n                crate::swap_native::seam_drill::report_counts(now_ms());\n                crate::engine::compat::logging::drain();\n                drains += 1;\n                if !drains.is_multiple_of(drains_per_beat) {\n                    continue;\n                }\n                let now = now_ms();\n                // Revision 33: housekeeping off the game threads \u2014 release inflated layout archives\n                // the game finished copying (training::ui).\n                crate::runtime::lobby::training::ui::release_stale_archives(now);\n                if TRACE_ENABLED {\n                    beat += 1;\n                    let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();\n                    crate::engine::compat::logging::diagnostic(format_args!(\n                        \"[Heartbeat] n={} up={}s mode={:?} {} {}\",\n                        beat,\n                        now.saturating_sub(started) / 1000,\n                        crate::runtime::lobby::game_mode::current(),\n                        probes.join(\" \"),\n                        crate::engine::compat::logging::ring_stats()\n                    ));\n                }\n            }\n        });\n    match spawned {\n        Ok(_) => {\n            if TRACE_ENABLED {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[Heartbeat] thread started interval={}s probes={}\",\n                    HEARTBEAT_INTERVAL.as_secs(),\n                    PROBES.len()\n                ));\n            }\n        }\n        Err(error) => {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[Heartbeat] thread unavailable: {error}\"));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[PracticeDiagnostics] writer=caller heartbeat_thread=unavailable\"\n            ));\n        }\n    }\n}\n",
+     "new": "",
+     "reason": "the fork's `practice-heartbeat` thread (`start`) is removed: the diagnostics drain thread is package 1's `diag_log::start_drain_thread` (it now also runs `seam_install::report_late`, the late seam report), layout archive retirement is package 5's own retire thread (`ui::archive`), and the diag hook-count summary is package 1's `hook_stats` line (review R5). The probes (`ROSTER_SERVICE.hit()` ...) stay as carried"
+    }
+   ]
   },
   {
    "src": "src/native_unlink_probe.rs",
@@ -1614,7 +1652,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "2e058bcf2556345724339771f1b8460a505e987255161e0b9968c17cc9eaf55b",
+   "dest_sha256": "aff533674bc8d341d25248614d6d47ca74be686395414c1919731a07bfe300ef",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1625,6 +1663,11 @@
      "old": "note(&format!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
      "new": "note(format_args!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
      "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
+     "new": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class).into());",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
     }
    ]
   },
@@ -1668,7 +1711,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "b2cda50f12540eb860590c68974dc1bf3465c48266da1964e98862050d34183e",
+   "dest_sha256": "483cdc24fe5d890354b2c65e976051e1ee3291077163eab5bc255d620d133154",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -1679,6 +1722,11 @@
      "old": "note(&format!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
      "new": "note(format_args!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
      "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
+     "new": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class).into());",
+     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
     }
    ]
   },
@@ -1687,14 +1735,14 @@
    "dest": "src/runtime/mii/mii_replay.rs",
    "crate": "root",
    "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-   "dest_sha256": "3c726dbe7fda2fa42d667cfa6982f800d50fa2d003cdf6bb25d78a1c8e512359"
+   "dest_sha256": "8ed6cbb54b9a5137961bbd1bb7669cd2c3d6a29a920799569fc9c6ba9b8e0f40"
   },
   {
    "src": "src/mii_saved_alpha.rs",
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "9b35a7821e99ea4906b12a19e4edb1dc3c16d36cf0cd96cb3f966d6c869ca3a1"
+   "dest_sha256": "0a4a7ea67c553f40727eae99d8d3fcfb7cd2ad26870331d519498b5ca7b29bc2"
   },
   {
    "src": "src/mii_saved_fingerprints.rs",
@@ -1884,7 +1932,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "e7826904600aade69b602e2c892962eeee43c5a5657f441f82ac6cfc08967eeb",
+   "dest_sha256": "b3d30e3e6ba029697e2e5a0c65f95720eb01993de78f7624e1dcf0c26e9e1265",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -2346,6 +2394,76 @@
    "crate": "root",
    "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
    "dest_sha256": "cf5ce60065242626647bc8e5a950490b0672fc8e8dba0e1b268bdb0956d3f1a9"
+  },
+  {
+   "src": "src/body_bank_probe.rs",
+   "dest": "src/runtime/roster/body_bank_probe.rs",
+   "crate": "root",
+   "src_sha256": "0744655791096b14a4cc12c58bcdeb244aeefc33344d57ef9786d91a3e3b9cd5",
+   "dest_sha256": "9f3391cc3c8b7746151853a28f8a335bc8d9c389c42103bd0b6721db18199510"
+  },
+  {
+   "src": "src/native_install.rs",
+   "dest": "src/runtime/roster/native_install.rs",
+   "crate": "root",
+   "src_sha256": "5f514294935e471005ff55921bc9b8103498d73ae736ab96fca202e0aba5b290",
+   "dest_sha256": "5f514294935e471005ff55921bc9b8103498d73ae736ab96fca202e0aba5b290"
+  },
+  {
+   "src": "src/native_fighter_install.rs",
+   "dest": "src/runtime/roster/native_fighter_install.rs",
+   "crate": "root",
+   "src_sha256": "106a7d1043e7f940521d4fb95581fa83b201b632c5bff08662db0b4debb7ef0f",
+   "dest_sha256": "106a7d1043e7f940521d4fb95581fa83b201b632c5bff08662db0b4debb7ef0f"
+  },
+  {
+   "src": "src/process_memory.rs",
+   "dest": "src/runtime/roster/process_memory.rs",
+   "crate": "root",
+   "src_sha256": "ec5971f8d90cdb2081fc1a3129a14762629d5542a7522cc1c2e5a20df4db192d",
+   "dest_sha256": "78e25e4a303944e2f49559bac35b8e1eebe689299902b13fc7d82b6d611c3d55"
+  },
+  {
+   "src": "src/source_lifecycle_probe.rs",
+   "dest": "src/runtime/roster/source_lifecycle_probe.rs",
+   "crate": "root",
+   "src_sha256": "3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2",
+   "dest_sha256": "958047209cd87a45acd63887b9db9ff0bcc49fbcf17f47bc4b2250939ede8d13"
+  },
+  {
+   "src": "src/source_capacity_probe.rs",
+   "dest": "src/runtime/roster/source_capacity_probe.rs",
+   "crate": "root",
+   "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
+   "dest_sha256": "5ffd56eb32d76b9f14e9d43c0ea219085efce235e2b8654273073032b3ba752d"
+  },
+  {
+   "src": "src/source_ldn_capacity_probe.rs",
+   "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
+   "crate": "root",
+   "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
+   "dest_sha256": "6a95d13f92b62c2f860b595c25caef094ca16867c6ae299800db9f84bee5afbc"
+  },
+  {
+   "src": "src/mii_pool_observer.rs",
+   "dest": "src/runtime/roster/mii_pool_observer.rs",
+   "crate": "root",
+   "src_sha256": "8016285af2a24c4f8b70bb0014d64aec421a559eca386f3a1aedf6707d3e5970",
+   "dest_sha256": "93cb22b2a62f900e287baf8e9290de4c84e853118a945b712b48bd166b02b60f"
+  },
+  {
+   "src": "src/mii_origin_observer.rs",
+   "dest": "src/runtime/roster/mii_origin_observer.rs",
+   "crate": "root",
+   "src_sha256": "7b5e4dfb309cdb466e123c76c1e761bfcbf62968357b6fea24381821af969c73",
+   "dest_sha256": "8801c4914bd51da5821a59bc43cfbd97b2f915bb0e4668f70256de69d7cf7471"
+  },
+  {
+   "src": "src/mii_pool_observer_policy.rs",
+   "dest": "src/model/mii_root/mii_pool_observer_policy.rs",
+   "crate": "root",
+   "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
+   "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
   }
  ]
 }

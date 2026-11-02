@@ -25,7 +25,7 @@ import argparse, hashlib, json, os, posixpath, re, sys
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
 EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags",
-            "training_mod_sync": "sync", "training_mod_macros": "macros"}
+            "training_mod_sync": "sync", "training_mod_macros": "macros", "log": "log"}
 HEADS = "crate|" + "|".join(EXTERNAL)
 
 

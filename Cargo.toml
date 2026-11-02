@@ -27,6 +27,8 @@ parking_lot = "0.12"
 # Package 6 (D3, lead-accepted): the fork's game-call crate for the carried code. MIT (`license = "MIT"` in its Cargo.toml). Pinned to the rev of stage m5o's lock.
 # The pilot's core crate (the operator's, MIT): the AI-as-pad primitives the carried cpu_pilot adapter uses. Tag v0.2.1, rev 8b03e3b.
 ssbu-cpu-pilot-core = { git = "https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot", rev = "8b03e3bffea8a156628f76cd9ca31c346f52ac70", features = ["native"] }
+# Package 6 (character items): `paste::paste!` builds the identifiers of the Daisy/Peach turnip power thunks. Already in the lock (a dependency of skyline_smash); build-time only.
+paste = "1"
 smash = { package = "skyline_smash", git = "https://github.com/ultimate-research/skyline-smash.git", rev = "01bf5835cc1140f5052ddfb2b4f9e98008f22679" }
 
 # `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it

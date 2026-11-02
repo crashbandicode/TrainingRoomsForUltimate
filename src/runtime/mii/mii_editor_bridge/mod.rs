@@ -231,7 +231,7 @@ pub(crate) fn mount_opened_catalog(catalog: Snapshot, opening: u64) -> OpenedCat
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
-    let mut app = crate::runtime::compat::menu_app::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);
+    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
@@ -239,7 +239,7 @@ pub(crate) fn mount_opened_catalog(catalog: Snapshot, opening: u64) -> OpenedCat
         return OpenedCatalog::Later(catalog);
     }
     if app.mount_mii_editor_catalog(catalog, opening) {
-        crate::runtime::compat::menu_app::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
+        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
         OpenedCatalog::Shown
     } else {
         OpenedCatalog::Dropped

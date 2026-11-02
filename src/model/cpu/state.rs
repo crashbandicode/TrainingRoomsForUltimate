@@ -163,6 +163,13 @@ impl Cpu {
                 fighter.mash.latch = None;
             }
         }
+        self.request_rerolls(rerolls);
+    }
+
+    /// The CPU takes the choices of the `reroll::*` bits again: SDI Direction and Shield Tilt are left pending for each body's next
+    /// CPU frame, the held ledge and throw cases are cleared. A menu commit (`publish`) and the waiting room's practice start (the
+    /// cached rolls start from the live menu, as after a Training reset) are the callers.
+    pub fn request_rerolls(&mut self, rerolls: u8) {
         for fighter in &mut self.fighters {
             fighter.pending |= rerolls & (reroll::SDI_DIRECTION | reroll::SHIELD_TILT);
             if rerolls & reroll::LEDGE_OPTIONS != 0 {
@@ -172,6 +179,19 @@ impl Cpu {
                 fighter.throw.clear_case();
             }
         }
+    }
+
+    /// The hidden-tech record belonged to `entry`, whose body is gone: it is dropped (a departed body does not leave a model hidden
+    /// or a cursor offset behind).
+    pub fn forget_hidden_entry(&mut self, entry: usize) {
+        if self.hidden.is_some_and(|hidden| usize::from(hidden.entry) == entry) {
+            self.hidden = None;
+        }
+    }
+
+    /// The scene ended: no hidden-tech record survives it.
+    pub fn forget_hidden(&mut self) {
+        self.hidden = None;
     }
 
     // ---- the reset bundle and the clock --------------------------------------------------------

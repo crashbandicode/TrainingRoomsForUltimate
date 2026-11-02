@@ -4,27 +4,27 @@
 //! with the existing SourceToken/Preflight/INSTALL contract.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Member {
-    pub(super) actor: usize,
-    pub(super) control: usize,
-    pub(super) kind: u32,
+pub(crate) struct Member {
+    pub(crate) actor: usize,
+    pub(crate) control: usize,
+    pub(crate) kind: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Bank {
-    pub(super) entry: usize,
-    pub(super) owner: u32,
-    pub(super) resource: (usize, u32, u32),
-    pub(super) kinds: [u32; 3],
-    pub(super) bodies: [(usize, u32); 3],
-    pub(super) members: [Option<Member>; 3],
-    pub(super) active: usize,
-    pub(super) record: usize,
+    pub(crate) entry: usize,
+    pub(crate) owner: u32,
+    pub(crate) resource: (usize, u32, u32),
+    pub(crate) kinds: [u32; 3],
+    pub(crate) bodies: [(usize, u32); 3],
+    pub(crate) members: [Option<Member>; 3],
+    pub(crate) active: usize,
+    pub(crate) record: usize,
     // Actual active control's input_index, binding, alias_index.
-    pub(super) route: (i32, usize, i32),
+    pub(crate) route: (i32, usize, i32),
 }
 
-pub(super) type Slot = (usize, u8, i32, i32, i32);
+pub(crate) type Slot = (usize, u8, i32, i32, i32);
 
 fn binding(bank: Bank) -> Option<(usize, i32)> {
     // Only Aegis and Trainer are alternate forms. IC/SoloPopo and ordinary
@@ -73,7 +73,7 @@ fn binding(bank: Bank) -> Option<(usize, i32)> {
 
 /// Derive an expected row from independent native member authority. Preserve
 /// occupancy and owner/alias fields exactly; never copy current input as truth.
-pub(super) fn expected_slot(previous: Slot, before: Bank, current: Bank) -> Option<Slot> {
+pub(crate) fn expected_slot(previous: Slot, before: Bank, current: Bank) -> Option<Slot> {
     let old_binding = binding(before)?;
     let new_binding = binding(current)?;
     let mut stable = current;
@@ -87,7 +87,7 @@ pub(super) fn expected_slot(previous: Slot, before: Bank, current: Bank) -> Opti
 /// Exact merge used by the native caller. Optional authority never changes the
 /// unchanged strict path. Changed rows need same-owner native bank evidence;
 /// state/owner/alias and all other rows remain the strict expected values.
-pub(super) fn merge_slots(
+pub(crate) fn merge_slots(
     mut expected: [Slot; 16], observed: [Slot; 16], owners: [u32; 2],
     before: [Option<Bank>; 2], current: [Option<Bank>; 2],
 ) -> Option<[Slot; 16]> {

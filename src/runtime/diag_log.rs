@@ -298,6 +298,14 @@ fn report_drops() {
 #[cfg(feature = "diag")]
 const HOOK_STATS_TICKS: u32 = 200;
 
+/// A step the drain thread runs on every tick (registered once at boot).
+static TICK: std::sync::OnceLock<fn()> = std::sync::OnceLock::new();
+
+/// Register the step the drain thread runs on every 50 ms tick, after the drain (the first registration wins).
+pub fn set_tick(step: fn()) {
+    let _ = TICK.set(step);
+}
+
 /// The drain thread: every 50 ms it moves buffered lines to the card. A 64 KiB stack, named. If it
 /// cannot be created, callers keep writing synchronously (SPEC-core-01 §7).
 pub fn start_drain_thread() {
@@ -307,6 +315,11 @@ pub fn start_drain_thread() {
         let (mut observer, mut ticks) = (crate::model::hook_stats::Observer::new(), 0u32);
         loop {
             drain();
+            // A step the owner of a late report registered (`set_tick`): package 6's seam installer writes the seam outcomes that
+            // settled after the install line (R-A0b) here, on this thread and never in a hook.
+            if let Some(tick) = TICK.get() {
+                tick();
+            }
             // Diag builds only (review R5): every `HOOK_STATS_TICKS` drains, one `hook_stats` line if
             // any hook ran or allocated since the previous line. This thread is not a hook, so its own
             // work is never counted. The shipped build has no such line.

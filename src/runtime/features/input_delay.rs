@@ -37,6 +37,10 @@ thread_local! {
 fn note(out: usize, slot: i64, state: usize) {
     let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot, state)));
     let controller = if state == 0 { 0 } else { unsafe { ((state + 0x10) as *const usize).read() } };
+    // Package 6: the waiting-room practice engine's once-per-frame step, before this frame's input processing (Player 1's poll).
+    if slot == 0 {
+        crate::runtime::lobby::update();
+    }
     let _ = CONTROLLER.try_with(|cell| cell.set(controller));
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
     if slot == 0 && controller != 0 && scene::is_training() {
@@ -67,6 +71,12 @@ fn apply() {
     // The menu reads P1 before the delay (SPEC-core-03 §4.1 sub-handler order); it sets the MENU owner,
     // which makes the poll below output neutral.
     ui::input::on_p1_poll(holder);
+    // Package 6: the roster's cycle chords and the Kirby hat shortcut see P1's record before the delay (and may consume the chord).
+    if slot == 0 {
+        let controller = CONTROLLER.try_with(|cell| cell.get()).unwrap_or(0);
+        // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
+        unsafe { crate::runtime::roster::handle_p1_input(out as *mut MappedInputs, controller) };
+    }
     let out = out as *mut MappedInputs;
     let mut adapter = ADAPTER.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.

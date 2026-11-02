@@ -20,6 +20,7 @@ mod lobby;
 mod mii;
 mod p1;
 mod published;
+mod roster;
 mod ui;
 
 mod scene;

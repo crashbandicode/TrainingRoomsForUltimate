@@ -184,6 +184,16 @@ pub unsafe fn sora_spell(accessor: usize, fighter: usize, ids: &Table, saved: i3
 /// The turnip face override (`0` none, else the face 1..=8), read by the sixteen probability hooks.
 static TURNIP_CHOSEN: AtomicU32 = AtomicU32::new(0);
 
+/// The turnip face override now (package 6's character items read it around their own grant).
+pub fn chosen_face() -> Option<u32> {
+    face()
+}
+
+/// Set (or clear) the turnip face override (package 6's character items, around their own grant).
+pub fn set_chosen_face(face: Option<u32>) {
+    TURNIP_CHOSEN.store(face.unwrap_or(0), Ordering::Release);
+}
+
 fn face() -> Option<u32> {
     match TURNIP_CHOSEN.load(Ordering::Acquire) {
         0 => None,

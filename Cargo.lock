@@ -264,6 +264,7 @@ name = "training_rooms"
 version = "0.1.0"
 dependencies = [
  "parking_lot",
+ "paste",
  "serde",
  "serde_json",
  "skyline",

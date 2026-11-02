@@ -10,7 +10,7 @@
 use std::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 
 
 /// Which page of the menu is showing, as the Mii code asks: only "the menu's own page list is up" matters to it.
@@ -89,14 +89,6 @@ impl App {
 pub static QUICK_MENU_APP: Mutex<App> = Mutex::new(App::new());
 /// The Mii code's "the menu got a catalog or an input since the last check" flag.
 pub static MENU_RECEIVED_INPUT: AtomicBool = AtomicBool::new(false);
-
-pub fn lock_write(app: &'static Mutex<App>) -> MutexGuard<'static, App> {
-    app.lock()
-}
-
-pub fn assign(flag: &AtomicBool, value: bool) {
-    flag.store(value, Ordering::Release);
-}
 
 /// Whether the menu is open now (the fork's `quick_menu_active`).
 pub fn active() -> bool {
