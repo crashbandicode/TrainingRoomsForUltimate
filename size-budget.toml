@@ -29,3 +29,21 @@ scope = "total"
 ceiling = 103500
 date = "2026-11-02"
 reason = "counter corrected to sloc4, primary 2026-11-02 (tools/sloc.py is now sloc4's rules: test-gated module files and cfg(all(test, ...)) items are tests, host-only simulator code is reported apart): stream/slim at eb8e034 counts 103,497 (8b73694: 106,099), rounded up"
+
+# Pending merges (lead 2026-11-02 ~14:0xZ: ceiling = head + known pending; integrator-3 lowers it to the actual count after
+# each merge). Each line item is that branch's sloc4 delta from its merge base with stream/slim (tools/sloc.py), or an
+# estimate where the code is not written yet:
+#   deluxe     e4432ad  +83     (owner: deluxe stream)
+#   hitbox     eca0f81  +1,285  (owner: hitbox stream)
+#   ui-screens 237b857  +1,062  measured, plus ~+1,500 estimated for the screens not written yet (roster grid, Mii
+#                               lists, waiting room, B3: about four screens of the size of the measured ones)
+#                               (owner: ui-screens stream)
+#   pkg4       2d25cdf  +219    measured (design C, expected net about 0) (owner: pkg4 stream)
+#   pkg6       d517dab  +169    (owner: pkg6 stream)
+#   total pending about +4,318
+[[budget]]
+scope = "total"
+ceiling = 107900
+date = "2026-11-02"
+reason = "head 103,497 (stream/slim 2aa887a, sloc4) plus the pending merges listed above (+4,318), rounded up to the next hundred; integrator-3 lowers it to the actual count after each merge"
+approved_by = "lead 0caa72b8 (2026-11-02 ~14:0xZ: ceiling at head plus the known pending merges)"
