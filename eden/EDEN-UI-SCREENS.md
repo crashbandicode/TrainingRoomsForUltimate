@@ -29,4 +29,14 @@ The freezes of ui-02/ui-04/ui-05 were first read as the firewall prompt of that 
 - Restore after ui-07: `mismatches: []`, kept trees unchanged, CLAIM back (`restore-verify-*.json` on the rig).
 - Same signature as pkg4's s4-07 (a settings publish from a non-game thread, then the game and the plugin's threads stop).
 
-Next: the probe build (`[Ui] probe close N`, `[Ui] probe publish N`, diag only) names the step the close stops at.
+## ui-08, ui-09: the probe builds (lent rig, restored after: `mismatches: []`, CLAIM back)
+- ui-08, diag of `3569c8d`: the probes went through the ring, and the drain thread stops with the game, so nothing after the open was logged.
+- ui-09, diag of `2202e23` (`9af41937…`): the probes write straight to `svcOutputDebugString` (`diagnostic_now`). In `eden/runs/ui-09/console.log`,
+  after `[Ui] menu opened` (239.78 s) and B:
+  `probe input push B` 245.819, `close 10/11/12/1`, `publish 1` 245.826, `2` .830, `3` .835, `4` .839, `5` .851, **then nothing**. The guest froze.
+- Probe 5 sits right after `compat::menu::apply_snapshot` and probe 6 right after `features::chords::publish` = `STATE.lock()`, a
+  `parking_lot::Mutex` that the game's P1 poll (`chords::on_poll`) takes every frame.
+- Root cause (source): `aarch64-skyline-switch.json` has `os: switch` and no `target-family`, so parking_lot_core 0.9.12 picks
+  `thread_parker/generic.rs`, whose `park()` is a pure `spin_loop()`. Under Horizon's fixed priorities, a waiter that spins on the
+  holder's core keeps the holder from ever running again, and the guest livelocks. Fix: the `sync` stream (kernel address-arbitration
+  locks, no hook waits).
