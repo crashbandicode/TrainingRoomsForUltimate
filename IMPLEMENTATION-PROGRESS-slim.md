@@ -1,5 +1,19 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
+## Current worker checkpoint — 2026-11-02 19:27Z
+Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium, lead tr-lead-astra-3.
+Branchstream/slim; code10a8232, docsHEADdcf88f3; onlyprogressdirty. Soleauthorizedmerge ebfcb98 via dae0787.
+All10a8232 compilegatesPASS with1110sourcehashes: fullhost/clippy-Dwarnings/no-default/ordinarySwitch/defaultrelease/diag; artifacts slim/10a8232-*.
+Release3bf44a35270cc95992ffce5e1b2ff6e1f9d593f40801a5c854aa0b536e65fecb; diag4fa94558f055532ce884f3d6d5521c23da40afbeab07e8cfac8b2960cbdd261b.
+Raw98,962/ceiling103,300; normalized126558excludingtools, -9511vsbase. Nextversion15%target notRCblocker; fiveenumlintrowsstillpending, hos2approved.
+sl-02 Surface19:23–19:26: finalprobe-retirement seam/install PASS, correctedexistingnativeTrainingloggate+actualshotPASS, fullconsole11934lines0Unmapped/0panic-abort-crash. HookallocationFAIL11rows/7nonzero deltas/final818delta100; no runtimeacceptance.
+All1244sourcegmutablehashes unchanged/noextras; originalpluginhashrestored, privateprofiledeletedbacktoinitialabsence; ownedEden4030437/displaystopped. SurfaceRELEASED19:26Z andqueueremoved. Yoga requestwithdrawnbeforeexecution. Noownclaim/job/queue/profile now.
+Archive artifacts/trainingrooms-nro-archive/slim/sl-02 hasrawfinalconsole/diagnostics/run.json/memory.peak/PREP/LAUNCH/route/macroreceipts/screens/restoration/sourcebeforeafter. InspectedTrainingSteve/LucarioKongoJungle.
+DeletedonlyowncompletedSurfacecache1.631GB withmanifest; Yoga10a8232target/fullhostbinaries retained. Prior55GBcachebound omittedAlly23.74GB; correction sentlead, noglobalunder60claim.
+ComplianceFAIL4 unchangedguardscanner/README/GIF/HANDOFFname; no diagmarkers. Fiveenumroots andintegration/runtimezerogates remain; noREADY.
+Next: leadbaseline/exactintegrationauthority andTextboundedrepresentationdecision inQUESTIONS; continueindependentownedrootwork, preserveallfailures. No redundantoldsourceEdenrerun absentfix. Hiddenwatcher11182alive.
+Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
+
 Lead `0caa72b8`; slim = Claude Opus 5.5 high (`claude-opus-5-5`, effort `high` from this agent's own transcript
 `…/0caa72b8-…/subagents/agent-acd076f24796f9c6b.jsonl`; one hidden watcher `/tmp/slim-model-watcher.ps1`, model/effort
 only, exits with the owner process 1069629). Work tree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-slim`,
@@ -148,11 +162,11 @@ Unverified is an explicit pending state; before READY each must have the prescri
 
 | Requirement | Tag | Result | Evidence |
 | --- | --- | --- | --- |
-| `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified; f07bda2 release NRO07fd793ddb1d, resident3,440,640B via playbook nro_size.py; final10 build pending. |
-| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml; release NRO d1e5392, build-release.log; compliance-d1e5392-release.md machine rows pass. |
-| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; host cargo test exit0 at98f9ab0; compliance machine row pass. |
-| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for initial slice; final rerun after changes | All five exited0; separate admitted claims/logs below. Switch dead-code warnings remain41/40; not accepted as warning-free. |
-| No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | FAIL | sl-01 installation heap_allocations=0, but full hook parser FAIL:43 rows,13 nonzero deltas, final1330/delta110; archived hook-stats-verdict.log. Final zero-hook regression remains open. |
+| `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified;10a8232 release3bf44a35 resident3,440,640B via playbook tools/build/nro_size.py; archivedreleaseNRO. |
+| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml;10a8232 release3bf44a35; archived10a8232-release/compliance.md machine rows pass. |
+| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; fullhost10a8232 exit0,1110trackedsource hashes unchanged; compliance machine row pass. |
+| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for10a8232 | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchivedsource/log receipts; ordinary-player-only Switch also0. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
+| No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | FAIL | sl-02 installation heap_allocations=0, but full hook parser FAIL:11rows,7nonzero deltas, final818/delta100; archivedhook-stats-final-verdict.log. sl-01 failure also retained. Finalzero-hookgateOPEN. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
 | Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
 | Version guard: the game reads `13.0.5` or nothing is installed and the log says `result=unsupported_version`. | M | unverified | Acceptance pending; no pass claimed. |
@@ -160,7 +174,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Card scan before the site is chosen: `tools/build/scan-offsets.py` over the card copy, for the site and, for a virtual function, its vtable slot. Evidence: the scan's output and the copy's date. | M | unverified | Acceptance pending; no pass claimed. |
 | (another plugin hooks or may hook the site) Sharing v1 or the chain rules ([HOOK-SHARING](HOOK-SHARING.md)); the owner election runs before the byte guard; both stand-in modes (`foreign=inline`, `foreign=far`) and both load orders tested in Eden. N/A only when the scan showed nobody at the site, with the scan cited. | C | unverified | Acceptance pending; no pass claimed. |
 | Hook after the prologue, or call the game function instead of hooking it; hook the most specific instruction. | M | unverified | Acceptance pending; no pass claimed. |
-| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | compliance-d1e5392-release.md: no diag markers in release NRO8140cab97427. |
+| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | 10a8232-release/compliance.md: no diagmarkers inrelease3bf44a35. |
 | The shipped NRO writes its install line and nothing per frame. **C** (a logging plugin whose product is the log) its data files too, but no per-frame diagnostics. | M | unverified | Acceptance pending; no pass claimed. |
 | Read-only rules reviewed in the code, hook by hook: no checked random number drawn, no native code that draws one skipped or reordered, no simulated state written (ssbu-desync-detector `docs/WHAT-IS-CHECKED.md`). Evidence: the review in the evidence doc. | C | unverified | Acceptance pending; no pass claimed. |
 | Replay A/B with the desync detector: the same replay with and without the plugin, identical check values and positions. | C | unverified | Acceptance pending; no pass claimed. |
@@ -237,6 +251,17 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+- 19:27Z sl-02 final10a8232 runtime: seam/install379 stock374 missing[] external[] heap0 PASS; route nativeTraininglayoutfreshsession+actualshot PASS (Steve/LucarioKongoJungle). Fullconsole11934lines0Unmapped/0panic-abort-crash. HookstatsFAIL11rows,7nonzerodeltas, final818/delta100; lastallocs inputnote27/apply1/cpu192/live1/preload594/named2/draw1. Rawfirst/finalscope lines184/256 in slim/sl-02/diagnostics-final-all.log, archivedparserverdicts. Thispre-R5source remainsFAIL, no exemption ornewrootattribution. Stopped/restored/source1244hashesverified/privateprofileabsent/SurfaceRELEASED19:26, noownqueue/job. AllcompilegatesPASS already; awaiting exactgatedintegration andfiveenum closure, not declaringREADY.
+
+
+- 19:18Z cache-scope correction after UI Ally census: my prior55.43GB bound summedSurface+Yoga only and omittedAllyTrainingRooms23.74GB. It must NOTbe citedasglobal<60GB. I have nofurthercompilequeued; deleted owncompletedSurfacecache1,631,270,784B withmanifest+NROhashverification (slim/cache-cleanup-10a8232). Yogaowncache retained forcurrentfrozenhostbinaries/runtimeidentity. Lead/owners mustreconcileglobalbudget/finishedAllypkg5cache beforefurthergrowth; Iwillnotdeleteforeigncaches. RuntimependingdoesnotgrowCargotargets.
+
+
+- 19:12Z lead admission request already actioned: ownUNCLAIMEDEden movedbehindlead-r5 at19:08 and19:11; nowalso movedbehind newlyqueuedpkg4Switch. Currentorder UI,lead-r5,pkg4,slimEden. Readycompileowners canconsume2slots; noownclaim/profilemutation. I keepEdenafterqueuedbuilds peroperator.
+
+- 19:09Z gate handoff: code10a8232 now has fullhost/clippy-Dwarnings/no-default + ordinary-player-only/defaultrelease/diag PASS with1110source hashes unchanged, artifacts under slim/10a8232-{host,clippy,no-default,ordinary,release,diag}. Release3bf44a35/diag4fa94558; release39.84s/diag36.76s, resident3440640/3780608, warningmessages41sameasprior release. No READY: fiveenumlintrows, integration/runtimezero andcompliance remain. sl-02 queuedYoga afterlead-r5/pkg4compiles; noownclaim/profileyet. Request lead review of separatelyproposed Text boundedrepresentation root and gated integration route; no blanketmerge taken.
+
 
 - 19:0xZ concrete keyboard lint alternative for lead/pkg4/pkg6 review: Text stores len/cursor as usize although validated bounds are <=96 UTF-16 units (Mii<=10); changing only those internal fields to u8 with existing validation before narrowing and usize accessors would reduce Text from216B to198B on64bit, and Decision Enter/Cancel below Clippy large-enum threshold without allocations, payload loss, wrapper tricks, or using the mutable latest text as the committed result. Native ABI structs stay unchanged. No patch applied: Mii representation work remains baseline-gated. Please authorize this bounded representation slice separately or provide the required baseline receipts. Ordinary10a8232 Switch nowPASS, fullhost/clippy/no-defaultPASS; defaultrelease/diag queued next.
 
@@ -597,3 +622,19 @@ Release10a8232 PASS0/39.84s; YogaRELEASED19:03Z. NRO3bf44a35270cc95992ffce5e1b2f
 
 ### ACTIVE Yoga diagnostic19:04Z
 RequeuedEND afterrelease thenactualhead/free; all1110sourcehashes and idleprocessfreshchecked, MemAvailable23,435,136KiB, disk247,380,656,128B. Existing ledger.claim usedwith fair_seconds0/parallel_grace0 peroperator/lead19:01 override. One diagvia existingwrapper6G/1800s incremental0; SSHexec96322. Releaseonexit; archiveartifact/source/warnings before runtime. NoownedEden/profile.
+
+Diag10a8232 PASS0/36.76s, YogaRELEASED19:04Z; NRO4fa94558f055532ce884f3d6d5521c23da40afbeab07e8cfac8b2960cbdd261b.40warnings retained,1110source hashes unchanged, onlysixhostpyccaches; archive slim/10a8232-diag raw/cleanlog/wrapper/manifests/NRO. Completeddiag queue removed; nojob/Eden/profile now. All required compilegates for10a8232 nowpassed; runtime/lint debt remains.
+Compliance on clean dcf88f3 (docs-only after10a8232), release3bf44a35: exit1, fourmachinefailures unchanged: guardscanner counts repeat initializer as0, README GIF/build/license combinedrow, missingGIF, missingHANDOFF.md exactname. No diagmarkers inrelease; clean-tree checkPASS. Fullreport archived10a8232-release/compliance.md; agent checklist stillneedsruntime/currentintegration. No READY.
+
+### sl-02 prelaunch checkpoint19:0xZ
+Allcompilegates for10a8232 pass; dcf88f3HEAD docs-only, progressdirty. Queued Yoga sl-02 after allbuilds; actualhead/free/nootherbuildrow and processidlechecked. Private root trainingrooms-eden-slim-astra/profiles/sl initiallyabsent, sourceb mutableinventory19988files saved source-before-sl-02.json (broader thanprior976manifest), no profilemutationyet. Prestaged diagnostic4fa94558 inownnro dir, pilot e3033426/tileb8313ca2 verified. Next existingharness solo.ps1 Up sl-02 with thisNRO installedaslibtraining_rooms.nro, Tile/Pilot, envTR_FAIR_SECONDS0/TR_PARALLEL_GRACE0 peroverride. Batch install/seam, nativeTraininglayoutgate+actualshot, allocation/fullconsole scan. Onanyfailure DownRestore, independentlyverify restoration/sourceunchanged, archiveallrawreceipts/logs/memory.peak, deleteonlynewownprofiletoinitialabsence, release/removeownqueue. Noforeignprofiletouch.
+
+Prelaunch correction: freshqueue included lead-r5 targeted integration gate behindownEden; initialkeywordassert failedtoclassify its wording ascompile. Human/modelreview caughtit BEFORE Up/claim/profilemutation. MovedownEdenrowEND behindlead-r5; no readycompile bypass. Noownedclaim/process. Admission must classify actualrowmeaning, notonlycargo/Switch/compile keywords.
+
+Completed Surface cache cleanup 2026-11-02T19:17:52.550191+00:00: allthree10a8232NROarchive hashes reverified, noCargo/rustc active locally. Deleted ONLY own cargo-targets/trainingrooms-slim (1848files,1,631,270,784B) after perfilepath/size/mtime manifest archived slim/cache-cleanup-10a8232/surface-target-manifest.json. Sources/logs/NROs/receipts unchanged; Yoga10a8232target and fullhostbinaries retained forcontinuation. FutureSurfacebuild will regenerateowncache; nootherstreamtargettouched.
+
+### Surface sl-02 prelaunch 2026-11-02T19:23:19.295529+00:00
+YogaEden requestWITHDRAWNunrun whilebuildscontinue; Surfacefree/noqueuedbuild. Prepared own /home/intpa/trainingrooms-eden-slim-surface harnesscopyof225d16b, configuredsourceg/privateprofile sl/display109/offlineforced; profileinitiallyabsent,1244mutable sourcefilehashes savedsource-before-sl-02.json. Sameverifieddiag4fa94558/pilote3033426/tileb8313ca2 stagedownnro. Freshqueueonlyownrow/fullrawledgerfree/processidle+gvpreflightPASS. NextUpclaims beforeprofilecopy; route usesnativeTraininglayoutgate+screenshots. Afterrun DownRestore, independentplugin/sourcehashverify, archivefulloutputs, deleteonlycreatedownprofilebacktoabsence. ExistingYogaprestage untouched/noownedclaimthere.
+
+### ACTIVE sl-02 Surface19:23Z
+CLAIMED19:23 beforeprivateprep; Upcompleted19:23:34. OwnedEdenPID4030437/display109 at trainingrooms-eden-slim-surface/runs/sl-02. Appd483c082/runtimeee3c2e95; plugin/pilot/tilePREPhashesverified. Mute set/save/get canonical0 BEFOREgame.load. Sourceg1244hashes retained; privateprofilecreated, sourceuntouched. Routeexec17104 runs existingroute.py --transport local --training-gate diag:[Ui]layout=info_training resolved (actualargv retains spaces), orderedroute-sl-02.log/receipt. Nextinspectroute/session/install/hookstats, collectthenDownRestore andfullidentityrestoration, releasequeue. DoNOTcompileonSurfacewhileclaimactive.
