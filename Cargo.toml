@@ -31,10 +31,93 @@ parking_lot = "0.12"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
 
 [features]
-default = []
-# Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it.
+# The shipped closure: the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
+# `m5o1-switch-root-full-release`), evaluated through the table below. `cargo skyline build --release`
+# (default features) therefore builds the shipped product; tests/pkg6_features.rs checks it.
+default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
+
+# Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
+# observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
 diag = []
 
+# --- Carried feature table (package 6, decision D11) ---------------------------------------------------
+# Taken from the fork's root Cargo.toml lines 82-240 of stage m5o (lead-authorised, CARRY-OVER.md pkg6
+# section). Sub-crate features of the fork (`training_mod_consts/x`, `training_mod_tui/x`) are the same-name
+# features of this one crate. `dep:` entries are added with the carry of their crate (C6).
+# Not in the shipped closure ("carried, not shipped"): every `*-probe`/`*-observer`/`*-trace`/meter feature
+# and `automation-results-native` (see docs/PACKAGE-6-PLAN.md section 12).
+native-body-bank-probe = ["diag"]
+native-body-bank-alpha = ["managed-visible-grouped-source-alpha", "lobby-preload-extended", "mii-ordinary-cpu-alpha"]
+cycle-preload-extended = ["managed-third-source-alpha"]
+console-map-probe = ["diag"]
+console-practice-trace = ["diag"]
+console-swap-trace = ["console-practice-trace"]
+native-unlink-probe = ["console-swap-trace"]
+native-unlink-guard = []
+enhancements-alpha = ["mii-editor-alpha", "cpu-pilot-probe", "mii-managed-helper-alpha", "waiting-roster-reload", "practice-stage-request-alpha", "training-stage-rotation-alpha"]
+# P1 AI assistance (product feature kept under its name). `dep:ssbu-cpu-pilot-core` joins with C6.
+cpu-pilot-probe = ["p1-cpu-control"]
+p1-cpu-control = []
+automation-results-observer = ["diag"]
+automation-results-native = ["deluxe-sdk"]
+hang-trace = ["diag"]
+plugin-heap-meter = ["diag"]
+archive-poison-probe = ["diag"]
+waiting-roster-reload = []
+named-input-trace = ["diag"]
+kirby-resource-probe = ["diag"]
+lobby-stage = []
+lobby-stage-probe = ["lobby-stage", "diag"]
+practice-stage = ["lobby-stage"]
+practice-stage-observer = ["practice-stage", "diag"]
+practice-stage-request-alpha = ["practice-stage"]
+training-stage-rotation-alpha = ["lobby-stage", "mii-editor-alpha", "training-stage-rotation"]
+training-stage-rotation = []
+stage-asset-probe = ["lobby-stage", "diag"]
+item-state-probe = ["diag"]
+mii-identity-probe = ["diag"]
+mii-saved-alpha = []
+mii-ordinary-player-alpha = ["mii-saved-alpha"]
+mii-ordinary-cpu-alpha = ["mii-ordinary-player-alpha"]
+mii-managed-source-coexist-alpha = ["mii-ordinary-cpu-alpha", "managed-sources"]
+mii-managed-helper-alpha = ["mii-managed-source-coexist-alpha"]
+mii-hud-portrait-alpha = ["mii-managed-helper-alpha"]
+mii-ldn-qualification-probe = ["mii-ordinary-player-alpha", "diag"]
+mii-pool-observer = ["diag"]
+mii-origin-observer = ["diag"]
+mii-preview-observer = ["diag"]
+mii-editor-alpha = ["mii-ordinary-cpu-alpha"]
+mii-quit-observer = ["diag"]
+mii-identical-reload-probe = ["mii-identity-probe"]
+mii-saved-file-probe = ["mii-identity-probe"]
+mii-special-change-probe = ["mii-identical-reload-probe"]
+mii-fullconfig-probe = ["mii-identical-reload-probe", "mii-saved-file-probe"]
+mii-native-adapter-probe = ["mii-fullconfig-probe"]
+mii-cpu-adapter-probe = ["mii-native-adapter-probe"]
+turnip-save-probe = ["item-state-probe"]
+gyro-variation-probe = ["item-state-probe"]
+source-owner-probe = ["diag"]
+managed-sources = []
+managed-third-source-alpha = ["managed-sources"]
+managed-grouped-source-alpha = ["managed-third-source-alpha"]
+managed-visible-grouped-source-alpha = ["managed-grouped-source-alpha"]
+managed-ldn-third-source-alpha = ["managed-third-source-alpha"]
+lobby-preload-extended = ["cycle-preload-extended", "managed-ldn-third-source-alpha"]
+source-ldn-grouped-helper-capacity-probe = ["managed-ldn-third-source-alpha", "source-ldn-grouped-probe"]
+source-lifecycle-probe = ["diag"]
+source-capacity-probe = ["source-lifecycle-probe"]
+source-capacity-link-probe = ["source-capacity-probe"]
+source-ldn-capacity-probe = ["source-capacity-link-probe"]
+source-ldn-grouped-probe = ["source-ldn-capacity-probe"]
+source-ldn-capacity-empty-probe = ["source-ldn-capacity-probe"]
+source-ldn-capacity-link-probe = ["source-ldn-capacity-empty-probe"]
+source-capacity-group-probe = ["source-ldn-capacity-empty-probe"]
+source-capacity-aegis-probe = ["source-capacity-group-probe", "source-ldn-grouped-probe"]
+source-capacity-trainer-probe = ["source-capacity-group-probe", "source-ldn-grouped-probe"]
+# Runtime capture toggle on the Deluxe Plugins page. `dep:deluxe-plugin-sdk` joins with C6.
+deluxe-sdk = []
+# The fork's host-only replay simulator (consts feature; used by the swap-model replay tests).
+simulator = []
 [profile.release]
 opt-level = "s"
 lto = true

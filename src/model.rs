@@ -29,8 +29,18 @@ pub mod migration;
 pub mod settings;
 #[path = "model/sites.rs"]
 pub mod sites;
+// Carried fork areas (package 6): compiled for tests only until their runtime consumers are carried (docs/PACKAGE-6-PLAN.md\n// section 5); each area's cfg(test) is removed with the step that lands its consumer, so the release build never carries\n// unused code and clippy -D warnings stays clean without an llow.
+#[cfg(test)]
+#[path = "model/preload/mod.rs"]
+pub mod preload;
+#[cfg(test)]
+#[path = "model/seams/mod.rs"]
+pub mod seams;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
+#[cfg(test)]
+#[path = "model/swap/mod.rs"]
+pub mod swap;
 #[path = "model/storage.rs"]
 pub mod storage;
 #[path = "model/version.rs"]

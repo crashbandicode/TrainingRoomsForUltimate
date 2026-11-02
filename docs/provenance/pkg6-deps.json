@@ -57,28 +57,6 @@
    },
    "used_by_files": 1
   },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 8,
-    "BASE": 6,
-    "aligned": 5,
-    "read": 5,
-    "INSTALL": 5,
-    "ready_forms": 3,
-    "InstallToken": 3,
-    "game_mode": 3,
-    "setting": 3,
-    "finish_install": 2,
-    "Forms": 2,
-    "nostics": 1,
-    "capture_reload_pose": 1,
-    "ready_kind": 1,
-    "ready_single_mii": 1,
-    "lobby": 1
-   },
-   "used_by_files": 14
-  },
   "src/logging.rs": {
    "origin": "mixed",
    "items": {
@@ -197,11 +175,9 @@
   "src/lib.rs": {
    "origin": "mixed",
    "items": {
-    "consts": 5,
-    "pulse": 4,
-    "control": 1
+    "consts": 5
    },
-   "used_by_files": 2
+   "used_by_files": 1
   },
   "src/logging.rs": {
    "origin": "mixed",
@@ -209,20 +185,6 @@
     "diagnostic": 16
    },
    "used_by_files": 6
-  },
-  "src/training/mod.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 1
-   },
-   "used_by_files": 1
-  },
-  "src/training/ui/mod.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 3
-   },
-   "used_by_files": 3
   },
   "training_mod_consts/src/lib.rs": {
    "origin": "mixed",
@@ -233,8 +195,7 @@
     "FighterId": 1,
     "LedgeOption": 1,
     "OnOff": 1,
-    "MENU": 1,
-    "*": 1
+    "MENU": 1
    },
    "used_by_files": 5
   },
@@ -291,34 +252,10 @@
   "src/lib.rs": {
    "origin": "mixed",
    "items": {
-    "*": 9,
-    "aligned": 5,
-    "read": 5,
     "Result": 4,
-    "BASE": 4,
-    "setting": 2,
-    "canonical": 2,
-    "WaitingChoice": 1,
-    "WaitingSession": 1,
-    "finish_install": 1,
-    "InstallToken": 1,
-    "ready_forms": 1,
-    "INSTALL": 1,
-    "pointer_chain": 1,
-    "Forms": 1,
-    "inputs_for": 1,
-    "Inputs": 1,
-    "Snapshot": 1,
-    "Layout": 1,
-    "exact_mii_for_expansion": 1,
-    "exact_mii_owner": 1,
-    "owner_admission": 1,
-    "owner_facts": 1,
-    "ExactMiiProof": 1,
-    "OwnerFacts": 1,
-    "matches": 1
+    "*": 2
    },
-   "used_by_files": 17
+   "used_by_files": 4
   },
   "src/logging.rs": {
    "origin": "mixed",
@@ -340,19 +277,14 @@
    "items": {
     "mii": 79,
     "TrioFighter": 13,
-    "ledger": 11,
     "OnOff": 10,
     "TrainingModpackMenu": 8,
-    "*": 8,
-    "native_model": 8,
     "MENU": 4,
     "BASE_MENU": 3,
-    "capabilities": 2,
-    "presentation": 1,
     "create_app": 1,
     "swap_native": 1
    },
-   "used_by_files": 23
+   "used_by_files": 18
   },
   "training_mod_sync/src/lib.rs": {
    "origin": "upstream-identical",
@@ -373,10 +305,9 @@
     "Toggle": 2,
     "NX_SUBMENU_COLUMNS": 2,
     "NX_SUBMENU_ROWS": 2,
-    "App": 1,
-    "*": 1
+    "App": 1
    },
-   "used_by_files": 5
+   "used_by_files": 4
   }
  },
  "Character items (menu icons from game assets, turnip face, item choice)": {
@@ -434,7 +365,6 @@
     "Toggle": 1,
     "NX_SUBMENU_COLUMNS": 1,
     "NX_SUBMENU_ROWS": 1,
-    "*": 1,
     "BASE_MENU": 1,
     "create_app": 1,
     "OnOff": 1
@@ -483,13 +413,6 @@
    },
    "used_by_files": 1
   },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 2
-   },
-   "used_by_files": 2
-  },
   "src/logging.rs": {
    "origin": "mixed",
    "items": {
@@ -532,13 +455,12 @@
     "TrainingModpackMenu": 8,
     "TOGGLE_MAX": 4,
     "MENU": 3,
-    "*": 3,
     "DEFAULTS_MENU": 2,
     "impl_submenutrait": 2,
     "TRAINING_MODPACK_ROOT": 2,
     "create_app": 2
    },
-   "used_by_files": 5
+   "used_by_files": 4
   },
   "training_mod_consts/src/options.rs": {
    "origin": "mixed",
@@ -608,13 +530,6 @@
    },
    "used_by_files": 1
   },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 1
-   },
-   "used_by_files": 1
-  },
   "src/logging.rs": {
    "origin": "mixed",
    "items": {
@@ -675,64 +590,6 @@
    },
    "used_by_files": 14
   },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 14,
-    "BASE": 3,
-    "INSTALL": 3,
-    "inline_keyboard": 3,
-    "Ownership": 2,
-    "Request": 2,
-    "Job": 2,
-    "active_body": 1,
-    "aligned": 1,
-    "pointer_chain": 1,
-    "read": 1,
-    "scope": 1,
-    "sources": 1,
-    "state_for": 1,
-    "PortraitIntent": 1,
-    "Role": 1,
-    "represent": 1,
-    "Binding": 1,
-    "Live": 1,
-    "RebindStep": 1,
-    "RebindWait": 1,
-    "Represent": 1,
-    "Shown": 1,
-    "REBIND_SETTLE_CALLBACKS": 1,
-    "hud_assets_settled": 1,
-    "service_bind_after_wait": 1,
-    "tick_bind_allowed": 1,
-    "HudAssets": 1,
-    "HudHold": 1,
-    "lobby": 1,
-    "STATES": 1,
-    "InstallToken": 1,
-    "control": 1,
-    "map": 1,
-    "pointer": 1,
-    "span": 1,
-    "classify": 1,
-    "decode_output": 1,
-    "enqueue": 1,
-    "finish": 1,
-    "is_busy": 1,
-    "poll_shared": 1,
-    "validate_initial": 1,
-    "validate_title": 1,
-    "KeyboardResult": 1,
-    "Phase": 1,
-    "Shared": 1,
-    "MAX_HEADER_UTF16_UNITS": 1,
-    "MAX_NAME_CHARS": 1,
-    "OUTPUT_UTF16_UNITS": 1,
-    "SDK_CANCEL": 1,
-    "SDK_SUCCESS": 1
-   },
-   "used_by_files": 14
-  },
   "src/logging.rs": {
    "origin": "mixed",
    "items": {
@@ -751,10 +608,9 @@
    "origin": "mixed",
    "items": {
     "mii": 320,
-    "*": 2,
     "TrioFighter": 1
    },
-   "used_by_files": 28
+   "used_by_files": 27
   },
   "training_mod_sync/src/lib.rs": {
    "origin": "upstream-identical",
@@ -774,7 +630,6 @@
     "SubMenuType": 2,
     "NX_SUBMENU_COLUMNS": 1,
     "NX_SUBMENU_ROWS": 1,
-    "*": 1,
     "App": 1,
     "InputControl": 1,
     "Tab": 1
@@ -800,17 +655,9 @@
   "src/hazard_manager/mod.rs": {
    "origin": "mixed",
    "items": {
-    "*": 1,
     "waiting_hazards": 1
    },
-   "used_by_files": 2
-  },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 3
-   },
-   "used_by_files": 3
+   "used_by_files": 1
   },
   "src/logging.rs": {
    "origin": "mixed",
@@ -836,8 +683,7 @@
     "mii": 2,
     "OnOff": 2,
     "TrainingModpackMenu": 2,
-    "MENU": 1,
-    "*": 1
+    "MENU": 1
    },
    "used_by_files": 5
   },
@@ -855,14 +701,13 @@
     "AppPage": 6,
     "InputControl": 4,
     "NX_SUBMENU_COLUMNS": 2,
-    "*": 2,
     "StatefulTable": 1,
     "SubMenu": 1,
     "SubMenuType": 1,
     "Toggle": 1,
     "NX_SUBMENU_ROWS": 1
    },
-   "used_by_files": 6
+   "used_by_files": 5
   }
  },
  "Input display renderer optimisation (fork fix on an upstream feature)": {
@@ -876,10 +721,9 @@
   "src/lib.rs": {
    "origin": "mixed",
    "items": {
-    "pts": 5,
     "menu": 4
    },
-   "used_by_files": 3
+   "used_by_files": 2
   },
   "src/training/input_log.rs": {
    "origin": "mixed",
@@ -991,10 +835,9 @@
   "training_mod_consts/src/lib.rs": {
    "origin": "mixed",
    "items": {
-    "FighterId": 2,
-    "*": 1
+    "FighterId": 2
    },
-   "used_by_files": 2
+   "used_by_files": 1
   },
   "training_mod_sync/src/lib.rs": {
    "origin": "upstream-identical",
@@ -1012,13 +855,6 @@
     "(module)": 1
    },
    "used_by_files": 1
-  },
-  "src/lib.rs": {
-   "origin": "mixed",
-   "items": {
-    "*": 6
-   },
-   "used_by_files": 5
   },
   "src/logging.rs": {
    "origin": "mixed",

@@ -1,0 +1,210 @@
+{
+ "stage": "m5o",
+ "comment": "Package 6 carry manifest (tools/carry_pkg6.py). Do not edit carried files by hand: change this manifest and re-run `carry`.",
+ "modules": {
+  "root": {
+   "native_fields": "crate::model::seams::native_fields",
+   "native_unlink_core": "crate::model::seams::native_unlink_core",
+   "native_unlink_guard": "crate::model::seams::native_unlink_guard",
+   "source_descriptor": "crate::model::swap::source_descriptor",
+   "source_lifetime": "crate::model::swap::source_lifetime",
+   "source_visible_forms": "crate::model::swap::source_visible_forms",
+   "native_hud_refresh": "crate::model::swap::native_hud_refresh"
+  },
+  "consts": {
+   "native_seams": "crate::model::seams::native_seams",
+   "source_load": "crate::model::swap::source_load",
+   "cycle_admission_grace": "crate::model::preload::cycle_admission_grace",
+   "notice_queue": "crate::model::preload::notice_queue"
+  },
+  "tui": {
+   "roster_grid": "crate::model::swap::roster_grid"
+  },
+  "mii": {}
+ },
+ "files": [
+  {
+   "src": "src/native_fields.rs",
+   "dest": "src/model/seams/native_fields.rs",
+   "crate": "root",
+   "src_sha256": "1659bef7f17ee20e313258ec62aa6d912e93761bb0c124142337c149c429b835",
+   "dest_sha256": "1659bef7f17ee20e313258ec62aa6d912e93761bb0c124142337c149c429b835"
+  },
+  {
+   "src": "src/native_unlink_core.rs",
+   "dest": "src/model/seams/native_unlink_core.rs",
+   "crate": "root",
+   "src_sha256": "cc0beb6ca3ab506dc57ada0e048f9d19547c3a4407d3e6f534a761ba7952ce94",
+   "dest_sha256": "cc0beb6ca3ab506dc57ada0e048f9d19547c3a4407d3e6f534a761ba7952ce94"
+  },
+  {
+   "src": "src/native_unlink_guard.rs",
+   "dest": "src/model/seams/native_unlink_guard.rs",
+   "crate": "root",
+   "src_sha256": "647fb995e92587a94b0d519f5aad706419ddc8795759febc89986f704b2879ea",
+   "dest_sha256": "5886b563f0c3ef520c561501f24bed763a388dad7b5abc3ee7097e82539b090a",
+   "edits": [
+    {
+     "old": "/// Safety: caller must supply the exact native store's live node/address/value.\n",
+     "new": "///\n/// # Safety\n///\n/// The caller must supply the exact native store's live node/address/value.\n",
+     "reason": "clippy::missing_safety_doc wants a `# Safety` heading; the fork silenced it with a crate-level allow in its (mixed) lib.rs, which is not carried (root-cause fix instead of an allow)"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/mod.rs",
+   "dest": "src/model/seams/native_seams/mod.rs",
+   "crate": "consts",
+   "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
+   "dest_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_a1.rs",
+   "dest": "src/model/seams/native_seams/rows_a1.rs",
+   "crate": "consts",
+   "src_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495",
+   "dest_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_a2.rs",
+   "dest": "src/model/seams/native_seams/rows_a2.rs",
+   "crate": "consts",
+   "src_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace",
+   "dest_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_a3.rs",
+   "dest": "src/model/seams/native_seams/rows_a3.rs",
+   "crate": "consts",
+   "src_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925",
+   "dest_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_a4.rs",
+   "dest": "src/model/seams/native_seams/rows_a4.rs",
+   "crate": "consts",
+   "src_sha256": "f22b743ebc91cb8d97fcc4d15acd3184dfa4521b5564bf4508fd04ab7b92d525",
+   "dest_sha256": "f22b743ebc91cb8d97fcc4d15acd3184dfa4521b5564bf4508fd04ab7b92d525"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_a5.rs",
+   "dest": "src/model/seams/native_seams/rows_a5.rs",
+   "crate": "consts",
+   "src_sha256": "840976a5e6ed534d82850aba0c5fd891d34339c1474e02fced838276bd432a33",
+   "dest_sha256": "840976a5e6ed534d82850aba0c5fd891d34339c1474e02fced838276bd432a33"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/rows_identity.rs",
+   "dest": "src/model/seams/native_seams/rows_identity.rs",
+   "crate": "consts",
+   "src_sha256": "0849f9d7a92a1b09f9ba0a4fc01ff496763690c67c6d7a13f8d7311cf7d72f16",
+   "dest_sha256": "0849f9d7a92a1b09f9ba0a4fc01ff496763690c67c6d7a13f8d7311cf7d72f16"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/images.rs",
+   "dest": "src/model/seams/native_seams/images.rs",
+   "crate": "consts",
+   "src_sha256": "70f9408efdb4aa1cb2321aeacdf163a4135ebd05689b46d267f7d06522d06632",
+   "dest_sha256": "70f9408efdb4aa1cb2321aeacdf163a4135ebd05689b46d267f7d06522d06632"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/report.rs",
+   "dest": "src/model/seams/native_seams/report.rs",
+   "crate": "consts",
+   "src_sha256": "b8dc43434245d6cc9c1d149cd17e762daebac0e5adc312e674509bac1501a0ad",
+   "dest_sha256": "43edeed9365ebfabac79c69db7579e1e70d6bfa9cfb7f04d98846dd174e045d1"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/drill.rs",
+   "dest": "src/model/seams/native_seams/drill.rs",
+   "crate": "consts",
+   "src_sha256": "bf2955350ef74a80f24dea49cd348bbe14d7287ceb9c9f9186a09e2587748627",
+   "dest_sha256": "5844b02f1c10dd530aa833ae65be8d5b31ef9f62e501c865b3edd9754ce8332b"
+  },
+  {
+   "src": "training_mod_consts/src/native_seams/tests.rs",
+   "dest": "src/model/seams/native_seams/tests.rs",
+   "crate": "consts",
+   "src_sha256": "fd7c889851be63354f4db71a22b2cfe61024eec5268f2e4dcc455b92ffc5c163",
+   "dest_sha256": "9c5de7f2764aba03bcb33592b3ff1d0d90189b972200cef6f4045760e2ec51f6",
+   "edits": [
+    {
+     "old": "Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"..\");",
+     "new": "Path::new(env!(\"CARGO_MANIFEST_DIR\")).to_path_buf();",
+     "reason": "the fork's manifest dir is the consts crate (its parent is the stage root); here the manifest dir is the repository root"
+    },
+    {
+     "old": "    rust_files(&root.join(\"src\"), &mut files);\n",
+     "new": "    // Only the carried runtime areas: the hooks of packages 1-5 are rows of src/model/sites.rs, not of this table.\n    for area in [\"swap\", \"mii\", \"preload\", \"kirby\", \"items\", \"stages\", \"lobby\", \"seams\", \"p1\", \"diag\"] {\n        let dir = root.join(\"src/runtime\").join(area);\n        if dir.is_dir() {\n            rust_files(&dir, &mut files);\n        }\n    }\n",
+     "reason": "the fork scans its whole src/ for #[skyline::hook] attributes without a row; in the clean room only the carried runtime areas belong to this table"
+    },
+    {
+     "old": "/../../research/game-13.0.5/main-13.0.5.elf",
+     "new": "/../research/game-13.0.5/main-13.0.5.elf",
+     "reason": "the owned ELF sits next to the worktree (package 1 convention), not two levels above the crate"
+    },
+    {
+     "old": "    assert!(attrs.len() >= 150, \"found only {} hook attributes\", attrs.len());\n",
+     "new": "    // The fork counted 150+ hooks over its whole src/. Here only the carried runtime areas are scanned and they\n    // land in steps C7-C10 (docs/PACKAGE-6-PLAN.md); the ratchet is active as soon as one carried hook exists.\n    if attrs.is_empty() {\n        return;\n    }\n",
+     "reason": "the whole-tree hook count of the fork does not apply to the carried subset"
+    }
+   ]
+  },
+  {
+   "src": "src/source_descriptor.rs",
+   "dest": "src/model/swap/source_descriptor.rs",
+   "crate": "root",
+   "src_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce",
+   "dest_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce"
+  },
+  {
+   "src": "src/source_lifetime.rs",
+   "dest": "src/model/swap/source_lifetime.rs",
+   "crate": "root",
+   "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
+   "dest_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf"
+  },
+  {
+   "src": "src/source_visible_forms.rs",
+   "dest": "src/model/swap/source_visible_forms.rs",
+   "crate": "root",
+   "src_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885",
+   "dest_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885"
+  },
+  {
+   "src": "src/native_hud_refresh.rs",
+   "dest": "src/model/swap/native_hud_refresh.rs",
+   "crate": "root",
+   "src_sha256": "b92d55d6aaed20764d3f98aa45ef152464c52d139e97d074ea91d821e2233bbb",
+   "dest_sha256": "f6ef86db6e46990b6aca89221310b1493e076b731915bba934cd0907454cda3f"
+  },
+  {
+   "src": "training_mod_consts/src/source_load.rs",
+   "dest": "src/model/swap/source_load.rs",
+   "crate": "consts",
+   "src_sha256": "96037cc4840bc01c6dd2466b9ddbe751e790404a324af9d65d6ac6c58205bf6f",
+   "dest_sha256": "96037cc4840bc01c6dd2466b9ddbe751e790404a324af9d65d6ac6c58205bf6f"
+  },
+  {
+   "src": "training_mod_tui/src/roster_grid.rs",
+   "dest": "src/model/swap/roster_grid.rs",
+   "crate": "tui",
+   "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
+   "dest_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20"
+  },
+  {
+   "src": "training_mod_consts/src/cycle_admission_grace.rs",
+   "dest": "src/model/preload/cycle_admission_grace.rs",
+   "crate": "consts",
+   "src_sha256": "2552af2ee8e87bbcdbb0bdca70a277930a97f948a1c99c6e655f0c7a8adc4737",
+   "dest_sha256": "2552af2ee8e87bbcdbb0bdca70a277930a97f948a1c99c6e655f0c7a8adc4737"
+  },
+  {
+   "src": "training_mod_consts/src/notice_queue.rs",
+   "dest": "src/model/preload/notice_queue.rs",
+   "crate": "consts",
+   "src_sha256": "c4013a040c6660e14820aa75ec08e92b10d8b2981d09e42d3faeec1c7d21a11e",
+   "dest_sha256": "c4013a040c6660e14820aa75ec08e92b10d8b2981d09e42d3faeec1c7d21a11e"
+  }
+ ]
+}

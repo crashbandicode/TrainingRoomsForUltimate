@@ -87,3 +87,22 @@ Nothing is carried yet. This section records what S6-0 read, so the lead can aud
 - Campaign evidence (not fork source): `refactor/RC-SUMMARY.md`, `c1162/EDEN-BRIEF-m5o.md`, `c1162/ONLINE-BRIEF-m5o.md`, `stages/m5o/eden/RESULT.md`, `stages/m5m/eden/RESULT.md`.
 - No search over mixed files, none over `upstream-ref/`, none over the fork worktree. No accidental exposure to report.
 - Not carried by package 6 and why: `src/training/cpu_rolls.rs`, `training_mod_consts/src/cpu_rolls.rs` (W11's CPU-ROLLS-APPLY: package 2's SPEC-cpu-02 §5, clean-room); `training/seams.rs` and `native_seams/rows_a3.rs` (the fork's upstream-hook install table: superseded by `src/model/sites.rs` rows of packages 1-5).
+
+### Disclosure: fork root `Cargo.toml` (mixed) read by line range, lead-authorised 2026-11-02
+
+Stage m5o `Cargo.toml` (sha256 `8f6ae99261740220bd90817c92c439b5d14244f6c8448ae6c496e816f3cd6b82`), lines **82-122 and 124-240 only** (the fork-only ranges the provenance scan lists), read with `Select-Object -Skip/-First`; line 123 and everything else not viewed. Taken: the `[features]` table (feature names and their local dependency lists), written into this crate's `Cargo.toml` with the fork's one-line comments shortened. Sub-crate features (`training_mod_consts/x`, `training_mod_tui/x`) became the same-name features of this crate; `dep:ssbu-cpu-pilot-core` and `dep:deluxe-plugin-sdk` were left out until their crates are carried (C6, decision D3). `layout_arc_from_file` (package 5) was not taken. Source of the default set: `RECEIPTS-m5o1.json`, job `m5o1-switch-root-full-release` (`enhancements-alpha,native-unlink-guard,deluxe-sdk,mii-hud-portrait-alpha,cycle-preload-extended,lobby-preload-extended,native-body-bank-alpha`).
+
+### pkg6 carried files (S6-1, tranche 1, 2026-11-02)
+
+Stage **m5o**, all files `ours-new`. The table (here path, fork path, source sha256, resulting sha256, every clean-room edit with its reason) is generated from the carry manifest: `docs/provenance/pkg6-carry-ledger.md`
+(`python3 -I tools/carry_pkg6.py ledger`; manifest `docs/provenance/pkg6-carry-manifest.json`). 22 files: seam table (`native_seams/*` incl. `rows_a3`, `tests.rs`), `native_fields`, `native_unlink_core`, `native_unlink_guard`,
+`source_descriptor`, `source_lifetime`, `source_visible_forms`, `native_hud_refresh`, `source_load`, `roster_grid`, `cycle_admission_grace`, `notice_queue`. Mechanism: a deterministic path rewrite (`crate::x`, `training_mod_consts::x`,
+`training_mod_tui::x` to `crate::model::<area>::x`) plus exact-text edits recorded in the manifest. Edits so far (all in two files, each offered back to the fork through the fix ledger):
+`native_seams/tests.rs` (three path/layout edits: manifest dir is the repo root, the hook-attribute scan covers only the carried runtime areas, the owned-ELF path is one level up; and the whole-tree count of 150 hooks does not apply to the subset, so the ratchet returns while no carried hook exists)
+and `native_unlink_guard.rs` (`# Safety` heading instead of the fork's crate-level `allow(clippy::missing_safety_doc)`).
+
+Deps table (decision D3 conditions): no dependency added yet.
+
+| Crate | Version (fork m5o Cargo.lock) | License field | Resident before | Resident after | Added by |
+| --- | --- | --- | --- | --- | --- |
+| (none yet) | | | | | |

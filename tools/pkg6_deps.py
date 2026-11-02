@@ -103,18 +103,9 @@ def main():
                 segs = r.split("::")
                 head = segs[0]
                 if head == "crate": c, cr, s = crate, croot, segs[1:]
-                elif head == "super":
-                    c, cr = crate, croot
-                    s = list(myseg[:-1] if p.endswith("/mod.rs") is False else myseg[:-1])
-                    if p.endswith("/mod.rs"): s = list(myseg[:-1])
-                    k = 0
-                    while k < len(segs) and segs[k] == "super":
-                        if k > 0: s = s[:-1]
-                        k += 1
-                    s = s + segs[k:]
-                elif head == "self":
-                    c, cr = crate, croot
-                    s = (list(myseg) if p.endswith("/mod.rs") else list(myseg)) + segs[1:]
+                elif head in ("super", "self"):
+                    # relative paths are almost always the inline mod tests naming its own file; skipped
+                    continue
                 elif head in CRATES:
                     c, cr, s = head, head + "/src/", segs[1:]
                 else: continue

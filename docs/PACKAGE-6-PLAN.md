@@ -274,3 +274,75 @@ estimate (1 + 2..5 + 6) is about 4 MB, under the fork's 4.88 MB. Over-budget mea
    `body_bank`: nothing hand-edited there, so the re-sync stays a copy.
 5. `Seam` rows and `sites.rs` rows describe overlapping offsets (`is_training_mode`, fighter on-init slot): the overlap
    test (D6) is mandatory.
+
+## 12. Lead rulings (2026-11-02) and what they change
+
+- **D1 accepted.** Package 5 owns the runtime commit of menu changes (menu close / apply). Package 6 provides one apply
+  function per feature, all of the shape `apply(&Snapshot, &Outbox)` called from that commit path, after the settings are
+  published: `preload::apply` (the 13 `cycle_preload_*` rows and the INI boot cache), `swap::apply` (Player Swapping, Solo
+  Popo flags, rosters), `kirby::apply` (hat orders), `stages::apply` (rotation, lobby stages, stage preferences),
+  `lobby::apply` (Lobby Practice, Fighter Prompt), `p1::apply` (P1 CPU rows, only while the pilot is absent). Each
+  returns without effect when its scene is not active. Write-backs of kept rows (roster cursor, hat cycle) go through one
+  call, `compat::menu::write_back(row_id, value)`, which package 5's commit path persists. A hook point needed from package 5
+  is requested through the lead.
+- **D2 accepted.** One crate, `src/model/<area>` + `src/runtime/<area>` (done for tranche 1).
+- **D3 accepted with conditions.** `skyline_smash`, `serde` / `serde_json` (derive), `byteflags` and the vendored
+  pilot core (ours): for each, check the crate's license field (MIT / Apache-2.0 compatible), record it in the deps table
+  of CARRY-OVER.md, measure resident size before and after adding it (`nro_size.py`) and pin the version the fork's m5o
+  `Cargo.lock` uses; a missing or unclear license stops the work and is reported. No dependency has been added yet
+  (tranche 1 needs none).
+- **D4 accepted.** The scene wrapper is `src/runtime/scene.rs` (+ `src/model/scene.rs`), content owned by package 6; the lead
+  merges it early. Written in step C7a (see §5), before the roster cluster; its sha is reported when it exists.
+- **D5 accepted.** No second fighter resolver: package 2's natives accessors and role table are used; if entry id -> accessor
+  or ready-go is missing, package 6 extends those modules minimally in a separate small commit and tells the lead.
+- **D6 accepted, with a correction found while carrying:** the table is carried **whole including `rows_a3`** (the seam rows
+  of the fork's upstream-hook installs). The carried code and the table's own tests refer to its rows (`needle.set_cpu_controls`,
+  `training.handle_effect`: the CPU-as-P1 rows and the hook-sharing drill sites), so dropping the file is not clean; the 82 extra
+  rows are checked against the owned ELF like all the others (`compared_rows_match_the_owned_elf` passes for the whole
+  table). Resident cost to be measured when the runtime consumes the table (it is `cfg(test)`-only until then).
+- **D7 accepted:** `cycle_preload.ini` stays the boot cache (regenerated, never imported).
+- **D8 accepted:** `.md` only; no GIFs.
+- **D9 accepted narrowly:** an `allow` stays only on carried code that is byte-identical to the fork's approved code; each is
+  listed (file, lint, the fork's approval reference/date) in the compliance report's approved-workarounds table. Any allow
+  on code package 6 changes, and any new allow, goes to the lead as a decision. Tranche 1 carries no `allow` at all. The
+  fork's crate-level `allow(clippy::missing_safety_doc)` lives in its (mixed) `lib.rs`; the root-cause fix is a `# Safety`
+  heading on the carried function (an edit in the manifest, offered back through the fix ledger).
+- **D10:** the lead names the W19 (F1/F2) and W20 (F3) stages; re-sync is `python3 -I tools/carry_pkg6.py carry --stage <name>
+  --update`, then `ledger`, then the tests.
+- **D11 accepted: the fork's cargo feature structure is kept.** The fork's `Cargo.toml` `[features]` table (lines 82-240 of
+  m5o, lead-authorised, disclosure in CARRY-OVER.md) is in this crate's `Cargo.toml`; sub-crate features became same-name
+  features. `default` is exactly the M5o release list (`enhancements-alpha, native-unlink-guard, deluxe-sdk,
+  mii-hud-portrait-alpha, cycle-preload-extended, lobby-preload-extended, native-body-bank-alpha`) so
+  `cargo skyline build --release` builds the shipped product; `diag` is an empty umbrella and every probe/observer/trace/
+  meter requires it. `tests/pkg6_features.rs` (ported from the fork's `diag_features.rs`) checks that default equals the shipped
+  list, that its closure has no diagnostic feature, that every dependency is declared and that every probe requires `diag`.
+  `cargo build --no-default-features` passes. `dep:ssbu-cpu-pilot-core` / `dep:deluxe-plugin-sdk` join with C6 and the D3 checks.
+- **Size budget 1.6 MB resident** for package 6 accepted; actuals per layer are reported (tranche 1: no change, the carried
+  areas are `cfg(test)`-only).
+
+### Carried, not shipped (features outside the shipped closure)
+
+These features exist in the table and in the carried code but are off in the release (closure of `default` computed by the
+host test): `automation-results-native` and all
+the diagnostic features below. (Note: `managed-grouped-source-alpha` and the third-source features are **on**, through
+`native-body-bank-alpha` and `cycle-preload-extended`.) `native-body-bank-probe`, `console-map-probe`, `console-practice-trace`, `console-swap-trace`,
+`native-unlink-probe`, `automation-results-observer`, `hang-trace`, `plugin-heap-meter`, `archive-poison-probe`,
+`named-input-trace`, `kirby-resource-probe`, `lobby-stage-probe`, `practice-stage-observer`, `stage-asset-probe`,
+`item-state-probe`, `mii-identity-probe`, `mii-ldn-qualification-probe`, `mii-pool-observer`, `mii-origin-observer`,
+`mii-preview-observer`, `mii-quit-observer`, `mii-identical-reload-probe`, `mii-saved-file-probe`, `mii-special-change-probe`,
+`mii-fullconfig-probe`, `mii-native-adapter-probe`, `mii-cpu-adapter-probe`, `turnip-save-probe`, `gyro-variation-probe`,
+`source-owner-probe` and the `source-*-probe` family, `simulator` (host tests only). They are carried and compile under
+`--features diag,...`; the diag build enables the set the Eden rows need.
+
+### Status of S6-1
+
+- **Tranche 1 carried (22 files, host tests pass, clippy clean, `--no-default-features` builds):** the seam table
+  (`native_seams` mod, rows a1-a5, identity, images, report, drill, tests: about 620 rows, every compared row re-checked against
+  the owned ELF) and `native_fields`, `native_unlink_core`, `native_unlink_guard`; `source_descriptor`, `source_lifetime`,
+  `source_visible_forms`, `native_hud_refresh`, `source_load`, `roster_grid`; `cycle_admission_grace`, `notice_queue`.
+  `tools/carry_pkg6.py` (carry / verify / ledger), `docs/provenance/pkg6-carry-manifest.json`, `pkg6-carry-ledger.md`,
+  `tests/carry_pkg6.rs` (a hand-edit of a carried file fails the test), `tests/pkg6_features.rs`.
+- Correction to §5/§3: `practice_stage_request_words.rs` is an `include!` fragment of `practice_stage_request.rs` and travels with
+  it (C7); `swap_model/mod.rs`, the Mii crate's `lib.rs` and `body_bank/*` declare submodules and travel with their whole
+  module (C3).
+- Next: C2 remainder and C3 (swap model + Mii crate, needs the menu-view adapter and serde derive: D3 checks), then C4/C5.

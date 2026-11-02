@@ -1,9 +1,4 @@
 {
- "diagnostics/trace-control/src/lib.rs": {
-  "src/lib.rs": {
-   "nostics": 1
-  }
- },
  "scripts/input-display-bench/fixtures/baseline-input_log.rs": {
   "training_mod_consts/src/lib.rs": {
    "InputDisplay": 1,
@@ -88,11 +83,6 @@
    "draw": 1
   }
  },
- "scripts/input-display-bench/rust/shims/skyline.rs": {
-  "src/lib.rs": {
-   "pts": 5
-  }
- },
  "scripts/input-display-bench/rust/shims/training_mod_consts.rs": {
   "training_mod_sync/src/lib.rs": {
    "RwLock": 2
@@ -116,12 +106,6 @@
  "scripts/roster-grid/validation.rs": {
   "src/lib.rs": {
    "Result": 2
-  }
- },
- "src/automation_helper/adapter.rs": {
-  "src/lib.rs": {
-   "control": 1,
-   "pulse": 4
   }
  },
  "src/automation_helper/native.rs": {
@@ -150,15 +134,6 @@
   }
  },
  "src/body_bank_probe.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "capture_reload_pose": 1,
-   "read": 1,
-   "ready_forms": 1,
-   "BASE": 1,
-   "INSTALL": 1,
-   "InstallToken": 1
-  },
   "src/common/mod.rs": {
    "(module)": 2
   },
@@ -207,10 +182,6 @@
   }
  },
  "src/character_memory.rs": {
-  "src/lib.rs": {
-   "WaitingChoice": 1,
-   "WaitingSession": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 1
   }
@@ -240,9 +211,6 @@
   "src/training/mod.rs": {
    "(module)": 2
   },
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/common/mod.rs": {
    "(module)": 1,
    "is_ready_go": 3,
@@ -254,14 +222,6 @@
   }
  },
  "src/character_sources.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "finish_install": 1,
-   "read": 1,
-   "InstallToken": 1,
-   "ready_forms": 1,
-   "INSTALL": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 8,
    "TrioFighter": 2
@@ -373,15 +333,7 @@
    "diagnostic": 2
   }
  },
- "src/cycle_preload_policy.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/effect_hook_chain.rs": {
-  "src/lib.rs": {
-   "*": 2
-  },
   "src/logging.rs": {
    "diagnostic": 3
   }
@@ -400,14 +352,6 @@
  "src/hazard_manager/policy.rs": {
   "training_mod_consts/src/lib.rs": {
    "mii": 2
-  },
-  "src/hazard_manager/mod.rs": {
-   "*": 1
-  }
- },
- "src/heap_metrics.rs": {
-  "src/lib.rs": {
-   "*": 1
   }
  },
  "src/item_state_probe.rs": {
@@ -427,9 +371,6 @@
   "src/training/character_specific/items.rs": {
    "TURNIP_CHOSEN": 2
   },
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/training/save_states.rs": {
    "is_loading": 1
   },
@@ -445,11 +386,6 @@
   },
   "src/training/ui/notifications.rs": {
    "notification": 1
-  }
- },
- "src/kirby_hat_cycle.rs": {
-  "src/lib.rs": {
-   "*": 1
   }
  },
  "src/kirby_hats.rs": {
@@ -495,11 +431,6 @@
    "SITE_COPY_SETUP": 1
   }
  },
- "src/lobby_stage_cycle.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/lobby_stage_probe.rs": {
   "training_mod_consts/src/lib.rs": {
    "OnOff": 1,
@@ -522,9 +453,6 @@
   }
  },
  "src/mii_auto_init.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 6
   },
@@ -642,9 +570,6 @@
   }
  },
  "src/mii_fullconfig_probe.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/logging.rs": {
    "diagnostic": 8
   },
@@ -656,43 +581,11 @@
   }
  },
  "src/mii_hud_portrait.rs": {
-  "src/lib.rs": {
-   "active_body": 1,
-   "aligned": 1,
-   "pointer_chain": 1,
-   "read": 1,
-   "scope": 1,
-   "sources": 1,
-   "state_for": 1,
-   "PortraitIntent": 1,
-   "Role": 1,
-   "BASE": 1,
-   "INSTALL": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 2
   }
  },
  "src/mii_hud_portrait_policy.rs": {
-  "src/lib.rs": {
-   "represent": 1,
-   "Binding": 1,
-   "Live": 1,
-   "Ownership": 2,
-   "RebindStep": 1,
-   "RebindWait": 1,
-   "Represent": 1,
-   "Request": 2,
-   "Shown": 1,
-   "REBIND_SETTLE_CALLBACKS": 1,
-   "hud_assets_settled": 1,
-   "service_bind_after_wait": 1,
-   "tick_bind_allowed": 1,
-   "HudAssets": 1,
-   "HudHold": 1,
-   "Job": 1,
-   "*": 4
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 1
   }
@@ -711,12 +604,6 @@
   }
  },
  "src/mii_ldn_qualification.rs": {
-  "src/lib.rs": {
-   "lobby": 1,
-   "BASE": 1,
-   "INSTALL": 1,
-   "STATES": 1
-  },
   "src/common/mod.rs": {
    "(module)": 2
   },
@@ -731,11 +618,6 @@
   }
  },
  "src/mii_managed_helper.rs": {
-  "src/lib.rs": {
-   "InstallToken": 1,
-   "BASE": 1,
-   "INSTALL": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 10
   },
@@ -749,17 +631,11 @@
   }
  },
  "src/mii_native_adapter.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 6
   }
  },
  "src/mii_native_cpu_scope.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/common/mod.rs": {
    "is_native_training_mode": 1,
    "FIGHTER_MANAGER_ADDR": 1
@@ -769,9 +645,6 @@
   }
  },
  "src/mii_ordinary_cpu.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 60
   },
@@ -793,9 +666,6 @@
   "training_mod_consts/src/lib.rs": {
    "mii": 27
   },
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_sync/src/lib.rs": {
    "read": 1
   },
@@ -804,9 +674,6 @@
   }
  },
  "src/mii_ordinary_player.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 35
   },
@@ -815,12 +682,6 @@
   }
  },
  "src/mii_origin_observer.rs": {
-  "src/lib.rs": {
-   "ready_kind": 1,
-   "ready_single_mii": 1,
-   "BASE": 1,
-   "INSTALL": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 2
   },
@@ -829,9 +690,6 @@
   }
  },
  "src/mii_pool_observer.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_sync/src/lib.rs": {
    "read": 1
   },
@@ -839,11 +697,6 @@
    "FIGHTER_MANAGER_ADDR": 1,
    "is_native_training_mode": 1,
    "is_ready_go": 1
-  }
- },
- "src/mii_pool_observer_policy.rs": {
-  "src/lib.rs": {
-   "*": 1
   }
  },
  "src/mii_preview_observer.rs": {
@@ -871,9 +724,6 @@
   }
  },
  "src/mii_replay.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 9
   },
@@ -882,9 +732,6 @@
   }
  },
  "src/mii_saved_alpha.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 17
   },
@@ -901,9 +748,6 @@
   }
  },
  "src/mii_saved_file_probe.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/logging.rs": {
    "diagnostic": 3
   }
@@ -934,21 +778,9 @@
  "src/mii_source_provenance.rs": {
   "training_mod_consts/src/lib.rs": {
    "mii": 41
-  },
-  "src/lib.rs": {
-   "control": 1,
-   "map": 1,
-   "pointer": 1,
-   "span": 1,
-   "*": 2
   }
  },
  "src/native_body_bank.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "read": 1,
-   "BASE": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 7,
    "TrainingModpackMenu": 5,
@@ -961,52 +793,12 @@
    "read": 3
   }
  },
- "src/native_fields.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
- "src/native_fighter_install.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/native_gc_guard.rs": {
   "src/logging.rs": {
    "diagnostic": 3
   }
  },
- "src/native_hud_refresh.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
- "src/native_install.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/native_keyboard.rs": {
-  "src/lib.rs": {
-   "classify": 1,
-   "decode_output": 1,
-   "enqueue": 1,
-   "finish": 1,
-   "is_busy": 1,
-   "poll_shared": 1,
-   "validate_initial": 1,
-   "validate_title": 1,
-   "Job": 1,
-   "KeyboardResult": 1,
-   "Phase": 1,
-   "Shared": 1,
-   "MAX_HEADER_UTF16_UNITS": 1,
-   "MAX_NAME_CHARS": 1,
-   "OUTPUT_UTF16_UNITS": 1,
-   "SDK_CANCEL": 1,
-   "SDK_SUCCESS": 1,
-   "inline_keyboard": 3
-  },
   "src/logging.rs": {
    "diagnostic": 2
   }
@@ -1016,20 +808,7 @@
    "diagnostic": 1
   }
  },
- "src/native_reload_pose.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/native_source.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "pointer_chain": 1,
-   "read": 1,
-   "setting": 1,
-   "Forms": 1,
-   "BASE": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "TrioFighter": 1,
    "mii": 4
@@ -1040,14 +819,6 @@
   }
  },
  "src/native_source_actors.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "inputs_for": 1,
-   "read": 1,
-   "Inputs": 1,
-   "Snapshot": 1,
-   "BASE": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "TrioFighter": 1
   },
@@ -1056,21 +827,6 @@
   }
  },
  "src/native_source_capacity.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "read": 1,
-   "setting": 1,
-   "BASE": 1,
-   "*": 1,
-   "canonical": 2,
-   "Layout": 1,
-   "exact_mii_for_expansion": 1,
-   "exact_mii_owner": 1,
-   "owner_admission": 1,
-   "owner_facts": 1,
-   "ExactMiiProof": 1,
-   "OwnerFacts": 1
-  },
   "src/common/mod.rs": {
    "(module)": 2
   },
@@ -1079,16 +835,6 @@
   },
   "src/logging.rs": {
    "diagnostic": 15
-  }
- },
- "src/native_unlink_core.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
- "src/native_unlink_guard.rs": {
-  "src/lib.rs": {
-   "*": 1
   }
  },
  "src/native_unlink_install.rs": {
@@ -1121,43 +867,18 @@
    "waiting_hazards": 1
   }
  },
- "src/practice_stage_request_policy.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/practice_trace.rs": {
   "src/logging.rs": {
    "diagnostic": 8
   }
  },
- "src/practice_trace_core.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/preload_metrics.rs": {
-  "src/lib.rs": {
-   "*": 1
-  },
   "src/logging.rs": {
    "diagnostic": 3,
    "heap_profile": 1
   }
  },
  "src/source_capacity_probe.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "game_mode": 1,
-   "read": 1,
-   "ready_forms": 1,
-   "setting": 1,
-   "BASE": 1,
-   "INSTALL": 1,
-   "finish_install": 1,
-   "InstallToken": 1,
-   "*": 1
-  },
   "src/common/mod.rs": {
    "(module)": 2
   },
@@ -1180,22 +901,7 @@
    "TrioFighter": 1
   }
  },
- "src/source_descriptor.rs": {
-  "src/lib.rs": {
-   "matches": 1
-  }
- },
  "src/source_ldn_capacity_probe.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "game_mode": 1,
-   "lobby": 1,
-   "read": 1,
-   "setting": 1,
-   "Forms": 1,
-   "BASE": 1,
-   "INSTALL": 1
-  },
   "src/common/mod.rs": {
    "(module)": 2
   },
@@ -1207,13 +913,6 @@
   }
  },
  "src/source_lifecycle_probe.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "game_mode": 1,
-   "read": 1,
-   "setting": 1,
-   "BASE": 1
-  },
   "src/common/mod.rs": {
    "is_native_training_mode": 1,
    "FIGHTER_MANAGER_ADDR": 1,
@@ -1226,22 +925,7 @@
    "diagnostic": 10
   }
  },
- "src/source_lifetime.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/source_owner_probe.rs": {
-  "src/lib.rs": {
-   "aligned": 1,
-   "finish_install": 1,
-   "read": 1,
-   "ready_forms": 1,
-   "Forms": 1,
-   "InstallToken": 1,
-   "BASE": 1,
-   "INSTALL": 1
-  },
   "src/common/mod.rs": {
    "is_native_training_mode": 6,
    "is_ready_go": 3,
@@ -1253,11 +937,6 @@
   },
   "src/common/consts.rs": {
    "FighterId": 1
-  }
- },
- "src/source_visible_forms.rs": {
-  "src/lib.rs": {
-   "*": 1
   }
  },
  "src/stage_asset_probe.rs": {
@@ -1359,9 +1038,6 @@
   }
  },
  "src/training/practice_policy.rs": {
-  "src/training/mod.rs": {
-   "*": 1
-  },
   "training_mod_consts/src/lib.rs": {
    "mii": 1
   }
@@ -1392,16 +1068,6 @@
    "diagnostic": 8
   }
  },
- "src/training/ui/archive_name.rs": {
-  "src/training/ui/mod.rs": {
-   "*": 1
-  }
- },
- "src/training/ui/archive_retirement.rs": {
-  "src/training/ui/mod.rs": {
-   "*": 1
-  }
- },
  "src/training/ui/native_menu.rs": {
   "src/logging.rs": {
    "diagnostic": 2
@@ -1419,11 +1085,6 @@
  "src/training/ui/stage_grid.rs": {
   "training_mod_tui/src/lib.rs": {
    "App": 1
-  }
- },
- "src/training/ui/waiting_archive.rs": {
-  "src/training/ui/mod.rs": {
-   "*": 1
   }
  },
  "src/training_stage_rotation.rs": {
@@ -1444,11 +1105,6 @@
    "is_native_training_mode": 1
   }
  },
- "src/training_stage_rotation_policy.rs": {
-  "src/lib.rs": {
-   "*": 1
-  }
- },
  "src/turnip_face_caller_probe.rs": {
   "src/logging.rs": {
    "diagnostic": 7
@@ -1461,19 +1117,16 @@
  },
  "training_mod_consts/src/body_bank.rs": {
   "training_mod_consts/src/lib.rs": {
-   "mii": 21,
-   "*": 1
+   "mii": 21
   }
  },
  "training_mod_consts/src/capacity_creation.rs": {
   "training_mod_consts/src/lib.rs": {
-   "mii": 2,
-   "*": 1
+   "mii": 2
   }
  },
  "training_mod_consts/src/character_forms.rs": {
   "training_mod_consts/src/lib.rs": {
-   "*": 1,
    "TrioFighter": 3,
    "TrainingModpackMenu": 1,
    "OnOff": 8,
@@ -1488,7 +1141,6 @@
    "Toggle": 1,
    "NX_SUBMENU_COLUMNS": 1,
    "NX_SUBMENU_ROWS": 1,
-   "*": 1,
    "BASE_MENU": 1,
    "create_app": 1,
    "TrainingModpackMenu": 2,
@@ -1499,21 +1151,14 @@
    "InputControl": 1
   }
  },
- "training_mod_consts/src/cycle_admission_grace.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
-  }
- },
  "training_mod_consts/src/cycle_preload_capacity.rs": {
   "training_mod_consts/src/lib.rs": {
-   "mii": 10,
-   "*": 1
+   "mii": 10
   }
  },
  "training_mod_consts/src/cycle_preload_config.rs": {
   "training_mod_consts/src/lib.rs": {
    "TOGGLE_MAX": 4,
-   "*": 1,
    "OnOff": 30,
    "impl_submenutrait": 2,
    "TrainingModpackMenu": 5,
@@ -1534,11 +1179,6 @@
    "SubMenuTrait": 3
   }
  },
- "training_mod_consts/src/identity_view.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
-  }
- },
  "training_mod_consts/src/lobby_stages.rs": {
   "training_mod_tui/src/lib.rs": {
    "StatefulTable": 1,
@@ -1552,7 +1192,6 @@
    "App": 3
   },
   "training_mod_consts/src/lib.rs": {
-   "*": 1,
    "BASE_MENU": 6,
    "MenuJsonStruct": 12,
    "create_app": 1,
@@ -1561,13 +1200,7 @@
  },
  "training_mod_consts/src/mii_cycle.rs": {
   "training_mod_consts/src/lib.rs": {
-   "TrioFighter": 1,
-   "*": 1
-  }
- },
- "training_mod_consts/src/mii_menu_tests.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
+   "TrioFighter": 1
   }
  },
  "training_mod_consts/src/ordered_roster.rs": {
@@ -1581,32 +1214,17 @@
    "InputControl": 2
   },
   "training_mod_consts/src/lib.rs": {
-   "TrioFighter": 1,
-   "*": 1
-  }
- },
- "training_mod_consts/src/p1_cpu_menu_tests.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
+   "TrioFighter": 1
   }
  },
  "training_mod_consts/src/practice_setup.rs": {
   "training_mod_consts/src/lib.rs": {
-   "*": 1,
    "SETUP_LIBRARY_DIR": 2
   }
  },
  "training_mod_consts/src/roster_menu_tests.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
-  },
   "training_mod_tui/src/lib.rs": {
    "AppPage": 1
-  }
- },
- "training_mod_consts/src/source_load.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "*": 1
   }
  },
  "training_mod_consts/src/swap_model/capabilities.rs": {
@@ -1617,20 +1235,7 @@
  },
  "training_mod_consts/src/swap_model/hud_model.rs": {
   "training_mod_consts/src/lib.rs": {
-   "presentation": 1,
    "mii": 8
-  }
- },
- "training_mod_consts/src/swap_model/native_model.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "ledger": 6
-  }
- },
- "training_mod_consts/src/swap_model/occupancy.rs": {
-  "training_mod_consts/src/lib.rs": {
-   "capabilities": 2,
-   "ledger": 5,
-   "native_model": 8
   }
  },
  "training_mod_consts/src/swap_model/presentation.rs": {
@@ -1661,7 +1266,6 @@
    "AppPage": 2
   },
   "training_mod_consts/src/lib.rs": {
-   "*": 1,
    "create_app": 1,
    "BASE_MENU": 2,
    "OnOff": 1,
@@ -1708,23 +1312,11 @@
    "SubMenu": 1,
    "SubMenuType": 1,
    "NX_SUBMENU_COLUMNS": 1,
-   "NX_SUBMENU_ROWS": 1,
-   "*": 1
-  }
- },
- "training_mod_tui/src/roster_grid.rs": {
-  "training_mod_tui/src/lib.rs": {
-   "*": 1
-  }
- },
- "training_mod_tui/src/stage_forms.rs": {
-  "training_mod_tui/src/lib.rs": {
-   "*": 1
+   "NX_SUBMENU_ROWS": 1
   }
  },
  "training_mod_tui/src/stage_menu.rs": {
   "training_mod_tui/src/lib.rs": {
-   "*": 1,
    "NX_SUBMENU_COLUMNS": 1
   }
  },
