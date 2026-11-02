@@ -74,3 +74,53 @@ crc32/hash40 and one constant table; rebased onto `566780a` at the lead's reques
 ## Checklist (docs/CHECKLIST.md)
 
 (filled at READY)
+
+## Handover (2026-11-02 ~14:1xZ, operator order: lead role to a Codex GPT-6 Astra lead)
+
+- **Where:** branch `stream/slim`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-slim`, head = the
+  "WIP: handover to Astra lead" commit (on `cf6004d`, rebased onto `work/implementation` `8b73694`). Target
+  `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-slim` was never created (no build ran), so there is
+  nothing to delete. No ledger claim held (none was ever written); the Surface queue line is deleted.
+- **Counts (sloc4, `python3 -I tools/sloc.py git . <rev> 1`):** base `8b73694` 106,099; head 103,497 (−2,602);
+  host-only simulator 1,118 (not counted). Fork M5q by sloc4: 106,629 (primary). Target ≤ 90,000 at RC, stretch ≤ 85,300.
+- **Budget:** `size-budget.toml` last entry 107,900 = head + pending line items (deluxe e4432ad +83, hitbox eca0f81
+  +1,285, ui-screens 237b857 +1,062 + ~1,500 estimated, pkg4 2d25cdf +219, pkg6 d517dab +169); integrator-3
+  lowers it to the actual count after each merge.
+- **Nothing in Phase A or B is compiled or gated.** The Surface queue never reached slim. Every commit since
+  `7bb86fd` is uncompiled. The changes most likely to need a fix at the first build are: `model::cpu::mash::Step`;
+  `panes` `[x, y, w, h]` const-fn parameters; `game_constants!` (cpu/state ids); `state_boot` `far!` macro and `boot.rs`
+  rebinding (Switch-only: needs the Switch release and diag builds); `threads.rs` `slots!` arms (Switch-only);
+  `native_seams` re-export of `guard`; the smash-match-data oracle crate (`crates/smash-match-data/tests/oracle`, a
+  dev-dependency; new `Cargo.lock` entry); the golden test `the_published_capture_matches_the_golden_files_and_a_plain_reader`
+  (its files `tests/fixtures/smd-golden/` do not exist yet: run it once with `SMD_GOLDEN_BLESS=1`, check the two files
+  are deterministic with a second run without it, commit them).
+- **Proven:** carry tools: `python3 -I tools/carry_pkg6.py verify` and `python3 -I tools/carry_pkg4.py verify` re-derive every
+  carried file from its source (261 / 42 files); `tools/test_size_gate.py` 6 tests pass; `tools/seam_census.py` evidence
+  in docs/SIZE-PLAN.md "Seam rows". No Eden row ran; the seam install-line row is owed.
+- **Next commands** (Surface, after a claim at the head of the queue; `CARGO_INCREMENTAL=0`, own target, each under
+  `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`; helper scripts `/tmp/slim/cg-inner.ps1`,
+  `/tmp/slim/sw-inner.ps1`): `cargo test` (with `SMD_GOLDEN_BLESS=1` once, then without), `cargo clippy --all-targets -- -D
+  warnings`, `cargo build --no-default-features`, `cargo test --manifest-path crates/smash-match-data/Cargo.toml`,
+  `cargo test --manifest-path crates/hos-lock/Cargo.toml`, `cargo skyline build --release` and `--features diag`
+  (docs/BUILD.md), `nro_size.py`; then one Eden boot row for the install line (`seams=`, `seams_unchecked=`,
+  `result=installed`, nothing missing) per the playbook harness; then `compliance.py` and this file's checklist.
+- **Approved, not done:** pkg6's probe list (lead 2026-11-02): delete the 8 empty features (console-map-probe,
+  archive-poison-probe, kirby-resource-probe, lobby-stage-probe, practice-stage-observer, stage-asset-probe,
+  mii-preview-observer, mii-quit-observer; some have only seam-row `feature:` strings and `tests/pkg6_features.rs` lines),
+  the source-capacity family (10 features, `source_capacity_probe.rs`, `source_ldn_capacity_probe.rs`, ~280 inline
+  sites), the Mii probe family (7 features: identity, saved-file, fullconfig, native-/cpu-adapter with
+  `mii_native_adapter.rs`/`mii_cpu_adapter.rs`/`mii_closed_ack.rs`, identical-reload, special-change; 91 inline sites) and
+  `texture-probe` (`runtime/ui/texture_probe.rs`, `ui/mod.rs`, `ui/tick.rs`). Each gets a "not carried: probe served
+  (pkg6 confirmation, 2026-11-02)" ledger/CARRY-OVER row; the features leave Cargo.toml and `tools/feature_matrix.py`.
+  pkg6-A chose option (1): the slim owner removes the inline sites itself through pkg6 manifest edits; pkg6's
+  committed work touches `character_roster.rs`, `character_sources.rs`, `kirby_hats.rs`, `cycle_preload*.rs`,
+  `native_source.rs`, `mii_cycle.rs` (not `native_source_capacity.rs`, `native_source_actors.rs` or the Mii
+  ordinary/native files). Keep: plugin-heap-meter, native-unlink-probe, hang-trace, console-practice-trace,
+  console-swap-trace, seam-drill, simulator. Observers (mii-pool, mii-origin, source-owner, source-lifecycle,
+  native-body-bank-probe, named-input-trace): delete if nothing shipped or tested needs them. Rename `lobby_stage_probe.rs`
+  and `practice_stage_observer.rs` (they ship) as recorded edits.
+- **Other open items:** hos-lock's two `declare_interior_mutable_const` allows wait for the operator (KNOWN rows);
+  `src/runtime/roster.rs:13` comment still names `effect_hook_chain`; `practice_stage_request::init` double init and its
+  false `ui_wired=true` are pkg6's; the rest of docs/SIZE-PLAN.md §2 (roster/Mii slices after pkg6's fixes merge).
+- **Watcher:** the model/effort watcher (`/tmp/slim-model-watcher.ps1`) is stopped with this handover; last check
+  claude-opus-5-5 / high.
