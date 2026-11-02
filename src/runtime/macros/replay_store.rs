@@ -91,8 +91,7 @@ pub fn persistence_compatible() -> bool {
 pub fn start_writer() -> Result<(), String> {
     if WRITER.get().is_some() { return Ok(()); }
     let (sender, receiver) = mpsc::sync_channel::<WriteJob>(MAX_RETAINED_CAPTURES);
-    std::thread::Builder::new().name("replay-capture-save".into()).stack_size(0x20000)
-        .spawn(move || {
+    crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::ReplaySave, move || {
             let archive = SharedCaptureArchive::new(format!("{}/replay_captures",
                 crate::model::storage::ROOT));
             // The same serialized owner is the only writer of mod presets. Native saves are read-only.
@@ -206,10 +205,7 @@ fn fallback_catalog(
         let (sender, receiver) = mpsc::sync_channel::<
             mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>,
         >(1);
-        let _ = std::thread::Builder::new()
-            .name("mii-catalog".into())
-            .stack_size(0x20000)
-            .spawn(move || {
+        let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
                     #[cfg(feature = "mii-editor-alpha")]

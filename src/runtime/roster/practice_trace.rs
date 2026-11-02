@@ -71,7 +71,6 @@ mod enabled {
     const PATH: &str = "sd:/ultimate/TrainingRooms/practice-trace-swap.bin";
     #[cfg(feature = "console-swap-trace")]
     const NATIVE_PATH: &[u8] = b"sd:/ultimate/TrainingRooms/practice-trace-swap.bin\0";
-    const STACK_BYTES: usize = 128 * 1024;
     static STARTED: AtomicBool = AtomicBool::new(false);
     // Capture even the generated main-entry scope and bootstrap Rust allocations
     // before init. They stay in the same bounded FIFO until init starts the writer.
@@ -289,7 +288,7 @@ mod enabled {
         crate::engine::compat::logging::diagnostic(format_args!(
             "[PracticeTrace] continuous v2 session={} next_slot={} recovered_tail={}+{} max_bytes={} queue={} stack={} build={}",
             stream.session, stream.next_slot, stream.recovery_offset, stream.recovery_bytes,
-            core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,
+            core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,
             option_env!("PRACTICE_TRACE_BUILD_ID").unwrap_or(""),
         ));
         let mut last_flush = Instant::now();
@@ -386,9 +385,7 @@ mod enabled {
             unsafe { skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize };
         MAIN.store(main as u64, Ordering::Relaxed);
         event(1, [0; 5]);
-        if let Err(error) = std::thread::Builder::new()
-            .stack_size(STACK_BYTES)
-            .spawn(writer)
+        if let Err(error) = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::PracticeTrace, writer)
         {
             QUEUE.fail(Error::Io(
                 error

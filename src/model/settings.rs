@@ -554,9 +554,10 @@ pub enum WriteMode {
     Synchronous,
 }
 
-/// The stack of the writer thread and the boot-time loader thread (SPEC-core-04 §5, §8).
-pub const WRITER_STACK_BYTES: usize = 64 * 1024;
-pub const LOADER_STACK_BYTES: usize = 128 * 1024;
+/// The stack of the writer thread and the boot-time loader thread (SPEC-core-04 §5, §8, amended 2026-11-02: the sizes come from
+/// the measured thread table, `model::thread_stacks`; the loader keeps its own thread).
+pub const WRITER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::IniWriter).bytes;
+pub const LOADER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::SettingsLoad).bytes;
 
 pub const fn write_mode(writer_thread_started: bool) -> WriteMode {
     if writer_thread_started {

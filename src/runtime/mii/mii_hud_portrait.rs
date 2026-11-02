@@ -1077,6 +1077,7 @@ unsafe fn finish_pipeline_retirement(base: usize, source: *const u8) {
 
 #[skyline::hook(offset = 0x3308f00, inline)]
 unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {
+    crate::runtime::threads::headroom("pipeline_before_tick");
     if RETIRE_PIPELINE.load(Ordering::Acquire) {
         let exhausted = {
             let mut s = STATE.lock().unwrap();
@@ -1099,6 +1100,7 @@ unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {
 
 #[skyline::hook(offset = 0x3308f30, inline)]
 unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {
+    crate::runtime::threads::headroom("pipeline_after_tick");
     if RETIRE_PIPELINE.load(Ordering::Acquire) {
         finish_pipeline_retirement(BASE.load(Ordering::Acquire), ctx.registers[19].x() as *const u8);
     }

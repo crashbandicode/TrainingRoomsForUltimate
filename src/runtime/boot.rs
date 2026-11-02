@@ -19,6 +19,7 @@ use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
+use crate::model::thread_stacks::ThreadId;
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
@@ -38,6 +39,21 @@ use crate::runtime::{clock, game, import, install, published, scene, state_boot,
 const SITE_COUNT: usize = SITES.len();
 
 pub fn run() {
+    // The diag build measures the boot thread's stack across the whole boot (stream/stack); the file must be open first.
+    #[cfg(feature = "diag")]
+    {
+        diag_log::init_diagnostics();
+        crate::runtime::threads::boot_begin();
+    }
+    run_inner();
+    #[cfg(feature = "diag")]
+    {
+        crate::runtime::threads::boot_end();
+        diag_log::flush();
+    }
+}
+
+fn run_inner() {
     diag_log::init_diagnostics();
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     diag_log::start_drain_thread();
@@ -90,7 +106,7 @@ pub fn run() {
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
     // background).
-    let migration = import::start();
+    let (migration, captures) = import::start();
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
@@ -118,7 +134,7 @@ pub fn run() {
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
     // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
-    crate::runtime::compat::menu::apply_kept(&loaded);
+    crate::runtime::compat::menu::apply_kept(&*loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
 
@@ -237,7 +253,7 @@ pub fn run() {
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
-        ui::install(&loaded, input_delay_on)
+        ui::install(&*loaded, input_delay_on)
     } else {
         diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
         ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found }
@@ -265,9 +281,7 @@ pub fn run() {
     let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
     let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
     if roster_on {
-        roster::init();
-        mii::init();
-        lobby::init();
+        init_roster_cycle();
     } else {
         diagnostic(format_args!("[TrainingRooms] roster cycle not started: a game function it calls failed its site guard"));
     }
@@ -345,11 +359,16 @@ pub fn run() {
     };
     install::write(&line);
     diag_log::flush();
+    // The import's captures run last, on the boot loaders' static stack (free once they and the install line are done).
+    if let Some(pending) = captures {
+        import::start_background(pending);
+    }
 }
 
 /// Diag builds: `diag-poison.txt` (names separated by blanks, commas or lines) marks those rows foreign before any
 /// install decision, each name logged (`diag_poison <name> found=<bool>`).
 #[cfg(feature = "diag")]
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
     let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
     let Ok(text) = fs::read_to_string(path.as_str()) else { return };
@@ -368,19 +387,17 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
     }
 }
 
-/// Read `save_states.json` on a thread with a 128 KiB stack, joined here (the settings reader's rule).
+/// Read `save_states.json` on its own thread (stack from `model::thread_stacks`), joined here (the settings reader's rule).
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn load_save_states() -> SaveFile {
-    let spawned = std::thread::Builder::new().name("tr-state-load".into()).stack_size(128 * 1024).spawn(states::load_file);
-    match spawned {
-        Ok(handle) => handle.join().unwrap_or_default(),
-        Err(_) => states::load_file(),
-    }
+    crate::runtime::threads::run_joined(ThreadId::StateLoad, states::load_file).unwrap_or_else(|_| states::load_file())
 }
 
 /// The CPU behaviours (package 2): the per-frame wrapper first (the facts every other piece reads),
 /// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
 /// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
 /// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>, bool, bool) {
     if !sites::feature_usable(Feature::CpuCore, usable) {
         return (false, false, false, false, false, Some("cpu_core_not_installed"), false, false);
@@ -450,6 +467,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
 
 /// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper
 /// reads the fall facts only once `set_mash_on` is set, before any of these hooks can fire.
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
     if !sites::feature_usable(Feature::CpuMash, usable) {
         return false;
@@ -468,6 +486,7 @@ fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(
 /// that carry the chords and the P1 stage, and the CPU core's per-frame facts), and the notice
 /// observers. Every row of a feature must have passed its guard. Returns whether the recorder and the
 /// notice hooks were installed.
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn install_pkg4(poll_ok: bool, cpu_core_on: bool, notices_closure: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
     let usable4 = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
     for (slot, site) in written4.iter_mut().zip(sites_pkg4::SITES.iter()) {
@@ -504,6 +523,7 @@ fn install_pkg4(poll_ok: bool, cpu_core_on: bool, notices_closure: bool, found4:
     (recording, combo_a && combo_b && stale)
 }
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
     let sites_ok = sites::feature_usable(Feature::StageHazards, usable);
     let flag = sites::find("hazard_flag").and_then(|site| {
@@ -527,6 +547,7 @@ fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&
 
 /// `developer.ini` through the one validated loader (`developer_ini::load`): it fails closed, and the
 /// install line reports the outcome (`developer=on|off reason=…`).
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn read_developer_ini() -> developer_ini::DeveloperIni {
     match FixedPath::<128>::in_root(storage::file::DEVELOPER_INI) {
         Some(path) => developer_ini::load(path.as_str()),
@@ -535,23 +556,37 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
 }
 
 
-/// Read `settings.json` (or the fork's file name, once) on a thread with a 128 KiB stack, joined here
+/// Read `settings.json` (or the fork's file name, once) on its own thread (stack from `model::thread_stacks`), joined here
 /// (SPEC-core-04 §5). All of the file logic, including the recovery of a file that does not read
 /// cleanly (the original kept as `settings.invalid-<n>.json`, the sanitized settings written to the
 /// active path before the original is retired), is `model::settings_file::load`; this only runs it and
 /// logs its notes.
-fn load_settings() -> Settings {
-    let spawned = std::thread::Builder::new().name("tr-settings-load".into()).stack_size(settings::LOADER_STACK_BYTES).spawn(load_settings_inner);
-    match spawned {
-        Ok(handle) => handle.join().unwrap_or_else(|_| Settings::factory()),
-        Err(_) => load_settings_inner(),
-    }
+/// The settings come back boxed (stream/stack): `Settings` is about 8 KB, and moved by value it took two 8 KB slots of the boot
+/// frame on Skyline's 64 KiB thread.
+fn load_settings() -> Box<Settings> {
+    crate::runtime::threads::run_joined(ThreadId::SettingsLoad, load_settings_boxed).unwrap_or_else(|_| load_settings_boxed())
 }
 
+#[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
 fn load_settings_inner() -> Settings {
     let boot = settings_file::load(Path::new(storage::ROOT));
     for note in &boot.notes {
         diagnostic(format_args!("{note}"));
     }
     boot.settings
+}
+
+/// The settings boxed where they are read (the loader thread, or this fallback's own frame), never in boot's frame.
+#[inline(never)]
+fn load_settings_boxed() -> Box<Settings> {
+    Box::new(load_settings_inner())
+}
+
+/// Package 6's roster cycle, Mii files and waiting-room engine (boot step 5): their inlined init state (two 8,040 B values in
+/// 1a14480) stays in this frame while it runs instead of boot's frame on Skyline's 64 KiB thread (stream/stack).
+#[inline(never)]
+fn init_roster_cycle() {
+    roster::init();
+    mii::init();
+    lobby::init();
 }

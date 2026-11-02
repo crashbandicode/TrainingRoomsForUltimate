@@ -105,3 +105,5 @@ pub mod screens;
 pub mod panes;
 #[path = "model/version.rs"]
 pub mod version;
+#[path = "model/thread_stacks.rs"]
+pub mod thread_stacks;
