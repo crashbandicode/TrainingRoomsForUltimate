@@ -1,7 +1,7 @@
 //! Optional read-ahead intent. No native pointer, lease, or installer is owned here.
 //! Actual loading uses CharacterSources' existing native callback and lifetime book.
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use crate::engine::preload::cycle_admission_grace::{AdmissionGrace, Settlement};
 pub(crate) use crate::engine::preload::cycle_preload_capacity::MAX_TARGETS;
 use crate::engine::mii::lifetime::Configuration;
@@ -63,7 +63,7 @@ fn advance_grace(grace: &mut GraceCoordinator, now: u64) {
 
 /// Scene/settings retirement, independent of measurements and sparse planning.
 pub(crate) fn reset_admission_grace() {
-    let mut grace = GRACE.lock().unwrap();
+    let mut grace = GRACE.lock();
     grace.generation = grace.generation.checked_add(1).expect("preload grace generation exhausted");
     let generation = grace.generation;
     grace.policy.reset(generation);
@@ -79,7 +79,7 @@ pub(crate) fn reset_admission_grace() {
 pub(crate) fn foreground_settled() {
     // Fail open: without a monotonic clock no burst is armed, so speculation is never held.
     let Some(now) = grace_now() else { return; };
-    let mut grace = GRACE.lock().unwrap();
+    let mut grace = GRACE.lock();
     advance_grace(&mut grace, now);
     let generation = grace.generation;
     let event = grace.policy.settled(now, generation);
@@ -100,7 +100,7 @@ pub(crate) fn foreground_settled() {
 /// Capture outside source STATE, after owned-load service. Returning None only
 /// postpones new speculative work; plans, attempts and warm sources stay intact.
 pub(crate) fn speculative_admission() -> Option<u64> {
-    let mut grace = GRACE.lock().unwrap();
+    let mut grace = GRACE.lock();
     let Some(now) = grace_now() else { return Some(grace.generation); };
     advance_grace(&mut grace, now);
     let generation = grace.generation;
@@ -126,7 +126,7 @@ pub(crate) fn speculative_admission_current(generation: u64) -> bool {
 /// Call only after SourceBook::begin_install succeeds, never for reservations
 /// or preflight refusals. Pure value lock; never traverses source/roster state.
 pub(crate) fn speculative_admission_committed(generation: u64) {
-    let mut grace = GRACE.lock().unwrap();
+    let mut grace = GRACE.lock();
     let now = grace_now();
     if let Some(now) = now { advance_grace(&mut grace, now); }
     if grace.policy.speculative_committed(generation) {
@@ -188,7 +188,7 @@ static STATUS: Mutex<Status> = Mutex::new(Status {
 const STATUS_HEADER: &str = "Fighters";
 
 fn reset_status() {
-    *STATUS.lock().unwrap() = Status {
+    *STATUS.lock() = Status {
         shown: None,
         pending: false,
         assets_logged: None,
@@ -204,7 +204,7 @@ fn reset_status() {
 /// Fighters notice: a visible operation, never the preloader's own helper or hat loads.
 fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Target>; MAX_TARGETS]>) {
     let desired = {
-        let mut status = STATUS.lock().unwrap();
+        let mut status = STATUS.lock();
         if let Some(desired) = desired {
             status.desired = desired;
         }
@@ -213,7 +213,7 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
     let readiness = crate::runtime::roster::character_roster::sources::preload_readiness(blocked, &desired);
     if crate::runtime::roster::cycle_preload_config::snapshot().measurements {
         let changed = {
-            let mut status = STATUS.lock().unwrap();
+            let mut status = STATUS.lock();
             let changed = status.assets_logged != Some(readiness);
             status.assets_logged = Some(readiness);
             changed
@@ -235,7 +235,7 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
 fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, scheduler_blocked: bool) {
     use crate::engine::preload::cycle_preload_policy::Progress;
     use crate::runtime::lobby::training::ui::notifications::{clear_notification, is_queued, take_delivered, upsert};
-    let mut status = STATUS.lock().unwrap();
+    let mut status = STATUS.lock();
     status.paused_polls = if now.progress() == Progress::Paused {
         status.paused_polls.saturating_add(1)
     } else {
@@ -297,7 +297,7 @@ pub(crate) fn request(role: usize, hat: bool, target: Target) {
         FRAME.load(Ordering::Relaxed),
     );
     let old = std::mem::replace(
-        &mut REQUESTS.lock().unwrap()[role + usize::from(hat) * 2],
+        &mut REQUESTS.lock()[role + usize::from(hat) * 2],
         stamp,
     );
     if let Some(old) = old {
@@ -310,7 +310,7 @@ pub(crate) fn request(role: usize, hat: bool, target: Target) {
 }
 
 fn close_requests(outcome: crate::engine::preload::preload_metrics::Outcome) {
-    let pending = std::mem::take(&mut *REQUESTS.lock().unwrap());
+    let pending = std::mem::take(&mut *REQUESTS.lock());
     for stamp in pending.iter().flatten() {
         stamp.finish(
             frame(),
@@ -322,7 +322,7 @@ fn close_requests(outcome: crate::engine::preload::preload_metrics::Outcome) {
 
 pub(crate) fn completed(role: usize, hat: bool, kind: u32) {
     let stamp = {
-        let mut requests = REQUESTS.lock().unwrap();
+        let mut requests = REQUESTS.lock();
         let slot = &mut requests[role + usize::from(hat) * 2];
         if slot.is_some_and(|s| s.kind == kind) {
             slot.take()
@@ -341,7 +341,7 @@ pub(crate) fn completed(role: usize, hat: bool, kind: u32) {
 
 pub(crate) fn scene_end() {
     reset_admission_grace();
-    let enabled = CONDITION.lock().unwrap().take().is_some_and(|c| c.measurements);
+    let enabled = CONDITION.lock().take().is_some_and(|c| c.measurements);
     close_requests(crate::engine::preload::preload_metrics::Outcome::Departed);
     crate::engine::preload::preload_metrics::snapshot(
         enabled,
@@ -437,9 +437,9 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
         return;
     }
     let frame = FRAME.fetch_add(1, Ordering::Relaxed);
-    if settings.measurements && REQUESTS.lock().unwrap().iter().any(Option::is_some) {
+    if settings.measurements && REQUESTS.lock().iter().any(Option::is_some) {
         let busy = crate::runtime::roster::character_roster::sources::metrics().busy;
-        for stamp in REQUESTS.lock().unwrap().iter_mut().flatten() {
+        for stamp in REQUESTS.lock().iter_mut().flatten() {
             stamp.frame(busy);
         }
     }
@@ -465,7 +465,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     crate::runtime::roster::character_roster::sources::refresh_preload_capacity();
     let key = settings;
     let label = {
-        let mut condition = CONDITION.lock().unwrap();
+        let mut condition = CONDITION.lock();
         let label = if condition.is_none() {
             Some(crate::engine::preload::preload_metrics::Label::Baseline)
         } else if *condition != Some(key) {

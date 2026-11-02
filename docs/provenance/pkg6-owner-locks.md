@@ -63,3 +63,33 @@ futex waiting differs from Horizon; these tests do not prove native no-heap.
 Exact composed Switch call-path inspection, stack gates and runtime first-use
 counts remain required. No warm-up, counter waiver, stack increase, or whole-R5
 acceptance follows from this source change.
+
+
+## Preload bookkeeping continuation
+
+`character_sources::scene_changed` invokes `cycle_preload::scene_end`, which
+touches GRACE, CONDITION, REQUESTS and STATUS even before preload first use.
+Settings changes and visible-player planning use those same value owners.
+GRACE never takes a source/roster/native lock; final source admission reads
+its atomic generation/deadline snapshot. REQUESTS releases its guard before
+finishing metrics against sources. CONDITION is released before metrics.
+STATUS snapshots desired values before source readiness, and retains its
+existing notification-lock nesting only in show_status. No reverse ownership
+or reentrant assumption is introduced by the primitive replacement.
+
+Exact `80ee800` diag shows cold OnceBox `0x1f82dc` from GraceCoordinator
+lock `0x5c690`, Status lock `0x5c6c8` and Settings lock `0x5bf14`.
+close_requests `0xbde90` calls the OperationStamp-array standard mutex
+at `0x5be34`; reset_status `0xbda44` and reset_admission_grace `0xbe110`
+reach the corresponding cold locks. Complete disassembly is archived as
+cycle-*.txt with that ELF. This source slice changes only those four lock
+primitives/guard APIs; no metrics, admission, notice or load-order change.
+
+The direct compiled note call graph additionally reaches preload_metrics SESSION
+through close_requests -> OperationStamp::finish, lock `0x5c5e4`. Its only
+owners are finish and snapshot: sample first, absorb/snapshot under the guard,
+drop before diagnostic formatting/heap-profile output. This value-only session
+uses the same constant primitive. Native panic=abort excludes the old poisoned
+fallback; no successful record or disabled-measurements behavior changes.
+The remaining catalog-broker lock is already initialized by its boot owner,
+as recorded above. Direct-call reachability does not prove indirect paths absent.
