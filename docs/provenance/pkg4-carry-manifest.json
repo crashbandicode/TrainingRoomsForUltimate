@@ -20,7 +20,7 @@
    "replay_preview": "crate::runtime::macros::replay_preview",
    "replay_move_start": "crate::runtime::macros::replay_move_start",
    "live_replay": "crate::runtime::macros::live_replay",
-   "capture_plugin": "crate::runtime::macros::capture_plugin",
+   "capture_plugin": "crate::runtime::deluxe_row",
    "training::named_macros": "crate::runtime::macros::named_macros",
    "training::practice": "crate::runtime::macros::port::practice",
    "training::ui::notifications": "crate::runtime::macros::port::notifications",
@@ -559,7 +559,39 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "4da80c37ed166bde0b13cee0c5c2c33651013aeca19a2bc2b1314953137c647b"
+   "dest_sha256": "bb1656aa10e577e22c02aab6191d3db9c40f435795860863579ffeb57b008f02",
+   "edits": [
+    {
+     "old": "//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! and the host rewrites the same INI after accepted edits when its layout is\n//! persistence-compatible. Native save success supplies the replay identity;\n",
+     "new": "//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! (`runtime::deluxe_row`); the plugin's own writer thread rewrites the INI from\n//! that preference (`features::writer`). Native save success supplies the replay identity;\n",
+     "reason": "deluxe stream (L1, Q7): the Deluxe row no longer asks the host to persist (`runtime::deluxe_row`; the small-file writer thread is the only writer of replay_capture.ini, lead ruling R5), so the host-persistence layout verdict has no reader"
+    },
+    {
+     "old": "static PERSISTENCE_COMPATIBLE: AtomicBool = AtomicBool::new(false);\n",
+     "new": "",
+     "reason": "its flag (no reader)"
+    },
+    {
+     "delete_from": "/// Whether the Deluxe host may rewrite the INI (see\n",
+     "delete_to": "/// Start once for the mod library",
+     "reason": "`persistence_compatible()` (no reader)"
+    },
+    {
+     "old": "    let result = (|| -> Result<(CaptureSettings, Result<(), String>), String> {\n",
+     "new": "    let result = (|| -> Result<CaptureSettings, String> {\n",
+     "reason": "init reads the settings only"
+    },
+    {
+     "old": "        let settings = CaptureSettings::parse(&text)?;\n        Ok((settings, CaptureSettings::persistence_compatible(&text)))\n",
+     "new": "        CaptureSettings::parse(&text)\n",
+     "reason": "init reads the settings only"
+    },
+    {
+     "old": "        Ok((settings, persistence)) => {\n            SEED_ENABLED.store(settings.enabled, Ordering::Release);\n            TOGGLE.seed(settings.enabled);\n            match persistence {\n                Ok(()) => {\n                    PERSISTENCE_COMPATIBLE.store(true, Ordering::Release);\n                    println!(\"[ReplayCapture] deluxe_persistence enabled\");\n                }\n                Err(reason) => println!(\"[ReplayCapture] deluxe_persistence disabled: {reason}\"),\n            }\n",
+     "new": "        Ok(settings) => {\n            SEED_ENABLED.store(settings.enabled, Ordering::Release);\n            TOGGLE.seed(settings.enabled);\n",
+     "reason": "init logs no host-persistence verdict"
+    }
+   ]
   },
   {
    "src": "src/replay_capture.rs",
@@ -605,7 +637,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "e57607280e90ab6ff5b3f39157f2bcef65f587e795b39ef0affb6af57845c1b7",
+   "dest_sha256": "2b16736bd254970f091272f192f25779060daa86c1a87499353d1efeb41b04cf",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -618,13 +650,6 @@
      "reason": "hook allocation accounting: starting a record allocates its session once"
     }
    ]
-  },
-  {
-   "src": "src/capture_plugin.rs",
-   "dest": "src/runtime/macros/capture_plugin.rs",
-   "crate": "root",
-   "src_sha256": "abecd53b34b45b43797cd1a29ddb44e1e1a4af4acc28177e7b175c15fd4a1117",
-   "dest_sha256": "42f601aba4139a4cb843b04bf54dc38d724f673627b6f22b88f1d07899fb3f30"
   }
  ]
 }

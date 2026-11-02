@@ -561,7 +561,7 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
 
 pub fn init() {
     #[cfg(feature = "deluxe-sdk")]
-    let registered = crate::runtime::macros::capture_plugin::host_registered();
+    let registered = crate::runtime::deluxe_row::host_registered();
     #[cfg(not(feature = "deluxe-sdk"))]
     let registered = false;
     let seed = crate::runtime::macros::replay_store::seed_enabled();

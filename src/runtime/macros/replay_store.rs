@@ -3,8 +3,8 @@
 //! The INI is the single startup authority: it seeds the runtime preference once
 //! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe
 //! host present, the Plugins page changes the in-memory preference at runtime
-//! and the host rewrites the same INI after accepted edits when its layout is
-//! persistence-compatible. Native save success supplies the replay identity;
+//! (`runtime::deluxe_row`); the plugin's own writer thread rewrites the INI from
+//! that preference (`features::writer`). Native save success supplies the replay identity;
 //! this module never guesses it from a filename appearing on disk or a
 //! controller button press.
 
@@ -38,7 +38,6 @@ const fn path_under_root(path: &str, root: &str, suffix: &str) -> bool {
 
 /// INI value read at startup; `toggle()` holds the runtime preference.
 static SEED_ENABLED: AtomicBool = AtomicBool::new(false);
-static PERSISTENCE_COMPATIBLE: AtomicBool = AtomicBool::new(false);
 static TOGGLE: CaptureToggle = CaptureToggle::new();
 static WRITER: OnceLock<SyncSender<WriteJob>> = OnceLock::new();
 
@@ -76,14 +75,6 @@ pub fn toggle() -> &'static CaptureToggle {
 /// What the INI said at startup. Runtime edits live in [`toggle`].
 pub fn seed_enabled() -> bool {
     SEED_ENABLED.load(Ordering::Acquire)
-}
-
-/// Whether the Deluxe host may rewrite the INI (see
-/// `CaptureSettings::persistence_compatible`); otherwise the row is session-only.
-/// Only the `deluxe-sdk` registration reads it; the verdict is logged regardless.
-#[cfg_attr(not(feature = "deluxe-sdk"), allow(dead_code))]
-pub fn persistence_compatible() -> bool {
-    PERSISTENCE_COMPATIBLE.load(Ordering::Acquire)
 }
 
 /// Start once for the mod library (combined alpha) or after live-capture guards.
@@ -250,7 +241,7 @@ pub fn init() {
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if let Err(error) = start_writer() { println!("[ReplayCapture] Mii library unavailable: {error}"); }
     let path = REPLAY_CAPTURE_INI;
-    let result = (|| -> Result<(CaptureSettings, Result<(), String>), String> {
+    let result = (|| -> Result<CaptureSettings, String> {
         // The host persists by rename; a crash between its renames leaves only
         // `replay_capture.previous.ini`. Restore it before creating a default.
         match recover_previous_ini(Path::new(path)) {
@@ -270,20 +261,12 @@ pub fn init() {
             return Err("replay_capture.ini exceeds 16 KiB".into());
         }
         let text = fs::read_to_string(path).map_err(|error| error.to_string())?;
-        let settings = CaptureSettings::parse(&text)?;
-        Ok((settings, CaptureSettings::persistence_compatible(&text)))
+        CaptureSettings::parse(&text)
     })();
     match result {
-        Ok((settings, persistence)) => {
+        Ok(settings) => {
             SEED_ENABLED.store(settings.enabled, Ordering::Release);
             TOGGLE.seed(settings.enabled);
-            match persistence {
-                Ok(()) => {
-                    PERSISTENCE_COMPATIBLE.store(true, Ordering::Release);
-                    println!("[ReplayCapture] deluxe_persistence enabled");
-                }
-                Err(reason) => println!("[ReplayCapture] deluxe_persistence disabled: {reason}"),
-            }
             crate::runtime::diag_log::diagnostic(format_args!("[ReplayCapture] live_enabled={}", settings.enabled));
         }
         Err(error) => {

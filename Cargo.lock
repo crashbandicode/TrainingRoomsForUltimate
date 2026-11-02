@@ -54,6 +54,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "deluxe-plugin-abi"
+version = "5.0.0"
+
+[[package]]
+name = "deluxe-plugin-sdk"
+version = "5.0.0"
+dependencies = [
+ "deluxe-plugin-abi",
+ "skyline",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,6 +343,7 @@ dependencies = [
 name = "training_rooms"
 version = "0.1.0"
 dependencies = [
+ "deluxe-plugin-sdk",
  "parking_lot",
  "paste",
  "serde",
