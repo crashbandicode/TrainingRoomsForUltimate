@@ -29,7 +29,8 @@ const MAX_FOUND_WORD: usize = 8;
 const MAX_WRITTEN_WORD: usize = 8;
 /// The longest seam outcome word (`native_seams::report::code_name`: `out_of_region`).
 const MAX_SEAM_CODE: usize = 13;
-/// The longest stand-in form word of the hook-sharing drill.
+/// The longest stand-in form word of the hook-sharing drill (its only reader, `drill_fields`, is compiled with `seam-drill`).
+#[cfg(feature = "seam-drill")]
 const MAX_DRILL_FORM: usize = 16;
 
 /// The fields every line has, at their longest: tick (20 digits), ` plugin=training_rooms/` and the version (32), ` game=` and the
