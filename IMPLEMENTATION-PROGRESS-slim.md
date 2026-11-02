@@ -1543,3 +1543,28 @@ b88failedtarget retired1593420408B/721files,59executedbinaries archiveSHA
 98b9209c3da142c2c1ed5cc5198584c141574b2c21d4760fe094d2a57a16813e.
 No ownqueue/claim/compiler/Eden/profile. Next: freezecombinedsourceNEWtarget,
 freshcachecensus, ONEqueuedhost thennative+clippy/no-default/release perclaim.
+
+## Fresh combined host admission 2026-11-02T23:29:06.981484+00:00
+4b86500 frozen1185 archive7d54f1802d590fdef1afda84b8787ddef9b01f05b5fda3fae4297e8f0d1ce1fe.
+Target wasEMPTY. FreshTRglobal55794753030B (Surface18300403106,
+Yoga11424468526,Ally26069881398)+3GBreserve. YogaONEhost claim23:28,
+controller70572/remote scope run-p2156000-i10533692.scope;6G1800incremental0,
+TMPDIRext4. Current product source unchanged while validation runs.
+Approved L2 status already present tests/lint_allows.rs; remaining3pending
+large_enum_variant rows stillOPEN (Configurationproposal stilllead-deferred).
+Next afterhost: reap/release, queuefreshdiag, nativeSDK/owner graph andthreadtable;
+clippy-Dwarnings/no-default/release and COREmatrix/crates onthissamefrozen source.
+NoEden/profile; helperboot hold remains.
+
+## Slim successor reconciliation 2026-11-02T23:44:04.6907637+00:00
+tr-w-slim-2 / thread01a19ea3-9209-72e3-a32c-a2cfd6953ac0, live gpt-6-astra/medium gate PASS.
+Playbook ae87443 pulled; README/all7docs/PROVENANCE read. One hidden owner-bound model watcher1371483.
+Inherited uncommitted progress-only admission note reviewed and preserved; no product dirt.
+Yoga 4b86500 host ended23:29:57Z cargo0, scope run-p2156000-i10533692.scope inactive/dead,
+no cargo/rustc or predecessor SSH controller remains. Collected raw host log/receipt and source manifests
+under artifacts/trainingrooms-nro-archive/slim/4b86500-host; log SHA a96cfda42331262e65db0651f6cf5cd7e22822bec7407325854fe88b5404a26a,
+1185 source files unchanged, 75 executed binaries hashed, peak4541095936B.
+Canonical predecessor RELEASED23:43Z on Yoga; own old queue row removed. No claim/compiler/Eden/profile.
+Read PRIMARY critical-path/rabbit-hole rules and queue PRIORITY OVERRIDE. Continuing remaining owned
+native/clippy/no-default gates on frozen4b86500; no duplicate host run or new counter tooling.
+Lead23:40 fixed4b86500 integration acknowledged; no main edits. Shared runtime rows remain integration-bound.
