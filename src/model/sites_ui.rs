@@ -14,7 +14,7 @@ pub const UI_REGISTER_CALCULATE_OFFSET: usize = 0x378_4ad4;
 pub const UI_MANAGER_GLOBAL_OFFSET: usize = 0x375_e280;
 /// The game's pane text setter (pane, text, units, flags).
 pub const UI_SET_TEXT_OFFSET: usize = 0x37a_2270;
-/// The game's pp::fighter::is_ready_go().
+/// The game's `app::fighter::is_ready_go().
 pub const UI_IS_READY_GO_OFFSET: usize = 0x15c_e620;
 
 /// The five words the two anchors pin (SPEC-core-05 §4.1): the instructions the hook sits on and the
