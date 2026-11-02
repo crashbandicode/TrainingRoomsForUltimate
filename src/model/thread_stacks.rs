@@ -83,7 +83,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "first-boot import of the fork's files (blocking part), joined with a deadline"),
     row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}",
         "first-boot import of the fork's captures in the background"),
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 31_472, 13_488, "Eden st-02..st-12", "ui::worker::run",
+    row(ThreadId::Menu, c"tr-menu", 60 * KIB, 35_600, 13_488, "Eden st-02..st-12", "ui::worker::run",
         "the menu worker: model steps, screens, settings JSON on close"),
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_576, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#1}",
         "returns parked layout archives to the pool after their grace"),
