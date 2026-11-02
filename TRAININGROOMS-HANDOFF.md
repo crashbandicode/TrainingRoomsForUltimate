@@ -40,8 +40,14 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
   the fork's settings live in `training_modpack_menu.conf` (41,649 B); `training_modpack.json` is the updater record
   (72 B) and is not imported. S1's decision is unchanged in meaning; specs, plan and the S1 picture corrected.
 - Lead decision: unknown settings keys are kept on rewrite (`SPEC-core-04`); retired keys dropped.
-- Running: the implementer on the playbook's `model.rs` / `runtime.rs` roots, the Training reset hub (B8 clear on
-  reset and load), then the Switch build with the campaign toolchain on this Surface.
+- Then `7c596f3` (playbook `model.rs` / `runtime.rs` roots), `57fc1ed` (Training reset hub on the fighter on-init
+  wrapper; B8 clear), `81cea59` (cast fix, build record). Switch builds on this Surface with the campaign launcher
+  (`RUSTUP_TOOLCHAIN=nightly-2026-02-14`, `toolchain/tools` homes; the 1.98.1 pin fails in cargo-skyline with
+  "the option 'Z' is only accepted on the nightly compiler" — open, with the primary): release `6d644384…`
+  172,032 B resident, diag `82f60e24…` 270,336 B resident (`nro_size.py`). Card-site scan of the 2026-11-01 MTP
+  preflight copy: only the fork's NRO touches our hook sites. `compliance.py`: 4 rows read only `src/*.rs`
+  (playbook tool limit, reported), README GIF / build line / HANDOFF rows wait for the RC.
+- Running: package-1 Eden rows (three boots, batched), tester worker; output `eden/EDEN-PACKAGE-1.md` in the worktree.
 
 ### Addendum 2026-11-02 (operator order via the primary): card swap and fixes in both trees
 
