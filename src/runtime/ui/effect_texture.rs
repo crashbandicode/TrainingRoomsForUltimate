@@ -207,7 +207,22 @@ pub fn describe(visual: Visual, mut line: impl FnMut(core::fmt::Arguments<'_>)) 
     };
     line(format_args!("describe {visual:?} common={common:?}"));
     match facts::effect_set(&Live, common.effn, visual.effect_name()) {
-        Ok(set) => line(format_args!("describe {visual:?} set={set}")),
+        Ok(set) => {
+            line(format_args!(
+                "describe {visual:?} set={set} resource sets={:?} textures={:?} file={:?}",
+                Live.i32(common.resource + facts::RESOURCE_SET_COUNT),
+                Live.i32(common.resource + facts::RESOURCE_TEXTURE_COUNT),
+                Live.ptr(common.resource + facts::RESOURCE_TEXTURES)
+            ));
+            match facts::emitters(&Live, common.resource, set) {
+                Ok(e) => {
+                    for (i, em) in e.emitters.iter().take(e.count).enumerate() {
+                        line(format_args!("describe {visual:?} raw emitter={i} emtr={:#x} slots={:#x?} magic={:?}", em.emtr, em.slots, Live.bytes(em.emtr, 4).map(|b| [b[0], b[1], b[2], b[3]])));
+                    }
+                }
+                Err(why) => line(format_args!("describe {visual:?} emitters={why:?}")),
+            }
+        }
         Err(why) => line(format_args!("describe {visual:?} effect_set={why:?}")),
     }
     match pictures(visual) {
