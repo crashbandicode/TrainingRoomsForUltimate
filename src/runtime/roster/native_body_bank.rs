@@ -204,6 +204,9 @@ static SPECIAL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Phase B′ fingerprints (the asynchronous construction path) and the functor vtable slot passed.
 static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
+// Filled before the hooks are enabled; each role moves its storage into its
+// first bank and retains it through every subsequent native bank lifetime.
+static BANK_STORAGE: [Mutex<Option<BankStorage>>; 2] = [Mutex::new(None), Mutex::new(None)];
 static RESERVED: AtomicU8 = AtomicU8::new(0);
 static ROLE_BUDGET: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 // Display targets are not resource reservations: canonical-only original
@@ -765,7 +768,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     }
                 }
             } else { None };
-            bank.groups.push(Group::planned_with(*members, identity));
+            bank.groups.plan(*members, identity);
             trace!("[GroupSwap] plan owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} pool={}/{} reserve={} hats={} alias={:#x} identity={:?}",
                 bank.owner, bank.groups.len() - 1, &members.kinds()[..members.count()], members.special(), members.count(),
                 settings.ready_fighters, live, capacity, POOL_RESERVE, hats_wanted, alias[role],
@@ -1146,7 +1149,7 @@ fn occupancy_of(bank: &Bank, role: usize, copy: Option<u32>) -> Occupancy {
     let mut kinds = KindOccupancy::default();
     kinds.live[role] = bank.observed.map(|(_, kind)| kind);
     for kind in bank.members.kinds().iter().take(bank.members.count()) { kinds.parked[role].insert(*kind); }
-    for group in &bank.groups {
+    for group in bank.groups.iter() {
         if group.state == GroupState::Built {
             for kind in group.members.kinds().iter().take(group.members.count()) { kinds.parked[role].insert(*kind); }
         }
@@ -1304,6 +1307,10 @@ struct Window {
 struct Group {
     // Immutable heap storage lent to the table hooks while this group is in the window.
     members: Box<Members>,
+    data: GroupData,
+}
+
+struct GroupData {
     state: GroupState,
     /// Saved window fields while built and detached.
     saved: Option<Window>,
@@ -1327,14 +1334,56 @@ struct Group {
     publish: PublishAttempts,
 }
 
-impl Group {
-    fn planned_with(members: Members, identity: Option<(MiiIdentity, Configuration)>) -> Self {
+impl GroupData {
+    fn planned(identity: Option<(MiiIdentity, Configuration)>) -> Self {
         let (identity, configuration) = identity.map_or((None, None), |(i, c)| (Some(i), Some(c)));
-        Self { members: Box::new(members), state: GroupState::Planned, saved: None,
+        Self { state: GroupState::Planned, saved: None,
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new() }
     }
+}
+
+impl std::ops::Deref for Group {
+    type Target = GroupData;
+    fn deref(&self) -> &GroupData { &self.data }
+}
+impl std::ops::DerefMut for Group {
+    fn deref_mut(&mut self) -> &mut GroupData { &mut self.data }
+}
+
+/// Exactly the existing native extra-group slots, allocated at boot. Clearing
+/// a bank retires its records without freeing tables borrowed by native hooks.
+struct Groups {
+    slots: Box<[Group; MAX_EXTRA_GROUPS]>,
+    len: usize,
+}
+impl Groups {
+    fn new() -> Self {
+        Self { slots: Box::new(std::array::from_fn(|_| Group {
+            members: Box::new(Members::pair_group()), data: GroupData::planned(None),
+        })), len: 0 }
+    }
+    fn clear(&mut self) { self.len = 0; }
+    fn plan(&mut self, members: Members, identity: Option<(MiiIdentity, Configuration)>) {
+        // The caller holds BANKS and has proved len < MAX_EXTRA_GROUPS.
+        let group = &mut self.slots[self.len];
+        *group.members = members;
+        group.data = GroupData::planned(identity);
+        self.len += 1;
+    }
+}
+impl std::ops::Deref for Groups {
+    type Target = [Group];
+    fn deref(&self) -> &[Group] { &self.slots[..self.len] }
+}
+impl std::ops::DerefMut for Groups {
+    fn deref_mut(&mut self) -> &mut [Group] { &mut self.slots[..self.len] }
+}
+
+struct BankStorage { members: Box<Members>, groups: Groups }
+impl BankStorage {
+    fn new() -> Self { Self { members: Box::new(Members::pair_group()), groups: Groups::new() } }
 }
 
 /// A cross-group request committed in-window; executed at the acknowledgement seam.
@@ -1364,7 +1413,7 @@ struct Bank {
     // consumes this as a refusal, never as successful completion.
     failed: bool,
     /// Extra groups beyond the window (group swap).
-    groups: Vec<Group>,
+    groups: Groups,
     /// Resource owner `R` seen when this window became Ready; identity only.
     alias: usize,
     /// Pinned at the verified exchange, never refreshed from arbitrary live state.
@@ -1557,12 +1606,18 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
     if state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Building | Phase::Changing)) {
         return false;
     }
+    let mut storage = match state.take() {
+        Some(bank) => BankStorage { members: bank.members, groups: bank.groups },
+        None => BANK_STORAGE[role].lock().unwrap().take().expect("boot-reserved bank storage"),
+    };
+    *storage.members = members;
+    storage.groups.clear();
     *state = Some(Bank {
         entry: entry as usize, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
-        members: Box::new(members), phase: Phase::Building,
+        members: storage.members, phase: Phase::Building,
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
-        groups: Vec::new(), alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
+        groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Vec::new(),
         construction: None, tick: TickGap::default(),
     });
@@ -3363,7 +3418,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         // `0x17e8410` keys on `R+0x58` like the request did): each key-holding Mii group keeps
         // its index (the ledger's group of its tokens) and identity.
         let mut identities: Vec<(usize, MiiIdentity)> = Vec::new();
-        for (index, group) in bank.groups.drain(..).enumerate() {
+        for (index, group) in bank.groups.iter().enumerate() {
             let mut detached = DetachedGroup { owner, ..Default::default() };
             match (group.state, group.saved) {
                 (GroupState::Built, Some(saved)) => {
@@ -3398,6 +3453,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
             }
             bundles.push(Bundle::Detached(detached));
         }
+        bank.groups.clear();
         bank.swap = None;
         bank.swap_started = None;
         GROUP_BODIES[role].store(0, Ordering::Release);
@@ -3863,6 +3919,10 @@ pub(super) unsafe fn install(base: usize) {
     if !gate(SEAM_GROUP, BANK_SEAMS, legacy) {
         if legacy { trace!("[BodyBank] seam guard refused; disabled"); }
         return;
+    }
+    for storage in &BANK_STORAGE {
+        let mut storage = storage.lock().unwrap();
+        if storage.is_none() { *storage = Some(BankStorage::new()); }
     }
     skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);
     ENABLED.store(true, Ordering::Release);
