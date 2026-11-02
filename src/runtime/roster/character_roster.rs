@@ -858,7 +858,7 @@ pub fn scene_changed(mode: game_mode::Mode) {
     source_owner_probe::scene_changed();
     crate::runtime::roster::character_items::scene_changed();
     #[cfg(feature = "mii-identity-probe")]
-    crate::mii_identity_probe::forget(std::ptr::null());
+    crate::runtime::mii::mii_identity_probe::forget(std::ptr::null());
     #[cfg(feature = "mii-identical-reload-probe")]
     mii_reload_probe::scene_changed();
     let same_lobby = WAITING_MEMORY
@@ -1129,9 +1129,9 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     #[cfg(feature="mii-saved-alpha")]
     if mii_saved_alpha::service(entry,owner){return;}
     #[cfg(feature = "mii-identity-probe")]
-    crate::mii_identity_probe::observe_entry(entry, owner);
+    crate::runtime::mii::mii_identity_probe::observe_entry(entry, owner);
     #[cfg(feature = "mii-saved-file-probe")]
-    crate::mii_saved_file_probe::on_service(entry, owner);
+    crate::runtime::mii::mii_saved_file_probe::on_service(entry, owner);
     #[cfg(feature = "mii-identical-reload-probe")]
     if mii_reload_probe::service(entry, owner, role, _caller_lr) {
         return;
@@ -1526,7 +1526,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
     }
     let role = if owner == 0 { Role::Player } else { Role::Cpu };
     #[cfg(feature = "mii-identity-probe")]
-    crate::mii_identity_probe::forget(entry);
+    crate::runtime::mii::mii_identity_probe::forget(entry);
     #[cfg(feature = "mii-identical-reload-probe")]
     mii_reload_probe::on_destroy(entry);
     let mut state = state_for(role).lock().unwrap();
@@ -2429,19 +2429,19 @@ pub fn init() {
 /// Mii resource rebuild. No descriptor byte, record, saved entry or information block is
 /// written, except that `mii-special-change-probe` writes the neutral special of the bound saved
 /// row and information block, and `mii-fullconfig-probe` writes the full alternate configuration
-/// (`crate::mii_fullconfig_probe`, shot 1) and restores it (shot 2) on the same live entry.
+/// (`crate::runtime::mii::mii_fullconfig_probe`, shot 1) and restores it (shot 2) on the same live entry.
 /// The install token is held until native completion or entry destruction.
 #[cfg(feature = "mii-identical-reload-probe")]
 pub(crate) mod mii_reload_probe {
     use super::*;
     #[cfg(feature = "mii-cpu-adapter-probe")]
-    use crate::mii_fullconfig_probe::{ack, ack_phase};
+    use crate::runtime::mii::mii_fullconfig_probe::{ack, ack_phase};
 
     const ARM_FILE: &str = "sd:/ultimate/TrainingRooms/mii_probe.arm";
     /// Second arm file required by the special-change variant; both must exist.
     const CHANGE_ARM_FILE: &str = "sd:/ultimate/TrainingRooms/mii_special_probe.arm";
     const CHANGE: bool = cfg!(feature = "mii-special-change-probe");
-    /// Full-configuration variant: both shots go through `crate::mii_fullconfig_probe::step`.
+    /// Full-configuration variant: both shots go through `crate::runtime::mii::mii_fullconfig_probe::step`.
     const FULL: bool = cfg!(feature = "mii-fullconfig-probe");
     const TARGET_OWNER: u32 = if cfg!(feature = "mii-cpu-adapter-probe") { 1 } else { 0 };
     /// Identical reload: one shot. Special change: shot 1 changes, shot 2 restores.
@@ -2490,7 +2490,7 @@ pub(crate) mod mii_reload_probe {
             && (!CHANGE || std::path::Path::new(CHANGE_ARM_FILE).exists());
         // Third arm file and the fingerprint-gated hook installation of the full-configuration probe.
         #[cfg(feature = "mii-fullconfig-probe")]
-        let armed = armed && crate::mii_fullconfig_probe::armed();
+        let armed = armed && crate::runtime::mii::mii_fullconfig_probe::armed();
         #[cfg(feature = "mii-cpu-adapter-probe")]
         let armed = armed && ack::init();
         ARMED.store(armed, Ordering::Relaxed);
@@ -2543,9 +2543,9 @@ pub(crate) mod mii_reload_probe {
     pub(super) unsafe fn service(entry: *mut u8, owner: u32, role: Role, _service_entry_lr: usize) -> bool {
         #[cfg(feature = "mii-cpu-adapter-probe")]
         if owner == 0 && ARMED.load(Ordering::Relaxed)
-            && crate::mii_fullconfig_probe::cpu_ordinary_pending() && permitted()
+            && crate::runtime::mii::mii_fullconfig_probe::cpu_ordinary_pending() && permitted()
         {
-            crate::mii_fullconfig_probe::observe_cpu_ordinary(entry);
+            crate::runtime::mii::mii_fullconfig_probe::observe_cpu_ordinary(entry);
         }
         let tracked = *TRACK.lock().unwrap();
         if let Some(mut track) = tracked {
@@ -2578,7 +2578,7 @@ pub(crate) mod mii_reload_probe {
                     owner, track.kind, track.ticks, body_id, fe46, d72, d94
                 );
                 #[cfg(feature = "mii-fullconfig-probe")]
-                crate::mii_fullconfig_probe::on_complete(entry, _service_entry_lr);
+                crate::runtime::mii::mii_fullconfig_probe::on_complete(entry, _service_entry_lr);
                 #[cfg(not(feature = "mii-cpu-adapter-probe"))]
                 finish_install(track.token, "identical reload probe complete");
                 #[cfg(feature = "mii-cpu-adapter-probe")]
@@ -2646,7 +2646,7 @@ pub(crate) mod mii_reload_probe {
         // captured one. Both run before the descriptor copy below so the copy carries the written
         // tokens. A refusal writes nothing and releases the token (no install was issued).
         #[cfg(feature = "mii-fullconfig-probe")]
-        if !crate::mii_fullconfig_probe::step(entry, SHOTS.load(Ordering::Relaxed), _service_entry_lr) {
+        if !crate::runtime::mii::mii_fullconfig_probe::step(entry, SHOTS.load(Ordering::Relaxed), _service_entry_lr) {
             #[cfg(not(feature = "mii-cpu-adapter-probe"))]
             finish_install(token, "full configuration probe refused (see [MiiFullProbe] lines)");
             #[cfg(feature = "mii-cpu-adapter-probe")]
@@ -2698,7 +2698,7 @@ pub(crate) mod mii_reload_probe {
     /// still holds the shot-1 tuple. Both shots require a fresh table binding of the live callback
     /// argument; any mismatch writes nothing.
     unsafe fn change_step(entry: *mut u8) -> bool {
-        let Some(bound) = crate::mii_identity_probe::bind_saved_entry(entry) else {
+        let Some(bound) = crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) else {
             trace!("[MiiSpecialProbe] refused: live entry could not be bound to a consistent saved row");
             return false;
         };
@@ -2751,7 +2751,7 @@ pub(crate) mod mii_reload_probe {
             trace!("[MiiSpecialProbe] ended on entry destruction id={} fe=0x{:x}; row already restored", o.id, o.fe);
             return;
         }
-        match crate::mii_identity_probe::bind_saved_entry(entry) {
+        match crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) {
             Some(b) if b.id == o.id && b.e == o.e && row_specials(b.e) == o.changed_tuple() => {
                 std::ptr::write_volatile((o.e + 0x1b2) as *mut u8, o.original[0]);
                 trace!("[MiiSpecialProbe] restored E+0x1b2={} on entry destruction id={} fe=0x{:x}",
@@ -2771,7 +2771,7 @@ pub(crate) mod mii_reload_probe {
             end_change_on_destroy(entry);
         }
         #[cfg(feature = "mii-fullconfig-probe")]
-        crate::mii_fullconfig_probe::on_destroy(entry);
+        crate::runtime::mii::mii_fullconfig_probe::on_destroy(entry);
         #[cfg(not(feature = "mii-cpu-adapter-probe"))]
         {
         let mut track = TRACK.lock().unwrap();
@@ -2817,7 +2817,7 @@ pub(crate) mod mii_reload_probe {
             }
         }
         #[cfg(feature = "mii-fullconfig-probe")]
-        crate::mii_fullconfig_probe::scene_changed();
+        crate::runtime::mii::mii_fullconfig_probe::scene_changed();
         if let Some(t) = TRACK.lock().unwrap().as_mut() {
             t.departed = true;
             trace!("[MiiReloadProbe] scene departure during reload; native teardown owns cancellation");

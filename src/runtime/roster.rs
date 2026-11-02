@@ -39,6 +39,7 @@ pub(crate) mod hang_trace {
 }
 #[cfg(feature = "plugin-heap-meter")]
 pub(crate) mod heap_metrics;
+
 pub(crate) mod kirby_hats;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
@@ -97,8 +98,10 @@ pub(crate) const CALLED_ROWS: [&str; 17] = [
 /// `out` is the 8-byte record the game just wrote for player 0; `controller` is the live `Controller` pointer or 0.
 pub(crate) unsafe fn handle_p1_input(out: *mut crate::model::input_delay::MappedInputs, controller: usize) {
     use crate::model::chords::{bit, field};
+    let _scope = crate::model::hook_stats::HookScope::enter_hook(crate::model::hook_stats::HookId::RosterInput);
     let held = if controller == 0 { 0 } else { ((controller + field::CURRENT_BUTTONS) as *const u32).read_volatile() };
     let mut record = crate::runtime::compat::input::MappedInputs::from(*out);
+
     character_roster::handle_input(&mut record);
     kirby_hats::handle_input(&mut record, held & bit::STICK_L != 0, held & bit::STICK_R != 0);
     *out = record.into();
@@ -112,6 +115,7 @@ pub(crate) unsafe fn handle_p1_input(out: *mut crate::model::input_delay::Mapped
 /// `out` is the 8-byte record the game just wrote for slot 1; `controller` is the live `Controller` pointer or 0.
 pub(crate) unsafe fn handle_operator_input(out: *mut crate::model::input_delay::MappedInputs, controller: usize) {
     use crate::model::chords::{bit, field};
+    let _scope = crate::model::hook_stats::HookScope::enter_hook(crate::model::hook_stats::HookId::RosterInput);
     if !crate::runtime::lobby::training::practice::cpu_operator(1) {
         return;
     }

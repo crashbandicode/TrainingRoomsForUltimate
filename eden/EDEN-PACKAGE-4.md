@@ -56,3 +56,33 @@ files read because the ring rotates at 128 KiB). The diag build writes one line 
 - **Pane writes** of the input display, the notice slot, the Combo Display consumer and the damage helper: package 5's layout.
 - **Crop/loop/hitstun with the real mash**, the **desync / online rows** (hooks only act in Training; the online review is in `docs/test-provenance/package-4.md`).
 - Screenshots of the recording tints were taken but not measured.
+
+## S4-4: named macros, replay capture adapter, replay window (2026-11-02, Yoga, display :94, profile t4)
+
+Builds: diag of stream/pkg4 at each run (s4-03 99d626f6, s4-04 68a54540, s4-05 ff63f59a (Yoga build), s4-07 e6595ff6 = work/implementation 8dfc4fc + pkg4).
+Other plugins: CPU pilot v0.2.1 (loads first), tile cursor 0.1.0. Data folder seeded before boot (`tr_eden4.py --seed`): a real fork capture
+(`replay_captures/7265…6e.smd`, 12,692 frames, from `runtime156/collected156`), the fork's `macros/` (4 macros + `selected.txt`), `replay_capture.ini` `enabled=on`.
+Rows are driven by `eden/route4.py` then `eden/rows_s44.py` through the diag request file (`runtime/macros/diag.rs`); every wait gated on a diag line or a file.
+Claims/releases in the Yoga ledger for every run; profile restored after each (`tr_eden4.py restore`). Muted (core.volume 0 set and saved before game.load).
+
+| Row | s4-03 | s4-04 | s4-05 | s4-07 | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Install line: named_macros, live_replay installed, macros_port reason, rows guarded | pass | pass | pass | pass (line cut, see below) | events.log of each run |
+| Live replay adapter: 18 seam rows guarded, hooks installed with capture on | pass | pass | pass | pass | `[ReplayCapture] guarded live adapter ready capture=on host_registered=false save=entry` |
+| Numbered record chord: lockout, recording, crop | pass | pass | pass | pass | `record_lockout ... frames=60`, `recording_complete slot=0 frames=12/13` |
+| Save slot to library: macros/<name>.json has the slot's frames, notice | pass | pass | pass | pass | `evtest.json` schema 1, frames = recorded, `notice_draw ... "Saved evtest"` |
+| Named library lists saved + seeded macros | (froze before) | pass | pass | pass | `[NamedMacroDiag] view title="Named Library" ...` |
+| Load from the library (selected.txt) | - | pass | fail (row parsing) | fail (grid: Down jumps a row) | s4-04 `selected.txt=evtest` |
+| Replay Window lists the seeded capture and opens it (Fighter Mismatch prompt) | - | pass | pass | - | `capture id=7265… frames=12692`, view `Fighter Mismatch` |
+| Keyboard applet (release path) opened by our code, answered through Eden's control API, result consumed | froze (diag opened the applet unanswered) | - | partial | partial | `[NativeKeyboard] begin/returned/consume/applied`; macro saved with the default name (the typed text did not reach the line edit: the UI job was not waited for) |
+| Steady-state hook allocations delta 0 while the layer runs | pass | pass | pass | - | `hook_stats ... delta=0` through recording, listing, capture browser |
+| console.log: panic/abort/crash/Unmapped | 0 | 0 | 0 | 11 (one early-boot fault, see below) | `tr_eden4.py scan` |
+
+Findings: (1) `compat::menu::apply` was never called, so the typed menu (Macro Source) never left the factory value; fixed by `apply_snapshot` from
+`published::publish` (s4-05 shows `named_source=true` after a publish). (2) s4-07: the combined tree's install line passed 8192 bytes and was cut before
+`result=`; `install.rs` formats it on the heap (integrator-3 fixes the same in work/implementation). (3) s4-07: after loading a cross-fighter macro and a
+settings publish from the diag thread, the game and all plugin threads stopped (fps 0, no modal, no fault); ui-screens reproduces the same signature on a
+menu close (publish from the menu worker) and owns the root cause; s4-08 has a stall watchdog (`[NamedMacroDiag] stall ... step= publish=`). (4) s4-07 at
+7.15 s: one stack overflow of a 64 KiB thread (SP just below a 64 KiB stack, jump to 0); handed to the stability audit.
+Not run: a capture written after a real match (needs a VS match and the game's own replay save); the clip preview (package 3's preview restore is
+not provided); the Deluxe Plugins page row (L1).

@@ -6,6 +6,7 @@ use skyline::nn::ui2d::Pane;
 use crate::model::frame::{Frame, Tone, View};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
+use crate::model::screens::TILE_HIDDEN;
 use crate::model::panes as p;
 use crate::runtime::ui::pane;
 
@@ -106,11 +107,12 @@ impl Panes {
         self.at(p::IDX_GROUP_HI, p::GROUP_X, p::group_y(usize::from(frame.group_active)));
 
         // The overrides screen keeps its situation line as the list's first row.
-        let list = matches!(frame.view, View::List | View::Overrides);
+        let list = matches!(frame.view, View::List | View::Overrides | View::Clip);
         self.draw_chips(frame);
         self.draw_tiles(frame);
         self.draw_delay(frame);
         self.draw_overrides(frame);
+        self.draw_clip(frame);
         // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; p::ROWS] };
         for i in 0..p::ROWS {
@@ -252,14 +254,25 @@ impl Panes {
             let weight = frame.chip_weights[i];
             let tile = if weight != 0 { [58, 66, 84, 255] } else { p::HIGHLIGHT };
             self.rect(p::IDX_CHIP + i, x, y, p::CHIP_SIZE, p::CHIP_SIZE, tile);
-            match CHIP_ANGLE[i] {
-                Some(angle) => {
+            // DI / SDI: the pointer carries the game's own effect texture (`chips`), turned to the chip's direction.
+            let layer = if i == crate::runtime::ui::chips::NEUTRAL { None } else { crate::runtime::ui::chips::layer() };
+            match (CHIP_ANGLE[i], layer) {
+                (Some(angle), Some(layer)) => {
+                    let at = crate::model::effect_chips::place(layer.visual, angle, x, y, p::CHIP_SIZE, layer.width, layer.height);
+                    let tint = if weight != 0 { layer.tint } else { [layer.tint[0] / 2, layer.tint[1] / 2, layer.tint[2] / 2, 255] };
+                    self.rect(p::IDX_CHIP_NEEDLE + i, at.x, at.y, at.w, at.h, tint);
+                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], at.rot);
+                }
+                (Some(angle), None) => {
                     let radians = angle.to_radians();
                     let (dx, dy) = (radians.cos(), radians.sin());
                     self.rect(p::IDX_CHIP_NEEDLE + i, x + dx * 34.0, y + 12.0 + dy * 34.0, 12.0, 52.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
                     pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], angle - 90.0);
                 }
-                None => self.rect(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM }),
+                (None, _) => {
+                    self.rect(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
+                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], 0.0);
+                }
             }
             let mut name = crate::model::frame::Text::<16>::new();
             let _ = core::fmt::Write::write_str(&mut name, DIRECTIONS[i]);
@@ -291,7 +304,7 @@ impl Panes {
             (p::ROW_LEFT + (c as f32 + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
         };
         for i in 0..p::TILES {
-            if !shown || i >= usize::from(frame.tile_count) {
+            if !shown || i >= usize::from(frame.tile_count) || frame.tile_state[i] == TILE_HIDDEN {
                 self.hide(p::IDX_TILE + i);
                 self.hide(p::IDX_TILE_LABEL + i);
                 continue;
@@ -438,6 +451,49 @@ impl Panes {
             self.rect(p::IDX_TILE_HI, x, y, OVERRIDE_COL_W, OVERRIDE_PITCH - 4.0, p::ACCENT_RING);
         } else {
             self.hide(p::IDX_TILE_HI);
+        }
+    }
+}
+// ---- the clip editor (the replay window): its lines are the list rows, the timeline sits under them ------------------
+const CLIP_BAR_L: f32 = -300.0;
+const CLIP_BAR_W: f32 = 1000.0;
+const CLIP_BAR_Y: f32 = -90.0;
+
+/// The x of frame `at` of a capture of `total` frames on the timeline.
+fn clip_x(at: u32, total: u32) -> f32 {
+    CLIP_BAR_L + CLIP_BAR_W * at.min(total) as f32 / total.max(1) as f32
+}
+
+impl Panes {
+    unsafe fn draw_clip(&self, frame: &Frame) {
+        if frame.view != View::Clip {
+            return;
+        }
+        use core::fmt::Write;
+        let bar = frame.clip;
+        let (start, end, now) = (clip_x(bar.start, bar.total), clip_x(bar.end, bar.total), clip_x(bar.cursor, bar.total));
+        let held = |handle: u8| if bar.handle == handle { p::ACCENT_RING } else { p::TEXT };
+        self.rect(p::IDX_CHIP, CLIP_BAR_L + CLIP_BAR_W / 2.0, CLIP_BAR_Y, CLIP_BAR_W, 8.0, [70, 78, 92, 255]);
+        self.rect(p::IDX_CHIP + 1, (start + end) / 2.0, CLIP_BAR_Y, (end - start).max(4.0), 8.0, p::ACCENT);
+        self.rect(p::IDX_CHIP + 2, start, CLIP_BAR_Y, 22.0, 44.0, held(1));
+        self.rect(p::IDX_CHIP + 3, end, CLIP_BAR_Y, 22.0, 44.0, held(2));
+        self.rect(p::IDX_CHIP + 4, now, CLIP_BAR_Y, 6.0, 96.0, if bar.playing { p::TEXT_ON } else { held(0) });
+        for i in 5..p::CHIPS {
+            self.hide(p::IDX_CHIP + i);
+        }
+        self.hide(p::IDX_CHIP_HI);
+        for i in 0..p::CHIPS {
+            self.hide(p::IDX_CHIP_BADGE + i);
+            self.hide(p::IDX_CHIP_NEEDLE + i);
+            if i >= 3 {
+                self.hide(p::IDX_CHIP_LABEL + i);
+            }
+        }
+        let marks = [(start, CLIP_BAR_Y - 52.0, bar.start, "in"), (end, CLIP_BAR_Y - 52.0, bar.end, "out"), (now, CLIP_BAR_Y + 70.0, bar.cursor, "now")];
+        for (slot, (x, y, frames, name)) in marks.into_iter().enumerate() {
+            let mut text = crate::model::frame::Text::<16>::new();
+            let _ = write!(text, "{name} {frames}");
+            self.label(p::IDX_CHIP_LABEL + slot, text.units(), x, y, 200.0, p::TEXT_DIM);
         }
     }
 }

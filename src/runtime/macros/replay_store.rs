@@ -91,8 +91,7 @@ pub fn persistence_compatible() -> bool {
 pub fn start_writer() -> Result<(), String> {
     if WRITER.get().is_some() { return Ok(()); }
     let (sender, receiver) = mpsc::sync_channel::<WriteJob>(MAX_RETAINED_CAPTURES);
-    std::thread::Builder::new().name("replay-capture-save".into()).stack_size(0x20000)
-        .spawn(move || {
+    crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::ReplaySave, move || {
             let archive = SharedCaptureArchive::new(format!("{}/replay_captures",
                 crate::model::storage::ROOT));
             // The same serialized owner is the only writer of mod presets. Native saves are read-only.
@@ -110,7 +109,7 @@ pub fn start_writer() -> Result<(), String> {
                                     outcome.id, saved.replay_name);
                                 #[cfg(feature = "mii-ordinary-cpu-alpha")]
                                 if let Some(miis) = saved.miis {
-                                    crate::runtime::macros::port::roster::mii_replay::committed(miis);
+                                    crate::runtime::roster::character_roster::mii_replay::committed(miis);
                                 }
                             }
                             Err(error) => println!("[ReplayCapture] persistence_failed id={:?}: {}",
@@ -123,7 +122,7 @@ pub fn start_writer() -> Result<(), String> {
                         // on this writer, after any import already queued ahead of this job.
                         let mut native = read_saved_mii_catalog();
                         #[cfg(feature = "mii-editor-alpha")]
-                        crate::runtime::macros::port::editor_bridge::catalog_read(&native);
+                        crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                         match &presets {
                             Ok(store) => native = native.with_library(store.library()),
                             Err(error) => native.findings.push(crate::engine::mii::inventory::Finding::PresetSource {
@@ -206,14 +205,11 @@ fn fallback_catalog(
         let (sender, receiver) = mpsc::sync_channel::<
             mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>,
         >(1);
-        let _ = std::thread::Builder::new()
-            .name("mii-catalog".into())
-            .stack_size(0x20000)
-            .spawn(move || {
+        let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
                     #[cfg(feature = "mii-editor-alpha")]
-                    crate::runtime::macros::port::editor_bridge::catalog_read(&native);
+                    crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                     #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     let native = {
                         let mut native = native;

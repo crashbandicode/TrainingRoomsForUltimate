@@ -13,8 +13,9 @@ use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
-use crate::runtime::ui::thumbs;
+use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
+use crate::runtime::ui::requests;
+use crate::runtime::ui::{chips, thumbs};
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
@@ -62,6 +63,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if name != INFO_TRAINING {
         return;
     }
+    // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
+    let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuDraw);
     if registration {
         INVALIDATE.store(true, Ordering::Release);
         REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
@@ -94,8 +97,10 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         }
     }
     let open = OPEN.load(Ordering::Acquire);
+    // A panel the menu does not own (the clip editor) is drawn with the menu closed.
+    let ext = EXT_SHOWN.load(Ordering::Acquire);
     let mut alpha = 255;
-    let mut showing = open;
+    let mut showing = open || ext;
     if CLOSING.load(Ordering::Acquire) {
         let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
         if count >= CLOSE_FRAMES {
@@ -103,7 +108,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
         } else {
             showing = true;
-            alpha = fade_alpha(count);
+            alpha = if ext { 255 } else { fade_alpha(count) };
         }
     }
     let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire);
@@ -119,24 +124,37 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     *shown = visible;
     let seq = FRAME_SEQ.load(Ordering::Acquire);
     if visible && (seq != *drawn_seq || !was_shown) {
-        if let Some(frame) = FRAME.try_lock() {
-            panes.draw(&frame);
-            thumbs::note_frame(&frame);
-            *drawn_seq = seq;
-            if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
-                log(format_args!("[Ui] first draw seq={seq}"));
-            }
+        // Wait-free (stream/sync): the worker hands frames over through a triple buffer; the tick reads its own slot.
+        FRAME.with_latest(|frame, _| {
+            // SAFETY: as the draw this tick made before (the panes were resolved from the live layout this tick).
+            unsafe { panes.draw(frame) };
+            thumbs::note_frame(frame);
+            chips::note_frame(frame);
+        });
+        *drawn_seq = seq;
+        if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
+            log(format_args!("[Ui] first draw seq={seq}"));
         }
     }
+    // What the menu worker asked of the game (the Give item grid's item): made here, where the game is.
+    requests::run_menu_requests();
+    // The clip editor's held scrub repeats once per drawn frame of the Training layout (the layer's fter_draw, a no-op unless the
+    // editor is in the foreground).
+    crate::runtime::macros::after_layout_draw();
     // The stage grid's thumbnails (SPEC-core-07 section 4.5): requested when a stage page shows, released when it changes or
     // the menu closes; `thumbs::run` also lets the helper retire released textures, once per UI frame.
     if !visible {
         thumbs::hide();
+        chips::hide();
     }
     // The texture helper's Eden proof (feature `texture-probe`): binds a few stage textures to menu tiles and photographs them.
     #[cfg(feature = "texture-probe")]
     crate::runtime::ui::texture_probe::tick(panes);
     if thumbs::run(panes) {
+        FRAME_SEQ.fetch_add(1, Ordering::Release);
+    }
+    // The DI / SDI chips (SPEC-core-07 section 4.6): the game's own effect texture on the chip pointers while that grid shows.
+    if chips::run(panes) {
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }
 }
@@ -150,7 +168,10 @@ fn log(args: core::fmt::Arguments<'_>) {
 /// The layout cannot draw the menu now: drop the readiness and, if the menu owns Player 1's input, give it back.
 fn renderer_lost(reason: &str) {
     // SAFETY: on the UI job thread; the textures are released without touching a pane.
-    unsafe { thumbs::lose_layout() };
+    unsafe {
+        thumbs::lose_layout();
+        chips::lose_layout();
+    }
     let was_ready = LAYOUT_READY.swap(false, Ordering::AcqRel);
     if state::readiness_facts(0).owns_input {
         state::release_menu();
@@ -163,6 +184,7 @@ fn renderer_lost(reason: &str) {
 unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     // The panes the thumbnails were bound to are about to be replaced: drop the textures first.
     thumbs::lose_layout();
+    chips::lose_layout();
     r.layout = layout as usize;
     r.panes = None;
     r.status_r = core::ptr::null_mut();

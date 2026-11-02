@@ -73,6 +73,12 @@ pub mod settings_file;
 pub mod sha256;
 #[path = "model/sites_u4.rs"]
 pub mod sites_u4;
+#[path = "model/sites_u4b.rs"]
+pub mod sites_u4b;
+#[path = "model/effect_texture.rs"]
+pub mod effect_texture;
+#[path = "model/effect_chips.rs"]
+pub mod effect_chips;
 #[path = "model/ui_texture.rs"]
 pub mod ui_texture;
 #[path = "model/ui/stage_textures.rs"]
@@ -99,6 +105,8 @@ pub mod state;
 pub mod storage;
 #[path = "model/ui/hash40.rs"]
 pub mod hash40;
+#[path = "model/ui/flow.rs"]
+pub mod flow;
 #[path = "model/ui/frame.rs"]
 pub mod frame;
 #[path = "model/ui/screens.rs"]
@@ -107,3 +115,5 @@ pub mod screens;
 pub mod panes;
 #[path = "model/version.rs"]
 pub mod version;
+#[path = "model/thread_stacks.rs"]
+pub mod thread_stacks;

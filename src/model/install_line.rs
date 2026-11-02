@@ -185,14 +185,53 @@ impl Display for InstallLine<'_> {
     }
 }
 
-/// The whole line as text. Called once, on the boot thread (the counting allocator does not count it): the line has no fixed size
-/// because every package adds its sites (8,150 characters at the 2026-11-02 integration head, which a fixed 8 KiB buffer cut before
-/// `result=` and `heap_allocations=`).
-pub fn render(line: &InstallLine<'_>) -> String {
+/// Bytes kept free at the end of the buffer for the overflow ending (` heap_allocations=<u64> result=line_overflow`, 59 bytes).
+pub const OVERFLOW_TAIL: usize = 64;
+
+/// A fixed-capacity sink over the caller's buffer: it writes into the slice it was given and never grows it; text past `limit`
+/// sets `overflow` and stops the line.
+struct Sink<'a> {
+    buf: &'a mut [u8],
+    len: usize,
+    limit: usize,
+    overflow: bool,
+}
+
+impl fmt::Write for Sink<'_> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        let end = self.len + text.len();
+        if self.overflow || end > self.limit {
+            self.overflow = true;
+            return Err(fmt::Error);
+        }
+        self.buf[self.len..end].copy_from_slice(text.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
+/// The whole line rendered into `buf`, a fixed buffer the caller sized (`INSTALL_LINE_CAPACITY`, the const worst case of the site
+/// and seam tables): it is never grown. A line that does not fit is never cut silently: it keeps every whole field that fit and ends
+/// ` heap_allocations=<n> result=line_overflow`. Returns the text and whether it overflowed.
+pub fn render_into<'a>(buf: &'a mut [u8], line: &InstallLine<'_>) -> (&'a str, bool) {
     use core::fmt::Write;
-    let mut text = String::with_capacity(16 * 1024);
-    let _ = write!(text, "{line}");
-    text
+    let limit = buf.len().saturating_sub(OVERFLOW_TAIL);
+    let mut sink = Sink { buf, len: 0, limit, overflow: false };
+    let _ = write!(sink, "{line}");
+    let overflow = sink.overflow;
+    if overflow {
+        // Back to the last whole field (fields are separated by one space, an ASCII byte: always a character boundary).
+        sink.len = sink.buf[..sink.len].iter().rposition(|byte| *byte == b' ').unwrap_or(0);
+        sink.limit = sink.buf.len();
+        sink.overflow = false;
+        let _ = match line.heap_allocations {
+            Some(n) => write!(sink, " heap_allocations={n} result=line_overflow"),
+            None => write!(sink, " heap_allocations=unmetered result=line_overflow"),
+        };
+    }
+    let Sink { buf, len, .. } = sink;
+    let buf: &'a [u8] = buf;
+    (core::str::from_utf8(&buf[..len]).unwrap_or(""), overflow)
 }
 
 #[cfg(test)]
@@ -235,11 +274,41 @@ mod tests {
             migration: Some("done"),
             heap_allocations: Some(0),
         };
-        let text = render(&line);
+        let mut buf = vec![0u8; 64 * 1024];
+        let (text, overflow) = render_into(&mut buf, &line);
+        assert!(!overflow);
         assert!(text.len() > 8192, "the merged tree's line ({} characters) is longer than the old fixed buffer", text.len());
         assert!(text.ends_with(" migration=done result=installed heap_allocations=0"), "{}", &text[text.len() - 120..]);
         assert!(text.contains(" roster=not_installed reason=roster=unavailable_until_cycle_lands"));
         assert_eq!(text, line.to_string());
+    }
+
+    /// A line longer than its buffer keeps its whole leading fields and ends `result=line_overflow`, never cut inside a field.
+    #[test]
+    fn a_line_that_does_not_fit_ends_with_line_overflow() {
+        let reports: Vec<SiteReport> = (0..40)
+            .map(|_| SiteReport { site: "a_long_enough_site_name", found: GuardOutcome::Stock, written: Written::Checked })
+            .collect();
+        let line = InstallLine {
+            tick: 1,
+            version: "0.1.0",
+            display: b"13.0.5",
+            build_id: None,
+            verdict: Verdict::Supported,
+            sites: &reports,
+            features: &[],
+            seams: None,
+            developer: None,
+            settings: None,
+            migration: None,
+            heap_allocations: Some(7),
+        };
+        let mut buf = [0u8; 512];
+        let (text, overflow) = render_into(&mut buf, &line);
+        assert!(overflow);
+        assert!(text.ends_with(" a_long_enough_site_name=stock/checked heap_allocations=7 result=line_overflow"), "{text}");
+        assert!(text.len() <= 512);
+        assert!(line.to_string().starts_with(text.trim_end_matches(" heap_allocations=7 result=line_overflow")));
     }
 
     #[test]

@@ -39,7 +39,7 @@ pub(crate) use {log_error, log_info, log_warn};
 pub fn heap_profile(label: &str) {
     #[cfg(all(target_os = "switch", feature = "plugin-heap-meter"))]
     {
-        let heap = crate::runtime::roster::heap_metrics::snapshot();
+        let heap = crate::model::hook_stats::heap_bytes();
         diagnostic(format_args!(
             "[HeapMeter] label={label} live={} peak={} total={} calls={} largest={}",
             heap.live, heap.peak, heap.total, heap.calls, heap.largest

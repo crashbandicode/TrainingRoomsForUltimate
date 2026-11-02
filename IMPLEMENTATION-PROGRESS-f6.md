@@ -1,5 +1,12 @@
 # Implementation progress, stream f6 (ledger F6: the first-boot group-build hitch)
 
+## Astra lead continuation (2026-11-02)
+
+- Lead owns this dormant stream now; no additional worker slot. Exact live thread 01a19c96-0e78-7293-a76c-6f46a70be468, gpt-6-astra / medium, one owner-bound watcher. Playbook ae87443 read completely; bounded-validation-evidence skill applied for upcoming acceptance.
+- Merged fixed integration ebfcb9800fba1f82b2730b19ed26e231c810a2d6 into f6 from eed09c1. Source merge was automatic. Manifest conflict combined the integration stack transform with all F6 transforms in order; regenerated ledger. Full derivation verified all 264 pkg6 files against frozen m5q (scope run-p2718935-i15286256).
+- No compile, Eden or ledger claim in this continuation yet. Source integration is not runtime proof. Remaining: inspect/adopt shared harness, freeze source, obtain admitted job, merged host/Switch gates and f6-05/06 with zero total Unmapped. Retain prior failed runs.
+- Existing checklist below is historical; open rows stay open until new source-bound evidence. In particular the first-switch runtime criterion and Kirby native baseline remain unproved.
+
 2026-11-02. Branch `stream/f6` (from `stream/pkg6` `98d6f5b`), worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-f6`, target
 `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-f6` (Surface), Yoga folder `/home/intpa/trainingrooms-build-f6` (own `target/`,
 `host-target/`), Eden labels `f6-NN`, own profile `/home/intpa/trainingrooms-eden-f6/profiles/f6` (display `:97`). Model gate: `claude-opus-5-5` /

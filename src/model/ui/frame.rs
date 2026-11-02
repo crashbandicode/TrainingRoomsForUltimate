@@ -95,6 +95,18 @@ pub struct RowLine {
     pub value_tone: Tone,
 }
 
+/// The effect visual of the direction chips.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChipVisual {
+    /// The clean room's own arrow chips (Airdodge Direction, Shield Tilt; and DI / SDI while the game's visual is not available).
+    #[default]
+    None,
+    /// DI Direction: the game's `sys_vector`.
+    Di,
+    /// SDI Direction: the game's `sys_hitstop_spark`.
+    Sdi,
+}
+
 /// What fills the area right of the divider.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum View {
@@ -109,6 +121,8 @@ pub enum View {
     Delay,
     /// The situation overrides screen (mockup 06): the situation line over two columns of action boxes.
     Overrides,
+    /// The replay window's clip editor: its text lines over a timeline (the crop window and the playhead).
+    Clip,
 }
 
 /// The delay popup's range control: two handles on a bar over the row's value set.
@@ -127,6 +141,17 @@ pub struct RangeView {
     pub editing: bool,
 }
 
+/// The clip editor's timeline (frames of the capture: the whole length, the crop window and the playhead).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ClipBar {
+    pub total: u32,
+    pub start: u32,
+    pub end: u32,
+    pub cursor: u32,
+    /// Which handle the Left / Right keys move: 0 the playhead, 1 the start, 2 the end.
+    pub handle: u8,
+    pub playing: bool,
+}
 
 /// One frame of the menu.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -135,6 +160,8 @@ pub struct Frame {
     /// Weight of each chip (array index order of options::DIRECTIONS) and the focused chip.
     pub chip_weights: [u8; super::panes::CHIPS],
     pub chip_focus: u8,
+    /// Which of the game's own effect visuals the chips draw (SPEC-core-07 section 4.6): DI and SDI only, the other grids keep the arrows.
+    pub chip_visual: ChipVisual,
     /// The tile grid: its geometry, the labels of the tiles on this page and the focused tile.
     pub tile_cols: u8,
     pub tile_rows: u8,
@@ -149,6 +176,7 @@ pub struct Frame {
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
     pub range: RangeView,
+    pub clip: ClipBar,
     pub title: Text<40>,
     pub tabs: [Text<40>; TABS],
     pub tab_count: u8,
@@ -177,6 +205,7 @@ impl Frame {
             view: View::List,
             chip_weights: [0; super::panes::CHIPS],
             chip_focus: 0,
+            chip_visual: ChipVisual::None,
             tile_cols: 0,
             tile_rows: 0,
             tiles: [Text::new(); super::panes::TILES],
@@ -187,6 +216,7 @@ impl Frame {
             tile_sig: 0,
             tile_state: [0; super::panes::TILES],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
+            clip: ClipBar { total: 0, start: 0, end: 0, cursor: 0, handle: 0, playing: false },
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,

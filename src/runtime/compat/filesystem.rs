@@ -6,23 +6,29 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-#[cfg(any(feature = "mii-editor-alpha", feature = "automation-results-observer"))]
+#[cfg(feature = "automation-results-observer")]
 use crate::engine::lobby::trace_slot::{flush_with, LatestSlot};
+#[cfg(feature = "mii-editor-alpha")]
+use crate::engine::lobby::trace_slot::{flush_boxed, BoxedSlot};
 
-const STACK_BYTES: usize = 64 * 1024;
 const POLL: Duration = Duration::from_millis(100);
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "mii-editor-alpha")]
-static MII_EDITOR: LatestSlot<crate::runtime::mii::mii_editor_bridge::Trace> = LatestSlot::new();
+/// The Mii editor trace (11 KB) lives in the slot's two heap buffers and is never moved through a stack frame (stream/stack:
+/// moved by value it gave this thread's body a 59,712 B frame on its 64 KiB stack, Eden s4-07 and u4b-02).
+static MII_EDITOR: BoxedSlot<crate::runtime::mii::mii_editor_bridge::Trace> = BoxedSlot::new();
 
 /// Start the writer thread (once).
 pub fn init() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    let started = std::thread::Builder::new().name("tr-trace-writer".into()).stack_size(STACK_BYTES).spawn(|| loop {
+    // The slot's buffers are made here, before any callback can publish (boot, not a hook).
+    #[cfg(feature = "mii-editor-alpha")]
+    MII_EDITOR.prepare(&crate::runtime::mii::mii_editor_bridge::Trace::EMPTY);
+    let started = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::TraceWriter, || loop {
         turn();
         std::thread::sleep(POLL);
     });
@@ -46,7 +52,7 @@ fn turn() {
         crate::engine::compat::logging::diagnostic(format_args!("[AutomationObserver] trace write failed: {error}"));
     }
     #[cfg(feature = "mii-editor-alpha")]
-    if let Err(error) = flush_with(&MII_EDITOR, crate::runtime::mii::mii_editor_bridge::write_trace) {
+    if let Err(error) = flush_boxed(&MII_EDITOR, crate::runtime::mii::mii_editor_bridge::write_trace) {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] trace write failed: {error}"));
     }
 }
@@ -60,5 +66,6 @@ pub fn write_results_observer(trace: Box<crate::runtime::lobby::automation_helpe
 /// The Mii editor bridge's newest trace (`mii-editor-last.json`).
 #[cfg(feature = "mii-editor-alpha")]
 pub fn publish_mii_editor(trace: &crate::runtime::mii::mii_editor_bridge::Trace) {
-    MII_EDITOR.put(trace.clone());
+    // Copied in place into the slot's pending buffer: no allocation, no stack copy of the trace.
+    MII_EDITOR.put(trace);
 }

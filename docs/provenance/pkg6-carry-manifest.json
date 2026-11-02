@@ -77,7 +77,10 @@
    "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
    "common::filesystem": "crate::runtime::compat::filesystem",
    "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
-   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT"
+   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT",
+   "mii_identity_probe": "crate::runtime::mii::mii_identity_probe",
+   "mii_fullconfig_probe": "crate::runtime::mii::mii_fullconfig_probe",
+   "mii_saved_file_probe": "crate::runtime::mii::mii_saved_file_probe"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1218,7 +1221,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "abf12f1f3059dfc2a2366c5625fab066da60577e40f6dfc1670f311cd40a9f77",
+   "dest_sha256": "254e88ddb315be4cab23714fcf79e285ebd42a61093c22be026127801375707c",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -1249,6 +1252,21 @@
      "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
      "new": "",
      "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"diag\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"diag\"))]\nimpl fmt::Display for DrillFields",
+     "new": "#[cfg(feature = \"seam-drill\")]\nuse super::seam_drill::InstallFields as DrillFields;\n#[cfg(not(feature = \"seam-drill\"))]\nstruct DrillFields;\n\n#[cfg(not(feature = \"seam-drill\"))]\nimpl fmt::Display for DrillFields",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "#[cfg(feature = \"diag\")]\npub(crate) fn bits_of(",
+     "new": "#[cfg(feature = \"seam-drill\")]\npub(crate) fn bits_of(",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS)"
+    },
+    {
+     "old": "pub(crate) fn report_late() {\n",
+     "new": "pub(crate) fn report_late() {\n    // The drill's stand-in run counts (rate-limited to once a second by the drill itself).\n    #[cfg(feature = \"seam-drill\")]\n    super::seam_drill::report_counts(crate::runtime::clock::uptime_ms());\n",
+     "reason": "the hook-sharing drill has its own diag feature `seam-drill` (integration, work/implementation: the drill installs stand-in hooks, so a plain diag build must not carry it); recorded here because the integrated tree had the change only in the carried file (carry verify reported DIFFERS); the drill's stand-in run counts are reported from the late-report tick"
     }
    ]
   },
@@ -1414,7 +1432,14 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "22718f1f019e6106de8ce88cf4daa53abebf8a69fa9f8f0b9d8802d2d80003ee"
+   "dest_sha256": "0282b287309623abd29a9dc1132f339962133fb313e357db81d7dc042943311b",
+   "edits": [
+    {
+     "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
+     "new": "    context: &ServiceEntryContext,\n) -> u64 {\n    crate::runtime::threads::headroom(\"native_service\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/native_unlink_install.rs",
@@ -1428,14 +1453,21 @@
    "dest": "src/runtime/roster/character_lifecycle.rs",
    "crate": "root",
    "src_sha256": "d3dc2989eabad2608dfa0841828103b3f8c32ce709426c57b6b9197d0a3af453",
-   "dest_sha256": "374796ae64082db4e925e88986c15829f77d243959bab34dacb3bf81e0f7d672"
+   "dest_sha256": "3a22de13ecf4536d73bfced0bdc28f6ebe61de16b4761917eee9ed73ac060eac",
+   "edits": [
+    {
+     "old": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"destruction_trace\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/character_roster.rs",
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "134f449376e9cf43e244e1fce66386975a27082d86f728e8df5ff7a7da98c6b0",
+   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1498,7 +1530,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "2c35f72b17fd644f31f8c59eac5937a00109d3ce42bb111eb49fa317850553d6",
+   "dest_sha256": "e1e5a05d5fc6724829cbe4535b2227adce3bd552948909ae45be6bb2d672f53d",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -1509,6 +1541,11 @@
      "old": "fn notice(text: impl Into<String>) {",
      "new": "fn notice(text: impl Into<std::borrow::Cow<'static, str>>) {",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "#[cfg(feature = \"turnip-save-probe\")]\npub(crate) fn turnip_probe_idle() -> bool {\n    !HAS_PENDING.load(Ordering::Acquire) && PENDING.lock().unwrap().is_none()\n}\n\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
     }
    ]
   },
@@ -1536,8 +1573,13 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "7f85e6920653929ff2d00ab80ac31c03b6ac6279de1b9cf01f1a62185ae03ce8",
+   "dest_sha256": "0461c28894fafabe9a77685247953ddebdd4b0f984fa53996b7da51a5640d0b3",
    "edits": [
+    {
+     "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
+     "new": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n    crate::runtime::threads::headroom(\"finalize_entry\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
     {
      "old": "use crate::runtime::roster::special_articles as articles;\n",
      "new": "use crate::runtime::roster::special_articles as articles;\nuse crate::runtime::roster::build_split as split;\n",
@@ -1725,7 +1767,19 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "09d353f9631a27b058b3869da23d167ec28fc06de6666b6331bd1cf18d897fbb"
+   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "edits": [
+    {
+     "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn listener_removed(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"listener_removed\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/effect_hook_chain.rs",
@@ -1746,7 +1800,7 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "b8c285449ce80b127cc9f7e228aabffc9dce1576fb0fccad12a0a67a836471c9",
+   "dest_sha256": "55854dce68991bb0a3e8dc42ec65394af70a76f7aa7129716bf3cd1622f8f923",
    "edits": [
     {
      "old": "use std::alloc::{GlobalAlloc, Layout, System};",
@@ -1777,6 +1831,21 @@
      "old": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init};",
      "new": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init, TraceAllocator};",
      "reason": "`TraceAllocator` is the global allocator `runtime::alloc` installs under this feature"
+    },
+    {
+     "old": "    const STACK_BYTES: usize = 128 * 1024;\n",
+     "new": "",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build) (the local STACK_BYTES is gone)"
+    },
+    {
+     "old": "std::thread::Builder::new()\n            .stack_size(STACK_BYTES)\n            .spawn(writer)",
+     "new": "crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::PracticeTrace, writer)",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    },
+    {
+     "old": "core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,",
+     "new": "core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,",
+     "reason": "stream/stack: the session line prints the table's stack size"
     }
    ]
   },
@@ -1933,7 +2002,19 @@
    "dest": "src/runtime/mii/mii_hud_portrait.rs",
    "crate": "root",
    "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
-   "dest_sha256": "5832ced6c12f6efe582ec72f9a4258947e670c0362fab2b9e42ee366dd237210"
+   "dest_sha256": "c851ef702240c0a8900b88715091d0cdaccd3673e0d8fa6dc86fb3ea00b085cc",
+   "edits": [
+    {
+     "old": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_before_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_after_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/mii_ldn_qualification.rs",
@@ -1961,7 +2042,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "bffc2029ceea598b289abce75d948d251c36b7fcda754a4e73a65e46c2b0f428",
+   "dest_sha256": "ca582e25916a342413d5f9454c1d54ebbf81576a26051d432940b722f45f7356",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1977,6 +2058,16 @@
      "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
      "new": "notify_args(Role::Cpu,format_args!(\"CPU {:?} choice skipped\",choice.canonical.class));",
      "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },
@@ -1999,7 +2090,24 @@
    "dest": "src/runtime/mii/mii_ordinary_gate.rs",
    "crate": "root",
    "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
-   "dest_sha256": "ce2644f46ccf0ef9b36d16ba90051baaf6e4ba29ed471b193267836eb2d72418"
+   "dest_sha256": "1e1016ded06643d45936e7360d56dc9d11f344753b0858385b0ae53341ebebd1",
+   "edits": [
+    {
+     "old": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n",
+     "new": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {\n        let valid_stack",
+     "new": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    // stream/stack: each arm is its own frame (inline(never)), so the callback's stack holds only the arm that runs.\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {return decide_cpu(entry,selected,native_sp);}\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {return decide_helper(entry,selected,native_sp);}\n    decide_player(entry,selected,native_sp)\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n#[inline(never)]\nunsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change"
+    },
+    {
+     "old": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "new": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[cfg(feature=\"mii-managed-helper-alpha\")]\n#[inline(never)]\nunsafe fn decide_helper(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[inline(never)]\nunsafe fn decide_player(entry:usize,selected:usize,native_sp:usize)->usize {\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change (the helper and player arms)"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_native.rs",
@@ -2020,7 +2128,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "9bdb188d599b919a74085970778361d97cfaae98d194ece6994fb62af1df30ab",
+   "dest_sha256": "2d0949f60cbf908144977885db5e80b3846cb47386f99ed3a6d52ef2e51a22b0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -2036,6 +2144,16 @@
      "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
      "new": "notify_args(Role::Player,format_args!(\"Player {:?} choice skipped\",choice.canonical.class));",
      "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },
@@ -2241,7 +2359,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "b3d30e3e6ba029697e2e5a0c65f95720eb01993de78f7624e1dcf0c26e9e1265",
+   "dest_sha256": "8b2cba722f3db30f294cbd9db62018c0f1359910e826ea6b195e377f4ead0f45",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -2267,6 +2385,16 @@
      "old": "    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {\n        let path = \"sd:/ultimate/TrainingRooms/mii-editor-last.json\";\n        if let Err(error) = std::fs::write(path, bytes) {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] trace write failed: {error}\"));\n        }\n    }",
      "new": "    crate::engine::lobby::trace_slot::write_json(std::path::Path::new(\"sd:/ultimate/TrainingRooms/mii-editor-last.json\"), trace)",
      "reason": "the trace file is written transactionally (temporary file, sync, replace; the old file stays on a failure) instead of `std::fs::write` over the live file (review R1); host tests in `engine::lobby::trace_slot` cover two loads and a failed write; offered back to the fork's fix ledger"
+    },
+    {
+     "old": "#[derive(Clone, Serialize)]\npub(crate) struct Trace {",
+     "new": "// Copy (stream/stack): the writer's slot copies it into a heap buffer in place instead of moving 11 KB through stack frames.\n#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace {",
+     "reason": "stream/stack: Trace is Copy so the trace writer's BoxedSlot copies it into a boot-made heap buffer in place (moved by value it gave tr-trace-writer a 59,712 B frame on a 64 KiB stack: the Eden s4-07/u4b-02 boot fault)"
+    },
+    {
+     "old": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n",
+     "new": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n\nimpl Trace {\n    /// No events: the template of the writer slot's two buffers.\n    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };\n}\n",
+     "reason": "stream/stack: Trace::EMPTY, the template the writer slot's two heap buffers are made from at init"
     }
    ]
   },
@@ -2566,7 +2694,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "117b9ea66701ff929a3848240e2a3ebcd8c71742d82fde1a7962a8d3fe6441fc",
+   "dest_sha256": "a455c1df1e9a19f7babd8a134228f6443c52226b02fc67b2bf151dfcee25d98a",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -2577,11 +2705,6 @@
      "old": "pub fn waiting() -> bool { context() == Some(Context::Waiting) }\n",
      "new": "",
      "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (pub fn waiting)"
-    },
-    {
-     "delete_from": "/// Native Training panels also hold extra CPUs.",
-     "delete_to": "unsafe fn native_entry(",
-     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (panel_entry)"
     },
     {
      "delete_from": "pub unsafe fn visualizes(",
@@ -2779,14 +2902,48 @@
    "dest": "src/runtime/roster/source_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "59204c4695a82aa8e5d032bff10c709358508551f476cfc2aea2f6634778ff27"
+   "dest_sha256": "3ee067ff3732c8af334af6c7c234047ec9e5724c9e7fc9dfaf2536f74e09cb01",
+   "edits": [
+    {
+     "old": "Layout::Training => scene_permitted(),",
+     "new": "Layout::Training => scene_permitted(),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => baseline(current),",
+     "new": "Layout::Training => baseline(current),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => true,",
+     "new": "Layout::Training => true,\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => snapshot(ctx, entry, SLOT as u32),",
+     "new": "Layout::Training => snapshot(ctx, entry, SLOT as u32),\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => None,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    if !crate::item_state_probe::capacity_probe_idle() {\n        return false;\n    }\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    }
+   ]
   },
   {
    "src": "src/source_ldn_capacity_probe.rs",
    "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "2b03502a03a932d7dcc39dd0130b5ad71a7cd04ca3187748e0db9a80dbe0166b"
+   "dest_sha256": "2a1d01699a2b8508334a61d4a69cb6c0057dc0f438581e046317f1792be2a2bb",
+   "edits": [
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    {\n        crate::item_state_probe::capacity_probe_idle()\n    }\n    #[cfg(not(feature = \"item-state-probe\"))]\n    {\n        true\n    }\n",
+     "new": "    true\n",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    }
+   ]
   },
   {
    "src": "src/mii_pool_observer.rs",
@@ -2808,6 +2965,27 @@
    "crate": "root",
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
+  },
+  {
+   "src": "src/mii_identity_probe.rs",
+   "dest": "src/runtime/mii/mii_identity_probe.rs",
+   "crate": "root",
+   "src_sha256": "239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c",
+   "dest_sha256": "4b19665574211de8811fe210ecbce375ed348dcdce2863b0a449e21edd8add3e"
+  },
+  {
+   "src": "src/mii_fullconfig_probe.rs",
+   "dest": "src/runtime/mii/mii_fullconfig_probe.rs",
+   "crate": "root",
+   "src_sha256": "3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e",
+   "dest_sha256": "fb90e342ec8513684272d367289892910c654db6d926fe0ca6f6b839dcc9656c"
+  },
+  {
+   "src": "src/mii_saved_file_probe.rs",
+   "dest": "src/runtime/mii/mii_saved_file_probe.rs",
+   "crate": "root",
+   "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
+   "dest_sha256": "48cdfd978e3f3762170edc972e9d2b9c6dd91fb4e5779251207e4a450f07c10b"
   }
  ]
 }

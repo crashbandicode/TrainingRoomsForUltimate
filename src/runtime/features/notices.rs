@@ -62,6 +62,9 @@ pub unsafe fn combo_display_b(ctx: &mut InlineCtx) {
 pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
     let menu = ctx.registers[22].x() as usize;
+    // Diag (package 6, F9 research): remember the pause menu object so Eden can dump it around a No. of CPUs change.
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_reload::note_pause_menu(menu);
     if menu != 0 && scene::is_native_training() {
         ((menu + 0xb60) as *mut u8).write(1);
     }
@@ -69,21 +72,46 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
-    QUEUE.lock().post_static(header, body, length, color);
+    send(Mail::Post { header, body, length, color });
 }
 
 /// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
 /// updated in place with this text, colour and a full `length`. `body` is copied (at most `BODY_MAX` bytes).
-/// Allocation-free.
+/// Allocation-free; any thread (it goes through the mailbox, see `post`).
 pub fn upsert(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
-    QUEUE.lock().upsert(id, header, Body::copied(body), length, color);
+    send(Mail::Upsert { id, header, body: Body::copied(body), length, color });
 }
 
-/// Remove the standing notice `id` (queued or on screen) and its delivery record.
+/// Remove the standing notice `id` (queued or on screen) and its delivery record. Any thread (through the mailbox).
 pub fn clear(id: u8) {
-    QUEUE.lock().clear_id(id);
+    send(Mail::Clear(id));
 }
 
+/// What a thread asks of the notification queue. Any thread posts it (the menu worker, the writer thread, package 4's and 6's
+/// notifications, a hook); the HUD tick, on the game's UI thread, applies it under `QUEUE` (stream/sync: no thread but the game's
+/// takes `QUEUE`).
+#[derive(Clone, Copy)]
+enum Mail {
+    Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
+    Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
+    Clear(u8),
+}
+
+static MAILBOX: hos_lock::Mailbox<Mail, 16> = hos_lock::Mailbox::new();
+
+fn send(mail: Mail) {
+    // A full mailbox drops the request and counts it (`take_dropped`, reported by the HUD tick).
+    let _ = MAILBOX.post(mail);
+}
+
+/// Apply the posted requests to the queue, in posting order (the HUD tick, under `QUEUE`).
+fn take_mail(queue: &mut Queue) {
+    MAILBOX.drain(|mail| match mail {
+        Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
+        Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
+        Mail::Clear(id) => queue.clear_id(id),
+    });
+}
 /// The standing notice `id` is queued (not yet shown for its whole time, not cleared).
 pub fn is_queued(id: u8) -> bool {
     QUEUE.lock().is_queued(id)
@@ -127,7 +155,11 @@ pub fn reset_combo_display() {
 /// One HUD tick. `menu_open` is the plugin menu's flag (package 5; the owner bit meanwhile).
 pub fn hud_tick() -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);
-    let out = QUEUE.lock().tick(combo_display(), menu_open);
+    let out = {
+        let mut queue = QUEUE.lock();
+        take_mail(&mut queue);
+        queue.tick(combo_display(), menu_open)
+    };
     #[cfg(feature = "diag")]
     {
         static LAST_VISIBLE: AtomicU8 = AtomicU8::new(2);

@@ -221,8 +221,10 @@ fn core04_publish_order() {
 fn core04_writer_fallback() {
     assert_eq!(settings::write_mode(true), WriteMode::Thread);
     assert_eq!(settings::write_mode(false), WriteMode::Synchronous);
-    assert_eq!(settings::WRITER_STACK_BYTES, 64 * 1024);
-    assert_eq!(settings::LOADER_STACK_BYTES, 128 * 1024);
+    // SPEC-core-04 as amended 2026-11-02: the writer and loader stacks are the measured thread table's rows (tests/thread_stacks.rs
+    // checks each covers its measured need); here only that both threads have one.
+    const { assert!(settings::WRITER_STACK_BYTES >= 16 * 1024) };
+    const { assert!(settings::LOADER_STACK_BYTES >= 16 * 1024) };
 }
 
 #[test]

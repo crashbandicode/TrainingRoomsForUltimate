@@ -20,7 +20,6 @@ use hos_lock::Mutex;
 use crate::model::chords::field;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::input_display::{raw_axis, Candidate, Log, Mode, Plan, RawInput, Renderer, Settings};
-use crate::model::settings::Snapshot;
 use crate::runtime::features::recorder;
 use crate::runtime::published;
 

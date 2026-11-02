@@ -34,7 +34,6 @@ use crate::model::cpu::settings::CpuSettings;
 use crate::model::cpu::state::Cpu;
 use crate::model::cpu::status::Situation;
 use crate::model::lra_reset::{self, HubStep};
-use crate::model::settings::Snapshot;
 use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::{HookId, HookScope};
@@ -473,7 +472,10 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // SAFETY: `a0` is the fighter object the game just ran a frame of.
         unsafe { fighter_frame(a0) };
         // Package 3: the save-state step runs on the same per-fighter callback, after the CPU's.
-        crate::runtime::features::states::frame(a0);
+        {
+            let _state = HookScope::enter_hook(HookId::StateFrame);
+            crate::runtime::features::states::frame(a0);
+        }
         // Package 6: the CPU-as-P1 fallback's step (nothing when the pilot is absent-and-not-installed or present).
         unsafe { crate::runtime::p1::frame(a0) };
         // Package 6: Player 1's body refreshes the waiting-room practice entry lease, once per game frame.
