@@ -27,7 +27,6 @@ pub mod p1;
 #[cfg(test)]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
-#[cfg(test)]
 #[path = "../model/seams/mod.rs"]
 pub mod seams;
 #[cfg(test)]

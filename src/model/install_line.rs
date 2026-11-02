@@ -86,6 +86,16 @@ pub const fn tick_to_ms(tick: u64) -> u64 {
     tick / (SYSTEM_TICK_HZ / 1000)
 }
 
+/// Fields another package formats itself (the seam installer's): written after a space, as given.
+#[derive(Clone, Copy)]
+pub struct Extra<'a>(pub &'a dyn Display);
+
+impl fmt::Debug for Extra<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("Extra(..)")
+    }
+}
+
 /// Everything the install line says.
 #[derive(Clone, Copy, Debug)]
 pub struct InstallLine<'a> {
@@ -99,6 +109,8 @@ pub struct InstallLine<'a> {
     /// Empty on an unsupported game (nothing is installed).
     pub sites: &'a [SiteReport],
     pub features: &'a [FeatureReport],
+    /// The seam installer's fields (package 6: seams=<n> seams_stock=<n> ...), written after the features; None leaves them out.
+    pub seams: Option<Extra<'a>>,
     /// `None` leaves the `settings:` group out.
     pub settings: Option<SettingsReport>,
     /// `none`, `done`, `partial` or `skipped` (SPEC-core-08 §2); `None` leaves the token out.
@@ -126,6 +138,9 @@ impl Display for InstallLine<'_> {
                 if let Some(reason) = feature.reason {
                     write!(f, " reason={reason}")?;
                 }
+            }
+            if let Some(extra) = self.seams {
+                write!(f, " {}", extra.0)?;
             }
             if let Some(s) = self.settings {
                 write!(
@@ -172,6 +187,7 @@ mod tests {
             verdict: Verdict::UnsupportedVersion,
             sites: &[],
             features: &[],
+            seams: None,
             settings: None,
             migration: None,
             heap_allocations: Some(0),

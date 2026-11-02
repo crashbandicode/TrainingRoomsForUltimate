@@ -12,7 +12,7 @@ use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
-use crate::model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+use crate::model::install_line::{Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
@@ -48,6 +48,7 @@ pub fn run() {
             verdict,
             sites: &[],
             features: &[],
+            seams: None,
             settings: None,
             migration: None,
             heap_allocations: Some(hook_allocations()),
@@ -201,6 +202,7 @@ pub fn run() {
         FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
         FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
     ];
+    let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),
         version: env!("CARGO_PKG_VERSION"),
@@ -209,6 +211,7 @@ pub fn run() {
         verdict,
         sites: &reports,
         features: &features,
+        seams: Some(Extra(&seam_fields)),
         settings: Some(SettingsReport {
             input_delay: loaded.menu.input_delay(),
             lra_reset: loaded.menu.lra_reset(),

@@ -24,6 +24,8 @@ skyline = "=0.6.0"
 # B9: locks come from parking_lot directly (the fork's helper crate is not kept). Used by the input
 # delay queue; no allocation, `const` constructor.
 parking_lot = "0.12"
+# Package 6 (D3, lead-accepted): the fork's game-call crate for the carried code. MIT (`license = "MIT"` in its Cargo.toml). Pinned to the rev of stage m5o's lock.
+smash = { package = "skyline_smash", git = "https://github.com/ultimate-research/skyline-smash.git", rev = "01bf5835cc1140f5052ddfb2b4f9e98008f22679" }
 
 # `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it
 # (this is a declaration, not an `allow`).

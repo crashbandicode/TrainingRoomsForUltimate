@@ -19,6 +19,7 @@ mod published;
 mod ui;
 
 mod scene;
+mod seams;
 mod state_boot;
 mod state_natives;
 #[cfg(feature = "diag")]
