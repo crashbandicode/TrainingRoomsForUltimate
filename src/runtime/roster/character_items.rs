@@ -29,11 +29,6 @@ struct Pending {
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 static HAS_PENDING: AtomicBool = AtomicBool::new(false);
 
-#[cfg(feature = "turnip-save-probe")]
-pub(crate) fn turnip_probe_idle() -> bool {
-    !HAS_PENDING.load(Ordering::Acquire) && PENDING.lock().unwrap().is_none()
-}
-
 #[cfg(feature = "source-capacity-probe")]
 pub(crate) fn capacity_probe_idle() -> bool {
     PENDING.lock().unwrap().is_none() && !HAS_PENDING.load(Ordering::Acquire)

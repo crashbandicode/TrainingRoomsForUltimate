@@ -53,7 +53,19 @@ fn row_or<T>(snapshot: &Snapshot, id: &str, all: &[T], fallback: T) -> T
 where
     T: Copy + std::ops::Add<Output = T> + std::ops::Mul<u8, Output = T>,
 {
-    snapshot.get(id).map_or(fallback, |row| from_row(row, all))
+    if let Some(row) = snapshot.get(id) {
+        return from_row(row, all);
+    }
+    // A row the settings table does not define (the Solo Popo cycle rows, which the Character Cycles grid sets with Y): its kept key,
+    // which the write-back stores in the row's own shape (`rows()`: the option bytes). Without this the typed view always read the
+    // factory value, so Solo Popo on a cycle slot could never be on.
+    let kept = snapshot.extra().get(id).and_then(|value| value.as_array()).map(|values| {
+        values.iter().map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok())).collect::<Option<Vec<u8>>>()
+    });
+    match kept {
+        Some(Some(row)) if row.len() == all.len() => from_row(&row, all),
+        _ => fallback,
+    }
 }
 
 const fn solo_popo_player_cycle_default() -> OnOff {
@@ -349,6 +361,53 @@ mod tests {
         assert_eq!(OnOff::ON.to_byte_vec(), [1, 0]);
         assert_eq!(OnOff::OFF.to_byte_vec(), [0, 1]);
         assert_eq!(OnOff::ON + OnOff::OFF, OnOff::all());
+    }
+
+    /// The Solo Popo cycle rows are not rows of the settings table: their kept keys carry them (the row's option bytes), and a
+    /// malformed or missing key is the factory value.
+    #[test]
+    fn the_solo_popo_cycle_rows_come_from_their_kept_keys() {
+        let mut snapshot = Snapshot::factory();
+        assert_eq!(TrainingModpackMenu::from_snapshot(&snapshot).solo_popo_player_cycle, OnOff::OFF);
+        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0])).unwrap();
+        snapshot.set_kept("solo_popo_cpu", serde_json::json!([1, 0])).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::ON, OnOff::ON));
+        snapshot.set_kept("solo_popo_cpu", serde_json::json!("On")).unwrap();
+        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0, 0])).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::OFF, OnOff::OFF));
+    }
+
+    /// Every row-shaped field of the view (`rows()`), whether the settings table defines it (a row) or not (a kept key the
+    /// write-back stores in the same shape): a non-factory value in the snapshot reaches the typed view and comes back unchanged.
+    /// The Solo Popo cycle rows were the kept keys this missed (Eden s6-04); the test lists the others with them.
+    #[test]
+    fn every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key() {
+        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
+        let mut snapshot = Snapshot::factory();
+        let mut wanted = Vec::new();
+        let mut kept_ids = Vec::new();
+        for (id, elements) in factory.rows() {
+            let mut changed = elements.clone();
+            changed.rotate_right(1);
+            if changed == elements {
+                continue;
+            }
+            if snapshot.get(id).is_some() {
+                snapshot.set(id, &changed).unwrap();
+            } else {
+                kept_ids.push(id);
+                snapshot.set_kept(id, serde_json::json!(changed)).unwrap();
+            }
+            wanted.push((id, changed));
+        }
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        let got: std::collections::HashMap<_, _> = view.rows().into_iter().collect();
+        for (id, changed) in &wanted {
+            assert_eq!(got.get(id), Some(changed), "{id} did not reach the typed view");
+        }
+        assert!(kept_ids.contains(&"solo_popo_player_cycle") && kept_ids.contains(&"solo_popo_cpu"), "kept: {kept_ids:?}");
     }
 
     #[test]

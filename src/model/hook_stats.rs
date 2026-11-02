@@ -50,6 +50,16 @@ pub enum HookId {
     UiRegisterCalculate,
     /// Package 4 S4-4: the live replay capture's hooks (the game's native replay recorder, the save actor, the fighter frame pair).
     LiveReplay,
+    /// Package 6, nested inside the hooks above so an allocation is charged to the step that made it: the roster cycle's input
+    /// step (P1 and the CPU operator), its per-frame steps (sources, Kirby hats, items, preload, the practice lease) and package
+    /// 3's per-fighter state frame.
+    RosterInput,
+    RosterSources,
+    RosterKirby,
+    RosterItems,
+    RosterPreload,
+    PracticeLease,
+    StateFrame,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -84,6 +94,13 @@ impl HookId {
         HookId::UiPassCalculate,
         HookId::UiRegisterCalculate,
         HookId::LiveReplay,
+        HookId::RosterInput,
+        HookId::RosterSources,
+        HookId::RosterKirby,
+        HookId::RosterItems,
+        HookId::RosterPreload,
+        HookId::PracticeLease,
+        HookId::StateFrame,
         HookId::Other,
     ];
 
@@ -114,6 +131,13 @@ impl HookId {
             HookId::UiPassCalculate => "ui_pass_calculate",
             HookId::UiRegisterCalculate => "ui_register_calculate",
             HookId::LiveReplay => "live_replay",
+            HookId::RosterInput => "roster_input",
+            HookId::RosterSources => "roster_sources",
+            HookId::RosterKirby => "roster_kirby",
+            HookId::RosterItems => "roster_items",
+            HookId::RosterPreload => "roster_preload",
+            HookId::PracticeLease => "practice_lease",
+            HookId::StateFrame => "state_frame",
             HookId::Other => "other",
         }
     }
@@ -127,9 +151,13 @@ thread_local! {
     static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
     /// Nesting depth of uncounted sections on this thread.
     static UNCOUNTED_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// The innermost hook scope on this thread (a `HookId` index): its steady-state allocations are charged to it.
+    static CURRENT: Cell<u8> = const { Cell::new(HookId::Other as u8) };
 }
 
 static HOOK_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+/// Steady-state hook allocations per innermost scope (attribution of a nonzero R5 delta).
+static ALLOCS: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
 /// Allocations of the one-per-load kind inside a hook (per_load), counted apart from the steady-state ones.
 static LOAD_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ENTRIES: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
@@ -153,6 +181,8 @@ fn count_allocation() {
             LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         } else {
             HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            let id = CURRENT.try_with(Cell::get).map_or(HookId::Other as usize, usize::from);
+            ALLOCS[id.min(HOOK_COUNT - 1)].fetch_add(1, Ordering::Relaxed);
         }
     }
 }
@@ -276,8 +306,11 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 }
 
-/// Marks the current thread as running hook code until dropped, and counts one invocation.
-pub struct HookScope;
+/// Marks the current thread as running hook code until dropped, and counts one invocation. Scopes nest: the innermost one is
+/// charged with the allocations made while it is open (`ALLOCS`), and the enclosing scope is current again when it drops.
+pub struct HookScope {
+    previous: u8,
+}
 
 impl HookScope {
     /// A hook without a name of its own (counted under `HookId::Other`).
@@ -289,11 +322,12 @@ impl HookScope {
     pub fn enter_hook(id: HookId) -> Self {
         ENTRIES[id as usize].fetch_add(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
+        let previous = CURRENT.try_with(|current| current.replace(id as u8)).unwrap_or(HookId::Other as u8);
         #[cfg(feature = "diag")]
         if let Some(probe) = ENTRY_PROBE.get() {
             probe(id.name());
         }
-        HookScope
+        HookScope { previous }
     }
 }
 
@@ -305,6 +339,7 @@ pub static ENTRY_PROBE: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceL
 impl Drop for HookScope {
     fn drop(&mut self) {
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
+        let _ = CURRENT.try_with(|current| current.set(self.previous));
     }
 }
 
@@ -352,6 +387,8 @@ pub fn per_load<R>(work: impl FnOnce() -> R) -> R {
 pub struct Snapshot {
     pub allocations: u64,
     pub entries: [u64; HOOK_COUNT],
+    /// Steady-state allocations charged to each innermost hook scope (they sum to `allocations`).
+    pub allocs: [u64; HOOK_COUNT],
 }
 
 /// Read the live counters.
@@ -360,7 +397,11 @@ pub fn snapshot() -> Snapshot {
     for (slot, counter) in entries.iter_mut().zip(&ENTRIES) {
         *slot = counter.load(Ordering::Relaxed);
     }
-    Snapshot { allocations: hook_allocations(), entries }
+    let mut allocs = [0u64; HOOK_COUNT];
+    for (slot, counter) in allocs.iter_mut().zip(&ALLOCS) {
+        *slot = counter.load(Ordering::Relaxed);
+    }
+    Snapshot { allocations: hook_allocations(), entries, allocs }
 }
 
 /// One report: the counters now and what changed since the previous report.
@@ -394,6 +435,18 @@ impl Display for Observation {
         if !any {
             f.write_str("none")?;
         }
+        // Where the steady-state allocations happened (innermost scope), when there are any.
+        if self.now.allocations > 0 {
+            f.write_str(" allocs=")?;
+            let mut first = true;
+            for id in HookId::ALL {
+                let n = self.now.allocs[id as usize];
+                if n > 0 {
+                    write!(f, "{}{}:{}", if first { "" } else { "," }, id.name(), n)?;
+                    first = false;
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -413,7 +466,7 @@ impl Default for Observer {
 
 impl Observer {
     pub const fn new() -> Self {
-        Self { last: Snapshot { allocations: 0, entries: [0; HOOK_COUNT] } }
+        Self { last: Snapshot { allocations: 0, entries: [0; HOOK_COUNT], allocs: [0; HOOK_COUNT] } }
     }
 
     /// Compare `now` with the previous report.
@@ -456,7 +509,7 @@ mod tests {
     #[test]
     fn a_quiet_sample_reports_nothing_and_an_active_one_reports_once() {
         let mut observer = Observer::new();
-        let quiet = Snapshot { allocations: 0, entries: [0; HOOK_COUNT] };
+        let quiet = Snapshot { allocations: 0, entries: [0; HOOK_COUNT], allocs: [0; HOOK_COUNT] };
         assert!(observer.observe(quiet).is_none());
         let mut busy = quiet;
         busy.entries[HookId::ResetCheck as usize] = 3;

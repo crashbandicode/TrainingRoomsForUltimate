@@ -92,11 +92,21 @@ def shot(name):
 
 
 # Every reload carries the whole menu (a reload replaces the snapshot): the base rows of this boot plus the row's own.
-BASE = {"trio_practice": [1, 0], "p1_cpu_control": [0, 1]}
+BASE = {"trio_practice": [1, 0], "p1_cpu_control": [0, 1], "player_roster": None, "cpu_roster": None}  # rosters filled below
+
+
+BASE["player_roster"] = roster("kirby", "ice", "squirtle", "palutena")  # the boot settings, eden/mk_s6_settings.py
+BASE["cpu_roster"] = roster("pikachu", "bowser")
 
 
 def reload(menu, what):
-    body = json.dumps({"menu": {**BASE, **menu}})
+    # Overlay the live settings (the writer thread keeps settings.json current: the cycle's own picks such as `player_character`)
+    # so a reload changes only the rows it names; a reload replaces the whole snapshot.
+    try:
+        live = json.loads((SD / "settings.json").read_text(encoding="utf-8")).get("menu", {})
+    except (OSError, ValueError):
+        live = {}
+    body = json.dumps({"menu": {**live, **BASE, **menu}})
     m = mark()
     tmp = SD / "diag-settings-next.tmp"
     tmp.write_text(body, encoding="utf-8")
@@ -122,8 +132,8 @@ def cycle(role, cap=40):
     """One cycle chord (P1: ZL + D-pad Right, CPU: ZL + D-pad Left); the swap's completion line."""
     m = mark()
     tap("zl,right" if role == 0 else "zl,left", hold=200, wait=0.5)
-    queued = wait_for(m, "[CharacterRoster] queued", 8)
-    done = wait_for(m, "[CharacterRoster] complete", cap)
+    queued = wait_for(m, "[CharacterRoster] request handed", 8) or wait_for(m, "[CharacterRoster] queued", 2)
+    done = wait_for(m, f"[CharacterRoster] HUD refresh owner={role}", cap)
     return m, queued, done
 
 
@@ -156,7 +166,7 @@ def r_item():
     row("item grant through the engine (owner not in the match)", granted is not None, granted)
     saved = save_state()
     row("save state with the held item", saved is not None, saved)
-    tap("z", wait=1.0)  # drop / throw what is held, so the load has to give it back
+    tap("a", wait=1.0)  # throw what is held, so the load has to give it back
     time.sleep(3)
     m, done = load_state()
     restored = wait_for(m, "[CharacterItem] restored", 30)
@@ -165,9 +175,7 @@ def r_item():
 
 
 def r_preload():
-    m, _ = reload({"player_roster": roster("mario", "kirby", "ice", "squirtle", "palutena"),
-                   "cpu_roster": roster("pikachu", "bowser", "kirby"),
-                   "cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, "preload on")
+    m, _ = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, "preload on")
     applied = wait_for(m, "[CyclePreload] applied", 10)
     row("menu commit reaches the preload engine (publish_applied)", applied is not None, applied)
     status = wait_for(m, "[PreloadStatus]", 60)
@@ -209,13 +217,121 @@ def r_ic():
 
 
 def r_solo():
-    reload({"player_roster": roster("mario", "kirby", "ice", "squirtle", "palutena"), "solo_popo_player_cycle": [1, 0]}, "solo popo")
+    reload({"solo_popo_player_cycle": [1, 0]}, "solo popo")
     time.sleep(3)
     save_state()
     m, done = load_state(cap=20)
     time.sleep(4)
     stuck = any("NanaPosMove" in x for x in after(m))
     row("Solo Popo: save/load ends at Popo (no NanaPosMove wait)", done is not None and not stuck, done)
+
+
+def r_solo2():
+    """Solo Popo on the cycle slots, then cycle to the Ice Climbers: Popo alone; a save/load must end at Popo."""
+    reload({"solo_popo_player_cycle": [1, 0]}, "solo popo on the cycle")
+    time.sleep(3)
+    done = None
+    for _ in range(5):
+        m, queued, done = cycle(0, cap=60)
+        if done and "kind=0x4b" in done:
+            break
+    time.sleep(4)
+    shot("solo-popo")
+    row("Solo Popo cycle slot reached (Ice Climbers descriptor)", done is not None and "kind=0x4b" in done, done)
+    save_state()
+    m, loaded = load_state(cap=20)
+    time.sleep(5)
+    shot("solo-popo-after-load")
+    after_load = after(m)
+    stuck = [x for x in after_load if "NanaPosMove" in x]
+    row("Solo Popo: save/load ends at Popo (no NanaPosMove wait)", loaded is not None and not stuck, loaded)
+    m2 = mark()
+    tap("zl,down", wait=1.0)
+    again = wait_for(m2, "saved_notice", 6)
+    row("Solo Popo: the machine is idle after the load (a new save is accepted)", again is not None, again)
+
+
+def pause_dump(tag):
+    m = mark()
+    (SD / "diag-pausedump.req").write_text(tag, encoding="utf-8")
+    return wait_for(m, f"diag_pause_dump tag={tag}", 8)
+
+
+def r_pause():
+    """F9 research: dump the native pause menu around a No. of CPUs change (1 -> 2 -> 3 -> 1), closing the menu last."""
+    tap("plus", wait=2.0)
+    lines = [pause_dump("open-cpus1")]
+    tap("right", wait=0.8)
+    lines.append(pause_dump("cpus2"))
+    tap("right", wait=0.8)
+    lines.append(pause_dump("cpus3"))
+    tap("left", wait=0.8)
+    tap("left", wait=0.8)
+    lines.append(pause_dump("back-cpus1"))
+    shot("pause-cpus1")
+    tap("plus", wait=2.0)
+    time.sleep(2)
+    lines.append(pause_dump("closed-cpus1"))
+    row("F9 research: pause menu dumps around No. of CPUs 1/2/3/1", all(x and "written=true" in x for x in lines), lines)
+
+
+def r_lease():
+    lines = [x for x in read_diag() if "practice_session" in x]
+    row("practice lease: why native Training holds no session (refusal reason)", bool(lines), lines[-3:])
+
+
+def r_r5_split():
+    lines = [x for x in read_diag() if "hook_stats allocations=" in x]
+    last = lines[-1] if lines else ""
+    split = re.search(r" allocs=(\S+)", last)
+    row("R5 attribution: allocations per innermost hook scope", split is not None or "allocations=0 " in last, split.group(1) if split else last[:200])
+
+
+def r_popo_path():
+    lines = [x for x in read_diag() if "state popo" in x]
+    row("Solo Popo: the load took the no-Nana path (nana_removed=true)", any("nana_removed=true" in x for x in lines), lines[-3:])
+
+
+def r_reload_alive():
+    """A diag settings reload, then the log must keep going (stack st-11 went silent after one)."""
+    m, line = reload({"cycle_preload_slots": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0]}, "reload liveness")
+    time.sleep(12)
+    later = [x for x in after(m) if "hook_stats" in x or "hook_counts" in x]
+    row("diag settings reload: the log keeps going afterwards", line is not None and len(later) >= 1, f"{line} | {len(later)} periodic lines after")
+
+
+def r_record():
+    """P1 moves, the record chord (ZR + D-pad Down) records a slot, the playback chord (ZR + D-pad Up) plays it."""
+    m = mark()
+    tap("zr,down", wait=0.1)
+    time.sleep(0.8)
+    rt.stick(LABEL, 1, 0, 600)
+    tap("a", hold=200, wait=0.2)
+    rec = wait_for(m, "recording_complete", 25)
+    row("recording: a slot is recorded", rec is not None, rec)
+    m = mark()
+    tap("zr,up", wait=0.15)
+    start = wait_for(m, "playback_shortcut", 10)
+    time.sleep(1.5)
+    shot("playback")
+    row("recording: the playback chord plays it", start is not None, start)
+
+
+def r_menu_cycles():
+    """Last rows of a boot (known menu-close hang class): open and close the TrainingRooms menu three times (Minus, then B)."""
+    results = []
+    for i in range(3):
+        m = mark()
+        tap("minus", wait=1.5)
+        opened = wait_for(m, "[Ui] menu opened", 8)
+        m = mark()
+        tap("b", wait=2.0)
+        closed = wait_for(m, "[Ui] menu closed", 8)
+        time.sleep(2)
+        alive = wait_for(m, "hook_stats", 15)
+        results.append((opened is not None, closed is not None, alive is not None))
+    shot("after-menu-cycles")
+    row("menu open/close x3, the game keeps running after each close", all(all(r) for r in results), results)
 
 
 def r_pt():
@@ -243,7 +359,7 @@ def r_r5():
 
 
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
 
 
 def main():
@@ -257,6 +373,10 @@ def main():
             raise
         except Exception as exc:  # one row's harness failure is that row's FAIL, never a silent pass
             row(f"{name} (harness)", False, repr(exc))
+    main_write()
+
+
+def main_write():
     path = OUT / "rows.json"
     previous = json.loads(path.read_text()) if path.exists() else []
     path.write_text(json.dumps(previous + RESULTS, indent=1))

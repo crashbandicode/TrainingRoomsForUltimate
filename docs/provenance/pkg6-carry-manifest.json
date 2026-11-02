@@ -77,7 +77,10 @@
    "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
    "common::filesystem": "crate::runtime::compat::filesystem",
    "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
-   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT"
+   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT",
+   "mii_identity_probe": "crate::runtime::mii::mii_identity_probe",
+   "mii_fullconfig_probe": "crate::runtime::mii::mii_fullconfig_probe",
+   "mii_saved_file_probe": "crate::runtime::mii::mii_saved_file_probe"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1464,7 +1467,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "134f449376e9cf43e244e1fce66386975a27082d86f728e8df5ff7a7da98c6b0",
+   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1527,7 +1530,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "2c35f72b17fd644f31f8c59eac5937a00109d3ce42bb111eb49fa317850553d6",
+   "dest_sha256": "e1e5a05d5fc6724829cbe4535b2227adce3bd552948909ae45be6bb2d672f53d",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -1538,6 +1541,11 @@
      "old": "fn notice(text: impl Into<String>) {",
      "new": "fn notice(text: impl Into<std::borrow::Cow<'static, str>>) {",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "#[cfg(feature = \"turnip-save-probe\")]\npub(crate) fn turnip_probe_idle() -> bool {\n    !HAS_PENDING.load(Ordering::Acquire) && PENDING.lock().unwrap().is_none()\n}\n\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
     }
    ]
   },
@@ -2506,7 +2514,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "117b9ea66701ff929a3848240e2a3ebcd8c71742d82fde1a7962a8d3fe6441fc",
+   "dest_sha256": "a455c1df1e9a19f7babd8a134228f6443c52226b02fc67b2bf151dfcee25d98a",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -2517,11 +2525,6 @@
      "old": "pub fn waiting() -> bool { context() == Some(Context::Waiting) }\n",
      "new": "",
      "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (pub fn waiting)"
-    },
-    {
-     "delete_from": "/// Native Training panels also hold extra CPUs.",
-     "delete_to": "unsafe fn native_entry(",
-     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (panel_entry)"
     },
     {
      "delete_from": "pub unsafe fn visualizes(",
@@ -2719,14 +2722,48 @@
    "dest": "src/runtime/roster/source_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "59204c4695a82aa8e5d032bff10c709358508551f476cfc2aea2f6634778ff27"
+   "dest_sha256": "3ee067ff3732c8af334af6c7c234047ec9e5724c9e7fc9dfaf2536f74e09cb01",
+   "edits": [
+    {
+     "old": "Layout::Training => scene_permitted(),",
+     "new": "Layout::Training => scene_permitted(),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => baseline(current),",
+     "new": "Layout::Training => baseline(current),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => true,",
+     "new": "Layout::Training => true,\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => snapshot(ctx, entry, SLOT as u32),",
+     "new": "Layout::Training => snapshot(ctx, entry, SLOT as u32),\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => None,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    if !crate::item_state_probe::capacity_probe_idle() {\n        return false;\n    }\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    }
+   ]
   },
   {
    "src": "src/source_ldn_capacity_probe.rs",
    "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "2b03502a03a932d7dcc39dd0130b5ad71a7cd04ca3187748e0db9a80dbe0166b"
+   "dest_sha256": "2a1d01699a2b8508334a61d4a69cb6c0057dc0f438581e046317f1792be2a2bb",
+   "edits": [
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    {\n        crate::item_state_probe::capacity_probe_idle()\n    }\n    #[cfg(not(feature = \"item-state-probe\"))]\n    {\n        true\n    }\n",
+     "new": "    true\n",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    }
+   ]
   },
   {
    "src": "src/mii_pool_observer.rs",
@@ -2748,6 +2785,27 @@
    "crate": "root",
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
+  },
+  {
+   "src": "src/mii_identity_probe.rs",
+   "dest": "src/runtime/mii/mii_identity_probe.rs",
+   "crate": "root",
+   "src_sha256": "239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c",
+   "dest_sha256": "4b19665574211de8811fe210ecbce375ed348dcdce2863b0a449e21edd8add3e"
+  },
+  {
+   "src": "src/mii_fullconfig_probe.rs",
+   "dest": "src/runtime/mii/mii_fullconfig_probe.rs",
+   "crate": "root",
+   "src_sha256": "3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e",
+   "dest_sha256": "fb90e342ec8513684272d367289892910c654db6d926fe0ca6f6b839dcc9656c"
+  },
+  {
+   "src": "src/mii_saved_file_probe.rs",
+   "dest": "src/runtime/mii/mii_saved_file_probe.rs",
+   "crate": "root",
+   "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
+   "dest_sha256": "48cdfd978e3f3762170edc972e9d2b9c6dd91fb4e5779251207e4a450f07c10b"
   }
  ]
 }

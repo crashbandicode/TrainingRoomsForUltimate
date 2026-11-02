@@ -800,6 +800,10 @@ unsafe fn finish(raw: &Raw, done: &Done) {
     if let Some(role) = Role::of_entry(raw.entry) {
         hud_load(role.index(), false);
     }
+    // Diag: which Ice Climbers path this load took (Solo Popo removes Nana: no hand-off).
+    if with(|s| s.ids.is(C::KindPopo, raw.kind)).unwrap_or(false) {
+        state_diag!("[TrainingRooms] state popo entry={} nana_removed={}", raw.entry, nana_removed(raw.entry));
+    }
     if let Some(target) = done.damage {
         n::heal(accessor, -natives::damage(accessor, 0));
         n::add_damage(accessor, target);

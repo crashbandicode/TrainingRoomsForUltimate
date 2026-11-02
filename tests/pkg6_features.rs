@@ -192,6 +192,35 @@ fn the_feature_matrix_lists_every_feature() {
     assert!(listing.contains("--features diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"));
 }
 
+/// The matrix skips exactly the fork's by-design exclusions: every `compile_error!` message of the sources is one row of
+/// `EXCLUSIONS` in `tools/feature_matrix.py`, and every row there names a message the sources still contain.
+#[test]
+fn the_matrix_skips_exactly_the_forks_compile_error_exclusions() {
+    fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                for line in std::fs::read_to_string(&path).unwrap().lines() {
+                    if let Some(rest) = line.trim_start().strip_prefix("compile_error!(\"") {
+                        out.push(rest.split('"').next().unwrap().to_string());
+                    }
+                }
+            }
+        }
+    }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut messages = Vec::new();
+    walk(&root.join("src"), &mut messages);
+    let tool = std::fs::read_to_string(root.join("tools/feature_matrix.py")).unwrap();
+    let rows = tool.matches("compile_error").count();
+    for message in &messages {
+        assert!(tool.contains(message.as_str()), "compile_error! not listed in EXCLUSIONS: {message}");
+    }
+    assert!(!messages.is_empty() && tool.matches(".rs:").count() >= messages.len(), "{rows} {messages:?}");
+}
+
 #[test]
 fn every_feature_dependency_is_declared() {
     let map = features();

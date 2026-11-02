@@ -56,8 +56,38 @@ fn poll_item_request() {
     ITEM_REQUEST.store(choice, std::sync::atomic::Ordering::Release);
 }
 
+/// F9 research (package 6): the native pause menu object (`x22` of package 4's stale-moves site), and `diag-pausedump.req` (one
+/// word, a tag) which writes its first `PAUSE_DUMP` bytes to `pausemenu-<tag>.bin`, so Eden can diff the object around a change of
+/// No. of CPUs and find the field and the moment the count changes. Diag only; a read of a live game object from this thread.
+static PAUSE_MENU: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+const PAUSE_DUMP: usize = 0x1000;
+
+pub fn note_pause_menu(menu: usize) {
+    if menu != 0 && menu % 8 == 0 && PAUSE_MENU.swap(menu, std::sync::atomic::Ordering::Relaxed) != menu {
+        diagnostic(format_args!("[TrainingRooms] diag_pause_menu object=0x{menu:x}"));
+    }
+}
+
+fn poll_pause_dump() {
+    let Some(path) = FixedPath::<128>::in_root("diag-pausedump.req") else { return };
+    let Ok(bytes) = fs::read(path.as_str()) else { return };
+    let _ = fs::remove_file(path.as_str());
+    let tag: String = String::from_utf8_lossy(&bytes).chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(24).collect();
+    let menu = PAUSE_MENU.load(std::sync::atomic::Ordering::Relaxed);
+    if menu == 0 {
+        diagnostic(format_args!("[TrainingRooms] diag_pause_dump tag={tag} object=none"));
+        return;
+    }
+    // SAFETY: diag only; the pause menu object of the current Training scene, read as bytes.
+    let dump = unsafe { std::slice::from_raw_parts(menu as *const u8, PAUSE_DUMP) }.to_vec();
+    let name = format!("pausemenu-{tag}.bin");
+    let written = FixedPath::<128>::in_root(&name).map(|p| fs::write(p.as_str(), &dump).is_ok()).unwrap_or(false);
+    diagnostic(format_args!("[TrainingRooms] diag_pause_dump tag={tag} object=0x{menu:x} written={written}"));
+}
+
 fn poll() {
     poll_item_request();
+    poll_pause_dump();
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());
