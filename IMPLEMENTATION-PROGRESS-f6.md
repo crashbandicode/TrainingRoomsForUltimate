@@ -174,3 +174,8 @@ Added steps (not in the playbook tools): `settings.json` copied into the profile
   - f6-04's boot stall on the pre-sync tree.
 - Open claims: none (last `RELEASED` 12:12Z, queue line deleted). Watcher stopped. Eden profile `/home/intpa/trainingrooms-eden-f6/profiles/f6`
   restored to source g's plugin set.
+
+## Astra continuation16:38Z (supersedes old handover next commands)
+Frozen Rust7bdeacf diagfd6a78bc/released0ca6d3 sourceverified gates retained under artifacts/trainingrooms-f6-astra/7bdeacf. Hosttestexit0; exactcountsnotaccepted due PowerShellstreamordering; hostlistingexit0 doesnotrepairoriginal. Switchwarnings40diag/41release notgreen. Sharedharness225d16b only; oldf6_boot/f6_eden wrappers mustnotclaim.
+Edenf605 bootstrap2+laps12, firstKirbysetup4723us/control55us, pollgap146094us,2072Unmapped FAIL. f606 invalidnativeconfigcaught (runtimeINIoverridesJSON)0Unmapped. f608explicitOffINI confirms0slots/0bank/groupsfalse; firstphysicalready#307 missedolderdriver then11continuationlapspass,0Unmapped, nativeKirbygap273654us. f607startupchordbeforeTrainingnoticeignored,failed/collected0Unmapped. Newbootstrapgatewaitsdeliverednotice;9Pythonregressionspass. EDEN-F6.md containsfullreceipts/limitations.
+Allfourruns stopped/collected, ownedprofile restored to sourceg singleNRO hashset verified. SurfaceRELEASED16:38Z,0Edenprocesses. Remainingordinaryfirstf609queuedEND behindexistingjobs/interleave. /tmp/tr-f6-ordinary.ps1 mustparameterizef609andCLAIMonnextUp (currentlyhardcodedf607/-NoClaim, DO NOTrununchanged). Noowncompiler/Edenlive. Rootboot_cachewiringassignedpkg6; unexplainedf605Unmapped remainslead. Next: ordinaryfirstrowthen finalmergedR5zero/0Unmapped/hostclippy+nodefault/warnings/compliance; noREADY.

@@ -14,7 +14,7 @@ spec.loader.exec_module(rows)
 
 
 class Rows(unittest.TestCase):
-    def run_rows(self, native, complete, prefetch=True, bootstrap=False, observed=True, native_off=True):
+    def run_rows(self, native, complete, prefetch=True, bootstrap=False, observed=True, native_off=True, delivered=True):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "route.py").touch()
@@ -26,6 +26,9 @@ class Rows(unittest.TestCase):
             if bootstrap and observed:
                 with diag.open("a") as stream:
                     stream.write("[CharacterRoster] observed owner=0\n[CharacterRoster] observed owner=1\n")
+            if bootstrap and delivered:
+                with diag.open("a") as stream:
+                    stream.write('[PreloadStatus] delivered text=Some("Swap both once to load")\n')
             presses = []
 
             def press(buttons, hold):
@@ -78,6 +81,11 @@ class Rows(unittest.TestCase):
         presses, records, error = self.run_rows(False, True, prefetch=False, bootstrap=True, observed=False)
         self.assertEqual((presses, records), ([], []))
         self.assertIn("was not observed", error)
+
+    def test_bootstrap_waits_for_training_notice_not_just_early_owner_observation(self):
+        presses, records, error = self.run_rows(False, True, bootstrap=True, delivered=False)
+        self.assertEqual((presses, records), ([], []))
+        self.assertIn("notice was not delivered", error)
 
     def test_missing_completion_retains_failure_and_stops(self):
         presses, records, error = self.run_rows(False, False)

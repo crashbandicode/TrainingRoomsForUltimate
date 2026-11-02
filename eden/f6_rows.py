@@ -106,6 +106,8 @@ def laps(args):
             return f"shot failed: {exc}"
 
     start = 0
+    if bootstrap and wait_for(0, '[PreloadStatus] delivered text=Some("Swap both once to load")', args.settle) is None:
+        raise SystemExit("GATE FAIL: initial Training preload notice was not delivered; no cycle inputs sent")
     if args.native_reload and not any(
             "[CyclePreload] loaded slots=0 " in line and "bank_members=0 group_swap=false" in line
             for line in read()):
