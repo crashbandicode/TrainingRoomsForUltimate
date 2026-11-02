@@ -1,0 +1,79 @@
+# Implementation progress, stream f6 (ledger F6: the first-boot group-build hitch)
+
+2026-11-02. Branch `stream/f6` (from `stream/pkg6` `98d6f5b`), worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-f6`, target
+`/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-f6` (Surface), Yoga folder `/home/intpa/trainingrooms-build-f6` (own `target/`,
+`host-target/`), Eden labels `f6-NN`, own profile `/home/intpa/trainingrooms-eden-f6/profiles/f6` (display `:97`). Model gate: `claude-opus-5-5` /
+high from the session transcript (subagent `agent-abaf2af94e284b397`); hidden watcher `/tmp/f6-watcher.py` (model/effort only, exits with the
+owner PID 1069629). Stream rules: `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`.
+
+**Playbook followed: `ae87443`** (pulled 2026-11-02, `Already up to date`; README.md, docs/{CHECKLIST,EDEN,GIFS,HOOK-SHARING,MACROS,TILE-CURSOR,WORKFLOW}.md,
+tools/PROVENANCE.md read completely; tool scripts read: `tools/build/nro_size.py`, `tools/check/compliance.py`, `tools/eden-solo/{gv.py,solo.ps1,step.ps1}`,
+`tools/eden-solo/examples/retry-batch.ps1`, `tools/eden-pair/{solo_surface.ps1,examples/queued-run.ps1}`).
+
+## Task
+Root-cause and fix the first-boot group-build hitch of the carried Phase B′ build (`runtime::roster::native_body_bank`): the first
+asynchronous group build of a boot paid 75-107 ms of `setup_us` on the game thread (later 10-16 ms; Kirby-first groups' gap 91-109 ms),
+evidence `R/stages/m5q/eden/{A,S}/RESULT.md`, `R/c1162/group-build-offthread/{RESULT,FINDINGS}.md`.
+
+## State (restart-safe)
+- `206e8bb` diag split (WIP), `a3c30f1` gates + harness. Diag NRO `cfe67ff9…` (`cargo-targets/f6-nro/f6-split-diag-cfe67ff9.nro`, Surface),
+  release `74bfad23…` (`f6-release-74bfad23.nro`, Yoga; no `[BuildSplit]` strings).
+- **Static finding (owned 13.0.5 ELF + owned decompile `research/phase2-native/native_entry_dispatch_6556b0.c`):** native loader state 8 runs
+  `0x654dc0` and `0x655320` on the game thread, then queues a task (`0x392e290(0x10,0x90)`, functor vtable `0x4f81510`, callback `0x655f30`,
+  `0x3549720(task+0x10, 0x655f30, 2, 1)`, record `E+0x5a68`); the functor's call slot `+0x30` is `0x6574e0: b 0x64f820`
+  (`pointer-tables-03.json` relocation addends; `llvm-objdump`). State 9 waits for it, state 10 allocates the bodies. So native runs
+  `0x64f820` (control init: AI params `0x17e8890(…, kind, 0x13)` + `0x2c9900` + context vfunc `+0x90` per context) **on the task worker**;
+  the carried Phase B′ calls it on the game thread (the synchronous `0x658af0` order, whose only caller is the respawn `0x65be14`). In the
+  stock game `0x64f820`'s only direct caller is `0x658af0`. Hypothesis to confirm in Eden: the first-use cost sits in `control_64f820`.
+- Next: Eden `f6-01` (Surface queue #2 behind pkg6) for the split; then the fix (queue `0x64f820` as native state 8 does, wait as state 9,
+  then allocate as state 10), host tests, Switch builds, proof boot `f6-02`.
+
+## Scripts written by this stream (playbook tool check)
+| Script | Playbook tool | Why the playbook does not cover it |
+| --- | --- | --- |
+| `eden/f6_eden.py` | `tools/eden-solo/gv.py` + `solo.ps1` (and `eden-pair/solo_surface.ps1`) | Those are hard-wired to other workspaces (gsp-visualizer `ROOT`, profile `b`/`y`, owner, display `:68`, labels `eNN`, a local ledger on the Yoga; solo_surface drives the Surface from the Yoga for elite-rematch). This is the stream's copy (pkg2 `s2_eden.py` → pkg6 `s6_eden.py`, itself adapted from gv.py + solo.ps1) with the same steps (hard-linked profile copy, set-aside, `eden-run.py` 8 GiB bounded launch, claim/release) plus what the playbook lacks here: the Surface-local run with the Yoga ledger over ssh, `settings.json` in the copy, `core.volume=0` through the CLI before boot (AGENTS.md), and `HH:MM:SS` ledger stamps (fix of a bug that made released claims look open). |
+| `eden/route_f6.py` | `tools/eden-solo/to-css.ps1`, MACROS hybrid, TILE-CURSOR | Copy of pkg6's `route_s6.py`: the MACROS "hybrid" (recorded segment macro `tr-main-to-stage-select`, screenshot gates against refs) and tile-cursor steps with the `settled` log gate; to-css.ps1 goes to Quickplay with fixed sleeps, not to Training. |
+| `eden/f6_rows.py`, `eden/f6_boot.py` | `tools/eden-pair/examples/queued-run.ps1`, `eden-solo/examples/retry-batch.ps1` (shape) | The row driver of this task (cycle chords gated on `[CharacterRoster] complete`, screenshots) and up→route→rows→collect→scan→down→restore in one bounded call with down/restore in `finally`; the playbook examples are elite-rematch / judge-log specific. |
+| `tools/f6_split_table.py` (+ `test_f6_split_table.py`, `tests/f6_split.rs`) | none (WORKFLOW §6 asks for it) | The committed, host-tested script that turns the `[BuildSplit]` lines into the evidence table. |
+| `/tmp/f6-watch/{gate,yf6,yhost}.ps1`, `claims.py`, `claim.py`, `free.py` | `solo.ps1` claim logic | Host-local claim + one cargo call + release (also on failure) for compile claims, not in the repo. |
+
+## Checklist (docs/CHECKLIST.md at `ae87443`)
+| Requirement | Tag | Result | Evidence |
+| --- | --- | --- | --- |
+| crate-type cdylib only | M | pass (unchanged) | `Cargo.toml` (`compliance.py` row) |
+| release profile s / lto / cgu 1 / abort; skyline =0.6.0; toolchain 1.98.1 | M | pass (unchanged) | `Cargo.toml`, `rust-toolchain.toml` |
+| pure logic in model with host tests; runtime only for Switch | M | pass | `src/model/build_split.rs` (6 unit tests), `tests/f6_split.rs` (2); `src/runtime/roster/build_split.rs` Switch-only |
+| gates: test, clippy -D warnings, no-default-features, skyline release, diag | M | partial | Yoga `a3c30f1` tree: test 63 binaries 8,055 passed 0 failed (owned-ELF facts skipped there: Surface run **open**), clippy 0, no-default-features ok; Switch release `74bfad23` (Yoga), diag `cfe67ff9` (Surface) |
+| no heap in hooks (`heap_allocations=0`) | M | open | meter uses fixed statics + stack lines; install line of `f6-01` to read |
+| fixed buffers, writer thread, stack paths | M | pass | lines through package 1's `diag_log` ring (no new writer) |
+| root cause fixed or workaround approved | M | open | measurement `f6-01` pending; no workaround coded |
+| version guard 13.0.5 | M | pass (unchanged) | package 1 boot |
+| 64-byte guard on every site / called function / relied instruction | M | open | the fix adds called natives (`0x655f30` callback, vtable `0x4f81510` slot): fingerprint rows to add with the fix |
+| card scan before the site is chosen | M | N/A: no new hook site; the fix calls game functions the carried path already calls or the native loader calls (scan-offsets.py run planned for the two new called addresses with the fix) |
+| hook sharing / chaining | C | N/A: no hook added or moved |
+| hook after prologue / call instead of hook | M | pass | calls only, no hook |
+| no diag code or strings in shipped NRO | M | pass | `74bfad23`: 0 `BuildSplit` strings; `compliance.py` row at READY |
+| shipped NRO writes only its install line | M | pass (unchanged) | meter is `cfg(feature = "diag")` |
+| online rows (read-only review, replay A/B, two consoles) | C | N/A: Training-only code path (the hot swap runs in Training / the lobby practice, never in an online match) |
+| Eden claim written and released, also after failure | M | open | `f6_boot.py` releases in `finally`; ledger lines at `f6-01` |
+| one Eden per host, MemAvailable >= 10 GiB, not profile a / :61 | M | open | harness asserts (`up`, `launch`) |
+| profile copy hard-linked | M | pass | `du -sh` source `g` 6.5G + copy together 791M (game content linked), `PREP-f6-01.json` |
+| link identical / copy written files | M | pass | harness copies config/saves/plugins, links `READ_ONLY` trees |
+| one target per source copy; df >= 40 GB; build products deleted at the end | M | open | targets `cargo-targets/trainingrooms-f6`, Yoga `trainingrooms-build-f6/{target,host-target}`; df Surface 188 GB, Yoga 253 GB; deletion manifest at the end **open** |
+| waits gated on log line / screenshot | M | pass (scripted) | `route_f6.py` (screenshot + tile log gates), `f6_rows.py` (diag line gates with caps) |
+| failed precondition aborted, retried under the next label | M | open | route exits 2 on a missed gate; retry as `f6-0N+1` |
+| shortest ruleset | M | N/A: Training mode, no match (no stock/time limit applies) |
+| profile restored after the run | M | open | `f6_boot.py` runs `restore` in `finally` |
+| console.log scanned; run.json, memory.peak kept | M | open | `collect` + `scan` in `f6_boot.py` |
+| every local command under memory/time guard | M | partial | cargo under `systemd-run … MemoryMax=6G timeout 1800`; Eden under `eden-run.py` 8 GiB / 3600 s; the profile prep ran unguarded once (file copy, my own root) |
+| outputs kept under the label | M | open | `eden/runs/<label>/` |
+| README / GIF | M | N/A for this stream: no README change (the package's README is the lead's); evidence is the Eden doc |
+| dated evidence doc | M | open | `eden/EDEN-F6.md` after `f6-01` |
+| numbers from a tested script | C | pass (tool) | `tools/f6_split_table.py`, `tools/test_f6_split_table.py`, `tests/f6_split.rs` |
+| no operator quotes, no claims beyond tests | M | pass | |
+| handoff current | M | pass | this file |
+| release / tag / card | C | not authorized: no order (nothing pushed, tagged or written) |
+| card connect/disconnect by the user only | M | pass | no card access |
+| nothing pushed / tagged / written without order | M | pass | |
+| model/effort gate and watcher | M | pass | see header |
+| spawned workers read the playbook | M | N/A: no workers spawned |
