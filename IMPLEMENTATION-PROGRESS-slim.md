@@ -1,29 +1,26 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
-## Current worker checkpoint — 2026-11-02 19:53Z
-Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium, lead tr-lead-astra-3.
-Branch stream/slim; code61b0aab macro name payload root; only progress dirty.
-Sole authorized merge ebfcb98 via dae0787. Native keyboard proposal still UNAPPLIED.
-61b0aab frozen1110files: fullhost PASS0/83.47s, clippy-Dwarnings PASS0/23.18s,
-no-defaultPASS0/2.06s, releasePASS0/40.64s, diagPASS0/77s. All sourcehashesunchanged.
-Releasee2946b9d968efb95cdc162a51e378b0d37ff715f511cc0e900aeeb71b3461c49;
-diagb03b325719adc7a66d424db95f51ceb3b6cf5858f5d560e1ddcbd32695bdcde9.
-Archived slim/61b0aab-{host,clippy,no-default,release,diag}, raworderedlogs/receipts/NROs.
-Raw98,962/ceiling103,300; normalized126549 excludingtools (-9vs10a8232);
-four unapproved enum rows remain, hos2 approved. Carrypkg4 full42PASS.
-BothclaimsRELEASED19:51; no owncompiler/Eden/queue/profile. TargetcacheYoga61b0aab
-reused from10a8232; Surface61b0aab new solecargo-targets/trainingrooms-slim.
-Prior47GB global estimate was later invalidated; UI fresh19:54 census53,306,307,619B afterpkg6retirement is the corrected basis. OwnSurfacecache retired20:02 withmanifest; Yoga target retained forcontinuingwork.
-Compiledstack61diag: Menu49392/required81920>57344, fiber25104>16384 FAILunchanged;
-5 tablefailures (Heartbeat4896,Menu49392,Archive2608,ReplaySave32432,MiiCatalog5920).
-OtherthanMenu allocatedsizescoverrequired buttableproofisstale; no waiver.
-Macrooffer frame800->480,restore736->400,on_pad1024->1056/depth2608->3232.
-Comparison archives include bothELFs/source/logs andstaticpaths. No runtimeacceptance.
-Prior sl-02 runtime allocationFAIL final818/delta100; route/installPASS,
-fullconsole11934lines0Unmapped. Sourceg1244hashesunchanged, privateprofileabsent,
-Surface released19:26. Archive slim/sl-02 preservesfinalrawlogs/restoration.
-Next: compliance61release, finishchecklist, exactleadbaseline/integration authority
-forremainingnative/stack/runtime roots. NoREADY. Watcher2674699/exec11182 remains.
+## Current worker checkpoint — 2026-11-02 20:36Z
+Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
+Branch stream/slim, codeHEAD8f762e1; only progress dirty. Sole authorized merge
+ebfcb98 via dae0787. HookId enum/ALL/name unified with all40 ordinals/labels exact;
+counter/TLS/allocator tail byte-identical. Raw98,885; normalized126472 excluding
+tools, both -77. Ceiling103,300 unchanged. Four unapproved native enum rows remain,
+hos2 approved. Native Text proposal remains UNAPPLIED pending lead baseline/ownership.
+All FIVE8f gates PASS: fullhost72.93s, clippy18.70s zero warnings, no-default1.87s;
+Switch diag40existingwarnings/release41existingwarnings. Source1110 hashes unchanged
+before/after everyjob. All claims RELEASED and own queue rows removed latest20:35Z.
+Artifacts slim/8f762e1-{host,clippy,no-default,diag,release,preflight}.
+Release6867957a resident3444736 (+4096vs61); diag a9c766ea resident3784704 unchanged.
+Stack exact8f retainsfive thread-table failures andonefiberfailure; no table/budget
+relaxation. Menu49392 required81920>57344; fiber25104>16384.
+Runtime sl-02 remainsFAIL818/delta100 on10a8232; no8f runtime/no acceptance inferred.
+Helperpathhold respected; no ownEden/profile. Async primary-resume-lead requestpending.
+Fresh20:24/25 global57.691GB lessownYoga retired0.917GB=56.774GB conservativebefore
+8f freshSurface0.323GB; Yoga target reused. All retiredNRO/ELF/manifests archived.
+Next: exact8f compliance, clean progress commit/handoff, continue authorized size
+reductions; await exact lead native/integration/stack decisions. NoREADY.
+One ownerboundwatcher2674699 alive/noalert; exactthread gate Astra/medium20:31.
 Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
 
 Lead `0caa72b8`; slim = Claude Opus 5.5 high (`claude-opus-5-5`, effort `high` from this agent's own transcript
@@ -792,3 +789,48 @@ tests are the relevant runtime contract; no duplicate implementation test added.
 Rawsloc4=98,885 (-77), sizegatePASS103,300, diffcheckPASS. Normalized andallfive
 compiler gates pending; prior61b0aab receipts remain valid only for that source.
 No own claim/job/queue/profile currently. Native Text remains unapplied.
+
+### 2026-11-02 20:29Z — 8f validation and fresh cache admission
+8f762e1 raw98,885/normalized126472 excludingtools; rustfmt1.9.0-stable0failures.
+Actual global census20:24/25: Surface14,792,426,329B (allcargo-targets+tinyarchived
+target-likedirs), Yoga16,829,042,789B (35recursive target*/-target/marker roots),
+Ally26,069,881,398B (all6TrainingRooms-prefixed c1161targets; lstat upperbound).
+Total57,691,350,516B. InitialAllygenerichomescan foundonlyforkcargo-targets and
+was NOTusedforadmission; explicit6TRroots corrected it. NativeWindowsMSIpwsh
+invokedWSL read-only metadata; no rig/profile/firewall mutation.
+Retiredonlyowncompleted Yoga d1e5392 target595,395,263B and1c0104e321,701,978B,
+withfullpath/sizemanifests andlastNRO/ELF copied+SHAverified. Fetchedarchive
+slim/cache-retirement-20261102-2025; prior logs/source/receipts retained.
+Afterretirement conservative56,774,253,275B, enoughforreusedYoga/new0.323GBSurface.
+Yoga61target movedto8f aftercheckingownedcompilerabsence;1110sourcehashesverified
+andmtimesrefreshed, bothfixturesexistingrunnerprechecked. FullhostCLAIMED20:27/
+SSH10842. Surfaceinitialadmissioncheck foundearlierqueuehead andrefused beforeclaim;
+freshqueueheadclear thenCLAIMED20:28/local42608diag. Each6G1800/incremental0.
+No allocator behavior change andno runtimezeroacceptance inferred.
+
+## HookId table gated slice — 2026-11-02 20:36Z
+Code8f762e1 independentSIZE-PLAN reduction, proof8f762e1-preflight/hook-id-table-proof.json.
+Frozenarchive SHA f090dbd47ddfd36e214b1cfddc8d412e68b6f205bd19bef06500d4d76f6f383a.
+- Fullhost exit0,72.9278s, source1110unchanged, raw992ccd7eff579e521c5d1b09218dfe47585ae1b1e355e33b2c4e6de87548ade5.
+  69 successful result lines; raw nested sums9259passed/0failed/6ignored are NOTunique certifiedcounts.
+  Existing HookId/index/name andallocator tests executed; zero warnings.
+- Clippy --all-targets -- -D warnings exit0,18.7009s, zero warnings,
+  rawbf4bcc2aeef0521dbbc1af6b23454a245286fd996fa95214b19cd2da86276e77.
+- build --no-default-features exit0,1.8717s,
+  raw522266abda07cf572f61b6aff558fbb7c61803417b1502faeb999219f07d018d.
+- Switch diag exit0,40warnings, raw1c90eb9c7f972dd9a830a402faa639d28f2ef541099c0b4c2c1f96a77472bdb3,
+  NROa9c766eafcf02b1ca9ec1f5eb6ed67a1c04aa3116a6df4eb13cc33312af39d10,
+  ELF28c8670e9e23228036a0608190be29684678fa81e50f2ba701d20eef8c88e3cf.
+  resident3784704 unchanged; retained before release compile overwritten target.
+- Switch release exit0,41warnings, rawb6777ad897220abc666752a423524071e0f494e168695e00b74502d916d11f19,
+  NRO6867957adb3d99a9de739eb94e102ae1b8af496f1739fa0b7d25e872be32a84a,
+  ELF914306d8837172c3a8f6ff1d3277e2a40440bb87a00e52052418cef04ed1b3b7.
+  resident3444736, +4096 vs61. Source reduction is NOTa binaryresident reduction.
+- Exact8f static reports archiveddiag/stack/table.txt,budget.txt,verdict.json:
+  same5threadtableFAIL and1fiberFAIL as61; no budget/suppression change.
+All actualcompilerjobs queue+CLAIMed6G/1800/incremental0, reapedandRELEASED;
+latestYoga no-default20:35, Surface release20:35. No ownremainingclaim/profile/Eden.
+Read-only tool invocation mistakes: stack_depth.py --help raised IndexError (expects
+ELF+command), and tools/nro_size.py missing becauseactualpath isplaybook/tools/build;
+correctedcommands succeeded. Several immediate small reads lackedexplicitcgroup/time
+bounds aftercompaction; compilerjobs remainedbounded; subsequentreads useguard.
