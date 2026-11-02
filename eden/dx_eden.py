@@ -106,7 +106,8 @@ def open_claims():
     state = {}
     now = time.time()
     for line in ledger_text().splitlines():
-        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        # Codex sessions stamp HH:MM:SSZ (lead 13:1xZ): the seconds are optional, else their open claims are invisible.
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?::\d{2})?Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
         if not m:
             continue
         stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
