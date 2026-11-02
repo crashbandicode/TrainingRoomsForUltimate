@@ -28,6 +28,83 @@ unsafe impl GlobalAlloc for CountAlloc {
 #[global_allocator]
 static ALLOCATOR: CountAlloc = CountAlloc;
 
+#[path = "../../src/runtime/roster/observe.rs"]
+mod observed_map;
+
+#[test]
+fn native_map_walk_preserves_bounds_and_uses_no_heap() {
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct Node { left: usize, right: usize, parent: usize, black: u64, key: u64, refs: u32, handle: u32 }
+    let mut nodes = [Node { left: 0, right: 0, parent: 0, black: 0, key: 0, refs: 1, handle: 0 }; 64];
+    let base = nodes.as_mut_ptr() as usize;
+    for (i, node) in nodes.iter_mut().enumerate() {
+        node.key = i as u64;
+        if i != 0 { node.left = base + (i - 1) * std::mem::size_of::<Node>(); }
+    }
+    let mut owner = [0usize; 16];
+    owner[2] = base + 63 * std::mem::size_of::<Node>();
+    owner[3] = 64;
+    let r = owner.as_mut_ptr() as usize;
+    COUNT.with(|count| count.set(0));
+    TRACK.with(|track| track.set(true));
+    let walked = unsafe { observed_map::walk_map(r) }.expect("64 native nodes");
+    let flags = unsafe { observed_map::owner_flags(r) };
+    TRACK.with(|track| track.set(false));
+    assert_eq!(COUNT.with(Cell::get), 0);
+    assert_eq!(flags, crate::engine::swap::swap_model::ledger::RFlags::TRAINING);
+    assert_eq!(walked.len(), 64);
+    assert!(walked.iter().enumerate().all(|(i, node)| node.key == i as u32 && node.refs == 1));
+    unsafe { ((r + 0x18) as *mut u64).write(65); }
+    assert!(unsafe { observed_map::walk_map(r) }.is_none());
+    unsafe {
+        ((r + 0x18) as *mut u64).write(64);
+        (base as *mut Node).as_mut().unwrap().left = base;
+    }
+    assert!(unsafe { observed_map::walk_map(r) }.is_none(), "cycle exhausts the existing walk bound");
+}
+
+#[test]
+fn reconciliation_streams_counts_and_preserves_duplicate_and_missing_order() {
+    use crate::engine::swap::swap_model::ledger::*;
+    use std::collections::BTreeMap;
+    let mut ledger = Ledger::new(RFlags::TRAINING);
+    let batch = ledger.new_batch();
+    let mut predicted = BTreeMap::<u32, u32>::new();
+    for kind in [0, 7, 0x48, 7, 0x75] {
+        let keys = registration_set(kind, RFlags::TRAINING);
+        for key in keys.iter(kind) { *predicted.entry(key.value()).or_default() += 1; }
+        let token = ledger.record_native(NativeRequest { kind, keys, nro: true }, batch);
+        let _ = std::hint::black_box(token);
+    }
+    for seed in 0..64u32 {
+        let actual = [(7 * KEY_STRIDE, seed % 4), (0, seed % 2), (8000, seed),
+            (7 * KEY_STRIDE, (seed + 1) % 4), (0x48 * KEY_STRIDE, 0)];
+        let map: BTreeMap<_, _> = actual.into_iter().collect();
+        let mut expected = Reconciliation::default();
+        for (key, refs) in &map {
+            match predicted.get(key) {
+                Some(p) if p == refs => expected.matched += 1,
+                Some(p) if p < refs => expected.residual.push((*key, refs - p)),
+                Some(p) => expected.missing.push((*key, p - refs)),
+                None => expected.residual.push((*key, *refs)),
+            }
+        }
+        for (key, refs) in &predicted {
+            if !map.contains_key(key) { expected.missing.push((*key, *refs)); }
+        }
+        assert_eq!(ledger.reconcile(&actual), expected);
+        COUNT.with(|count| count.set(0));
+        TRACK.with(|track| track.set(true));
+        assert!(ledger.predicted_iter().eq(predicted.iter().map(|(k, v)| (*k, *v))));
+        assert!(ledger.residual_iter(actual.into_iter()).eq(expected.residual.iter().copied()));
+        assert!(ledger.missing_iter(actual.into_iter()).eq(expected.missing.iter().copied()));
+        assert_eq!(ledger.predicted_map_nodes(), predicted.len());
+        TRACK.with(|track| track.set(false));
+        assert_eq!(COUNT.with(Cell::get), 0);
+    }
+}
+
 #[test]
 fn native_request_receipts_and_diagnostic_iterators_allocate_nothing() {
     use crate::engine::compat::fixed::DebugIter;

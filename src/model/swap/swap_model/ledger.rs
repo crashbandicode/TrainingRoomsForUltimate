@@ -474,6 +474,22 @@ pub struct Reconciliation {
     pub missing: Vec<(u32, u32)>,
     pub matched: usize,
 }
+
+/// BTreeMap collection semantics without storage: sorted keys, final duplicate wins.
+fn ordered_actual(input: impl Iterator<Item = (u32, u32)> + Clone)
+    -> impl Iterator<Item = (u32, u32)> + Clone {
+    let mut previous = None;
+    std::iter::from_fn(move || {
+        let mut next = None;
+        for (key, refs) in input.clone() {
+            if previous.is_none_or(|old| key > old) && next.is_none_or(|(best, _)| key <= best) {
+                next = Some((key, refs));
+            }
+        }
+        if let Some((key, _)) = next { previous = Some(key); }
+        next
+    })
+}
 impl Reconciliation {
     pub fn balanced(&self) -> bool { self.residual.is_empty() && self.missing.is_empty() }
 }
@@ -661,13 +677,19 @@ impl Ledger {
 
     /// `(key value, refs)` the model predicts in `R+0x10` right now, sorted by key.
     pub fn predicted(&self) -> Vec<(u32, u32)> {
-        let mut map: BTreeMap<u32, u32> = BTreeMap::new();
-        for a in &self.acquisitions {
-            for key in a.keys.iter(a.kind) { *map.entry(key.value()).or_insert(0) += 1; }
-        }
-        map.into_iter().collect()
+        self.predicted_iter().collect()
     }
-    pub fn predicted_map_nodes(&self) -> usize { self.predicted().len() }
+    pub fn predicted_iter(&self) -> impl Iterator<Item = (u32, u32)> + Clone + '_ {
+        let mut previous = None;
+        std::iter::from_fn(move || {
+            let keys = || self.acquisitions.iter().flat_map(|a| a.keys.iter(a.kind).map(KeyId::value));
+            let next = keys().filter(|key| previous.is_none_or(|old| *key > old)).min()?;
+            let refs = keys().filter(|key| *key == next).fold(0u32, |n, _| n + 1);
+            previous = Some(next);
+            Some((next, refs))
+        })
+    }
+    pub fn predicted_map_nodes(&self) -> usize { self.predicted_iter().count() }
 
     /// Nothing held by us or recorded for native: a canonical Reload may be issued (state 6 needs
     /// `R+0x18 == 0`, `0x17e4700`).
@@ -678,21 +700,29 @@ impl Ledger {
 
     /// Compare the prediction with the owner's actual `(key value, refs)` pairs.
     pub fn reconcile(&self, actual: &[(u32, u32)]) -> Reconciliation {
-        let predicted: BTreeMap<u32, u32> = self.predicted().into_iter().collect();
-        let actual: BTreeMap<u32, u32> = actual.iter().copied().collect();
-        let mut out = Reconciliation::default();
-        for (key, refs) in &actual {
-            match predicted.get(key) {
-                Some(p) if p == refs => out.matched += 1,
-                Some(p) if p < refs => out.residual.push((*key, refs - p)),
-                Some(p) => out.missing.push((*key, p - refs)),
-                None => out.residual.push((*key, *refs)),
+        Reconciliation { residual: self.residual_iter(actual.iter().copied()).collect(),
+            missing: self.missing_iter(actual.iter().copied()).collect(),
+            matched: ordered_actual(actual.iter().copied()).filter(|pair| self.predicted_iter().any(|p| p == *pair)).count() }
+    }
+
+    pub fn residual_iter<'a>(&'a self, actual: impl Iterator<Item = (u32, u32)> + Clone + 'a)
+        -> impl Iterator<Item = (u32, u32)> + Clone + 'a {
+        ordered_actual(actual).filter_map(move |(key, refs)| {
+            match self.predicted_iter().find(|(k, _)| *k == key) {
+                Some((_, p)) if p < refs => Some((key, refs - p)),
+                None => Some((key, refs)),
+                _ => None,
             }
-        }
-        for (key, refs) in &predicted {
-            if !actual.contains_key(key) { out.missing.push((*key, *refs)); }
-        }
-        out
+        })
+    }
+
+    pub fn missing_iter<'a>(&'a self, actual: impl Iterator<Item = (u32, u32)> + Clone + 'a)
+        -> impl Iterator<Item = (u32, u32)> + Clone + 'a {
+        // Preserve the original two-pass order: short actual keys, then absent keys.
+        ordered_actual(actual.clone()).filter_map(move |(key, refs)| {
+            self.predicted_iter().find(|(k, _)| *k == key)
+                .and_then(|(_, p)| (p > refs).then(|| (key, p - refs)))
+        }).chain(self.predicted_iter().filter(move |(key, _)| !actual.clone().any(|(k, _)| k == *key)))
     }
 
     /// WP2 shadow mode: a ledger mirroring what the current bank code holds — one `OwnedPerKind`

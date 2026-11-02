@@ -245,9 +245,8 @@ pub(crate) fn settle(role: Role, group: usize, kinds: &[u32], reason: &str) -> V
 pub(crate) fn settle_stale_on_empty(role: Role, reason: &str) -> usize {
     let mut slot = lock(role);
     let Some(handle) = slot.as_mut() else { return 0; };
-    let stale: Vec<(usize, AcqToken)> = std::mem::take(&mut handle.held);
-    let count = stale.len();
-    for (group, token) in stale {
+    let count = handle.held.len();
+    for (group, token) in handle.held.drain(..) {
         let (kind, batch) = (token.kind(), token.batch());
         if handle.ledger.settle(token) {
             trace!("[Ledger] stale owner={} group={} kind={:#x} batch={} settled reason={}", handle.owner,
@@ -344,10 +343,12 @@ pub(crate) fn expect_free(role: Role) -> Result<(), Vec<u32>> {
 /// # Safety
 /// As for `observe::walk_map`: the owner's task idle, the current callback.
 pub(crate) unsafe fn reconcile(role: Role, phase: &str) {
-    let (r, owner, predicted) = match lock(role).as_ref() {
-        Some(handle) => (handle.r, handle.owner, handle.ledger.predicted()),
-        None => return,
-    };
+    // Read-only field probes and formatting make no native calls. Keep one coherent
+    // ledger view while walking the idle map; no copied prediction or tree is needed.
+    let slot = lock(role);
+    let Some(handle) = slot.as_ref() else { return; };
+    let (r, owner) = (handle.r, handle.owner);
+    let predicted = DebugIter(handle.ledger.predicted_iter());
     let map = fields::read::<u64>(r, 0x18).unwrap_or(0);
     let task_pending = fields::child(r, 0xa8).and_then(|task| fields::read::<u32>(task, 0x10)).unwrap_or(0);
     if task_pending != 0 {
@@ -356,10 +357,10 @@ pub(crate) unsafe fn reconcile(role: Role, phase: &str) {
     }
     match observe::walk_map(r) {
         Some(nodes) => {
-            let actual: Vec<(u32, u32)> = nodes.iter().map(|n| (n.key, n.refs)).collect();
-            let result = match lock(role).as_ref() { Some(handle) => handle.ledger.reconcile(&actual), None => return };
+            let actual = nodes.iter().map(|n| (n.key, n.refs));
             trace!("[Ledger] reconcile owner={} phase={} map={} task_pending=0 predicted={:x?} actual={:x?} residual={:x?} missing={:x?}",
-                owner, phase, map, predicted, actual, result.residual, result.missing);
+                owner, phase, map, predicted, DebugIter(actual.clone()),
+                DebugIter(handle.ledger.residual_iter(actual.clone())), DebugIter(handle.ledger.missing_iter(actual)));
         }
         None => trace!("[Ledger] reconcile owner={} phase={} map={} task_pending=0 predicted={:x?} walk=invalid", owner, phase, map, predicted),
     }

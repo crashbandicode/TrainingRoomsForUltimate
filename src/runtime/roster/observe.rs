@@ -26,6 +26,7 @@
 use crate::engine::seams::native_fields as fields;
 use std::convert::TryFrom; // root crate is edition 2018: not in the prelude
 use crate::engine::swap::swap_model::ledger::RFlags;
+use crate::engine::compat::fixed::FixedList;
 
 /// Nodes a walk may visit. Every recorded lap stayed at `map<=15`; two prefetched specials plus a
 /// window cannot exceed 24 keys (8 + 8 + 8).
@@ -44,12 +45,12 @@ pub(crate) struct MapNode {
 /// `r` must be the role's resource owner inside the current entry callback with INSTALL held
 /// (the bank's `resource(base, owner)` proof) and its task idle; every dereference goes through
 /// `native_fields` validation and nothing is retained past the call.
-pub(crate) unsafe fn walk_map(r: usize) -> Option<Vec<MapNode>> {
+pub(crate) unsafe fn walk_map(r: usize) -> Option<FixedList<MapNode, MAP_WALK_LIMIT>> {
     let count = usize::try_from(fields::read::<u64>(r, 0x18)?).ok()?;
     if count > MAP_WALK_LIMIT { return None; }
-    let Some(root) = fields::child(r, 0x10) else { return (count == 0).then(Vec::new); };
-    let mut out = Vec::with_capacity(count);
-    let mut stack: Vec<usize> = Vec::new();
+    let mut out = FixedList::new(MapNode { key: 0, refs: 0 });
+    let Some(root) = fields::child(r, 0x10) else { return (count == 0).then_some(out); };
+    let mut stack = FixedList::<usize, MAP_WALK_LIMIT>::new(0);
     let mut node = Some(root);
     while node.is_some() || !stack.is_empty() {
         while let Some(current) = node {
@@ -60,7 +61,7 @@ pub(crate) unsafe fn walk_map(r: usize) -> Option<Vec<MapNode>> {
         let current = stack.pop()?;
         let key = fields::read::<u64>(current, 0x20)?;
         let refs = fields::read::<u32>(current, 0x28)?;
-        out.push(MapNode { key: u32::try_from(key).ok()?, refs });
+        if !out.push(MapNode { key: u32::try_from(key).ok()?, refs }) { return None; }
         if out.len() > count { return None; }
         node = fields::child(current, 8);
     }
@@ -111,10 +112,10 @@ mod tests {
             p.add(2).write(Node { left: 0, right: 0, parent: at(1), black: 0, key: 0x1338, refs: 1, handle: 0 });
         }
         let walked = unsafe { walk_map(r) }.expect("valid tree");
-        assert_eq!(walked, vec![MapNode { key: 0x1332, refs: 1 }, MapNode { key: 0x1333, refs: 2 }, MapNode { key: 0x1338, refs: 1 }]);
+        assert_eq!(&*walked, &[MapNode { key: 0x1332, refs: 1 }, MapNode { key: 0x1333, refs: 2 }, MapNode { key: 0x1338, refs: 1 }]);
         unsafe { (*(r as *mut Owner)).size = 2; }
-        assert_eq!(unsafe { walk_map(r) }, None, "a count that disagrees with the nodes is not trusted");
+        assert!(unsafe { walk_map(r) }.is_none(), "a count that disagrees with the nodes is not trusted");
         unsafe { (*(r as *mut Owner)).size = 0; (*(r as *mut Owner)).root = 0; }
-        assert_eq!(unsafe { walk_map(r) }, Some(Vec::new()), "an empty map walks to nothing");
+        assert!(unsafe { walk_map(r) }.is_some_and(|nodes| nodes.is_empty()), "an empty map walks to nothing");
     }
 }
