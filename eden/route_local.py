@@ -145,7 +145,7 @@ def main():
     press(label, "a")
     wait_match(label, "ready.png", (40, 40, 1240, 330), 25, 25, "ready to fight")
     press(label, "a")
-    wait_match(label, "training.png", (100, 200, 430, 500), 16, 90, "training scene")
+    wait_match(label, "training.png", (100, 200, 430, 500), 30, 90, "training scene")
     print("ROUTE DONE", flush=True)
 
 

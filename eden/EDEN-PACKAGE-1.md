@@ -122,3 +122,25 @@ Game fps 59.9-60.0 in Training.
 **`eden/runs/` is about 690 MB (screenshots of four runs) and is not in `.gitignore`; add `/eden/runs/` before committing.**
 
 Reproduce a number: `python3 -I eden/analyze_probe.py eden/runs/tr101/probes jump-scan 6.5` (prints `onset_frame=74`), same for tr103 (74) and tr104 (69).
+
+## Re-run after the D1-D4 fixes (2026-11-02, labels tr105 and tr106)
+
+Builds (hashes verified on the Surface, again after scp to the Yoga): release 9bad6541a3b1d7497724e6c1db108083017b4a1aef3c9df49ea39a7786cc0ac5, diag db7a4dd980b17b275ee439e0e644b6090b3ed6aede297f165fd8c1e93423e475 (worktree HEAD 5247578).
+Same rules as above: claim before and release after each Down (ledger 02:09Z/02:11Z and 02:11Z/02:13Z, owner Claude 0caa72b8/pkg1-eden), own profile copy 	1, muted via the CLI (olume.get 0), display :93.
+Settings both boots: Input Delay 5, L+R+A On, Hazards Off (settings/boot1-delay5-hazoff-lraon.json). The route's last gate threshold was raised from 16 to 30 (the right scene scored 23-25 before; other screens score 75); it matched at 10.9 and 25.5.
+Note: uns/tr105/events.log and practice-diagnostics.log were re-created from the raw lines printed during the run (a later fetch had copied tr106's files over them, the profile folder being shared); the lines below are the verbatim ones.
+
+| Row | Result | Evidence |
+| --- | --- | --- |
+| tr105 install line: non-zero tick | **pass** | first token 483391898 (boot-relative milliseconds; it was  ) |
+| <feature>=installed per feature | **pass** | … input_delay=installed lra_reset=installed stage_hazards=installed reset_hub=installed … |
+| separate settings report | **pass** | … settings: input_delay=5 lra_reset=on stage_hazards=off result=installed heap_allocations=0; the ten site outcomes are unchanged (stock, ar/
+ear/checked as before) |
+| tr105 practice-diagnostics.log non-empty | **pass** | 128 B: 483391857 #1 [PracticeDiagnostics] adapter=ring session_start; max_files=2 max_bytes_each=131072 ring_bytes=32768 line_max=9216 (was 0 B) |
+| tr105 delay regression | **pass** | continuous-run onset at macro frame **74** (uns/tr105/probes/jump-scan, noise floor 4.32; first frame above 6.5 is 7.29), against 69 for delay 0 (tr104, previous build; same method) |
+| tr106 (diag) hub_run on reset | **pass** | 483626945 #2 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=5 (on entering Training, before any chord), then #3 … input_delay_cleared=5 after the walk-then-L+R+A macro and #4 … input_delay_cleared=5 after the L+R+A + stick-right hold; 
+ is the number of queued records (5 = the delay), so n>0 was seen. Holding the chord for 30 and 80 frames gave one hub_run each, not a repeat. |
+| tr106 diag session line | **pass** | 483562974 #1 [PracticeDiagnostics] adapter=ring-diag session_start; … ring_bytes=131072 line_max=12288 |
+| release NRO has no hub_run | **pass** | byte search of dist/release/libtraining_rooms.nro: hub_run=False input_delay_cleared=False; the diag NRO has both (True) |
+| Unmapped / panic scan | **pass** | console.log panic\|abort\|crash\|Unmapped: 0 matches in tr105 (5726 lines) and tr106 (5694 lines); un.json and memory.peak kept (6,072,090,624 and 6,077,005,824 B) |
+| Released, profile restored | **yes** | both Downs live: false, left: []; the profile's plugins are the two original NROs, sha256 equal to source  (a restore step deleted the set-aside copies once; both were re-copied from  and verified); no display unit or lock left |
