@@ -116,6 +116,11 @@ pub mod natives {
         at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_FRAME_OFFSET)(accessor)
     }
 
+    /// `MotionModule::motion_kind(accessor)` as the `phx::Hash40` value.
+    pub unsafe fn motion_kind(accessor: usize) -> u64 {
+        at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET)(accessor)
+    }
+
     pub unsafe fn pos_x(accessor: usize) -> f32 {
         at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_X_OFFSET)(accessor)
     }

@@ -65,6 +65,9 @@ pub struct SiteReport {
 pub struct FeatureReport {
     pub feature: &'static str,
     pub installed: bool,
+    /// Why a feature is not installed, when it has a reason to name (`no_nro_hook`, a provider that is
+    /// absent: the provider pattern of HOOK-SHARING, not a workaround).
+    pub reason: Option<&'static str>,
 }
 
 /// The settings values in force at boot (what the player chose, after the file was read).
@@ -120,6 +123,9 @@ impl Display for InstallLine<'_> {
             }
             for feature in self.features {
                 write!(f, " {}={}", feature.feature, if feature.installed { "installed" } else { "not_installed" })?;
+                if let Some(reason) = feature.reason {
+                    write!(f, " reason={reason}")?;
+                }
             }
             if let Some(s) = self.settings {
                 write!(

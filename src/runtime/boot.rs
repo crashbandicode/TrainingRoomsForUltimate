@@ -20,7 +20,7 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
+use crate::runtime::features::{cpu, cpu_common, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
 use crate::runtime::{clock, game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
@@ -124,21 +124,22 @@ pub fn run() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
-    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason) = install_cpu(&usable, &mut mark);
 
     // 6. The install line.
     let reports: [SiteReport; SITE_COUNT] =
         std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
     let features = [
-        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
-        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
-        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on },
-        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on },
-        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on },
-        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on },
-        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
-        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
-        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
+        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
+        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
+        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on, reason: None },
+        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on, reason: None },
+        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on, reason: None },
+        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on, reason: None },
+        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on, reason: None },
+        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on, reason: None },
+        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on, reason: None },
+        FeatureReport { feature: Feature::CpuCommon.name(), installed: false, reason: cpu_common_reason },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -164,9 +165,9 @@ pub fn run() {
 /// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
 /// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
 /// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
-fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool) {
+fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>) {
     if !sites::feature_usable(Feature::CpuCore, usable) {
-        return (false, false, false, false, false);
+        return (false, false, false, false, false, Some("cpu_core_not_installed"));
     }
     cpu::install_frame();
     mark("cpu_on_frame_slot", Written::Far);
@@ -205,7 +206,14 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
             mark(name, Written::Far);
         }
     }
-    (true, defence, ledge, tech, shield)
+    // The hooks in the `common` script module install when that module loads, through the nro-load
+    // provider (`libnro_hook`); the install line names why they are not installed yet, or at all.
+    let common = if sites::feature_usable(Feature::CpuCommon, usable) {
+        cpu_common::register()
+    } else {
+        Some("site_guard_failed")
+    };
+    (true, defence, ledge, tech, shield, common)
 }
 
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.

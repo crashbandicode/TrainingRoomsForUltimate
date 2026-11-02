@@ -49,3 +49,32 @@ package 2: 180,224 B resident, so +53,248 B: text +24.5 KB, ro +16 KB, data +12 
 removed because they linked the whole math library, +98 KB), diag `8b39f3cc247554a645c68167db40f667c347c81c4fd39f62728d9d41b91d9cf2`
 (339,968 B resident). Site rows live in `src/model/sites_pkg2.rs` (registered by `SITES = concat(BASE_SITES, SITES_PKG2)`).
 `compliance.py` machine rows that fail are the repo-level ones (README GIF, HANDOFF.md, dirty tree before commit).
+
+## Lead rulings applied (2026-11-02): the `common` script module hooks
+**Extraction (local research, never committed).** `lua2cpp_common.nro` came out of `data.arc` with W7's single-file extractor:
+`cd /tmp; /home/intpa/ssbu-recomp/deps/venv/bin/python3 -I <c1162>/di-sdi-extract/tools/w7/arc_one.py /home/intpa/ssbu-recomp/build-linux/work/ro_study /home/intpa/ssbu-recomp/build-linux/dump/romfs/data.arc 0x281dd03565 /home/intpa/smash-training-lobby/research/game-13.0.5/nro/lua2cpp_common.nro`
+(`0x281dd03565` is the Hash40 of `prebuilt:/nro/release/lua2cpp_common.nro`, listed in `ro_study/nro/index.json`). Result: 8,466,432 B, sha256
+`43876f961a80e413370629d32c23af9de6e4cc26b448bab88d5433714a566097`, byte-identical to the earlier `ro_study/nro/lua2cpp_common.nro`.
+**Sites.** `src/model/sites_pkg2.rs::COMMON_SITES`: `correctDamageVectorCommon` (text+0x15df0), `L2CFighterBase::change_status` (0xa1e0),
+`L2CFighterCommon::sub_guard_cont` (0x18cea0) as replace hooks at the entry, `is_enable_passive` (0xed2a0) called. `tests/cpu_common.rs` reads the module from
+the research path (skip-with-message only when absent and `SKIP_OWNED_ELF_FACT` is set) and compares the 64 bytes (`cpu_common_guards_match_the_owned_module`,
+`cpu02_common_guard_gate`). ABI read from the disassembly: arguments by reference (`mov x21, x1`), result in x8 (`mov x19, x8`), the script object's module accessor at +0x40.
+**Runtime.** `src/runtime/features/cpu_common.rs`: `libnro_hook`'s `add_nro_load_hook` found by `LookupSymbol`; on the `common` module's load each
+function is found with `LookupModuleSymbol`, its 64 bytes are compared, and the three hooks are written only when all four match (all or nothing); one
+late line in `events.log` (`cpu_common_load … cpu_common=installed|not_installed`). Without the provider the install line says
+`cpu_common=not_installed reason=no_nro_hook` (`FeatureReport` gained an optional `reason`); with it, `reason=awaiting_common_nro`.
+The logic entry points are in `features/cpu.rs` (`di_before`, `tech_request`, `oos_after`). Not run on Eden: whether the loader's name for the module is
+`common` is a guess covered by `is_common` (`common`, `lua2cpp_common`, a suffix match) and the late line prints the name it saw.
+**Builds.** release `6cea4a592c5d4214e9a1da618dee32e31b68a7bb8e205ef02e618479ccc2619f` (245,760 B resident), diag
+`1b5381adafc744683edbb6ae12c87e9d9934f325fcdac4846f625aa23ca0aa8d` (348,160 B). Gates: `cargo test` (20 binaries), clippy `-D warnings`, `--no-default-features`.
+**Diag counters** (`cpu_hook_counts`) now also print `heap_allocations=`; r1fix's API replaces it when merged.
+
+## Still open (rulings 2 and 3)
+* **Shield damage multiplier / `libparam_hook`.** The provider exports `add_param_load_hook(callback)`; the callback's argument layout (a pair of references
+  to the params info and the file hash, read from `handle_load_prc_file`) and the `CommonParams` field offset are not in any spec or owned source, and decoding
+  them from the plugin's machine code was not done. Not installed; `Cpu::damage_multiplier` (tested) is ready. Needs the provider's source or a decision.
+* **StageID values (fixed camera).** The route order was: (1) lua constants by name: not tried (cannot be known without a run; the constant names would be
+  `STAGE_ID_*` guesses); (2) `ui_stage_db.prc` through `arc_one.py`: not done; (3) the ours-new fork file `training_mod_consts/src/lobby_stages.rs` holds the
+  `stage_place_id` of each selectable stage (Battlefield 0, Small Battlefield 347, Big Battlefield 2, Final Destination 3, ...), joined to the game's form table at
+  `main+0x454a7e8` (stride 72) for the Omega and Battlefield forms. The camera rule needs the Omega and Battlefield form ids of every stage, which come from that
+  form table; the mapping is not built yet.

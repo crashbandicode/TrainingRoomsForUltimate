@@ -82,6 +82,7 @@ constants! {
     StatusEscape = "FIGHTER_STATUS_KIND_ESCAPE",
     StatusEscapeF = "FIGHTER_STATUS_KIND_ESCAPE_F",
     StatusEscapeB = "FIGHTER_STATUS_KIND_ESCAPE_B",
+    TermContEscape = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE",
     ButtonGuard = "CONTROL_PAD_BUTTON_GUARD",
     ButtonGuardHold = "CONTROL_PAD_BUTTON_GUARD_HOLD",
     // The clatter list (SPEC-cpu-01 §3 "in clatter").

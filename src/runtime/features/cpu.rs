@@ -22,7 +22,9 @@ use parking_lot::Mutex;
 
 use crate::model::cpu::defence::SdiAnswer;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
-use crate::model::cpu::shield::ButtonAnswer;
+use crate::model::cpu::shield::{ButtonAnswer, OosFacts};
+use crate::model::cpu::tech::{is_tech_situation, TechChange, TechRequest};
+use crate::model::cpu::status;
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::ids::{self, Table, C, UNRESOLVED};
 use crate::model::cpu::role::{is_cpu_role, FighterKey, Scene, LOBBY_CPU_ENTRY};
@@ -55,6 +57,14 @@ static CLATTER_EFFECT_ATTRIBUTES: AtomicU32 = AtomicU32::new(0);
 static STATUS_LAY_DOWN: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static WORK_CURSOR_OFFSET: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static QUAKE_KIND_NONE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_VECOR_X: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_VECOR_Y: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE_WALL: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE_CEIL: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CONT_ESCAPE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// `phx::Hash40` of `just_shield_off`, the parry animation.
+static PARRY_MOTION: AtomicU64 = AtomicU64::new(0);
 static BUTTON_GUARD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static BUTTON_GUARD_HOLD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of `common`, `shield_dec1` and `shield_recovery1` (the parameter hook compares them).
@@ -102,7 +112,7 @@ mod counts {
         }
         let take = |i: usize| COUNTS[i].swap(0, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={}",
+            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={} heap_allocations={}",
             take(FRAME),
             take(SDI),
             take(STICK_X),
@@ -110,7 +120,8 @@ mod counts {
             take(CLATTER_START),
             take(TRANSITION_TERM),
             take(MOTION_CHANGE),
-            take(QUAKE_POS)
+            take(QUAKE_POS),
+            crate::runtime::alloc::hook_allocations()
         ));
     }
 }
@@ -192,6 +203,13 @@ fn ensure_consts() -> bool {
     TERM_CLIFF_ATTACK.store(table.get(C::TermContCliffAttack), Ordering::Release);
     FLAG_CATCH_CLIFF.store(table.get(C::WorkFlagCatchCliff), Ordering::Release);
     FLAG_DISABLE_PENALTY.store(table.get(C::WorkFlagDisableEscapePenalty), Ordering::Release);
+    WORK_VECOR_X.store(table.get(C::WorkFloatVecorCorrectStickX), Ordering::Release);
+    WORK_VECOR_Y.store(table.get(C::WorkFloatVecorCorrectStickY), Ordering::Release);
+    TERM_PASSIVE.store(table.get(C::TermPassive), Ordering::Release);
+    TERM_PASSIVE_WALL.store(table.get(C::TermPassiveWall), Ordering::Release);
+    TERM_PASSIVE_CEIL.store(table.get(C::TermPassiveCeil), Ordering::Release);
+    TERM_CONT_ESCAPE.store(table.get(C::TermContEscape), Ordering::Release);
+    PARRY_MOTION.store(hash40("just_shield_off"), Ordering::Release);
     BUTTON_GUARD.store(table.get(C::ButtonGuard), Ordering::Release);
     BUTTON_GUARD_HOLD.store(table.get(C::ButtonGuardHold), Ordering::Release);
     for (slot, name) in PARAM_HASHES.iter().zip(["common", "shield_dec1", "shield_recovery1"]) {
@@ -604,4 +622,77 @@ pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f3
         return original;
     }
     role_of(accessor).and_then(|key| with(|cpu| cpu.shield_param(key, decay)).flatten()).unwrap_or(original)
+}
+
+// ---- the `common` script module's hooks (called from `cpu_common`) -------------------------------------
+
+/// The module accessor of a script object (`L2CFighterBase`): the pointer at +0x40, which the owned
+/// 13.0.5 `common` module loads from its first argument before every `lua_bind` call (checked on
+/// `correctDamageVectorCommon` and `sub_guard_cont`). A pointer that is no registered CPU body does
+/// nothing, so a wrong offset can only make the hooks inert.
+pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
+    if fighter == 0 {
+        return 0;
+    }
+    ((fighter + 0x40) as *const usize).read()
+}
+
+/// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
+pub(crate) unsafe fn di_before(accessor: usize) {
+    let Some(key) = role_of(accessor) else { return };
+    let (x, y) = (WORK_VECOR_X.load(Ordering::Acquire), WORK_VECOR_Y.load(Ordering::Acquire));
+    if x == UNRESOLVED || y == UNRESOLVED {
+        return;
+    }
+    let cpu_x = natives::pos_x(accessor);
+    if let Some(Some((vx, vy))) = with(|cpu| cpu.di_correction(key, player_x(), cpu_x)) {
+        natives::set_float(accessor, vx, x);
+        natives::set_float(accessor, vy, y);
+    }
+}
+
+/// Tech: the status a CPU body's script is about to change to, or the one to request instead. `passive`
+/// asks the script's own "is passive enabled".
+pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<i32> {
+    let key = role_of(accessor)?;
+    if !with(|cpu| is_tech_situation(&cpu.ids, requested))? {
+        return None;
+    }
+    let term = |id: &AtomicI32| {
+        let id = id.load(Ordering::Acquire);
+        id != UNRESOLVED && natives::is_enable_transition_term(accessor, id)
+    };
+    let request = TechRequest {
+        requested,
+        second_prev: natives::prev_status_kind(accessor, 1),
+        passive: term(&TERM_PASSIVE),
+        passive_wall: term(&TERM_PASSIVE_WALL),
+        passive_ceil: term(&TERM_PASSIVE_CEIL),
+        script_passive_enabled: passive(),
+    };
+    match with(|cpu| cpu.tech_status_change(key, &request))? {
+        TechChange::Status(status) => Some(status),
+        TechChange::Unchanged => None,
+    }
+}
+
+/// Out of shield: after the script continuation, the dodge or roll status to change to, if any.
+pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
+    let key = role_of(accessor)?;
+    let prev = natives::prev_status_kind(accessor, 0);
+    let status_now = natives::status_kind(accessor);
+    let motion = natives::motion_kind(accessor);
+    let term = TERM_CONT_ESCAPE.load(Ordering::Acquire);
+    let cont_escape = term != UNRESOLVED && natives::is_enable_transition_term(accessor, term);
+    let parry = PARRY_MOTION.load(Ordering::Acquire);
+    with(|cpu| {
+        let facts = OosFacts {
+            left_shieldstun: cpu.ids.is(C::StatusGuardDamage, prev),
+            shielding: status::shielding(&cpu.ids, status_now),
+            in_parry: motion == parry,
+            cont_escape,
+        };
+        cpu.out_of_shield(key, &facts).escape_status
+    })
+    .flatten()
 }

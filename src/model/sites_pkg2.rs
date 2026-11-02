@@ -3,7 +3,7 @@
 //! (`tests/cpu_sites.rs` checks the symbol of every row and `core01_sites_match_owned_elf` the bytes).
 //! Registered in `sites::SITES` by one line; the features are `Feature::Cpu*`.
 
-use super::guard::{HookForm, Placement, SeamKind};
+use super::guard::{outcome_for, GuardOutcome, HookForm, Placement, SeamKind, Sharing, GUARD_BYTES};
 use super::sites::{Feature, Site};
 
 /// Package 2: the per-frame slot and its original, the constant table lookup, the natives the facts
@@ -36,6 +36,7 @@ pub const WORK_GET_FLOAT_OFFSET: usize = 0x208_db50;
 pub const WORK_SET_FLOAT_OFFSET: usize = 0x208_db60;
 pub const WORK_GET_PARAM_FLOAT_OFFSET: usize = 0x208_de50;
 pub const MOTION_CHANGE_HOOK_OFFSET: usize = 0x205_cb30;
+pub const MOTION_KIND_OFFSET: usize = 0x205_cc20;
 pub const QUAKE_POS_HOOK_OFFSET: usize = 0x1ff_0ac0;
 pub const SHIELD_PARAM_HOOK_OFFSET: usize = 0x208_de50;
 pub const CHECK_BUTTON_ON_HOOK_OFFSET: usize = 0x200_1430;
@@ -43,7 +44,7 @@ pub const CHECK_BUTTON_OFF_HOOK_OFFSET: usize = 0x200_1440;
 pub const STICK_X_NO_CLAMP_HOOK_OFFSET: usize = 0x200_1600;
 pub const STICK_Y_NO_CLAMP_HOOK_OFFSET: usize = 0x200_1610;
 
-pub static SITES_PKG2: [Site; 34] = [
+pub static SITES_PKG2: [Site; 35] = [
     Site {
         name: "cpu_on_frame_slot",
         feature: Feature::CpuCore,
@@ -485,5 +486,99 @@ pub static SITES_PKG2: [Site; 34] = [
             0x00, 0x24, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0xad, 0x41, 0xf9, 0x21, 0x00, 0x00, 0x12,
         ],
         note: "ControlModule::get_stick_y_no_clamp, the next thunk: the shield tilt (SPEC-cpu-05 section 4).",
+    },
+    Site {
+        name: "motion_kind",
+        feature: Feature::CpuCommon,
+        offset: 0x205cc20,
+        kind: SeamKind::Called,
+        guard: [
+            0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x01, 0x9d, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6,
+            0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x01, 0xa1, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6,
+            0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x01, 0xa5, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6,
+            0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x01, 0xa9, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6,
+        ],
+        note: "MotionModule::motion_kind, read for the parry rule of the out-of-shield decision (SPEC-cpu-05 section 5).",
+    },
+];
+
+/// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
+/// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from
+/// `research/game-13.0.5/nro/lua2cpp_common.nro`, extracted from `data.arc`; see
+/// `IMPLEMENTATION-PROGRESS-pkg2.md`).
+#[derive(Clone, Copy, Debug)]
+pub struct CommonSite {
+    pub name: &'static str,
+    /// The mangled symbol the loader's `LookupSymbol` answers.
+    pub symbol: &'static str,
+    /// A replace hook at the entry (otherwise a called function).
+    pub hooked: bool,
+    pub guard: [u8; GUARD_BYTES],
+    pub note: &'static str,
+}
+
+impl CommonSite {
+    pub const fn kind(&self) -> SeamKind {
+        if self.hooked {
+            SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }
+        } else {
+            SeamKind::Called
+        }
+    }
+
+    /// The outcome for the 64 bytes now at the function in the loaded module.
+    pub fn outcome(&self, actual: &[u8; GUARD_BYTES]) -> GuardOutcome {
+        outcome_for(&self.guard, actual, self.kind(), Sharing::None)
+    }
+}
+
+pub static COMMON_SITES: [CommonSite; 4] = [
+    CommonSite {
+        name: "common_di_hook",
+        symbol: "_ZN7lua2cpp16L2CFighterCommon46FighterStatusDamage__correctDamageVectorCommonEN3lib8L2CValueE",
+        hooked: true,
+        guard: [
+            0xff, 0x43, 0x07, 0xd1, 0xe8, 0xc3, 0x00, 0xfd, 0xfc, 0x5f, 0x19, 0xa9, 0xf6, 0x57, 0x1a, 0xa9,
+            0xf4, 0x4f, 0x1b, 0xa9, 0xfd, 0x7b, 0x1c, 0xa9, 0xfd, 0x03, 0x07, 0x91, 0xf5, 0x03, 0x01, 0xaa,
+            0xf4, 0x03, 0x00, 0xaa, 0xa0, 0x83, 0x01, 0xd1, 0xe1, 0x03, 0x1f, 0x2a, 0xf3, 0x03, 0x08, 0xaa,
+            0x84, 0x64, 0x14, 0x94, 0xa0, 0xc3, 0x01, 0xd1, 0xe1, 0x03, 0x1f, 0x2a, 0x81, 0x64, 0x14, 0x94,
+        ],
+        note: "FighterStatusDamage__correctDamageVectorCommon(fighter, value): the DI stick floats are written before the original runs (SPEC-cpu-02 section 4). A replace hook at the entry of a 0x1224-byte script function: the spec's design, the arguments (L2CValue, passed by reference) and the result (sret in x8) are forwarded untouched.",
+    },
+    CommonSite {
+        name: "common_change_status_hook",
+        symbol: "_ZN7lua2cpp14L2CFighterBase13change_statusEN3lib8L2CValueES2_",
+        hooked: true,
+        guard: [
+            0xff, 0x83, 0x01, 0xd1, 0xf6, 0x57, 0x03, 0xa9, 0xf4, 0x4f, 0x04, 0xa9, 0xfd, 0x7b, 0x05, 0xa9,
+            0xfd, 0x43, 0x01, 0x91, 0x16, 0x20, 0x03, 0x91, 0xf5, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x00, 0xaa,
+            0xe1, 0x03, 0x1c, 0x32, 0xe0, 0x03, 0x16, 0xaa, 0xf4, 0x03, 0x02, 0xaa, 0x85, 0x93, 0x14, 0x94,
+            0xf4, 0x93, 0x14, 0x94, 0xe0, 0x02, 0x00, 0x36, 0xe1, 0x03, 0x1c, 0x32, 0xe0, 0x03, 0x16, 0xaa,
+        ],
+        note: "L2CFighterBase::change_status(fighter, status, unk): a CPU body's tech request is rewritten before the original runs (SPEC-cpu-04 section 4). Replace hook at the entry of a 0xc8-byte function.",
+    },
+    CommonSite {
+        name: "common_sub_guard_cont_hook",
+        symbol: "_ZN7lua2cpp16L2CFighterCommon14sub_guard_contEv",
+        hooked: true,
+        guard: [
+            0xff, 0x83, 0x06, 0xd1, 0xfc, 0x5f, 0x16, 0xa9, 0xf6, 0x57, 0x17, 0xa9, 0xf4, 0x4f, 0x18, 0xa9,
+            0xfd, 0x7b, 0x19, 0xa9, 0xfd, 0x43, 0x06, 0x91, 0x15, 0x20, 0x03, 0x91, 0xf4, 0x03, 0x00, 0xaa,
+            0x81, 0x06, 0x80, 0x52, 0xe0, 0x03, 0x15, 0xaa, 0xf3, 0x03, 0x08, 0xaa, 0x55, 0x88, 0x0e, 0x94,
+            0xe1, 0x03, 0x00, 0xaa, 0xa0, 0x43, 0x01, 0xd1, 0x7a, 0x88, 0x0e, 0x94, 0xa0, 0x43, 0x01, 0xd1,
+        ],
+        note: "L2CFighterCommon::sub_guard_cont(): the out-of-shield decision runs after the original (SPEC-cpu-05 section 4), which a hook after the prologue cannot do; replace hook at the entry of a 0x1108-byte function.",
+    },
+    CommonSite {
+        name: "common_is_enable_passive",
+        symbol: "_ZN7lua2cpp16L2CFighterCommon17is_enable_passiveEv",
+        hooked: false,
+        guard: [
+            0xff, 0x03, 0x02, 0xd1, 0xf6, 0x57, 0x05, 0xa9, 0xf4, 0x4f, 0x06, 0xa9, 0xfd, 0x7b, 0x07, 0xa9,
+            0xfd, 0xc3, 0x01, 0x91, 0xf6, 0x38, 0x00, 0xd0, 0xd6, 0xbe, 0x42, 0xf9, 0xc1, 0x9e, 0x50, 0xb9,
+            0xf4, 0x03, 0x00, 0xaa, 0xe0, 0xc3, 0x00, 0x91, 0xf3, 0x03, 0x08, 0xaa, 0x59, 0x07, 0x11, 0x94,
+            0xe0, 0xc3, 0x00, 0x91, 0x83, 0x07, 0x11, 0x94, 0xe1, 0x03, 0x00, 0xaa, 0x80, 0x22, 0x40, 0xf9,
+        ],
+        note: "L2CFighterCommon::is_enable_passive(): called, never hooked, for the script's own tech check (SPEC-cpu-04 section 3).",
     },
 ];

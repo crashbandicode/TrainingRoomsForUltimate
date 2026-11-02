@@ -14,7 +14,7 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 32] = [
+const SYMBOLS: [(&str, &str); 33] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("prev_status_kind", "_ZN3app8lua_bind35StatusModule__prev_status_kind_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -42,6 +42,7 @@ const SYMBOLS: [(&str, &str); 32] = [
     ("work_get_param_float", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("motion_change_hook", "_ZN3app8lua_bind32MotionModule__change_motion_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40Effbfbb"),
     ("quake_pos_hook", "_ZN3app8lua_bind32CameraModule__req_quake_pos_implEPNS_26BattleObjectModuleAccessorEiRKN3phx8Vector3fE"),
+    ("motion_kind", "_ZN3app8lua_bind30MotionModule__motion_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("shield_param_hook", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("check_button_on_hook", "_ZN3app8lua_bind35ControlModule__check_button_on_implEPNS_26BattleObjectModuleAccessorEi"),
     ("check_button_off_hook", "_ZN3app8lua_bind36ControlModule__check_button_off_implEPNS_26BattleObjectModuleAccessorEi"),
@@ -58,7 +59,7 @@ const PILOT_SITES: [usize; 23] = [
 ];
 
 fn cpu_sites() -> impl Iterator<Item = &'static Site> {
-    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield))
+    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuCommon))
 }
 
 #[test]
@@ -99,6 +100,7 @@ fn cpu_sites_are_the_symbols_they_name() {
         ("work_get_param_float", sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET),
         ("motion_change_hook", sites_pkg2::MOTION_CHANGE_HOOK_OFFSET),
         ("quake_pos_hook", sites_pkg2::QUAKE_POS_HOOK_OFFSET),
+        ("motion_kind", sites_pkg2::MOTION_KIND_OFFSET),
         ("shield_param_hook", sites_pkg2::SHIELD_PARAM_HOOK_OFFSET),
         ("check_button_on_hook", sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET),
         ("check_button_off_hook", sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET),
@@ -190,7 +192,7 @@ fn cpu_sites_overlapping_windows_are_all_our_own() {
     let mut pairs = 0;
     for (a, b) in sites::overlapping_pairs() {
         let (a, b) = (&sites::SITES[a], &sites::SITES[b]);
-        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield);
+        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuCommon);
         if cpu(a) || cpu(b) {
             pairs += 1;
             assert!(cpu(a) && cpu(b), "{} overlaps {} (a site of another feature)", a.name, b.name);
