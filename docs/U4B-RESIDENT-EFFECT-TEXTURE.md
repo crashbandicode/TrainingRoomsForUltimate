@@ -52,3 +52,15 @@ from the resident bytes (`entry + 0x10`), requires exactly as many names as entr
 - Diag proof: `src/runtime/ui/effect_probe.rs` (`[EffTex]` log lines; DI row above, SDI row below, on the menu's tile panes).
 - Lifetime: the chip's page asks when it opens (UI thread, once, not per frame), binds, and on close `unbind` then `texture::retire`.
   The registered slot is the UI texture's own and is released by the game's destroy; the view stays the effect system's.
+
+## Eden (Yoga, own profile u4b, display :95, muted; CPU pilot e3033426, tile cursor b8313ca2; outputs under eden/runs/<label>/, gitignored)
+
+| Label | NRO (diag) | Result |
+| --- | --- | --- |
+| u4b-01 | 47184b85 | all ten u4b guards Stock; manager found (8 resident effect entries, each EFFN); the entry hash is the folder hash, so the file was not found (fixed: EF_COMMON_HASH40 = hash40(ffect/system/common) = 0x1482d0fc5a) |
+| u4b-02 boot 1 | db32d344 | entry 3 (key 0x100) holds ef_common: SYS_VECTOR -> set 82, SYS_HITSTOP_SPARK -> set 101 (= W7); walk stopped at the resource's valid byte (+9 is not word aligned, the live reader refused it; fixed: byte reads need only the address range, pointers stay 4-aligned; the byte is tested non-zero as the loader does) |
+| u4b-02 boot 2 (same session, NRO swapped, game restarted) | 9b21b6ea | DI: 4 textures 64x128 (tri00), 64x256 (line09), 64x128 (line11), 32x32 (flare01); SDI: 64x128 (line00), 256x128 (impact13), 128x128 (mask00), 64x64 (grade00) = W7's sizes; all 8 built by load_resident (the game's registration) and bound, tinted with the emitter colour; shot shots/110755-eff-c2-1.png (upper row DI wedge, streak, dashes, blue flare; lower row SDI streak, jagged impact band, star mask, gradient); released after 4 UI frames, two cycles identical, allocation count unchanged (31) |
+
+console.log: one boot-time fault per boot (~3.5 s after boot: Unmapped Write64 @ ...b80, then Cannot execute instruction at unmapped address 0) in both u4b-02 boots and in u4b-01's second boot; the same fault appears in pkg4's s4-07 (10:58Z, no u4b code). It happens long before the probe runs and the game continues to Training; not this stream's code. memory.peak 7.58 GB (8 GiB limit).
+
+Not covered: the chip page itself (pkg5 / ui-screens composes the chip from pictures()), the layout destroyed while bound (the page must unbind first, as for u4), an effect mod (the walk reads names, so a mod that keeps the names works; one that renames them answers NoEffect -> arrow).

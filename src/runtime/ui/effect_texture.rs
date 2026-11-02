@@ -40,10 +40,10 @@ pub struct Live;
 
 impl Memory for Live {
     fn bytes(&self, address: usize, len: usize) -> Option<&[u8]> {
-        if !facts::plausible(address) || len == 0 {
+        if !facts::in_range(address) || len == 0 {
             return None;
         }
-        // SAFETY: the address is inside user space and word aligned (`plausible`); every address the walk passes was read from a structure
+        // SAFETY: the address is inside user space (`in_range`; pointers the walk follows are also word aligned, `plausible`); every address the walk passes was read from a structure
         // of the game the guards identified, and the memory of the effect manager and particle system stays mapped while the game runs.
         Some(unsafe { slice::from_raw_parts(address as *const u8, len) })
     }

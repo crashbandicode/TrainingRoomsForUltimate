@@ -119,9 +119,14 @@ pub trait Memory {
     }
 }
 
-/// An address the walk may dereference: user-space, aligned to 4 (every structure the walk follows is at least word aligned).
+/// A pointer value the walk may follow: in user space and aligned to 4 (every structure the walk follows is at least word aligned).
 pub fn plausible(address: usize) -> bool {
-    (0x1_0000..(1usize << 40)).contains(&address) && address % 4 == 0
+    in_range(address) && address % 4 == 0
+}
+
+/// An address a read may start at (a field of a structure the walk entered may sit at any byte, e.g. the resource's valid byte at `+9`).
+pub fn in_range(address: usize) -> bool {
+    (0x1_0000..(1usize << 40)).contains(&address)
 }
 
 /// Where the resident `ef_common.eff` is.
@@ -201,7 +206,8 @@ pub fn find_common<M: Memory>(mem: &M, manager: usize) -> Result<Common, Absent>
         }
         let id = mem.i32(base + ENTRY_RESOURCE).filter(|id| (0..SYSTEM_RESOURCE_MAX).contains(id)).ok_or(Absent::NotLoaded)?;
         let resource = mem.ptr(resources + 8 * id as usize).ok_or(Absent::NotLoaded)?;
-        if mem.bytes(resource + RESOURCE_VALID, 1) != Some(&[1u8][..]) {
+        // The loader takes the resource only when this byte is non-zero (`ldrb w9, [x8, #9]; cmp w9, #0; csel`).
+        if mem.bytes(resource + RESOURCE_VALID, 1).is_none_or(|b| b[0] == 0) {
             return Err(Absent::Shape);
         }
         return Ok(Common { effn, resource, entry });
