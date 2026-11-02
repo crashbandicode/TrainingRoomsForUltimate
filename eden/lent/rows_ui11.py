@@ -1,8 +1,9 @@
 """ui-11 rows on the lent Ally rig (Eden in Training via `ui_lent.py route`): the portrait roster grid (Character Cycles with the
 Player and CPU lists, Player Character), the install line read whole, and the hook counters. Uses the ui-06 walker and helpers.
 
-    rows_ui11.py live-ui-11
+    rows_ui11.py live-ui-11 --menu-static-bytes <exact retained ELF stack_depth bound>
 """
+import argparse
 import json
 import re
 import sys
@@ -14,7 +15,16 @@ sys.path.insert(0, str(HERE.parent))
 import hook_stats  # noqa: E402
 sys.path.insert(0, str(HERE.parents[1] / "tools"))
 import stack_table  # noqa: E402
-PHASE = sys.argv[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("phase")
+parser.add_argument("--menu-static-bytes", type=int, required=True,
+                    help="tr-menu static bytes from the retained exact candidate ELF stack_depth report")
+args = parser.parse_args()
+if args.menu_static_bytes <= 0:
+    parser.error("--menu-static-bytes must be positive")
+PHASE = args.phase
+MENU_STATIC_BYTES = args.menu_static_bytes
+MENU_STACK_BYTES = 57_344  # Lead-approved composed allocation; no budget override.
 sys.argv = [sys.argv[0], PHASE]
 import ui_lent as u  # noqa: E402
 import rows_ui06 as r6  # noqa: E402
@@ -138,15 +148,18 @@ def main():
     threads, _, spawns = stack_table.collect(stats.splitlines())
     menu_stack = threads.get("tr-menu")
     # The approved table uses 25% headroom plus 16 KiB SDK reserve,
-    # rounded to a 4 KiB page; the compiled static path is 35,600 bytes.
-    need = max(35_600, menu_stack["used"]) if menu_stack else 0
+    # rounded to a 4 KiB page. The static bound must come from this run's
+    # retained ELF report, not a historical UI binary or a guessed lower value.
+    need = max(MENU_STATIC_BYTES, menu_stack["used"]) if menu_stack else 0
     required_stack = ((need + need // 4 + 16_384 + 4095) // 4096) * 4096
     menu_spawns = [size for name, _, size, _ in spawns if name == "tr-menu"]
-    r6.row("menu stack retains measured margin on the approved 60 KiB stack",
-           bool(menu_stack) and menu_spawns == [61_440]
-           and menu_stack["size"] == 61_440 and not menu_stack["low"]
+    menu_sizes = {int(m.group(4)) for m in stack_table.THREAD_RE.finditer(stats) if m.group(2) == "tr-menu"}
+    r6.row("menu stack retains measured margin on the approved 56 KiB stack",
+           bool(menu_stack) and menu_spawns == [MENU_STACK_BYTES]
+           and menu_sizes == {MENU_STACK_BYTES}
+           and menu_stack["size"] == MENU_STACK_BYTES and not menu_stack["low"]
            and menu_stack["size"] >= required_stack,
-           f"stack={menu_stack} spawns={menu_spawns} required={required_stack}")
+           f"static={MENU_STATIC_BYTES} stack={menu_stack} spawns={menu_spawns} sizes={sorted(menu_sizes)} required={required_stack}")
     console = u.get(PHASE, "console.log", r6.OUT)
     unmapped = [line for line in console.read_text(errors="replace").splitlines() if "unmapped" in line.lower()]
     (r6.OUT / "unmapped-lines.log").write_text("\n".join(unmapped), encoding="utf-8")
