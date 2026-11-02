@@ -44,3 +44,10 @@ w-01 (3a682e9): 18 of 19 rows; the input log was not drawn (pane search cap), fi
 
 This stream built on the Surface at 06:27-06:28Z, 06:35-06:36Z and 06:39-06:40Z (host gates and Switch release/diag builds, each under a compile-only claim and RELEASED line in the Yoga ledger). None of them was at ~06:48Z; the fork's m5qo1 claim opened at 06:41Z, after the last one. At 06:35Z the foreign note (06:33Z) asking for no Surface cargo applied only to its own open claim, which did not exist yet. No build of this stream has run since 06:40Z; from here on no NRO/Switch build or full clippy runs on a host with an open claim of any owner.
 
+
+## R2 findings (review R2-3..R2-6, 2026-11-02) and final state
+
+Fixed and Eden-proven (w-03, `eden/EDEN-WIRE.md`; rows in `/home/intpa/smash-training-lobby/artifacts/trainingrooms-reviews/R2-astra-pkg2-5/FIXES.md`). Final gates at `5676b32`
+(merge of `work/implementation` `915fda1` inside): `cargo test` all pass, `cargo clippy --all-targets -- -D warnings` 0, `cargo build --no-default-features` ok, Switch release
+`d48367567fc885a7568244e9a4442774da303d707de9ebeeefa5e61e4d06e35f` and diag `1d5d0323b1a18ca8c8d02015eb58aa9e1af60be986348b91fc3e5ccaa5b92b9b`; release warnings only the pkg6-facing API
+(items 10-12). The shared natives commit for r2fix is `7eeec7c` (merged into `stream/wire` at `377f303`).
