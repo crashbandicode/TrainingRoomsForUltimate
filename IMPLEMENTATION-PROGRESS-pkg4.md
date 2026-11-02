@@ -81,6 +81,28 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Resumption16:2xZ: exact thread Astra/medium; hidden watcher service active, no alert.
+  Prepared ordered-capture host-67dad67.ps1 under own Yoga root. No claim obtained:
+  fresh claim helper refused with `ledger.Busy: ['imgui-nvn-sol is queued for the yoga and has not had it since the last TrainingRooms release there', 'tm-f8-terra is queued for the yoga and has not had it since the last TrainingRooms release there']`.
+  Raw ledger changed during preflight (memory-guard q02 release16:22Z mentions Yoga evidence);
+  retaining conservative helper decision, retry after grace and fresh checks. No cargo/Eden started.
+- HEAD67dad67 freezes replay/diag/lock-audit slice; Yoga cargo test --lib --test hook_locks queued
+  and own gate source staged. No claim held. Subsequent uncommitted metadata serial retirement
+  after event loss is now carried; ledger regenerated and all42 files verified.
+- Exact gate still Astra/medium. Prior Start-Process watcher exited; replaced by one hidden user service
+  pkg4-model-watch-01a19c9f.service (MemoryMax256M, RuntimeMaxSec43200), bound to owner2589048.
+  Reap that unit at an eventual yield. No alert; no extra watcher is alive.
+- Read full lead inbox at16:0xZ: preview stub explicitly remains OPEN; lead owns the core dependency
+  and seeks behavior-only contract. Preserve UI-owned hud_draw b4e497e and notices::hud_tick predicate
+  at future authorized integration (no local overlapping edits). F11 gated SHA still pending.
+- Preview interface for lead: worker now prepares PlayBuffers and sends Copy StartState plus PlaybackStart
+  (len/facing/status/buffer generation) and editor revision. Game SESSION retains only this metadata.
+  request_preview_restore(true) is called after SESSION creation; start_context() returns Copy StartState
+  on the game callback. false requests cleanup/return. Existing save_states signatures/stub remain intact;
+  no worker native reads and no invented numbered-slot/temp-pair semantics.
+- Shared harness ledger.py/params.py diff exactly matches authorized225d16b; both fully read.
+  Read compliance.py completely (self-contained). Read/reused lead /tmp/tr-capture-command.py for the
+  next necessary Cargo gate, with stdout/stderr on one descriptor; prior exit0 evidence remains valid.
 - Additional dirty live-replay work (not compiled): hooks now retain fixed LiveTokens and native
   owner/latch/save-actor checks, posting Copy events to existing menu worker. LiveArchive owns pool Vecs,
   Arc snapshots, string conversion and persist dispatch. Removed both per_load calls. BoundSave deque

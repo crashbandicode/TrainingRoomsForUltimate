@@ -1278,7 +1278,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "9df4b043f911e016294d894c91b6c06e9aeda6d05c40bc652229a0bee325a951",
+   "dest_sha256": "e0fa2e3d889a9acab93239f3660dca166b0ecdf999e2265f67e433800482810e",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1424,6 +1424,31 @@
      "old": "        while values.len() >= 16 { values.pop_front(); }\n",
      "new": "",
      "reason": "Keep all delivered metadata until its queued commit consumes it; draining a second batch must not evict an earlier unprocessed commit"
+    },
+    {
+     "old": "Mailbox<(u64, FixedReplayMiis), 16>",
+     "new": "Mailbox<(u64, u64, FixedReplayMiis), 16>",
+     "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
+    },
+    {
+     "old": "Mutex<VecDeque<(u64, FixedReplayMiis)>>",
+     "new": "Mutex<VecDeque<(u64, u64, FixedReplayMiis)>>",
+     "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
+    },
+    {
+     "old": "    let accepted = MII_EVENTS.post((save, miis));",
+     "new": "    let serial = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let accepted = MII_EVENTS.post((save, serial, miis));",
+     "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
+    },
+    {
+     "old": "        let lost = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);\n        LOST_SERIAL.fetch_max(lost, Ordering::Release);",
+     "new": "        LOST_SERIAL.fetch_max(serial, Ordering::Release);",
+     "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
+    },
+    {
+     "old": "    MII_EVENTS.drain(|value| {\n        values.push_back(value);\n    });\n    let at = values.iter().position(|(id, _)| *id == save)?;\n    values.remove(at)?.1.owned()",
+     "new": "    let lost = LOST_SERIAL.load(Ordering::Acquire);\n    values.retain(|(_, serial, _)| *serial > lost);\n    MII_EVENTS.drain(|value| {\n        if value.1 > lost { values.push_back(value); }\n    });\n    let at = values.iter().position(|(id, _, _)| *id == save)?;\n    values.remove(at)?.2.owned()",
+     "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
     }
    ]
   },

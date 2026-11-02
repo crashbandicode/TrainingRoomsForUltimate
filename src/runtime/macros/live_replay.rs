@@ -42,14 +42,14 @@ static EVENT_SERIAL: AtomicU64 = AtomicU64::new(1);
 static LOST_SERIAL: AtomicU64 = AtomicU64::new(0);
 static SAVE_SERIAL: AtomicU64 = AtomicU64::new(1);
 static ARCHIVE: Mutex<LiveArchive> = Mutex::new(LiveArchive::new());
-static MII_EVENTS: hos_lock::Mailbox<(u64, FixedReplayMiis), 16> = hos_lock::Mailbox::new();
-static MII_VALUES: Mutex<VecDeque<(u64, FixedReplayMiis)>> = Mutex::new(VecDeque::new());
+static MII_EVENTS: hos_lock::Mailbox<(u64, u64, FixedReplayMiis), 16> = hos_lock::Mailbox::new();
+static MII_VALUES: Mutex<VecDeque<(u64, u64, FixedReplayMiis)>> = Mutex::new(VecDeque::new());
 
 fn post_miis(save: u64, miis: FixedReplayMiis) -> bool {
-    let accepted = MII_EVENTS.post((save, miis));
+    let serial = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);
+    let accepted = MII_EVENTS.post((save, serial, miis));
     if !accepted {
-        let lost = EVENT_SERIAL.fetch_add(1, Ordering::Relaxed);
-        LOST_SERIAL.fetch_max(lost, Ordering::Release);
+        LOST_SERIAL.fetch_max(serial, Ordering::Release);
     }
     crate::runtime::ui::worker::wake();
     accepted
@@ -57,11 +57,13 @@ fn post_miis(save: u64, miis: FixedReplayMiis) -> bool {
 
 fn take_miis(save: u64) -> Option<crate::engine::mii::replay::ReplayMiis> {
     let mut values = MII_VALUES.lock().unwrap();
+    let lost = LOST_SERIAL.load(Ordering::Acquire);
+    values.retain(|(_, serial, _)| *serial > lost);
     MII_EVENTS.drain(|value| {
-        values.push_back(value);
+        if value.1 > lost { values.push_back(value); }
     });
-    let at = values.iter().position(|(id, _)| *id == save)?;
-    values.remove(at)?.1.owned()
+    let at = values.iter().position(|(id, _, _)| *id == save)?;
+    values.remove(at)?.2.owned()
 }
 
 fn post(event: LiveEvent) -> bool {
