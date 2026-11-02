@@ -103,7 +103,7 @@ def to_training(label, stage_steps, tile_gate, p1_steps):
     # read after the run (reported to the lead as the known install-line length defect).
     wait_line(EVENTS, "plugin=training_rooms/", 240, "install line")
     menu_box = (40, 60, 620, 380)
-    for attempt in range(10):
+    for attempt in range(25):  # f6-04: the title stayed black past 10 tries (30 s) once
         press(label, "a")
         time.sleep(3)
         try:
