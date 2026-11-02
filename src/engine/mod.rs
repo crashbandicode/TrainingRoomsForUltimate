@@ -22,6 +22,9 @@ pub mod mii;
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
 #[cfg(test)]
+#[path = "../model/p1/mod.rs"]
+pub mod p1;
+#[cfg(test)]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
 #[cfg(test)]

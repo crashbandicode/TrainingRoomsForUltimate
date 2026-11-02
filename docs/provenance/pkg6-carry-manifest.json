@@ -21,7 +21,8 @@
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
    "stage_menu": "crate::engine::stages::stage_menu",
-   "character_items": "crate::engine::items::character_items"
+   "character_items": "crate::engine::items::character_items",
+   "cpu_pilot::pilot": "crate::engine::p1"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1058,6 +1059,62 @@
      "reason": "R1 durable publish: the temporary file is flushed to storage and a failed flush fails the store before the rename retires the live file (the fork ignored the sync_all result); offered back to the fork through the fix ledger"
     }
    ]
+  },
+  {
+   "src": "src/cpu_pilot/pilot.rs",
+   "dest": "src/model/p1/mod.rs",
+   "crate": "root",
+   "src_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f",
+   "dest_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f"
+  },
+  {
+   "src": "src/cpu_pilot/config.rs",
+   "dest": "src/model/p1/config.rs",
+   "crate": "root",
+   "src_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6",
+   "dest_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6"
+  },
+  {
+   "src": "src/cpu_pilot/move_observer.rs",
+   "dest": "src/model/p1/move_observer.rs",
+   "crate": "root",
+   "src_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325",
+   "dest_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325"
+  },
+  {
+   "src": "src/cpu_pilot/move_observer_tests.rs",
+   "dest": "src/model/p1/move_observer_tests.rs",
+   "crate": "root",
+   "src_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2",
+   "dest_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2"
+  },
+  {
+   "src": "src/cpu_pilot/tests.rs",
+   "dest": "src/model/p1/tests.rs",
+   "crate": "root",
+   "src_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb",
+   "dest_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb"
+  },
+  {
+   "src": "src/cpu_pilot/examples/completed-attacks-walk-off.json",
+   "dest": "src/model/p1/examples/completed-attacks-walk-off.json",
+   "crate": "root",
+   "src_sha256": "8b0a1b85b16755d30dfe978051ad712c45732fe40f7800dbe4ccea157a825b8e",
+   "dest_sha256": "8b0a1b85b16755d30dfe978051ad712c45732fe40f7800dbe4ccea157a825b8e"
+  },
+  {
+   "src": "src/cpu_pilot/examples/fight-five-seconds-walk-off.json",
+   "dest": "src/model/p1/examples/fight-five-seconds-walk-off.json",
+   "crate": "root",
+   "src_sha256": "c51d31284ff68191efed77e566f9070d09257d1d75a433375168c6341df25b68",
+   "dest_sha256": "c51d31284ff68191efed77e566f9070d09257d1d75a433375168c6341df25b68"
+  },
+  {
+   "src": "src/cpu_pilot/examples/immediate-release.json",
+   "dest": "src/model/p1/examples/immediate-release.json",
+   "crate": "root",
+   "src_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15",
+   "dest_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15"
   }
  ]
 }
