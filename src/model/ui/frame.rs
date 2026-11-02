@@ -42,7 +42,7 @@ impl<const N: usize> Text<N> {
         }
     }
 
-    pub fn to_string_lossy(&self) -> String {
+    pub fn string_lossy(&self) -> String {
         String::from_utf16_lossy(self.units())
     }
 }
@@ -61,7 +61,7 @@ impl<const N: usize> PartialEq for Text<N> {
 
 impl<const N: usize> fmt::Debug for Text<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.to_string_lossy())
+        write!(f, "{:?}", self.string_lossy())
     }
 }
 
@@ -388,13 +388,13 @@ mod tests {
         let m = menu();
         let mut f = Frame::new();
         page_frame(&m, &mut f);
-        assert_eq!(f.tabs[0].to_string_lossy(), "CPU");
+        assert_eq!(f.tabs[0].string_lossy(), "CPU");
         assert_eq!(f.tab_count, 5);
         assert_eq!(f.tab_active, 0);
         assert_eq!(f.group_count, 6);
-        assert_eq!(f.groups[0].to_string_lossy(), "Reactions  (4)");
+        assert_eq!(f.groups[0].string_lossy(), "Reactions  (4)");
         assert_eq!(f.group_active, 0);
-        assert_eq!(f.rows[0].label.to_string_lossy(), "Mash");
+        assert_eq!(f.rows[0].label.string_lossy(), "Mash");
         assert_eq!(f.row_count, 4);
         assert_eq!(f.focus, Some(0));
         assert!(!f.help[0].is_empty());
@@ -409,7 +409,7 @@ mod tests {
         let mut f = Frame::new();
         page_frame(&m, &mut f);
         assert_eq!(f.group_active, 1);
-        assert_eq!(f.rows[0].label.to_string_lossy(), "Airdodge Direction");
+        assert_eq!(f.rows[0].label.string_lossy(), "Airdodge Direction");
         assert_eq!(f.focus, Some(0));
         assert_eq!(f.row_count, 6);
     }
@@ -422,9 +422,9 @@ mod tests {
         }
         let mut f = Frame::new();
         page_frame(&m, &mut f);
-        let dropdown = (0..f.row_count as usize).find(|i| f.rows[*i].label.to_string_lossy() == "SDI Strength").unwrap();
-        assert!(f.rows[dropdown].value.to_string_lossy().starts_with("<  "));
-        let toggle = (0..f.row_count as usize).find(|i| f.rows[*i].label.to_string_lossy() == "Dodge Staling").unwrap();
+        let dropdown = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "SDI Strength").unwrap();
+        assert!(f.rows[dropdown].value.string_lossy().starts_with("<  "));
+        let toggle = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "Dodge Staling").unwrap();
         assert!(matches!(f.rows[toggle].value_tone, Tone::On | Tone::Off));
     }
 
@@ -467,6 +467,6 @@ mod tests {
     fn text_is_cut_at_its_capacity_never_past_it() {
         let mut t: Text<4> = Text::new();
         let _ = t.write_str("abcdefgh");
-        assert_eq!(t.to_string_lossy(), "abcd");
+        assert_eq!(t.string_lossy(), "abcd");
     }
 }

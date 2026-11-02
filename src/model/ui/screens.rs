@@ -436,10 +436,10 @@ mod tests {
         open(&mut m, "SDI Strength");
         let f = frame(&m);
         assert_eq!(f.row_count, 4);
-        assert_eq!(f.rows[3].label.to_string_lossy(), "High");
-        assert!(f.rows.iter().take(4).any(|r| r.value.to_string_lossy() == "(current)"));
-        assert!(f.crumb.to_string_lossy().contains("SDI Strength"));
-        assert!(f.hint.to_string_lossy().contains("A set"));
+        assert_eq!(f.rows[3].label.string_lossy(), "High");
+        assert!(f.rows.iter().take(4).any(|r| r.value.string_lossy() == "(current)"));
+        assert!(f.crumb.string_lossy().contains("SDI Strength"));
+        assert!(f.hint.string_lossy().contains("A set"));
         assert_eq!(f.group_count, 0);
     }
 
@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(window_start(20, 30), 20 + 1 + ROW_LINES / 2 - ROW_LINES);
         m.press(Button::A);
         let f = frame(&m);
-        assert!(f.rows[f.focus.unwrap() as usize].value.to_string_lossy() == "[x]");
+        assert!(f.rows[f.focus.unwrap() as usize].value.string_lossy() == "[x]");
     }
 
     #[test]
@@ -480,7 +480,7 @@ mod tests {
             m.press(Button::Up);
         }
         let f = frame(&m);
-        assert!(f.help[1].to_string_lossy().contains("range is set"), "{:?}", f.help[1]);
+        assert!(f.help[1].string_lossy().contains("range is set"), "{:?}", f.help[1]);
     }
 
     #[test]
@@ -488,8 +488,8 @@ mod tests {
         let mut m = menu();
         open(&mut m, "Situation overrides");
         let f = frame(&m);
-        assert!(f.rows[0].label.to_string_lossy().starts_with("Situation"));
-        assert_eq!(f.rows[0].value.to_string_lossy(), "<  Ledge Neutral Getup  >");
+        assert!(f.rows[0].label.string_lossy().starts_with("Situation"));
+        assert_eq!(f.rows[0].value.string_lossy(), "<  Ledge Neutral Getup  >");
         let mut m = menu();
         m.press(Button::R);
         m.press(Button::R);
@@ -498,8 +498,8 @@ mod tests {
         assert_eq!(f.row_count, 6);
         m.press(Button::A);
         let f = frame(&m);
-        assert!(f.crumb.to_string_lossy().contains("Save State Save"));
-        assert!(f.hint.to_string_lossy().contains("press the others"));
+        assert!(f.crumb.string_lossy().contains("Save State Save"));
+        assert!(f.hint.string_lossy().contains("press the others"));
         let _ = (Page::Cpu, Editor::GiveItem);
     }
 
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!(f.view, View::Chips);
         assert_eq!(f.chip_focus, 8, "the focus starts on Neutral");
         assert_eq!(f.chip_weights[8], 1);
-        assert!(f.help[1].to_string_lossy().contains("Neutral x1"), "{:?}", f.help[1]);
+        assert!(f.help[1].string_lossy().contains("Neutral x1"), "{:?}", f.help[1]);
     }
 
     fn open_grid(mode: crate::model::menu::grid::ConsoleMode, title: &str) -> Menu {
@@ -534,7 +534,7 @@ mod tests {
         m.press(Button::R);
         m.press(Button::R);
         assert_eq!(frame(&m).tile_count, 6, "the third page holds the last 6 items");
-        assert!(frame(&m).crumb.to_string_lossy().contains("page 3 of 3"));
+        assert!(frame(&m).crumb.string_lossy().contains("page 3 of 3"));
     }
 
     #[test]
@@ -547,10 +547,10 @@ mod tests {
             m.press(Button::R);
         }
         assert_eq!(counts, [40, 40, (crate::model::menu::grid::STAGE_TILES - 80) as u8]);
-        assert_eq!(frame(&m).tiles[0].to_string_lossy(), "All");
+        assert_eq!(frame(&m).tiles[0].string_lossy(), "All");
         let m = open_grid(ConsoleMode::Handheld, "Lobby Stages");
         let pages = crate::model::menu::grid::STAGE_TILES.div_ceil(16);
-        assert!(frame(&m).crumb.to_string_lossy().contains(&format!("page 1 of {pages}")));
+        assert!(frame(&m).crumb.string_lossy().contains(&format!("page 1 of {pages}")));
     }
     #[test]
     fn every_sub_screen_of_every_row_draws_within_the_budget() {

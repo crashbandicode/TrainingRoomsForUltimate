@@ -299,7 +299,7 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
         i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
-            if (i - IDX_ROW) % 2 == 0 {
+            if (i - IDX_ROW).is_multiple_of(2) {
                 Name::indexed("tr_rl_", (i - IDX_ROW) / 2)
             } else {
                 Name::indexed("tr_rv_", (i - IDX_ROW) / 2)
@@ -408,7 +408,7 @@ pub const fn spec(index: usize) -> Spec {
         }
         i => {
             let row = (i - IDX_ROW) / 2;
-            if (i - IDX_ROW) % 2 == 0 {
+            if (i - IDX_ROW).is_multiple_of(2) {
                 text(name, ROW_LEFT + ROW_LABEL_W / 2.0, row_y(row), ROW_LABEL_W, ROW_H, Align::Left, FONT, 80, TEXT)
             } else {
                 text(name, ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(row), ROW_VALUE_W, ROW_H, Align::Right, FONT, 72, TEXT)
