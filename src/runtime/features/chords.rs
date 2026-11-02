@@ -9,18 +9,19 @@
 //! NOT YET SWITCH-RUN.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use parking_lot::Mutex;
 
 use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
 use crate::model::ini_files;
 use crate::model::input_delay::Owners;
-#[cfg(feature = "diag")]
 use crate::model::menu::chord::Chord;
-use crate::model::menu_shortcuts;
+use crate::model::menu_shortcuts::{self, MenuShortcuts};
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
+use crate::runtime::features::recorder;
 use crate::runtime::published;
 
 struct State {
@@ -31,6 +32,21 @@ struct State {
 }
 
 static STATE: Mutex<State> = Mutex::new(State { chords: ChordSet::factory(), detector: Detector::new(), style: 5 });
+
+/// The two menu shortcuts as the INI and the menu's edits have them (chord masks, slot 0 low, slot 1 high), for the
+/// menu's input adapter and the menu's display: read without a lock on the game's input thread.
+static SHORTCUT_MASKS: AtomicU32 = AtomicU32::new(menu_shortcuts::DEFAULT_SHORTCUTS.slots()[0].0 as u32);
+
+fn publish_shortcuts(shortcuts: MenuShortcuts) {
+    let [a, b] = shortcuts.slots();
+    SHORTCUT_MASKS.store(u32::from(a.0) | u32::from(b.0) << 16, Ordering::Release);
+}
+
+/// The two menu shortcuts now.
+pub fn shortcuts() -> [Chord; 2] {
+    let masks = SHORTCUT_MASKS.load(Ordering::Acquire);
+    [Chord(masks as u16), Chord((masks >> 16) as u16)]
+}
 
 /// Owners that block the chords: everything but this stage's own stop-chord bit.
 fn blocked() -> bool {
@@ -49,7 +65,7 @@ pub unsafe fn on_poll(controller: usize) {
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
     let sample = Sample::of(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
-    let modal = published::input_owners().contains(Owners::MENU) || published::input_owners().contains(Owners::REPLAY_EDITOR);
+    let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let accepted = {
         let mut state = STATE.lock();
         state.style = style;
@@ -61,15 +77,12 @@ pub unsafe fn on_poll(controller: usize) {
             if passed != 0 {
                 diagnostic(format_args!("[TrainingRooms] chords_passed bits={passed:#x}"));
             }
-            // Eden stand-in for package 5's menu (diag build only): a menu-open shortcut toggles the
-            // MENU owner bit, also while it is set, so the owner paths can be exercised.
-            if set.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0) {
-                let now = published::INPUT_OWNERS.fetch_xor(Owners::MENU.bits(), std::sync::atomic::Ordering::AcqRel) ^ Owners::MENU.bits();
-                diagnostic(format_args!("[TrainingRooms] standin menu_owner open={}", now & Owners::MENU.bits() != 0));
-            }
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
+        // The menu opens from package 5's own reading of the same chords (the permanent one and these shortcuts), so
+        // nothing consumes this request; it is dropped at once instead of staying pending for ever.
+        detector.consume(Request::OpenMenu);
         !block && chords::plus_shortcut_accepted(set, sample)
     };
     if chords::clear_plus_bits(modal, accepted) {
@@ -111,18 +124,18 @@ pub fn load_ini() {
         diagnostic(format_args!("[TrainingRooms] button_config.ini could not be created: {error}"));
     }
     STATE.lock().chords.shortcuts = shortcuts;
+    publish_shortcuts(shortcuts);
 }
 
-/// The menu's confirmed shortcut change (draft 9, N7); package 5's menu calls it, the diag build's stand-in
-/// (`recorder::chord_step`) until then: the new chords are live at once, and the file
-/// is rewritten as a transaction. A refused edit changes nothing; a failed write keeps the change in
-/// memory for the session and says so (SPEC-input-04 question 6 (b), (c)).
-#[cfg(feature = "diag")]
+/// The menu's confirmed shortcut change (draft 9, N7), called by package 5's menu worker when it closes: the new
+/// chords are live at once and the file is rewritten by the writer thread as a transaction (this call only stores
+/// the request: no file I/O here). A refused edit changes nothing; a failed write keeps the change in memory for
+/// the session and says so (SPEC-input-04 question 6 (b), (c)).
 pub fn commit_shortcut(slot: usize, chord: Chord) -> Result<(), ini_files::EditRefusal> {
     let current = STATE.lock().chords.shortcuts;
     let next = ini_files::check_edit(current, slot, chord)?;
     STATE.lock().chords.shortcuts = next;
-    // The file is written by the writer thread, never from this (possibly hook) context.
+    publish_shortcuts(next);
     crate::runtime::features::writer::request_shortcuts(next);
     Ok(())
 }

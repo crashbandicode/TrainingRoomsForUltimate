@@ -65,14 +65,6 @@ impl Buffs {
     }
 }
 
-/// What starts an input recording on a load (SPEC-state-01 §2.1 `record_trigger`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum RecordTrigger {
-    #[default]
-    ButtonCombination,
-    SaveStateLoad,
-}
-
 /// The state rows, as a hook reads them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StateSettings {
@@ -88,9 +80,6 @@ pub struct StateSettings {
     pub damage_cpu: DamageMode,
     pub limits_cpu: (u8, u8),
     pub buffs: Buffs,
-    /// Save State Playback slots (weights).
-    pub playback: Weights<5>,
-    pub record_trigger: RecordTrigger,
 }
 
 impl Default for StateSettings {
@@ -107,8 +96,6 @@ impl Default for StateSettings {
             damage_cpu: DamageMode::Default,
             limits_cpu: (0, 150),
             buffs: Buffs(0),
-            playback: Weights::default(),
-            record_trigger: RecordTrigger::ButtonCombination,
         }
     }
 }
@@ -160,11 +147,6 @@ impl StateSettings {
             damage_cpu: damage(row("save_damage_cpu")),
             limits_cpu: limits(row("save_damage_limits_cpu")),
             buffs: Buffs::from_row(row("buff_state").unwrap_or(&[])),
-            playback: Weights::from_row(row("save_state_playback").unwrap_or(&[])),
-            record_trigger: match first(row("record_trigger")) {
-                Some(1) => RecordTrigger::SaveStateLoad,
-                _ => RecordTrigger::ButtonCombination,
-            },
         }
     }
 }

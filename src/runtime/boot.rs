@@ -25,7 +25,7 @@ use crate::model::sites_pkg4;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, cpu_common, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
+    chords, cpu, cpu_common, hud_draw, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
@@ -96,8 +96,8 @@ pub fn run() {
     states::start_diag_triggers();
     // Package 4: the shortcuts file (fail-closed, created when absent) and the recorder's generator.
     chords::load_ini();
-    #[cfg(feature = "diag")]
-    crate::runtime::features::writer::start();
+    writer::load_replay_capture();
+    writer::start();
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
     #[cfg(feature = "diag")]
@@ -120,6 +120,18 @@ pub fn run() {
     let usable = |site: &sites::Site| {
         SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
     };
+    // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
+    let row_usable = |name: &str| sites::find(name).is_some_and(usable);
+    let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
+    if row4_usable("fighter_manager_get_entry") {
+        game::allow_natives(game::NativeGroup::Entry);
+    }
+    if row_usable("fighter_information") && row_usable("is_operation_cpu") {
+        game::allow_natives(game::NativeGroup::Operator);
+    }
+    if row_usable("utility_get_category") && row_usable("utility_get_kind") {
+        game::allow_natives(game::NativeGroup::Category);
+    }
     if sites::find("is_training_mode").is_some_and(usable) {
         game::allow_training_predicate();
     }
@@ -166,10 +178,16 @@ pub fn run() {
     let state_reports = state_boot::reports(&state_found, &state_written);
     // Package 4: the recorder, the chords' poll and the notices.
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
-    let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
+    // The recorder calls package 2's `work_get_int` row (the ledge rest timer): its own guard gates the recorder.
+    let get_int_ok = sites::find("work_get_int").is_some_and(usable);
+    let (recording_on, notices_on) = install_pkg4(input_delay_on && get_int_ok, cpu_core_on, &found4, &mut written4);
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers.
     let ui_install = ui::install(&loaded, input_delay_on);
+    // Package 4's notices and input log draw from the layout tick package 5 just installed.
+    if !ui::hud::register(hud_draw::draw) {
+        diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
+    }
 
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;

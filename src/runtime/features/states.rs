@@ -11,8 +11,8 @@
 //! * The hooks (`get_param_int`, `set_dead_rumble`, `req_quake`, `play_se`, `effect_req`,
 //!   `effect_req_follow`, the star-KO query) make a load silent and instant (SPEC-state-01 §4.1); each
 //!   reads two flags the frame step publishes (`LOADING`, `KILLING`) and the three settings bits.
-//! * Chords: pkg4's chord engine calls `request_save` / `request_load`; a diag build also reads request
-//!   files from the Eden profile (`diag_triggers`).
+//! * Chords: this step pulls the Save and Load chords from package 4's chord engine and calls `request_save` /
+//!   `request_load` (a diag build also reads request files from the Eden profile, `diag_triggers`).
 //!
 //! NOT YET SWITCH-RUN: compiled for the Switch, not run on Eden or the console.
 
@@ -32,7 +32,7 @@ use crate::model::state::charge;
 use crate::model::state::file::SaveFile;
 use crate::model::state::hooks::{self, DeathParam};
 use crate::model::state::ids::{self, Table, C, UNRESOLVED};
-use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request, Role, StatusNow, Trigger};
+use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request, Role, StatusNow};
 use crate::model::state::persist;
 use crate::model::state::pokemon::{self, Descriptor, Kinds, KirbyKinds, PtWait, Sound, SwitchEffect};
 use crate::model::state::record::{Marker, SavedState};
@@ -40,10 +40,11 @@ use crate::model::state::settings::StateSettings;
 use crate::model::storage::{self, FixedPath};
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{reset_hub, state_effects, state_recorder, state_restore};
+use crate::runtime::features::{chords, recorder, reset_hub, state_effects, state_restore};
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives as n;
 use crate::runtime::hub;
+use crate::runtime::scene;
 
 /// Everything the per-frame step owns, behind one lock.
 struct State {
@@ -342,12 +343,11 @@ pub fn cancel_pending() {
     }
 }
 
+/// A save-state load is in progress: the load machine's own flag, published each fighter frame. The one source
+/// of this fact (the CPU runtime's mash and the recorder's chords read it here). The hooks of this module read
+/// `LOADING` and `KILLING` directly.
 pub fn is_loading() -> bool {
     LOADING.load(Ordering::Acquire)
-}
-
-pub fn is_killing() -> bool {
-    KILLING.load(Ordering::Acquire)
 }
 
 /// What the hooks need of the settings: the three bits, as a `StateSettings`.
@@ -444,7 +444,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if accessor == 0 || Role::of_entry(entry).is_none() {
         return;
     }
-    if !game::is_training_mode() {
+    if !scene::is_training() {
         if LOADING.load(Ordering::Acquire) {
             cancel_pending();
         }
@@ -557,6 +557,14 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 trainer != 0 && natives::status_kind(trainer) == kid(K_PT_RESTART)
             },
         );
+    // The chord engine is pull-based (SPEC-input-04 §2): this per-fighter step consumes the Save and Load chords
+    // and latches them for the first eligible fighter (a Load only on a non-CPU-operated, non-Nana body).
+    if chords::consume(crate::model::chords::Request::SaveState) {
+        request_save();
+    }
+    if !nana && !reset_hub::cpu_operated(fighter) && chords::consume(crate::model::chords::Request::LoadState) {
+        request_load();
+    }
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
@@ -614,7 +622,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     if out.stop_playback {
         // A new load: no buff carries over.
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
-        state_recorder::stop();
+        recorder::stop();
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
     if out.pokemon_predeath {
@@ -652,13 +660,8 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         let _ = slot;
     }
     if let Some(ledge) = out.restored {
-        state_recorder::on_state_restored(ledge);
+        recorder::on_state_restored(ledge);
         state_diag!("[TrainingRooms] state restored ledge={ledge}");
-    }
-    match out.trigger {
-        Some(Trigger::Record) => state_recorder::start_record(),
-        Some(Trigger::Playback(slot)) => state_recorder::start_playback(slot),
-        None => {}
     }
 }
 
@@ -1020,7 +1023,7 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
     let _scope = HookScope::enter();
     bump(counts_index::PARAM);
     if let Some(param) = param_of(kind, name) {
-        if let Some(value) = hooks::param_override(param, &hook_settings(), LOADING.load(Ordering::Acquire), game::is_training_mode()) {
+        if let Some(value) = hooks::param_override(param, &hook_settings(), LOADING.load(Ordering::Acquire), scene::is_training()) {
             if param == DeathParam::DeadRebirthWaitFrame {
                 // The jostle and Shulk cleanups that ride on this override (SPEC-state-01 §4).
                 let jostle = JOSTLE_ID.load(Ordering::Acquire);
@@ -1045,7 +1048,7 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
 pub unsafe fn state_set_dead_rumble_hook(lua_state: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::RUMBLE);
-    if ENABLE.load(Ordering::Acquire) && game::is_training_mode() {
+    if ENABLE.load(Ordering::Acquire) && scene::is_training() {
         return 0;
     }
     call_original!(lua_state)
@@ -1057,7 +1060,7 @@ pub unsafe fn state_req_quake_hook(accessor: usize, kind: i32) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::QUAKE);
     let none = QUAKE_NONE.load(Ordering::Acquire);
-    if none != UNRESOLVED && hooks::quake_suppressed(KILLING.load(Ordering::Acquire)) && game::is_training_mode() {
+    if none != UNRESOLVED && hooks::quake_suppressed(KILLING.load(Ordering::Acquire)) && scene::is_training() {
         return call_original!(accessor, none);
     }
     call_original!(accessor, kind)
@@ -1068,7 +1071,7 @@ pub unsafe fn state_req_quake_hook(accessor: usize, kind: i32) -> u64 {
 pub unsafe fn state_play_se_hook(accessor: usize, hash: u64, a: bool, b: bool, c: bool, d: bool, kind: u32) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::SOUND);
-    if hooks::sound_silenced(KILLING.load(Ordering::Acquire)) && game::is_training_mode() {
+    if hooks::sound_silenced(KILLING.load(Ordering::Acquire)) && scene::is_training() {
         return call_original!(accessor, HASHES[H_SE_SILENT].load(Ordering::Acquire), a, b, c, d, kind);
     }
     call_original!(accessor, hash, a, b, c, d, kind)
@@ -1094,7 +1097,7 @@ pub unsafe fn state_effect_req_hook(
         return call_original!(accessor, effect, pos, rot, 0.0, a, b, c, d);
     }
     // A buffing fighter keeps its visuals (SPEC-state-03 §5.2).
-    if hooks::effect_hidden(LOADING.load(Ordering::Acquire), fighter_buffing(accessor)) && game::is_training_mode() {
+    if hooks::effect_hidden(LOADING.load(Ordering::Acquire), fighter_buffing(accessor)) && scene::is_training() {
         return call_original!(accessor, effect, pos, rot, 0.0, a, b, c, d);
     }
     call_original!(accessor, effect, pos, rot, size, a, b, c, d)
@@ -1110,7 +1113,7 @@ unsafe fn switch_effect_hidden(accessor: usize, effect: u64) -> bool {
     } else {
         return false;
     };
-    if !pokemon::switch_effect_hidden(class, LOADING.load(Ordering::Acquire)) || !game::is_training_mode() {
+    if !pokemon::switch_effect_hidden(class, LOADING.load(Ordering::Acquire)) || !scene::is_training() {
         return false;
     }
     let kind = n::object_kind(accessor);
@@ -1166,7 +1169,7 @@ pub unsafe fn state_effect_req_follow_hook(
 ) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::FOLLOW);
-    if effect == SCORE_AURA.load(Ordering::Acquire) && hooks::score_aura_hidden(LOADING.load(Ordering::Acquire)) && game::is_training_mode() {
+    if effect == SCORE_AURA.load(Ordering::Acquire) && hooks::score_aura_hidden(LOADING.load(Ordering::Acquire)) && scene::is_training() {
         return call_original!(accessor, effect, joint, pos, rot, 0.0, a, b, c, d, e, f, g, h);
     }
     call_original!(accessor, effect, joint, pos, rot, size, a, b, c, d, e, f, g, h)
@@ -1177,7 +1180,7 @@ pub unsafe fn state_effect_req_follow_hook(
 pub unsafe fn state_no_star_ko_hook(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::STAR_KO);
-    if ENABLE.load(Ordering::Acquire) && game::is_training_mode() {
+    if ENABLE.load(Ordering::Acquire) && scene::is_training() {
         return 0;
     }
     call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
@@ -1191,7 +1194,7 @@ pub unsafe fn state_joker_summon_hook(accessor: usize, a: bool, b: bool) -> u32 
     let _scope = HookScope::enter();
     let result = call_original!(accessor, a, b);
     let summon = JOKER_SUMMON.load(Ordering::Acquire);
-    if summon != UNRESOLVED && result == summon as u32 && fighter_buffing(accessor) && game::is_training_mode() {
+    if summon != UNRESOLVED && result == summon as u32 && fighter_buffing(accessor) && scene::is_training() {
         return 0xFFFF_FFFF;
     }
     result
@@ -1202,7 +1205,7 @@ pub unsafe fn state_joker_summon_hook(accessor: usize, a: bool, b: bool) -> u32 
 #[skyline::hook(offset = s::STATE_MAC_METER_OFFSET)]
 pub unsafe fn state_mac_meter_hook(entry: usize, value: i32) -> u64 {
     let _scope = HookScope::enter();
-    if LOADING.load(Ordering::Acquire) && KO_SELECTED.load(Ordering::Acquire) && MAC_PRESENT.load(Ordering::Acquire) && game::is_training_mode() {
+    if LOADING.load(Ordering::Acquire) && KO_SELECTED.load(Ordering::Acquire) && MAC_PRESENT.load(Ordering::Acquire) && scene::is_training() {
         return call_original!(entry, 100);
     }
     call_original!(entry, value)
@@ -1215,7 +1218,7 @@ pub unsafe fn state_wiifit_heal_hook(module: usize, amount: f32, kind: i32) -> u
     if module != 0 && BUFF_WIIFIT.iter().any(|w| w.load(Ordering::Acquire)) {
         let accessor = ((module + 8) as *const usize).read();
         let wii_buffing = BUFF_ACC.iter().zip(BUFF_WIIFIT.iter()).any(|(a, w)| w.load(Ordering::Acquire) && a.load(Ordering::Acquire) == accessor);
-        if wii_buffing && game::is_training_mode() {
+        if wii_buffing && scene::is_training() {
             return call_original!(module, 0.0, kind);
         }
     }
@@ -1227,7 +1230,7 @@ pub unsafe fn state_wiifit_heal_hook(module: usize, amount: f32, kind: i32) -> u
 pub unsafe fn state_req_screen_hook(accessor: usize, hash: u64, a: bool, b: bool, c: bool) -> u64 {
     let _scope = HookScope::enter();
     const WING_BACKGROUND: u64 = 0x10DCB5700E;
-    if hash == WING_BACKGROUND && fighter_buffing(accessor) && game::is_training_mode() {
+    if hash == WING_BACKGROUND && fighter_buffing(accessor) && scene::is_training() {
         return call_original!(accessor, hash40("bg"), a, b, c);
     }
     call_original!(accessor, hash, a, b, c)
@@ -1239,7 +1242,7 @@ pub unsafe fn state_req_screen_hook(accessor: usize, hash: u64, a: bool, b: bool
 pub unsafe fn state_fighter_play_se_hook(a0: usize, a1: u64, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::SOUND);
-    if (any_buffing() || fighter_sound_silenced(a0, a1)) && game::is_training_mode() {
+    if (any_buffing() || fighter_sound_silenced(a0, a1)) && scene::is_training() {
         return call_original!(a0, HASHES[H_SE_SILENT].load(Ordering::Acquire), a2, a3, a4, a5, a6, a7);
     }
     call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
@@ -1289,7 +1292,7 @@ unsafe fn fighter_sound_silenced(module: usize, hash: u64) -> bool {
 #[skyline::hook(offset = s::STATE_POKEMON_DECIDE_OFFSET, inline)]
 pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
-    if !LOADING.load(Ordering::Acquire) || !game::is_training_mode() {
+    if !LOADING.load(Ordering::Acquire) || !scene::is_training() {
         return;
     }
     let (entry_object, descriptor) = (ctx.registers[20].x() as usize, ctx.registers[9].x() as usize);
@@ -1321,7 +1324,7 @@ pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
 #[skyline::hook(offset = s::STATE_KIRBY_OPFF_OFFSET)]
 pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
     let _scope = HookScope::enter();
-    let started = fighter != 0 && LOADING.load(Ordering::Acquire) && game::is_training_mode() && {
+    let started = fighter != 0 && LOADING.load(Ordering::Acquire) && scene::is_training() && {
         let flag = kid(K_COPY_ON_START);
         let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
         flag != UNRESOLVED && accessor != 0 && natives::is_flag(accessor, flag)

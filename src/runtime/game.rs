@@ -9,11 +9,26 @@ use skyline::hooks::{getRegionAddress, Region};
 use skyline::nn::oe::{DisplayVersion, GetDisplayVersion};
 
 use crate::model::guard::GUARD_BYTES;
-use crate::model::{sites, sites_pkg2};
+use crate::model::{lra_reset, sites, sites_pkg2, sites_pkg4};
 use crate::model::version::BUILD_ID_SCAN_BYTES;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static TRAINING_PREDICATE_USABLE: AtomicBool = AtomicBool::new(false);
+/// Which groups of the fighter natives passed the guards of the rows they call (set by boot).
+static ENTRY_NATIVES_USABLE: AtomicBool = AtomicBool::new(false);
+static OPERATOR_NATIVES_USABLE: AtomicBool = AtomicBool::new(false);
+static CATEGORY_NATIVES_USABLE: AtomicBool = AtomicBool::new(false);
+
+/// A group of `natives` that boot enables once its rows are usable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeGroup {
+    /// `fighter_entry`, `entry_body`, `module_accessor`: row `fighter_manager_get_entry`.
+    Entry,
+    /// `is_operation_cpu`: rows `fighter_information` and `is_operation_cpu`.
+    Operator,
+    /// `is_fighter`: rows `utility_get_category` and `utility_get_kind`.
+    Category,
+}
 
 /// The start of `main`'s `.text` (offsets in the site table are relative to it).
 pub fn text_base() -> usize {
@@ -69,6 +84,17 @@ pub fn allow_training_predicate() {
     TRAINING_PREDICATE_USABLE.store(true, Ordering::Release);
 }
 
+/// Record that every row a group of fighter natives calls or relies on passed its 64-byte guard. Until
+/// then those natives answer "nothing" (0, `None`, false).
+pub fn allow_natives(group: NativeGroup) {
+    match group {
+        NativeGroup::Entry => &ENTRY_NATIVES_USABLE,
+        NativeGroup::Operator => &OPERATOR_NATIVES_USABLE,
+        NativeGroup::Category => &CATEGORY_NATIVES_USABLE,
+    }
+    .store(true, Ordering::Release);
+}
+
 /// The game's constant table lookup `lib::lua_bind_get_value<int>(key, out)` (`main+0x3728e10`), asked
 /// for one constant's key (`model::cpu::hash::lua_bind_hash` of its identifier). `None` when the game
 /// does not know the key (or its table is not built yet).
@@ -88,7 +114,23 @@ pub unsafe fn lua_const(key: u64) -> Option<i32> {
 /// Every function below is only valid after the `CpuCore` sites passed their guards, with
 /// `accessor` the module accessor of a live fighter.
 pub mod natives {
-    use super::{sites_pkg2, text_base};
+    use std::sync::atomic::Ordering;
+
+    use super::{
+        lra_reset, sites, sites_pkg2, sites_pkg4, text_base, CATEGORY_NATIVES_USABLE, ENTRY_NATIVES_USABLE, OPERATOR_NATIVES_USABLE,
+    };
+    use crate::model::cpu::ids::UNRESOLVED;
+    use crate::runtime::features::cpu;
+
+    /// `FighterEntry` (the entry object): its first body (the fighter object) pointer.
+    pub const ENTRY_BODY_FIELD: usize = 0x4160;
+    /// The fighter object: its `BattleObjectModuleAccessor` pointer.
+    pub const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
+    /// The accessor: its battle object id (`utility::get_kind`'s `ldr w0, [x0, #8]`, guarded by the
+    /// `utility_get_kind` row).
+    pub const ACCESSOR_OBJECT_ID_FIELD: usize = 0x8;
+    /// `utility::get_category` of a fighter's battle object id.
+    const CATEGORY_FIGHTER: i32 = 0;
 
     unsafe fn at<F: Copy>(offset: usize) -> F {
         debug_assert_eq!(std::mem::size_of::<F>(), std::mem::size_of::<usize>());
@@ -220,6 +262,105 @@ pub mod natives {
             extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, *const [f32; 3], *const [f32; 3], bool, u32, i32, i32) -> u64;
         let zero = [0.0f32; 3];
         at::<ReqOnJoint>(sites_pkg2::EFFECT_REQ_ON_JOINT_OFFSET)(accessor, effect, joint, &zero, &zero, scale, &zero, &zero, true, attribute, 0, 0);
+    }
+
+    /// `PostureModule::lr(accessor)`: the facing, +1.0 or -1.0.
+    pub unsafe fn lr(accessor: usize) -> f32 {
+        at::<extern "C" fn(usize) -> f32>(sites_pkg4::POSTURE_LR_OFFSET)(accessor)
+    }
+
+    /// `StopModule::is_stop(accessor)`: the body is in hitstop.
+    pub unsafe fn is_stop(accessor: usize) -> bool {
+        at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET)(accessor)
+    }
+
+    /// `WorkModule::set_int(accessor, value, id)`.
+    pub unsafe fn set_int(accessor: usize, id: i32, value: i32) {
+        at::<extern "C" fn(usize, i32, i32)>(sites_pkg4::WORK_SET_INT_OFFSET)(accessor, value, id)
+    }
+
+    /// `ModelModule::set_color_rgb(accessor, r, g, b, MODEL_COLOR_TYPE)`.
+    pub unsafe fn set_color_rgb(accessor: usize, r: f32, g: f32, b: f32, kind: i32) {
+        at::<extern "C" fn(usize, f32, f32, f32, i32)>(sites_pkg4::MODEL_SET_COLOR_RGB_OFFSET)(accessor, r, g, b, kind)
+    }
+
+    // ---- fighters by entry id -------------------------------------------------------------------------
+    //
+    // The functions below answer nothing (0, `None`, false) until boot has called `allow_natives` for their
+    // group after the guards of the rows they use passed (`NativeGroup`). They read the live game on every
+    // call and keep no pointer.
+
+    /// The `FighterManager` singleton, or 0.
+    unsafe fn fighter_manager() -> usize {
+        ((text_base() + lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile()
+    }
+
+    /// `FighterManager::get_fighter_entry(manager, entry id)`: the entry object of a fighter entry
+    /// (0 is player 1; 0 when the entry does not exist or the natives are not usable).
+    pub unsafe fn fighter_entry(entry: i32) -> usize {
+        if !ENTRY_NATIVES_USABLE.load(Ordering::Acquire) || !lra_reset::entry_id_valid(entry) {
+            return 0;
+        }
+        let manager = fighter_manager();
+        if manager == 0 {
+            return 0;
+        }
+        at::<extern "C" fn(usize, i32) -> usize>(sites_pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET)(manager, entry)
+    }
+
+    /// The entry object's first body (the fighter object), or 0.
+    pub unsafe fn entry_body(entry_ptr: usize) -> usize {
+        if entry_ptr == 0 {
+            return 0;
+        }
+        ((entry_ptr + ENTRY_BODY_FIELD) as *const usize).read()
+    }
+
+    /// The fighter object's `BattleObjectModuleAccessor`, or 0.
+    pub unsafe fn fighter_accessor(fighter: usize) -> usize {
+        if fighter == 0 {
+            return 0;
+        }
+        ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read()
+    }
+
+    /// The module accessor of the first body of a fighter entry (`None` when the entry or its body does
+    /// not exist).
+    pub unsafe fn module_accessor(entry: i32) -> Option<usize> {
+        let accessor = fighter_accessor(entry_body(fighter_entry(entry)));
+        (accessor != 0).then_some(accessor)
+    }
+
+    /// Whether the accessor belongs to a fighter (its battle object id is in the fighter category).
+    pub unsafe fn is_fighter(accessor: usize) -> bool {
+        if accessor == 0 || !CATEGORY_NATIVES_USABLE.load(Ordering::Acquire) {
+            return false;
+        }
+        let id = ((accessor + ACCESSOR_OBJECT_ID_FIELD) as *const u32).read();
+        at::<extern "C" fn(u32) -> i32>(sites_pkg2::UTILITY_GET_CATEGORY_OFFSET)(id) == CATEGORY_FIGHTER
+    }
+
+    /// Whether the body is on the ground (`StatusModule::situation_kind` is `SITUATION_KIND_GROUND`);
+    /// false until the CPU runtime has resolved the game's constants.
+    pub unsafe fn is_grounded(accessor: usize) -> bool {
+        let ground = cpu::situation_ground();
+        accessor != 0 && ground != UNRESOLVED && situation_kind(accessor) == ground
+    }
+
+    /// `FighterInformation::is_operation_cpu` of an entry: the game's own operator flag.
+    pub unsafe fn is_operation_cpu(entry: i32) -> bool {
+        if !OPERATOR_NATIVES_USABLE.load(Ordering::Acquire) || !lra_reset::entry_id_valid(entry) {
+            return false;
+        }
+        let manager = fighter_manager();
+        if manager == 0 {
+            return false;
+        }
+        let information = at::<extern "C" fn(usize, i32) -> usize>(sites::FIGHTER_INFORMATION_OFFSET)(manager, entry);
+        if information == 0 {
+            return false;
+        }
+        at::<extern "C" fn(usize) -> bool>(sites::IS_OPERATION_CPU_OFFSET)(information)
     }
 }
 
