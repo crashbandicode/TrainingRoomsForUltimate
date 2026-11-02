@@ -6,20 +6,28 @@
 
 #[path = "../model/compat/mod.rs"]
 pub mod compat;
+#[cfg(test)]
 #[path = "../model/items/mod.rs"]
 pub mod items;
+#[cfg(test)]
 #[path = "../model/kirby/mod.rs"]
 pub mod kirby;
+#[cfg(test)]
 #[path = "../model/lobby/mod.rs"]
 pub mod lobby;
+#[cfg(test)]
 #[path = "../model/mii/mod.rs"]
 pub mod mii;
+#[cfg(test)]
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
+#[cfg(test)]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
+#[cfg(test)]
 #[path = "../model/seams/mod.rs"]
 pub mod seams;
+#[cfg(test)]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;
 #[path = "../model/stages/mod.rs"]

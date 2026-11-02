@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Shared with the native stage panel: paging moves the cursor, never ranks.
 pub const PAGE_ROWS: usize = 4;
-pub const PAGE_COLUMNS: usize = crate::engine::compat::menu::NX_SUBMENU_COLUMNS;
+pub const PAGE_COLUMNS: usize = crate::engine::compat::grid::NX_SUBMENU_COLUMNS;
 pub const PAGE_SIZE: usize = PAGE_ROWS * PAGE_COLUMNS;
 
 /// Wrap pages, retaining the cell where possible and clamping on the final page.

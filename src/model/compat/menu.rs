@@ -196,8 +196,7 @@ impl TrainingModpackMenu {
     }
 }
 
-/// Columns of the fork's stage grid page (4 x 4 per page, docs/DECISIONS.md Q14): the carried stage_menu paging constant.
-pub const NX_SUBMENU_COLUMNS: usize = 4;
+pub use super::grid::NX_SUBMENU_COLUMNS;
 
 #[cfg(test)]
 mod tests {

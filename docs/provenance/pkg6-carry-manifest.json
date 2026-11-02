@@ -60,7 +60,7 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "lobby_stages": "crate::engine::stages::lobby_stages",
    "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
-   "NX_SUBMENU_COLUMNS": "crate::engine::compat::menu::NX_SUBMENU_COLUMNS"
+   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS"
   },
   "mii": {
    "auto_init": "crate::engine::mii::auto_init",
@@ -780,7 +780,7 @@
    "dest_sha256": "c3b079332b89b5588972dbddd0ba06674b0a6e8559ea24faaa5d124acc826389",
    "edits": [
     {
-     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
      "new": "",
      "reason": "the fork's old menu structure (StatefulTable/SubMenu/App) is replaced by package 1's menu-model editor rows and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
@@ -816,7 +816,7 @@
    "dest_sha256": "a282e41ee3502345704983c001207b630ecda66d60962a5b8650b72b7a8b6ebe",
    "edits": [
     {
-     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
      "new": "",
      "reason": "the fork's old menu structure (StatefulTable/SubMenu/App) is replaced by package 1's menu-model editor rows and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
@@ -917,7 +917,7 @@
    "dest": "src/model/stages/stage_menu.rs",
    "crate": "tui",
    "src_sha256": "7dece73f4a1563cb27d760b54577627d5ecbfe54867701737f45a3ffcb70592c",
-   "dest_sha256": "6495abb5aa8864393cac8672fde71cd831bd3a9767d4e71c6f3cd46adfb9e08f"
+   "dest_sha256": "c9ddaf93b3886db79a8b90902992d47a617875fa782ac7888c332a5a141f0d10"
   },
   {
    "src": "training_mod_consts/src/lobby_stages.rs",
@@ -927,7 +927,7 @@
    "dest_sha256": "7c82cd2d730b475035da96af3397a69cfbb196d12f6e4a902635cfb13498271f",
    "edits": [
     {
-     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
      "new": "",
      "reason": "the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
