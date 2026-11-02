@@ -30,7 +30,28 @@ const COVERED: &[(&str, &str)] = &[
     ("FighterEntry::current_fighter_id", "p1_entry_current_fighter_id"),
     ("utility::get_kind", "state_object_kind"),
     ("sv_battle_object::module_accessor", "state_object_module_accessor"),
-];
+    // Package 4, S4-4 (the named-macro layer's carried sources): existing rows where the symbol is the same function, new `named_macros` rows of sites_pkg4.rs otherwise.
+    ("PostureModule::lr", "posture_lr"),
+    ("PostureModule::set_lr", "state_set_lr"),
+    ("PostureModule::set_pos", "state_set_pos"),
+    ("PostureModule::pos_z", "pos_z"),
+    ("KineticModule::clear_speed_all", "state_clear_speed_all"),
+    ("EffectModule::kill_kind", "state_effect_kill_kind"),
+    ("EffectModule::req", "state_effect_req"),
+    ("StatusModule::change_status_request", "state_status_request"),
+    ("StatusModule::situation_kind", "situation_kind"),
+    ("ControlModule::get_button", "control_get_button"),
+    ("ControlModule::get_stick_x", "control_get_stick_x"),
+    ("ControlModule::get_stick_y", "control_get_stick_y"),
+    ("ControlModule::get_stick_x_no_clamp", "control_get_stick_x_no_clamp"),
+    ("ControlModule::get_stick_y_no_clamp", "control_get_stick_y_no_clamp"),
+    ("ControlModule::get_sub_stick_x", "control_get_sub_stick_x"),
+    ("ControlModule::get_sub_stick_y", "control_get_sub_stick_y"),
+    ("KineticModule::get_energy", "kinetic_get_energy"),
+    ("KineticModule::get_sum_speed_x", "kinetic_get_sum_speed_x"),
+    ("KineticModule::get_sum_speed_y", "kinetic_get_sum_speed_y"),
+    ("StopModule::is_special_stop", "stop_is_special_stop"),
+    ("StopModule::set_special_stop", "stop_set_special_stop"),];
 
 fn all_rows() -> BTreeSet<&'static str> {
     sites::BASE_SITES

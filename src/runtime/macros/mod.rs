@@ -30,9 +30,28 @@ pub(crate) use port::{input_record, lobby, practice, save_states};
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::published;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Every row the layer calls passed its guard and install ran.
+static READY: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn ready() -> bool {
+    READY.load(Ordering::Acquire)
+}
+
+/// Macro Source is the Named Library and the layer is installed.
+pub(crate) fn named_active() -> bool {
+    ready() && named_macros::source_is_named()
+}
+
 /// Boot: the replay-capture preference and writer, the named library's selected macro, the capture adapter's guards and hooks (the seam
 /// installer decides; hooks only when the INI says on). Returns `(named layer ready, live capture adapter ready)`.
-pub(crate) fn install(named_source: bool) -> (bool, bool) {
+pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
+    // R2-1: every game call the layer makes is a guarded row (NamedMacros, plus the recorder's own); a rejected row leaves the whole layer off.
+    if !rows_ok {
+        return (false, false);
+    }
+    READY.store(true, Ordering::Release);
     replay_store::init();
     named_macros::init();
     replay_capture::init();
@@ -51,7 +70,7 @@ pub(crate) fn install(named_source: bool) -> (bool, bool) {
 /// # Safety
 /// `fighter` is the live fighter object the game is running a frame of.
 pub(crate) unsafe fn frame_before(fighter: usize) {
-    if fighter == 0 {
+    if fighter == 0 || !ready() {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
@@ -71,7 +90,7 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
 /// # Safety
 /// As `frame_before`.
 pub(crate) unsafe fn frame_after(fighter: usize) {
-    if fighter == 0 {
+    if fighter == 0 || !ready() {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
@@ -111,7 +130,7 @@ fn sync_owner() {
 /// # Safety
 /// `controller` is the live `Controller` of the mapping call (or 0); `out` the record the game just mapped.
 pub(crate) unsafe fn on_p1_input(controller: usize, out: *mut crate::model::input_delay::MappedInputs) {
-    if controller == 0 || !named_macros::clip_foreground() {
+    if controller == 0 || !ready() || !named_macros::clip_foreground() {
         return;
     }
     replay_capture::on_input(&port::input::Controller::read(controller));

@@ -28,7 +28,7 @@ use super::settings::Snapshot;
 pub const SLOTS: usize = 5;
 /// Frames per slot: the largest Recording Duration.
 pub const SLOT_FRAMES: usize = 600;
-/// Frames of a named recording (	raining_mod_macros::MAX_FRAMES: ten minutes at 60 fps); the named capture lasts until the stop chord.
+/// Frames of a named recording (`training_mod_macros::MAX_FRAMES`: ten minutes at 60 fps); the named capture lasts until the stop chord.
 pub const NAMED_FRAMES: u16 = 36_000;
 /// A slot's length before anything was recorded into it.
 pub const INITIAL_LENGTH: u16 = 60;
@@ -565,8 +565,8 @@ impl Recorder {
         self.named = true;
     }
 
-    /// The named layer's playback (playback_named, playback_preview): rames frames from the layer's buffer, mirrored by the
-    /// recorded acing against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
+    /// The named layer's playback (`playback_named`, `playback_preview`): `frames` frames from the layer's buffer, mirrored by the
+    /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
     pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
         match self.mode {
             Mode::Pause => return Err(PlayRefusal::Lockout),

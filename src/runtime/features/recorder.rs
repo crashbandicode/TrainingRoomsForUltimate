@@ -440,7 +440,7 @@ unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
         return;
     }
     let record = record && settings.trigger_chord;
-    if named_macros::source_is_named() {
+    if crate::runtime::macros::named_active() {
         // Macro Source = Named Library: the chords drive the named layer (SPEC-input-01 section 9). The record chord while a capture
         // records was consumed by the poll (the stop chord); here it starts one.
         if playback {
@@ -545,7 +545,7 @@ fn finish_named_capture() {
     }
 }
 
-/// The layer's playback (playback_named, playback_preview): rames frames of its buffer, started on the CPU now.
+/// The layer's playback (`playback_named`, `playback_preview`): `frames` frames of its buffer, started on the CPU now.
 pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) -> bool {
     // SAFETY: called on the game thread with live fighters.
     unsafe {
@@ -569,7 +569,7 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
     }
 }
 
-/// P1's next rames polls read as neutral (see SWALLOW).
+/// P1's next `frames` polls read as neutral (see `SWALLOW`).
 /// The recorder's phase (diag lines).
 pub fn phase() -> Phase {
     REC.lock().phase()
@@ -613,7 +613,7 @@ pub fn request_playback(start: PlaybackStart) {
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
 /// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
 pub fn on_state_restored(saved_on_ledge: bool) {
-    if named_macros::source_is_named() || replay_preview::occupied() {
+    if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
         // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
         // SAFETY: both fighters were just restored.
         unsafe { named_macros::service_restore() };

@@ -206,7 +206,8 @@ pub fn run() {
     // Package 4, S4-4: the named-macro layer and the live replay capture (its guards and hooks are the seam installer's: hooks only when
     // replay_capture.ini says on). The roster cycle and the menu's panel screens are behind the layer's port, named in the install line.
     let named_source = loaded.menu.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
-    let (macros_on, capture_on) = crate::runtime::macros::install(named_source);
+    let macros_rows_ok = recording_on && sites_pkg4::sites_of(Feature::NamedMacros).all(|site| row4_usable(site.name));
+    let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
@@ -240,7 +241,7 @@ pub fn run() {
         FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
         FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
         FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason },
-        FeatureReport { feature: "named_macros", installed: macros_on, reason: None },
+        FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") } },
         FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") } },
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()) },
     ];

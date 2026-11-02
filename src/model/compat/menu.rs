@@ -126,7 +126,7 @@ pub struct TrainingModpackMenu {
     /// Mii Groups.
     #[serde(default = "preload::default_mii_groups")]
     pub cycle_preload_mii_groups: OnOff,
-    /// Ask before a replay or a named recording switches the CPU's fighter (ighter_prompt, package 4).
+    /// Ask before a replay or a named recording switches the CPU's fighter (`fighter_prompt`, package 4).
     #[serde(default = "fighter_prompt_default")]
     pub fighter_prompt: OnOff,
     /// Where the CPU's recordings come from (macro_source, package 4).
