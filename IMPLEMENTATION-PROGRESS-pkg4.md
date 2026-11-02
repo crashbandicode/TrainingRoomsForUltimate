@@ -201,3 +201,15 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
 - BLOCKED: the Switch build lacks practice::panel_entry until 5e0fab3 is in this tree; asked the lead: merge stream/pkg6 (conflicts in the pkg4
   manifest/ledger, hook_stats.rs, macros/diag.rs, from stream/stack) or wait for the integrator. Queue line on the Yoga is marked NOT READY.
 - Next after that: local Switch release+diag, then the Yoga turn (build + s4-08) as in the handoff above.
+### Rule slip disclosed (2026-11-02, ~12:50Z-13:30Z): unclaimed Switch builds on the Surface
+- This worktree is on `ubuntu-surface`. The local Switch builds of `/tmp/pkg4s44/sw.ps1` (target `trainingrooms-pkg4-sw`) are Surface compiles and need
+  a ledger claim in queue order; I ran four without one: release + diag at ~12:50Z-13:00Z (after a6f81b0, the build the lead saw at 13:00Z) and diag + release
+  at ~13:25Z (the 48eebe1 merge). Each finished in about a minute; none is running now. From now on every Switch build (local Surface or Yoga) is claimed.
+- Disk order: CARGO_INCREMENTAL=0 in cg.ps1 / clippy.ps1 / sw.ps1; after gates, stale duplicate artifacts in trainingrooms-pkg4/debug/deps deleted (471 files,
+  1.36 GB; 1.20 GB left); no incremental directories remain in either target.
+
+### Merge of work/implementation 48eebe1 (stream/pkg6 5e0fab3 with stack, b2 install line, sync slice 1)
+- Conflicts resolved: hook_stats.rs (both: package-4 ids + the diag entry probe), macros/diag.rs (the stack table's threads::spawn(MacroDiag) around the
+  watchdog loop; stack line kept, size now from the table), pkg4 carry manifest (stack's replay_store edits; carry verify clean, ledger regenerated),
+  tests/hook_alloc.rs: ours (the child-process exact meter test the lead accepted; work/implementation had a 64 MiB block with a 4 MiB SLACK tolerance).
+- Gates on the merged tree: host tests all pass, clippy -D warnings 0, --no-default-features builds, Switch release + diag build (unclaimed, see above).

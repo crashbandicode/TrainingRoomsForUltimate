@@ -62,6 +62,9 @@ pub unsafe fn combo_display_b(ctx: &mut InlineCtx) {
 pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
     let menu = ctx.registers[22].x() as usize;
+    // Diag (package 6, F9 research): remember the pause menu object so Eden can dump it around a No. of CPUs change.
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_reload::note_pause_menu(menu);
     if menu != 0 && scene::is_native_training() {
         ((menu + 0xb60) as *mut u8).write(1);
     }
