@@ -58,3 +58,9 @@ scope = "total"
 ceiling = 103300
 date = "2026-11-02"
 reason = "cut: approved Mii probe retirement and helper scope roots; raw sloc4 98956 plus retained pending merge allowance4318 =103274, rounded up. Previous101224, slice reduction2268; no count/layout change."
+
+[[budget]]
+scope = "total"
+ceiling = 103200
+date = "2026-11-02"
+reason = "cut: HookId and Feature declaration tables remove maintained duplicate mappings; raw sloc4 98865 plus unchanged pending merge allowance4318 =103183, rounded up. No counting/layout or behavior change."

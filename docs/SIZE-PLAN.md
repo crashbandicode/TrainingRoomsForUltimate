@@ -288,6 +288,13 @@ declarative table in model/hook_stats.rs. This removes three maintained copies
 of the same mapping, rather than compressing its formatting. Before/after source
 comparison proves every ordinal, label and variant comment is retained, and all
 allocator, scope, counter and formatter code is unchanged. Raw sloc4 is98,885
-(-77 from61b0aab); the103,300 ceiling remains unchanged. Normalized count and
-compiler gates are pending for this slice. This does not resolve any runtime
+(-77 from61b0aab); the103,300 ceiling remains unchanged. Normalized126472excludingtools (-77); allfivecompiler gatesPASS at8f762e1.
+Release resident3444736 (+4096vs61), diagnostic3784704 unchanged. This does not resolve any runtime
 allocation failure.
+
+## Feature declaration (2026-11-02)
+
+The28 Feature variants and name lookup now share one declaration with all variant
+docs retained. All Site rows, bytes, rules and later definitions are byte-identical.
+Raw98865 (-20vs8f762e1); normalized andcompiler gates pending. Ceiling103200
+retains4318 pending merge allowance (98865+4318=103183 rounded up).

@@ -262,6 +262,17 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
 
+### 2026-11-02 20:38Z — 8f gated; next independent Feature table
+8f762e1 allfivecompilegatesPASS; raw98885/normalized126472excltools (-77both);
+release6867957a resident3444736 (+4096), diaga9c766ea3784704 unchanged.
+Compliance atcleanf4fc2e0 exit1 samefourmachinefailures/29agentrows; table5/fiber1
+remainFAIL. No runtime acceptance. Exactarchivedreceipts in8f directories.
+NextownedSIZE-PLAN coreitem: model/sites.rs Feature enum+name intoone localtable,
+preserving28variantorder/names/docs; everythingfromSite struct onward staysbyteidentical.
+No siteguards/carrydata/runtime/TLS changes. Native Text remainsUNAPPLIED; need
+baseline/integration/stackownership rulings alreadyrequested below.
+
+
 - 20:18Z independent planned reduction notice: src/model/hook_stats.rs, enum/ALL/name declaration only (SIZE-PLAN section2 core row). Blob98e0ef37 and actual sourceSHA846d9faa match lead, pkg4 and UI worktrees. Replace three copies of the same40 hook entries with one local declarative table, preserving ordinals, report names, variant metadata and public API. No TLS, allocator, HookScope, attribution, counter or formatter behavior edit; no native Mii/roster overlap. This is within slim's already planned safe table reductions. Gates and exact before/after mapping proof will follow.
 
 ### Milestone report and decisions needed — 2026-11-02 19:57Z
@@ -834,3 +845,13 @@ Read-only tool invocation mistakes: stack_depth.py --help raised IndexError (exp
 ELF+command), and tools/nro_size.py missing becauseactualpath isplaybook/tools/build;
 correctedcommands succeeded. Several immediate small reads lackedexplicitcgroup/time
 bounds aftercompaction; compilerjobs remainedbounded; subsequentreads useguard.
+
+## Feature table precompile checkpoint20:39Z
+Feature/name duplicate declaration reduced; raw98865 (-20), ceiling103200 with
+unchanged4318pendingallowance. Mappingproof /tmp/slim/feature-table-proof.json:
+28variantordinals/labels/comments exact, allSite/data/rules tail byteidentical.
+Preedithash5b02f703bdae75698226250019b63b9d4d758a1a1da775366d05cda9e5b29b5b
+matchedlead/pkg4/UI; postedownershipnoticebeforeedit. No carrieddata changed,
+no manifesttransformneeded. UNCOMPILED; no claims/Eden/profile currently.
+8fcomplianceatcleanf4fc2e0 exit1 samefourmandatorymachinefailures/29agentrows;
+release no-diagmarkersPASS, cleanPASS. Report8f762e1-release/compliance.md.
