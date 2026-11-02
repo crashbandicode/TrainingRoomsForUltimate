@@ -250,23 +250,28 @@ pub(crate) fn menu_ready(opening: u64) {
 
 pub(crate) enum OpenedCatalog {
     Shown,
-    Later(Snapshot),
+    Later(std::sync::Arc<Snapshot>),
     Dropped,
 }
 
 /// Mount one owned snapshot into the already-open menu. A non-submenu page keeps the snapshot.
-pub(crate) fn mount_opened_catalog(catalog: Snapshot, opening: u64) -> OpenedCatalog {
+pub(crate) fn mount_opened_catalog(catalog: std::sync::Arc<Snapshot>, opening: u64) -> OpenedCatalog {
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
-    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);
+    let Some(mut app) = crate::runtime::ui::menu_app::QUICK_MENU_APP.try_lock() else {
+        return OpenedCatalog::Later(catalog);
+    };
+    app.follow_open();
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
     if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {
         return OpenedCatalog::Later(catalog);
     }
-    if app.mount_mii_editor_catalog(catalog, opening) {
+    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {
+        catalog, epoch: opening, context: None, ordinary_cpu: false,
+    }) {
         crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
         OpenedCatalog::Shown
     } else {

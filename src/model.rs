@@ -121,3 +121,7 @@ pub mod parked_entries;
 /// F11: the running cell of a fighter entry's window (the game's active-cell index).
 #[path = "model/entry_cells.rs"]
 pub mod entry_cells;
+
+/// Startup-allocated catalog reply transport; native callers never allocate channels.
+#[path = "model/catalog_reply.rs"]
+pub mod catalog_reply;

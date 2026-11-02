@@ -52,7 +52,7 @@ struct CommittedCapture {
 enum WriteJob {
     Capture(Box<CommittedCapture>),
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
-    ReadCatalog(mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>),
+    ReadCatalog(CatalogJob),
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     // Keep ordinary catalog requests small; only an actual import owns this payload.
     Import { name: Option<String>, configuration: Box<crate::engine::mii::lifetime::Configuration>,
@@ -128,7 +128,7 @@ pub fn start_writer() -> Result<(), String> {
                             Err(error) => native.findings.push(crate::engine::mii::inventory::Finding::PresetSource {
                                 error: format!("Mii preset library: {error}") }),
                         }
-                        let _ = reply.send(native);
+                        reply.complete(Arc::new(native));
                     }
                     #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     WriteJob::Import {name, configuration, native, reply} => {
@@ -165,9 +165,14 @@ pub fn persist_committed(replay_id: String, replay_name: String, session: Arc<Li
 #[cfg(feature = "mii-saved-alpha")]
 pub(crate) enum CatalogQueue {
     Queued,
-    Full,
-    Unavailable,
+    Full(CatalogJob),
+    Unavailable(CatalogJob),
 }
+
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) type CatalogJob = crate::model::catalog_reply::Job<Arc<crate::engine::mii::inventory::Snapshot>>;
+#[cfg(feature = "mii-saved-alpha")]
+static CATALOG_FALLBACK: OnceLock<SyncSender<CatalogJob>> = OnceLock::new();
 
 #[cfg(feature = "mii-saved-alpha")]
 fn read_saved_mii_catalog() -> crate::engine::mii::inventory::Snapshot {
@@ -176,17 +181,17 @@ fn read_saved_mii_catalog() -> crate::engine::mii::inventory::Snapshot {
 
 #[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn request_mii_catalog(
-    reply: mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>,
+    reply: CatalogJob,
 ) -> CatalogQueue {
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if let Some(writer) = WRITER.get() {
         return match writer.try_send(WriteJob::ReadCatalog(reply)) {
             Ok(()) => CatalogQueue::Queued,
-            Err(mpsc::TrySendError::Full(_)) => CatalogQueue::Full,
+            Err(mpsc::TrySendError::Full(WriteJob::ReadCatalog(reply))) => CatalogQueue::Full(reply),
             Err(mpsc::TrySendError::Disconnected(WriteJob::ReadCatalog(reply))) => {
                 fallback_catalog(reply)
             }
-            Err(mpsc::TrySendError::Disconnected(_)) => CatalogQueue::Unavailable,
+            Err(_) => unreachable!("catalog submission returned another job variant"),
         };
     }
     fallback_catalog(reply)
@@ -195,16 +200,9 @@ pub(crate) fn request_mii_catalog(
 /// One permanent 128 KiB reader used only when the shared replay writer cannot take the job.
 /// Saved-only builds have no preset writer; a dead writer still returns the native catalog.
 #[cfg(feature = "mii-saved-alpha")]
-fn fallback_catalog(
-    reply: mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>,
-) -> CatalogQueue {
-    static WORKER: OnceLock<
-        SyncSender<mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>>,
-    > = OnceLock::new();
-    let sender = WORKER.get_or_init(|| {
-        let (sender, receiver) = mpsc::sync_channel::<
-            mpsc::SyncSender<crate::engine::mii::inventory::Snapshot>,
-        >(1);
+fn init_catalog_fallback() {
+    CATALOG_FALLBACK.get_or_init(|| {
+        let (sender, receiver) = mpsc::sync_channel::<CatalogJob>(1);
         let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
@@ -218,16 +216,23 @@ fn fallback_catalog(
                         });
                         native
                     };
-                    let _ = reply.send(native);
+                    reply.complete(Arc::new(native));
                 }
             });
         // A failed spawn drops the receiver. Later sends disconnect once and do not retry forever.
         sender
     });
+}
+
+#[cfg(feature = "mii-saved-alpha")]
+fn fallback_catalog(reply: CatalogJob) -> CatalogQueue {
+    let Some(sender) = CATALOG_FALLBACK.get() else {
+        return CatalogQueue::Unavailable(reply);
+    };
     match sender.try_send(reply) {
         Ok(()) => CatalogQueue::Queued,
-        Err(mpsc::TrySendError::Full(_)) => CatalogQueue::Full,
-        Err(mpsc::TrySendError::Disconnected(_)) => CatalogQueue::Unavailable,
+        Err(mpsc::TrySendError::Full(reply)) => CatalogQueue::Full(reply),
+        Err(mpsc::TrySendError::Disconnected(reply)) => CatalogQueue::Unavailable(reply),
     }
 }
 
@@ -243,6 +248,8 @@ pub(crate) fn import_mii(configuration: crate::engine::mii::lifetime::Configurat
 /// before the Deluxe row registers. Configuration is read once; capture
 /// sampling performs no filesystem reads.
 pub fn init() {
+    #[cfg(feature = "mii-saved-alpha")]
+    init_catalog_fallback();
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if let Err(error) = start_writer() { println!("[ReplayCapture] Mii library unavailable: {error}"); }
     let path = REPLAY_CAPTURE_INI;

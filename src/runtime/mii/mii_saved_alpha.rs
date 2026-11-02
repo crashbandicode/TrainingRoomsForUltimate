@@ -78,6 +78,7 @@ fn notice(reason: &str) {
 }
 
 pub(super) fn init(base: usize) {
+    super::mii_catalog_request::init();
     // Generated from the same pristine row/applier/INSTALL receipts as fullconfig. No new hook.
     let valid = super::mii_saved_fingerprints::valid(base);
     ENABLED.store(valid, Ordering::Release);
@@ -100,14 +101,15 @@ pub(crate) fn menu_open() -> u64 {
 }
 
 /// Queue the catalog read after App reset. No file IO and no writer wait on this thread.
-pub(crate) fn menu_ready(opening: u64) {
+pub(crate) fn menu_ready(opening: u64) -> bool {
     if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {
-        return;
+        return false;
     }
     super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {
         opening,
         owners: [current_generation(0), current_generation(1)],
     });
+    true
 }
 
 pub(super) fn accept_catalog(catalog: Arc<Snapshot>, opening: u64, owners: [u64; 2]) -> bool {
@@ -570,8 +572,7 @@ unsafe fn finish_saved_capture(
     let cpu_context=ordinary_cpu.then(super::mii_ordinary_cpu::cpu_context);
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     let cpu_context=None;
-    // publish_mii_catalog takes an owned Snapshot. ALPHA keeps the Arc, so this
-    // one clone is the menu publish, not a per-tick copy.
+    // Keep the worker-built snapshot shared; the UI constructs its menu off-hook.
     let publish = s.menu.take_owned_context(captured_context,ordinary,cpu_context)
         .map(|context| {
             #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -586,21 +587,16 @@ unsafe fn finish_saved_capture(
                     None
                 };
             }
-            ((*catalog).clone(), context)
+            (Arc::clone(&catalog), context)
         });
     refresh_work(&s);
     drop(s);
     if let Some((catalog, context)) = publish {
-        // No G/state lock remains; App contains owned values only.
-        let mut app = crate::runtime::compat::sync::lock_write(&menu::QUICK_MENU_APP);
-        // Check under App: an older capture may have completed before cancellation.
-        let mounted=app.publish_mii_catalog(catalog, context, menu_epoch(), || {
-            crate::runtime::compat::sync::assign(&menu::MENU_RECEIVED_INPUT, true);
-        });
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
-        if mounted {app.qualify_ordinary_cpu_cycle(ordinary_cpu);}
         #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-        let _=mounted;
+        let ordinary_cpu = false;
+        super::mii_catalog_request::publish_menu(crate::runtime::ui::menu_app::CatalogPublication {
+            catalog, epoch: context.epoch, context: Some(context), ordinary_cpu,
+        });
     }
     None
 }

@@ -1876,7 +1876,146 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "628b44a3dd1652be29891482dd199b25404fc6c0e790ae6b648d9867cb5bb00d"
+   "dest_sha256": "483c696802ab5e5e70c0e0cb9f9fb3f23d31fe19329147b53f7538e1063c59d9",
+   "edits": [
+    {
+     "old": "use std::sync::{mpsc, Arc, Mutex};",
+     "new": "use std::sync::{mpsc, Arc, Mutex};\nuse crate::model::catalog_reply::{Job, Replies};",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "reply: Option<mpsc::Receiver<Snapshot>>,",
+     "new": "reply: Option<Replies<Arc<Snapshot>>>,\n    in_flight: bool,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "held_editor: Option<(Snapshot, u64)>,",
+     "new": "held_editor: Option<(Arc<Snapshot>, u64)>,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "reply: None,",
+     "new": "reply: None,\n            in_flight: false,",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn live() -> Live {",
+     "new": "/// Startup only, before native callbacks are installed.\npub(super) fn init() {\n    let mut broker = STATE.lock().unwrap();\n    if broker.reply.is_none() { broker.reply = Some(Replies::new()); }\n}\n\nfn live() -> Live {",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn poll(&mut self) -> Option<(Verdict, Snapshot)> {\n        if let Some(reply) = self.reply.as_ref() {\n            match reply.try_recv() {\n                Ok(snapshot) => {\n                    self.reply = None;",
+     "new": "fn poll(&mut self) -> Option<(Verdict, Arc<Snapshot>)> {\n        if self.in_flight {\n            let reply = self.reply.as_mut().expect(\"catalog initialized before requests\");\n            match reply.poll() {\n                Ok(Ok(snapshot)) => {\n                    self.in_flight = false;",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "Err(mpsc::TryRecvError::Disconnected) => {\n                    self.reply = None;",
+     "new": "Ok(Err(())) | Err(mpsc::TryRecvError::Disconnected) => {\n                    self.in_flight = false;",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    fn enqueue(&mut self) -> Effect {\n        let (sender, receiver) = mpsc::sync_channel(1);\n        match crate::runtime::macros::replay_store::request_mii_catalog(sender) {\n            crate::runtime::macros::replay_store::CatalogQueue::Queued => {\n                self.flight_serial = self.policy.serial();\n                self.reply = Some(receiver);\n                Effect::quiet(Step::Wait)\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Full => {\n                drop(receiver);\n                self.policy.rejected_full()\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Unavailable => {\n                drop(receiver);\n                self.policy.failed(live())\n            }\n        }\n    }\n\n",
+     "new": "    fn enqueue(&mut self) -> Effect {\n        let Some(replies) = self.reply.as_mut() else { return self.policy.failed(live()); };\n        let Some(sender) = replies.begin() else { return self.policy.failed(live()); };\n        match crate::runtime::macros::replay_store::request_mii_catalog(Job::new(sender)) {\n            crate::runtime::macros::replay_store::CatalogQueue::Queued => {\n                self.flight_serial = self.policy.serial();\n                self.in_flight = true;\n                Effect::quiet(Step::Wait)\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Full(job) => {\n                replies.rejected(job.rejected());\n                self.policy.rejected_full()\n            }\n            crate::runtime::macros::replay_store::CatalogQueue::Unavailable(job) => {\n                replies.rejected(job.rejected());\n                self.policy.failed(live())\n            }\n        }\n    }\n\n",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn apply(verdict: Verdict, snapshot: Snapshot)",
+     "new": "fn apply(verdict: Verdict, snapshot: Arc<Snapshot>)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "Arc::new(snapshot)",
+     "new": "snapshot",
+     "count": 2,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn retain_editor(snapshot: Snapshot, opening: u64)",
+     "new": "fn retain_editor(snapshot: Arc<Snapshot>, opening: u64)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "use crate::model::catalog_reply::{Job, Replies};",
+     "new": "use crate::model::catalog_reply::{Job, Replies};\nuse crate::runtime::ui::menu_app::{CatalogPublication, QUICK_MENU_APP, MENU_RECEIVED_INPUT};",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "held_editor: Option<(Arc<Snapshot>, u64)>,",
+     "new": "held_editor: Option<(Arc<Snapshot>, u64)>,\n    held_menu: Option<CatalogPublication>,",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "held_editor: None,",
+     "new": "held_editor: None,\n            held_menu: None,",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "self.held_editor.is_some() || self.policy.pending()",
+     "new": "self.held_menu.is_some() || self.held_editor.is_some() || self.policy.pending()",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    let restart_auto = broker.policy.close_menu(opening);",
+     "new": "    let restart_auto = broker.policy.close_menu(opening);\n    if broker.held_menu.as_ref().is_some_and(|p| p.epoch == opening) { broker.held_menu = None; }",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    broker.policy.retire();",
+     "new": "    broker.policy.retire();\n    broker.held_menu = None;",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    let (held, ready) = {",
+     "new": "    let (held, menu, ready) = {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "        let held = broker.held_editor.take();",
+     "new": "        let held = broker.held_editor.take();\n        let menu = broker.held_menu.take();",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "        (held, ready)",
+     "new": "        (held, menu, ready)",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    if let Some((snapshot, opening)) = held {",
+     "new": "    if let Some(publication) = menu { publish_menu(publication); }\n    if let Some((snapshot, opening)) = held {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {",
+     "new": "/// Capture has completed. A contended UI lock retains the value for the next\n/// native service callback; close/retire cancels it through the existing broker.\npub(super) fn publish_menu(publication: CatalogPublication) {\n    if !crate::runtime::ui::menu_app::active()\n        || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }\n    if let Some(mut app) = QUICK_MENU_APP.try_lock() {\n        app.follow_open();\n        if publication.epoch == super::mii_saved_alpha::menu_epoch()\n            && app.publish_catalog(publication) {\n            MENU_RECEIVED_INPUT.store(true, Ordering::Release);\n        }\n        return;\n    }\n    let mut broker = STATE.lock().unwrap();\n    broker.held_menu = Some(publication);\n    PENDING.store(true, Ordering::Release);\n}\n\nfn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "pub(super) fn service() {",
+     "new": "pub(super) fn service() {\n    crate::runtime::mii::menu_handoff::service();",
+     "reason": "Service typed UI intent only at existing native game callback, before pending catalog work."
+    }
+   ]
   },
   {
    "src": "src/mii_cpu_adapter.rs",
@@ -2057,7 +2196,38 @@
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "0a4a7ea67c553f40727eae99d8d3fcfb7cd2ad26870331d519498b5ca7b29bc2"
+   "dest_sha256": "996b108b292516c531560918c04b9dd7e6fc4697f048e4f205852d664fcd73b0",
+   "edits": [
+    {
+     "old": "pub(super) fn init(base: usize) {",
+     "new": "pub(super) fn init(base: usize) {\n    super::mii_catalog_request::init();",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    // publish_mii_catalog takes an owned Snapshot. ALPHA keeps the Arc, so this\n    // one clone is the menu publish, not a per-tick copy.",
+     "new": "    // Keep the worker-built snapshot shared; the UI constructs its menu off-hook.",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "            ((*catalog).clone(), context)",
+     "new": "            (Arc::clone(&catalog), context)",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "    if let Some((catalog, context)) = publish {\n        // No G/state lock remains; App contains owned values only.\n        let mut app = crate::runtime::compat::sync::lock_write(&menu::QUICK_MENU_APP);\n        // Check under App: an older capture may have completed before cancellation.\n        let mounted=app.publish_mii_catalog(catalog, context, menu_epoch(), || {\n            crate::runtime::compat::sync::assign(&menu::MENU_RECEIVED_INPUT, true);\n        });\n        #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n        if mounted {app.qualify_ordinary_cpu_cycle(ordinary_cpu);}\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let _=mounted;\n    }\n",
+     "new": "    if let Some((catalog, context)) = publish {\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let ordinary_cpu = false;\n        super::mii_catalog_request::publish_menu(crate::runtime::ui::menu_app::CatalogPublication {\n            catalog, epoch: context.epoch, context: Some(context), ordinary_cpu,\n        });\n    }\n",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
+    },
+    {
+     "old": "pub(crate) fn menu_ready(opening: u64) {\n    if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {\n        return;\n    }\n    super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {\n        opening,\n        owners: [current_generation(0), current_generation(1)],\n    });\n}",
+     "new": "pub(crate) fn menu_ready(opening: u64) -> bool {\n    if !ENABLED.load(Ordering::Acquire) || mii_backend::current().is_none() {\n        return false;\n    }\n    super::mii_catalog_request::request(crate::engine::mii::catalog_request::Kind::Menu {\n        opening,\n        owners: [current_generation(0), current_generation(1)],\n    });\n    true\n}",
+     "reason": "Report existing native capture admission so editor-only fallback cannot supersede a valid role-aware catalog request."
+    }
+   ]
   },
   {
    "src": "src/mii_saved_fingerprints.rs",
@@ -2284,7 +2454,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "069725175dc5b9aeb2bab111448ce6b9f0a00e507491fd6b2cf768711788f97b",
+   "dest_sha256": "0bf07d2ee59a9ca1d4af0a0fcecd02f7a19f4cdee3b47490eefedae35be89d1c",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -2390,6 +2560,24 @@
      "old": "    crate::runtime::compat::filesystem::init();",
      "new": "    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();",
      "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    Later(Snapshot),",
+     "new": "    Later(std::sync::Arc<Snapshot>),",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "fn mount_opened_catalog(catalog: Snapshot, opening: u64)",
+     "new": "fn mount_opened_catalog(catalog: std::sync::Arc<Snapshot>, opening: u64)",
+     "count": 1,
+     "reason": "Move catalog transport allocation to startup/worker; preserve existing request policy and worker failure delivery."
+    },
+    {
+     "old": "    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);\n    if !editor_opening_current(opening) {\n        return OpenedCatalog::Dropped;\n    }\n    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.mount_mii_editor_catalog(catalog, opening) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }",
+     "new": "    let Some(mut app) = crate::runtime::ui::menu_app::QUICK_MENU_APP.try_lock() else {\n        return OpenedCatalog::Later(catalog);\n    };\n    app.follow_open();\n    if !editor_opening_current(opening) {\n        return OpenedCatalog::Dropped;\n    }\n    if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {\n        return OpenedCatalog::Later(catalog);\n    }\n    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {\n        catalog, epoch: opening, context: None, ordinary_cpu: false,\n    }) {\n        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);\n        OpenedCatalog::Shown\n    } else {\n        OpenedCatalog::Dropped\n    }",
+     "count": 1,
+     "reason": "Typed Arc catalog publication; native producer never blocks on UI or deep-clones/boxes catalog data."
     }
    ]
   },
