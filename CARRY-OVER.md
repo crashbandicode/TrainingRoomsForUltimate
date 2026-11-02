@@ -325,3 +325,18 @@ UI portrait admission correction after ui-13: the existing enforcing character_r
 
 ### UI item picture assets (2026-11-02)
 38 PNGs and sources.json, identity-copied from frozen m5q scripts/item-icons/assets, all ours-new verified before reading. Full digests/transforms: docs/provenance/ui-item-assets.json; generated ledger: docs/provenance/ui-item-assets-ledger.md. tools/carry_ui_items.py verifies binary files (the existing Rust carry tools rewrite UTF-8 text). No fork/stage mutation. The pinned MIT layout builder appends item textures/materials to both Training and waiting archives; stage/fighter pictures still load at runtime. Runtime/recipe gates pending in stream progress.
+## Lead exact-Mii state capture, 2026-11-02
+Clean-room runtime/features/states.rs now passes a Copy Configuration from the
+existing settled role accessor to the writer, which serializes it off-hook.
+model/state/record.rs gains writer-only attach_mii with failure atomicity;
+model/state/file.rs projects imported records to a JSON-free game copy while
+the writer retains the complete opaque identity. No additional fork source
+was copied. The existing Mii Configuration serialization contract was read in
+the carried model; current_configuration still requires the separate native
+first-lock root. Source contract: manifest-verified ours-new m5i
+docs/setup-library.md d178081ae95cf30726273c2c0178df99d542ffd9d977ce75042ce9fe796be17c
+and src/training/setup_library.rs 4362b966d43d4725f330228b2b50ce64966ab117bf88ee0b0660efc0252cf9fb.
+This is not native acceptance or permission to relax exact identity checks.
+
+## Lead preview checkpoint, 2026-11-02
+Clean-room implementation from manifest-verified ours-new m5i docs/named-macros.md (c587e3e7cb61710e30dc7374914000ee5fd3e86dbd8da70be8e5348b1671d299), docs/reference/named-macros.md (11a1c3eac4c921cef8799f4b634aefdbeb6b2706b607dfac4876e02c1a0fa0d4) and docs/named-macros/SCREENSHOTS.md (723ad2c4208ed94d56134ac064e80a2c9855bfa54b1a881e2ff9cd4d21b7343c). No mixed save_states implementation read or copied. Existing capture native reads extracted without changed ordering into read_record; checkpoint/identity and retirement transport are new. Source and gate limitations in IMPLEMENTATION-PROGRESS-state-core.md.

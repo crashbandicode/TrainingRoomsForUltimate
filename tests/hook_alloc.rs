@@ -33,6 +33,130 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
+fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
+    use model::state::{preview::Checkpoint, record::SavedState};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        let mut checkpoint = Checkpoint::new();
+        for generation in 0..20 {
+            let pair = std::array::from_fn(|role| SavedState {
+                x: 40.0 * (1.0 - 2.0 * role as f32),
+                percent: 15.0,
+                ..SavedState::never_saved()
+            });
+            checkpoint.capture(generation, pair).unwrap();
+            for _ in 0..10 { std::hint::black_box(checkpoint.restore(&generation).unwrap()); }
+            checkpoint.clear();
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
+#[test]
+fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
+    use model::state::file::SaveFile;
+    use model::state::machine::{Machine, Role};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    // An opaque future field must survive storage even though gameplay never
+    // interprets it. Include both roles and a non-default slot.
+    let mut writer = SaveFile::default();
+    writer.player[3].fighter_kind = 0x48;
+    writer.player[3].percent = 47.0;
+    writer.player[3].mii = Some(serde_json::json!({"future": ["player", 7]}));
+    writer.cpu[3].fighter_kind = 0x4a;
+    writer.cpu[3].x = -19.0;
+    writer.cpu[3].mii = Some(serde_json::json!({"future": ["cpu", 9]}));
+    let bytes = writer.to_pretty();
+    let old_before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        std::hint::black_box(writer.player[3].clone());
+    }
+    assert!(hook_allocations() > old_before, "the imported JSON copy must be observable");
+    let mut machine = Machine::new(writer.clone().into_game_records());
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        for _ in 0..20 {
+            for role in [Role::Player, Role::Cpu] {
+                let record = machine.record(role, 3).clone();
+                assert!(record.mii.is_none());
+                assert!(machine.capture(role, 3, record));
+            }
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+    assert_eq!(machine.record(Role::Player, 3).percent, 47.0);
+    assert_eq!(machine.record(Role::Cpu, 3).x, -19.0);
+    assert_eq!(writer.to_pretty(), bytes);
+    assert_eq!(SaveFile::parse(bytes.as_bytes()).unwrap(), writer);
+}
+
+#[test]
+fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
+    use model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};
+    use model::state::quick_reset::{Pose, QuickReset};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut quick = QuickReset::new();
+    let mut machine = Machine::default();
+    let mut rng = model::cpu::rng::Rng::new(8);
+    let settings = model::state::settings::StateSettings::default();
+    let pose = Pose {
+        x: 3.0,
+        y: 4.0,
+        lr: 1.0,
+        percent: 23.0,
+        kind: 7,
+        situation: 0,
+        stage: 8,
+    };
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        for _ in 0..20 {
+            quick.clear();
+            quick.observe([8, 16], 0, true, pose);
+            quick.observe([8, 16], 1, true, pose);
+            let pair = quick.pair([8, 16]).unwrap();
+            assert!(machine.begin_temporary(pair.map(Pose::record)));
+            for _ in 0..2 {
+                for entry in [0, 1] {
+                    std::hint::black_box(machine.frame(
+                        &FrameIn {
+                            entry,
+                            nana: false,
+                            popo: false,
+                            kind: 7,
+                            dead: false,
+                            status: StatusNow::Wait,
+                            prev_rebirth: false,
+                            standby: false,
+                            stage_id: 8,
+                            situation: SituationIds {
+                                ground: 0,
+                                air: 2,
+                                cliff: 1,
+                            },
+                            save_chord: false,
+                            load_chord: false,
+                            kirby: false,
+                            pokemon: false,
+                            buffable: false,
+                        },
+                        &settings,
+                        &mut rng,
+                    ));
+                }
+            }
+            assert!(!machine.is_loading());
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
+#[test]
 fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
     let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
     let mut observer = Observer::new();

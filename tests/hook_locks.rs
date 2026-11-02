@@ -33,6 +33,8 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/chords.rs", "STATE"),
     ("features/cpu.rs", "CPU"),
     ("features/states.rs", "STATE"),
+    ("features/states/quick_reset.rs", "QUICK"),
+    ("features/states/preview.rs", "CHECKPOINT"),
     ("features/recorder.rs", "REC"),
     ("features/recorder.rs", "RNG"),
     ("features/input_display.rs", "LOG"),

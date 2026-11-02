@@ -68,10 +68,9 @@ pub(crate) mod input {
     }
 }
 
-/// What the install line says about the dependency boundary that is left: the clip preview's temporary setup restore (package 3 does not
-/// provide it yet) and the menu's panel screens (package 5; the layer's API is ready for them).
+/// The named layer uses package 3's temporary checkpoint provider.
 pub(crate) fn install_report() -> &'static str {
-    "preview_restore=unavailable_until_pkg3"
+    "preview_restore=temporary_checkpoint"
 }
 
 /// The fork's `input_record` as the named layer calls the core (SPEC-input-01 section 9), over `features::recorder`.

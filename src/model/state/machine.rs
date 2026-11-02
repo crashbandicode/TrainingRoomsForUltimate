@@ -25,6 +25,20 @@ pub enum Role {
 }
 
 impl Role {
+    pub fn for_scene(scene: crate::model::cpu::role::Scene, entry: i32) -> Option<Role> {
+        let cpu = match scene {
+            crate::model::cpu::role::Scene::Training => 1,
+            crate::model::cpu::role::Scene::Lobby => crate::model::cpu::role::LOBBY_CPU_ENTRY,
+        };
+        if entry == 0 {
+            Some(Role::Player)
+        } else if entry == cpu {
+            Some(Role::Cpu)
+        } else {
+            None
+        }
+    }
+
     pub const fn index(self) -> usize {
         match self {
             Role::Player => 0,
@@ -193,6 +207,8 @@ pub struct Machine {
     active: Option<usize>,
     /// The recorder has not been told yet that the load finished.
     restore_pending: bool,
+    /// Ephemeral restore records. Never part of `file` or the persistence handoff.
+    temporary: Option<[SavedState; 2]>,
 }
 
 impl Default for Machine {
@@ -203,7 +219,14 @@ impl Default for Machine {
 
 impl Machine {
     pub fn new(file: SaveFile) -> Self {
-        Self { file, mirror_sign: 1.0, random_slot: 0, active: None, restore_pending: false }
+        Self {
+            file,
+            mirror_sign: 1.0,
+            random_slot: 0,
+            active: None,
+            restore_pending: false,
+            temporary: None,
+        }
     }
 
     fn records(&self, role: Role) -> &[SavedState; SLOTS] {
@@ -232,31 +255,90 @@ impl Machine {
         &self.records(role)[slot.min(SLOTS - 1)]
     }
 
+    /// Record of the running restore; numbered-slot readers keep using `record`.
+    pub fn restoring_record(&self, role: Role, settings: &StateSettings) -> &SavedState {
+        self.load_record(role, self.current_slot(settings))
+    }
+
+    fn load_record(&self, role: Role, slot: usize) -> &SavedState {
+        self.temporary
+            .as_ref()
+            .map_or_else(|| self.record(role, slot), |pair| &pair[role.index()])
+    }
+
+    fn load_marker(&self, role: Role, slot: usize) -> Marker {
+        self.load_record(role, slot).marker
+    }
+
+    fn set_load_marker(&mut self, role: Role, slot: usize, marker: Marker) {
+        if let Some(pair) = &mut self.temporary {
+            pair[role.index()].marker = marker;
+        } else {
+            self.set_marker(role, slot, marker);
+        }
+    }
+
+    pub fn temporary_active(&self) -> bool {
+        self.temporary.is_some()
+    }
+
+    /// Start an already-captured pair without borrowing a numbered slot, drawing
+    /// a random slot or changing its mirror history. Ownership moves, no clone.
+    pub fn begin_temporary(&mut self, mut pair: [SavedState; 2]) -> bool {
+        if self.is_loading()
+            || self.temporary.is_some()
+            || self
+                .file
+                .player
+                .iter()
+                .chain(self.file.cpu.iter())
+                .any(|r| r.marker == Marker::Save)
+        {
+            return false;
+        }
+        for record in &mut pair {
+            record.marker = Marker::KillPlayer;
+        }
+        self.temporary = Some(pair);
+        // This index is only bookkeeping for the existing per-role machine;
+        // every load access above selects the temporary pair while it exists.
+        self.active = Some(0);
+        self.restore_pending = true;
+        true
+    }
+
     /// The slot a frame consults: the latched slot of the load in progress, else Save State Slot.
     pub fn current_slot(&self, settings: &StateSettings) -> usize {
-        self.active.unwrap_or(usize::from(settings.slot)).min(SLOTS - 1)
+        self.active
+            .unwrap_or(usize::from(settings.slot))
+            .min(SLOTS - 1)
     }
 
     /// Either record of the load's slot is not `NoAction` (SPEC-state-01 §5.2).
     pub fn is_loading(&self) -> bool {
         self.active.is_some_and(|slot| {
-            [Role::Player, Role::Cpu].iter().any(|role| self.marker(*role, slot) != Marker::NoAction)
+            [Role::Player, Role::Cpu]
+                .iter()
+                .any(|role| self.load_marker(*role, slot) != Marker::NoAction)
         })
     }
 
     /// Either record of the load's slot is in `KillPlayer` or `WaitForAlive`.
     pub fn is_killing(&self) -> bool {
         self.active.is_some_and(|slot| {
-            [Role::Player, Role::Cpu]
-                .iter()
-                .any(|role| matches!(self.marker(*role, slot), Marker::KillPlayer | Marker::WaitForAlive))
+            [Role::Player, Role::Cpu].iter().any(|role| {
+                matches!(
+                    self.load_marker(*role, slot),
+                    Marker::KillPlayer | Marker::WaitForAlive
+                )
+            })
         })
     }
 
     /// A feature's wait is over: the load's record for `role` goes back to `NoAction`.
     pub fn finish_wait(&mut self, role: Role) {
         if let Some(slot) = self.active {
-            self.set_marker(role, slot, Marker::NoAction);
+            self.set_load_marker(role, slot, Marker::NoAction);
         }
     }
 
@@ -270,13 +352,14 @@ impl Machine {
         }
         self.active = None;
         self.restore_pending = false;
+        self.temporary = None;
     }
 
     /// Accept a load request if none is in progress (OQ 5): pick the slot (a weighted random one when
     /// Randomize Slots has any, remembered), set both records to `KillPlayer`, choose the mirror sign.
     /// Returns whether the request was accepted.
     pub fn begin_load(&mut self, settings: &StateSettings, rng: &mut Rng) -> bool {
-        if self.is_loading() {
+        if self.is_loading() || self.temporary.is_some() {
             return false;
         }
         let slot = match settings.randomize.pick(rng) {
@@ -301,51 +384,63 @@ impl Machine {
         let slot = slot.min(SLOTS - 1);
         state.marker = Marker::NoAction;
         self.records_mut(role)[slot] = state;
-        [Role::Player, Role::Cpu].iter().all(|r| self.marker(*r, slot) != Marker::Save)
+        [Role::Player, Role::Cpu]
+            .iter()
+            .all(|r| self.marker(*r, slot) != Marker::Save)
     }
 
     /// Run one fighter body's frame.
     pub fn frame(&mut self, input: &FrameIn, settings: &StateSettings, rng: &mut Rng) -> Out {
         let mut out = Out::default();
-        let Some(role) = Role::of_entry(input.entry) else { return out };
-        if !settings.enable {
+        let Some(role) = Role::of_entry(input.entry) else {
+            return out;
+        };
+        if !settings.enable && !self.temporary_active() {
             return out;
         }
         let slot = self.current_slot(settings);
-        let marker = self.marker(role, slot);
+        let marker = self.load_marker(role, slot);
 
         // 5.1 Load request.
         let auto = settings.autoload && marker == Marker::NoAction && input.dead;
-        if (auto || input.load_chord) && !input.nana {
+        if (auto || input.load_chord) && !input.nana && !self.temporary_active() {
             out.stop_playback = self.begin_load(settings, rng);
             return out;
         }
 
         let slot = self.current_slot(settings);
-        let marker = self.marker(role, slot);
+        let marker = self.load_marker(role, slot);
         match marker {
             Marker::KillPlayer if !input.nana => {
                 out.pokemon_predeath = input.pokemon;
                 out.force_dead = !input.dead;
-                self.set_marker(role, slot, Marker::WaitForAlive);
+                self.set_load_marker(role, slot, Marker::WaitForAlive);
             }
             Marker::WaitForAlive => {
                 out.pokemon_predeath = input.pokemon;
                 if !input.dead && !input.nana {
                     out.cleanup = true;
-                    self.set_marker(role, slot, Marker::PosMove);
+                    self.set_load_marker(role, slot, Marker::PosMove);
                     self.place(role, slot, input, settings, rng, &mut out);
                 }
             }
-            Marker::PosMove if !input.nana => self.place(role, slot, input, settings, rng, &mut out),
-            Marker::NanaPosMove if input.nana && !input.standby => self.place(role, slot, input, settings, rng, &mut out),
+            Marker::PosMove if !input.nana => {
+                self.place(role, slot, input, settings, rng, &mut out)
+            }
+            Marker::NanaPosMove if input.nana && !input.standby => {
+                self.place(role, slot, input, settings, rng, &mut out)
+            }
             // The waits of the features: the runtime steps them and calls `finish_wait` when done.
-            Marker::ApplyBuff | Marker::WaitForPokemonSwitch | Marker::WaitForCopyAbility if !input.nana => out.wait = Some(marker),
+            Marker::ApplyBuff | Marker::WaitForPokemonSwitch | Marker::WaitForCopyAbility
+                if !input.nana =>
+            {
+                out.wait = Some(marker)
+            }
             _ => {}
         }
 
         // 5.5 Save, at the end of every callback.
-        if input.save_chord {
+        if input.save_chord && !self.temporary_active() {
             self.mirror_sign = 1.0;
             let save_slot = usize::from(settings.slot).min(SLOTS - 1);
             for r in [Role::Player, Role::Cpu] {
@@ -354,7 +449,7 @@ impl Machine {
             out.saved_notice = Some(save_slot);
         }
         let save_slot = usize::from(settings.slot).min(SLOTS - 1);
-        if self.marker(role, save_slot) == Marker::Save && !input.nana {
+        if self.marker(role, save_slot) == Marker::Save && !input.nana && !self.temporary_active() {
             self.set_marker(role, save_slot, Marker::NoAction);
             out.capture = Some(save_slot);
         }
@@ -365,8 +460,10 @@ impl Machine {
             if let Some(slot) = self.active.take() {
                 // The restore is complete: the recorder is told once (pkg4 interface), with whether
                 // the CPU was saved on the ledge. Package 4 then records or plays per its own settings.
-                out.restored = Some(self.record(Role::Cpu, slot).situation_kind == input.situation.cliff);
+                out.restored =
+                    Some(self.load_record(Role::Cpu, slot).situation_kind == input.situation.cliff);
             }
+            self.temporary = None;
         }
         if !self.is_loading() {
             self.active = None;
@@ -375,37 +472,83 @@ impl Machine {
     }
 
     /// Steps 2 to 9 of §5.3 for one body.
-    fn place(&mut self, role: Role, slot: usize, input: &FrameIn, settings: &StateSettings, rng: &mut Rng, out: &mut Out) {
+    fn place(
+        &mut self,
+        role: Role,
+        slot: usize,
+        input: &FrameIn,
+        settings: &StateSettings,
+        rng: &mut Rng,
+        out: &mut Out,
+    ) {
         // Copy the values out (no clone: a record may hold a heap-backed Mii identity and this runs in a
         // frame hook).
-        let (saved_x, saved_y, saved_lr, saved_situation, saved_percent, saved_kind, saved_charge, saved_steve, saved_item) = {
-            let record = self.record(role, slot);
-            (record.x, record.y, record.lr, record.situation_kind, record.percent, record.fighter_kind, record.charge, record.steve, record.held_item)
+        let (
+            saved_x,
+            saved_y,
+            saved_lr,
+            saved_situation,
+            saved_percent,
+            saved_kind,
+            saved_charge,
+            saved_steve,
+            saved_item,
+        ) = {
+            let record = self.load_record(role, slot);
+            (
+                record.x,
+                record.y,
+                record.lr,
+                record.situation_kind,
+                record.percent,
+                record.fighter_kind,
+                record.charge,
+                record.steve,
+                record.held_item,
+            )
         };
         let situation = input.situation.classify(saved_situation);
         let mut y = saved_y;
         if situation == Situation::Cliff {
             y += place::ledge_raise(input.kind);
         }
-        let x = place::target_x(saved_x, self.mirror_sign, input.stage_id);
-        let lr = place::target_lr(saved_lr, self.mirror_sign);
+        let mirror = if self.temporary_active() {
+            1.0
+        } else {
+            self.mirror_sign
+        };
+        let x = place::target_x(saved_x, mirror, input.stage_id);
+        let lr = place::target_lr(saved_lr, mirror);
         let request = match situation {
             Situation::Ground if input.status != StatusNow::Wait => Some(Request::Wait),
             Situation::Air if input.status != StatusNow::Fall => Some(Request::Fall),
-            Situation::Cliff if !matches!(input.status, StatusNow::Fall | StatusNow::CliffCatch) => Some(Request::Fall),
+            Situation::Cliff
+                if !matches!(input.status, StatusNow::Fall | StatusNow::CliffCatch) =>
+            {
+                Some(Request::Fall)
+            }
             _ => None,
         };
-        out.placing = Some(Placing { x, y, lr, grounded: situation == Situation::Ground, request });
+        out.placing = Some(Placing {
+            x,
+            y,
+            lr,
+            grounded: situation == Situation::Ground,
+            request,
+        });
         out.run_hub = true;
         if request.is_some() {
             return;
         }
 
         // Placed: 8a-8g.
-        let (mode, limits) = match role {
+        let (mut mode, limits) = match role {
             Role::Player => (settings.damage_player, settings.limits_player),
             Role::Cpu => (settings.damage_cpu, settings.limits_cpu),
         };
+        if self.temporary_active() {
+            mode = super::settings::DamageMode::SaveState;
+        }
         let mut next = Marker::NoAction;
         let charge = (saved_kind == input.kind).then_some(saved_charge);
         if input.kirby {
@@ -420,7 +563,9 @@ impl Machine {
         }
         out.done = Some(Done {
             damage: place::load_damage(mode, saved_percent, limits, rng),
-            item: (role == Role::Player && !input.nana).then_some(saved_item).flatten(),
+            item: (role == Role::Player && !input.nana)
+                .then_some(saved_item)
+                .flatten(),
             charge,
             steve: saved_steve,
             reset_sound: role == Role::Cpu,
@@ -432,6 +577,6 @@ impl Machine {
             next = Marker::NanaPosMove;
             out.nana_next = true;
         }
-        self.set_marker(role, slot, next);
+        self.set_load_marker(role, slot, next);
     }
 }
