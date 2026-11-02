@@ -340,10 +340,17 @@ unsafe fn on_ai_frame(ai: usize) {
             let rec = REC.lock();
             (rec.mode() == Mode::Playback, rec.frame() == 0)
         };
-        if playing && at_zero && !named_macros::prepare_playback_start(&mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor)) {
+        let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
+        // A clip preview emits only while its session owns this CPU and the clip is in the foreground (SPEC-input-01 section 9).
+        let preview_blocked = playing && replay_preview::occupied() && !replay_preview::can_emit(module);
+        if preview_blocked || (playing && at_zero && !named_macros::prepare_playback_start(module)) {
             ControlOut { write: Some(crate::model::recording::Inject::NEUTRAL), hold_cliff_timer: false }
         } else {
-            REC.lock().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)))
+            let out = REC.lock().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)));
+            if playing && replay_preview::occupied() {
+                replay_preview::progress(REC.lock().frame().into());
+            }
+            out
         }
     } else {
         REC.lock().control(&ctx)
