@@ -1,5 +1,8 @@
-//! Original regressions for the scalar TLS input handoff. The oracle is the
-//! prior two-Cell representation, not another scalar-slot implementation.
+#[path = "../src/model/scalar_tls.rs"]
+#[allow(dead_code)]
+mod scalar_tls;
+// Original regressions for the scalar TLS input handoff. The oracle is the
+// prior two-Cell representation, not another scalar-slot implementation.
 #[path = "../src/model/input_pending.rs"]
 mod input_pending;
 #[path = "../src/model/input_delay.rs"]

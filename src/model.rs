@@ -117,3 +117,6 @@ pub mod panes;
 pub mod version;
 #[path = "model/thread_stacks.rs"]
 pub mod thread_stacks;
+
+#[path = "model/scalar_tls.rs"]
+pub mod scalar_tls;

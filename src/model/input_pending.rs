@@ -6,62 +6,43 @@
 //! Reserve on the boot thread before installing any caller hook. Keys remain
 //! reserved for the plugin lifetime; no thread pointers or heap boxes are kept.
 
-/// The SDK boundary. Successful keys start at zero on existing and future
-/// threads. Reads/writes address the current thread and cannot allocate.
-pub trait Tls {
-    type Error;
-    fn allocate(&self) -> Result<u32, Self::Error>;
-    fn free(&self, key: u32);
-    fn get(&self, key: u32) -> usize;
-    fn set(&self, key: u32, value: usize);
-}
+pub use super::scalar_tls::Tls;
+use super::scalar_tls::Slots;
 
 /// One key for each word of (out, slot, holder), plus the separate controller.
 /// Private keys cannot be observed until all four allocations succeed.
 pub struct Pending {
-    keys: [u32; 4],
+    slots: Slots<4>,
 }
 
 impl Pending {
     pub fn reserve<T: Tls>(tls: &T) -> Result<Self, T::Error> {
-        let mut keys = [0; 4];
-        for index in 0..keys.len() {
-            match tls.allocate() {
-                Ok(key) => keys[index] = key,
-                Err(error) => {
-                    for &key in keys[..index].iter().rev() { tls.free(key); }
-                    return Err(error);
-                }
-            }
-        }
-        Ok(Self { keys })
+        Ok(Self { slots: Slots::reserve(tls)? })
     }
 
     /// Boot rollback only, before any hook can use this set.
-    pub fn release(self, tls: &impl Tls) {
-        for key in self.keys.into_iter().rev() { tls.free(key); }
-    }
+    pub fn release(self, tls: &impl Tls) { self.slots.release(tls); }
 
     pub fn note(&self, tls: &impl Tls, out: usize, slot: i64, holder: usize) {
-        for (key, value) in self.keys[..3].iter().zip([out, slot as usize, holder]) {
-            tls.set(*key, value);
+        for (index, value) in [out, slot as usize, holder].into_iter().enumerate() {
+            self.slots.set(tls, index, value);
         }
     }
 
     /// An unnoted/no-call pass returns zeros. Taking the tuple does not clear
     /// the controller; early-return and nested-helper behavior stays unchanged.
     pub fn take(&self, tls: &impl Tls) -> (usize, i64, usize) {
-        let values = [self.keys[0], self.keys[1], self.keys[2]].map(|key| tls.get(key));
-        for &key in &self.keys[..3] { tls.set(key, 0); }
+        let values = [0, 1, 2].map(|index| self.slots.get(tls, index));
+        for index in 0..3 { self.slots.set(tls, index, 0); }
         (values[0], values[1] as i64, values[2])
     }
 
     pub fn set_controller(&self, tls: &impl Tls, controller: usize) {
-        tls.set(self.keys[3], controller);
+        self.slots.set(tls, 3, controller);
     }
 
     pub fn controller(&self, tls: &impl Tls) -> usize {
-        tls.get(self.keys[3])
+        self.slots.get(tls, 3)
     }
 
     pub fn take_controller(&self, tls: &impl Tls) -> usize {

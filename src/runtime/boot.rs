@@ -83,6 +83,14 @@ fn run_inner() {
         diag_log::flush();
         return;
     }
+    // Counter storage must exist before ANY hook, including seam-drill hooks.
+    // Allocation before this point reads unavailable TLS without initializing
+    // it. Reservation/rollback calls only native scalar-slot SDK functions.
+    if let Err(error) = crate::runtime::hook_tls::init() {
+        diagnostic(format_args!("[TrainingRooms] install_refused reason=hook_counter_native_tls_unavailable result={error:#x}"));
+        diag_log::flush();
+        return;
+    }
     // The hook-sharing drill (feature `seam-drill`): with `foreign=` in diag.txt it hooks its sites as a plugin that does not share
     // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
     #[cfg(feature = "seam-drill")]
