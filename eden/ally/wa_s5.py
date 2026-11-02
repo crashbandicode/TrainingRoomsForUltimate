@@ -253,7 +253,7 @@ def ops(phase, items):
             elif k == 'plug':
                 f = USER / 'sdmc' / 'ultimate' / op[1]
                 pat = re.compile(op[2]); got = [x for x in (f.read_text(errors='replace').splitlines() if f.exists() else []) if pat.search(x)]
-                rec({'op': op, 'count': len(got), 'lines': got[-(op[3] if len(op) > 3 else 5):]})
+                rec({'op': op, 'count': len(got), 'lines': [x[:200] for x in got[-(op[3] if len(op) > 3 else 5):]]})
             elif k == 'waitplug':
                 f = USER / 'sdmc' / 'ultimate' / op[1]; pat = re.compile(op[2]); end = time.monotonic() + (op[3] if len(op) > 3 else 60)
                 before = len(f.read_text(errors='replace').splitlines()) if f.exists() else 0; hit = None

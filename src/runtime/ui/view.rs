@@ -142,7 +142,7 @@ impl Panes {
 }
 
 /// Where the "Selected (weight)" panel of the direction grids sits: right of the chips (they end at x = 480).
-const PANEL_X: f32 = 560.0;
+const PANEL_X: f32 = 520.0;
 const PANEL_NAME_W: f32 = 240.0;
 const PANEL_WEIGHT_W: f32 = 110.0;
 
