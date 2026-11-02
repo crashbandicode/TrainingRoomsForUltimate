@@ -24,13 +24,15 @@ both hook the same sites (`DECISIONS.md` B1).
 
 | Fork file under `sd:/ultimate/TrainingModpack/` | TrainingRooms (`sd:/ultimate/TrainingRooms/`) | How |
 | --- | --- | --- |
-| `training_modpack.json` | `settings.json` | copied and renamed at first boot; setting ids unchanged; *Item on load* is converted once into each save's item snapshot (N6) and dropped |
+| `training_modpack_menu.conf` (the fork's settings, JSON content; 41,649 B on the card) | `settings.json` | copied and renamed at first boot; setting ids unchanged; *Item on load* is converted once into each save's item snapshot (N6) and dropped. Corrected 2026-11-02: an earlier draft named `training_modpack.json`, which is the updater record |
 | `save_states.json` (live) | `save_states.json` | copied at first boot; the file is the one on the card at that moment, so the operator can keep using the fork until the swap |
-| `setups/`, `mii-presets.json`, `macros/` | same names | copied |
+| `setups/`, `mii-presets.json`, `macros/` | same names | copied (the `switch-c1162-firstboot` card listing shows no `setups/` folder: that copy is then empty) |
 | `button_config.ini`, `replay_capture.ini` | same names | copied (S1 item 2); the menu now edits `button_config.ini` (N7) |
 | `replay_captures/` | `replay_captures/` | copied in full, no size cap, on a background thread after boot (N8); the Replay Window lists a capture once its copy is complete |
 | `cycle_preload.ini` | regenerated | not copied |
-| `*.toml`, `*.conf`, logs, `dev.json`, `layout.arc` | – | not copied |
+| `training_modpack.json` (updater record, 72 B) | – | not copied; the clean room has no updater |
+| `*.toml` (the listing shows `training_modpack.toml` and a legacy `save_states.toml` next to the live `save_states.json`), `training_modpack_menu_defaults.conf`, `training_modpack_menu.json`, logs, `dev.json`, `layout.arc`, `version.txt` | – | not copied (named in `SPEC-core-08` §4 *Not migrated*) |
+| `practice-trace*.bin` and `practice-trace*.map.json` (one `.bin` is 1.5 GB), `console-*.bin`, `console-*.log`, `native-unlink.bin`, the `handoff-*` folders, `backups/`, `install/`, `cpu_pilot/` (the pilot's own folder), `mii-editor-last.json` | – | not copied: fork trace, debug and tooling output. `SPEC-core-08` does not name them; its import list is a whitelist (§4 *Imported*), so they are skipped |
 | – | `developer.ini` (`developer_page=on`) | written by the install for the operator's card only (N1) |
 | – | `migration.json` | written by the import when it finishes (marker) |
 

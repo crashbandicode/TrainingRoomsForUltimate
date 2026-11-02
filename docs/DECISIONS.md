@@ -220,8 +220,8 @@ passed on the patch's own builds; `PATCH.patch` is in the same folder); the pict
 
 The storage root and the import are decided. Five details remain; each has a numbered tag in the picture.
 
-- **1 · settings file name:** rename to `settings.json`, or keep `training_modpack.json`? *Rename*; the loader
-  also accepts the old name once.
+- **1 · settings file name:** rename to `settings.json`, or keep the fork's name `training_modpack_menu.conf`?
+  *Rename*; the loader also accepts the old name once.
 - **2 · the two INIs** (`button_config.ini`, `replay_capture.ini`): import them too? *Yes*, under the same
   rules, so shortcuts and the capture choice survive.
 - **3 · `replay_captures/`:** not imported (the Replay Window starts empty), or imported below a size cap
@@ -236,6 +236,8 @@ Cost: item 2 adds two small files to the copy list. The others cost nothing.
 ![S1 import details](decisions/S1-import-details.png)
 
 **Decided 2026-11-01: as recommended, except item 3.** `replay_captures/` holds the companions the Replay Window crops macros from (`docs/reference/named-macros.md` in the fork), so it is imported in full, with no size cap (N8).
+
+Corrected 2026-11-02: the source is `training_modpack_menu.conf`; `training_modpack.json` is the updater record and is not imported.
 
 ### S2 · Corrupt settings file (`SPEC-core-04` question 2)
 

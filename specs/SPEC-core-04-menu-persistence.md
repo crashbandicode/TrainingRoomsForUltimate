@@ -68,7 +68,7 @@ None in game memory. Files:
 
 - **Missing file**: factory settings; the file is created at the first close.
 - **Corrupt file** (not JSON, wrong types, missing required key, duplicate key): upstream deleted it on the spot and continued with factory settings. Recommendation (Q2): keep the file, rename it to `settings.invalid-<n>.json`, log, continue with factory settings; load every setting that parses and default the rest (per-field defaults).
-- **File from a newer build** with extra keys: loads; extras are ignored and **dropped on the next write** (the writer emits only known keys).
+- **File from a newer build** with extra keys: loads; extras are ignored and **kept on the next write** (lead decision 2026-11-02: unknown keys round-trip unchanged, so a newer build's file, or rows a package does not implement yet, survive a write by this build; only the retired keys `update_policy`, `menu_open_start_press` and `character_item` are dropped).
 - **File from an older build** with fewer keys: loads only if every known key has a default (clean room) — upstream would have deleted it.
 - **Upstream file in the user's old folder**: the key set and value shape are identical for all upstream rows, so an upstream `training_modpack_menu.conf` can be imported as-is (SPEC-core-01 Q2); `update_policy` and `menu_open_start_press` are ignored.
 - **Fork envelope**: `mii_preferences` (per role/class identity selectors; invalid selectors are dropped individually) and `stage_preferences` (mode, direct stage, forms; invalid content is rejected and the file is re-read without it, keeping the numeric settings and reporting the reason) — fork's own, carry over with its tests. The fork also imports retired fixed-slot roster keys of its own older builds (`trio_fighter_1..3`, `player_roster_4..8`, `cpu_roster_1..8`, `*_roster_size` one-hot arrays) into ordered rosters once and never writes them again — fork's own.
@@ -97,7 +97,7 @@ This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/settings.j
 | --- | --- | --- | --- |
 | Wire shape: every setting an array in declaration order; OnOff `[1,0]`/`[0,1]`; sliders `[lower, upper]`; chord bit order | `core04_wire_shape_fixture` (fixture file pinned) | `core04-E1` read the file after a close | `docs/EDEN-RESULTS.md` |
 | Factory file round trip; defaults snapshot independent of settings | `core04_roundtrip_factory`, `core04_defaults_independent` | `core04-E2` X then restart then reset | — |
-| Unknown keys ignored and dropped on rewrite | `core04_unknown_keys_ignored` | — | — |
+| Unknown keys ignored on load and kept on rewrite; retired keys dropped | `core04_unknown_keys_ignored` | — | — |
 | Missing keys take defaults (every field) | `core04_missing_keys_default` | `core04-E3` older file | — |
 | Corrupt file: preserved under another name, factory used, logged | `core04_corrupt_file_policy` | `core04-E4` | `docs/EDEN-RESULTS.md` |
 | Duplicate key rejected | `core04_duplicate_key_error` | — | — |
@@ -112,7 +112,7 @@ This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/settings.j
 
 1. **Byte-exact sample.** The writer did not transcribe a real upstream settings file (none is checked into either tree). Recommendation: capture one from an Eden run of the fork into the test fixtures before implementation, so the clean room's fixture is validated against a real file rather than this description.
 2. **Corrupt-file policy.** Upstream deletes; recommendation: preserve and rename, per-field defaults. Operator decision because it changes a user-visible recovery path. **Decided 2026-11-01 (S2): as recommended;** keep a renamed copy and load field by field.
-3. **File name and location.** `settings.json` under `sd:/ultimate/TrainingRooms/`; or keep upstream's `.conf` name for drop-in import. Recommendation: new name, plus a one-time import of the upstream file (SPEC-core-01 Q2). **Decided 2026-11-01 (S1 item 1, SPEC-core-08): `settings.json`;** the import copies the fork's `training_modpack.json` under that name, and the loader also accepts the old name once. (This spec's earlier working name `menu.json` is superseded.)
+3. **File name and location.** `settings.json` under `sd:/ultimate/TrainingRooms/`; or keep upstream's `.conf` name for drop-in import. Recommendation: new name, plus a one-time import of the upstream file (SPEC-core-01 Q2). **Decided 2026-11-01 (S1 item 1, SPEC-core-08): `settings.json`;** the import copies the fork's `training_modpack_menu.conf` under that name (corrected 2026-11-02; `training_modpack.json` is the updater record and is not imported), and the loader also accepts the old name once. (This spec's earlier working name `menu.json` is superseded.)
 4. **Updater config file.** With auto-update dropped, `training_modpack.json` has no reader. Recommendation: do not create it.
 5. **Asynchronous write.** Keep the writer thread (shared with save states and recordings) or write the small menu file synchronously at close. Recommendation: keep one writer thread with a 64 KiB stack for all files, flush on the panic path.
 6. **Pretty vs compact JSON.** Upstream pretty-printed. Recommendation: pretty, for hand editing.

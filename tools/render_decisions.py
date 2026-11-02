@@ -514,15 +514,15 @@ def d_import():
     c.rect(12, 12, WIDE - 12, 538, fill=PANEL, outline=LINE, radius=8)
     c.text(28, 24, "sd:/ultimate/TrainingModpack/", "h", FG)
     c.text(700, 24, "sd:/ultimate/TrainingRooms/", "h", FG)
-    rows_ = [("training_modpack.json", "settings.json", "1", OURS, "copy + rename"),
+    rows_ = [("training_modpack_menu.conf", "settings.json", "1", OURS, "copy + rename"),
              ("save_states.json", "save_states.json", None, OURS, "copy"),
              ("setups/", "setups/", None, OURS, "copy"),
              ("mii-presets.json", "mii-presets.json", None, OURS, "copy"),
              ("macros/", "macros/", None, OURS, "copy"),
-             ("button_config.ini", "button_config.ini", "2", OURS, "copy (proposed)"),
-             ("replay_capture.ini", "replay_capture.ini", "2", OURS, "copy (proposed)"),
-             ("replay_captures/", "(starts empty)", "3", MUTED, "not copied"),
-             ("*.toml, *.conf (old formats)", "(not converted)", "4", MUTED, "use port_save_states.py"),
+             ("button_config.ini", "button_config.ini", "2", OURS, "copy"),
+             ("replay_capture.ini", "replay_capture.ini", "2", OURS, "copy"),
+             ("replay_captures/", "replay_captures/", "3", OURS, "copy, all (background)"),
+             ("*.toml (old formats)", "(not converted)", "4", MUTED, "use port_save_states.py"),
              ("cycle_preload.ini", "cycle_preload.ini", None, MUTED, "regenerated"),
              ("logs, dev.json, layout.arc", "-", None, MUTED, "not copied"),
              (None, "migration.json", "5", ADV, "marker: import done")]
