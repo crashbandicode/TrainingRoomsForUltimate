@@ -1,0 +1,404 @@
+{
+ "stage": "m5q",
+ "comment": "Package 4 carry manifest (tools/carry_pkg4.py). Do not edit carried files by hand: change this manifest and re-run `carry`.",
+ "modules": {
+  "macros": {
+   "*": "crate::engine::macros",
+   "capture_settings": "crate::model::capture_settings"
+  },
+  "tui": {
+   "*": "crate::engine::macro_ui",
+   "NX_SUBMENU_ROWS": "crate::engine::compat::grid::NX_SUBMENU_ROWS",
+   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS"
+  },
+  "mii": {
+   "*": "crate::engine::mii"
+  }
+ },
+ "files": [
+  {
+   "src": "training_mod_macros/src/capture_archive.rs",
+   "dest": "src/model/macros/capture_archive.rs",
+   "crate": "macros",
+   "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
+   "dest_sha256": "fef476e670524caafdc1c28a6bd89af00d9e40cd26a38b9c5f240385c7098acf"
+  },
+  {
+   "src": "training_mod_macros/src/capture_toggle.rs",
+   "dest": "src/model/macros/capture_toggle.rs",
+   "crate": "macros",
+   "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
+   "dest_sha256": "ba76aa883c4b2dccb6aa800e1489aa61c8f18fabc80baf6774b76fdf8a04ede7"
+  },
+  {
+   "src": "training_mod_macros/src/live_capture.rs",
+   "dest": "src/model/macros/live_capture.rs",
+   "crate": "macros",
+   "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
+   "dest_sha256": "166b7619197e057eff6d2f3fefb774154ad19db9326520652be4fe44ab22520d"
+  },
+  {
+   "src": "training_mod_macros/src/live_frame.rs",
+   "dest": "src/model/macros/live_frame.rs",
+   "crate": "macros",
+   "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
+   "dest_sha256": "d1da961f019dc3af1be99bf485c5629f533aa2a63c1d316d51126b1a03e8b8c3"
+  },
+  {
+   "src": "training_mod_macros/src/move_start.rs",
+   "dest": "src/model/macros/move_start.rs",
+   "crate": "macros",
+   "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
+   "dest_sha256": "1d03dd4f45fca53cb6ce8d078c85baa2fbb9648f5562024d0549593e52496643"
+  },
+  {
+   "src": "training_mod_macros/src/recording.rs",
+   "dest": "src/model/macros/recording.rs",
+   "crate": "macros",
+   "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
+   "dest_sha256": "0f101398a5f56c521c3659582ec5c113e9c0e4f3ffaab2f6e9703604cd31d872"
+  },
+  {
+   "src": "training_mod_macros/src/replay.rs",
+   "dest": "src/model/macros/replay.rs",
+   "crate": "macros",
+   "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
+   "dest_sha256": "db396b5d2d7bd0c5c6aaee5dac59c882aaf1a08082c9f864d337aecc33729b18"
+  },
+  {
+   "src": "training_mod_macros/src/shared_capture.rs",
+   "dest": "src/model/macros/shared_capture.rs",
+   "crate": "macros",
+   "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
+   "dest_sha256": "f5a43c2d99d21a44f7da738475195ea27a58bac90e52acf009b60f08f56fbd7b"
+  },
+  {
+   "src": "training_mod_macros/src/ui_anchor.rs",
+   "dest": "src/model/macros/ui_anchor.rs",
+   "crate": "macros",
+   "src_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684",
+   "dest_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684"
+  },
+  {
+   "src": "training_mod_macros/src/window.rs",
+   "dest": "src/model/macros/window.rs",
+   "crate": "macros",
+   "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
+   "dest_sha256": "67c037aff31049b905f735d0184c9d0f0ade5c72017831e47a981fec091c99e7"
+  },
+  {
+   "src": "training_mod_macros/src/test_util.rs",
+   "dest": "src/model/macros/test_util.rs",
+   "crate": "macros",
+   "src_sha256": "84136e6677ec3bd094ff71f668289ce080bab17c23e8a9fb041167c3732e6ab7",
+   "dest_sha256": "1fc1c266a299cc345691ca6881747aeb5f32c60dd3d5b3ce11d56064a8d8cceb"
+  },
+  {
+   "src": "training_mod_macros/src/recording/tests.rs",
+   "dest": "src/model/macros/recording/tests.rs",
+   "crate": "macros",
+   "src_sha256": "d08afc313059da5a98b341647b8187ba0079a96379a5a5377ea8d936e98d1a22",
+   "dest_sha256": "2b3e2272db2d832e0f2f2678ec2462a876a0521bbf8844eb3bd9264f37d25160"
+  },
+  {
+   "src": "training_mod_macros/src/window/tests.rs",
+   "dest": "src/model/macros/window/tests.rs",
+   "crate": "macros",
+   "src_sha256": "2dc0eace36a068b95ca9347fa277446b874dcf8c2f69fd5375432464cffd666f",
+   "dest_sha256": "6fc99117d4eed875c7bb10c8db92b10a3aef85312df1f06fed9b87c98d30dbd8"
+  },
+  {
+   "src": "training_mod_macros/src/library.rs",
+   "dest": "src/model/macros/library.rs",
+   "crate": "macros",
+   "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
+   "dest_sha256": "0d7e5dc1789e25f877537e36bbe7fbeda8965e27ec7e8610c37e563339ee2a97",
+   "edits": [
+    {
+     "delete_from": "use std::{\n    ffi::OsString,",
+     "delete_to": "/// Summary of one loadable macro",
+     "reason": "the generic Store, Record trait, limits and helpers are model::store (package 3); not carried twice"
+    },
+    {
+     "old": "/// Summary of one loadable macro",
+     "new": "use crate::model::store::{Record, Store, StoreError, MAX_FILE_BYTES};\n\nuse super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\n\n/// The store's own failures become the macro crate's error, variant for variant (the carried code matches on `MacroError`).\nimpl From<StoreError> for MacroError {\n    fn from(err: StoreError) -> Self {\n        match err {\n            StoreError::UnsupportedVersion { found } => Self::UnsupportedVersion { found },\n            StoreError::FileTooLarge { bytes, max } => Self::FileTooLarge { bytes, max },\n            StoreError::InvalidId(id) => Self::InvalidId(id),\n            StoreError::NotFound(id) => Self::NotFound(id),\n            StoreError::NoFreeId => Self::NoFreeId,\n            StoreError::Parse(err) => Self::Parse(err),\n            StoreError::Io(err) => Self::Io(err),\n        }\n    }\n}\n\n/// Summary of one loadable macro",
+     "reason": "imports from model::store and the StoreError to MacroError conversion the carried Store instantiation needs"
+    },
+    {
+     "delete_from": "/// A `.json` file that could not be used, and why.",
+     "delete_to": "/// The named-macro library: the original API",
+     "reason": "SkippedFile, Listing and the Store struct are model::store"
+    },
+    {
+     "delete_from": "impl<R> Clone for Store<R> {",
+     "delete_to": "impl Record for MacroRecording {",
+     "reason": "Store's Clone/Debug impls are model::store"
+    },
+    {
+     "delete_from": "impl<R: Record> Store<R> {",
+     "delete_to": "#[cfg(test)]\nmod tests;",
+     "reason": "Store's methods and helpers are model::store (same code, one copy)"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_macros/src/library/tests.rs",
+   "dest": "src/model/macros/library/tests.rs",
+   "crate": "macros",
+   "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
+   "dest_sha256": "32d730ebd150b7fd442e1c985bbc332839b0fe35d0c3547883ddfbdd19a3375b",
+   "edits": [
+    {
+     "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
+     "new": "use std::path::Path;\n\nuse super::*;\nuse crate::engine::macros::{\n    test_util::{frames, recording, start, TempDir},\n    MomentumMode, Placement, MAX_FRAMES,\n};\nuse crate::model::store::{Listing, MAX_ID_CHARS};\n",
+     "reason": "the store's private constants live in model::store (its own tests keep the slug/id-length invariant); imports of the shared Store types"
+    },
+    {
+     "old": "fn ids(listing: &Listing) -> Vec<&str> {",
+     "new": "fn ids(listing: &Listing<MacroEntry>) -> Vec<&str> {",
+     "reason": "model::store's Listing has no default summary type"
+    },
+    {
+     "old": "    let longest = \"a\".repeat(MAX_ID_CHARS);\n    assert!(check_id(&longest).is_ok());\n    assert!(check_id(\"a-b_c9\").is_ok());\n",
+     "new": "    // The longest legal id and a mixed one pass the id check (they are simply not present).\n    assert!(matches!(lib.load(&\"a\".repeat(MAX_ID_CHARS)), Err(MacroError::NotFound(_))));\n    assert!(matches!(lib.load(\"a-b_c9\"), Err(MacroError::NotFound(_))));\n",
+     "reason": "check_id is private to model::store: the same two accepted ids through the public load"
+    },
+    {
+     "delete_from": "#[test]\nfn ids_are_lowercase_ascii_slugs_that_fit_the_id_limit() {",
+     "delete_to": "#[test]\nfn save_new_never_reuses_an_id_even_when_the_existing_file_is_corrupt() {",
+     "reason": "slug() is private to model::store, whose own tests pin it; the observable ids are pinned by names_without_ascii... below"
+    },
+    {
+     "old": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro-2\");\n",
+     "new": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry-2\");\n",
+     "reason": "the shared Store's id fallback is `entry` (package 3, CARRY-OVER item 5), the fork library's was `macro`"
+    },
+    {
+     "delete_from": "#[test]\nfn backup_swap_replaces_the_file_and_cleans_up() {",
+     "delete_to": "#[test]\nfn list_restores_an_orphaned_backup_but_leaves_a_stale_one_alone() {",
+     "reason": "replace_via_backup is private to model::store, whose tests cover the swap and its failure; the orphaned-backup test below stays"
+    },
+    {
+     "old": "impl From<MacroError> for MemoError {\n    fn from(err: MacroError) -> Self {\n        Self::Store(err)\n    }\n}\n",
+     "new": "impl From<MacroError> for MemoError {\n    fn from(err: MacroError) -> Self {\n        Self::Store(err)\n    }\n}\n\nimpl From<crate::model::store::StoreError> for MemoError {\n    fn from(err: crate::model::store::StoreError) -> Self {\n        Self::Store(err.into())\n    }\n}\n",
+     "reason": "Record::Error converts from the store's own StoreError"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_macros/src/lib.rs",
+   "dest": "src/model/macros/mod.rs",
+   "crate": "macros",
+   "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
+   "dest_sha256": "01e0d408003edd6cf38bd561066f27cde1fb64aadea7ba9c13fe6b204b6a792c",
+   "edits": [
+    {
+     "old": "mod capture_settings;\n",
+     "new": "",
+     "reason": "capture_settings.rs is carried by S4-2 at crate::model::capture_settings (Q7 additions: to_ini_text, from_bytes)"
+    },
+    {
+     "old": "pub use capture_settings::{",
+     "new": "pub use crate::model::capture_settings::{",
+     "reason": "the same names from the S4-2 module"
+    },
+    {
+     "old": "pub use library::{Library, Listing, MacroEntry, Record, SkippedFile, Store, MAX_FILE_BYTES, MAX_ID_CHARS};",
+     "new": "pub use crate::model::store::{Listing, Record, SkippedFile, Store, MAX_FILE_BYTES, MAX_ID_CHARS};\npub use library::{Library, MacroEntry};",
+     "reason": "the generic Store is package 3's model::store (not carried twice); only the macro instantiation stays here"
+    },
+    {
+     "old": "#![forbid(unsafe_code)]\n",
+     "new": "",
+     "reason": "an inner attribute is only legal at a crate root; the crate-level forbid is not applied to a module (the file has no unsafe)"
+    },
+    {
+     "append": "\n#[cfg(test)]\nmod move_crop_continuation_tests;\n",
+     "reason": "the fork's integration test tests/move_crop_continuation.rs runs as a unit test here: this crate is a cdylib, no integration test can link it"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_macros/tests/move_crop_continuation.rs",
+   "dest": "src/model/macros/move_crop_continuation_tests.rs",
+   "crate": "macros",
+   "src_sha256": "be8269aefe30822af6f9ad9974c338ff5e3ce5abd5a234f24c1dc12359aa1210",
+   "dest_sha256": "70b8bfc7b51e5c343378177d9bbcb5c6c647905b98120cb62cc3c3114d68ad1a",
+   "edits": [
+    {
+     "old": "use training_mod_macros::*;",
+     "new": "use super::*;",
+     "reason": "unit test of the module (see mod.rs)"
+    },
+    {
+     "old": "[\"--exact\", \"move_crop_child\", \"--nocapture\"]",
+     "new": "[\"--exact\", \"engine::macros::move_crop_continuation_tests::move_crop_child\", \"--nocapture\"]",
+     "reason": "the child process re-runs this binary: the exact test name now carries the module path"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_tui/src/clip_browser.rs",
+   "dest": "src/model/macro_ui/clip_browser.rs",
+   "crate": "tui",
+   "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
+   "dest_sha256": "58a70f3c40c06651c26e98b9194f2dab6793c4493bd8e4237ca43e8d18033c27"
+  },
+  {
+   "src": "training_mod_tui/src/clip_panel.rs",
+   "dest": "src/model/macro_ui/clip_panel.rs",
+   "crate": "tui",
+   "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
+   "dest_sha256": "409e4514dc728f60bc5981dc789b9611d53e278a293a4b8633c32ae524e080fa"
+  },
+  {
+   "src": "training_mod_tui/src/replay_panel.rs",
+   "dest": "src/model/macro_ui/replay_panel.rs",
+   "crate": "tui",
+   "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
+   "dest_sha256": "dbc2f5292c8a986c550cdf55fc6a27157e3cc6ffa7064255197295bac6d0dd68"
+  },
+  {
+   "src": "training_mod_tui/src/macro_panel.rs",
+   "dest": "src/model/macro_ui/macro_panel.rs",
+   "crate": "tui",
+   "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
+   "dest_sha256": "15bdc70f0aa8bc3ee4d73918068bfe18d0ac990d76dd6f827916ca9d7f47f616"
+  },
+  {
+   "src": "training_mod_tui/src/macro_panel/fighter.rs",
+   "dest": "src/model/macro_ui/macro_panel/fighter.rs",
+   "crate": "tui",
+   "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
+   "dest_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69"
+  },
+  {
+   "src": "src/lib.rs",
+   "dest": "crates/smash-match-data/src/lib.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "3499ed6485324a0a0dac609fa7c9c16f5502c57c98b2de797de722f9cbf78119",
+   "dest_sha256": "c21465eb04a85ae879fbbb3953bda7b70074eb62bead5b1be957bbeb52c61971",
+   "edits": [
+    {
+     "old": "//! * `replay`: saved-replay import behind the `replay` feature.\n",
+     "new": "",
+     "reason": "the replay module is not vendored (see Cargo.toml)"
+    },
+    {
+     "old": "#[cfg(feature = \"replay\")]\npub mod replay;\n",
+     "new": "",
+     "reason": "the replay module is not vendored (see Cargo.toml)"
+    }
+   ]
+  },
+  {
+   "src": "src/archive.rs",
+   "dest": "crates/smash-match-data/src/archive.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1",
+   "dest_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1"
+  },
+  {
+   "src": "src/capture.rs",
+   "dest": "crates/smash-match-data/src/capture.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
+   "dest_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc"
+  },
+  {
+   "src": "src/clip.rs",
+   "dest": "crates/smash-match-data/src/clip.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc",
+   "dest_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc"
+  },
+  {
+   "src": "src/model.rs",
+   "dest": "crates/smash-match-data/src/model.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "529606f63d2fb7f89bf9067d6b6f6e3d6335f1ed8b4511d75506e8af89edbb3c",
+   "dest_sha256": "529606f63d2fb7f89bf9067d6b6f6e3d6335f1ed8b4511d75506e8af89edbb3c"
+  },
+  {
+   "src": "src/validate.rs",
+   "dest": "crates/smash-match-data/src/validate.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524",
+   "dest_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524"
+  },
+  {
+   "src": "Cargo.toml",
+   "dest": "crates/smash-match-data/Cargo.toml",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "f0b6dba3d83cfed9e3761f1fd4a403b3340792d646dde7402689d8bd0315ab5d",
+   "dest_sha256": "c3041ae2837944d9eb41148aef6d65842b7b996b6b72f5a95a40160cd420642d",
+   "edits": [
+    {
+     "delete_from": "[features]",
+     "delete_to": "[dependencies]",
+     "reason": "the `replay` feature (saved-replay import through the private smash-replay-core git dependency) is not vendored: no consumer, and a git dependency would break an offline lock"
+    },
+    {
+     "old": "smash-replay-core = { git = \"https://git.syntaxbyexample.com/intpa/smash-replay-export.git\", rev = \"bf84744fd7feeecc81ff3ed7495ffc63c8ae80fa\", optional = true }\n",
+     "new": "",
+     "reason": "the optional smash-replay-core git dependency is dropped with its feature"
+    }
+   ]
+  },
+  {
+   "src": "docs/FORMAT.md",
+   "dest": "crates/smash-match-data/docs/FORMAT.md",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "4a1914c2f633db627a3ae1d4a4dc66879c3b37ba8e13b6f736f6775acc3a2b1f",
+   "dest_sha256": "4a1914c2f633db627a3ae1d4a4dc66879c3b37ba8e13b6f736f6775acc3a2b1f"
+  },
+  {
+   "src": "tests/core.rs",
+   "dest": "crates/smash-match-data/tests/core.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032",
+   "dest_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032"
+  },
+  {
+   "src": "tests/review_archive.rs",
+   "dest": "crates/smash-match-data/tests/review_archive.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "5afedc053af3434ccf793dcce5bd23b9bde0850956246804bafedd82ce34494b",
+   "dest_sha256": "5afedc053af3434ccf793dcce5bd23b9bde0850956246804bafedd82ce34494b"
+  },
+  {
+   "src": "tests/review_correctness.rs",
+   "dest": "crates/smash-match-data/tests/review_correctness.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb",
+   "dest_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb"
+  },
+  {
+   "src": "tests/review_precision.rs",
+   "dest": "crates/smash-match-data/tests/review_precision.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "a0c731af298c92315f7edc2984ad4f1f61fb05f96bfe7b576132ae0ff7823326",
+   "dest_sha256": "a0c731af298c92315f7edc2984ad4f1f61fb05f96bfe7b576132ae0ff7823326"
+  },
+  {
+   "src": "tests/review_selection.rs",
+   "dest": "crates/smash-match-data/tests/review_selection.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db",
+   "dest_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db"
+  }
+ ]
+}

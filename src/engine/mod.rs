@@ -31,3 +31,7 @@ pub mod seams;
 pub mod swap;
 #[path = "../model/stages/mod.rs"]
 pub mod stages;
+#[path = "../model/macro_ui/mod.rs"]
+pub mod macro_ui;
+#[path = "../model/macros/mod.rs"]
+pub mod macros;

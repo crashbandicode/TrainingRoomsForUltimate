@@ -196,3 +196,24 @@ Not carried yet (S4-4, waiting on the lead's sequencing: pkg6's `training_mod_mi
 
 New code in this stream with no fork origin: everything else under `src/model/{recording,chords,ini_files,notify,damage_display,input_display,sites_pkg4}.rs`
 and `src/runtime/features/{recorder,chords,notices,input_display}.rs`, written from SPEC-input-01/02/04/05 and the owned 13.0.5 ELF.
+
+### pkg4 S4-4 (named-macro / replay / clip layer), carried by `tools/carry_pkg4.py` from stage **m5q** (2026-11-02)
+
+Source: stage **m5q** (`.../parked-reuse175/refactor/stages/m5q/stage`; m5q is the newest frozen stage, F1-F4 landed). Every path was checked as `ours-new` in
+`docs/provenance/provenance-files.json` before it was opened (the `training_mod_macros` crate, `training_mod_tui/src/{clip_browser,clip_panel,macro_panel,macro_panel/fighter,replay_panel}.rs`);
+nothing under `upstream-ref/`, no mixed file, no stage-wide search. `smash-match-data-design` (the standalone crate the fork's macros crate depends on, git `faac04e`) is read from its own folder.
+The table (here path, fork path, source sha256, resulting sha256, every recorded edit with its reason) is generated from the manifest: `docs/provenance/pkg4-carry-ledger.md`
+(`python3 -I tools/carry_pkg4.py ledger`; manifest `docs/provenance/pkg4-carry-manifest.json`; `tests/carry_pkg4.rs` fails on a hand edit and on a stale ledger).
+
+- `training_mod_macros` (pure model: macro recording, library, replay window, move-start rules, capture toggle/archive/shared archive, live capture/frame, UI anchor): `src/model/macros/`, declared as `crate::engine::macros`.
+  Edits: `lib.rs` (the crate-level `forbid(unsafe_code)` dropped, `capture_settings` is S4-2's `model::capture_settings`, the generic Store names come from `model::store`, the integration test becomes a unit test),
+  `library.rs` (the generic Store, `Record`, limits and helpers are `model::store` (package 3): only `MacroEntry`, `Library = Store<MacroRecording>`, `Record for MacroRecording` and `From<StoreError> for MacroError` stay),
+  `library/tests.rs` (tests of the Store's private helpers `check_id` / `slug` / `replace_via_backup` dropped: `model::store`'s own tests pin them; the slug fallback is `entry`, not `macro`), `move_crop_continuation.rs` (unit test).
+  `training_mod_mii::` paths become `crate::engine::mii::` (the carried Mii crate; `engine::mii` is unconditional now: one-line change in `src/engine/mod.rs`, package 6's area).
+- `training_mod_tui` panel models: `src/model/macro_ui/` (`crate::engine::macro_ui`), pure state machines and `View` values (no ratatui, no terminal); package 5 draws them. `resume.rs` is package 6 worker B's, not carried here.
+  The constants `NX_SUBMENU_ROWS` (value 8, from pkg6's disclosure above) joins `engine::compat::grid`.
+- `smash-match-data` (vendored): `crates/smash-match-data/` as a path crate (`smash-match-data = { path = "crates/smash-match-data" }`), source files copied unchanged. Dropped: the `replay` feature and its private git dependency `smash-replay-core`
+  (no consumer; a git dependency would break the offline lock), `src/bin`, `examples/`, `tests/{cli,replay}.rs`. Dependencies: `serde` (derive), `serde_json` with `float_roundtrip`, `sha2 0.10.9` (MIT OR Apache-2.0); the source repository has no
+  licence file (the project is the operator's own; the lead's ruling covers vendoring it).
+  Its own tests run with `cargo test --manifest-path crates/smash-match-data/Cargo.toml` (22 pass).
+- Writes: the carried archives only ever create new capture folders (`.smd-N.tmp` staging, then one rename into a name that does not exist; a failure removes the staging folder) and never overwrite; the named library goes through `model::store`'s transactional write.
