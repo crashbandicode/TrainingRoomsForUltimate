@@ -13,6 +13,7 @@ mod game;
 mod hub;
 mod install;
 mod published;
+mod scene;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {
