@@ -43,3 +43,8 @@ replay-capture toggle through the writer thread with R5 delta 0, a real menu clo
 Next commands: `ssh memento-claw-yoga-ubuntu`, claim per the queue file, then from the Surface worktree:
 `ssh … "cd /home/intpa/trainingrooms-eden-wire; python3 -I tr_eden_w.py up w-01 --nro inbox/diag/libtraining_rooms.nro --nro inbox/libssbu_tile_cursor.nro --nro inbox/pilot/libssbu_cpu_pilot.nro --settings inbox/boot-w.json"`,
 `python3 -I eden/route_w.py w-01`, `python3 -I eden/rows_w.py w-01`, `tr_eden_w.py scan w-01`, `tr_eden_w.py down w-01`, `tr_eden_w.py restore`.
+
+## Build log note (2026-11-02)
+
+This stream built on the Surface at 06:27-06:28Z, 06:35-06:36Z and 06:39-06:40Z (host gates and Switch release/diag builds, each under a compile-only claim and RELEASED line in the Yoga ledger). None of them was at ~06:48Z; the fork's m5qo1 claim opened at 06:41Z, after the last one. At 06:35Z the foreign note (06:33Z) asking for no Surface cargo applied only to its own open claim, which did not exist yet. No build of this stream has run since 06:40Z; from here on no NRO/Switch build or full clippy runs on a host with an open claim of any owner.
+
