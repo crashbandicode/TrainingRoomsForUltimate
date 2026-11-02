@@ -1,5 +1,7 @@
 //! Value projection of SourceBook ownership; never a second source lifetime book.
-use crate::engine::swap::source_lifetime::{Phase, ReadyToken, SceneEpoch, SourceKey, SourceToken};
+use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken};
+#[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+use crate::engine::swap::source_lifetime::{ReadyToken, SourceKey};
 use crate::engine::mii::ordinary_player::Owner;
 
 pub(crate) const BUSY: &str = "managed helper load still owns native installation";
@@ -49,6 +51,7 @@ impl MiiProof {
 pub(crate) enum Helper {
     Unmanaged,
     Unavailable { token: SourceToken, phase: Phase },
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     Ready { ready: ReadyToken, key: SourceKey, proof: Proof },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -84,7 +87,8 @@ impl View {
         Ok(())
     }
 
-    pub fn accepts(self, id: usize, now: Proof, parked: bool) -> bool {
+    pub fn accepts(self, id: usize, now: Proof,
+        #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked: bool) -> bool {
         let Some(ordinal)=self.ordinal(id) else{return false;};
         let helper=&self.slots[ordinal];
         match *helper {
@@ -95,6 +99,7 @@ impl View {
             Helper::Unmanaged => crate::engine::mii::role_owner::original_row_matches(
                 now.kind, now.original.kind),
             Helper::Unavailable { .. } => false,
+            #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
             Helper::Ready { ready, key, proof } => {
                 let token = ready.source();
                 token.slot() == id && Some(token.epoch()) == self.epoch

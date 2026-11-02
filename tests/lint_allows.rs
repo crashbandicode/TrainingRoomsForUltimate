@@ -18,7 +18,6 @@ const KNOWN: &[(&str, &str, usize, &str)] = &[
     ("src/model/macro_ui/macro_panel.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg4 manifest), D9"),
     ("src/runtime/mii/mii_editor_bridge/draft.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/mii/mii_hud_portrait.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
-    ("src/runtime/mii/mii_ordinary_native.rs", "dead_code", 1, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
     ("src/runtime/mii/native_keyboard/inline_keyboard.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/roster/character_roster.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
 ];

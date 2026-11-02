@@ -274,3 +274,7 @@ Operator sloc-fmt.ps1 on git1c0104e: rustfmt1.9.0-stable48a229cea, zero failures
 ## Served Mii probes and helper scopes (2026-11-02)
 
 Raw sloc4:98,956 (src95,449/crates3,356/tools151); simulator1,118 excluded, tests28,416 excluded. This slice removes2,268 implementation lines after capacity1c0104e. Six Mii experiment files/seven features retired, shared native helpers and exact-write-set regression retained; twelve dead-code suppressions removed through consumer feature/test scopes, with no new suppression. Two stage service module names now describe shipped behavior; historical seam metadata remains. Budget103,300 =98,956+4,318pending rounded up, down from105,600. Normalized measurement and host/Switch gates pending; shared runtime failures remain open.
+
+Normalizedf07bda2 via operator sloc-fmt.ps1:126710incltools167 =126543excltools; simulator2102excluded, tests44339excluded; rustfmt1.9.0-stable48a229cea,0failures. Reduction2870from1c0104e,9526fromauthorizedbase136069. The next-version15%target remains unmet; current RC criterion is monotone ratchet.
+
+Helper feature-scope follow-up: raw98,962 (+6 versusf07bda2; ceiling103,300 unchanged), removing the last pending module-wide dead_code allow with actual feature/test scopes. Normalized count and compiler gates pending; no claim of further line reduction for this lint root. Five large-enum ratchet rows remain pending alongside the two approved hos-lock allows.

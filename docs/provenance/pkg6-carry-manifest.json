@@ -3229,12 +3229,36 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "1cff1553d441afb726659d8c7b05fedae1dd7916039e2e68fda92c45c21fa0b5",
+   "dest_sha256": "33a98e143a926a316a39741874a24aa71b3bc6e5a2a20c05f76148c08b676781",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
      "new": "super::note(format_args!(\"[MiiOrdinaryPlayer] bank settle diverged",
      "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "#[cfg_attr(not(feature=\"mii-managed-source-coexist-alpha\"), allow(dead_code))]\n",
+     "new": "",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "    let managed=matches!(view.slots.get(ordinal),Some(helpers::Helper::Ready{..}));",
+     "new": "    #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n    let managed=matches!(view.slots.get(ordinal),Some(helpers::Helper::Ready{..}));",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "    let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32",
+     "new": "    #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n    let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "    if !view.accepts(id,now,parked) {return false;}",
+     "new": "    if !view.accepts(id,now, #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))] parked) {return false;}",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
     }
    ]
   },
@@ -3312,7 +3336,33 @@
    "dest": "src/runtime/mii/mii_source_provenance.rs",
    "crate": "root",
    "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
-   "dest_sha256": "9e9afda29fd99a07349c0d4f0724d6b30e714e43497ea8f1318f27edd364d12d"
+   "dest_sha256": "560bbd9a0beb9d048469033adc9b9a0b730e4724ea2f92a5f7aa6473c2f18156",
+   "edits": [
+    {
+     "old": "use crate::engine::swap::source_lifetime::{Phase, ReadyToken, SceneEpoch, SourceKey, SourceToken};",
+     "new": "use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken};\n#[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\nuse crate::engine::swap::source_lifetime::{ReadyToken, SourceKey};",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "    Ready { ready: ReadyToken, key: SourceKey, proof: Proof },",
+     "new": "    #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n    Ready { ready: ReadyToken, key: SourceKey, proof: Proof },",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "    pub fn accepts(self, id: usize, now: Proof, parked: bool) -> bool {",
+     "new": "    pub fn accepts(self, id: usize, now: Proof,\n        #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))] parked: bool) -> bool {",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    },
+    {
+     "old": "            Helper::Ready { ready, key, proof } => {",
+     "new": "            #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n            Helper::Ready { ready, key, proof } => {",
+     "count": 1,
+     "reason": "Scope coexist-only Ready representation and parked input to the actual feature or retained tests; no change to enabled-feature decisions."
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_gate.S",

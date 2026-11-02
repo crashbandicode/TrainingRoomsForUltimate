@@ -383,3 +383,6 @@ Removed seven diagnostic features: `mii-identity-probe`, `mii-saved-file-probe`,
 | src/mii_closed_ack.rs | eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b | src/runtime/mii/mii_closed_ack.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
 
 The shipped stage services are renamed lobby_stage_probe.rs -> lobby_stage.rs and practice_stage_observer.rs -> practice_stage.rs through destination/module-map transforms. Historical seam group strings, guards and behavior stay unchanged; lobby declarations and the notice-header test use the new paths.
+
+### Slim helper feature scope (2026-11-02)
+The broad dead_code allowance on mii_ordinary_native::helpers is removed through pkg6 manifest edits. Helper::Ready, its token/key imports, accepts arm and parked argument compile with mii-managed-source-coexist-alpha or tests, exactly where Ready constructors exist. Native helper_kind uses the same predicate for the managed/parked calculation and argument. Enabled product and test decision bodies are preserved; disabled coexistence no longer compiles an unconstructible variant. This changes no native ownership or transaction rule.

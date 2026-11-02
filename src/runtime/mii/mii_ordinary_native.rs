@@ -15,7 +15,6 @@ use crate::engine::mii::{
 // with registry released before helper release; no G acquisition under source STATE.
 // Reads release COMMITTED before STATE access. Registry operations call no native code.
 #[path="mii_source_provenance.rs"]
-#[cfg_attr(not(feature="mii-managed-source-coexist-alpha"), allow(dead_code))]
 pub(crate) mod helpers;
 pub(crate) struct Registry {
     visible: [Option<Committed>;8],
@@ -129,10 +128,12 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
     let now=helpers::Proof {original:helpers::OriginalRow {row:owner.row,
         kind:rd(owner.row,8),index:owner.index,selector:owner.selector,control:control(owner.row)},
         thread:skyline::nn::os::GetCurrentThread() as usize,owner,kind,costume:rd(owner.object,0x64)};
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let managed=matches!(view.slots.get(ordinal),Some(helpers::Helper::Ready{..}));
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
-    if !view.accepts(id,now,parked) {return false;}
+    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {return false;}
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
         if b.epoch!=super::super::mii_saved_alpha::current_generation(1)
