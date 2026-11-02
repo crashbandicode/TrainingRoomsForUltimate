@@ -30,15 +30,26 @@ WORK = "/home/intpa/trainingrooms-eden-p4"
 YOGA = "memento-claw-yoga-ubuntu"
 PROFILE_SD = f"{WORK}/profiles/t4/user/sdmc/ultimate"
 REFS = HERE / "refs"
+SCRATCH = Path(os.environ.get("TMPDIR", "/home/intpa/smash-training-lobby/tmp-pkg4"))
+SCRATCH.mkdir(parents=True, exist_ok=True)
+CONTROL = str(SCRATCH / "ssh-s4-%C")
 SSH = ["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ControlMaster=auto",
-       "-o", "ControlPath=/tmp/trssh-s4-%C", "-o", "ControlPersist=900", YOGA]
+       "-o", f"ControlPath={CONTROL}", "-o", "ControlPersist=900", YOGA]
+OWNER = os.environ.get("TR_OWNER")
+if not OWNER:
+    thread = os.environ.get("CODEX_THREAD_ID")
+    if not thread:
+        raise RuntimeError("Set TR_OWNER to the current ledger owner before using pkg4's route")
+    OWNER = f"Codex {thread}/pkg4"
 PARAMS = params.load(env={}, host="yoga",
-    owner="Codex 01a19c9f-04ad-7f72-8d2f-440ee0a6a04f/pkg4",
+    owner=OWNER,
     prefix="s4", stream="pkg4", root=WORK, profile="t4", display=":94",
     refs=str(REFS), install_gate="result=installed")
 
 
 def remote(command, timeout=120):
+    command = ("$env:TMPDIR='/home/intpa/smash-training-lobby/tmp-pkg4'; "
+               "[IO.Directory]::CreateDirectory($env:TMPDIR) | Out-Null; " + command)
     encoded = base64.b64encode(command.encode("utf-16le")).decode()
     result = subprocess.run([*SSH, "/usr/bin/pwsh", "-NoLogo", "-NoProfile",
         "-NonInteractive", "-EncodedCommand", encoded],
@@ -47,6 +58,10 @@ def remote(command, timeout=120):
 
 
 class Transport(shared.Ssh):
+    def __init__(self, p, label):
+        self.p, self.label = p, label
+        self.control, self.ssh = CONTROL, list(SSH)
+
     def gv(self, args, timeout=120):
         rc, out, err = remote(
             f"/usr/bin/python3 -I {WORK}/harness/gv.py {args}", timeout)
