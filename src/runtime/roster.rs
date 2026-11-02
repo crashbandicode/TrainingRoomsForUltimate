@@ -36,6 +36,12 @@ pub(crate) mod hang_trace {
 }
 #[cfg(feature = "plugin-heap-meter")]
 pub(crate) mod heap_metrics;
+/// The held-item diag probes (`item-state-probe` and the turnip features that require it): the turnip face caller probe is the item
+/// probe's own helper.
+#[cfg(feature = "item-state-probe")]
+pub(crate) mod item_state_probe;
+#[cfg(feature = "item-state-probe")]
+pub(crate) mod turnip_face_caller_probe;
 pub(crate) mod kirby_hats;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
@@ -96,6 +102,9 @@ pub(crate) unsafe fn handle_p1_input(out: *mut crate::model::input_delay::Mapped
     use crate::model::chords::{bit, field};
     let held = if controller == 0 { 0 } else { ((controller + field::CURRENT_BUTTONS) as *const u32).read_volatile() };
     let mut record = crate::runtime::compat::input::MappedInputs::from(*out);
+    // Diag (`item-state-probe`): the held-item probe's chord, right stick click + X, takes the record while it is held.
+    #[cfg(feature = "item-state-probe")]
+    item_state_probe::handle_input(&mut record, held & bit::STICK_R != 0, held & bit::X != 0);
     character_roster::handle_input(&mut record);
     kirby_hats::handle_input(&mut record, held & bit::STICK_L != 0, held & bit::STICK_R != 0);
     *out = record.into();
@@ -150,6 +159,11 @@ fn register_nro_load() {
 extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
     // SAFETY: called by the provider with the loader's own NRO record.
     unsafe { turnip_identity::on_load(info) };
+    // Diag (`item-state-probe`): the turnip face caller probe records each loaded module's base, size and imports.
+    #[cfg(feature = "item-state-probe")]
+    unsafe {
+        turnip_face_caller_probe::on_load(info)
+    };
 }
 
 /// Start the cycle, in the order the fork's `main` did: the preload cache first (the INI is read once, before anything asks for a

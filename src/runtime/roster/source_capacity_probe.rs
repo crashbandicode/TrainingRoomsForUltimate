@@ -94,7 +94,7 @@ fn plugin_consumers_idle() -> bool {
         return false;
     }
     #[cfg(feature = "item-state-probe")]
-    if !crate::item_state_probe::capacity_probe_idle() {
+    if !crate::runtime::roster::item_state_probe::capacity_probe_idle() {
         return false;
     }
     // The older independent CPU2 experiment would compete for the same scene.
@@ -134,6 +134,8 @@ unsafe fn permitted_layout() -> Option<Layout> {
 unsafe fn scene_permitted_for(layout: Layout) -> bool {
     match layout {
         Layout::Training => scene_permitted(),
+        #[cfg(feature = "lobby-preload-extended")]
+        Layout::QuickplayWaiting => false,
         #[cfg(all(feature = "managed-ldn-third-source-alpha",
                 not(feature = "source-ldn-capacity-empty-probe")))]
         Layout::LdnWaiting => false,
@@ -197,6 +199,8 @@ fn decline(reason: &str) {
 unsafe fn baseline_for(current: &Snapshot) -> bool {
     match current.layout {
         Layout::Training => baseline(current),
+        #[cfg(feature = "lobby-preload-extended")]
+        Layout::QuickplayWaiting => false,
         #[cfg(all(feature = "managed-ldn-third-source-alpha",
                 not(feature = "source-ldn-capacity-empty-probe")))]
         Layout::LdnWaiting => false,
@@ -793,6 +797,8 @@ mod link_probe {
     pub(super) fn requested(layout: Layout) -> bool {
         match layout {
             Layout::Training => true,
+            #[cfg(feature = "lobby-preload-extended")]
+            Layout::QuickplayWaiting => false,
             #[cfg(all(feature = "managed-ldn-third-source-alpha",
                 not(feature = "source-ldn-capacity-empty-probe")))]
             Layout::LdnWaiting => false,
@@ -809,6 +815,8 @@ mod link_probe {
         match life.before.layout {
             // Keep the legacy Training wrapper and its mandatory quantity read.
             Layout::Training => snapshot(ctx, entry, SLOT as u32),
+            #[cfg(feature = "lobby-preload-extended")]
+            Layout::QuickplayWaiting => None,
             #[cfg(all(feature = "managed-ldn-third-source-alpha",
                 not(feature = "source-ldn-capacity-empty-probe")))]
             Layout::LdnWaiting => None,

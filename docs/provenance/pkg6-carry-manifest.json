@@ -77,7 +77,12 @@
    "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
    "common::filesystem": "crate::runtime::compat::filesystem",
    "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
-   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT"
+   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT",
+   "item_state_probe": "crate::runtime::roster::item_state_probe",
+   "turnip_face_caller_probe": "crate::runtime::roster::turnip_face_caller_probe",
+   "mii_identity_probe": "crate::runtime::mii::mii_identity_probe",
+   "mii_fullconfig_probe": "crate::runtime::mii::mii_fullconfig_probe",
+   "mii_saved_file_probe": "crate::runtime::mii::mii_saved_file_probe"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1435,7 +1440,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "134f449376e9cf43e244e1fce66386975a27082d86f728e8df5ff7a7da98c6b0",
+   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -2590,14 +2595,36 @@
    "dest": "src/runtime/roster/source_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "59204c4695a82aa8e5d032bff10c709358508551f476cfc2aea2f6634778ff27"
+   "dest_sha256": "0596838415402aa93c09c2132caeedd54d37c1c94a41ece19e04ffe0e54cd47a",
+   "edits": [
+    {
+     "old": "Layout::Training => scene_permitted(),",
+     "new": "Layout::Training => scene_permitted(),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => baseline(current),",
+     "new": "Layout::Training => baseline(current),\n        #[cfg(feature = \"lobby-preload-extended\")]\n        Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => true,",
+     "new": "Layout::Training => true,\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => false,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "Layout::Training => snapshot(ctx, entry, SLOT as u32),",
+     "new": "Layout::Training => snapshot(ctx, entry, SLOT as u32),\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => None,",
+     "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    }
+   ]
   },
   {
    "src": "src/source_ldn_capacity_probe.rs",
    "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "2b03502a03a932d7dcc39dd0130b5ad71a7cd04ca3187748e0db9a80dbe0166b"
+   "dest_sha256": "f33adb5a4c849b810303f51bdb2e53c9e23b28b504563d119ddf28e3c8db5a5c"
   },
   {
    "src": "src/mii_pool_observer.rs",
@@ -2619,6 +2646,41 @@
    "crate": "root",
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
+  },
+  {
+   "src": "src/item_state_probe.rs",
+   "dest": "src/runtime/roster/item_state_probe.rs",
+   "crate": "root",
+   "src_sha256": "aded55fcc945b7258b63d90c697edf457a1ec840c0bfbb7b51fd5dd86633a92c",
+   "dest_sha256": "60477d60f59638cdc852aa720c36afd03069f661a892f3b9ae6709a5710bdb4f"
+  },
+  {
+   "src": "src/turnip_face_caller_probe.rs",
+   "dest": "src/runtime/roster/turnip_face_caller_probe.rs",
+   "crate": "root",
+   "src_sha256": "f5bc70811fc01e6abd46dbb7f0438cf7eac78b1c203b0d6fcc73751d79c33238",
+   "dest_sha256": "64e14a8d31cd6d8e6d6b13cf9fa43b7edea1c20ecbfd7d6e44f82a04a71261eb"
+  },
+  {
+   "src": "src/mii_identity_probe.rs",
+   "dest": "src/runtime/mii/mii_identity_probe.rs",
+   "crate": "root",
+   "src_sha256": "239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c",
+   "dest_sha256": "4b19665574211de8811fe210ecbce375ed348dcdce2863b0a449e21edd8add3e"
+  },
+  {
+   "src": "src/mii_fullconfig_probe.rs",
+   "dest": "src/runtime/mii/mii_fullconfig_probe.rs",
+   "crate": "root",
+   "src_sha256": "3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e",
+   "dest_sha256": "fb90e342ec8513684272d367289892910c654db6d926fe0ca6f6b839dcc9656c"
+  },
+  {
+   "src": "src/mii_saved_file_probe.rs",
+   "dest": "src/runtime/mii/mii_saved_file_probe.rs",
+   "crate": "root",
+   "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
+   "dest_sha256": "48cdfd978e3f3762170edc972e9d2b9c6dd91fb4e5779251207e4a450f07c10b"
   }
  ]
 }

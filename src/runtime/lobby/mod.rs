@@ -97,6 +97,8 @@ pub(crate) unsafe fn frame(fighter: usize) {
                 crate::runtime::roster::character_items::request(choice);
             }
             crate::runtime::roster::character_items::on_frame(body);
+            #[cfg(feature = "item-state-probe")]
+            crate::runtime::roster::item_state_probe::on_frame(body);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
         }
     }

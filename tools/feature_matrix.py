@@ -64,6 +64,43 @@ CORE = [
 ]
 
 
+# The fork's mutual exclusions, by design (each is a `compile_error!` in the carried sources): a combination whose feature closure
+# holds both sides is not a build anyone makes, so the matrix skips exactly these and nothing else.
+EXCLUSIONS = [
+    ("automation-results-observer", ("automation-results-native",),
+     "src/runtime/lobby/automation_helper.rs:7: results observer and native adapter both hook 0x150e5f0 and 0x150e9d0; enable only one"),
+    ("native-body-bank-probe", ("native-body-bank-alpha",),
+     "src/runtime/roster/character_roster.rs:32: The fixed bank probe and managed bank candidate cannot share native hooks"),
+    ("source-capacity-group-probe", ("source-ldn-capacity-link-probe", "managed-third-source-alpha"),
+     "src/runtime/roster/source_capacity_probe.rs:20: isolated grouped probe cannot share a build with ordinary P2 or managed third-source admission"),
+    ("source-capacity-aegis-probe", ("source-capacity-trainer-probe",),
+     "src/runtime/roster/source_capacity_probe.rs:23: select one isolated canonical group target per build"),
+]
+
+
+def closure(table, roots):
+    seen, stack = set(), list(roots)
+    while stack:
+        name = stack.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        stack.extend(d for d in table.get(name, []) if "/" not in d and ":" not in d)
+    return seen
+
+
+def excluded(table, flags):
+    """The fork's exclusion a combination falls under, or None."""
+    roots = [] if "--no-default-features" in flags else ["default"]
+    if "--features" in flags:
+        roots += flags[flags.index("--features") + 1].split(",")
+    enabled = closure(table, roots)
+    for one, others, why in EXCLUSIONS:
+        if one in enabled and any(o in enabled for o in others):
+            return why
+    return None
+
+
 def combinations(table, which):
     out = []
     if which in ("core", "all"):
@@ -86,6 +123,7 @@ def main():
     ap.add_argument("--target-spec", default="", help="switch: the Skyline target spec, aarch64-skyline-switch.json")
     ap.add_argument("--only", default="", help="substring filter on the combination label")
     ap.add_argument("--root", default=ROOT)
+    ap.add_argument("--log-dir", default="", help="write the whole output of each failing combination here")
     args = ap.parse_args()
     with open(os.path.join(args.root, "Cargo.toml"), encoding="utf-8") as f:
         table = read_features(f.read())
@@ -111,16 +149,29 @@ def main():
     else:
         base = shlex.split(args.runner) + [args.cargo, "check"]
     failed = []
+    skipped = []
     for label, flags in combos:
+        why = excluded(table, flags)
+        if why:
+            skipped.append(label)
+            print(f"skip  {label}: the fork's exclusion, {why}", flush=True)
+            continue
         started = time.time()
         proc = subprocess.run(base + flags, cwd=args.root, env=env, capture_output=True, text=True)
-        tail = (proc.stdout + proc.stderr).strip().splitlines()[-6:]
+        text = (proc.stdout + proc.stderr).strip().splitlines()
+        tail = [line for line in text if line.startswith("error") or line.lstrip().startswith("-->")][:24] or text[-6:]
+        if proc.returncode != 0 and args.log_dir:
+            os.makedirs(args.log_dir, exist_ok=True)
+            with open(os.path.join(args.log_dir, label.replace(":", "_") + ".log"), "w", encoding="utf-8") as f:
+                f.write("\n".join(text) + "\n")
         status = "ok" if proc.returncode == 0 else "FAIL"
         print(f"{status:4} {time.time() - started:6.1f}s {args.mode} {label}", flush=True)
         if proc.returncode != 0:
             failed.append(label)
             print("\n".join("     " + line for line in tail), flush=True)
-    print(f"{len(combos) - len(failed)}/{len(combos)} combinations build" + (f"; failed: {', '.join(failed)}" if failed else ""))
+    built = len(combos) - len(failed) - len(skipped)
+    print(f"{built}/{len(combos) - len(skipped)} combinations build ({len(skipped)} skipped by the fork's exclusions)"
+          + (f"; failed: {', '.join(failed)}" if failed else ""))
     return 1 if failed else 0
 
 
