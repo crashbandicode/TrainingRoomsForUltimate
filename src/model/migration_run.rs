@@ -6,7 +6,8 @@
 //!
 //! Rules (SPEC-core-08 §4, review R1): the fork's folder is only ever read; an existing destination is
 //! never overwritten; a copy is complete or absent (a leftover `.part` is overwritten next run); a read or
-//! write error skips that one file and the result is `partial`; the marker is the only thing that means
+//! write error skips that one file, the result is `partial` and the marker is withheld (the next boot
+//! retries; only deterministic by-design skips allow it); the marker is the only thing that means
 //! "already imported" (a pre-installed `developer.ini` does not count and is never touched); the marker
 //! itself is written through the store's atomic replace, and when that fails the import runs again next
 //! boot (harmless: what exists is kept).
@@ -16,8 +17,10 @@
 //! entry whose metadata fails, a source folder that is not a folder) is an error. It goes to the
 //! receipt's `unlisted` list and the log with its path and the error, the result is `partial`, the other
 //! paths are still imported, and **no marker is written**, so the next boot tries again and the exists
-//! rule keeps what was copied. (A file that was listed but fails while it is copied stays rule 4's
-//! `partial` with its marker.)
+//! rule keeps what was copied. A listed file that fails while it is copied is the same: an I/O error
+//! withholds the marker, so a failed `save_states.json` copy is retried and not lost for good. The
+//! deterministic skips (a capture staging folder, an existing destination, a file over the cap) are
+//! counted and allow the marker.
 
 use std::fs;
 use std::io::{self, Read, Write};
@@ -105,10 +108,11 @@ impl Blocking {
         self.background.len()
     }
 
-    /// Whether some present path could not be listed: the marker is not written, the next boot imports
-    /// again.
+    /// Whether some present path could not be listed, or a listed file failed while it was copied (an I/O
+    /// error): the marker is not written, the next boot imports again. Only deterministic skips by design (a
+    /// capture staging folder, a destination that exists, a file over the cap) allow the marker.
     pub fn marker_withheld(&self) -> bool {
-        !self.receipt.unlisted.is_empty()
+        self.receipt.outcomes.contains(&Outcome::IoError)
     }
 }
 
@@ -276,8 +280,8 @@ fn examine_source(source: &Path) -> Option<Listing> {
     }
 }
 
-fn withheld_reason(unlisted: usize) -> String {
-    format!("{unlisted} present path(s) could not be listed; the import runs again next boot")
+fn withheld_reason(failed: usize) -> String {
+    format!("{failed} path(s) could not be listed or copied (I/O errors); the import runs again next boot")
 }
 
 fn record(receipt: &mut Receipt, action: &Action<'_>, result: io::Result<Option<(u64, String, String)>>) {
@@ -412,7 +416,7 @@ pub fn run_background(roots: Roots<'_>, mut blocking: Blocking, log: &mut dyn Fn
 /// that could not be written, and the next boot imports again.
 fn write_marker_unless_withheld(dest: &Path, blocking: &Blocking) -> Result<(), String> {
     if blocking.marker_withheld() {
-        return Err(withheld_reason(blocking.receipt.unlisted.len()));
+        return Err(withheld_reason(blocking.receipt.outcomes.iter().filter(|o| **o == Outcome::IoError).count()));
     }
     write_marker(dest, blocking).map_err(|e| e.to_string())
 }

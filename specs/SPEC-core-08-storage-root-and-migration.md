@@ -94,17 +94,26 @@ Rules for every copy:
    quitting the game never leaves a truncated file that the exists rule
    (rule 2) would keep; a leftover `.part` is overwritten on the next run.
 4. Any read or write error skips that one file (`reason=io:<code>`) and the
-   import continues; the result is `partial`.
-4a. **Absent is not unreadable (review R2-8, 2026-11-02).** Only `NotFound` means a
-   path is absent. A present path that cannot be enumerated, stat-ed or typed
-   (a directory that cannot be opened, an entry whose metadata fails, a source
-   that is not a folder, an unreadable settings file) is reported with its path
-   and the error (`[Migration] cannot list <path>: io:<code> (...)`), makes the
-   result `partial`, and **withholds the marker**: the other paths are still
-   imported, the install line says `migration=partial`, and
-   the next boot imports again (rule 2 keeps what was copied).
+   import continues; the result is `partial` and **the marker is not written**
+   (rule 4a): the next boot imports again, so a copy that failed (a
+   `save_states.json` above all) is retried and never lost for good, and the
+   destination-exists rule (rule 2) keeps what was copied. Only deterministic,
+   by-design skips are counted and allow the marker: a capture staging folder
+   (`.<id>.smd-N.tmp`), a destination that exists (`reason=exists`) and a file
+   over the cap (`reason=too_large`). (Ruling 2026-11-02, replacing the earlier
+   "partial, marker written".)
+4a. **Any I/O error withholds the marker; absent is not unreadable (review R2-8,
+   2026-11-02).** Only `NotFound` means a path is absent. A present path that
+   cannot be enumerated, stat-ed or typed (a directory that cannot be opened, an
+   entry whose metadata fails, a source that is not a folder, an unreadable
+   settings file) is reported with its path and the error (`[Migration] cannot
+   list <path>: io:<code> (...)`), like a listed file that fails while it is
+   copied (rule 4). Either makes the result `partial` and **withholds the
+   marker**: the other paths are still imported, the install line says
+   `migration=partial`, and the next boot imports again (rule 2 keeps what was
+   copied).
 5. Write `migration.json` last: `{ "source": "sd:/ultimate/TrainingModpack",
-   "at": <tick>, "plugin": "<version>", "result": "done|partial|none",
+   "at": <tick>, "plugin": "<version>", "result": "done|none",   (`partial` is never written: rule 4a)
    "files": [ { "from", "to", "bytes", "sha256", "result" } … ],
    "skipped": [ { "path", "reason" } … ] }`. If the marker cannot be written,
    the import is reported `skipped reason=marker` and will run again next boot
@@ -161,8 +170,8 @@ two parts (draft 9, N8):
    the fork keeps working. The card-level conflict of two plugins hooking the
    same sites is SPEC-core-01's concern, not this spec's.
 2. **Downgrade to the fork:** the fork reads `TrainingModpack/`, untouched.
-3. **Partial earlier import** (marker missing because the write failed):
-   re-runs; every destination that exists is kept.
+3. **Partial earlier import** (marker missing because the write failed, or because an
+   I/O error withheld it, rule 4a): re-runs; every destination that exists is kept.
 4. **Player edits `TrainingRooms/` files afterwards:** nothing is re-imported.
 5. **Corrupt source file:** copied as is; the reader's corrupt-file policy
    (SPEC-core-04 Q2) applies when it is loaded; the import does not validate
@@ -198,7 +207,7 @@ else is the owning spec's file, now under the new root.
 | Receipt JSON shape and sha256 per file | `migration::receipt_shape` (fixtures from `training_mod_consts/tests/fixtures/ported-json`) | — | |
 | First boot on a profile with a populated `TrainingModpack/`: files copied, originals' hashes unchanged, settings loaded from the copy, install line `migration=done`, notification shown | — | CORE08-E01 | |
 | Second boot: no copies, `migration=skipped reason=marker_present` not logged as an error | — | CORE08-E02 | |
-| One unreadable source file → `partial`, the rest copied | `migration::io_error_is_partial` | CORE08-E05 (file made unreadable in the profile) | |
+| One unreadable source file → `partial`, the rest copied, **no marker**; the next boot copies it and writes the marker | `migration_run::migration_unreadable_source_file_is_partial`, `migration_io_error_is_partial_and_the_rest_is_copied`, `migration_a_failed_copy_withholds_the_marker_and_the_second_run_completes`; the by-design skips still allow the marker: `migration_deterministic_skips_still_allow_the_marker` | CORE08-E05 (file made unreadable in the profile) | |
 | Oversized file → `too_large` (not under `replay_captures/`) | `migration::too_large_skipped` | — | |
 | **S1 items 1–2** The settings file is copied as `settings.json`; both INI files are copied; the loader accepts the old name once | `migration::settings_renamed_on_copy`, `migration::ini_files_copied`, `migration::loader_accepts_old_name_once` | CORE08-E06 | |
 | **N6** Item-on-load conversion: a player-role record without `held_item` gets a snapshot resolved from `character_item` against its own `fighter_kind`; `None`, no entry for that kind, an existing snapshot (any state) and CPU-role records are left alone; only the copy changes; runs once | `migration::item_on_load_converts_player_records`, `migration::item_on_load_never_overwrites_snapshot`, `migration::item_on_load_none_and_no_entry_leave_absent`, `migration::item_on_load_runs_once` | CORE08-E07 profile with a fork save file that has no snapshot and `character_item` = Player 1st Var.: after the first boot the save restores the item; the original files' hashes are unchanged | |
