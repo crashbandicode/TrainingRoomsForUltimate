@@ -11,82 +11,180 @@
 <text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">A adds the stage to the rotation order, Y cycles its form (Normal / Omega / Battlefield), L/R pages.</text>
 <text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
 <text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Fighters &amp; Stages  &gt;  Stages  &gt;  Lobby Stages</text>
-<text x="1220.0" y="112.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">page 1 / 8   (All + 117 stages)</text>
-<rect x="69.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/all.png" x="170" y="141" width="70" height="71" preserveAspectRatio="none"/>
-<text x="205.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">All (listed order)</text>
-<rect x="359.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<text x="495.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Waiting Room</text>
-<ellipse cx="373.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="373.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">1</text>
-<rect x="591.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="608.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
-<rect x="649.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/battlefield.png" x="743" y="141" width="84" height="71" preserveAspectRatio="none"/>
-<text x="785.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Battlefield</text>
-<ellipse cx="663.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="663.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">2</text>
-<rect x="881.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="898.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
-<rect x="939.0" y="136.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(176,52,42)" stroke-width="3"/>
-<image href="captures/stages/small-battlefield.png" x="1033" y="141" width="84" height="71" preserveAspectRatio="none"/>
-<text x="1075.0" y="226.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Small Battlefield</text>
-<ellipse cx="953.0" cy="150.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="953.0" y="152.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">3</text>
-<rect x="1171.0" y="142.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="1188.0" y="153.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
-<rect x="69.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/big-battlefield.png" x="162" y="249" width="85" height="71" preserveAspectRatio="none"/>
-<text x="205.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Big Battlefield</text>
-<rect x="359.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/final-destination.png" x="452" y="249" width="85" height="71" preserveAspectRatio="none"/>
-<text x="495.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Final Destination</text>
-<ellipse cx="373.0" cy="258.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="373.0" y="260.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">4</text>
-<rect x="591.0" y="250.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="608.0" y="261.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
-<rect x="649.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/peach-s-castle.png" x="742" y="249" width="85" height="71" preserveAspectRatio="none"/>
-<text x="785.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Peach's Castle</text>
-<rect x="939.0" y="244.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/kongo-jungle.png" x="1032" y="249" width="85" height="71" preserveAspectRatio="none"/>
-<text x="1075.0" y="334.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Kongo Jungle</text>
-<rect x="69.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/hyrule-castle.png" x="162" y="357" width="85" height="71" preserveAspectRatio="none"/>
-<text x="205.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Hyrule Castle</text>
-<ellipse cx="83.0" cy="366.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="83.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">7</text>
-<rect x="301.0" y="358.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="318.0" y="369.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">BF</text>
-<rect x="359.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/super-happy-tree.png" x="452" y="357" width="85" height="71" preserveAspectRatio="none"/>
-<text x="495.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Super Happy Tree</text>
-<rect x="649.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/dream-land.png" x="742" y="357" width="85" height="71" preserveAspectRatio="none"/>
-<text x="785.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Dream Land</text>
-<ellipse cx="663.0" cy="366.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="663.0" y="368.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">5</text>
-<rect x="881.0" y="358.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="898.0" y="369.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
-<rect x="939.0" y="352.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/saffron-city.png" x="1032" y="357" width="85" height="71" preserveAspectRatio="none"/>
-<text x="1075.0" y="442.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Saffron City</text>
-<rect x="69.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/mushroom-kingdom.png" x="162" y="465" width="85" height="71" preserveAspectRatio="none"/>
-<text x="205.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Mushroom Kingdom</text>
-<rect x="359.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/princess-peach-s-castle.png" x="452" y="465" width="85" height="71" preserveAspectRatio="none"/>
-<text x="495.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Princess Peach's Castle</text>
-<rect x="649.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/rainbow-cruise.png" x="742" y="465" width="85" height="71" preserveAspectRatio="none"/>
-<text x="785.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Rainbow Cruise</text>
-<rect x="939.0" y="460.0" width="272.0" height="100.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
-<image href="captures/stages/kongo-falls.png" x="1032" y="465" width="85" height="71" preserveAspectRatio="none"/>
-<text x="1075.0" y="550.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">Kongo Falls</text>
-<ellipse cx="953.0" cy="474.0" rx="10.0" ry="10.0" fill="rgb(232,72,72)"/>
-<text x="953.0" y="476.6" font-size="12" fill="rgb(236,236,232)" text-anchor="middle">6</text>
-<rect x="1171.0" y="466.0" width="34.0" height="18.0" rx="4" fill="rgb(38,42,52)"/>
-<text x="1188.0" y="477.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">Ω</text>
-<text x="69.0" y="581.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)</text>
-<text x="69.0" y="603.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Thumbnails: read at run time from each stage's own game UI texture, so a stage mod's picture shows; this mock shows stock captures.</text>
+<text x="1220.0" y="112.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">page 1 of 3   (All + 117 stages)</text>
+<rect x="54.0" y="136.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/all.png" x="70" y="140" width="40" height="40" preserveAspectRatio="none"/>
+<text x="128.0" y="163.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">All</text>
+<rect x="290.0" y="136.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="140.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="161.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">WR</text>
+<text x="364.0" y="163.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Waiting Room</text>
+<ellipse cx="304.0" cy="148.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="304.0" y="150.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">1</text>
+<rect x="482.0" y="142.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="497.0" y="152.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="526.0" y="136.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/battlefield.png" x="538" y="140" width="47" height="40" preserveAspectRatio="none"/>
+<text x="600.0" y="163.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Battlefield</text>
+<ellipse cx="540.0" cy="148.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="540.0" y="150.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">2</text>
+<rect x="718.0" y="142.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="733.0" y="152.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="762.0" y="136.0" width="228.0" height="48.0" rx="6" fill="rgb(46,52,66)" stroke="rgb(176,52,42)" stroke-width="3"/>
+<image href="captures/stages/small-battlefield.png" x="774" y="140" width="47" height="40" preserveAspectRatio="none"/>
+<text x="836.0" y="163.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Small Battle…</text>
+<ellipse cx="776.0" cy="148.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="776.0" y="150.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">3</text>
+<rect x="954.0" y="142.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="969.0" y="152.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="998.0" y="136.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/big-battlefield.png" x="1010" y="140" width="48" height="40" preserveAspectRatio="none"/>
+<text x="1072.0" y="163.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Big Battlefield</text>
+<rect x="54.0" y="190.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/final-destination.png" x="66" y="194" width="48" height="40" preserveAspectRatio="none"/>
+<text x="128.0" y="217.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Final Destin…</text>
+<ellipse cx="68.0" cy="202.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="68.0" y="204.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">4</text>
+<rect x="246.0" y="196.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="261.0" y="206.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="290.0" y="190.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/peach-s-castle.png" x="302" y="194" width="48" height="40" preserveAspectRatio="none"/>
+<text x="364.0" y="217.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Peach's Castle</text>
+<rect x="526.0" y="190.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/kongo-jungle.png" x="538" y="194" width="48" height="40" preserveAspectRatio="none"/>
+<text x="600.0" y="217.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Kongo Jungle</text>
+<rect x="762.0" y="190.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/hyrule-castle.png" x="774" y="194" width="48" height="40" preserveAspectRatio="none"/>
+<text x="836.0" y="217.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Hyrule Castle</text>
+<ellipse cx="776.0" cy="202.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="776.0" y="204.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">7</text>
+<rect x="954.0" y="196.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="969.0" y="206.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">BF</text>
+<rect x="998.0" y="190.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/super-happy-tree.png" x="1010" y="194" width="48" height="40" preserveAspectRatio="none"/>
+<text x="1072.0" y="217.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Super Happy Tree</text>
+<rect x="54.0" y="244.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/dream-land.png" x="66" y="248" width="48" height="40" preserveAspectRatio="none"/>
+<text x="128.0" y="271.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Dream Land</text>
+<ellipse cx="68.0" cy="256.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="68.0" y="258.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">5</text>
+<rect x="246.0" y="250.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="261.0" y="260.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">N</text>
+<rect x="290.0" y="244.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/saffron-city.png" x="302" y="248" width="48" height="40" preserveAspectRatio="none"/>
+<text x="364.0" y="271.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Saffron City</text>
+<rect x="526.0" y="244.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/mushroom-kingdom.png" x="538" y="248" width="48" height="40" preserveAspectRatio="none"/>
+<text x="600.0" y="271.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Mushroom Kingdom</text>
+<rect x="762.0" y="244.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/princess-peach-s-castle.png" x="774" y="248" width="48" height="40" preserveAspectRatio="none"/>
+<text x="836.0" y="271.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Princess Peach's…</text>
+<rect x="998.0" y="244.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/rainbow-cruise.png" x="1010" y="248" width="48" height="40" preserveAspectRatio="none"/>
+<text x="1072.0" y="271.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Rainbow Cruise</text>
+<rect x="54.0" y="298.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<image href="captures/stages/kongo-falls.png" x="66" y="302" width="48" height="40" preserveAspectRatio="none"/>
+<text x="128.0" y="325.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Kongo Falls</text>
+<ellipse cx="68.0" cy="310.0" rx="8.0" ry="8.0" fill="rgb(232,72,72)"/>
+<text x="68.0" y="312.0" font-size="10" fill="rgb(236,236,232)" text-anchor="middle">6</text>
+<rect x="246.0" y="304.0" width="30.0" height="16.0" rx="4" fill="rgb(38,42,52)"/>
+<text x="261.0" y="314.6" font-size="12" fill="rgb(111,195,154)" text-anchor="middle">Ω</text>
+<rect x="290.0" y="298.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="302.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="323.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="364.0" y="325.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 17</text>
+<rect x="526.0" y="298.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="532.0" y="302.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="562.0" y="323.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="600.0" y="325.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 18</text>
+<rect x="762.0" y="298.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="768.0" y="302.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="798.0" y="323.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="836.0" y="325.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 19</text>
+<rect x="998.0" y="298.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="1004.0" y="302.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="1034.0" y="323.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="1072.0" y="325.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 20</text>
+<rect x="54.0" y="352.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="60.0" y="356.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="90.0" y="377.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="128.0" y="379.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 21</text>
+<rect x="290.0" y="352.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="356.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="377.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="364.0" y="379.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 22</text>
+<rect x="526.0" y="352.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="532.0" y="356.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="562.0" y="377.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="600.0" y="379.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 23</text>
+<rect x="762.0" y="352.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="768.0" y="356.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="798.0" y="377.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="836.0" y="379.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 24</text>
+<rect x="998.0" y="352.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="1004.0" y="356.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="1034.0" y="377.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="1072.0" y="379.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 25</text>
+<rect x="54.0" y="406.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="60.0" y="410.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="90.0" y="431.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="128.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 26</text>
+<rect x="290.0" y="406.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="410.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="431.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="364.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 27</text>
+<rect x="526.0" y="406.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="532.0" y="410.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="562.0" y="431.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="600.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 28</text>
+<rect x="762.0" y="406.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="768.0" y="410.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="798.0" y="431.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="836.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 29</text>
+<rect x="998.0" y="406.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="1004.0" y="410.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="1034.0" y="431.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="1072.0" y="433.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 30</text>
+<rect x="54.0" y="460.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="60.0" y="464.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="90.0" y="485.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="128.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 31</text>
+<rect x="290.0" y="460.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="464.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="485.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="364.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 32</text>
+<rect x="526.0" y="460.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="532.0" y="464.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="562.0" y="485.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="600.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 33</text>
+<rect x="762.0" y="460.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="768.0" y="464.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="798.0" y="485.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="836.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 34</text>
+<rect x="998.0" y="460.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="1004.0" y="464.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="1034.0" y="485.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="1072.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 35</text>
+<rect x="54.0" y="514.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="60.0" y="518.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="90.0" y="539.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="128.0" y="541.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 36</text>
+<rect x="290.0" y="514.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="296.0" y="518.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="326.0" y="539.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="364.0" y="541.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 37</text>
+<rect x="526.0" y="514.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="532.0" y="518.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="562.0" y="539.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="600.0" y="541.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 38</text>
+<rect x="762.0" y="514.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="768.0" y="518.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="798.0" y="539.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="836.0" y="541.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 39</text>
+<rect x="998.0" y="514.0" width="228.0" height="48.0" rx="6" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="1004.0" y="518.0" width="60.0" height="40.0" rx="4" fill="none" stroke="rgb(70,76,90)" stroke-width="1"/>
+<text x="1034.0" y="539.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">text</text>
+<text x="1072.0" y="541.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Stage 40</text>
+<text x="54.0" y="581.2" font-size="14" fill="rgb(236,236,232)" text-anchor="start">Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)</text>
+<text x="54.0" y="601.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Docked: 5 x 8 per page, short names, pages of 40, 40 and 38. Tiles 17-40 are text placeholders: the mock has captures for the first 16 only.</text>
 </svg>

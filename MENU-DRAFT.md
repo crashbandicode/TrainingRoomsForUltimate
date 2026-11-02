@@ -28,13 +28,15 @@ range** (a checklist and a min–max range in one popup, never both at once);
 *Menu shortcut 1 / 2* become `editor` rows (the menu writes `button_config.ini`);
 *Preload Samples* moves, with the developer-only rows, to a sixth page,
 **Developer**, which is hidden unless `developer.ini` has `developer_page=on`;
-the item grid is one 5 × 8 page when docked and three 4 × 4 pages in handheld
-mode. Decisions that change behaviour only (SDI not set = no SDI; recordings win
-over the CPU settings by default; settings changes apply at the next CPU frame;
-longer SDI streaks on the chips) are in §4 and in the specs. Still open: question
-5 (first page on open; working default the last page used), B11 (ledge options
-changed while the CPU is already hanging; `specs/SPEC-cpu-03`), and the two
-confirmations (the delay popup's slot sets, the stage grid's 4 × 4 paging).
+the item grid and the stage grid are 5 × 8 pages when docked (items: one page;
+stages: three pages) and 4 × 4 pages in handheld mode. Decisions that change
+behaviour only (SDI not set = no SDI; recordings win over the CPU settings by
+default; settings changes apply at the next CPU frame; ledge and throw options
+re-roll when the menu changes them; longer SDI streaks on the chips, ×2.0) are in
+§4 and in the specs. **Answered 2026-11-02:** question 5 (the last page used; the
+first open ever shows CPU), B11 (re-roll on menu change, both trees), the Developer
+page, the delay popup (the slot sets keep the checklist only) and the paging rule
+extended to the stage grid. Nothing is open.
 
 **Draft 6 (the operator's review of v6):** the DI and SDI direction chips show
 the game's own DI / SDI direction visual, read from the game at run time like
@@ -82,13 +84,13 @@ Control vocabulary used in both tables:
 | `dropdown` | **new**: one value from a list; ◂/▸ cycles in place, A opens the popup list |
 | `number` | **new**: one numeric value with ◂/▸ step and a popup for direct pick |
 | `multi-select` | **new**: a set, edited in a popup checklist (A toggles, ZL all/none) |
-| `multi-select + range` | **new (draft 9, question 3)**: one popup with two controls over the same values, a checklist and a min–max range. A ticked checklist greys the range; a set range (the CPU picks any step value from min to max, uniform) greys the checklist; Y clears the active one. A saved file with no range loads as a checklist. Used by the seven delay rows; the slot sets (Randomize Slots, Button slots, Save-state slots) stay `multi-select` (to confirm) |
+| `multi-select + range` | **new (draft 9, question 3)**: one popup with two controls over the same values, a checklist and a min–max range. A ticked checklist greys the range; a set range (the CPU picks any step value from min to max, uniform) greys the checklist; Y clears the active one. A saved file with no range loads as a checklist. Used by the seven delay rows; the slot sets (Randomize Slots, Button slots, Save-state slots) stay `multi-select` (confirmed 2026-11-02) |
 | `editor` | **new name** for `action`: opens a sub-screen (grid, list, chord editor, override editor) |
 | `info` | read-only row |
 | `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction (DI and SDI: the game's own DI / SDI visual, read at run time, draft 6; Airdodge and Shield Tilt: the clean room's own arrow; *Direction chips* below); A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots (DI: the selected chips themselves, draft 7; SDI: the same, draft 8) |
 | `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the fighter icons (draft 9, question 16: read at run time like the stage thumbnails; the review screens still show the stock icons), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
 | `item grid` | the 38 items of `training_mod_consts/src/character_items.rs` with **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, 64×64, made from the game's own item files; draft 5). **Draft 9 (question 14, B):** docked, one page of 5 × 8 tiles (38 used) with short names; handheld (the console's operation mode when the grid opens), three pages of 4 × 4 (16, 16, 6) with full names; L / R page. The fork's two pages of 4 × 8 are replaced |
-| `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below). Draft 9: unchanged, 4 × 4 (question 14's denser option was about the items; to confirm) |
+| `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below). Draft 9 (question 14 B, extended to stages 2026-11-02): docked, 5 × 8 tiles per page, 3 pages (All + 117 = 118 tiles: 40, 40, 38), short names; handheld, 4 × 4 per page, 8 pages, full names; the layout is chosen when the grid opens, as for the item grid |
 | `chip` | an icon at the row's right edge (Kirby Hats, Solo Popo, character items); **draft 4: a neutral placeholder** (dashed rounded square, short label); the final icons are open and will be designed once the functionality is settled |
 
 **Grid pictures (draft 5; answers question 13 for stages and items).**
@@ -151,7 +153,8 @@ Control vocabulary used in both tables:
   the chip sheet as the check.
 - **Streaks (draft 9, question 17 decided as proposed).** Only the DI and SDI
   chips show the game's visual. The SDI chips draw the spark's white streaks
-  longer, closer to a capture (`specs/SPEC-core-07` §4.6).
+  longer, closer to a capture: twice as long (×2.0, confirmed 2026-11-02;
+  `specs/SPEC-core-07` §4.6).
 - **Fallback:** if the asset cannot be read, the chip shows the clean room's
   own arrow, never a baked copy of the game's picture.
 
@@ -368,7 +371,7 @@ change, so existing settings files load as they are (the retired
 | Fighters & Stages | Extras | Mii Swordfighter | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Extras | Mii Gunner | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Stages | Lobby Practice | toggle | On, Off | Off | ours | from Misc |
-| Fighters & Stages | Stages | Lobby Stages | editor (stage grid) | ordered legal stages + All, 4×4 per page; Y cycles form | as today | ours | from Misc; row previews the first ordered stages; thumbnails read at run time from each stage's game UI texture (stage mods show) |
+| Fighters & Stages | Stages | Lobby Stages | editor (stage grid) | ordered legal stages + All; docked 5×8 per page (3 pages), handheld 4×4 per page (8 pages); Y cycles form | as today | ours | from Misc; row previews the first ordered stages; thumbnails read at run time from each stage's game UI texture (stage mods show) |
 | Fighters & Stages | Stages | Training Stage Rotation | toggle | On, Off | Off | ours | from Misc |
 | Fighters & Stages | Stages | Stage Hazards | toggle | On, Off | Off | upstream | from Misc; grouped with the stage rows (mockup v1's placement, adopted) |
 | Fighters & Stages | Loading *(advanced)* | Cycle Preload | dropdown | Off, 1–5 | built-in max | ours | was single |
@@ -455,29 +458,28 @@ carries this page): the MIT copyright holder is the handle
 with a one-time first-boot import of the fork's settings, save states, Mii
 presets and macro library, originals untouched (`specs/SPEC-core-08`). The
 persistence behind every row above therefore lives under the new root.
-**Draft 9: the operator answered the menu questions on 2026-11-01
-(`docs/DECISIONS.md`, whose *Decision* column is authoritative).** Questions 1–4,
-6–18 are decided, each marked "Decided 2026-11-01" below (question 13 was already
-answered in draft 5); **question 5 is open** (working default: the last page
-used). Two confirmations are also still to ask: the slot sets in question 3, and
-the stage grid's paging in question 14. The question text is kept as asked.
+**Draft 9: the operator answered the menu questions on 2026-11-01 and
+2026-11-02 (`docs/DECISIONS.md`, whose *Decision* column is authoritative).**
+All of questions 1–18 are decided, each marked "Decided" below (question 13 was
+already answered in draft 5); the slot sets of question 3 and the stage grid of
+question 14 were confirmed on 2026-11-02. The question text is kept as asked.
 
 1. **Five pages as laid out**, or the variants in `docs/menu-redesign.md` (four pages by merging *Display & Controls* into *Saves*; six by splitting *Stages & Lobby* out of *Fighters & Stages*)?
    **Decided 2026-11-01: five pages, as recommended**, plus the hidden *Developer* page of question 8.
 2. **Dropdown input**: ◂/▸ cycles the value in place without opening the list (fast, but easier to change by accident). Keep, or require A to open?
    **Decided 2026-11-01: as recommended** (◂/▸ cycle in place; A opens the list).
 3. **Random-among-a-set delays** (Aerial/Fast Fall/Throw/Pummel/Ledge Delay, OoS Offset, Reaction Time, Randomize Slots, Playback slots): keep as multi-select checklists (exactly today's semantics), or change the delays to a *min–max range* slider ("random in range") which is simpler to read but changes the semantics?
-   **Decided 2026-11-01: both.** The seven delay rows offer the checklist and a min–max range in one popup (`multi-select + range`); using one greys the other, and Y clears the active one. The slot sets keep the checklist only (a range of slots is a run of ticks): to confirm with the operator.
+   **Decided 2026-11-01: both.** The seven delay rows offer the checklist and a min–max range in one popup (`multi-select + range`); using one greys the other, and Y clears the active one. The slot sets keep the checklist only (a range of slots is a run of ticks): confirmed 2026-11-02.
 4. **Sub-screens**: *Situation overrides*, *Button chords* and *Swap groups* as sub-screens/popups (as drawn), or as rows on the page?
    **Decided 2026-11-01: as recommended** (one editor row each).
 5. **First page on open**: the last page used (today's behaviour) or always *CPU*?
-   **Open (not answered 2026-11-01).** Working default: the last page used.
+   **Decided 2026-11-02: as recommended;** the last page used; the very first open (no saved page yet) shows CPU.
 6. **Item on load (older saves)**: keep for compatibility with saves made before the fork's item snapshot, or drop it and migrate those saves (the fork's JSON import could set the snapshot from this field once)?
    **Decided 2026-11-01: drop the row.** The first-boot import converts older saves once (`specs/SPEC-core-08`, `SPEC-state-04`).
 7. **Replay capture in the menu**: add the toggle (it writes `replay_capture.ini` and mirrors the Deluxe Plugins page row), or keep it INI/Deluxe-only as today?
    **Decided 2026-11-01: as recommended** (add the toggle).
 8. **Preload Samples** (writes sparse timing/memory samples to the diagnostics file): keep as a shipped setting under *Loading (advanced)*, or move it to the `diag` build only?
-   **Decided 2026-11-01: neither; a hidden Developer page.** Preload Samples moves to the sixth page *Developer*, together with the developer-only rows of B9. It ships in the normal build and is hidden, with inert rows, unless `developer.ini` has `developer_page=on`; the operator's own card and the Eden test profiles enable it.
+   **Decided 2026-11-01 (the Developer page confirmed 2026-11-02): neither; a hidden Developer page.** Preload Samples moves to the sixth page *Developer*, together with the developer-only rows of B9. It ships in the normal build and is hidden, with inert rows, unless `developer.ini` has `developer_page=on`; the operator's own card and the Eden test profiles enable it.
 9. **Menu shortcuts**: shown read-only from the INI (as drawn), or editable in the menu with the INI as the file of record?
    **Decided 2026-11-01: editable (option B).** The two shortcut rows open the chord editor; the menu writes `button_config.ini`, the file of record; the new chord applies at once. The permanent B + D-pad Up stays fixed. This also answers `PROVENANCE.md` open question 5.
 10. **Help text position and length**: one line at the bottom as today, or a two-line panel so the longer fork help texts (group rows) do not need shortening?
@@ -488,13 +490,13 @@ the stage grid's paging in question 14. The question text is kept as asked.
    **Decided 2026-11-01: as recommended** (weights).
 13. **Grid picture source** — *answered 2026-11-01 (draft 5).* Background (draft 4): the fork commits its grid pictures — `scripts/roster-grid/assets/` 89 stock icons (`sources.json`: SmashWiki copies), `scripts/stage-grid/assets/` 115 thumbnails decoded from the game's `stage_1` textures, `scripts/item-icons/assets/` 38 icons rendered from the game's item files — and builds them into its patched `layout.arc`. **Answer:** stage thumbnails are not carried over or baked at all; the stage grid reads each stage's own game UI texture at run time, through the mod-aware file view, so stage mods show (*Grid pictures* in the vocabulary section; `specs/SPEC-core-07` §4.5). The item grid uses the fork's own 38 item icons. Fighter portraits: question 16. The review crops and copies in `docs/menu-mockup/captures/` stay mockup-only.
 14. **Grid paging** (draft 3): items 4×8 per page (two pages of 38) and stages 4×4 (eight pages of All + 117) as the fork does, or denser pages so the items fit on one screen?
-   **Decided 2026-11-01: denser (option B), with a handheld rule.** Docked: all 38 items on one page (5 × 8 tiles, short names). Handheld: three pages of 4 × 4 (16, 16, 6) with full names. The stage grid keeps 4 × 4: the operator's choice was about the items, to confirm.
+   **Decided 2026-11-01: denser (option B), with a handheld rule; extended to the stage grid 2026-11-02.** Docked: all 38 items on one page (5 × 8 tiles, short names) and the stages on three 5 × 8 pages (All + 117 = 118 tiles: 40, 40, 38, short names). Handheld: items on three pages of 4 × 4 (16, 16, 6) and stages on eight pages of 4 × 4, with full names.
 15. **Mii rows** (draft 3): lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only? (Saved Miis have no stock portrait, so a portrait grid does not apply.)
    **Decided 2026-11-01: as recommended** (busts where they exist).
 16. **Fighter portraits and mods** (draft 5, open): should the portrait grid follow the stage rule — read each fighter's own UI portrait texture from the game at run time, so character and costume mods show — or keep a fixed set of stock icons, as the fork does with its 89 committed icons? Not decided.
    **Decided 2026-11-01: as recommended** (read at run time, falling back to a text tile; one more development probe is needed, `specs/SPEC-core-07`).
 17. **DI / SDI visual** (draft 6, open): (a) confirm that only the DI and SDI chips show the game's own visual and that Airdodge Direction and Shield Tilt keep the clean room's arrows (as proposed; unchanged in draft 7); (b) *status, draft 7:* the visuals are identified (DI `sys_vector`, SDI `sys_hitstop_spark`, two different effects) and the DI streak is captured; an SDI capture is still to be scheduled (`specs/SPEC-core-07` §4.6). *Status, draft 8:* the SDI spark is captured (Up and In) and the DI turn with the launch is confirmed; the screens draw renders made from the game's effect file, the captures are the check. (a) is still open.
-   **Decided 2026-11-01: as recommended** (DI and SDI only), with one change: the SDI chips draw the spark's white streaks longer, closer to a match (screens 01, 16, 17).
+   **Decided 2026-11-01: as recommended** (DI and SDI only), with one change: the SDI chips draw the spark's white streaks longer, closer to a match (screens 01, 16, 17); ×2.0 confirmed 2026-11-02.
 18. **When a CPU setting change takes effect** (draft 8, open): in the fork, a CPU SDI Direction changed in the menu takes effect only at the next Training reset (`sdi::roll_direction()` ← `reset::on_reset()`), and the menu does not say so; other per-reset rolls (shield tilt) may do the same. Recommendation: apply the change immediately (re-roll when the row changes), or at least show "applies on next reset" on the row. Not decided (`specs/SPEC-cpu-02` question 9).
    **Decided 2026-11-01: follow the fork (option A).** The fork's stage M5o rule: a changed SDI Direction or Shield Tilt applies at the next CPU frame with a new weighted roll that holds until the next reset or the next change of that row (not a new roll every hitlag episode); DI was already read live at each hit. No "applies on next reset" label is needed.
 
