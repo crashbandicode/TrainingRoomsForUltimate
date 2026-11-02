@@ -45,6 +45,8 @@ pub mod sites;
 pub mod stage_hazards;
 #[path = "model/storage.rs"]
 pub mod storage;
+#[path = "model/ui/hash40.rs"]
+pub mod hash40;
 #[path = "model/ui/frame.rs"]
 pub mod frame;
 #[path = "model/ui/screens.rs"]

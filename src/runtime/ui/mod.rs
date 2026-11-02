@@ -13,6 +13,8 @@ pub mod archive;
 pub mod hud;
 pub mod input;
 pub mod pane;
+#[cfg(feature = "diag")]
+pub mod probe;
 pub mod registry;
 pub mod state;
 pub mod tick;
@@ -63,6 +65,8 @@ fn pilot_present() -> bool {
 
 pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     state::PILOT_PRESENT.store(pilot_present(), std::sync::atomic::Ordering::Release);
+    #[cfg(feature = "diag")]
+    probe::install();
     let mut found = [GuardOutcome::Stock; UI_SITES.len()];
     for (slot, site) in found.iter_mut().zip(UI_SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
