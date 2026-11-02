@@ -100,24 +100,19 @@ pub fn menu_context() -> Option<MenuContext> {
     (scene.epoch == EPOCH.load(Ordering::Acquire)).then_some(MenuContext { scene, original })
 }
 
-/// A UI close may only address the scene/active stage that opened that menu.
+/// A UI request may only address the scene/active stage that opened that menu.
 pub fn request_in(context: MenuContext, stage: impl Into<Selection>) -> Result<u64, &'static str> {
-    queue(stage.into(), Some(context))
+    queue(stage.into(), context)
 }
 
-/// Submit once from the existing UI after choosing a catalog stage. Queued means
-/// no native mutation yet. The next current update either commits or refuses;
-/// nothing retries automatically. The original stage is not a global preference.
-pub fn request(stage: impl Into<Selection>) -> Result<u64, &'static str> { queue(stage.into(), None) }
-
-fn queue(selection: Selection, context: Option<MenuContext>) -> Result<u64, &'static str> {
+fn queue(selection: Selection, context: MenuContext) -> Result<u64, &'static str> {
     if !VERIFIED.load(Ordering::Acquire) { return Err("native contract not verified"); }
     let stage = native_stage(selection)?;
     let mut state=STATE.try_lock().ok_or("request busy")?;
     if state.queued.is_some() || state.live.is_some() { return Err("request already owned"); }
     let (scene, original)=state.seen.ok_or("no current practice update")?;
     if scene.epoch != EPOCH.load(Ordering::Acquire) { return Err("scene departed"); }
-    if context.is_some_and(|old| !policy::current_request(old.scene, scene, old.original, original)) {
+    if !policy::current_request(context.scene, scene, context.original, original) {
         return Err("practice changed while menu was open");
     }
     state.next=state.next.checked_add(1).ok_or("request id exhausted")?;
