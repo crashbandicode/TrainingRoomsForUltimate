@@ -30,7 +30,7 @@ file in this repository. Rows with root `smd` come from the standalone `smash-ma
 | `src/model/macro_ui/macro_panel.rs` | `training_mod_tui/src/macro_panel.rs` | `1b6e698f679029bc` | `f25302dd66b9d091` | playback start without a clone (hot-path allocation contract); the original function stays |
 | `src/model/macro_ui/macro_panel/fighter.rs` | `training_mod_tui/src/macro_panel/fighter.rs` | `1a4e2da3199c28c0` | `1a4e2da3199c28c0` | path rewrite only |
 | `crates/smash-match-data/src/lib.rs` | `src/lib.rs` | `3499ed6485324a0a` | `c21465eb04a85ae8` | the replay module is not vendored (see Cargo.toml); the replay module is not vendored (see Cargo.toml) |
-| `crates/smash-match-data/src/archive.rs` | `src/archive.rs` | `b05ab94a60ad8350` | `b05ab94a60ad8350` | copied unchanged |
+| `crates/smash-match-data/src/archive.rs` | `src/archive.rs` | `b05ab94a60ad8350` | `52da75eb9204cd93` | size: the manifest is read with from_slice; reading the timeline lines through the same reader type shares one monomorphised deserializer per format type instead of a second copy for the string reader (the line was already valid UTF-8, a String); results are identical |
 | `crates/smash-match-data/src/capture.rs` | `src/capture.rs` | `7e4b3cbb5f142a60` | `7e4b3cbb5f142a60` | copied unchanged |
 | `crates/smash-match-data/src/clip.rs` | `src/clip.rs` | `a4d85a1b4fcaaec3` | `a4d85a1b4fcaaec3` | copied unchanged |
 | `crates/smash-match-data/src/model.rs` | `src/model.rs` | `529606f63d2fb7f8` | `529606f63d2fb7f8` | copied unchanged |

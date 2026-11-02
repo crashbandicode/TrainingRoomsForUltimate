@@ -359,7 +359,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1",
-   "dest_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1"
+   "dest_sha256": "52da75eb9204cd93c1e73efccf5bdab46c4a9af33eaf657c58040e9b999a7d98",
+   "edits": [
+    {
+     "old": "serde_json::from_str(text)",
+     "new": "serde_json::from_slice(text.as_bytes())",
+     "reason": "size: the manifest is read with from_slice; reading the timeline lines through the same reader type shares one monomorphised deserializer per format type instead of a second copy for the string reader (the line was already valid UTF-8, a String); results are identical"
+    }
+   ]
   },
   {
    "src": "src/capture.rs",
