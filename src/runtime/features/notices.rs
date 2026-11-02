@@ -13,7 +13,7 @@
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::cpu::advantage::{format_advantage, Tint, NOTIFICATION_FRAMES};

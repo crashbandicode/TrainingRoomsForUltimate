@@ -10,7 +10,7 @@
 
 use std::cell::Cell;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::input_adapter::InputAdapter;

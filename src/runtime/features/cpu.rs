@@ -18,13 +18,13 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::cpu::defence::SdiAnswer;
 use crate::model::cpu::command::CmdFacts;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
 use crate::model::cpu::shield::{ButtonAnswer, OosFacts};
-use crate::model::cpu::tech::{is_tech_situation, TechChange, TechRequest};
+use crate::model::cpu::tech::{self, is_tech_situation, StageClass, TechChange, TechRequest};
 use crate::model::cpu::status;
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::playback::PlaybackState;
@@ -230,7 +230,10 @@ mod ev {
     pub const CLIMB_DENIED: usize = 14;
     pub const STATUS: usize = 15;
     pub const ROLE: usize = 16;
-    pub const COUNT: usize = 17;
+    pub const DI_CALL: usize = 17;
+    pub const TECH_CALL: usize = 18;
+    pub const OOS_CALL: usize = 19;
+    pub const COUNT: usize = 20;
 }
 
 #[cfg(feature = "diag")]
@@ -253,20 +256,23 @@ fn bump(which: usize) {
 #[inline(always)]
 fn bump(_which: usize) {}
 
+/// The last published settings generation the CPU adopted (only read and written under `CPU`).
+static ADOPTED: AtomicU32 = AtomicU32::new(0);
+
+/// Run `f` on the CPU state; a newly published value (`published::Live`) is adopted first. `CPU` is taken by game threads only
+/// (stream/sync): the menu worker publishes through `published`, never through this lock.
 fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
-    CPU.lock().as_mut().map(f)
+    let mut guard = CPU.lock();
+    let cpu = guard.as_mut()?;
+    if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
+        cpu.publish(live.cpu, crate::runtime::published::take_rerolls());
+    }
+    Some(f(cpu))
 }
 
 /// Create the state (boot, before any hook is installed).
 pub fn init(settings: CpuSettings, seed: u64) {
     *CPU.lock() = Some(Cpu::new(settings, seed));
-}
-
-/// A menu commit or the first publish: the new settings and the menu outbox's re-roll bits
-/// (decisions Q18 A, B11).
-pub fn publish(snapshot: &Snapshot, rerolls: u8) {
-    let settings = CpuSettings::from_snapshot(snapshot);
-    with(|cpu| cpu.publish(settings, rerolls));
 }
 
 /// The CPU takes the choices of the `reroll::*` bits again (package 6: the waiting room's practice start re-rolls every cached choice
@@ -501,6 +507,8 @@ unsafe fn fighter_frame(fighter: usize) {
     let scene_now = crate::runtime::scene::current();
     let training = scene_now.is_some();
     if entry == 0 {
+        // Also outside Training: leaving it restores the game's multiplier.
+        damage_multiplier_frame(training);
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
             frame_advantage(accessor);
@@ -582,7 +590,7 @@ unsafe fn fighter_frame(fighter: usize) {
         ev::ROLE,
         key.index(),
         Some(accessor as u64),
-        "role entry={} partner={} kind={kind} lobby={lobby}",
+        "role entry={} partner={} kind={kind} lobby={lobby} accessor={accessor:#x}",
         key.entry,
         key.partner
     );
@@ -731,7 +739,7 @@ unsafe fn apply_mash(accessor: usize, out: &FrameOut) {
         let attribute = EFFECT_CONCLUDE.load(Ordering::Acquire);
         if attribute != UNRESOLVED {
             let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
-            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
+            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, &[0.0; 3], 2.0, (0, 0, true, attribute));
         }
     }
 }
@@ -743,7 +751,7 @@ unsafe fn apply_tech(accessor: usize, out: &FrameOut) {
     }
     if let Some(status) = out.force_status {
         cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
-        natives::change_status_force(accessor, status);
+        natives::change_status_force(accessor, status, true);
     }
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if let (Some(value), true) = (out.hide.cursor, cursor != UNRESOLVED) {
@@ -938,6 +946,88 @@ pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3
 
 // ---- SPEC-cpu-05 hooks ----------------------------------------------------------------------------------
 
+/// The game's `CommonParams` object, captured when the game fills it from its parameter file (0 until then).
+static COMMON_PARAMS: AtomicUsize = AtomicUsize::new(0);
+
+/// Inline hook on the `mov x19, x0` of the function that fills `CommonParams`: x0 is the object.
+#[skyline::hook(offset = sites_pkg2::COMMON_PARAMS_FILL_OFFSET, inline)]
+pub unsafe fn cpu_common_params_hook(ctx: &mut skyline::hooks::InlineCtx) {
+    let _scope = HookScope::enter();
+    let params = ctx.registers[0].x() as usize;
+    COMMON_PARAMS.store(params, Ordering::Release);
+    cpu_event!("common_params object={params:#x}");
+}
+
+// ---- SPEC-cpu-04 fixed camera ---------------------------------------------------------------------------
+
+/// The camera class of the stage the game is on now.
+unsafe fn stage_class_now() -> StageClass {
+    let id = natives::stage_id();
+    tech::stage_class(id, natives::stage_form(id))
+}
+
+/// Write the fixed centre into the camera manager (`manager + 0xbd0`, three floats of the game's vector).
+unsafe fn write_camera_centre(manager: usize, centre: [f32; 3]) {
+    ((manager + sites_pkg2::CAMERA_CENTRE_FIELD) as *mut [f32; 3]).write(centre);
+}
+
+/// Inline hook right after the prologue of the camera manager's change-active-camera function (x0 the manager,
+/// w1 the requested mode): for the fixed mode in Training, the stage's centre (or the remembered default) goes
+/// into the manager before the game acts.
+#[skyline::hook(offset = sites_pkg2::CAMERA_MODE_HOOK_OFFSET, inline)]
+pub unsafe fn cpu_camera_mode_hook(ctx: &mut skyline::hooks::InlineCtx) {
+    let _scope = HookScope::enter();
+    let mode = ctx.registers[1].w() as i32;
+    if mode != tech::CAMERA_MODE_FIXED || crate::runtime::scene::current().is_none() {
+        return;
+    }
+    let manager = ctx.registers[0].x() as usize;
+    let class = stage_class_now();
+    let centre = with(|cpu| cpu.camera_mode(class, mode)).flatten();
+    cpu_event!("camera_mode mode={mode} class={class:?} stage={} write={centre:?}", natives::stage_id());
+    if let (Some(centre), true) = (centre, manager != 0) {
+        write_camera_centre(manager, centre);
+    }
+}
+
+/// The Training fixed-camera setup (`values` first field: the centre the game uses). The centre is remembered as
+/// the stage default; after the game copied it into the manager, the stage's value replaces it (Hide Tech
+/// Animations On) so the caller's own struct is never written.
+#[skyline::hook(offset = sites_pkg2::FIXED_CAMERA_SETUP_HOOK_OFFSET)]
+pub unsafe fn cpu_camera_setup_hook(unused: usize, values: *const [f32; 3]) {
+    let _scope = HookScope::enter();
+    call_original!(unused, values);
+    if values.is_null() || crate::runtime::scene::current().is_none() {
+        return;
+    }
+    let game = values.read();
+    let class = stage_class_now();
+    let centre = with(|cpu| cpu.camera_setup(class, game)).flatten();
+    cpu_event!("camera_setup game={game:?} class={class:?} stage={} write={centre:?}", natives::stage_id());
+    let slot = (game::text_base() + sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize;
+    let manager = if slot.read().is_null() { 0 } else { slot.read().read() };
+    if let (Some(centre), true) = (centre, manager != 0) {
+        write_camera_centre(manager, centre);
+    }
+}
+
+/// Once per frame (the player entry's frame): the shield damage multiplier, 0.0 while Training is active and
+/// the shield is Infinite, otherwise the game's own value, also outside Training (SPEC-cpu-05 section 4).
+unsafe fn damage_multiplier_frame(training: bool) {
+    let params = COMMON_PARAMS.load(Ordering::Acquire);
+    if params == 0 {
+        return;
+    }
+    let field = (params + sites_pkg2::SHIELD_DAMAGE_MUL_FIELD) as *mut f32;
+    let current = field.read_volatile();
+    if let Some(Some(want)) = with(|cpu| cpu.damage_multiplier(training, current)) {
+        if want != current {
+            field.write_volatile(want);
+            cpu_event!("shield_damage_mul write={want:.3} was={current:.3} training={training}");
+        }
+    }
+}
+
 fn is_guard_button(button: i32) -> bool {
     button != UNRESOLVED && (button == BUTTON_GUARD.load(Ordering::Acquire) || button == BUTTON_GUARD_HOLD.load(Ordering::Acquire))
 }
@@ -1079,6 +1169,7 @@ pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
 
 /// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
 pub(crate) unsafe fn di_before(accessor: usize) {
+    cpu_event_on_change!(ev::DI_CALL, 0, Some(accessor as u64), "di_before accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let Some(key) = role_of(accessor) else { return };
     let (x, y) = (WORK_VECOR_X.load(Ordering::Acquire), WORK_VECOR_Y.load(Ordering::Acquire));
     if x == UNRESOLVED || y == UNRESOLVED {
@@ -1095,6 +1186,7 @@ pub(crate) unsafe fn di_before(accessor: usize) {
 /// Tech: the status a CPU body's script is about to change to, or the one to request instead. `passive`
 /// asks the script's own "is passive enabled".
 pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<i32> {
+    cpu_event_on_change!(ev::TECH_CALL, 0, Some((accessor as u64) ^ ((requested as u32 as u64) << 48)), "tech_call accessor={accessor:#x} requested={requested} role={}", role_of(accessor).is_some());
     let key = role_of(accessor)?;
     if !with(|cpu| is_tech_situation(&cpu.ids, requested))? {
         return None;
@@ -1140,6 +1232,7 @@ pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl
 
 /// Out of shield: after the script continuation, the dodge or roll status to change to, if any.
 pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
+    cpu_event_on_change!(ev::OOS_CALL, 0, Some(accessor as u64), "oos_call accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let key = role_of(accessor)?;
     let prev = natives::prev_status_kind(accessor, 0);
     let status_now = natives::status_kind(accessor);
@@ -1236,16 +1329,23 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
         // Playback Mash Interrupt: the running playback stops (package 4's recorder).
         recorder::interrupt_playback();
     }
-    cpu_event_on_change!(
-        if cat2 { ev::CMD2 } else { ev::CMD1 },
-        key.index(),
-        if out.bits != 0 { Some(u64::from(out.bits)) } else { None },
-        "command_flags entry={} cat={} bits={:#x} status={}",
-        key.entry,
-        if cat2 { 2 } else { 1 },
-        out.bits,
-        natives::status_kind(accessor)
-    );
+    #[cfg(feature = "diag")]
+    {
+        let (queued, latched) = with(|cpu| cpu.mash_debug(key)).unwrap_or((false, false));
+        let status = natives::status_kind(accessor);
+        let state = (u64::from(status as u32) << 20) ^ (u64::from(out.bits) << 2) ^ (u64::from(queued) << 1) ^ u64::from(latched);
+        cpu_event_on_change!(
+            if cat2 { ev::CMD2 } else { ev::CMD1 },
+            key.index(),
+            Some(state),
+            "command_query entry={} cat={} status={status} bits={:#x} request={:?} queued={queued} latched={latched} situation={:?}",
+            key.entry,
+            if cat2 { 2 } else { 1 },
+            out.bits,
+            out.request_status,
+            facts.situation
+        );
+    }
     original | out.bits
 }
 

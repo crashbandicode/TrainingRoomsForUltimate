@@ -36,35 +36,35 @@ per-binary counts overlap). Eden labels `s3-NN` (results in `eden/EDEN-PACKAGE-3
 | Read table per kind, write only present fields | `state02_read_table_per_kind`, `state02_write_only_present_and_matching_kind` | s3-02 (Samus) | see EDEN-PACKAGE-3 |
 | Full-charge visuals, Sheik needles, G&W, Pac-Man, Robin, Incineroar, Hero | `state02_full_charge_visuals`, `state02_sheik_needle_groups`, `state02_gw_bucket_clear_flash`, `state02_pacman_key_flag`, `state02_robin_tomes`, `state02_incineroar_revenge`, `state02_hero_clear_then_set` | s3-02 (Samus glow) | Samus: see EDEN-PACKAGE-3; the others runtime, unrun |
 | Olimar line, Sora spell | `charge::line_order`, `prev_colour`, `spawn_colour`, `sora_written_kind` (in the charge model, exercised by the state02 table) | - | runtime, unrun |
-| Buff steps: Hero, Cloud/Joker/Mac, Sephiroth, Wario, Shulk, Wii Fit, Min Min, unselected, per-record bookkeeping | `tests/state03_buffs.rs` (12) | s3-03 (Cloud Limit) | see EDEN-PACKAGE-3; the others runtime, unrun |
+| Buff steps: Hero, Cloud/Joker/Mac, Sephiroth, Wario, Shulk, Wii Fit, Min Min, unselected, per-record bookkeeping | `tests/state03_buffs.rs` (12) | s3-04 (Cloud Limit, after the s3-03 crash fix) | Eden pass for Cloud (and Wii Fit, buffed as the CPU in s3-04); the other buff fighters are host pass, runtime unrun |
 
 ## SPEC-state-04 items, SPEC-state-05 fighter-specific restore
 
 | Requirement | Host test | Eden row | Status |
 | --- | --- | --- | --- |
 | Item table for the 38 choices, sources, common items, snapshot precedence, timers rule, turnip face hooks, choice of a held item | `tests/state04_items.rs` (7) | s3-02 (Bob-omb snapshot) | see EDEN-PACKAGE-3 |
-| N6 conversion of the retired `character_item` (all values, never overwrites, no entry leaves absent) | `tests/state04_convert.rs` (7), `migration_item_on_load_*` | s3-04 (import copy) | host pass |
+| N6 conversion of the retired `character_item` (all values, never overwrites, no entry leaves absent) | `tests/state04_convert.rs` (7), `migration_item_on_load_*` | s3-09, s3-10 (import copy; N6: 5 snapshots) | host pass; Eden pass |
 | Steve materials and tools restored, bar refreshed | `steve` layout in the model (round trip) and the fixture | s3-01: slot 3 fixture, wood 77 / sword 11.5 etc. read back exactly | Eden pass |
 | Keep-list, Pikmin autonomy gate | `Table::keeps_article`; the gate is a hook | - | runtime, unrun |
-| Pokemon Trainer decide mapping (rotation, descriptor validation, non-Pokemon untouched) | `state05_pt_decide_mapping` | s3-03 PT row (fixture `s3-pt-states.json`: saved Ivysaur, Squirtle out) | host pass; runtime, unrun |
-| Trainer wait: 5 frames, rate 1.0 in RUN, airborne trainer grounded, per-role counter | `state05_pt_wait_sequence` | s3-03 PT row | host pass; runtime, unrun |
-| Pokemon dead test (switching frame) and switch effect / sound suppressions | `state05_pt_dead_test`, `state05_pt_suppressions` | s3-03 PT row (no plate, no switch sound) | host pass; runtime, unrun |
-| Pre-death rule (flag off, rates 1000, ball hidden) | `state05_pt_predeath` (in `state01_machine.rs`: the flag, the raise and the wait marker); the calls are runtime | s3-03 PT row | host pass; runtime, unrun |
-| Kirby acceptance rule (equal, Pokemon family, Pyra/Mythra) | `state05_kirby_accept_rule` | s3-03 Kirby row (`diag-copy.req`, then Save, Load) | host pass; runtime, unrun |
-| New optional record field `copy_charge` (Kirby with a copy only; same shape as `charge`; the copied fighter's own HAD / pull-throw flag; written only when present, so fork-compatible files are byte-identical and the fork's loader ignores the key; lead ruling 2026-11-02, to be added to SPEC-state-05 and SPEC-state-01 §7): round trip, absent field, fork-written file, damaged value | `state05_copy_charge_round_trip_absent_and_fork_files`, the ported-files round trip (`state01_ported_files_load_and_rewrite_as_the_fork_wrote_them`), and the flag cases of `state05_kirby_charge_table` | s3-03 Kirby row (saved file shows the key) | host pass; runtime, unrun |
-| Kirby copied charge table, copy flag and kind saved | `state05_kirby_charge_table` | s3-03 Kirby row (dump line: copy flag, chara, module kind) | host pass; runtime, unrun |
-| Kirby copy sound and Sora jingle silences by status | `state05_sfx_status_rules` | s3-03 | host pass; runtime, unrun |
-| Kirby copy-setup with the opponent's real entry id; copy hook writes charge and ends the wait | runtime only (`states::kirby_copy`, `state_kirby_opff_hook`) | s3-03 Kirby row | runtime, unrun |
+| Pokemon Trainer decide mapping (rotation, descriptor validation, non-Pokemon untouched) | `state05_pt_decide_mapping` | s3-05, s3-07 (PT row) (fixture `s3-pt-states.json`: saved Ivysaur, Squirtle out) | host pass; Eden pass (s3-05 to s3-07) |
+| Trainer wait: 5 frames, rate 1.0 in RUN, airborne trainer grounded, per-role counter | `state05_pt_wait_sequence` | s3-05, s3-07 (PT row) | host pass; Eden pass (s3-05 to s3-07) |
+| Pokemon dead test (switching frame) and switch effect / sound suppressions | `state05_pt_dead_test`, `state05_pt_suppressions` | s3-05, s3-07 (PT row) (no plate, no switch sound) | host pass; Eden pass (s3-05 to s3-07) |
+| Pre-death rule (flag off, rates 1000, ball hidden) | `state05_pt_predeath` (in `state01_machine.rs`: the flag, the raise and the wait marker); the calls are runtime | s3-05, s3-07 (PT row) | host pass; Eden pass (s3-05 to s3-07) |
+| Kirby acceptance rule (equal, Pokemon family, Pyra/Mythra) | `state05_kirby_accept_rule` | s3-06 (Kirby row) (`diag-copy.req`, then Save, Load) | host pass; Eden pass (s3-05 to s3-07) |
+| New optional record field `copy_charge` (Kirby with a copy only; same shape as `charge`; the copied fighter's own HAD / pull-throw flag; written only when present, so fork-compatible files are byte-identical and the fork's loader ignores the key; lead ruling 2026-11-02, to be added to SPEC-state-05 and SPEC-state-01 §7): round trip, absent field, fork-written file, damaged value | `state05_copy_charge_round_trip_absent_and_fork_files`, the ported-files round trip (`state01_ported_files_load_and_rewrite_as_the_fork_wrote_them`), and the flag cases of `state05_kirby_charge_table` | s3-06 (saved file for a copy without a flag has no `copy_charge` key) | host pass; the key with a flag (Mewtwo, Lucario, Pac-Man copy) not Eden-run |
+| Kirby copied charge table, copy flag and kind saved | `state05_kirby_charge_table` | s3-06 (Kirby row) (dump line: copy flag, chara, module kind) | host pass; Eden pass (s3-05 to s3-07) |
+| Kirby copy sound and Sora jingle silences by status | `state05_sfx_status_rules` | s3-05, s3-06 (se_silenced, se_passed=0) | host pass; Eden pass for the trainer-switch and Kirby copy sounds; Sora's jingle not Eden-run |
+| Kirby copy-setup with the opponent's real entry id; copy hook writes charge and ends the wait | runtime only (`states::kirby_copy`, `state_kirby_opff_hook`) | s3-06 (Kirby row) | Eden pass (s3-05 to s3-07) |
 
 ## SPEC-core-08 first-boot import (S3-5)
 
 | Requirement | Host test | Eden row | Status |
 | --- | --- | --- | --- |
-| Plan splits blocking and background; originals untouched; receipt shape and hashes | `migration_plan_splits_blocking_and_background`, `migration_full_import_receipt_and_originals`, `migration_receipt_hashes_the_converted_copy_separately` | s3-04 | host pass |
-| N6 on the copy only, never over a snapshot or an existing save | `migration_item_on_load_converts_player_records_in_the_copy`, `migration_item_on_load_never_overwrites_a_snapshot_or_an_existing_save` | s3-04 | host pass |
-| `developer.ini` does not mark imported, left byte-identical | `migration_developer_ini_does_not_mark_imported` | s3-04 | host pass |
-| Marker blocks a second boot; no source writes `none` | `migration_marker_blocks_a_second_boot`, `migration_no_source_writes_a_none_marker` | s3-04 | host pass |
-| Existing destinations never overwritten; size caps; captures uncapped | `migration_existing_destinations_are_never_overwritten`, `migration_captures_have_no_size_cap_and_the_rest_do` | s3-04 | host pass |
-| Staging folders skipped, never read, counted | `migration_staging_folders_are_skipped_and_never_touched` | s3-04 | host pass |
-| I/O error partial, unreadable source partial, interrupted background rerun, marker write failure reruns | `migration_io_error_is_partial_and_the_rest_is_copied`, `migration_unreadable_source_file_is_partial`, `migration_interrupted_background_copy_reruns_and_completes`, `migration_marker_write_failure_leaves_the_import_to_run_again` | s3-04 | host pass |
+| Plan splits blocking and background; originals untouched; receipt shape and hashes | `migration_plan_splits_blocking_and_background`, `migration_full_import_receipt_and_originals`, `migration_receipt_hashes_the_converted_copy_separately` | s3-09, s3-10 | host pass; Eden pass |
+| N6 on the copy only, never over a snapshot or an existing save | `migration_item_on_load_converts_player_records_in_the_copy`, `migration_item_on_load_never_overwrites_a_snapshot_or_an_existing_save` | s3-09, s3-10 | host pass; Eden pass |
+| `developer.ini` does not mark imported, left byte-identical | `migration_developer_ini_does_not_mark_imported` | s3-09, s3-10 | host pass; Eden pass |
+| Marker blocks a second boot; no source writes `none` | `migration_marker_blocks_a_second_boot`, `migration_no_source_writes_a_none_marker` | s3-09, s3-10 | host pass; Eden pass |
+| Existing destinations never overwritten; size caps; captures uncapped | `migration_existing_destinations_are_never_overwritten`, `migration_captures_have_no_size_cap_and_the_rest_do` | s3-09, s3-10 | host pass; Eden pass |
+| Staging folders skipped, never read, counted | `migration_staging_folders_are_skipped_and_never_touched` | s3-09, s3-10 | host pass; Eden pass |
+| I/O error partial, unreadable source partial, interrupted background rerun, marker write failure reruns | `migration_io_error_is_partial_and_the_rest_is_copied`, `migration_unreadable_source_file_is_partial`, `migration_interrupted_background_copy_reruns_and_completes`, `migration_marker_write_failure_leaves_the_import_to_run_again` | s3-09, s3-10 | host pass; Eden pass |
 | SHA-256 vectors | `sha256::tests` | - | host pass |

@@ -588,3 +588,21 @@ fn cpu_ids_resolved_entries_lists_exactly_what_resolved_by_name() {
     assert_eq!(Table::unresolved().resolved_entries().count(), 0);
     assert_eq!(table.resolved_entries().count() + table.missing().count(), ids::COUNT);
 }
+
+#[test]
+fn eden_package_2_settings_files_parse_without_issues_and_change_the_rows_they_name() {
+    // The files `eden/mk_settings.py` writes: every row has the model's length and parses.
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("eden/settings");
+    let mut seen = 0;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.file_name().unwrap().to_string_lossy().starts_with("p2-") {
+            continue;
+        }
+        let loaded = model::settings::parse_bytes(&std::fs::read(&path).unwrap());
+        assert!(loaded.issues.is_empty(), "{}: {:?}", path.display(), loaded.issues);
+        assert_ne!(loaded.settings.menu, Snapshot::factory(), "{} changes nothing", path.display());
+        seen += 1;
+    }
+    assert!(seen >= 10, "the package-2 settings files are missing");
+}

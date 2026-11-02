@@ -19,7 +19,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::cpu::hash::hash40;
@@ -248,8 +248,18 @@ macro_rules! state_diag {
     };
 }
 
+/// The last published settings generation the state machine adopted (only read and written under `STATE`).
+static ADOPTED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Run `f` on the state; a newly published value (`published::Live`) is adopted first (stream/sync: the menu worker publishes
+/// through `published`, never through this lock).
 fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
-    STATE.lock().as_mut().map(f)
+    let mut guard = STATE.lock();
+    let state = guard.as_mut()?;
+    if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
+        adopt(state, live.states);
+    }
+    Some(f(state))
 }
 
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
@@ -287,7 +297,14 @@ pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
     SCORE_AURA.store(hash40("sys_score_aura"), Ordering::Release);
 }
 
-fn set_flags(settings: &StateSettings) {
+/// The publishing thread's half of a publish (atomics only): the flags the hooks test before they take `STATE`, and, when the
+/// feature is off, the cancel of whatever runs (done by `adopt` at the next hook under `STATE`; the flags clear now).
+pub(crate) fn set_flags(settings: &StateSettings) {
+    if !settings.enable && ENABLE.load(Ordering::Acquire) {
+        CANCEL.store(true, Ordering::Release);
+        LOADING.store(false, Ordering::Release);
+        KILLING.store(false, Ordering::Release);
+    }
     ENABLE.store(settings.enable, Ordering::Release);
     AUTOLOAD.store(settings.autoload, Ordering::Release);
     RESPAWN_INVINCIBILITY.store(settings.respawn_invincibility, Ordering::Release);
@@ -304,17 +321,17 @@ fn fighter_buffing(accessor: usize) -> bool {
 
 /// A menu commit or the first publish. Turning Enable Save States Off cancels every load in progress
 /// (SPEC-state-01 §5.6).
-pub fn publish(settings: StateSettings) {
-    set_flags(&settings);
-    with(|state| {
-        if state.settings.enable && !settings.enable {
-            state.machine.cancel_all();
-            LOADING.store(false, Ordering::Release);
-            KILLING.store(false, Ordering::Release);
-        }
-        state.settings = settings;
-    });
+/// A published value reaches the state machine (at the next hook, under `STATE`): turning the feature off cancels what runs. The
+/// flags were set by the publishing thread (`set_flags`).
+fn adopt(state: &mut State, settings: StateSettings) {
+    if CANCEL.swap(false, Ordering::AcqRel) || (state.settings.enable && !settings.enable) {
+        state.machine.cancel_all();
+    }
+    state.settings = settings;
 }
+
+/// A publish turned the feature off: the running save or load is cancelled at the next `with`.
+static CANCEL: AtomicBool = AtomicBool::new(false);
 
 /// The chord engine's calls (package 4): the Save and Load chords passed.
 pub fn request_save() {
@@ -480,8 +497,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             raw.entry,
             raw.kind,
             natives::pos_x(accessor),
-            n::pos_y(accessor),
-            n::lr(accessor),
+            natives::pos_y(accessor),
+            natives::lr(accessor),
             natives::damage(accessor, 0),
             raw.status,
             raw.situation
@@ -512,7 +529,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                     raw.entry,
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopy)),
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopyOnStart)),
-                    n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)),
+                    natives::get_int(accessor, ids.get(C::KirbyIntCopyChara)),
                     module_kind
                 ));
             }
@@ -528,8 +545,13 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 ));
             }
         }
-        if raw.entry == 1 && !nana {
-            DUMP.store(false, Ordering::Release);
+        // Both bodies are dumped, in whichever order the game runs them (a switched Pokemon runs after the CPU).
+        if !nana && raw.entry <= 1 {
+            let seen = DUMPED.fetch_or(1 << raw.entry, Ordering::AcqRel) | (1 << raw.entry);
+            if seen == 0b11 {
+                DUMPED.store(0, Ordering::Release);
+                DUMP.store(false, Ordering::Release);
+            }
         }
     }
     // A diag copy request: give Kirby the opponent's hat through the game's own routine.
@@ -572,7 +594,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
-    let stage_id = n::stage_id();
+    let stage_id = natives::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
         if raw.entry <= 1 && !nana {
@@ -662,7 +684,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         state_restore::pt_predeath(accessor, &pt_ids());
     }
     if out.force_dead {
-        natives::change_status_force(accessor, with(|s| s.ids.get(C::StatusDead)).unwrap_or(UNRESOLVED));
+        natives::change_status_force(accessor, with(|s| s.ids.get(C::StatusDead)).unwrap_or(UNRESOLVED), true);
         state_diag!("[TrainingRooms] state kill entry={}", raw.entry);
     }
     if out.cleanup {
@@ -840,7 +862,7 @@ impl charge::Work for Fields<'_> {
     }
     fn get_int(&self, id: i32) -> i32 {
         // SAFETY: only used from the frame step with a live fighter's accessor.
-        unsafe { n::work_get_int(self.0, id) }
+        unsafe { natives::get_int(self.0, id) }
     }
     fn get_float(&self, id: i32) -> f32 {
         unsafe { natives::get_float(self.0, id) }
@@ -970,7 +992,7 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     let slot = role.index();
     BUFF_ACC[slot].store(if out.buffing { accessor } else { 0 }, Ordering::Release);
     BUFF_WIIFIT[slot].store(out.buffing && kind == BuffKind::WiiFit, Ordering::Release);
-    state_effects::run_buff(accessor, raw.fighter, raw.entry, &ids, &out);
+    state_effects::run_buff(accessor, raw.entry, &ids, &out);
     if out.done {
         with(|s| s.machine.finish_wait(role));
         state_diag!("[TrainingRooms] state buff_done entry={} kind={:?}", raw.entry, kind);
@@ -993,7 +1015,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
                 // §5.2 step 1: the copy flag and the copied fighter's kind, then its charge values; the
                 // copied fighter's own flag goes to `copy_charge`.
                 let has_copy = natives::is_flag(accessor, ids.get(C::KirbyFlagCopy));
-                charge::read_kirby(ids, has_copy, n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
+                charge::read_kirby(ids, has_copy, natives::get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
             } else {
                 (charge::read(ids, raw.kind, &fields), None)
             }
@@ -1001,9 +1023,9 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         .unwrap_or_default();
     let state = SavedState {
         x: natives::pos_x(accessor),
-        y: n::pos_y(accessor),
+        y: natives::pos_y(accessor),
         percent: natives::damage(accessor, 0),
-        lr: n::lr(accessor),
+        lr: natives::lr(accessor),
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
@@ -1012,7 +1034,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
         held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
-        saved_stage: Some(n::stage_id()),
+        saved_stage: Some(natives::stage_id()),
         mii: None,
     };
     let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
@@ -1070,12 +1092,12 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
             if param == DeathParam::DeadRebirthWaitFrame {
                 // The jostle and Shulk cleanups that ride on this override (SPEC-state-01 §4).
                 let jostle = JOSTLE_ID.load(Ordering::Acquire);
-                if jostle != UNRESOLVED && n::work_get_int(accessor, jostle) > 1 {
-                    n::work_set_int(accessor, 1, jostle);
+                if jostle != UNRESOLVED && natives::get_int(accessor, jostle) > 1 {
+                    natives::set_int(accessor, 1, jostle);
                 }
                 let flash = SHULK_FLASH_ID.load(Ordering::Acquire);
                 if flash != UNRESOLVED {
-                    n::work_set_int(accessor, 0, flash);
+                    natives::set_int(accessor, 0, flash);
                     n::effect_remove_common(accessor, hash40("monad_arts_damage_buster"));
                     n::effect_remove_common(accessor, hash40("monad_arts_damage_smash"));
                 }
@@ -1445,8 +1467,13 @@ pub fn start_writer() {
 #[cfg(feature = "diag")]
 static DUMP: AtomicBool = AtomicBool::new(false);
 
+/// Diag build: which of the two bodies the current dump has printed (bit 0 player, bit 1 CPU).
+#[cfg(feature = "diag")]
+static DUMPED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 #[cfg(feature = "diag")]
 fn request_dump() {
+    DUMPED.store(0, Ordering::Release);
     DUMP.store(true, Ordering::Release);
 }
 

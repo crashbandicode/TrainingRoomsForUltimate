@@ -457,12 +457,12 @@ impl fmt::Display for Missing {
 
 /// The diagnostic build's hook-sharing drill fields (` foreign=<mode> <site>=<entry>/<outcome> …`,
 /// `super::seam_drill`); nothing in other builds.
-#[cfg(feature = "diag")]
+#[cfg(feature = "seam-drill")]
 use super::seam_drill::InstallFields as DrillFields;
-#[cfg(not(feature = "diag"))]
+#[cfg(not(feature = "seam-drill"))]
 struct DrillFields;
 
-#[cfg(not(feature = "diag"))]
+#[cfg(not(feature = "seam-drill"))]
 impl fmt::Display for DrillFields {
     fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         Ok(())
@@ -470,7 +470,7 @@ impl fmt::Display for DrillFields {
 }
 
 /// The current bits of a `main` row (the diagnostic drill reads its sites' outcomes).
-#[cfg(feature = "diag")]
+#[cfg(feature = "seam-drill")]
 pub(crate) fn bits_of(label: &str) -> Option<u8> {
     native_seams::find_site(label).and_then(|(index, _)| OUTCOMES.get(index)).map(|slot| slot.load(Ordering::Relaxed))
 }
@@ -518,6 +518,9 @@ impl fmt::Display for InstallFields {
 /// were checked or changed after the install line, once they settle (`native_seams::report::pass`).
 /// Returns at once while nothing is pending. Snapshots live on this thread's stack.
 pub(crate) fn report_late() {
+    // The drill's stand-in run counts (rate-limited to once a second by the drill itself).
+    #[cfg(feature = "seam-drill")]
+    super::seam_drill::report_counts(crate::runtime::clock::uptime_ms());
     if !BOOTED.load(Ordering::Acquire) || !LATE_ACTIVE.swap(false, Ordering::AcqRel) {
         return;
     }

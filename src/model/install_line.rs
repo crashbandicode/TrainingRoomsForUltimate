@@ -185,9 +185,62 @@ impl Display for InstallLine<'_> {
     }
 }
 
+/// The whole line as text. Called once, on the boot thread (the counting allocator does not count it): the line has no fixed size
+/// because every package adds its sites (8,150 characters at the 2026-11-02 integration head, which a fixed 8 KiB buffer cut before
+/// `result=` and `heap_allocations=`).
+pub fn render(line: &InstallLine<'_>) -> String {
+    use core::fmt::Write;
+    let mut text = String::with_capacity(16 * 1024);
+    let _ = write!(text, "{line}");
+    text
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every site of every table of the merged tree and every feature the boot reports: the line is whole (longer than the old 8 KiB
+    /// buffer) and still ends with its result and the allocation count.
+    #[test]
+    fn the_merged_trees_line_is_whole_and_ends_with_its_result() {
+        use super::super::{sites, sites_pkg3, sites_pkg4, sites_pkg6, sites_u4, sites_ui};
+        let tables: [&[sites::Site]; 6] =
+            [&sites::SITES, &sites_pkg3::STATE_SITES, &sites_pkg4::SITES, &sites_ui::UI_SITES, &sites_u4::SITES, &sites_pkg6::SITES];
+        let reports: Vec<SiteReport> = tables
+            .iter()
+            .flat_map(|table| table.iter())
+            .map(|site| SiteReport { site: site.name, found: GuardOutcome::Stock, written: Written::Checked })
+            .collect();
+        let names = [
+            "input_delay", "lra_reset", "stage_hazards", "reset_hub", "cpu_core", "cpu_defence", "cpu_ledge", "cpu_tech", "cpu_shield",
+            "cpu_mash", "cpu_common", "state_core", "chords", "input_display", "recording", "notices", "ui", "p1_cpu", "ui_texture",
+            "named_macros", "live_replay", "macros_port", "roster",
+        ];
+        let features: Vec<FeatureReport> = names
+            .iter()
+            .map(|feature| FeatureReport { feature, installed: false, reason: Some("roster=unavailable_until_cycle_lands menu_app=screens_installed"), site: None })
+            .collect();
+        let seams = "seams=176 seams_stock=176 seams_other=0 seams_foreign=0 seam_groups=cpu_pilot,roster,mii,lobby";
+        let line = InstallLine {
+            tick: 330571890,
+            version: "0.1.0",
+            display: b"13.0.5",
+            build_id: Some(&[0x21, 0x45]),
+            verdict: Verdict::Supported,
+            sites: &reports,
+            features: &features,
+            seams: Some(Extra(&seams)),
+            developer: Some(DeveloperReport { on: true, reason: "on" }),
+            settings: Some(SettingsReport { input_delay: 0, lra_reset: true, stage_hazards: false }),
+            migration: Some("done"),
+            heap_allocations: Some(0),
+        };
+        let text = render(&line);
+        assert!(text.len() > 8192, "the merged tree's line ({} characters) is longer than the old fixed buffer", text.len());
+        assert!(text.ends_with(" migration=done result=installed heap_allocations=0"), "{}", &text[text.len() - 120..]);
+        assert!(text.contains(" roster=not_installed reason=roster=unavailable_until_cycle_lands"));
+        assert_eq!(text, line.to_string());
+    }
 
     #[test]
     fn ticks_convert_to_milliseconds() {

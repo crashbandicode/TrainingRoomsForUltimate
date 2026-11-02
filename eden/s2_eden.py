@@ -16,27 +16,33 @@ Usage: tr_eden.py up <label> [--nro p ...] [--settings json-file] [--diag-txt fi
        tr_eden.py scan <label>        (console.log: panic/abort/crash/Unmapped)
 """
 import argparse
+import calendar
 import hashlib
 import json
 import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path("/home/intpa/trainingrooms-eden-pkg2")
-SOURCE = Path("/home/intpa/ssbu-desync-1029/profiles/b")
+SURFACE = socket.gethostname() == "ubuntu-surface"
+YOGA_SSH = "memento-claw-yoga-ubuntu"
+HOST = "Surface" if SURFACE else "Yoga"
+# The Surface runs offline (LAN Online off, airplane mode on): a solo boot, no peer.
+SOURCE = Path("/home/intpa/ssbu-desync-1029/profiles/" + ("g" if SURFACE else "b"))
 PROFILE = ROOT / "profiles" / "s2"
 APP = Path("/home/intpa/Applications/Eden-GIF/current/Eden.AppImage")
 RUNTIME = Path("/home/intpa/elite-rematch-work/eden-lan-runtime")
 RUNTIME_SHA = "ee3c2e953a0b87541c29eb8918ce0354489035296ac5eaf060b3444d06a8bbcb"
 COORD = Path("/tmp/deluxe-surface-1007/OWNER-COORDINATION.md")
 HELPER = "/home/intpa/eden-nso-autolan/live-tools/display-rootful.ps1"
-GAME = ("/home/intpa/Games/Roms/Switch/Super Smash Bros. Ultimate "
-        "[01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci")
+GAME = ("/home/intpa/eden-assets/games/01006A800016E000/base/" if SURFACE else "/home/intpa/Games/Roms/Switch/") + \
+    "Super Smash Bros. Ultimate [01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci"
 OWNER = "Claude 0caa72b8/pkg2-eden"
 DISPLAY = ":95"
 READ_ONLY = ["user/nand/user/Contents", "user/nand/system/Contents", "user/firmware"]
@@ -44,6 +50,9 @@ PLUGINS = Path("user/sdmc/atmosphere/contents/01006A800016E000/romfs/skyline/plu
 OUTPUT = Path("user/sdmc/ultimate/TrainingRooms")
 CONFIG = Path("user/config/qt-config.ini")
 FORCED = {"pauseWhenInBackground": "false", "volume": "0", "volume\\default": "false"}
+if SURFACE:
+    FORCED.update({"lan_online": "false", "airplane_mode": "true"})
+STALE_CLAIM_HOURS = 12
 SHOTS = ROOT / "shots"
 sys.path.insert(0, str(APP.parent / "tools"))
 
@@ -67,16 +76,42 @@ def stamp():
 
 
 def ledger(line):
-    with COORD.open("a", encoding="utf-8") as f:
-        f.write(f"\n{stamp()} {line}\n")
+    text = f"\n{stamp()} {line}\n"
+    if not SURFACE:
+        with COORD.open("a", encoding="utf-8") as f:
+            f.write(text)
+        return
+    # The ledger lives on the Yoga (one file for both hosts): ship the line as a file, append it there.
+    name = f"/tmp/tr-pkg2-ledger-{os.getpid()}.txt"
+    Path(name).write_text(text, encoding="utf-8")
+    subprocess.run(["/usr/bin/scp", "-q", "-o", "BatchMode=yes", name, f"{YOGA_SSH}:{name}"], check=True)
+    subprocess.run(["/usr/bin/ssh", "-o", "BatchMode=yes", YOGA_SSH,
+                    f"Add-Content -Path {COORD} -Value (Get-Content -Raw {name}) -NoNewline; Remove-Item {name}"],
+                   check=True)
+    Path(name).unlink()
+
+
+def ledger_text():
+    if not SURFACE:
+        return COORD.read_text(encoding="utf-8", errors="replace")
+    return subprocess.run(["/usr/bin/ssh", "-o", "BatchMode=yes", YOGA_SSH, f"Get-Content {COORD}"], check=True,
+                          capture_output=True, text=True).stdout
 
 
 def open_claims():
+    """Open claims of other owners that concern this host. A claim older than STALE_CLAIM_HOURS is stale
+    ledger noise (old owners that never wrote a matching RELEASED); a claim that names only the other host
+    does not block this one. The Eden process check in `up` is the hard truth."""
     state = {}
-    for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
-        if m:
-            state[m.group(2)] = m.group(1) == "CLAIMED"
+    now = time.time()
+    for line in ledger_text().splitlines():
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        if not m:
+            continue
+        stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
+        names_hosts = re.findall(r"\b(surface|yoga)\b", line, re.I)
+        concerns = not names_hosts or HOST.lower() in {h.lower() for h in names_hosts}
+        state[m.group(3)] = m.group(2) == "CLAIMED" and (now - stamped) / 3600 < STALE_CLAIM_HOURS and concerns
     return [k for k, v in state.items() if v and k != OWNER]
 
 
@@ -242,9 +277,9 @@ def up(args):
         print(json.dumps({"active_claims": busy}))
         sys.exit(3)
     nro_hashes = {n.partition(":")[2] or Path(n).name: digest(n.partition(":")[0]) for n in args.nro}
-    ledger(f"CLAIMED: {OWNER} TrainingRooms package-1 Eden rows (clean-room plugin boot/delay/hazard/reset), "
-           f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
-           f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
+    ledger(f"CLAIMED: {OWNER} TrainingRooms package-2 Eden rows (CPU behaviours), "
+           f"solo run {label} on the {HOST}, display {DISPLAY}, own profile {PROFILE} (copy of "
+           f"{SOURCE.parent.parent.name}/profiles/{SOURCE.name}), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
         print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
                                   if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
@@ -252,14 +287,15 @@ def up(args):
                         "-Action", "Start", "-Unit", f"trp1-{label}-display", "-Socket", f"wayland-trp1-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
                        check=True, stdout=subprocess.DEVNULL)
-        subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit=trp1-{label}-gpu-lock",
-                        "--property=RuntimeMaxSec=3600", "--property=TimeoutStopSec=5", "/usr/bin/flock",
-                        "--nonblock", "/tmp/opencode/yoga-gpu-reservation.lock", "/usr/bin/sleep", "3600"],
-                       check=True)
-        time.sleep(1)
-        active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"trp1-{label}-gpu-lock"],
-                                capture_output=True, text=True).stdout.strip()
-        assert active == "active", "Yoga GPU lock is held by someone else"
+        if not SURFACE:  # the Yoga's GPU reservation lock; the Surface has none
+            subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit=trp1-{label}-gpu-lock",
+                            "--property=RuntimeMaxSec=3600", "--property=TimeoutStopSec=5", "/usr/bin/flock",
+                            "--nonblock", "/tmp/opencode/yoga-gpu-reservation.lock", "/usr/bin/sleep", "3600"],
+                           check=True)
+            time.sleep(1)
+            active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"trp1-{label}-gpu-lock"],
+                                    capture_output=True, text=True).stdout.strip()
+            assert active == "active", "Yoga GPU lock is held by someone else"
         print("launch", json.dumps(launch(label)))
         deadline = time.time() + 90
         while not (run_dir(label) / "control.sock").exists() and time.time() < deadline:
@@ -314,8 +350,8 @@ def down(args, failed=False):
     subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"trp1-{label}-gpu-lock"], check=False,
                    stderr=subprocess.DEVNULL)
     left = eden_processes()
-    ledger(f"RELEASED: {OWNER} TrainingRooms package-1 Eden run {label} stopped on the Yoga (display {DISPLAY} "
-           f"and GPU lock stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
+    ledger(f"RELEASED: {OWNER} TrainingRooms package-2 Eden run {label} stopped on the {HOST} (display {DISPLAY} "
+           f"stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
            f"No physical Switch writes.")
     print("down", json.dumps({"label": label, "failed_up": failed, **note, "left": left}))
 
@@ -333,6 +369,46 @@ def scan(args):
     for n, l in hits[:200]:
         print(f"{n}: {l[:300]}")
     print(f"-- {len(text)} lines, {len(hits)} matching")
+
+
+def diag_log_path():
+    return PROFILE / OUTPUT / "practice-diagnostics.log"
+
+
+def reload(args):
+    """Write a whole settings file as `diag-settings-next.json` (tmp file, then rename) and wait for the
+    plugin's `diag_settings_reload` line."""
+    out = PROFILE / OUTPUT
+    before = diag_log_path().read_text(encoding="utf-8", errors="replace").count("diag_settings_reload") \
+        if diag_log_path().exists() else 0
+    tmp = out / ".diag-settings-next.tmp"
+    shutil.copyfile(args.settings, tmp)
+    tmp.rename(out / "diag-settings-next.json")
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        text = diag_log_path().read_text(encoding="utf-8", errors="replace") if diag_log_path().exists() else ""
+        lines = [l for l in text.splitlines() if "diag_settings_reload" in l]
+        if len(lines) > before:
+            print(lines[-1])
+            return
+        time.sleep(1)
+    raise SystemExit("no diag_settings_reload line within 30 s")
+
+
+def collect(args):
+    dest = Path(__file__).resolve().parent / "runs" / args.label
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(PROFILE / OUTPUT, dest / "TrainingRooms", dirs_exist_ok=True)
+    pilot = PROFILE / "user/sdmc/ultimate/ssbu-cpu-pilot"
+    if pilot.exists():
+        shutil.copytree(pilot, dest / "ssbu-cpu-pilot", dirs_exist_ok=True)
+    for name in ("console.log", "run.json", "memory.peak"):
+        if (run_dir(args.label) / name).exists():
+            shutil.copyfile(run_dir(args.label) / name, dest / name)
+    for name in (f"PREP-{args.label}.json", f"LAUNCH-{args.label}.json"):
+        if (ROOT / name).exists():
+            shutil.copyfile(ROOT / name, dest / name)
+    print(dest)
 
 
 def restore(args):
@@ -390,6 +466,13 @@ def main():
     p = sub.add_parser("scan")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=scan)
+    p = sub.add_parser("reload")  # diag build: replace the live settings (B11 / Q18 A rows)
+    p.add_argument("label", type=label_ok)
+    p.add_argument("settings")
+    p.set_defaults(fn=reload)
+    p = sub.add_parser("collect")  # copy the run's logs next to the repo (eden/runs/<label>/, gitignored)
+    p.add_argument("label", type=label_ok)
+    p.set_defaults(fn=collect)
     p = sub.add_parser("shot")
     p.add_argument("label", type=label_ok)
     p.add_argument("name")

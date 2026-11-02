@@ -32,7 +32,7 @@ pub unsafe fn steve_read(accessor: usize, ids: &Table) -> Option<Steve> {
     }
     let mut counts = [0i32; 7];
     for (slot, c) in counts.iter_mut().zip(steve_layout::COUNT_IDS) {
-        *slot = n::work_get_int(accessor, id(ids, c)?);
+        *slot = natives::get_int(accessor, id(ids, c)?);
     }
     let mut tools = [(0u8, 0.0f32); steve_layout::TOOLS];
     for (i, tool) in tools.iter_mut().enumerate() {
@@ -53,7 +53,7 @@ pub unsafe fn steve_write(accessor: usize, ids: &Table, steve: &Steve) {
     let parts = steve_layout::parts(steve);
     for (value, c) in parts.counts.iter().zip(steve_layout::COUNT_IDS) {
         if let Some(slot) = id(ids, c) {
-            n::work_set_int(accessor, *value, slot);
+            natives::set_int(accessor, *value, slot);
         }
     }
     if let Some(slot) = id(ids, C::SteveExtendBuffer) {
@@ -89,7 +89,7 @@ unsafe fn pikmin_colour(object_id: u32, ids: &Table) -> Option<i32> {
     if accessor == 0 {
         return None;
     }
-    Some(n::work_get_int(accessor, id(ids, C::PikminVariation)?))
+    Some(natives::get_int(accessor, id(ids, C::PikminVariation)?))
 }
 
 /// The colours of Olimar's Pikmin in line order, held first (SPEC-state-02 §5.1).
@@ -105,7 +105,7 @@ pub unsafe fn olimar_line(accessor: usize, ids: &Table) -> [Option<i32>; 3] {
     let held_count = (((manager + TROOPS_HELD_COUNT) as *const u32).read() as usize).min(3);
     for (i, c) in [C::OlimarHold0, C::OlimarHold1, C::OlimarHold2].into_iter().enumerate().take(held_count) {
         if let Some(slot) = id(ids, c) {
-            let object = n::work_get_int(accessor, slot);
+            let object = natives::get_int(accessor, slot);
             if object > 0 {
                 held[i] = pikmin_colour(object as u32, ids);
             }
@@ -142,8 +142,8 @@ pub unsafe fn olimar_respawn(accessor: usize, ids: &Table, line: &[Option<i32>; 
     for _ in 0..3 {
         let active = n::article_active_num(accessor, article);
         let Some(colour) = charge::spawn_colour(active, line) else { break };
-        n::work_set_int(accessor, charge::prev_colour(colour), pre);
-        n::work_set_int(accessor, charge::prev_colour(charge::prev_colour(colour)), before);
+        natives::set_int(accessor, charge::prev_colour(colour), pre);
+        natives::set_int(accessor, charge::prev_colour(charge::prev_colour(colour)), before);
         n::article_generate(accessor, article, -1);
     }
     let manager = n::work_get_int64(accessor, TROOPS_MANAGER_ID) as usize;
@@ -172,7 +172,7 @@ pub unsafe fn olimar_respawn(accessor: usize, ids: &Table, line: &[Option<i32>; 
 /// As `steve_read`; `fighter` is Sora's fighter object.
 pub unsafe fn sora_spell(accessor: usize, fighter: usize, ids: &Table, saved: i32) {
     if let (Some(kind), Some(flag)) = (id(ids, C::SoraMagicKind), id(ids, C::SoraChangeMagicFlag)) {
-        n::work_set_int(accessor, charge::sora_written_kind(saved), kind);
+        natives::set_int(accessor, charge::sora_written_kind(saved), kind);
         natives::set_flag(accessor, true, flag);
         n::sora_change_magic(fighter);
     }
@@ -345,6 +345,6 @@ pub unsafe fn pt_apply(trainer: usize, ids: &PtIds, out: &crate::model::state::p
     }
     if out.ground_and_run && ids.ground != UNRESOLVED && ids.run != UNRESOLVED {
         n::set_situation_kind(trainer, ids.ground);
-        n::status_force(trainer, ids.run, false);
+        natives::change_status_force(trainer, ids.run, false);
     }
 }

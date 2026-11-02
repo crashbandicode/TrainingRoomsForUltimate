@@ -67,10 +67,10 @@ pub(crate) fn recording_or_playback() -> bool {
 
 /// The fork's `save_states` module, as far as the lobby reads it.
 pub(crate) mod save_states {
-    /// The stage id the game holds now (package 3's guarded native).
+    /// The stage id the game holds now (the guarded native, `game::natives::stage_id`; -1 when there is none).
     pub fn stage_id() -> i32 {
         // SAFETY: a guarded called function with no arguments.
-        unsafe { crate::runtime::state_natives::stage_id() }
+        unsafe { crate::runtime::game::natives::stage_id() }
     }
 
     /// A save state is loading (package 3's fact, `features::states::is_loading`).
