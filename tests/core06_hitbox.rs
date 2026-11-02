@@ -330,7 +330,7 @@ fn core06_site_guards() {
     // Three hooks (each its own row, installed independently), eight called natives, the accessor getter, two relied windows.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 8);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 9);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 5);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
@@ -356,19 +356,20 @@ fn core06_site_guards() {
         assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(site.name), "{}", site.name);
     }
     // The natives it shares with other packages are in its closure too: rejecting any of them blocks the feature.
-    for shared in ["status_kind", "lua_const_lookup", "effect_set_visible_kind"] {
-        let usable = |row: &model::sites::Site| row.name != shared;
-        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(shared), "{shared}");
+    for shared in capabilities::CROSS_NEEDS.iter().find(|(u, _)| *u == Feature::Hitbox).map(|(_, n)| *n).unwrap_or(&[]) {
+        let usable = |row: &model::sites::Site| row.name != *shared;
+        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(*shared), "{shared}");
     }
     // And the native-call layer grants only what passed: an unreachable row's function is not granted.
-    // (Rows with the same bytes and kind of guard on one function pass and fail together: the state package's
-    // `state_effect_kill_kind` names the same function as our `effect_kill_kind`.)
-    let poisoned: Vec<&str> = capabilities::equivalent_rows(capabilities::find("effect_kill_kind").unwrap()).map(|r| r.name).collect();
-    assert!(poisoned.len() >= 2 && poisoned.contains(&"effect_kill_kind"), "{poisoned:?}");
+    // A rejected native is not granted, and the others still are (rows with the same bytes on one function fail together).
+    let poisoned: Vec<&str> = capabilities::equivalent_rows(capabilities::find("sphere_effect_kill").unwrap()).map(|r| r.name).collect();
     let usable = |row: &model::sites::Site| !poisoned.contains(&row.name);
     let granted = capabilities::Granted::from_usable(&usable);
-    assert!(!granted.allows(sites_hitbox::HITBOX_KILL_KIND_OFFSET));
+    assert!(!granted.allows(sites_hitbox::HITBOX_KILL_OFFSET));
     assert!(granted.allows(sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET));
+    // The plugin never kills by kind: no row of ours names `EffectModule::kill_kind` (0x2017860), so the shield bubble and every other
+    // `sys_shield` user are never touched.
+    assert!(SITES.iter().all(|s| s.offset != 0x2017860));
     // The offsets constants name the rows.
     for (offset, name) in [
         (sites_hitbox::HITBOX_ATTACK_OFFSET, "hitbox_attack"),
@@ -377,7 +378,8 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_IS_ATTACK_OFFSET, "attack_is_attack"),
         (sites_hitbox::HITBOX_ATTACK_DATA_OFFSET, "attack_data"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
-        (sites_hitbox::HITBOX_KILL_KIND_OFFSET, "effect_kill_kind"),
+        (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
+        (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
         (sites_hitbox::HITBOX_RGB_LAST_OFFSET, "effect_set_rgb_partial_last"),
         (sites_hitbox::HITBOX_RATE_LAST_OFFSET, "effect_set_rate_last"),
         (sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET, "motion_animcmd_set_sleep_effect"),
@@ -406,7 +408,8 @@ fn core06_rows_match_the_owned_elf() {
         ("attack_is_attack", "_ZN3app8lua_bind28AttackModule__is_attack_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_data", "_ZN3app8lua_bind30AttackModule__attack_data_implEPNS_26BattleObjectModuleAccessorEib"),
         ("effect_req_follow", "_ZN3app8lua_bind29EffectModule__req_follow_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_RKNS3_8Vector3fES7_fbjiiiibb"),
-        ("effect_kill_kind", "_ZN3app8lua_bind28EffectModule__kill_kind_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40Ebb"),
+        ("sphere_effect_kill", "_ZN3app8lua_bind23EffectModule__kill_implEPNS_26BattleObjectModuleAccessorEjbb"),
+        ("sphere_effect_is_exist", "_ZN3app8lua_bind34EffectModule__is_exist_effect_implEPNS_26BattleObjectModuleAccessorEj"),
         ("effect_set_rgb_partial_last", "_ZN3app8lua_bind39EffectModule__set_rgb_partial_last_implEPNS_26BattleObjectModuleAccessorEfff"),
         ("effect_set_rate_last", "_ZN3app8lua_bind32EffectModule__set_rate_last_implEPNS_26BattleObjectModuleAccessorEf"),
         ("motion_animcmd_set_sleep_effect", "_ZN3app8lua_bind42MotionAnimcmdModule__set_sleep_effect_implEPNS_26BattleObjectModuleAccessorEb"),
@@ -612,4 +615,154 @@ fn core06_hurtbox_layout_matches_the_owned_elf() {
     assert_eq!(w(0x469540), 0xb9807818, "ldrsw x24, [x0, #0x78]");
     // get_part_size(group) answers the group's count (slot 0x170): `ldrsh w0, [x8, #0x6]`.
     assert_eq!(w(0x46a8bc), 0x79c0_0d00);
+}
+
+// ---- persistent spheres: the handle-set state machine (lead ruling on Q3) ---------------------------------------------
+
+/// A fake effect module: handles 1, 2, 3, ... while the pool has room; `end` ends a handle as a status change would.
+struct FakeFx {
+    live: Vec<u32>,
+    next: u32,
+    pool: usize,
+    log: Vec<String>,
+}
+
+impl FakeFx {
+    fn new(pool: usize) -> FakeFx {
+        FakeFx { live: Vec::new(), next: 1, pool, log: Vec::new() }
+    }
+    fn end(&mut self, h: u32) {
+        self.live.retain(|x| *x != h);
+    }
+}
+
+impl hitbox::Effects for FakeFx {
+    fn sphere_alive(&mut self, h: u32) -> bool {
+        self.live.contains(&h)
+    }
+    fn sphere_kill_own(&mut self, h: u32) {
+        assert!(self.live.contains(&h), "killed a handle that is not alive: {h}");
+        self.live.retain(|x| *x != h);
+        self.log.push(format!("kill {h}"));
+    }
+    fn sphere_spawn(&mut self, s: &hitbox::Sphere) -> u32 {
+        if self.live.len() >= self.pool {
+            self.log.push(format!("refused {:#x}", s.key));
+            return 0;
+        }
+        let h = self.next;
+        self.next += 1;
+        self.live.push(h);
+        self.log.push(format!("spawn {:#x} -> {h}", s.key));
+        h
+    }
+}
+
+fn sphere(key: u32, x: f32) -> hitbox::Sphere {
+    hitbox::Sphere { key, joint: 7, pos: [x, 0.0, 0.0], scale: 0.2, tint: hitbox::HURTBOX_TINT }
+}
+
+#[test]
+fn core06_persistent_spheres() {
+    use hitbox::{sphere_key, HandleSet, KIND_GRAB, KIND_HIT, KIND_HURT};
+    let mut fx = FakeFx::new(100);
+    let mut set = HandleSet::new();
+    let hurt: Vec<_> = (0..3).map(|i| sphere(sphere_key(KIND_HURT, i, 0), i as f32)).collect();
+    // First pass: every sphere is requested once.
+    let c = set.reconcile(&hurt, true, &mut fx);
+    assert_eq!((c.spawned, c.kept, c.killed), (3, 0, 0));
+    // Unchanged frames: nothing is requested or killed, only checked (the effects follow their bones by themselves).
+    for _ in 0..10 {
+        let c = set.reconcile(&hurt, true, &mut fx);
+        assert_eq!((c.spawned, c.kept, c.killed, c.ended), (0, 3, 0, 0));
+    }
+    assert_eq!(fx.live.len(), 3);
+    // A hitbox appears: only it is requested; it goes: only it is killed, by its own handle.
+    let mut with_hit = hurt.clone();
+    with_hit.push(sphere(sphere_key(KIND_HIT, 0, 0), 9.0));
+    let c = set.reconcile(&with_hit, true, &mut fx);
+    assert_eq!((c.spawned, c.kept), (1, 3));
+    let hit_handle = *fx.live.last().unwrap();
+    let c = set.reconcile(&hurt, true, &mut fx);
+    assert_eq!((c.killed, c.kept, c.spawned), (1, 3, 0));
+    assert!(fx.log.contains(&format!("kill {hit_handle}")));
+    // A shape that changed (a part moved to another offset) is killed and requested again.
+    let mut moved = hurt.clone();
+    moved[1].pos = [5.0, 0.0, 0.0];
+    let c = set.reconcile(&moved, true, &mut fx);
+    assert_eq!((c.killed, c.spawned, c.kept), (1, 1, 2));
+    // The game ended a sphere (a status change concluded it): it is requested again, never killed.
+    let ended = set.handles().next().unwrap();
+    fx.end(ended);
+    let c = set.reconcile(&moved, true, &mut fx);
+    assert_eq!((c.ended, c.spawned, c.killed), (1, 1, 0));
+    // Grab spheres: queued by the command, requested by the pass, kept while the game keeps them, never requested again.
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), 1.0)));
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 1), 2.0)));
+    let c = set.reconcile(&[], true, &mut fx);
+    assert_eq!(c.spawned, 2, "the grab spheres");
+    assert_eq!(c.killed, 3, "a grab status wants no hitbox or hurtbox spheres");
+    assert_eq!(set.len(), 2);
+    let grab = set.handles().next().unwrap();
+    fx.end(grab);
+    let c = set.reconcile(&[], true, &mut fx);
+    assert_eq!((c.ended, c.spawned, c.kept), (1, 0, 1), "a grab sphere the game ended is not requested again");
+    // Off / shield / rebound / not practice: every held sphere is killed by its handle, the queue is dropped.
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 1, 0), 3.0)));
+    let c = set.clear(&mut fx);
+    assert_eq!((c.killed, c.spawned), (1, 0));
+    assert!(set.is_empty() && fx.live.is_empty());
+    // A full pool: the refused requests are counted and asked again next pass; what fits stays.
+    let mut small = FakeFx::new(2);
+    let mut set = HandleSet::new();
+    let c = set.reconcile(&hurt, true, &mut small);
+    assert_eq!((c.spawned, c.failed), (2, 1));
+    let c = set.reconcile(&hurt, true, &mut small);
+    assert_eq!((c.kept, c.failed, c.spawned), (2, 1, 0));
+    // Never more than MAX_HELD per fighter: the rest is counted as dropped.
+    let mut big = FakeFx::new(10_000);
+    let mut set = HandleSet::new();
+    let many: Vec<_> = (0..hitbox::MAX_HELD + 5).map(|i| sphere(sphere_key(KIND_HURT, i, 0), i as f32)).collect();
+    let c = set.reconcile(&many, true, &mut big);
+    assert_eq!((c.spawned as usize, c.dropped), (hitbox::MAX_HELD, 5));
+    // Forget (the fighter object was initialised again): records go without a single call.
+    let calls = big.log.len();
+    set.forget();
+    assert!(set.is_empty());
+    assert_eq!(big.log.len(), calls);
+}
+
+#[test]
+fn core06_fighter_sets_and_keys() {
+    use hitbox::{sphere_key, SetTable, FIGHTER_SETS, KIND_GRAB, KIND_HIT, KIND_HURT};
+    // Keys tell kind, index and sphere apart.
+    let keys = [sphere_key(KIND_HIT, 0, 0), sphere_key(KIND_HIT, 0, 1), sphere_key(KIND_HIT, 1, 0), sphere_key(KIND_HURT, 0, 0), sphere_key(KIND_GRAB, 0, 0)];
+    for (i, a) in keys.iter().enumerate() {
+        for b in &keys[i + 1..] {
+            assert_ne!(a, b);
+        }
+    }
+    // push_shape: a capsule's spheres in order, keyed per sphere, scaled and tinted; what does not fit is counted.
+    let shape = hitbox::Shape { id: 2, joint: 9, size: 2.0, a: [0.0; 3], b: Some([10.0, 0.0, 0.0]) };
+    let mut out = [hitbox::Sphere::NONE; 3];
+    let mut len = 0;
+    let left = hitbox::push_shape(&mut out, &mut len, KIND_HIT, 2, &shape, hitbox::hitbox_tint(2));
+    assert_eq!((len, left), (3, 1), "4 spheres for 10 units at size 2, one left out");
+    assert_eq!(out[1].key, sphere_key(KIND_HIT, 2, 1));
+    assert!((out[0].scale - 0.19).abs() < 1e-6);
+    // The table: one set per fighter; a new fighter takes a free set, then the least recently used one, forgotten.
+    let mut table = SetTable::new();
+    let first = table.index_for(0x1000);
+    assert_eq!(table.index_for(0x1000), first);
+    for k in 1..FIGHTER_SETS {
+        table.index_for(0x1000 + k * 0x100);
+    }
+    table.sets[first].push_grab(hitbox::Sphere::NONE);
+    assert!(!table.sets[first].is_empty());
+    table.index_for(0x1000 + 0x100); // used again: 0x1000 is now the oldest
+    let taken = table.index_for(0x9000);
+    assert_eq!(taken, first, "the least recently used fighter's set is taken over");
+    assert!(table.sets[taken].is_empty(), "and forgotten, without a game call");
+    assert_eq!(table.find(0x1000), None);
+    assert_eq!(table.find(0), None);
 }

@@ -661,6 +661,8 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     }
     if let Some(ledge) = out.restored {
         recorder::on_state_restored(ledge);
+        // SPEC-core-06: the hitbox visualizer's held spheres go and come back from the restored state (no game call here).
+        crate::runtime::features::hitbox::on_state_restored();
         state_diag!("[TrainingRooms] state restored ledge={ledge}");
     }
 }

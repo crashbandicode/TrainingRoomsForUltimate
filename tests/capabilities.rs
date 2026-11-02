@@ -125,6 +125,10 @@ impl Analysis {
         let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
+        // SPEC-core-06: the held-sphere state machine (`model::hitbox::HandleSet`, not scanned) calls back into the runtime's effect module.
+        for (from, to) in [("hitbox::frame", "hitbox::sphere_alive"), ("hitbox::frame", "hitbox::sphere_kill_own"), ("hitbox::frame", "hitbox::sphere_spawn"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own")] {
+            graph.dynamic.push((from.to_owned(), to.to_owned()));
+        }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
             assert_eq!(graph.find(to).len(), 1, "dynamic edge target {to}");

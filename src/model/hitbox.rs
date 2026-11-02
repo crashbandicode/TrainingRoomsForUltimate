@@ -458,3 +458,258 @@ impl Default for SleepBook {
         SleepBook::new()
     }
 }
+
+// ---- persistent spheres (lead ruling 2026-11-02 on Q3, after Eden hb-01) ------------------------------------------
+//
+// Respawning every sphere every frame (kill by kind, request again) ran the game's effect pool dry once hurtboxes were drawn
+// (Eden hb-01: the CPU's 55 hurtbox spheres and the grab boxes never appeared, later none at all). Each sphere is now an effect
+// the plugin keeps: requested once on its bone (the effect follows the bone by itself), killed by its own handle when its shape
+// changes or goes away, and requested again only when the game itself ended it (a status change concludes it). The plugin never
+// kills by kind, so the shield bubble and every other `sys_shield` user are left alone.
+
+/// Spheres one fighter can hold at once (every attack slot's and every hurtbox part's spheres together).
+pub const MAX_HELD: usize = 128;
+/// Grab spheres waiting for the fighter's pass (the `CATCH` command records them; the pass requests them).
+pub const MAX_PENDING: usize = 24;
+/// Fighters tracked at once (eight entries; a fighter that is gone is forgotten without a game call).
+pub const FIGHTER_SETS: usize = 8;
+
+pub const KIND_HIT: u32 = 1;
+pub const KIND_HURT: u32 = 2;
+pub const KIND_GRAB: u32 = 3;
+
+/// The identity of one sphere: what it belongs to (`kind`), which slot, part or grab id (`index`), which sphere of its capsule.
+pub const fn sphere_key(kind: u32, index: usize, sphere: usize) -> u32 {
+    (kind << 24) | (((index & 0xffff) as u32) << 8) | (sphere & 0xff) as u32
+}
+
+/// One sphere as the game is asked for it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sphere {
+    pub key: u32,
+    pub joint: u64,
+    pub pos: [f32; 3],
+    pub scale: f32,
+    pub tint: [f32; 3],
+}
+
+impl Sphere {
+    pub const NONE: Sphere = Sphere { key: 0, joint: 0, pos: [0.0; 3], scale: 0.0, tint: [0.0; 3] };
+}
+
+/// Append a shape's spheres to `out[..*len]` (as many as fit). Returns how many were left out for lack of room.
+pub fn push_shape(out: &mut [Sphere], len: &mut usize, kind: u32, index: usize, shape: &Shape, tint: [f32; 3]) -> u32 {
+    let mut left_out = 0;
+    for (i, pos) in spheres(shape.a, shape.b, shape.size).enumerate() {
+        if *len >= out.len() {
+            left_out += 1;
+            continue;
+        }
+        out[*len] = Sphere { key: sphere_key(kind, index, i), joint: shape.joint, pos, scale: sphere_scale(shape.size), tint };
+        *len += 1;
+    }
+    left_out
+}
+
+/// What the plugin asks of the game's effect module for one fighter (the runtime calls the natives; the tests count).
+pub trait Effects {
+    /// Whether the effect behind `handle` still exists (the game ends a sphere at a status change).
+    fn sphere_alive(&mut self, handle: u32) -> bool;
+    /// End one of the plugin's own effects.
+    fn sphere_kill_own(&mut self, handle: u32);
+    /// Request a sphere; its handle, 0 when the game made none.
+    fn sphere_spawn(&mut self, sphere: &Sphere) -> u32;
+}
+
+/// What one reconciliation did.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Counts {
+    /// Spheres kept as they were (one existence check each).
+    pub kept: u32,
+    pub spawned: u32,
+    /// Own spheres killed (their shape changed or went away).
+    pub killed: u32,
+    /// Own spheres the game had already ended (dropped from the set, no call).
+    pub ended: u32,
+    /// Requests the game answered with no effect (its pool is full).
+    pub failed: u32,
+    /// Spheres left out because the set was full.
+    pub dropped: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Held {
+    sphere: Sphere,
+    handle: u32,
+    /// A grab sphere: requested once, kept until the game ends it or the rebound clears it, never requested again.
+    once: bool,
+}
+
+/// One fighter's spheres: the handles the plugin holds and the grab spheres waiting for the pass. Fixed storage.
+#[derive(Clone, Copy, Debug)]
+pub struct HandleSet {
+    held: [Held; MAX_HELD],
+    len: usize,
+    pending: [Sphere; MAX_PENDING],
+    pending_len: usize,
+}
+
+impl Default for HandleSet {
+    fn default() -> Self {
+        HandleSet::new()
+    }
+}
+
+impl HandleSet {
+    pub const fn new() -> HandleSet {
+        HandleSet {
+            held: [Held { sphere: Sphere::NONE, handle: 0, once: false }; MAX_HELD],
+            len: 0,
+            pending: [Sphere::NONE; MAX_PENDING],
+            pending_len: 0,
+        }
+    }
+
+    /// Spheres held now.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0 && self.pending_len == 0
+    }
+
+    /// The handles held now (tests, diagnostics).
+    pub fn handles(&self) -> impl Iterator<Item = u32> + '_ {
+        self.held[..self.len].iter().map(|h| h.handle)
+    }
+
+    /// The `CATCH` command made a grab sphere: requested by the fighter's next pass. `false` when the queue is full.
+    pub fn push_grab(&mut self, sphere: Sphere) -> bool {
+        if self.pending_len == MAX_PENDING {
+            return false;
+        }
+        self.pending[self.pending_len] = sphere;
+        self.pending_len += 1;
+        true
+    }
+
+    fn remove(&mut self, i: usize) {
+        self.held[i] = self.held[self.len - 1];
+        self.len -= 1;
+    }
+
+    fn add(&mut self, sphere: &Sphere, once: bool, fx: &mut impl Effects, c: &mut Counts) {
+        if self.len == MAX_HELD {
+            c.dropped += 1;
+            return;
+        }
+        let handle = fx.sphere_spawn(sphere);
+        if handle == 0 {
+            c.failed += 1;
+            return;
+        }
+        self.held[self.len] = Held { sphere: *sphere, handle, once };
+        self.len += 1;
+        c.spawned += 1;
+    }
+
+    /// Make the held spheres the `wants` (plus the grab spheres, kept while the game keeps them when `keep_grabs`): a held sphere
+    /// whose want is unchanged and that still exists is kept; one whose want changed or went away is killed (when it still
+    /// exists); one the game ended is dropped; every want not held is requested. Kills come before requests, so the pool gets
+    /// back what the fighter gives up before it asks again. Waiting grab spheres are requested when `keep_grabs`, else dropped.
+    pub fn reconcile(&mut self, wants: &[Sphere], keep_grabs: bool, fx: &mut impl Effects) -> Counts {
+        let mut c = Counts::default();
+        let mut i = 0;
+        while i < self.len {
+            let h = self.held[i];
+            let wanted = if h.once { keep_grabs } else { wants.iter().any(|w| *w == h.sphere) };
+            let alive = fx.sphere_alive(h.handle);
+            if wanted && alive {
+                c.kept += 1;
+                i += 1;
+                continue;
+            }
+            if alive {
+                fx.sphere_kill_own(h.handle);
+                c.killed += 1;
+            } else {
+                c.ended += 1;
+            }
+            self.remove(i);
+        }
+        for w in wants {
+            if !self.held[..self.len].iter().any(|h| !h.once && h.sphere.key == w.key) {
+                self.add(w, false, fx, &mut c);
+            }
+        }
+        if keep_grabs {
+            for k in 0..self.pending_len {
+                let p = self.pending[k];
+                self.add(&p, true, fx, &mut c);
+            }
+        }
+        self.pending_len = 0;
+        c
+    }
+
+    /// Kill every sphere still held and drop the waiting ones (the setting went Off, the fighter shields, the scene is no practice,
+    /// a save state was loaded, a grab ended).
+    pub fn clear(&mut self, fx: &mut impl Effects) -> Counts {
+        self.reconcile(&[], false, fx)
+    }
+
+    /// Drop every record without a game call: the fighter object was initialised again (its effect module may reuse the numbers,
+    /// so the old handles must not be used; the game ends the old spheres with the status they concluded with).
+    pub fn forget(&mut self) {
+        self.len = 0;
+        self.pending_len = 0;
+    }
+}
+
+/// The fighters' sets, by accessor address; a new fighter takes a free or the least recently used set (forgotten, no call).
+#[derive(Clone, Copy, Debug)]
+pub struct SetTable {
+    keys: [usize; FIGHTER_SETS],
+    used: [u64; FIGHTER_SETS],
+    clock: u64,
+    pub sets: [HandleSet; FIGHTER_SETS],
+}
+
+impl Default for SetTable {
+    fn default() -> Self {
+        SetTable::new()
+    }
+}
+
+impl SetTable {
+    pub const fn new() -> SetTable {
+        SetTable { keys: [0; FIGHTER_SETS], used: [0; FIGHTER_SETS], clock: 0, sets: [HandleSet::new(); FIGHTER_SETS] }
+    }
+
+    /// The set of `key` (an accessor address), taken over when new.
+    pub fn index_for(&mut self, key: usize) -> usize {
+        self.clock += 1;
+        let i = match self.keys.iter().position(|k| *k == key) {
+            Some(i) => i,
+            None => {
+                let i = (0..FIGHTER_SETS).min_by_key(|&i| (self.keys[i] != 0, self.used[i])).unwrap_or(0);
+                self.keys[i] = key;
+                self.sets[i].forget();
+                i
+            }
+        };
+        self.used[i] = self.clock;
+        i
+    }
+
+    /// The set of `key` if it has one.
+    pub fn find(&self, key: usize) -> Option<usize> {
+        self.keys.iter().position(|k| *k == key && key != 0)
+    }
+
+    /// Spheres held by every fighter (diagnostics: the plugin's share of the effect pool).
+    pub fn held_spheres(&self) -> usize {
+        self.sets.iter().map(|s| s.len()).sum()
+    }
+}

@@ -3,7 +3,7 @@
 //! read from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` and `tests/core06_hitbox.rs` re-checks every row against
 //! it. Offsets are from the start of `.text`.
 //!
-//! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), eight called natives of the
+//! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), nine called natives of the
 //! attack, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
 //! repeats from the game's own command code) and three relied-on windows of HitModule (the hurtbox tables, decision HB1). Every row is a capability (`model::capabilities`); the natives the
 //! feature shares with other packages (`status_kind`, the constant lookup, `set_visible_kind`) stay in those packages' tables
@@ -18,7 +18,8 @@ pub const HITBOX_REBOUND_OFFSET: usize = 0x202_7bb0;
 pub const HITBOX_IS_ATTACK_OFFSET: usize = 0x1fd_01c0;
 pub const HITBOX_ATTACK_DATA_OFFSET: usize = 0x1fd_0520;
 pub const HITBOX_REQ_FOLLOW_OFFSET: usize = 0x201_7730;
-pub const HITBOX_KILL_KIND_OFFSET: usize = 0x201_7860;
+pub const HITBOX_KILL_OFFSET: usize = 0x201_7840;
+pub const HITBOX_IS_EXIST_OFFSET: usize = 0x201_7a20;
 pub const HITBOX_RGB_LAST_OFFSET: usize = 0x201_7c80;
 pub const HITBOX_RATE_LAST_OFFSET: usize = 0x201_7ce0;
 pub const HITBOX_SLEEP_EFFECT_OFFSET: usize = 0x206_9140;
@@ -33,7 +34,7 @@ pub const HITBOX_HURT_PART_OFFSET: usize = 0x46_8490;
 /// The three hooks' rows (the other rows are called or relied on, never written).
 pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
 
-pub static SITES: [Site; 16] = [
+pub static SITES: [Site; 17] = [
     Site {
         name: "hitbox_attack",
         feature: Feature::Hitbox,
@@ -113,17 +114,30 @@ pub static SITES: [Site; 16] = [
         note: "`EffectModule::req_follow(accessor, Hash40 effect, Hash40 joint, pos&, rot&, scale, follow, attribute, 0, 0, 0, 0, bool, bool)`: spawns the sphere (the game's `sys_shield` effect) attached to the hitbox's bone.",
     },
     Site {
-        name: "effect_kill_kind",
+        name: "sphere_effect_kill",
         feature: Feature::Hitbox,
-        offset: 0x2017860,
+        offset: 0x2017840,
         kind: SeamKind::Called,
         guard: [
+            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x04, 0x6d, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
+            0x63, 0x00, 0x00, 0x12, 0x80, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x04, 0x71, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
             0x63, 0x00, 0x00, 0x12, 0x80, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x04, 0x75, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
-            0x63, 0x00, 0x00, 0x12, 0x80, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
-        note: "`EffectModule::kill_kind(accessor, Hash40 effect, bool, bool)`: removes the previous frame's spheres.",
+        note: "`EffectModule::kill(accessor, unsigned handle, bool, bool)`: ends one of the plugin's own spheres by its handle (never by kind, so the shield bubble and other `sys_shield` users are untouched).",
+    },
+    Site {
+        name: "sphere_effect_is_exist",
+        feature: Feature::Hitbox,
+        offset: 0x2017a20,
+        kind: SeamKind::Called,
+        guard: [
+            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0xc5, 0x40, 0xf9, 0x40, 0x00, 0x1f, 0xd6,
+            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0xc9, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
+            0x60, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0xcd, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
+        ],
+        note: "`EffectModule::is_exist_effect(accessor, unsigned handle)`: whether a held sphere still exists (the game ends it at a status change) before it is kept or killed.",
     },
     Site {
         name: "effect_set_rgb_partial_last",

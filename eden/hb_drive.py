@@ -65,10 +65,8 @@ def main():
         print(json.dumps(r.call(label, rest[0], json.loads(rest[1]) if len(rest) > 1 else None)))
     elif op == "speed":
         if rest[0] == "off":
-            print(json.dumps(r.call(label, "settings.set", {"key": "core.use_speed_limit", "value": True})))
             print(json.dumps(r.call(label, "settings.set", {"key": "core.speed_limit", "value": 100})))
         else:
-            print(json.dumps(r.call(label, "settings.set", {"key": "core.use_speed_limit", "value": True})))
             print(json.dumps(r.call(label, "settings.set", {"key": "core.speed_limit", "value": int(rest[0])})))
     else:
         sys.exit(f"unknown op {op}")

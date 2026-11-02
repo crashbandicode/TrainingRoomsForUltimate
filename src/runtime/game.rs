@@ -419,17 +419,23 @@ pub mod natives {
         at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
     }
 
-    /// `EffectModule::req_follow(accessor, effect, joint, pos, zero rot, scale, follow = true, attribute, 0, 0, 0, 0, true, true)`.
-    pub unsafe fn sphere_req_follow(accessor: usize, effect: u64, joint: u64, pos: &[f32; 3], scale: f32, attribute: u32) {
-        type ReqFollow = extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u64;
+    /// `EffectModule::req_follow(accessor, effect, joint, pos, zero rot, scale, follow = true, attribute, 0, 0, 0, 0, true, true)`: the
+    /// effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none (or the call was not granted).
+    pub unsafe fn sphere_req_follow(accessor: usize, effect: u64, joint: u64, pos: &[f32; 3], scale: f32, attribute: u32) -> u32 {
+        type ReqFollow = extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u32;
         let zero = [0.0f32; 3];
         at::<ReqFollow>(crate::model::sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET)
-            .map_or_else(Default::default, |f| f(accessor, effect, joint, pos, &zero, scale, true, attribute, 0, 0, 0, 0, true, true));
+            .map_or_else(Default::default, |f| f(accessor, effect, joint, pos, &zero, scale, true, attribute, 0, 0, 0, 0, true, true))
     }
 
-    /// `EffectModule::kill_kind(accessor, effect, false, true)`.
-    pub unsafe fn sphere_kill_kind(accessor: usize, effect: u64) {
-        at::<extern "C" fn(usize, u64, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, false, true))
+    /// `EffectModule::kill(accessor, handle, false, true)`: ends one of the plugin's own effects (never by kind).
+    pub unsafe fn sphere_kill(accessor: usize, handle: u32) {
+        at::<extern "C" fn(usize, u32, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
+    }
+
+    /// `EffectModule::is_exist_effect(accessor, handle)`: whether the effect still exists (false when the call was not granted).
+    pub unsafe fn sphere_is_exist(accessor: usize, handle: u32) -> bool {
+        at::<extern "C" fn(usize, u32) -> bool>(crate::model::sites_hitbox::HITBOX_IS_EXIST_OFFSET).map_or_else(Default::default, |f| f(accessor, handle))
     }
 
     /// `EffectModule::set_rgb_partial_last(accessor, r, g, b)`: tints the effect just requested.

@@ -1,8 +1,13 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
-//! With the `hitbox_vis` setting On, every active hitbox of a fighter in Training is drawn as translucent spheres (the game's
-//! `sys_shield` effect) that follow the hitbox's bone, tinted by hitbox id; grab boxes are drawn when their command runs. The
-//! fighter's other animation-command effects are put to sleep meanwhile, except in the grab, tread and knockdown statuses.
+//! With the `hitbox_vis` setting On, every active hitbox (by id colour), every grab box and every hurtbox (yellow, decision HB1)
+//! of a fighter in Training is drawn as translucent spheres (the game's `sys_shield` effect) on its bone. The fighter's other
+//! animation-command effects are put to sleep meanwhile, except in the grab, tread and knockdown statuses.
+//!
+//! The spheres are kept, not respawned (lead ruling 2026-11-02 on Q3, after Eden hb-01 ran the effect pool dry): each fighter's
+//! pass works out the spheres it wants and `model::hitbox::HandleSet` requests the new ones, keeps the unchanged ones (they follow
+//! their bones by themselves) and kills the ones that changed or went away by their own handles. Nothing is ever killed by kind,
+//! so the shield bubble and the game's other `sys_shield` effects are never touched.
 //!
 //! Three hooks (`sites_hitbox`: the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`) and one per-frame
 //! pass, `frame`, which the CPU core's on-frame wrapper calls for every fighter after the game's own frame (SPEC-core-01 §5.2:
@@ -10,12 +15,8 @@
 //! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
 //! `game::natives`, whose grant check refuses a row boot rejected.
 //!
-//! No allocation: the spheres are an iterator over at most 16 points, the Lua stack is read in place, the sleep bookkeeping is
-//! fixed storage, and every entry point counts under a `HookScope`. Writes: only the game's effect and motion-animation-command
-//! module calls named in the spec (no memory is written outside them); the pass runs on the game thread.
-//!
-//! NOT YET SWITCH-RUN beyond the builds recorded in `IMPLEMENTATION-PROGRESS-hitbox.md`.
-
+//! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and the hurtbox tables are read in place, and
+//! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
@@ -23,7 +24,7 @@ use smash::app::BattleObjectModuleAccessor;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, Cell, FrameFacts, Indices, Shape, SleepBook, StatusIds};
+use crate::model::hitbox::{self, layout, Cell, Counts, Effects, FrameFacts, Indices, SetTable, Shape, SleepBook, Sphere, StatusIds};
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::scene::Scene;
 use crate::model::settings::Snapshot;
@@ -118,38 +119,109 @@ fn book_set(accessor: usize, slept: bool) {
     }
 }
 
-// ---- drawing ------------------------------------------------------------------------------------------------------
 
-/// One shape as spheres on its bone: request, tint, rate. Returns how many were drawn.
-unsafe fn draw_shape(accessor: usize, joint: u64, size: f32, a: [f32; 3], b: Option<[f32; 3]>, tint: [f32; 3]) -> u32 {
-    let effect = EFFECT.load(Ordering::Acquire);
-    let attribute = ATTRIBUTE.load(Ordering::Acquire);
-    let scale = hitbox::sphere_scale(size);
-    let mut drawn = 0;
-    for position in hitbox::spheres(a, b, size) {
-        natives::sphere_req_follow(accessor, effect, joint, &position, scale, attribute);
-        natives::sphere_set_rgb(accessor, tint);
-        natives::sphere_set_rate(accessor, hitbox::RATE);
-        drawn += 1;
+// ---- the spheres the plugin keeps (lead ruling 2026-11-02 on Q3) ------------------------------------------------------
+
+/// Every fighter's held spheres, the scratch list of the spheres a pass wants, and the save-state epoch each set last saw.
+struct Store {
+    table: SetTable,
+    seen_epoch: [u32; hitbox::FIGHTER_SETS],
+    wants: [Sphere; hitbox::MAX_HELD],
+}
+
+static STORE: Mutex<Store> =
+    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::MAX_HELD] });
+/// Spheres held by every fighter together (the per-frame pass skips everything when this is 0 and the setting is Off).
+static HELD: AtomicUsize = AtomicUsize::new(0);
+/// Bumped when a save state was loaded: every fighter's set kills its spheres on its next pass.
+static RESTORE_EPOCH: AtomicU32 = AtomicU32::new(0);
+
+/// A save state finished loading (package 3's restore completion calls this; no game call here).
+pub fn on_state_restored() {
+    RESTORE_EPOCH.fetch_add(1, Ordering::AcqRel);
+}
+
+/// The game initialised this fighter object again (the reset hub's on-init wrapper calls this): its records are dropped without a
+/// game call, since its effect module may hand out the same numbers again; the game ends the old spheres with their status.
+pub fn forget_fighter(fighter: usize) {
+    if fighter == 0 {
+        return;
     }
-    drawn
+    // SAFETY: a field read of the fighter object the game just initialised.
+    let accessor = unsafe { natives::fighter_accessor(fighter) };
+    let mut store = STORE.lock();
+    if let Some(i) = store.table.find(accessor) {
+        store.table.sets[i].forget();
+    }
+    HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+}
+
+/// The game's effect module of one fighter, as `model::hitbox::Effects`.
+struct GameEffects {
+    accessor: usize,
+    effect: u64,
+    attribute: u32,
+}
+
+impl Effects for GameEffects {
+    fn sphere_alive(&mut self, handle: u32) -> bool {
+        // SAFETY: `accessor` is the live fighter whose pass or hook runs now; the native checks its own grant.
+        unsafe { natives::sphere_is_exist(self.accessor, handle) }
+    }
+
+    fn sphere_kill_own(&mut self, handle: u32) {
+        // SAFETY: as above; `handle` is one of this fighter's own spheres that still exists.
+        unsafe { natives::sphere_kill(self.accessor, handle) }
+    }
+
+    fn sphere_spawn(&mut self, sphere: &Sphere) -> u32 {
+        // SAFETY: as above.
+        unsafe {
+            let handle = natives::sphere_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, sphere.scale, self.attribute);
+            if handle != 0 {
+                natives::sphere_set_rgb(self.accessor, sphere.tint);
+                natives::sphere_set_rate(self.accessor, hitbox::RATE);
+            }
+            handle
+        }
+    }
+}
+
+fn effects(accessor: usize) -> GameEffects {
+    GameEffects { accessor, effect: EFFECT.load(Ordering::Acquire), attribute: ATTRIBUTE.load(Ordering::Acquire) }
 }
 
 unsafe fn read_vec3(at: usize) -> [f32; 3] {
     [(at as *const f32).read(), ((at + 4) as *const f32).read(), ((at + 8) as *const f32).read()]
 }
 
-/// Hide and kill the previous frame's spheres of one fighter.
-unsafe fn clear_spheres(accessor: usize) {
-    let effect = EFFECT.load(Ordering::Acquire);
-    natives::set_visible_kind(accessor, effect, false);
-    natives::sphere_kill_kind(accessor, effect);
+/// The spheres of the fighter's active attack slots, appended to `out`. Returns how many were left out for lack of room.
+unsafe fn want_hitboxes(accessor: usize, out: &mut [Sphere], len: &mut usize) -> u32 {
+    let mut left_out = 0;
+    for slot in 0..hitbox::SLOTS {
+        if !natives::attack_is_attack(accessor, slot) {
+            continue;
+        }
+        let data = natives::attack_data(accessor, slot);
+        if data == 0 {
+            continue;
+        }
+        let shape = Shape {
+            id: slot,
+            joint: ((data + layout::NODE) as *const u64).read(),
+            size: ((data + layout::SIZE) as *const f32).read(),
+            a: read_vec3(data + layout::OFFSET),
+            b: hitbox::second_centre(read_vec3(data + layout::OFFSET2)),
+        };
+        left_out += hitbox::push_shape(out, len, hitbox::KIND_HIT, slot as usize, &shape, hitbox::hitbox_tint(slot));
+    }
+    left_out
 }
 
 /// The fighter's hurtboxes (decision HB1): the parts of `HitModule`'s group 0 that are not switched off, each its capsule on its
 /// bone, yellow. The tables are read in place (layout `model::hitbox::layout`, rows `hurtbox_*`); a table that does not look like
-/// one draws nothing. Returns how many spheres were drawn.
-unsafe fn draw_hurtboxes(accessor: usize) -> u32 {
+/// one gives nothing. Returns how many spheres were left out for lack of room.
+unsafe fn want_hurtboxes(accessor: usize, out: &mut [Sphere], len: &mut usize) -> u32 {
     let module = ((accessor + layout::HIT_MODULE) as *const usize).read();
     if module == 0 {
         return 0;
@@ -164,19 +236,36 @@ unsafe fn draw_hurtboxes(accessor: usize) -> u32 {
     let first = ((group + layout::HIT_GROUP_FIRST) as *const i16).read_unaligned();
     let count = ((group + layout::HIT_GROUP_COUNT) as *const i16).read_unaligned();
     let Some(range) = hitbox::group_parts(first, count, total) else { return 0 };
-    let mut drawn = 0;
+    let mut left_out = 0;
     for index in range {
         let record = ((parts + index * layout::HIT_PART_STRIDE) as *const [u8; layout::HIT_PART_STRIDE]).read_unaligned();
-        if let Some(Shape { joint, size, a, b, .. }) = hitbox::hurtbox_shape(&record) {
-            drawn += draw_shape(accessor, joint, size, a, b, hitbox::HURTBOX_TINT);
+        if let Some(shape) = hitbox::hurtbox_shape(&record) {
+            left_out += hitbox::push_shape(out, len, hitbox::KIND_HURT, index, &shape, hitbox::HURTBOX_TINT);
         }
     }
-    drawn
+    left_out
+}
+
+/// One shape requested once and not tracked: an article's command (projectiles are not in the per-frame pass, spec Q1); it ends
+/// with the article's status.
+unsafe fn draw_untracked(accessor: usize, shape: &Shape, tint: [f32; 3]) -> u32 {
+    let mut fx = effects(accessor);
+    let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
+    let mut len = 0;
+    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_HIT, 0, shape, tint);
+    let mut made = 0;
+    for sphere in &wants[..len] {
+        if fx.sphere_spawn(sphere) != 0 {
+            made += 1;
+        }
+    }
+    made
 }
 
 // ---- the per-frame pass ---------------------------------------------------------------------------------------------
+
 /// One fighter's pass (SPEC-core-06 §5), after the game's frame for it. A readiness boundary: nothing happens before boot
-/// installed the feature. With the setting Off and nothing to restore it makes no game call at all (Q4).
+/// installed the feature. With the setting Off, nothing held and nothing to restore it makes no game call at all (Q4).
 ///
 /// # Safety
 /// `fighter` is the fighter object the game just ran a frame of.
@@ -188,16 +277,33 @@ pub unsafe fn frame(fighter: usize) {
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);
-    if !enabled && SLEPT.load(Ordering::Relaxed) == 0 {
+    if !enabled && SLEPT.load(Ordering::Relaxed) == 0 && HELD.load(Ordering::Relaxed) == 0 {
         return;
     }
     let accessor = natives::fighter_accessor(fighter);
-    let slept = accessor != 0 && BOOK.lock().slept(accessor);
-    // Off and nothing of this fighter's to restore: no game call at all.
-    if accessor == 0 || (!enabled && !slept) || !visualizes(accessor) || !ensure_ready() {
+    if accessor == 0 {
         return;
     }
-    let facts = FrameFacts { visualizes: true, enabled, slept, status: if enabled { natives::status_kind(accessor) } else { 0 }, ids: status_ids() };
+    let slept = BOOK.lock().slept(accessor);
+    let mut store = STORE.lock();
+    let held = store.table.find(accessor).is_some_and(|i| !store.table.sets[i].is_empty());
+    // Off with nothing of this fighter's to restore or kill: no game call at all.
+    if !enabled && !slept && !held {
+        return;
+    }
+    let visualizes = visualizes(accessor);
+    let mut fx = effects(accessor);
+    if !visualizes || !ensure_ready() {
+        // Not (or no longer) a practice fighter: its own spheres go, its effect flag is never touched.
+        if let Some(i) = store.table.find(accessor) {
+            store.table.sets[i].clear(&mut fx);
+            HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+        }
+        return;
+    }
+    let ids = status_ids();
+    let status = if enabled { natives::status_kind(accessor) } else { 0 };
+    let facts = FrameFacts { visualizes: true, enabled, slept, status, ids };
     let plan = hitbox::plan(facts);
     if plan.restore {
         natives::set_sleep_effect(accessor, false);
@@ -205,34 +311,51 @@ pub unsafe fn frame(fighter: usize) {
     if plan.sleep {
         natives::set_sleep_effect(accessor, true);
     }
-    let mut spheres = 0;
-    let mut hurt = 0;
-    if plan.redraw {
-        clear_spheres(accessor);
-        for slot in 0..hitbox::SLOTS {
-            if !natives::attack_is_attack(accessor, slot) {
-                continue;
-            }
-            let data = natives::attack_data(accessor, slot);
-            if data == 0 {
-                continue;
-            }
-            let size = ((data + layout::SIZE) as *const f32).read();
-            let joint = ((data + layout::NODE) as *const u64).read();
-            let a = read_vec3(data + layout::OFFSET);
-            let b = hitbox::second_centre(read_vec3(data + layout::OFFSET2));
-            spheres += draw_shape(accessor, joint, size, a, b, hitbox::hitbox_tint(slot));
-        }
-        hurt = draw_hurtboxes(accessor);
+    let i = store.table.index_for(accessor);
+    let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
+    let Store { table, seen_epoch, wants } = &mut *store;
+    let set = &mut table.sets[i];
+    let mut counts = Counts::default();
+    if seen_epoch[i] != epoch {
+        // A save state was loaded since this fighter's last pass: its spheres go and come back from the restored state.
+        seen_epoch[i] = epoch;
+        counts = set.clear(&mut fx);
     }
-    let slept = hitbox::slept_after(facts, plan);
-    if slept != facts.slept {
-        book_set(accessor, slept);
+    let mut len = 0;
+    let mut left_out = 0;
+    let c = if !enabled || ids.shielding(status) {
+        // Off, or shielding (the shield bubble is the game's own `sys_shield`; ours go so it reads alone).
+        set.clear(&mut fx)
+    } else if ids.in_grab(status) {
+        // Grabbing: no hitbox or hurtbox spheres, the grab boxes are kept (and the ones the command just made are requested).
+        set.reconcile(&[], true, &mut fx)
+    } else {
+        left_out += want_hitboxes(accessor, wants, &mut len);
+        let hits = len;
+        left_out += want_hurtboxes(accessor, wants, &mut len);
+        #[cfg(feature = "diag")]
+        stats::wanted(hits as u32, (len - hits) as u32);
+        #[cfg(not(feature = "diag"))]
+        let _ = hits;
+        set.reconcile(&wants[..len], true, &mut fx)
+    };
+    counts.kept += c.kept;
+    counts.spawned += c.spawned;
+    counts.killed += c.killed;
+    counts.ended += c.ended;
+    counts.failed += c.failed;
+    counts.dropped += c.dropped + left_out;
+    let held_now = set.len();
+    HELD.store(table.held_spheres(), Ordering::Relaxed);
+    drop(store);
+    let slept_now = hitbox::slept_after(facts, plan);
+    if slept_now != facts.slept {
+        book_set(accessor, slept_now);
     }
     #[cfg(feature = "diag")]
-    stats::frame_end(plan, spheres, hurt);
+    stats::frame_end(plan, counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
     #[cfg(not(feature = "diag"))]
-    let _ = (spheres, hurt);
+    let _ = (counts, held_now);
 }
 
 // ---- the hooks --------------------------------------------------------------------------------------------------------
@@ -248,7 +371,9 @@ unsafe fn lua_cell(lua: usize, index: usize) -> Cell {
     hitbox::stack_cell(base, top, index, |slot| Cell { raw: (slot as *const u64).read(), tag: ((slot + layout::TAG_FIELD) as *const u32).read() })
 }
 
-/// The plugin part of an animation command: draw the shape it creates, once, from its parameters.
+/// The plugin part of an animation command. A fighter's hitbox is drawn by its pass in the same frame (the pass runs after the
+/// game's frame, which ran this command), so nothing is requested here; a fighter's grab box is queued for that pass (the
+/// command runs inside the animation script, where the fighter's effects may be asleep); an article's shape is requested now.
 unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let _scope = HookScope::enter_hook(if grab { HookId::HitboxCatch } else { HookId::HitboxAttack });
     if lua == 0 || !SETTING.load(Ordering::Acquire) || !ensure_ready() {
@@ -258,13 +383,26 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     if accessor == 0 || !hitbox::draw_on_command(true, visualizes(accessor)) {
         return;
     }
-    let Some(Shape { id, joint, size, a, b }) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
-    let tint = if grab { hitbox::grab_tint(id) } else { hitbox::hitbox_tint(id) };
-    let spheres = draw_shape(accessor, joint, size, a, b, tint);
+    let fighter = natives::is_fighter(accessor);
+    if fighter && !grab {
+        return;
+    }
+    let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
+    let tint = if grab { hitbox::grab_tint(shape.id) } else { hitbox::hitbox_tint(shape.id) };
+    let made = if fighter {
+        let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
+        let mut len = 0;
+        hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
+        let mut store = STORE.lock();
+        let i = store.table.index_for(accessor);
+        wants[..len].iter().filter(|w| store.table.sets[i].push_grab(**w)).count() as u32
+    } else {
+        draw_untracked(accessor, &shape, tint)
+    };
     #[cfg(feature = "diag")]
-    stats::command(grab, id, joint, size, b.is_some(), spheres);
+    stats::command(grab, fighter, shape.id, shape.joint, shape.size, shape.b.is_some(), made);
     #[cfg(not(feature = "diag"))]
-    let _ = spheres;
+    let _ = made;
 }
 
 /// `sv_animcmd::ATTACK`: the plugin part first, then the game's own command.
@@ -281,7 +419,8 @@ pub unsafe fn hitbox_catch_hook(lua_state: usize) {
     call_original!(lua_state)
 }
 
-/// `GrabModule::set_rebound`: a grab ended when the rebound is cleared; the spheres go unless the fighter shields.
+/// `GrabModule::set_rebound`: a grab ended when the rebound is cleared; the fighter's spheres go (by their own handles) unless it
+/// shields, and its next pass brings back what still stands.
 #[skyline::hook(offset = sites_hitbox::HITBOX_REBOUND_OFFSET)]
 pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     call_original!(accessor, rebound);
@@ -291,9 +430,15 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     }
     let shielding = status_ids().shielding(natives::status_kind(accessor));
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
-        clear_spheres(accessor);
-        #[cfg(feature = "diag")]
-        stats::rebound_cleared();
+        let mut store = STORE.lock();
+        if let Some(i) = store.table.find(accessor) {
+            let c = store.table.sets[i].clear(&mut effects(accessor));
+            HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+            #[cfg(feature = "diag")]
+            stats::rebound_cleared(c.killed);
+            #[cfg(not(feature = "diag"))]
+            let _ = c;
+        }
     }
 }
 
@@ -342,30 +487,36 @@ pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport
     std::array::from_fn(|i| SiteReport { site: sites_hitbox::SITES[i].name, found: found[i], written: written[i] })
 }
 
-// ---- diag: the cost of the pass and what it drew ---------------------------------------------------------------------
+// ---- diag: the cost of the pass and the plugin's share of the effect pool -------------------------------------------------
 
-/// Counters and one line per 600 passes of the first fighter (`[Hitbox] stats ...`), so the Eden rows read the cost per frame
-/// and the spheres drawn; the shipped build compiles all of it away.
+/// Counters and one line per 600 passes (`[Hitbox] stats ...`), so the Eden rows read the cost per frame, the spheres the plugin
+/// holds (its share of the game's effect pool), the requests the game refused, and what changed; the shipped build compiles all of
+/// it away.
 #[cfg(feature = "diag")]
 mod stats {
     use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-    use crate::model::hitbox::FramePlan;
+    use crate::model::hitbox::{Counts, FramePlan};
     use crate::runtime::diag_log::diagnostic;
 
     static PASSES: AtomicU32 = AtomicU32::new(0);
     static WORK: AtomicU32 = AtomicU32::new(0);
-    static SPHERES: AtomicU32 = AtomicU32::new(0);
-    static HURT: AtomicU32 = AtomicU32::new(0);
-    static MAX_HURT: AtomicU32 = AtomicU32::new(0);
+    static WANT_HIT: AtomicU32 = AtomicU32::new(0);
+    static WANT_HURT: AtomicU32 = AtomicU32::new(0);
+    static KEPT: AtomicU32 = AtomicU32::new(0);
+    static SPAWNED: AtomicU32 = AtomicU32::new(0);
+    static KILLED: AtomicU32 = AtomicU32::new(0);
+    static ENDED: AtomicU32 = AtomicU32::new(0);
+    static FAILED: AtomicU32 = AtomicU32::new(0);
+    static DROPPED: AtomicU32 = AtomicU32::new(0);
     static SLEEPS: AtomicU32 = AtomicU32::new(0);
     static RESTORES: AtomicU32 = AtomicU32::new(0);
     static COMMANDS: AtomicU32 = AtomicU32::new(0);
-    static MAX_SPHERES: AtomicU32 = AtomicU32::new(0);
+    static MAX_HELD: AtomicU32 = AtomicU32::new(0);
     static TICKS: AtomicU64 = AtomicU64::new(0);
     static MAX_TICKS: AtomicU64 = AtomicU64::new(0);
     static START: AtomicU64 = AtomicU64::new(0);
-    static LAST_SPHERES: AtomicU32 = AtomicU32::new(u32::MAX);
+    static LAST: AtomicU64 = AtomicU64::new(u64::MAX);
     const REPORT_EVERY: u32 = 600;
 
     fn now() -> u64 {
@@ -377,40 +528,56 @@ mod stats {
         START.store(now(), Ordering::Relaxed);
     }
 
-    pub fn frame_end(plan: FramePlan, spheres: u32, hurt: u32) {
-        HURT.fetch_add(hurt, Ordering::Relaxed);
-        MAX_HURT.fetch_max(hurt, Ordering::Relaxed);
+    pub fn wanted(hits: u32, hurts: u32) {
+        WANT_HIT.fetch_add(hits, Ordering::Relaxed);
+        WANT_HURT.fetch_add(hurts, Ordering::Relaxed);
+    }
+
+    pub fn frame_end(plan: FramePlan, c: Counts, held: u32, held_total: u32) {
         let ticks = now().wrapping_sub(START.load(Ordering::Relaxed));
         TICKS.fetch_add(ticks, Ordering::Relaxed);
         MAX_TICKS.fetch_max(ticks, Ordering::Relaxed);
-        if plan.calls() {
-            WORK.fetch_add(1, Ordering::Relaxed);
-        }
-        SPHERES.fetch_add(spheres, Ordering::Relaxed);
-        MAX_SPHERES.fetch_max(spheres, Ordering::Relaxed);
+        WORK.fetch_add(1, Ordering::Relaxed);
+        KEPT.fetch_add(c.kept, Ordering::Relaxed);
+        SPAWNED.fetch_add(c.spawned, Ordering::Relaxed);
+        KILLED.fetch_add(c.killed, Ordering::Relaxed);
+        ENDED.fetch_add(c.ended, Ordering::Relaxed);
+        FAILED.fetch_add(c.failed, Ordering::Relaxed);
+        DROPPED.fetch_add(c.dropped, Ordering::Relaxed);
+        MAX_HELD.fetch_max(held_total, Ordering::Relaxed);
         if plan.sleep {
             SLEEPS.fetch_add(1, Ordering::Relaxed);
         }
         if plan.restore {
             RESTORES.fetch_add(1, Ordering::Relaxed);
         }
-        if spheres != LAST_SPHERES.swap(spheres, Ordering::Relaxed) {
-            diagnostic(format_args!("[Hitbox] pass spheres={spheres} hurtbox_spheres={hurt} sleep={} restore={} redraw={}", plan.sleep, plan.restore, plan.redraw));
+        // One line whenever this fighter's set changed (a sphere was requested, killed, ended or refused).
+        let change = (u64::from(held) << 32) | u64::from(c.spawned + c.killed + c.ended + c.failed);
+        if (c.spawned | c.killed | c.ended | c.failed) != 0 && LAST.swap(change, Ordering::Relaxed) != change {
+            diagnostic(format_args!(
+                "[Hitbox] pass held={held} held_total={held_total} kept={} spawned={} killed={} ended={} failed={} dropped={} sleep={} redraw={}",
+                c.kept, c.spawned, c.killed, c.ended, c.failed, c.dropped, plan.sleep, plan.redraw
+            ));
         }
         let passes = PASSES.fetch_add(1, Ordering::Relaxed) + 1;
         if passes >= REPORT_EVERY {
             let take = |c: &AtomicU32| c.swap(0, Ordering::Relaxed);
             let passes = take(&PASSES).max(1);
             diagnostic(format_args!(
-                "[Hitbox] stats passes={passes} with_calls={} spheres={} hurtbox_spheres={} max_hurtbox_spheres={} sleeps={} restores={} commands={} max_spheres={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
+                "[Hitbox] stats passes={passes} with_work={} want_hit={} want_hurt={} kept={} spawned={} killed={} ended={} failed={} dropped={} held_max={} held_now={held_total} sleeps={} restores={} commands={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
                 take(&WORK),
-                take(&SPHERES),
-                take(&HURT),
-                take(&MAX_HURT),
+                take(&WANT_HIT),
+                take(&WANT_HURT),
+                take(&KEPT),
+                take(&SPAWNED),
+                take(&KILLED),
+                take(&ENDED),
+                take(&FAILED),
+                take(&DROPPED),
+                take(&MAX_HELD),
                 take(&SLEEPS),
                 take(&RESTORES),
                 take(&COMMANDS),
-                take(&MAX_SPHERES),
                 TICKS.swap(0, Ordering::Relaxed) / u64::from(passes),
                 MAX_TICKS.swap(0, Ordering::Relaxed),
                 crate::runtime::alloc::hook_allocations()
@@ -418,12 +585,15 @@ mod stats {
         }
     }
 
-    pub fn command(grab: bool, id: i32, joint: u64, size: f32, extended: bool, spheres: u32) {
+    pub fn command(grab: bool, fighter: bool, id: i32, joint: u64, size: f32, extended: bool, made: u32) {
         COMMANDS.fetch_add(1, Ordering::Relaxed);
-        diagnostic(format_args!("[Hitbox] command kind={} id={id} joint={joint:#x} size={size:.2} extended={extended} spheres={spheres}", if grab { "catch" } else { "attack" }));
+        diagnostic(format_args!(
+            "[Hitbox] command kind={} fighter={fighter} id={id} joint={joint:#x} size={size:.2} extended={extended} spheres={made}",
+            if grab { "catch" } else { "attack" }
+        ));
     }
 
-    pub fn rebound_cleared() {
-        diagnostic(format_args!("[Hitbox] rebound cleared: spheres killed"));
+    pub fn rebound_cleared(killed: u32) {
+        diagnostic(format_args!("[Hitbox] rebound cleared: killed={killed}"));
     }
 }

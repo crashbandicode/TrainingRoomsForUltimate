@@ -110,7 +110,7 @@ def main():
     label = sys.argv[1]
     events = f"{PROFILE_SD}/TrainingRooms/events.log"
     tile_log = f"{PROFILE_SD}/ssbu-tile-cursor/events.log"
-    wait_line(events, "result=installed", 240, "install line")
+    wait_line(events, "plugin=training_rooms/", 240, "install line")
     menu_box = (40, 60, 620, 380)
     for attempt in range(10):
         press(label, "a")
