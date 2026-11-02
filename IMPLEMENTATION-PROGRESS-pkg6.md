@@ -201,3 +201,97 @@ Scripts of this worker, against the playbook's tools:
 - Queue read: imgui-nvn-sol line appended near file end refers to Surface despite location below Ally heading; account for that explicit host. Yoga tm-f8-terra line exists. Latest ledger tail shows imgui Surface diag RELEASED 14:20:07Z; tm-f8-terra Yoga compile RELEASED 14:21Z; tm-f8-sol-eden Ally CLAIMED 14:19:09Z. Tail is NOT full admission proof: read/reconcile full live ledger before any claim, honor all unmatched claims with no age expiry.
 - Next: complete required reading, build full own M/C checklist (previous worker's checklist is evidence history only), record restart-safe state; exact authorized merge; queue R5 v2 host test then clippy/no-default/release/diag, one claim each, fairness/interleave. Read any tool completely before running. F11 early accessor slice (+0x5918 active index < min(count,3), guard and fake banks). F9 design goes to lead inbox BEFORE coding. Coordinate slim inline removals via committed slices. Finish s6-08 >=3-minute fighters+hats zero allocation deltas, F9 count transitions, F11 recorder/PT, A/B/C and lead set D rows, carry verify and compliance before READY.
 - Local shell: explicit /usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command; commands now bounded by systemd-run --user --scope -p MemoryMax=1G /usr/bin/timeout 60 for reads; build budgets per stream rules. Two initial malformed shell quoting attempts failed without project mutations; use outer tool shell /usr/bin/pwsh, login=false and script-block Command form.
+
+## Current worker checklist and live state (2026-11-02)
+
+Playbook followed: ae87443cbb801472e474b3f0c20b5f9c3f5f1f77. This checklist is the current worker's; earlier passes above remain historical until revalidated on the final candidate.
+Authorized exact merge ebfcb98 completed without conflict as 345c6e3. R5 v2 remains untested on the merged tree.
+Model: exact thread gpt-6-astra / medium. Watcher corrected to owner Codex PID 2588877, watcher PID 2639686 (temporary file /tmp/pkg6-model-watch.py); old owner 1847 was systemd and is no longer used.
+Queue: pkg6 Surface host test appended after slim; no claim taken. / free 245 GB; all local cargo-targets total 16 GB.
+Parent handoff current dispatch section read: this worker belongs to tr-lead-astra; L2 approved and 15% size reduction is next-version, not RC blocking. No subdelegation.
+Inherited F11 implementation found in game.rs and model/entry_cells.rs: it currently falls back to cell zero for invalid/empty banks and a failed active-layout guard; fake-memory reader coverage missing. Inspect and fix after the initial R5 compile, without modifying pkg4-owned reader call sites.
+
+| Requirement | Tag | Result | Evidence / remaining proof |
+| --- | --- | --- | --- |
+| cdylib-only, release profile, skyline pin, toolchain | M | fail | final manifest/compliance and resident size not yet checked |
+| Pure logic with host tests; Switch-only runtime | M | fail | final diff review and host tests pending |
+| test, full clippy zero, no-default, release and diag separately | M | fail | all final-candidate gates pending |
+| Counting allocator; zero heap in hooks | M | fail | s6-08 >=3 minutes fighters+hats all hook deltas zero pending |
+| Fixed buffers, static-stack writer, stack-built paths | M | fail | final changed-path review pending |
+| Root fixes; approved workarounds listed; common cause abstraction reviewed | M | fail | F9 design and implementation pending; inherited F3 synchronous special-group approval in CARRY-OVER |
+| 13.0.5 version guard | M | fail | candidate boot evidence pending |
+| 64-byte guards for hooks/calls/relied instructions | M | fail | F11 guard exists; owned-ELF and boot gates pending |
+| Card-copy site/vtable scan | M | fail | cite existing scan for unchanged sites; scan any new site before choosing |
+| Sharing election and both stand-ins/load orders if applicable | C | fail | classify changed sites and retain/refresh corresponding evidence |
+| Specific hook after prologue or native call | M | fail | final site review pending |
+| No diagnostic code/strings shipped | M | fail | editor trace cleanup and release compliance pending |
+| Shipped output only install line, except product data | M/C | fail | writer review pending; logging-plugin exception N/A (not a logging product) |
+| Online read-only hook review | C | fail | lobby paths apply; coordinated lead/package-7 evidence pending |
+| Replay A/B with detector | C | fail | lead/package-7 evidence pending |
+| Two-console changed path and matching desync-free frame ends | C | fail | set D scheduled with lead, pending |
+| Claim before start/release after down including failures | M | pass | this worker has taken no claim yet; record every future claim |
+| One Eden/host, >=10 GiB, own profile/display | M | fail | launch preconditions pending |
+| Hardlinks for identical immutable files; real mutable copies | M | fail | profile receipt and disk comparison pending |
+| Own target, refreshed timestamps, >=40 GB, target cleanup manifest | M | fail | target assigned; disk 245 GB / targets 16 GB; final cleanup pending |
+| Gated waits including macros | M | fail | run receipts pending |
+| Abort failed precondition; retry new label | M | fail | run receipts pending |
+| Shortest ruleset or documented longer-row need | M | fail | Training allocation row needs >=3 minutes; other row setup pending |
+| Profile restored, temp files removed, claims released | M | fail | currently no mutations; final run cleanup pending |
+| Zero Unmapped; panic/abort/crash scan, run.json/memory.peak | M | fail | final runtime evidence pending |
+| Memory/time command bounds | M | fail | reads now bounded; bootstrap exceptions disclosed; builds/runs pending |
+| Outputs under unique run labels | M | fail | s6-08 and subsequent rows pending |
+| README full-screen GIF, caption, paths/build/license/disclaimer | M | fail | lead/package-7 deliverable; cite candidate evidence before READY |
+| Dated evidence with build identity/logs | M | fail | candidate evidence pending |
+| Log-derived numbers from committed host-tested scripts | C | fail | required allocation/Unmapped reports pending |
+| No operator quotes or unsupported success claims | M | pass | current checkpoint reports unverified gates as incomplete |
+| Current handoff including branch/commit/live state/next steps | M | pass | this section and prior bootstrap; no secrets |
+| Release version/tag/assets/anonymous downloads | C | not authorized | worker brief prohibits release/tag/push |
+| Tagged rebuild byte identity | C | N/A: no release authorized | worker scope is local RC stream |
+| Installation transaction/readback/rollback | C | not authorized | worker brief prohibits card/DBI/USB |
+| No mount/unmount/DBI actions; no unauthorized push | M | pass | none performed |
+| Forgejo destination; UTF-8 commit message files | M | pass | 51d0309 and 345c6e3 local commits, mandated identity |
+| Live model/effort and owner-bound watcher | M | pass | sqlite/rollout gpt-6-astra medium; corrected watcher above |
+| Every spawned worker's own playbook/checklist/compliance | M | N/A: no subdelegation | worker brief prohibits it |
+| Carry manifest transforms + regenerated ledger and verify | M (stream) | fail | no carried source edits yet; final verification pending |
+| F9 1->2->3 and reverse with helper/hat lease, native identity | M (stream) | fail | design then runtime tests pending |
+| F11 active reader/recorder on bank and PT changes | M (stream) | fail | incomplete reader found; gates pending |
+| Single practice stage init and truthful wiring | M (stream) | fail | pending |
+| Remove shipped mii-editor-last.json; coordinate slim | M (stream) | fail | pending |
+| Package-6 A/B/C and coordinated D | M (stream) | fail | candidate run matrix pending |
+| compliance.py --nro release with every agent row resolved | M | fail | final release NRO not built |
+
+## QUESTIONS
+
+- F11 reader exists but invalid/empty bank and failed guard currently return cell zero. I will make invalid/unverified active-body lookup return no body, with fake-bank read coverage, then provide a gated slice for pkg4 after the required first R5 compile.
+- Slim coordination: this worker has not changed roster/Mii inline probe sites. Please exchange exact committed slices before overlapping manifest changes.
+
+## pkg6 successor checkpoint — 2026-11-02, thread 01a19cb7-090c-71d2-aef0-6cc7bec76fa9
+- Resumed stream/pkg6 at 345c6e3; preserved predecessor's uncommitted checklist and questions. Exact authorized merge already done; no second merge.
+- Own live model/effort gpt-6-astra / medium verified through exact sqlite row and latest turn_context. Watcher /tmp/pkg6-model-watch-01a19cb7-090c-71d2-aef0-6cc7bec76fa9.py PID 2746934, scans model/effort only and owner liveness. No alert/stderr at checkpoint.
+- Playbook followed: ae87443cbb801472e474b3f0c20b5f9c3f5f1f77; own pull current; README, all seven docs, tools/PROVENANCE fully read. Own checklist uses the complete M/C table immediately above: reviewed against CHECKLIST.md, all unverified rows remain fail, no historical pass promoted.
+- Own complete reads: brief, routing, MY_MODEL, stream rules, Astra lead handover, progress file (truncated middle recovered), BUILD, implementation-packages, PACKAGE-6-PLAN (truncated middle recovered), DECISIONS, MENU-DRAFT (four parts), CARRY-OVER (four parts), IMPLEMENTATION-PROGRESS, specs/TEMPLATE and all four INDEX files (core recovered separately). Parent AGENTS and current TRAINING_LOBBY_HANDOFF dispatch section read; historical tail not fully read due truncation. TRAININGROOMS-HANDOFF lines 1-140 read; remaining historical lines and newest F9/F10/F11 facts outstanding. Interface specs still to read before changing their behavior.
+- Initial read commands lacked explicit memory/time limits; now every command uses systemd-run MemoryMax=1G timeout 60 for reads, 6G/1800s for cargo. No source code, build, Eden, profile or claim mutations by this successor yet.
+- Queue still contains predecessor pkg6 Surface host-test entry. Old a3 claim tools personally read but not run: age expiry invalid; 180s wait invalid. Keep admission inline or adopt authorized integrated harness; never disturb foreign claims.
+- Next: finish applicable interface specs and current fix facts; read tool scripts before use; reconcile full live Yoga ledger, preserve queue/interleave, first R5 host compile, then F11 early slice. F9 design required before code. Slim owns inline deletions, coordinate via exact committed slice. No upstream/fork code opened.
+
+## Successor handoff preparation (2026-11-02 ~14:53Z)
+- Current source remains 345c6e3, no code edits. Own full mandatory baseline reading completed except applicable detailed interface specs (read before editing their paths); historical TRAININGROOMS-HANDOFF beyond line140 not fully read. Newest fix facts read directly from review/menu-proposal TRAININGROOMS-HANDOFF lines145-147 by targeted search: F9 CPU entries2/3 helper collision; F10 allocation-free planner; F11 byte+0x5918 and count+0x4150/cells+0x4160.
+- IMPORTANT F11 discrepancy: newest fix-ledger row147 explicitly says invalid-index/guard fallback cell0, whereas predecessor intended no-body. No change made. Asked lead via TRAININGROOMS-LEAD-INBOX.md to resolve; do not silently substitute semantics.
+- Full 2,535-line live Yoga ledger fetched into /tmp/pkg6-live-ledger.txt. Parsed every claim/release without expiry. Two apparent Surface open claims were formatting artifacts: line34 CLAIMED again for ssbu-refresh-clock-t2 released line36; line630 CLAIMED (build only...) e202df30 released line687. Only live unmatched claim was tm-f8-sol-ally14:50:09Z on Ally. Surface free, queue head pkg6, imgui last release14:48:07Z, no local cargo/rustc/Eden, disk244GB and cargo-targets16GB.
+- Surface CLAIMED14:51:45Z Codex01a19cb7/pkg6 for ONE cargo test --no-fail-fast at345c6e3. Tool session88672, raw log /tmp/pkg6-r5-host-345c6e3.log; bounded cg.ps1 personally read, CARGO_INCREMENTAL=0 target trainingrooms-pkg6, 6G/1800s. Must release after exit, remove queue line and append next gate at end; never leave claim open on handoff.
+- Hidden Start-Process watcher disappeared without alert or stderr by14:52Z. Rearmed same thread-specific script as bounded no-TTY exec session15075 (128M/1800s); reap before yielding. Check live model again after any compaction. Initial watcher gap disclosed; no claim of continuous coverage.
+- Sources not exposed: no upstream-ref or fork source opened. Tools not yet fully read: s6_eden.py only lines1-180 read (do not run); carry_pkg6.py and runtime row scripts not yet read. Old a3 admission scripts not used (12h expiry/180s wait violate rules).
+- Lead coordination via shared inbox: exact slim probe-removal slice and authorized harness adoption requested. No subdelegation. No new merge authorized beyond already-completed345c6e3.
+
+## Handover — first R5 host gate passed (successor 01a19cb7, 2026-11-02)
+
+- Exact source tested: stream/pkg6 HEAD345c6e3, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6. Only progress notes changed; inherited checklist/questions preserved. No runtime/model source changes in this turn.
+- PASS: cargo test --no-fail-fast, exit0, 67 completed Rust test binaries, 9,542 passed / 0 failed; no warning/error lines. Counts are the sum of each raw `test result:` line (not unique test functions; by-path tests repeat modules). Owned ELF available on Surface; no SKIP_OWNED_ELF_FACT override.
+- Durable raw output: /home/intpa/smash-training-lobby/artifacts/trainingrooms-nro-archive/pkg6/host-test-345c6e3-01a19cb7.log (also /tmp/pkg6-r5-host-345c6e3.log). Recount by matching `test result: (\w+)\. (\d+) passed; (\d+) failed` and summing columns2/3. Build identity is345c6e3; final docs commit does not change tested source.
+- Surface claim RELEASED after cargo exit; completed pkg6 queue line removed. No open claims, no Eden/profile changes, no card/push/tag/release. Target retained because work is ongoing. Watcher2798116 (exec15075) to be reaped before yielding; initial Start-Process watcher disappeared, replacement ran without alerts.
+- Current checklist above remains applicable; only the cargo-test portion of the gates row passes now. Clippy, no-default, Switch release/diag, carry verification and compliance remain pending. R5 is NOT proven until s6-08 >=3 minutes preload fighters+hats shows every hook delta0 and zero Unmapped. No READY.
+- Immediate next commands: verify live model after compaction; arm owner-bound watcher; queue pkg6 Surface clippy at the END (or Yoga after full ledger+queue admission), honor >=3-minute fairness and foreign interleave. Use own target trainingrooms-pkg6 and CARGO_INCREMENTAL=0. Run one `cargo clippy --all-targets -- -D warnings` under6G/1800s, release, then separately queue `cargo build --no-default-features`; Switch release and diag likewise separate claims. cg.ps1 has been fully read, safe build wrapper; old a3 claim/prio helpers are NOT safe admission.
+- Before F11 coding: resolve fallback contract with lead inbox (row147 currently specifies first-cell fallback; predecessor proposed no-body), read relevant interface specs, inspect game.rs/entry_cells.rs and original fake-bank regressions, deliver small gated accessor slice for pkg4. No-body behavior has NOT been approved or implemented.
+- Before F9 coding: read owned roster lifecycle/native source paths, explain activation/reload ordering in lead inbox; release hat lease before give-back; no waits/rejected count/new restrictions. Independently attribute scene-load Read16 bursts. Slim owns inline probe deletions: get exact committed slice first; harness absent from345c6e3, adoption needs lead-authorized slice, do not merge moving branch.
+- Remaining reading tracked above: all baseline required docs and playbook complete for this thread; detailed applicable specs, full used tools, and runtime/model interfaces to read before changing code. No fork/upstream source exposure.
+- Context milestone: developer requested a persisted handoff after context threshold. Goal remains active and incomplete; this is not an operator blocker and not a readiness claim.
