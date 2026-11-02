@@ -37,7 +37,7 @@ pub mod panes {
     pub const ROW_PREFIX: &str = "TrModInputLog";
     pub const FRAME_TEXT: &str = "Frame";
     pub const STATUS_TEXT: &str = "Status";
-    /// `Input0` .. `Input4`, each holding one picture pane per icon name.
+    /// `Input0` .. `Input4`: one text box per icon slot (a glyph in the slot's colour).
     pub const ICON_SLOT_PREFIX: &str = "Input";
 }
 
@@ -137,18 +137,36 @@ impl Icon {
             Icon::DownRight => "down_right",
         }
     }
+    /// The glyph the slot's text box shows.
+    pub const fn glyph(self) -> Glyph {
+        match self {
+            Icon::A => Glyph::Font(0xE0E0),
+            Icon::B => Glyph::Letter(0x42),
+            Icon::X => Glyph::Font(0xE0E2),
+            Icon::Y => Glyph::Font(0xE0E3),
+            Icon::Lb => Glyph::Font(0xE0E4),
+            Icon::Rb => Glyph::Font(0xE0E5),
+            Icon::Zl => Glyph::Font(0xE0E6),
+            Icon::Zr => Glyph::Font(0xE0E7),
+            Icon::Plus => Glyph::Font(0xE0EF),
+            Icon::Minus => Glyph::Font(0xE0F0),
+            Icon::DpadUp => Glyph::Font(0xE079),
+            Icon::DpadDown => Glyph::Font(0xE07A),
+            Icon::DpadLeft => Glyph::Font(0xE07B),
+            Icon::DpadRight => Glyph::Font(0xE07C),
+            Icon::Right => Glyph::Arrow(0),
+            Icon::UpRight => Glyph::Arrow(45),
+            Icon::Up => Glyph::Arrow(90),
+            Icon::UpLeft => Glyph::Arrow(135),
+            Icon::Left => Glyph::Arrow(180),
+            Icon::DownLeft => Glyph::Arrow(225),
+            Icon::Down => Glyph::Arrow(270),
+            Icon::DownRight => Glyph::Arrow(315),
+        }
+    }
 }
 
-/// The 37 icon names of the layout's slot (SPEC-input-02 §3.4); an icon whose name is not in the list
-/// is skipped without consuming a slot.
-pub const LAYOUT_ICON_NAMES: [&str; 37] = [
-    "a", "b", "x", "y", "lb", "rb", "zl", "zr", "up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right", "gcc_l",
-    "gcc_r", "gcc_z", "plus", "minus", "l_stick", "r_stick", "gcc_c_stick", "dpad_up", "dpad_down", "dpad_left", "dpad_right",
-    "dpad_left_right", "up_strong", "down_strong", "left_strong", "right_strong", "up_left_strong", "down_left_strong",
-    "up_right_strong", "down_right_strong",
-];
-
-/// An icon's colour as the picture material's "black" colour (RGB).
+/// An icon's colour: the text colour of its slot (RGB, sRGB bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color(pub u8, pub u8, pub u8);
 
@@ -162,6 +180,29 @@ impl Color {
     pub const WHITE: Color = Color(255, 255, 255);
 }
 
+/// What an icon slot's text box shows (lead decision 2026-11-02: no picture panes, each slot is a text
+/// box holding one glyph of the game's own font, or the plugin's arrow glyph for a stick direction).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Glyph {
+    /// A private-use code point of the game's font (SPEC-core-03 §4.3, Pro / Joy-Con set).
+    Font(u16),
+    /// A plain character where the font has no glyph (B: "no distinct glyph upstream"; the colour
+    /// tells it from A).
+    Letter(u16),
+    /// The plugin's own arrow glyph (package 5): the stick direction in degrees, 0 right .. 315.
+    Arrow(u16),
+}
+
+impl Glyph {
+    /// The UTF-16 unit written into the text box, for the font and letter glyphs; the arrow is the
+    /// layout owner's (`None`).
+    pub const fn code_unit(self) -> Option<u16> {
+        match self {
+            Glyph::Font(c) | Glyph::Letter(c) => Some(c),
+            Glyph::Arrow(_) => None,
+        }
+    }
+}
 /// One icon slot's content.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Slot {
@@ -169,7 +210,7 @@ pub struct Slot {
     pub color: Color,
 }
 
-/// The icons of a row, in slot order (at most five).
+/// The icons of a row, in slot order (at most five). Each is written as text: the slot's glyph in the slot's colour.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Icons {
     slots: [Option<Slot>; ICON_SLOTS],
@@ -322,7 +363,7 @@ pub fn icons_of(mode: Mode, c: &Candidate) -> Icons {
     let mut list: [Option<Slot>; 24] = [None; 24];
     let mut len = 0usize;
     let push = |list: &mut [Option<Slot>; 24], len: &mut usize, icon: Icon, color: Color| {
-        if LAYOUT_ICON_NAMES.contains(&icon.name()) && !list[..*len].iter().flatten().any(|s| s.icon == icon) {
+        if !list[..*len].iter().flatten().any(|s| s.icon == icon) {
             list[*len] = Some(Slot { icon, color });
             *len += 1;
         }
@@ -402,7 +443,7 @@ pub fn icons_of(mode: Mode, c: &Candidate) -> Icons {
     let mut out = Icons::none();
     let mut n = 0usize;
     let mut put = |slot: Slot| {
-        if n < ICON_SLOTS && LAYOUT_ICON_NAMES.contains(&slot.icon.name()) {
+        if n < ICON_SLOTS {
             out.slots[n] = Some(slot);
             n += 1;
         }
@@ -570,7 +611,7 @@ pub enum Op {
     Row { phys: u8, y: f32, alpha: u8 },
     /// Row `phys` hidden (ttl 0).
     RowHidden { phys: u8 },
-    /// Row `phys`: all icon slots hidden once before first use, then these shown.
+    /// Row `phys`: the five slot text boxes: each shown slot's glyph and colour, the rest emptied.
     Icons { phys: u8, icons: Icons },
     /// Row `phys`: the `Frame` text.
     Frames { phys: u8, frames: u8 },

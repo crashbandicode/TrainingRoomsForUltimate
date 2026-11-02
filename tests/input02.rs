@@ -124,10 +124,13 @@ fn icon_order_and_colours() {
     // Status only shows no icons; an unmapped bit shows none.
     assert_eq!(icons_of(Mode::StatusOnly, &smash(0xffff_ffff)).count(), 0);
     assert_eq!(icons_of(Mode::Smash, &smash(0x40)).count(), 0);
-    // Every icon the display can produce is in the layout's list of 37.
-    for icon in [Icon::A, Icon::B, Icon::X, Icon::Y, Icon::Lb, Icon::Rb, Icon::Zl, Icon::Zr, Icon::Plus, Icon::Minus, Icon::DpadUp, Icon::DownLeft] {
-        assert!(LAYOUT_ICON_NAMES.contains(&icon.name()), "{}", icon.name());
-    }
+    // Glyphs: the game's font code points (SPEC-core-03 §4.3), B as a letter, sticks as the plugin's arrow.
+    assert_eq!(
+        [Icon::A, Icon::X, Icon::Y, Icon::Lb, Icon::Rb, Icon::Zl, Icon::Zr, Icon::Plus, Icon::Minus, Icon::DpadUp, Icon::DpadDown, Icon::DpadLeft, Icon::DpadRight].map(|i| i.glyph().code_unit()),
+        [0xE0E0, 0xE0E2, 0xE0E3, 0xE0E4, 0xE0E5, 0xE0E6, 0xE0E7, 0xE0EF, 0xE0F0, 0xE079, 0xE07A, 0xE07B, 0xE07C].map(Some)
+    );
+    assert_eq!(Icon::B.glyph(), Glyph::Letter(0x42));
+    assert_eq!((Icon::Up.glyph(), Icon::DownLeft.glyph(), Icon::Right.glyph().code_unit()), (Glyph::Arrow(90), Glyph::Arrow(225), None));
 }
 
 #[test]
