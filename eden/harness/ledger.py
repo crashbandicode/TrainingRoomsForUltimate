@@ -15,8 +15,8 @@ What it adds to solo.ps1's parse (all seen in the real ledger):
   * host awareness: a claim is ON the host its "on <host>" phrase names; without one, every host the line names;
     without any, every host (conservative). A RELEASED closes the owner's claim on the hosts it names (all
     hosts when it names none);
-  * the open claims of foreign owners block, however old, only up to `stale_hours` (noise from owners that never
-    wrote a RELEASED); the Eden process check of `gv.py`/`solo.ps1` stays the hard truth;
+  * the open claims of foreign owners block regardless of age until a later RELEASED;
+    `stale_hours` only separates old claims in the report, never grants admission;
   * fairness: after your RELEASED wait `fair_seconds` before claiming the same host again;
   * the queue file's head item per host (advisory: a free-text file);
   * the queue file's interleave rule (binding, 2026-11-02): where `imgui-nvn-sol` is queued it takes the host after
@@ -86,7 +86,7 @@ def parse(text):
 
 def open_claims(text, host, exclude=(), now=None, stale_hours=12):
     """(open, stale): the claims on `host` whose owner has no later RELEASED, minus `exclude` (own owners);
-    `stale` are those older than `stale_hours`, which do not block."""
+    `stale` are those at least `stale_hours` old. Both lists block admission until RELEASED."""
     now = time.time() if now is None else now
     held = {}
     for e in parse(text):
@@ -233,8 +233,8 @@ def busy(p, text=None, now=None, queue=None):
     queue = queue_text(p) if queue is None else queue
     now = time.time() if now is None else now
     me = owner_of(p.owner)
-    fresh, _ = open_claims(text, p.host, exclude=me, now=now, stale_hours=p.stale_hours)
-    why = [f"({'Eden' if c.eden else 'compile'}) {c.text[:110]}" for c in fresh]
+    fresh, stale = open_claims(text, p.host, exclude=me, now=now, stale_hours=p.stale_hours)
+    why = [f"({'Eden' if c.eden else 'compile'}) {c.text[:110]}" for c in fresh + stale]
     waited = since_release(text, me, p.host, now)
     if waited is not None and waited < p.fair_seconds:
         why.append(f"fairness: own RELEASED {waited:.0f} s ago, wait {p.fair_seconds - waited:.0f} s more")
@@ -281,8 +281,8 @@ def main(argv=None):
         for c in fresh:
             print(f"OPEN on {p.host} ({'Eden' if c.eden else 'compile'}) {c.text[:130]}")
         for c in stale:
-            print(f"stale (> {p.stale_hours:g} h, not blocking) {c.owner}: {c.text[:80]}")
-        sys.exit(3 if fresh else 0)
+            print(f"OPEN on {p.host} (age >= {p.stale_hours:g} h, blocking until RELEASED) {c.owner}: {c.text[:80]}")
+        sys.exit(3 if fresh or stale else 0)
     elif op == "free":
         why = busy(p)
         print("\n".join(why) or f"{p.host} free")

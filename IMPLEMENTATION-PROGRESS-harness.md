@@ -1,5 +1,15 @@
 # Implementation progress, harness stream (`stream/harness`)
 
+## Astra lead admission correction, 2026-11-02
+
+Lead `01a19c96-0e78-7293-a76c-6f46a70be468`, live Astra medium; playbook ae87443 read fully. Starting head `6ce55ef256748bef59ab544c5e5e12bd60d25994`, clean. No other worker requested for harness. This is a Python-only admission fix; no compile, Eden, ledger mutation, profile or card access.
+
+Root cause: `busy()` discarded the aged half of `open_claims()`, and CLI `open` exited 0 for those claims. A foreign claim without RELEASED became invisible to admission after 12 hours, contrary to the shared stream rules. Both lists now block; age is reporting only. Matching RELEASED still clears the claim. Docs corrected, including the unsubmitted playbook proposal; the playbook repository is unchanged.
+
+Regression proof: two new tests failed against the old code: `test_old_foreign_claim_blocks_until_explicit_release` returned `[]` (`AssertionError: [] is not true`); `test_open_command_reports_old_claim_as_blocking` exited 0 (`AssertionError: 0 != 3`). After the fix, `/usr/bin/python3 -I tests/eden/test_harness.py` passed **52 tests**, 0 failures, 0.077 s (scope `run-p2638401-i15195773`, MemoryMax=512M, timeout 30). The claim test also proves refusal leaves the ledger unchanged and explicit release permits admission. This does not substitute for the still-open Ally transport smoke or integrated Cargo gates.
+
+Next: lead reviews and commits this exact slice, then retains the harness merge gate pending Ally smoke. Old per-stream harness copies are unchanged; workers must obey the raw ledger rule independently until adoption.
+
 Branch `stream/harness`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-harness`, from `7bb86fd`. Claude Sonnet 5.5 high
 (verified from the session transcript `subagents/agent-a238856696f98fa41.jsonl`: `claude-sonnet-5-5`, effort `high`; hidden watcher in the temp
 folder `harness-watch`, exits with its owner). Lead session `0caa72b8`. Playbook followed: `ae87443cbb801472e474b3f0c20b5f9c3f5f1f77`

@@ -109,7 +109,7 @@ class LedgerParse(unittest.TestCase):
             self.assertNotIn("Claude e202df30", [c.owner for c in fresh + stale])
             self.assertNotIn("Claude ssbu-refresh-clock-t2", [c.owner for c in fresh + stale])
 
-    def test_own_claims_and_stale_claims_do_not_block(self):
+    def test_own_claims_are_excluded_and_old_claims_are_reported_separately(self):
         fresh, _ = ledger.open_claims(LEDGER, "yoga", exclude="Claude 0caa72b8/stack-eden", now=NOW)
         self.assertEqual(fresh, [])
         fresh, stale = ledger.open_claims(LEDGER, "yoga", now=NOW + 13 * 3600, stale_hours=12)
@@ -127,6 +127,34 @@ class LedgerParse(unittest.TestCase):
 
 
 class Claiming(unittest.TestCase):
+    def test_old_foreign_claim_blocks_until_explicit_release(self):
+        import tempfile
+        text = "2026-11-01 10:00Z CLAIMED: Codex 123/foreign Eden run on Yoga\n"
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "ledger.md"
+            path.write_text(text, encoding="utf-8")
+            mine = p(ledger=str(path), stale_hours=12)
+            self.assertTrue(ledger.busy(mine, now=NOW, queue=""))
+            with self.assertRaises(ledger.Busy):
+                ledger.claim(mine, "compile on Yoga", now=NOW, queue="")
+            self.assertEqual(path.read_text(), text)
+            path.write_text(text + "2026-11-02 11:00Z RELEASED: Codex 123/foreign Eden stopped on Yoga\n")
+            self.assertEqual(ledger.busy(mine, now=NOW, queue=""), [])
+
+    def test_open_command_reports_old_claim_as_blocking(self):
+        import contextlib
+        import io
+        from unittest.mock import patch
+        text = "2026-11-01 10:00Z CLAIMED: Codex 123/foreign Eden run on Yoga\n"
+        output = io.StringIO()
+        with patch.object(params, "load", return_value=p()), patch.object(ledger, "read", return_value=text), \
+                patch.object(ledger.time, "time", return_value=NOW), contextlib.redirect_stdout(output):
+            with self.assertRaises(SystemExit) as result:
+                ledger.main(["open"])
+        self.assertEqual(result.exception.code, 3)
+        self.assertIn("blocking", output.getvalue())
+        self.assertNotIn("not blocking", output.getvalue())
+
     def test_format_names_only_the_claimed_host_and_has_no_seconds(self):
         line = ledger.format_line(p(), "CLAIMED", "Eden run st-04 on Yoga, display :99", now=NOW)
         self.assertEqual(line, "2026-11-02 12:00Z CLAIMED: Claude 0caa72b8/stack-eden Eden run st-04 on Yoga, display :99")

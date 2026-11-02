@@ -37,7 +37,7 @@ default. `deploy.py` writes the config on the Eden host, so a host-side run need
 | `unit` | `tr<prefix>` | `UNIT`, the `trp1` / `trp6` / `trf6` unit names; the aside folder follows (`plugins-set-aside-<unit>`) |
 | `refs`, `macros` | `eden/refs`, `eden/macros` | `REFS`, `MACROS` |
 | `install_gate` | `result=installed` | the hard-coded install-line wait (the integrated tree's line is cut before `result=`: `plugin=training_rooms/`) |
-| `stale_hours`, `fair_seconds` | 12, 180 | `STALE_CLAIM_HOURS` (6 or 12); the 3-minute rule |
+| `stale_hours`, `fair_seconds` | 12, 180 | age-report threshold only (claims never expire); the 3-minute rule |
 | `ledger`, `ledger_ssh`, `queue`, `stream` | the Yoga's file, the Yoga, the queue file, the prefix | `COORD`, `YOGA_SSH` |
 | `ally_root`, `ally_claim`, `ally_mem_gib`, `ally_eden_sha` | the lent rig `C:/Eden/c1162-w5-ally`, none, 11, the rig's pinned `eden.exe` | `O`, `OWNER`, `MEM_GIB`, `EDEN_SHA` of `wa_s2.py` / `wa_s5.py` / `wui.py` |
 
@@ -49,7 +49,7 @@ Every profile copy gets `pauseWhenInBackground=false`, `volume=0`, `volume\defau
 
 Common: the claim rules of `TRAININGROOMS-STREAM-RULES.md` are enforced by `ledger.py`, which `solo.ps1 -Action Up` calls
 before anything else: no Eden here, display free, MemAvailable >= 10 GiB, `df` >= 40 GB, then the claim is refused while any
-claim on that host has no later RELEASED (foreign owners included; stale after `stale_hours` and listed, not blocking),
+claim on that host has no later RELEASED (foreign owners included, regardless of age; `stale_hours` only labels old claims),
 within `fair_seconds` of your own RELEASED, and while `imgui-nvn-sol` or `tm-f8-terra*` (`-ally`, `-eden`; matched by name
 prefix, each on its own; `ledger.PARALLEL`) is queued for the host and has not had it since the last TrainingRooms release
 there (queue file interleave rule), but only for `parallel_grace` seconds (default 180, `TR_PARALLEL_GRACE`) after our last

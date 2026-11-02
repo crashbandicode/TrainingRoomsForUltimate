@@ -42,8 +42,8 @@ relaunch inside a claim, `-Restore` on Down.
 The `(CLAIMED|RELEASED): (\S+ \S+)` parse misses real lines: stamps with seconds (`12:34:56Z`), `CLAIMED again:`,
 `CLAIMED (build only ...):`, owners like `Codex <uuid>/<stream>` and `Claude tangent <name>`, and it keys by owner only, so a
 RELEASED naming one host closes the owner's claims on every host. `ledger.py` handles those, is host-aware (a claim is ON
-the host its "on <Host>" phrase names), refuses while any foreign claim on the host is open (listing, but not honouring,
-claims older than `stale_hours`), enforces a wait after the owner's own RELEASED, writes stamps without seconds (older
+the host its "on <Host>" phrase names), refuses while any foreign claim on the host is open regardless of age
+(`stale_hours` only labels old claims), enforces a wait after the owner's own RELEASED, writes stamps without seconds (older
 parsers read only that form), reads the ledger over ssh from the machines that do not hold it, and exposes the queue file's
 head per host. Its tests parse real ledger lines. EDEN.md would say: a claim line names its host as "on <Host>" and no
 other; waits are checks of at most 60 s.
