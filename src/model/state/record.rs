@@ -191,6 +191,15 @@ pub struct SavedState {
 }
 
 impl SavedState {
+    /// Writer/worker only. A hook hands over a fixed-size typed identity and
+    /// never builds its JSON representation. Failed serialization leaves the
+    /// previous identity intact.
+    pub fn attach_mii<T: serde::Serialize>(&mut self, identity: Option<T>) -> Result<(), serde_json::Error> {
+        let value = identity.map(serde_json::to_value).transpose()?;
+        self.mii = value;
+        Ok(())
+    }
+
     /// A never-saved record (SPEC-state-01 §7.3).
     pub fn never_saved() -> Self {
         SavedState {

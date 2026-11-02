@@ -485,7 +485,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "fb2dde5f7e08c9782eaa2acd7bf18c2e5e2822bcb2943e07bb4bf8a04966f149",
+   "dest_sha256": "91aa7ec0d0278d13916fe60d9ae06aa07cd433d161d3f31a984506c55fc2225a",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -940,6 +940,11 @@
      "old": "crate::runtime::roster::character_roster::mii_replay::reacknowledge_named(target);",
      "new": "crate::runtime::macros::identity::reacknowledge_named(target);",
      "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {",
+     "new": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n        crate::runtime::features::states::retire_setup_session();",
+     "reason": "Lead fixed da1 Setup composition: retire the Setup epoch only at the existing actual waiting-lobby boundary; preserve worker lifecycle handoff."
     }
    ]
   },

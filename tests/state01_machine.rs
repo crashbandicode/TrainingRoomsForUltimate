@@ -82,6 +82,104 @@ fn run_ground_load(machine: &mut Machine, settings: &StateSettings, rng: &mut Rn
     (player, cpu)
 }
 
+#[test]
+fn temporary_pair_uses_death_restore_without_mutating_any_numbered_record() {
+    let mut machine = Machine::default();
+    for (i, record) in machine
+        .file
+        .player
+        .iter_mut()
+        .chain(machine.file.cpu.iter_mut())
+        .enumerate()
+    {
+        record.x = 100.0 + i as f32;
+        record.mii = Some(serde_json::json!({"saved_identity": i}));
+    }
+    let persisted = machine.file.clone();
+    machine.mirror_sign = -1.0;
+    machine.random_slot = 4;
+    let settings = StateSettings {
+        enable: false,
+        slot: 3,
+        mirroring: Mirroring::Random,
+        damage_player: DamageMode::Random,
+        damage_cpu: DamageMode::Default,
+        ..StateSettings::default()
+    };
+    let mut random = rng();
+    assert!(machine.begin_temporary([
+        saved(10.0, 2.0, 1.0, GROUND, 7),
+        saved(-8.0, 3.0, -1.0, GROUND, 7)
+    ]));
+    assert_eq!(machine.record(Role::Player, 0), &persisted.player[0]);
+    assert_eq!(machine.restoring_record(Role::Player, &settings).x, 10.0);
+    assert!(!machine.begin_load(&settings, &mut random));
+    for entry in [1, 0] {
+        let out = machine.frame(
+            &FrameIn {
+                save_chord: true,
+                load_chord: true,
+                ..input(entry)
+            },
+            &settings,
+            &mut random,
+        );
+        assert!(out.force_dead);
+        assert!(out.capture.is_none() && out.saved_notice.is_none());
+        assert_eq!(machine.file, persisted);
+    }
+    for entry in [1, 0] {
+        let out = machine.frame(
+            &FrameIn {
+                status: StatusNow::Wait,
+                ..input(entry)
+            },
+            &settings,
+            &mut random,
+        );
+        assert!(out.cleanup);
+        assert_eq!(out.done.unwrap().damage, Some(42.0));
+        assert_eq!(out.placing.unwrap().x, if entry == 0 { 10.0 } else { -8.0 });
+        assert_eq!(out.restored, (entry == 0).then_some(false));
+        assert_eq!(machine.file, persisted);
+    }
+    assert!(!machine.temporary_active() && !machine.is_loading());
+    assert_eq!((machine.mirror_sign, machine.random_slot), (-1.0, 4));
+}
+
+#[test]
+fn temporary_pair_cancellation_and_pending_save_do_not_repurpose_a_slot() {
+    let mut machine = Machine::default();
+    machine.file.cpu[4].marker = Marker::Save;
+    let pair = || {
+        [
+            saved(1.0, 0.0, 1.0, GROUND, 7),
+            saved(2.0, 0.0, 1.0, GROUND, 7),
+        ]
+    };
+    assert!(!machine.begin_temporary(pair()));
+    machine.file.cpu[4].marker = Marker::NoAction;
+    let file = machine.file.clone();
+    assert!(machine.begin_temporary(pair()));
+    assert!(!machine.begin_temporary(pair()));
+    machine.cancel_all();
+    assert!(!machine.temporary_active() && !machine.is_loading());
+    assert_eq!(machine.file, file);
+    assert!(machine.begin_temporary(pair()));
+}
+
+#[test]
+fn waiting_state_role_is_entry_four_and_never_a_parked_native_cpu() {
+    use model::cpu::role::Scene;
+    assert_eq!(Role::for_scene(Scene::Lobby, 0), Some(Role::Player));
+    assert_eq!(Role::for_scene(Scene::Lobby, 4), Some(Role::Cpu));
+    for entry in [1, 2, 3, 5, 6, 7, -1, 8] {
+        assert_eq!(Role::for_scene(Scene::Lobby, entry), None);
+    }
+    assert_eq!(Role::for_scene(Scene::Training, 1), Some(Role::Cpu));
+    assert_eq!(Role::for_scene(Scene::Training, 4), None);
+}
+
 /// SPEC-state-05 §5.1 step 1: the Pokemon Trainer pre-death rule is asked on KillPlayer and on every
 /// WaitForAlive frame for a Pokemon only, and the trainer's switch flag is raised once it is placed.
 #[test]

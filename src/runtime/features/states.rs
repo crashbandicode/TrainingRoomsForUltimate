@@ -46,9 +46,17 @@ use crate::runtime::state_natives as n;
 use crate::runtime::hub;
 use crate::runtime::scene;
 
+mod quick_reset;
+mod preview;
+pub(crate) mod setups;
+pub(crate) use quick_reset::on_input as on_quick_reset_input;
+pub(crate) use quick_reset::request as request_quick_reset;
+pub(crate) use preview::{request as request_preview_restore, finish as finish_preview_restore, end as end_preview_restore};
+
 /// Everything the per-frame step owns, behind one lock.
 struct State {
     machine: Machine,
+    saved_miis: [[Option<crate::engine::mii::lifetime::Configuration>; 5]; 2],
     settings: StateSettings,
     rng: Rng,
     ids: Table,
@@ -66,6 +74,8 @@ static STATE: Mutex<Option<State>> = Mutex::new(None);
 /// A load is in progress / killing (the hooks read these without the lock).
 static LOADING: AtomicBool = AtomicBool::new(false);
 static KILLING: AtomicBool = AtomicBool::new(false);
+static TEMPORARY: AtomicBool = AtomicBool::new(false);
+static SESSION_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// The settings bits the hooks need (`StateSettings::enable`, `autoload`, `respawn_invincibility`).
 static ENABLE: AtomicBool = AtomicBool::new(true);
 static AUTOLOAD: AtomicBool = AtomicBool::new(false);
@@ -267,8 +277,11 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
     // The writer thread keeps its own copy (boot, before any hook): Saves reach it through `hand_to_writer`.
     *WRITER_FILE.lock() = Some(file.clone());
+    let saved_miis = setups::saved_identities(&file);
+    let file = file.into_game_records();
     *STATE.lock() = Some(State {
         machine: Machine::new(file),
+        saved_miis,
         settings,
         rng: Rng::new(seed),
         ids: Table::unresolved(),
@@ -356,6 +369,7 @@ pub fn cancel_pending() {
     }
     LOADING.store(false, Ordering::Release);
     KILLING.store(false, Ordering::Release);
+    TEMPORARY.store(false, Ordering::Release);
     MAC_PRESENT.store(false, Ordering::Release);
     for slot in &BUFF_ACC {
         slot.store(0, Ordering::Release);
@@ -364,6 +378,25 @@ pub fn cancel_pending() {
     if crate::runtime::roster::running() {
         crate::runtime::roster::kirby_hats::cancel_pending();
     }
+}
+
+pub(crate) fn clear_session() {
+    with(|_| setups::clear_facts());
+    cancel_pending();
+    quick_reset::clear();
+    preview::clear();
+    SAVE_REQUEST.store(false, Ordering::Release);
+    LOAD_REQUEST.store(false, Ordering::Release);
+}
+
+/// The roster's existing waiting-room lifetime decision, rather than a practice
+/// active edge, retires Setup drafts. Serialize this epoch with game commits.
+pub(crate) fn retire_setup_session() {
+    with(|_| setups::retire_session());
+}
+
+fn role_of_entry(entry: i32) -> Option<Role> {
+    Role::for_scene(scene::current()?, entry)
 }
 
 /// A save-state load is in progress: the load machine's own flag, published each fighter frame. The one source
@@ -376,7 +409,7 @@ pub fn is_loading() -> bool {
 /// What the hooks need of the settings: the three bits, as a `StateSettings`.
 fn hook_settings() -> StateSettings {
     StateSettings {
-        enable: ENABLE.load(Ordering::Acquire),
+        enable: ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire),
         autoload: AUTOLOAD.load(Ordering::Acquire),
         respawn_invincibility: RESPAWN_INVINCIBILITY.load(Ordering::Acquire),
         ..StateSettings::default()
@@ -445,6 +478,7 @@ fn ensure_consts() -> bool {
 /// The raw facts of one fighter body, read from the game with no lock held.
 struct Raw {
     entry: i32,
+    role: Role,
     kind: i32,
     accessor: usize,
     status: i32,
@@ -464,18 +498,23 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     }
     let entry = ((fighter + FIGHTER_ENTRY_FIELD) as *const i32).read();
     let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
-    if accessor == 0 || Role::of_entry(entry).is_none() {
+    if accessor == 0 {
         return;
     }
-    if !scene::is_training() {
-        if LOADING.load(Ordering::Acquire) {
-            cancel_pending();
+    preview::service_retirement();
+    let scene_facts = scene::facts();
+    if !crate::model::scene::is_training(scene_facts) {
+        // The shared predicate is also false during a hot swap. A suspended
+        // callback is not an entry-lifetime boundary: practice retirement owns
+        // that boundary, and only actual scene departure clears the cache here.
+        if entry == 0 && !scene_facts.native_training && !scene_facts.lobby_active
+            && SESSION_ACTIVE.swap(false, Ordering::AcqRel) {
+            clear_session();
         }
         return;
     }
-    if !ENABLE.load(Ordering::Acquire) {
-        return;
-    }
+    let Some(role) = role_of_entry(entry) else { return };
+    SESSION_ACTIVE.store(true, Ordering::Release);
     #[cfg(feature = "diag")]
     if entry == 0 && ((fighter + FIGHTER_KIND_FIELD) as *const i32).read() != NANA_KIND.load(Ordering::Acquire) {
         counts::bump(counts::FRAME);
@@ -484,6 +523,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let nana = kind == NANA_KIND.load(Ordering::Acquire);
     let raw = Raw {
         entry,
+        role,
         kind,
         accessor,
         status: natives::status_kind(accessor),
@@ -491,6 +531,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         situation: natives::situation_kind(accessor),
         fighter,
     };
+    quick_reset::observe(&raw, nana);
+    if role == Role::Player && !nana { setups::service(); }
+    if !ENABLE.load(Ordering::Acquire) && !TEMPORARY.load(Ordering::Acquire) {
+        return;
+    }
 
     #[cfg(feature = "diag")]
     if DUMP.load(Ordering::Acquire) {
@@ -548,8 +593,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             }
         }
         // Both bodies are dumped, in whichever order the game runs them (a switched Pokemon runs after the CPU).
-        if !nana && raw.entry <= 1 {
-            let seen = DUMPED.fetch_or(1 << raw.entry, Ordering::AcqRel) | (1 << raw.entry);
+        if !nana {
+            let seen = DUMPED.fetch_or(1 << raw.role.index(), Ordering::AcqRel) | (1 << raw.role.index());
             if seen == 0b11 {
                 DUMPED.store(0, Ordering::Release);
                 DUMP.store(false, Ordering::Release);
@@ -570,10 +615,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         }
     }
     if !nana {
-        if let Some(role) = Role::of_entry(entry) {
-            FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
-            FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
-        }
+        FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
+        FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
     }
     // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
     let switching = is_pokemon_kind(kind)
@@ -599,15 +642,15 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let stage_id = natives::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
-        if raw.entry <= 1 && !nana {
-            state.last_kinds[raw.entry as usize] = raw.kind;
+        if !nana {
+            state.last_kinds[raw.role.index()] = raw.kind;
         }
         if ids.is(C::KindLittleMac, raw.kind) {
             MAC_PRESENT.store(true, Ordering::Release);
         }
         let dead = ids.is(C::StatusDead, raw.status) || ids.is(C::StatusStandby, raw.status) || switching;
         let input = FrameIn {
-            entry: raw.entry,
+            entry: raw.role.index() as i32,
             nana,
             popo: ids.is(C::KindPopo, raw.kind) && !nana_removed(raw.entry),
             kind: raw.kind,
@@ -635,6 +678,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         let out = state.machine.frame(&input, &settings, &mut state.rng);
         LOADING.store(state.machine.is_loading(), Ordering::Release);
         KILLING.store(state.machine.is_killing(), Ordering::Release);
+        TEMPORARY.store(state.machine.temporary_active(), Ordering::Release);
         (out, input.situation.classify(raw.situation))
     });
     if let Some((out, _)) = out {
@@ -799,9 +843,7 @@ unsafe fn place(accessor: usize, placing: &Placing) {
 /// buffs, the item snapshot, the fighter-specific restores).
 unsafe fn finish(raw: &Raw, done: &Done) {
     let accessor = raw.accessor;
-    if let Some(role) = Role::of_entry(raw.entry) {
-        hud_load(role.index(), false);
-    }
+    hud_load(raw.role.index(), false);
     // Diag: which Ice Climbers path this load took (Solo Popo removes Nana: no hand-off).
     if with(|s| s.ids.is(C::KindPopo, raw.kind)).unwrap_or(false) {
         state_diag!("[TrainingRooms] state popo entry={} nana_removed={}", raw.entry, nana_removed(raw.entry));
@@ -838,9 +880,9 @@ unsafe fn finish(raw: &Raw, done: &Done) {
     }
     // Kirby (§5.2 step 2): the saved hat comes back when the opponent is the fighter it came from.
     if let Some(saved) = &done.charge {
-        if let (Some(role), Some(copied), Some(true)) = (Role::of_entry(raw.entry), saved.int_z, saved.has_charge) {
+        if let (Some(copied), Some(true)) = (saved.int_z, saved.has_charge) {
             if with(|s| s.ids.is(C::KindKirby, raw.kind)).unwrap_or(false) {
-                kirby_copy(accessor, role, copied);
+                kirby_copy(accessor, raw.role, copied);
             }
         }
     }
@@ -891,7 +933,7 @@ fn pt_ids() -> state_restore::PtIds {
 /// trainer's five frames (SPEC-state-05 §5.1 step 5), `WaitForCopyAbility` ends whenever Kirby's copy-start
 /// flag is clear (the copy hook consumes it and writes the charge, §5.2 steps 4 and 5).
 unsafe fn run_wait(raw: &Raw, marker: Marker) {
-    let Some(role) = Role::of_entry(raw.entry) else { return };
+    let role = raw.role;
     match marker {
         Marker::ApplyBuff => apply_buff(raw, role),
         Marker::WaitForPokemonSwitch => pt_wait(raw, role),
@@ -1001,12 +1043,10 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     }
 }
 
-/// The Save step (§5.5 step 2): read the values, store them, write the file when both are done.
-unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
-    if nana {
-        return;
-    }
-    let Some(role) = Role::of_entry(raw.entry) else { return };
+/// Read value-only fighter state without changing a numbered slot, requesting
+/// persistence or emitting the Save effect. All native calls stay outside locks.
+unsafe fn read_record(raw: &Raw) -> SavedState {
+    let role = raw.role;
     let accessor = raw.accessor;
     let ids = with(|s| s.ids.clone());
     let (charge, copy_charge) = ids
@@ -1023,7 +1063,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
             }
         })
         .unwrap_or_default();
-    let state = SavedState {
+    SavedState {
         x: natives::pos_x(accessor),
         y: natives::pos_y(accessor),
         percent: natives::damage(accessor, 0),
@@ -1038,10 +1078,27 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
         saved_stage: Some(natives::stage_id()),
         mii: None,
-    };
-    // The writer thread gets its own copy of the record (no heap: a captured state carries no Mii value), so it never takes `STATE`.
-    hand_to_writer(role, slot, state.clone());
-    let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
+    }
+}
+
+/// The Save step (§5.5 step 2): read the values, store them, write the file when both are done.
+unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
+    if nana { return; }
+    let role = raw.role;
+    let accessor = raw.accessor;
+    let state = read_record(raw);
+    // Capture only the settled, exact value belonging to this loaded role.
+    // JSON conversion belongs to the writer, never to this hook. A not-yet-ready
+    // Mii remains explicitly absent (Setup Save refuses it until saved again).
+    let mii = (crate::runtime::roster::running() && crate::model::state::setup::MII_KINDS.contains(&raw.kind))
+        .then(|| crate::runtime::roster::character_roster::current_mii_configuration(role.index()))
+        .flatten()
+        .filter(|value| value.canonical().class as i32 == raw.kind);
+    hand_to_writer(role, slot, state.clone(), mii);
+    let write = with(|s| {
+        s.saved_miis[role.index()][slot.min(4)] = mii;
+        s.machine.capture(role, slot, state)
+    }).unwrap_or(false);
     // The save flash.
     let attributes = with(|s| {
         [C::EffectNoJointScale, C::EffectFollow, C::EffectConcludeStatus]
@@ -1117,7 +1174,7 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
 pub unsafe fn state_set_dead_rumble_hook(lua_state: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::RUMBLE);
-    if ENABLE.load(Ordering::Acquire) && scene::is_training() {
+    if (ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) && scene::is_training() {
         return 0;
     }
     call_original!(lua_state)
@@ -1249,7 +1306,7 @@ pub unsafe fn state_effect_req_follow_hook(
 pub unsafe fn state_no_star_ko_hook(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::STAR_KO);
-    if ENABLE.load(Ordering::Acquire) && scene::is_training() {
+    if (ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) && scene::is_training() {
         return 0;
     }
     call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
@@ -1369,10 +1426,9 @@ pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
         return;
     }
     let entry = ((entry_object + 0x10) as *const i32).read();
-    let Some(role) = Role::of_entry(entry) else { return };
+    let Some(role) = role_of_entry(entry) else { return };
     let Some((saved, kinds)) = with(|s| {
-        let slot = s.machine.current_slot(&s.settings);
-        (s.machine.record(role, slot).fighter_kind, pokemon_kinds(&s.ids))
+        (s.machine.restoring_record(role, &s.settings).fighter_kind, pokemon_kinds(&s.ids))
     }) else {
         return;
     };
@@ -1408,10 +1464,9 @@ pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
 unsafe fn kirby_copy_started(fighter: usize) {
     let entry = ((fighter + FIGHTER_ENTRY_FIELD) as *const i32).read();
     let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
-    let Some(role) = Role::of_entry(entry) else { return };
+    let Some(role) = role_of_entry(entry) else { return };
     let Some((ids, plan)) = with(|s| {
-        let slot = s.machine.current_slot(&s.settings);
-        let record = s.machine.record(role, slot);
+        let record = s.machine.restoring_record(role, &s.settings);
         (s.ids.clone(), charge::plan_kirby(&s.ids, &record.charge, record.copy_charge.as_ref()))
     }) else {
         return;
@@ -1453,7 +1508,14 @@ const SLOT_EMPTY: u8 = 0;
 const SLOT_WRITING: u8 = 1;
 const SLOT_FULL: u8 = 2;
 const SLOT_READING: u8 = 3;
-type Captured = Option<(u64, Role, usize, SavedState)>;
+struct CapturedRecord {
+    sequence: u64,
+    role: Role,
+    slot: usize,
+    state: SavedState,
+    mii: Option<crate::engine::mii::lifetime::Configuration>,
+}
+type Captured = Option<CapturedRecord>;
 struct HandoffSlot(std::cell::UnsafeCell<Captured>);
 // SAFETY: a slot's cell is touched only by the one thread that moved its state to SLOT_WRITING or SLOT_READING.
 unsafe impl Sync for HandoffSlot {}
@@ -1465,12 +1527,12 @@ static HANDOFF_SEQ: AtomicU64 = AtomicU64::new(0);
 static HANDOFF_DROPPED: AtomicU32 = AtomicU32::new(0);
 
 /// A Save captured `state` for `role` in `slot` (game thread): the writer's copy follows. Never waits, no heap.
-fn hand_to_writer(role: Role, slot: usize, state: SavedState) {
+fn hand_to_writer(role: Role, slot: usize, state: SavedState, mii: Option<crate::engine::mii::lifetime::Configuration>) {
     let seq = HANDOFF_SEQ.fetch_add(1, Ordering::AcqRel);
     for (i, cell) in HANDOFF_STATE.iter().enumerate() {
         if cell.compare_exchange(SLOT_EMPTY, SLOT_WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
             // SAFETY: the slot is ours between SLOT_WRITING and SLOT_FULL.
-            unsafe { *HANDOFF[i].0.get() = Some((seq, role, slot, state)) };
+            unsafe { *HANDOFF[i].0.get() = Some(CapturedRecord { sequence: seq, role, slot, state, mii }) };
             cell.store(SLOT_FULL, Ordering::Release);
             return;
         }
@@ -1480,6 +1542,7 @@ fn hand_to_writer(role: Role, slot: usize, state: SavedState) {
 
 /// The writer applies the captured records to its copy, oldest first (as `Machine::capture` stores them).
 fn take_captured(file: &mut SaveFile) {
+    let mut binding = setups::take_writer_bind();
     let mut taken: [Captured; HANDOFF_SLOTS] = [const { None }; HANDOFF_SLOTS];
     for (i, cell) in HANDOFF_STATE.iter().enumerate() {
         if cell.compare_exchange(SLOT_FULL, SLOT_READING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
@@ -1488,15 +1551,22 @@ fn take_captured(file: &mut SaveFile) {
             cell.store(SLOT_EMPTY, Ordering::Release);
         }
     }
-    taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |(seq, ..)| *seq));
-    for (_, role, slot, mut state) in taken.into_iter().flatten() {
+    taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
+    for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
+        if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
+            setups::apply_writer_bind(file, binding.take().unwrap());
+        }
         state.marker = Marker::NoAction;
+        // Configuration serializes only validated integer/byte values. Its
+        // allocation-bearing JSON representation stays on this writer thread.
+        state.attach_mii(mii).expect("validated Mii configuration serialization");
         let records = match role {
             Role::Player => &mut file.player,
             Role::Cpu => &mut file.cpu,
         };
         records[slot.min(records.len() - 1)] = state;
     }
+    if let Some(binding) = binding { setups::apply_writer_bind(file, binding); }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
     if dropped != 0 {
         diagnostic(format_args!("[TrainingRooms] save-state records dropped before the writer took them: {dropped}"));

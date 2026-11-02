@@ -81,6 +81,7 @@ pub fn suspend_waiting() {
 }
 pub fn waiting_scene_changed(same_lobby: bool) {
     if !same_lobby {
+        crate::runtime::features::states::retire_setup_session();
         let discard = SUSPENDED.swap(false, Ordering::AcqRel);
         post_lifecycle(Lifecycle::SceneChanged { discard });
     }
