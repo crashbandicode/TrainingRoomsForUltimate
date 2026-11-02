@@ -19,6 +19,8 @@ pub mod archive_retire;
 pub mod cpu;
 #[path = "model/capture_settings.rs"]
 pub mod capture_settings;
+#[path = "model/capabilities.rs"]
+pub mod capabilities;
 #[path = "model/chords.rs"]
 pub mod chords;
 #[path = "model/damage_display.rs"]

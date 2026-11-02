@@ -4,15 +4,21 @@
 //! NOT YET SWITCH-COMPILED.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::OnceLock;
 
 use skyline::hooks::{getRegionAddress, Region};
 use skyline::nn::oe::{DisplayVersion, GetDisplayVersion};
 
+use crate::model::capabilities::Granted;
 use crate::model::guard::GUARD_BYTES;
 use crate::model::{lra_reset, sites, sites_pkg2, sites_pkg4};
 use crate::model::version::BUILD_ID_SCAN_BYTES;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
+/// The natives whose rows passed their guards (`model::capabilities::Granted`), set once by boot before any
+/// hook is installed. Until then, and for any offset that was not granted, the native-call layer calls nothing
+/// (R2-1).
+static GRANTED: OnceLock<Granted> = OnceLock::new();
 static TRAINING_PREDICATE_USABLE: AtomicBool = AtomicBool::new(false);
 /// Which groups of the fighter natives passed the guards of the rows they call (set by boot).
 static ENTRY_NATIVES_USABLE: AtomicBool = AtomicBool::new(false);
@@ -28,6 +34,16 @@ pub enum NativeGroup {
     Operator,
     /// `is_fighter`: rows `utility_get_category` and `utility_get_kind`.
     Category,
+}
+
+/// Boot hands the native-call layer the set of natives it may call (once; a second call is ignored).
+pub fn grant(granted: Granted) {
+    let _ = GRANTED.set(granted);
+}
+
+/// Whether the native at `main+offset` may be called: its rows passed their guards at boot.
+pub fn granted(offset: usize) -> bool {
+    GRANTED.get().is_some_and(|set| set.allows(offset))
 }
 
 /// The start of `main`'s `.text` (offsets in the site table are relative to it).
@@ -102,6 +118,9 @@ pub fn allow_natives(group: NativeGroup) {
 /// # Safety
 /// The `lua_const_lookup` site must have passed its guard.
 pub unsafe fn lua_const(key: u64) -> Option<i32> {
+    if !granted(sites_pkg2::LUA_CONST_LOOKUP_OFFSET) {
+        return None;
+    }
     let lookup: extern "C" fn(u64, *mut i32) -> bool = std::mem::transmute(text_base() + sites_pkg2::LUA_CONST_LOOKUP_OFFSET);
     let mut value = 0i32;
     lookup(key, &mut value).then_some(value)
@@ -132,127 +151,132 @@ pub mod natives {
     /// `utility::get_category` of a fighter's battle object id.
     const CATEGORY_FIGHTER: i32 = 0;
 
-    unsafe fn at<F: Copy>(offset: usize) -> F {
+    /// The native at `main+offset`, or `None` when its rows did not pass their guards at boot (`granted`): a
+    /// native that was not granted is never called, and the function that asked answers nothing (R2-1).
+    unsafe fn at<F: Copy>(offset: usize) -> Option<F> {
         debug_assert_eq!(std::mem::size_of::<F>(), std::mem::size_of::<usize>());
-        std::mem::transmute_copy(&(text_base() + offset))
+        if !super::granted(offset) {
+            return None;
+        }
+        Some(std::mem::transmute_copy(&(text_base() + offset)))
     }
 
     pub unsafe fn status_kind(accessor: usize) -> i32 {
-        at::<extern "C" fn(usize) -> i32>(sites_pkg2::STATUS_KIND_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> i32>(sites_pkg2::STATUS_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `StatusModule::prev_status_kind(accessor, index)`.
     pub unsafe fn prev_status_kind(accessor: usize, index: u32) -> i32 {
-        at::<extern "C" fn(usize, u32) -> i32>(sites_pkg2::PREV_STATUS_KIND_OFFSET)(accessor, index)
+        at::<extern "C" fn(usize, u32) -> i32>(sites_pkg2::PREV_STATUS_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor, index))
     }
 
     pub unsafe fn situation_kind(accessor: usize) -> i32 {
-        at::<extern "C" fn(usize) -> i32>(sites_pkg2::SITUATION_KIND_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> i32>(sites_pkg2::SITUATION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn prev_situation_kind(accessor: usize) -> i32 {
-        at::<extern "C" fn(usize) -> i32>(sites_pkg2::PREV_SITUATION_KIND_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> i32>(sites_pkg2::PREV_SITUATION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn motion_frame(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_FRAME_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_FRAME_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `MotionModule::motion_kind(accessor)` as the `phx::Hash40` value.
     pub unsafe fn motion_kind(accessor: usize) -> u64 {
-        at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn is_enable_cancel(accessor: usize) -> bool {
-        at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn pos_y(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn pos_z(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Z_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Z_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn get_int(accessor: usize, id: i32) -> i32 {
-        at::<extern "C" fn(usize, i32) -> i32>(sites_pkg2::WORK_GET_INT_OFFSET)(accessor, id)
+        at::<extern "C" fn(usize, i32) -> i32>(sites_pkg2::WORK_GET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
     }
 
     /// `KineticModule::get_sum_speed_y(accessor, energy id)`.
     pub unsafe fn sum_speed_y(accessor: usize, energy: i32) -> f32 {
-        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET)(accessor, energy)
+        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET).map_or_else(Default::default, |f| f(accessor, energy))
     }
 
     /// `EffectModule::req(accessor, effect, pos, rot, scale, 0, 0, true, attribute)`.
     pub unsafe fn effect_req(accessor: usize, effect: u64, pos: &[f32; 3], scale: f32, attribute: i32) {
         type Req = extern "C" fn(usize, u64, *const [f32; 3], *const [f32; 3], f32, u32, i32, bool, i32) -> u64;
         let zero = [0.0f32; 3];
-        at::<Req>(sites_pkg2::EFFECT_REQ_OFFSET)(accessor, effect, pos, &zero, scale, 0, 0, true, attribute);
+        at::<Req>(sites_pkg2::EFFECT_REQ_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, pos, &zero, scale, 0, 0, true, attribute));
     }
 
     pub unsafe fn pos_x(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_X_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_X_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     pub unsafe fn is_flag(accessor: usize, id: i32) -> bool {
-        at::<extern "C" fn(usize, i32) -> bool>(sites_pkg2::WORK_IS_FLAG_OFFSET)(accessor, id)
+        at::<extern "C" fn(usize, i32) -> bool>(sites_pkg2::WORK_IS_FLAG_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
     }
 
     pub unsafe fn set_flag(accessor: usize, value: bool, id: i32) {
-        at::<extern "C" fn(usize, bool, i32)>(sites_pkg2::WORK_SET_FLAG_OFFSET)(accessor, value, id)
+        at::<extern "C" fn(usize, bool, i32)>(sites_pkg2::WORK_SET_FLAG_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 
     /// `StatusModule::change_status_request_from_script(accessor, status, true)`.
     pub unsafe fn change_status_request(accessor: usize, status: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_REQUEST_OFFSET)(accessor, status, true)
+        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_REQUEST_OFFSET).map_or_else(Default::default, |f| f(accessor, status, true))
     }
 
     /// `WorkModule::is_enable_transition_term(accessor, term)`: the function the ledge hook wraps (the
     /// call goes through the hook, which answers the original for any term it does not own).
     pub unsafe fn is_enable_transition_term(accessor: usize, term: i32) -> bool {
-        at::<extern "C" fn(usize, i32) -> bool>(sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)(accessor, term)
+        at::<extern "C" fn(usize, i32) -> bool>(sites_pkg2::TRANSITION_TERM_HOOK_OFFSET).map_or_else(Default::default, |f| f(accessor, term))
     }
 
     /// `StatusModule::change_status_force(accessor, status, true)`.
     pub unsafe fn change_status_force(accessor: usize, status: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_FORCE_OFFSET)(accessor, status, true)
+        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_FORCE_OFFSET).map_or_else(Default::default, |f| f(accessor, status, true))
     }
 
     pub unsafe fn set_whole(accessor: usize, visible: bool) {
-        at::<extern "C" fn(usize, bool)>(sites_pkg2::VISIBILITY_SET_WHOLE_OFFSET)(accessor, visible)
+        at::<extern "C" fn(usize, bool)>(sites_pkg2::VISIBILITY_SET_WHOLE_OFFSET).map_or_else(Default::default, |f| f(accessor, visible))
     }
 
     /// `EffectModule::set_visible_kind(accessor, Hash40, visible)`.
     pub unsafe fn set_visible_kind(accessor: usize, effect: u64, visible: bool) {
-        at::<extern "C" fn(usize, u64, bool)>(sites_pkg2::EFFECT_SET_VISIBLE_KIND_OFFSET)(accessor, effect, visible)
+        at::<extern "C" fn(usize, u64, bool)>(sites_pkg2::EFFECT_SET_VISIBLE_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, visible))
     }
 
     pub unsafe fn motion_end_frame(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_END_FRAME_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_END_FRAME_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `DamageModule::damage(accessor, index)`.
     pub unsafe fn damage(accessor: usize, index: i32) -> f32 {
-        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::DAMAGE_OF_OFFSET)(accessor, index)
+        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::DAMAGE_OF_OFFSET).map_or_else(Default::default, |f| f(accessor, index))
     }
 
     pub unsafe fn get_float(accessor: usize, id: i32) -> f32 {
-        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::WORK_GET_FLOAT_OFFSET)(accessor, id)
+        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::WORK_GET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
     }
 
     pub unsafe fn set_float(accessor: usize, value: f32, id: i32) {
-        at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET)(accessor, value, id)
+        at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 
     /// `WorkModule::get_param_float(accessor, param type hash, param hash)`.
     pub unsafe fn get_param_float(accessor: usize, kind: u64, name: u64) -> f32 {
-        at::<extern "C" fn(usize, u64, u64) -> f32>(sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET)(accessor, kind, name)
+        at::<extern "C" fn(usize, u64, u64) -> f32>(sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, kind, name))
     }
 
     /// `ControlModule::add_clatter_time(accessor, delta, 0)`.
     pub unsafe fn add_clatter_time(accessor: usize, delta: f32) {
-        at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::ADD_CLATTER_TIME_OFFSET)(accessor, delta, 0)
+        at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::ADD_CLATTER_TIME_OFFSET).map_or_else(Default::default, |f| f(accessor, delta, 0))
     }
 
     /// `EffectModule::req_on_joint(accessor, effect, joint, pos, rot, scale, pos_rand, rot_rand, true,
@@ -261,27 +285,27 @@ pub mod natives {
         type ReqOnJoint =
             extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, *const [f32; 3], *const [f32; 3], bool, u32, i32, i32) -> u64;
         let zero = [0.0f32; 3];
-        at::<ReqOnJoint>(sites_pkg2::EFFECT_REQ_ON_JOINT_OFFSET)(accessor, effect, joint, &zero, &zero, scale, &zero, &zero, true, attribute, 0, 0);
+        at::<ReqOnJoint>(sites_pkg2::EFFECT_REQ_ON_JOINT_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, joint, &zero, &zero, scale, &zero, &zero, true, attribute, 0, 0));
     }
 
     /// `PostureModule::lr(accessor)`: the facing, +1.0 or -1.0.
     pub unsafe fn lr(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(sites_pkg4::POSTURE_LR_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> f32>(sites_pkg4::POSTURE_LR_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `StopModule::is_stop(accessor)`: the body is in hitstop.
     pub unsafe fn is_stop(accessor: usize) -> bool {
-        at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET)(accessor)
+        at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `WorkModule::set_int(accessor, value, id)`.
     pub unsafe fn set_int(accessor: usize, id: i32, value: i32) {
-        at::<extern "C" fn(usize, i32, i32)>(sites_pkg4::WORK_SET_INT_OFFSET)(accessor, value, id)
+        at::<extern "C" fn(usize, i32, i32)>(sites_pkg4::WORK_SET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 
     /// `ModelModule::set_color_rgb(accessor, r, g, b, MODEL_COLOR_TYPE)`.
     pub unsafe fn set_color_rgb(accessor: usize, r: f32, g: f32, b: f32, kind: i32) {
-        at::<extern "C" fn(usize, f32, f32, f32, i32)>(sites_pkg4::MODEL_SET_COLOR_RGB_OFFSET)(accessor, r, g, b, kind)
+        at::<extern "C" fn(usize, f32, f32, f32, i32)>(sites_pkg4::MODEL_SET_COLOR_RGB_OFFSET).map_or_else(Default::default, |f| f(accessor, r, g, b, kind))
     }
 
     // ---- fighters by entry id -------------------------------------------------------------------------
@@ -305,7 +329,7 @@ pub mod natives {
         if manager == 0 {
             return 0;
         }
-        at::<extern "C" fn(usize, i32) -> usize>(sites_pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET)(manager, entry)
+        at::<extern "C" fn(usize, i32) -> usize>(sites_pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET).map_or_else(Default::default, |f| f(manager, entry))
     }
 
     /// The entry object's first body (the fighter object), or 0.
@@ -337,7 +361,7 @@ pub mod natives {
             return false;
         }
         let id = ((accessor + ACCESSOR_OBJECT_ID_FIELD) as *const u32).read();
-        at::<extern "C" fn(u32) -> i32>(sites_pkg2::UTILITY_GET_CATEGORY_OFFSET)(id) == CATEGORY_FIGHTER
+        at::<extern "C" fn(u32) -> i32>(sites_pkg2::UTILITY_GET_CATEGORY_OFFSET).map_or_else(Default::default, |f| f(id)) == CATEGORY_FIGHTER
     }
 
     /// Whether the body is on the ground (`StatusModule::situation_kind` is `SITUATION_KIND_GROUND`);
@@ -356,17 +380,17 @@ pub mod natives {
         if manager == 0 {
             return false;
         }
-        let information = at::<extern "C" fn(usize, i32) -> usize>(sites::FIGHTER_INFORMATION_OFFSET)(manager, entry);
+        let information = at::<extern "C" fn(usize, i32) -> usize>(sites::FIGHTER_INFORMATION_OFFSET).map_or_else(Default::default, |f| f(manager, entry));
         if information == 0 {
             return false;
         }
-        at::<extern "C" fn(usize) -> bool>(sites::IS_OPERATION_CPU_OFFSET)(information)
+        at::<extern "C" fn(usize) -> bool>(sites::IS_OPERATION_CPU_OFFSET).map_or_else(Default::default, |f| f(information))
     }
 }
 
 /// The game's `app::smashball::is_training_mode()`; false when its guard did not pass.
 pub fn is_training_mode() -> bool {
-    if !TRAINING_PREDICATE_USABLE.load(Ordering::Acquire) {
+    if !TRAINING_PREDICATE_USABLE.load(Ordering::Acquire) || !granted(sites::IS_TRAINING_MODE_OFFSET) {
         return false;
     }
     // SAFETY: the site was guarded against the 13.0.5 bytes; the function takes no arguments and
@@ -378,7 +402,7 @@ pub fn is_training_mode() -> bool {
 
 /// The game's `app::fighter::is_ready_go()`; false when its guard did not pass.
 pub fn is_ready_go() -> bool {
-    if !READY_GO_USABLE.load(Ordering::Acquire) {
+    if !READY_GO_USABLE.load(Ordering::Acquire) || !granted(crate::model::sites_ui::UI_IS_READY_GO_OFFSET) {
         return false;
     }
     // SAFETY: the site was guarded against the 13.0.5 bytes; the function takes no arguments and returns a bool.

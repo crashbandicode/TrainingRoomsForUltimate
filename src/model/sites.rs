@@ -367,14 +367,12 @@ pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
     SITES.iter().filter(move |site| site.feature == feature)
 }
 
-/// Whether a feature can be installed: every one of its sites and the shared Training predicate
-/// must come out usable.
+/// Whether a feature can be installed: every row of its closure must come out usable (R2-1,
+/// `capabilities`): its own rows, the shared Training predicate, the CPU core's rows for the CPU features and
+/// the rows of other features its entry points reach.
 pub fn feature_usable(feature: Feature, usable: impl Fn(&Site) -> bool) -> bool {
-    // The CPU features read their facts through the core's natives, so they need its sites too.
-    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon).then_some(Feature::CpuCore);
-    sites_of(feature).chain(sites_of(Feature::Training)).chain(core.into_iter().flat_map(sites_of)).all(usable)
+    super::capabilities::unit_usable(super::capabilities::unit_of(feature), &usable)
 }
-
 /// What boot does with the table for a game verdict: nothing for an unsupported game
 /// (SPEC-core-01 §2: install nothing and log one line), every site otherwise.
 pub fn install_plan(verdict: Verdict) -> &'static [Site] {

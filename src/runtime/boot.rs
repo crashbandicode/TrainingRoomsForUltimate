@@ -11,6 +11,7 @@ use std::path::Path;
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
+use crate::model::capabilities::{self, Granted};
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
@@ -21,7 +22,9 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
+use crate::model::sites_pkg3::STATE_SITES;
 use crate::model::sites_pkg4;
+use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
@@ -104,7 +107,8 @@ pub fn run() {
     crate::runtime::diag_reload::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
-    let state_found = state_boot::check();
+    #[allow(unused_mut)]
+    let mut state_found = state_boot::check();
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
         *slot = if site.compared() {
@@ -117,9 +121,27 @@ pub fn run() {
     for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
     }
+    // Package 5's rows are compared here too, before anything is written: a feature's closure (R2-1) can hold
+    // a row of any table.
+    let mut ui_found = [GuardOutcome::Stock; UI_SITES.len()];
+    for (slot, site) in ui_found.iter_mut().zip(UI_SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
+    // Eden proof of R2-1 (diag only): rows named in `diag-poison.txt` are treated as foreign, as if another plugin
+    // or an unknown patch had changed those bytes, so the install decisions run on a rejected row.
+    #[cfg(feature = "diag")]
+    apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
+    // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
     let usable = |site: &sites::Site| {
-        SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
+        let by_name = |rows: &[sites::Site], outcomes: &[GuardOutcome]| rows.iter().position(|s| s.name == site.name).map(|i| outcomes[i].usable());
+        by_name(&SITES, &found)
+            .or_else(|| by_name(&STATE_SITES, &state_found))
+            .or_else(|| by_name(&sites_pkg4::SITES, &found4))
+            .or_else(|| by_name(&UI_SITES, &ui_found))
+            .unwrap_or(false)
     };
+    // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
+    game::grant(Granted::from_usable(&usable));
     // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
     let row_usable = |name: &str| sites::find(name).is_some_and(usable);
     let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
@@ -174,16 +196,25 @@ pub fn run() {
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
     let mut state_written = [Written::Skipped; state_boot::N];
-    let state_on = state_boot::install(&state_found, cpu_core_on, &mut state_written);
+    let state_on = state_boot::install(&state_found, cpu_core_on && capabilities::unit_usable(Feature::StateCore, &usable), &mut state_written);
     let state_reports = state_boot::reports(&state_found, &state_written);
     // Package 4: the recorder, the chords' poll and the notices.
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
     // The recorder calls package 2's `work_get_int` row (the ledge rest timer): its own guard gates the recorder.
-    let get_int_ok = sites::find("work_get_int").is_some_and(usable);
-    let (recording_on, notices_on) = install_pkg4(input_delay_on && get_int_ok, cpu_core_on, &found4, &mut written4);
+    // R2-1: the recorder's closure (its own rows and the other features' rows its code calls) is checked as a
+    // whole; the notices keep their own per-observer rows and only need the cross-feature part here.
+    let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
+    let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
+    let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
+    recorder::set_enabled(recording_on);
 
-    // Package 5: the menu's layout archive hook, UI anchors and input callers.
-    let ui_install = ui::install(&loaded, input_delay_on);
+    // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
+    let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
+        ui::install(&loaded, input_delay_on)
+    } else {
+        diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
+        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false }
+    };
     // Package 4's notices and input log draw from the layout tick package 5 just installed.
     if !ui::hud::register(hud_draw::draw) {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
@@ -203,23 +234,32 @@ pub fn run() {
     });
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
+    // A feature that is not installed names the first row of its closure that was rejected, when there is one.
+    let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
+    let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
+        feature: feature.name(),
+        installed,
+        reason,
+        site: if installed || reason.is_some() { None } else { blocked(feature) },
+    };
+    let common_blocked = cpu_common_reason == Some("site_guard_failed");
     let features = [
-        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
-        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
-        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on, reason: None },
-        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on, reason: None },
-        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on, reason: None },
-        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on, reason: None },
-        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on, reason: None },
-        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on, reason: None },
-        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on, reason: None },
-        FeatureReport { feature: Feature::CpuMash.name(), installed: cpu_mash_on, reason: None },
-        FeatureReport { feature: Feature::CpuCommon.name(), installed: false, reason: cpu_common_reason },
-        FeatureReport { feature: Feature::StateCore.name(), installed: state_on, reason: None },
-        FeatureReport { feature: "chords", installed: input_delay_on, reason: None },
-        FeatureReport { feature: Feature::Recording.name(), installed: recording_on, reason: None },
-        FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
-        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
+        report(Feature::InputDelay, input_delay_on, None),
+        report(Feature::LraReset, lra_on, None),
+        report(Feature::StageHazards, hazards_on, None),
+        report(Feature::ResetHub, hub_on, None),
+        report(Feature::CpuCore, cpu_core_on, None),
+        report(Feature::CpuDefence, cpu_defence_on, None),
+        report(Feature::CpuLedge, cpu_ledge_on, None),
+        report(Feature::CpuTech, cpu_tech_on, None),
+        report(Feature::CpuShield, cpu_shield_on, None),
+        report(Feature::CpuMash, cpu_mash_on, None),
+        report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
+        report(Feature::StateCore, state_on, None),
+        FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
+        report(Feature::Recording, recording_on, None),
+        report(Feature::Notices, notices_on, None),
+        report(Feature::Ui, ui_install.anchors, None),
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -240,6 +280,27 @@ pub fn run() {
     };
     install::write(&line);
     diag_log::flush();
+}
+
+/// Diag builds: `diag-poison.txt` (names separated by blanks, commas or lines) marks those rows foreign before any
+/// install decision, each name logged (`diag_poison <name> found=<bool>`).
+#[cfg(feature = "diag")]
+fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
+    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
+    let Ok(text) = fs::read_to_string(path.as_str()) else { return };
+    let mut poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
+        match rows.iter().position(|row| row.name == name) {
+            Some(i) => {
+                outcomes[i] = GuardOutcome::Foreign { first_diff: 0 };
+                true
+            }
+            None => false,
+        }
+    };
+    for name in text.split(|c: char| c.is_whitespace() || c == ',').filter(|n| !n.is_empty()) {
+        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name);
+        diagnostic(format_args!("[TrainingRooms] diag_poison {name} found={hit}"));
+    }
 }
 
 /// Read `save_states.json` on a thread with a 128 KiB stack, joined here (the settings reader's rule).
@@ -267,6 +328,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
         skyline::install_hook!(cpu::cpu_stick_x_hook);
         skyline::install_hook!(cpu::cpu_stick_y_hook);
         skyline::install_hook!(cpu::cpu_clatter_start_hook);
+        cpu::set_defence_on(true);
         for name in ["sdi_hook", "stick_x_hook", "stick_y_hook", "clatter_start_hook"] {
             mark(name, Written::Far);
         }
@@ -274,6 +336,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     let ledge = sites::feature_usable(Feature::CpuLedge, usable);
     if ledge {
         skyline::install_hook!(cpu::cpu_transition_term_hook);
+        cpu::set_ledge_on(true);
         mark("transition_term_hook", Written::Far);
     }
     let tech = sites::feature_usable(Feature::CpuTech, usable);
@@ -326,7 +389,7 @@ fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(
 /// that carry the chords and the P1 stage, and the CPU core's per-frame facts), and the notice
 /// observers. Every row of a feature must have passed its guard. Returns whether the recorder and the
 /// notice hooks were installed.
-fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
+fn install_pkg4(poll_ok: bool, cpu_core_on: bool, notices_closure: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
     let usable4 = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
     for (slot, site) in written4.iter_mut().zip(sites_pkg4::SITES.iter()) {
         if usable4(site.name) {
@@ -344,9 +407,9 @@ fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], writt
         mark("ai_epilogue", Written::Near);
     }
     // Each observer is its own site and its own pin: a mismatch leaves notices visible (SPEC-input-05 §4).
-    let combo_a = usable4("combo_display_a_pin") && usable4("combo_display_a");
-    let combo_b = usable4("combo_display_b_pin") && usable4("combo_display_b");
-    let stale = usable4("stale_moves_toggle");
+    let combo_a = notices_closure && usable4("combo_display_a_pin") && usable4("combo_display_a");
+    let combo_b = notices_closure && usable4("combo_display_b_pin") && usable4("combo_display_b");
+    let stale = notices_closure && usable4("stale_moves_toggle");
     if combo_a {
         skyline::install_hook!(notices::combo_display_a);
         mark("combo_display_a", Written::Near);
