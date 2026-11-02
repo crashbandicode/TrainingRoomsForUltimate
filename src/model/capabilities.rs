@@ -18,6 +18,7 @@ use super::sites_pkg3::STATE_SITES;
 use super::sites_pkg4;
 use super::sites_pkg6;
 use super::sites_u4;
+use super::sites_u4b;
 use super::sites_ui::UI_SITES;
 
 /// Every row of every table, in install-line order.
@@ -29,12 +30,13 @@ pub fn all_sites() -> impl Iterator<Item = &'static Site> {
         .chain(UI_SITES.iter())
         .chain(sites_pkg6::SITES.iter())
         .chain(sites_u4::SITES.iter())
+        .chain(sites_u4b::SITES.iter())
 }
 
 /// The install unit that owns a row: its feature's unit, except that the run-time texture helper's rows (they say `Ui` in their table)
 /// are the `UiTexture` unit, so a helper whose rows are rejected leaves the menu installed.
 pub fn unit_of_row(site: &Site) -> Feature {
-    if sites_u4::SITES.iter().any(|row| row.name == site.name) {
+    if sites_u4::SITES.iter().chain(sites_u4b::SITES.iter()).any(|row| row.name == site.name) {
         Feature::UiTexture
     } else {
         unit_of(site.feature)
