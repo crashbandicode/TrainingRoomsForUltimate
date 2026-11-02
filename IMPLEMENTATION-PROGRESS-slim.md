@@ -173,7 +173,7 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified;61b0aab releasee2946b9d resident3,440,640B via playbook compliance.py nro_facts; archivedreleaseNRO. |
 | Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml;61b0aab releasee2946b9d; archived61b0aab-release/compliance.md machine rows pass. |
 | Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; fullhost61b0aab exit0,1110trackedsource hashes unchanged; compliance machine row pass. |
-| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for61b0aab | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchivedsource/log receipts; prior10a8232 ordinary-player-only Switch also0; unchanged feature-scope code. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
+| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass fora6e4d07 | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchived1110source/log receipts; prior10a8232 ordinary-player-only Switch also0; unchanged feature-scope code. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
 | No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | FAIL | sl-02 installation heap_allocations=0, but full hook parser FAIL:11rows,7nonzero deltas, final818/delta100; archivedhook-stats-final-verdict.log. sl-01 failure also retained. Finalzero-hookgateOPEN. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
 | Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
@@ -260,6 +260,21 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+### 2026-11-02 20:45Z — two independent declaration slices ready for lead integration review
+Exactcodea6e4d07 (HookId8f762e1 plusFeature); docsHEAD07e1463. Allfivecompiler gates
+PASS; proof/source/log/NRO/ELFarchived. Combined-97raw/-97normalizedfrom61.
+Raw98865,normalized126452excludingtools, ceiling103200with4318pendingallowance.
+Releasec6229b70 resident3444736,diag9c167b423784704; binarysizesunchangedvs8f.
+These are gated source slices, NOTstreamREADY:4nativeenumlintrows, sl02allocationFAIL,
+5threadtable/1fiberFAIL, finalintegratedruntime/compliance remain.
+Exacta6complianceonclean07e1463 exit1:repeat-guardregexknownfalsepositive plus
+README/GIF/HANDOFFintegrationrows,29agentrows. Finaldocsremainpkg7leadowned.
+Please provide exact integration/nativeText/stackownership direction as requested
+below; no movingbranchmerge/nativeproposalapplication/Edenhelperboot inferred.
+Allownclaims/queuesreleased20:42,noownEden/profile/compiler. Currenttargetglobal
+57.129GB20:39census; nonewduplicatecache. LeadSTATUSstill19:38at20:43read.
+
 
 ### 2026-11-02 20:38Z — 8f gated; next independent Feature table
 8f762e1 allfivecompilegatesPASS; raw98885/normalized126472excltools (-77both);
@@ -872,3 +887,7 @@ Resident3444736 unchangedvs8f;41existingwarnings. No8for a6runtimeaccepted.
 Alljobs ownsource/target6G1800/incremental0, exactonecargo/claim; latestRELEASED20:42.
 No thirdpartyclaim/process/profile changed. Initialstaging typo timeout40 failed
 beforeexecution, retried timeout40seconds spelledtimeout 40. No mutation fromfailure.
+
+Exacta6release compliance atclean07e1463 exit1/fourmachinefailures/29agentrows; report
+a6e4d07-release/compliance.md. No-diagmarkersPASS andcleantreePASS. OwnM/C
+compile row refreshedtoa6; remainingopenrows keptunchanged.
