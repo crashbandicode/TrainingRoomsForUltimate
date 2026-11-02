@@ -92,7 +92,11 @@ def shot(name):
 
 
 # Every reload carries the whole menu (a reload replaces the snapshot): the base rows of this boot plus the row's own.
-BASE = {"trio_practice": [1, 0], "p1_cpu_control": [0, 1]}
+BASE = {"trio_practice": [1, 0], "p1_cpu_control": [0, 1], "player_roster": None, "cpu_roster": None}  # rosters filled below
+
+
+BASE["player_roster"] = roster("kirby", "ice", "squirtle", "palutena")  # the boot settings, eden/mk_s6_settings.py
+BASE["cpu_roster"] = roster("pikachu", "bowser")
 
 
 def reload(menu, what):
@@ -165,9 +169,7 @@ def r_item():
 
 
 def r_preload():
-    m, _ = reload({"player_roster": roster("mario", "kirby", "ice", "squirtle", "palutena"),
-                   "cpu_roster": roster("pikachu", "bowser", "kirby"),
-                   "cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, "preload on")
+    m, _ = reload({"cycle_preload_slots": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, "preload on")
     applied = wait_for(m, "[CyclePreload] applied", 10)
     row("menu commit reaches the preload engine (publish_applied)", applied is not None, applied)
     status = wait_for(m, "[PreloadStatus]", 60)
@@ -209,7 +211,7 @@ def r_ic():
 
 
 def r_solo():
-    reload({"player_roster": roster("mario", "kirby", "ice", "squirtle", "palutena"), "solo_popo_player_cycle": [1, 0]}, "solo popo")
+    reload({"solo_popo_player_cycle": [1, 0]}, "solo popo")
     time.sleep(3)
     save_state()
     m, done = load_state(cap=20)
