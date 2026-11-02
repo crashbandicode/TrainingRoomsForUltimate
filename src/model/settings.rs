@@ -16,13 +16,17 @@
 //! copy of the file. A key the table below does not know is kept verbatim and written back, so a
 //! file written by a later build (or by the fork, for rows this build does not have yet) survives
 //! a save; the retired keys `update_policy` and `menu_open_start_press` are read and dropped.
-//! Package 1 knows three rows; every later package adds its own to `DEFS`.
+//! The factory table (`DEFS`, in `model::factory`) holds every row of the menu with a plain array
+//! value; the rows whose value is not one (the fork's rosters, hats, Mii picks and stage
+//! preferences) are kept as they are until the package that owns them gives them a row.
 
 use std::fmt;
 
 use serde::de::{Deserialize, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
 
+/// Top-level key holding the page id the menu opens on (Q5; SPEC-core-04 §3.1).
+pub const LAST_PAGE_KEY: &str = "last_page";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
 /// Largest slider value (the two damage ranges).
@@ -42,7 +46,14 @@ pub enum Kind {
     Weighted,
     /// `[lower, upper]`, `lower <= upper <= SLIDER_MAX`.
     Slider,
+    /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
+    /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
+    /// while empty.
+    Range,
 }
+
+/// Largest option index a delay range may name (the delay rows have 31 options, `0..=30`).
+pub const RANGE_INDEX_MAX: u8 = 30;
 
 impl Kind {
     pub const fn max(self) -> u8 {
@@ -50,6 +61,7 @@ impl Kind {
             Kind::Single | Kind::Multiple => 1,
             Kind::Weighted => WEIGHT_MAX,
             Kind::Slider => SLIDER_MAX,
+            Kind::Range => RANGE_INDEX_MAX,
         }
     }
 }
@@ -64,31 +76,7 @@ pub struct Def {
     pub default: &'static [u8],
 }
 
-const fn one_hot<const N: usize>(index: usize) -> [u8; N] {
-    let mut row = [0; N];
-    row[index] = 1;
-    row
-}
-
-/// `OnOff` is `[On, Off]`.
-static ON: [u8; 2] = one_hot(0);
-static OFF: [u8; 2] = one_hot(1);
-/// `Delay` is `0, 1, …, 30` frames; the default is `0`.
-static DELAY_ZERO: [u8; 31] = one_hot(0);
-
-/// Index of `input_delay` in `DEFS`.
-pub const INPUT_DELAY: usize = 0;
-/// Index of `lra_reset` in `DEFS`.
-pub const LRA_RESET: usize = 1;
-/// Index of `stage_hazards` in `DEFS`.
-pub const STAGE_HAZARDS: usize = 2;
-
-/// The rows this build knows.
-pub static DEFS: [Def; 3] = [
-    Def { id: "input_delay", kind: Kind::Single, len: 31, default: &DELAY_ZERO },
-    Def { id: "lra_reset", kind: Kind::Single, len: 2, default: &ON },
-    Def { id: "stage_hazards", kind: Kind::Single, len: 2, default: &OFF },
-];
+pub use super::factory::{DEFS, INPUT_DELAY, LRA_RESET, STAGE_HAZARDS};
 
 /// The table row called `id`, with its index.
 pub fn def(id: &str) -> Option<(usize, &'static Def)> {
@@ -150,7 +138,10 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         }
         elements.push(byte);
     }
-    if def.kind == Kind::Slider {
+    if def.kind == Kind::Range && elements.is_empty() {
+        return Ok(elements);
+    }
+    if matches!(def.kind, Kind::Slider | Kind::Range) {
         let &[lower, upper] = elements.as_slice() else {
             return Err(Reason::BadSliderLength);
         };
@@ -216,6 +207,10 @@ impl Snapshot {
     fn to_value(&self) -> Value {
         let mut object = self.extra.clone();
         for (def, row) in DEFS.iter().zip(&self.rows) {
+            // An empty delay range is "no range": the key is absent (SPEC-core-04 §3.1).
+            if def.kind == Kind::Range && row.is_empty() {
+                continue;
+            }
             object.insert(def.id.to_owned(), Value::Array(row.iter().map(|b| Value::from(*b)).collect()));
         }
         Value::Object(object)
@@ -234,6 +229,17 @@ pub struct Settings {
 impl Settings {
     pub fn factory() -> Self {
         Self { menu: Snapshot::factory(), defaults: Snapshot::factory(), extra: Map::new() }
+    }
+
+    /// The page the menu was last left on (`last_page`, SPEC-core-04 §3.1): a top-level string, kept
+    /// with the other top-level keys. `None` when absent or not a string.
+    pub fn last_page(&self) -> Option<&str> {
+        self.extra.get(LAST_PAGE_KEY).and_then(Value::as_str)
+    }
+
+    /// Record the page the menu is left on; the next close writes it.
+    pub fn set_last_page(&mut self, page_id: &str) {
+        self.extra.insert(LAST_PAGE_KEY.to_owned(), Value::from(page_id));
     }
 
     /// The file's contents: pretty-printed JSON, for hand editing (SPEC-core-04 question 6). Key

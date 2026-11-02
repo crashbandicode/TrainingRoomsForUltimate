@@ -95,3 +95,39 @@ Note 3: `developer.ini` compares the key and the value exactly (`developer_page`
 Note 1: the spec says unknown keys are dropped on rewrite. This build knows 3 of the ~90 rows, so dropping
 them would erase the player's other settings until their packages land; they are kept verbatim instead
 (`core04_unknown_keys_kept_on_rewrite`). Retired keys are dropped as the spec says. Lead decision requested.
+
+## Menu model (SPEC-core-02, SPEC-core-03 §2.5, SPEC-core-04 `last_page`, SPEC-input-04 N7), `tests/core02_menu.rs`
+
+`src/model/menu/` (pure; no rendering, no hooks) and the factory table `src/model/factory.rs`. Rows that the
+new page layout replaced (the 8 x 4 submenu grid, tabs, R-confirm reset) keep their spec test name where the
+requirement survives in the new structure, adapted as noted. Names with the `chords::` prefix in SPEC-input-04
+§10 are written `chords_...` here.
+
+| Requirement | § | Host test | Eden row planned | Status |
+| --- | --- | --- | --- | --- |
+| Factory table: every row of §2.7 with kind, option count, default; draft 9 rows; the two sliders; the seven delay ranges; `character_item` and `update_policy` not in the table | core02 §2.7, §9 | `core02_factory_table_matches_spec`, `every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key` | core02-E5 | host pass |
+| Layout: 5 pages + hidden Developer; rows per page 31 / 13 / 17 / 20 / 11 (+3); 92 rows without the pilot, 91 with it; 4 direction grids, 7 delay rows, 13 multi-selects, 2 sliders | MENU-DRAFT §2 counts | `layout_row_counts_match_the_draft`, `layout_the_pilot_swaps_the_fallback_rows_for_one_info_row` | core02-E5 | host pass |
+| Two-line help text for every row, no stale chord text | core02 §2.6, Q10 | `layout_every_row_has_two_line_help` | core03-E7 | host pass |
+| Advanced group collapsed by default, opened with A on its header | MENU-DRAFT §2 | `layout_advanced_group_is_collapsed_until_opened` | core02-E1 | host pass |
+| List navigation wraps and skips non-focusable headers; grid cursor skips empty cells (adapted from the 8 x 4 grid) | core02 §2.3, §9 | `core02_table_nav_wrap_skip`, `core02_table_carriage_return` | core02-E1 | host pass (adapted) |
+| Page machine: A opens, B closes the sub-screen first, B on the page closes; L / R round the ring | core02 §2.3, §9 | `core02_page_machine` | core02-E1 | host pass |
+| Toggle flips; dropdown keeps exactly one option, Left / Right cycle in place with wrap, A opens the list on the current option (Q2); weight wraps at the largest; Y clears weighted only (adapted) | core02 §2.2-2.3, core03 §2.5 | `core02_toggle_flips_on_a`, `core02_toggle_single_exclusive`, `core02_toggle_wrap`, `core02_y_clears_weighted_only` | core02-E2 | host pass (adapted) |
+| Clear-toggle hint rule | core02 §4, §9 | `core02_clear_hint_rule` | core02-E2 | host pass |
+| Yes / No / Random over a weighted `[True, False]` row; number rows step and clamp | MENU-DRAFT §2 | `dropdown_yes_no_random_maps_to_the_weighted_row`, `number_row_steps_and_clamps` | core02-E2 | host pass |
+| Multi-select: A ticks, ZL all / none; situation-override editor | MENU-DRAFT §2, Q4 | `multi_select_ticks_and_all_none`, `situation_overrides_editor_picks_a_situation_then_actions` | core02-E2 | host pass |
+| Slider: states, steps (slow 1, fast 10), clamp; greyed unless Random | core02 §2.4, §9 | `core02_slider_states`, `core02_slider_clamp_steps`, `damage_range_is_greyed_unless_random` | core02-E3 | host pass |
+| Greyed rows with the reason: Respawn invincibility while Auto-load on death is On (N2); swap-group dependencies | N2, MENU-DRAFT §2 | `respawn_invincibility_is_greyed_while_auto_load_is_on`, `swap_group_entries_grey_with_the_reason` | core02-E2 | host pass (dependencies inferred, see progress file) |
+| Direction grids: chip layout and navigation, weights, ZL all / none, nine-dot preview; Shield Tilt exactly one chip | Q12, MENU-DRAFT §1 | `direction_grid_navigation_follows_the_chip_layout`, `direction_grid_weights_all_none_and_preview`, `shield_tilt_grid_holds_exactly_one_chip` | core03-E7 | host pass |
+| N3 delay rows: checklist or range exclusion, Y clears the active one, bounds and steps, round trip, file without a range, slot sets have no range, reset / save-defaults and bulk update treat them as one row | N3, core02 §2.8, §9 | `core02_delay_row_exclusion`, `core02_delay_row_y_clear`, `core02_delay_range_bounds`, `core02_delay_range_roundtrip`, `core02_delay_no_range_loads_checklist`, `core02_slot_sets_have_no_range`, `core02_delay_row_reset_and_save_defaults`, `core02_delay_row_bulk_update_clears_range`, `delay_range_pick_is_uniform_over_the_step_values`, `core03_delay_popup_render_plan` | core02-E8, E9, core03-E14 | host pass |
+| X resets the page to the defaults snapshot (saved defaults replace the factory ones); serialization shape and round trip; bulk update clears before applying | core02 §2.5, §5, §9 | `core02_defaults_and_reset`, `core02_serialize_roundtrip`, `core02_update_from_shorter_array` | core02-E4 | host pass (see gap: no key saves defaults) |
+| Hold repeat every 21 frames on sticks | core02 §2.3, §9 | `core02_hold_repeat_period` | core02-E6 | host pass |
+| N1 Developer page in the ring only while the flag is on; rows serialized, inert while hidden | N1, core02 §2.8 | `core02_hidden_page_ring`, `core02_hidden_page_rows_serialized` | core02-E7 | host pass |
+| Q5 opens on the last page used, CPU on the first open ever, a saved page not in the ring opens CPU; `last_page` round trip | Q5, core02 §2.8, core04 §3.1 | `core02_first_open_is_cpu`, `core02_open_on_last_page`, `core02_last_page_missing_falls_back`, `core04_last_page_roundtrip` | core02-E10 | host pass |
+| Re-roll events (Q18 A: SDI Direction, Shield Tilt; B11: Ledge Options, Throw options only; delay rows and DI do not) | Q18, B11 | `menu_change_to_cpu_choices_emits_reroll_events` | CPU package rows | host pass (model only; the CPU package consumes `Outbox::rerolls`) |
+| N7 shortcut rows open the chord editor and show the chord text; permanent chord is a read-only info row; a confirmed change applies at once and emits the `button_config.ini` request, only then | N7, input04 §10 | `core03_shortcut_rows_open_editor`, `core03_permanent_shortcut_row_info`, `chords_shortcut_rows_open_editor`, `chords_permanent_chord_fixed`, `chords_shortcut_change_applies_immediately`, `chords_ini_written_only_on_confirmed_change`, `button_chords_editor_writes_the_chord_setting`, `chord_text_and_row_conversion` | core03-E13, IN04-E08 | host pass (the INI text and the write are package 4 / the runtime) |
+| Replay capture toggle emits its INI request | Q7 | `replay_capture_toggle_writes_its_ini` | - | host pass |
+| N5 paging by console mode: items docked 5 x 8 one page, handheld 4 x 4 pages 16 / 16 / 6; stages docked 3 pages 40 / 40 / 38, handheld 8 pages; every tile once; layout fixed at open | N5, core03 §2.5, §9 | `core03_item_grid_layout_docked`, `core03_item_grid_layout_handheld`, `core03_item_grid_layout_fixed_at_open`, `core03_item_grid_pages_cover_38_items_once`, `core03_stage_grid_layout_docked`, `core03_stage_grid_layout_handheld`, `core03_stage_grid_pages_docked_40_40_38`, `core03_stage_grid_pages_handheld_8`, `core03_stage_grid_pages_cover_118_tiles_once`, `core03_stage_grid_rotation_and_form_same_in_both_layouts`, `grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile` | core03-E12, E15 | host pass (rotation badges and the form tag are drawn per tile: package 5) |
+| Dropdown lists read back and have unique labels | MENU-DRAFT §2 | `dropdown_options_are_unique_and_row_values_read_back` | - | host pass |
+
+Not covered by the model (later packages): the fork's grid contents (portraits, hats, Mii lists, stage and
+item actions), the named-macro and setup libraries, rendering of every screen, the INI text writer.

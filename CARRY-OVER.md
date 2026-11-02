@@ -35,3 +35,27 @@ fork's menu structs and is not carried (the settings reader here is new code tha
   settings file. In the fork that file is the updater record (`{"update":{"last_update_version":…}}`, see the
   carried fixtures `…-training_modpack.json`); the settings file is `training_modpack_menu.conf`.
   `storage::file::LEGACY_SETTINGS` uses the real name.
+
+## Read for setting ids only, nothing carried (menu model, 2026-11-02)
+
+The menu model's factory table (`src/model/factory.rs`) needed the fork's own setting ids and option
+counts for the rows the fork added. These ours-new files of stage **m5o** were searched for quoted ids and
+option lists; no line of them was copied and no file was edited (the ids and counts are facts of the file
+format that real fork settings files already carry):
+
+| Fork path (stage m5o) | sha256 | Used for |
+| --- | --- | --- |
+| `training_mod_consts/src/menu_json.rs` | `b73c5765a3bb3c654a840de212f2c30ce03800814dbf8169942357395a0e6c90` | `trio_practice` is Player Swapping (a test comment), `fighter_prompt`, `macro_source`, `training_stage_rotation`, `lobby_stages`, `trio_practice` |
+| `training_mod_consts/src/cycle_preload_config.rs` | `49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01` | the `cycle_preload_*` ids; Cycle Preload Off, 1-5; Sources Fighters / Hats / Both; Bodies Off, 2, 3; Ready Fighters 2-12 default 8; the order of the group switches; Preload Samples is `cycle_preload_measurements` |
+| `training_mod_consts/src/p1_cpu_menu_tests.rs` | `591d885b1d0b72215fa20e5a929d8440cd2ce35fb3e2e9525f6c0c8f83842634` | `p1_cpu_control`, `p1_cpu_level` |
+| `training_mod_consts/src/roster_menu_tests.rs` | `3d0e1477d2513dca2a1fcb279a51c018637245b349ab4a7a08aa41036d9ad56b` | `player_kirby_hats`, `solo_popo_original`, `player_roster`, `cpu_roster` (kept as unknown keys until package 6) |
+| `training_mod_consts/src/mii_menu_tests.rs`, `training_mod_tui/src/mii_menu.rs` | `154ece2b…`, `94d7a41f…` | `lobby_practice`, `mii_brawler_config`, `mii_sword_config`, `mii_gunner_config` |
+| `training_mod_consts/src/character_items.rs` | `57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf` | `character_item_grant` (the give-item row's key) |
+| `training_mod_consts/src/lobby_stages.rs`, `training_mod_tui/src/stage_menu.rs` | `86d084f7…`, `7dece73f…` | `lobby_stages` key only |
+
+**Disclosure.** One search for "Player Swapping" ran over whole source directories of the stage and printed
+three lines of **mixed** files (`training_mod_tui/src/containers/app.rs`: the name of a
+`player_swapping_enabled` method and a call of it; `training_mod_consts/src/lib.rs`: the string
+`"Player Swapping"`), besides ours-new docs. Nothing from them was used: the id came from `menu_json.rs`
+above, and the row title is the one already in MENU-DRAFT. The lead should decide whether that counts as
+opening a mixed file.

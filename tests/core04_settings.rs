@@ -82,9 +82,10 @@ fn array_u8(len: usize, selected: usize) -> Vec<u8> {
 #[test]
 fn core04_unknown_keys_ignored() {
     // Keys the table does not know never change a known row.
-    let loaded = parse(&json!({"menu": {"mash_state": [1,0,0], "hud": [1,0], "input_delay": array(31, 2)}, "defaults_menu": {}, "future": 1}).to_string());
+    let loaded = parse(&json!({"menu": {"future_row": [1,0,0], "hud": [1,0], "input_delay": array(31, 2)}, "defaults_menu": {}, "future": 1}).to_string());
     assert!(!loaded.corrupt());
     assert_eq!(loaded.settings.menu.input_delay(), 2);
+    assert_eq!(loaded.settings.menu.extra().get("future_row"), Some(&json!([1, 0, 0])), "kept, not applied");
     assert_eq!(loaded.settings.defaults.input_delay(), 0);
     // The retired keys are read and dropped.
     let loaded = parse(&json!({"menu": {"update_policy": [1,0,0], "menu_open_start_press": [1,0]}, "defaults_menu": {}, "update_policy": 1}).to_string());
@@ -96,8 +97,8 @@ fn core04_unknown_keys_ignored() {
 
 #[test]
 fn core04_unknown_keys_kept_on_rewrite() {
-    // This build knows three rows, so every other row of the fork's file is kept verbatim and
-    // written back; dropping them would erase the player's settings until the rows arrive.
+    // Rows this build has no table row for (the fork's rosters, hats and Mii picks until package 6) are
+    // kept verbatim and written back; dropping them would erase the player's settings.
     for text in [OLD, NEW] {
         let original: Value = serde_json::from_str(text).unwrap();
         let loaded = parse(text);
@@ -193,6 +194,9 @@ fn core04_duplicate_key_error() {
     assert_eq!(loaded.issues[0].reason, Reason::DuplicateKey);
     let loaded = parse(r#"{"menu": {"mash_state": [1], "mash_state": [0]}}"#);
     assert_eq!(loaded.issues[0].at, "menu.mash_state");
+    // A repeated key this build has no row for is reported too.
+    let loaded = parse(r#"{"menu": {"future_row": [1], "future_row": [0]}}"#);
+    assert_eq!(loaded.issues[0].at, "menu.future_row");
 }
 
 #[test]
@@ -262,13 +266,30 @@ fn core04_slider_rows() {
 
 #[test]
 fn core04_draft9_fields_default() {
-    // Rows of draft 9 that this build does not have yet are absent in an older file and load clean;
-    // when present they are kept verbatim (a later package gives them their rows).
+    // The draft 9 rows are absent in an older file and take their factory value, clean.
     let loaded = parse(&json!({"menu": {"lra_reset": [1, 0]}}).to_string());
     assert!(!loaded.corrupt());
-    let loaded = parse(&json!({"menu": {"respawn_invincibility": [0, 1], "aerial_delay_range": [2, 9]}}).to_string());
+    for id in ["respawn_invincibility", "settings_override_playback", "dev_reload_config", "dev_debug_hooks"] {
+        assert_eq!(loaded.settings.menu.get(id), Some(&[0u8, 1][..]), "{id} is Off");
+    }
+    for id in ["aerial_delay_range", "fast_fall_delay_range", "throw_delay_range", "pummel_delay_range", "ledge_delay_range", "oos_offset_range", "reaction_time_range"] {
+        assert_eq!(loaded.settings.menu.get(id), Some(&[][..]), "{id} has no range");
+    }
+    // Present, they load into their rows; a range is absent from the file again while empty.
+    let loaded = parse(&json!({"menu": {"respawn_invincibility": [1, 0], "aerial_delay_range": [2, 9]}}).to_string());
     assert!(!loaded.corrupt());
-    assert_eq!(loaded.settings.menu.extra().get("aerial_delay_range"), Some(&json!([2, 9])));
+    assert_eq!(loaded.settings.menu.get("respawn_invincibility"), Some(&[1u8, 0][..]));
+    assert_eq!(loaded.settings.menu.get("aerial_delay_range"), Some(&[2u8, 9][..]));
+    assert!(loaded.settings.menu.extra().is_empty());
+    let json: Value = serde_json::from_str(&loaded.settings.to_json()).unwrap();
+    assert_eq!(json["menu"]["aerial_delay_range"], json!([2, 9]));
+    assert!(json["menu"].get("fast_fall_delay_range").is_none());
+    // A bad range (reversed, one element, above the largest option index) defaults, and is reported.
+    for bad in [json!([9, 2]), json!([1]), json!([1, 31])] {
+        let loaded = parse(&json!({"menu": {"aerial_delay_range": bad}}).to_string());
+        assert_eq!(loaded.issues.len(), 1, "{bad}");
+        assert_eq!(loaded.settings.menu.get("aerial_delay_range"), Some(&[][..]));
+    }
 }
 
 #[test]

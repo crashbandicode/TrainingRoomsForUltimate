@@ -9,6 +9,8 @@
 pub mod developer_ini;
 #[path = "model/diag_ring.rs"]
 pub mod diag_ring;
+#[path = "model/factory.rs"]
+pub mod factory;
 #[path = "model/guard.rs"]
 pub mod guard;
 #[path = "model/input_delay.rs"]
@@ -17,6 +19,8 @@ pub mod input_delay;
 pub mod install_line;
 #[path = "model/lra_reset.rs"]
 pub mod lra_reset;
+#[path = "model/menu/mod.rs"]
+pub mod menu;
 #[path = "model/migration.rs"]
 pub mod migration;
 #[path = "model/settings.rs"]

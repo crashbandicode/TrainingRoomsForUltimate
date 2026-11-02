@@ -1,0 +1,1270 @@
+//! The menu model (SPEC-core-02, SPEC-core-03 input rules, SPEC-core-04 persistence of the last page,
+//! SPEC-input-04 chord editing; layout `MENU-DRAFT.md` §2, draft 9): the pure state machine behind
+//! the in-game menu. It draws nothing and touches no game memory. The input adapter feeds it
+//! logical buttons (`Menu::press`); the renderer reads the page, the entries, the cursor and the
+//! screen on top of the stack; what the menu asks the runtime to do (publish settings, re-roll a CPU
+//! choice, write an INI file) is collected in an `Outbox` the runtime takes.
+//!
+//! Values live in the settings model (`model::settings`), one row per setting id; this module only
+//! knows how each row is edited. Allocation happens on input events only (a screen pushed, a row
+//! written), never per frame.
+
+pub mod chord;
+pub mod delay;
+pub mod grid;
+pub mod input;
+pub mod options;
+pub mod table;
+
+use chord::Chord;
+use delay::{DelayRange, DelaySpec};
+use grid::{ConsoleMode, GridKind, GridLayout, Move};
+use input::Button;
+use options::{CHORD_ROWS, SITUATIONS, SWAP_GROUP_IDS};
+use table::{Control, Editor, Page, Row, GROUPS, ROWS};
+
+use super::settings::{self, Settings};
+
+/// Everything the menu needs to know about the install and the console.
+#[derive(Clone, Copy, Debug)]
+pub struct Env {
+    /// `developer.ini` has `developer_page=on` (N1).
+    pub developer_page: bool,
+    /// The standalone CPU pilot plugin is on the card (Q11).
+    pub pilot_present: bool,
+    /// The operation mode now (read again each time a grid opens).
+    pub console: ConsoleMode,
+    /// `button_config.ini`'s two menu shortcuts (N7).
+    pub shortcuts: [Chord; 2],
+    /// `replay_capture.ini` (Q7).
+    pub replay_capture: bool,
+}
+
+impl Default for Env {
+    fn default() -> Env {
+        Env {
+            developer_page: false,
+            pilot_present: false,
+            console: ConsoleMode::Docked,
+            shortcuts: [Chord::DEFAULT_SHORTCUT_1, Chord::NONE],
+            replay_capture: true,
+        }
+    }
+}
+
+/// CPU choices a menu change makes the CPU take again (Q18 A, B11). Bits of `Outbox::rerolls`.
+pub mod reroll {
+    /// SDI Direction changed: a new weighted roll at the next CPU frame.
+    pub const SDI_DIRECTION: u8 = 1;
+    /// Shield Tilt changed.
+    pub const SHIELD_TILT: u8 = 2;
+    /// Ledge Options changed: the held ledge case is cleared (B11); a Ledge Delay change is not here.
+    pub const LEDGE_OPTIONS: u8 = 4;
+    /// Throw Options changed: the held throw case is cleared (B11).
+    pub const THROW_OPTIONS: u8 = 8;
+}
+
+/// The setting ids whose change re-rolls a CPU choice, with the bit each sets.
+const REROLL_IDS: [(&str, u8); 4] = [
+    ("sdi_state", reroll::SDI_DIRECTION),
+    ("shield_tilt", reroll::SHIELD_TILT),
+    ("ledge_state", reroll::LEDGE_OPTIONS),
+    ("throw_state", reroll::THROW_OPTIONS),
+];
+
+/// What the menu asks the runtime to do. Taken with `Menu::take_outbox`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Outbox {
+    /// Any setting changed since the last take (the commit publishes before it queues the write).
+    pub changed: bool,
+    /// `reroll::*` bits.
+    pub rerolls: u8,
+    /// A confirmed change of a menu shortcut: write `button_config.ini` with these two chords and
+    /// apply them at once (N7).
+    pub button_config: Option<[Chord; 2]>,
+    /// The Replay capture toggle changed: write `replay_capture.ini` (Q7).
+    pub replay_capture: Option<bool>,
+}
+
+/// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Grey {
+    /// Respawn invincibility while Auto-load on death is On (N2): a save state loads instead.
+    AutoLoadOn,
+    /// A damage range while its damage setting is not Random Value.
+    DamageNotRandom,
+    /// A swap group while Group Swap is Off.
+    GroupSwapOff,
+    /// A swap group that needs the Ice Climbers pair bank, while it is Off.
+    PairBankOff,
+    /// The Ice Climbers pair bank while Ready Fighter Bodies is not 3.
+    NeedsThreeBodies,
+    /// The checklist of a delay row while a range is set.
+    RangeSet,
+    /// The range of a delay row while the checklist holds a value.
+    ChecklistSet,
+}
+
+impl Grey {
+    pub const fn text(self) -> &'static str {
+        match self {
+            Grey::AutoLoadOn => "Auto-load on death is On: a save state loads instead",
+            Grey::DamageNotRandom => "Only used when damage on load is Random Value",
+            Grey::GroupSwapOff => "Group Swap is Off",
+            Grey::PairBankOff => "Ice Climbers pair bank is Off",
+            Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
+            Grey::RangeSet => "A range is set: clear it first (Y)",
+            Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
+        }
+    }
+}
+
+/// An entry of a page's list: a group header or a row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Entry {
+    Group(usize),
+    Row(usize),
+}
+
+/// A row's value as the renderer shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowValue {
+    Toggle(bool),
+    /// The chosen option of a list, `None` when the array holds no selection.
+    Choice(Option<usize>),
+    /// The chosen number of a `Number` row.
+    Number(Option<u16>),
+    /// `ticked` of `total` entries.
+    Checklist { ticked: usize, total: usize },
+    /// A delay row: nothing set, `n selected`, or `min - max`.
+    Delay(DelayView),
+    Slider { lower: u8, upper: u8 },
+    /// The lit chips of a direction grid, bit `i` for array index `i` (the nine dots of the row).
+    Chips(u16),
+    /// A menu shortcut's chord.
+    Chord(Chord),
+    /// *Situation overrides*: how many of the 13 situations have an action set.
+    OverridesSet(usize),
+    None,
+}
+
+/// A delay row's state for display.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DelayView {
+    Empty,
+    Ticked(usize),
+    Range(DelayRange),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SliderState {
+    LowerHover,
+    UpperHover,
+    LowerSelected,
+    UpperSelected,
+}
+
+/// What a chord entry will write when confirmed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChordTarget {
+    /// One of the six rows of `CHORD_ROWS`.
+    Row(u8),
+    /// Menu shortcut 1 or 2.
+    Shortcut(u8),
+}
+
+/// A screen on the sub-screen stack (the page itself is the root, below the stack).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Screen {
+    /// The popup list of a dropdown, Yes/No/Random or number row.
+    List { row: usize, cursor: usize },
+    /// A multi-select popup.
+    Checklist { row: usize, cursor: usize },
+    /// A delay row's popup (N3): cursor `0..len` is a checklist entry, `len` the Min handle, `len + 1`
+    /// the Max handle; `editing` means the handle under the cursor is selected.
+    Delay { row: usize, cursor: usize, editing: bool },
+    Slider { row: usize, state: SliderState },
+    /// A direction grid; `chip` is the array index of the focused chip.
+    Directions { row: usize, chip: usize },
+    SwapGroups { cursor: usize },
+    /// *Situation overrides*: cursor `0` is the situation, `1..=30` an action.
+    Overrides { situation: usize, cursor: usize },
+    /// *Button chords*: the six chord rows.
+    Chords { cursor: usize },
+    /// The chord editor (SPEC-input-04): `captured` is what the next confirm writes.
+    ChordEntry { target: ChordTarget, captured: Chord },
+    /// The item or stage grid, its layout fixed when it opened.
+    Grid { layout: GridLayout, page: usize, cell: usize },
+    /// A sub-screen whose content belongs to a later package.
+    External(Editor),
+}
+
+/// The menu.
+#[derive(Clone, Debug)]
+pub struct Menu {
+    settings: Settings,
+    env: Env,
+    page: Page,
+    /// The focused entry of each page.
+    cursor: [usize; 6],
+    /// Bit `g` set: advanced group `g` is open.
+    expanded: u32,
+    stack: Vec<Screen>,
+    outbox: Outbox,
+    closed: bool,
+}
+
+const SLIDER_SLOW: u8 = 1;
+const SLIDER_FAST: u8 = 10;
+/// Faster step of a handle in a delay range, in option steps.
+const RANGE_FAST: usize = 10;
+
+impl Menu {
+    /// Open the menu on `settings`: on the page last used (`last_page`), CPU when there is none or
+    /// the saved page is not in the ring (the Developer page with the flag off), Q5.
+    pub fn new(settings: Settings, env: Env) -> Menu {
+        let mut menu = Menu {
+            settings,
+            env,
+            page: Page::Cpu,
+            cursor: [0; 6],
+            expanded: 0,
+            stack: Vec::new(),
+            outbox: Outbox::default(),
+            closed: false,
+        };
+        menu.sync();
+        menu
+    }
+
+    /// Open again on freshly committed settings (the fork's `open_settings_for_player`): the stack and
+    /// the pending requests are dropped, the page is the one last used, cursors stay.
+    pub fn reopen(&mut self, settings: Settings, env: Env) {
+        self.settings = settings;
+        self.env = env;
+        self.stack.clear();
+        self.outbox = Outbox::default();
+        self.closed = false;
+        self.sync();
+    }
+
+    fn sync(&mut self) {
+        let saved = self.settings.last_page().and_then(Page::from_id).filter(|page| self.page_in_ring(*page));
+        if let Some(page) = saved {
+            self.page = page;
+        } else if !self.page_in_ring(self.page) {
+            self.page = Page::Cpu;
+        }
+        self.normalize_delay_rows();
+        self.clamp_cursor();
+    }
+
+    /// A delay row with a checklist and a range at once (a hand-edited file) keeps the checklist.
+    fn normalize_delay_rows(&mut self) {
+        for row in &ROWS {
+            if let Control::MultiSelectRange { range_id, .. } = row.control {
+                let ticked = self.get(row.id).iter().any(|v| *v != 0);
+                if ticked && !self.get(range_id).is_empty() {
+                    self.put(range_id, &[]);
+                }
+            }
+        }
+        // Loading is not a change the player made.
+        self.outbox = Outbox::default();
+    }
+
+    // ---- pages and entries -------------------------------------------------------------------
+
+    fn page_in_ring(&self, page: Page) -> bool {
+        page != Page::Developer || self.env.developer_page
+    }
+
+    /// The pages in the ring now: five, or six with the Developer page enabled.
+    pub fn ring(&self) -> impl Iterator<Item = Page> + '_ {
+        Page::ALL.into_iter().filter(|page| self.page_in_ring(*page))
+    }
+
+    pub fn page(&self) -> Page {
+        self.page
+    }
+
+    pub fn env(&self) -> &Env {
+        &self.env
+    }
+
+    fn group_open(&self, group: usize) -> bool {
+        !GROUPS[group].advanced || self.expanded & (1 << group) != 0
+    }
+
+    fn group_visible(&self, group: usize) -> bool {
+        ROWS.iter().any(|row| usize::from(row.group) == group && row.visible(self.env.pilot_present))
+    }
+
+    /// Visit the entries of `page` in order: a header for each group with a visible row, then its
+    /// rows unless the group is collapsed. `visit` returns `false` to stop.
+    fn scan(&self, page: Page, mut visit: impl FnMut(usize, Entry) -> bool) {
+        let mut n = 0;
+        for (g, group) in GROUPS.iter().enumerate() {
+            if group.page != page || !self.group_visible(g) {
+                continue;
+            }
+            if !visit(n, Entry::Group(g)) {
+                return;
+            }
+            n += 1;
+            if !self.group_open(g) {
+                continue;
+            }
+            for (r, row) in ROWS.iter().enumerate() {
+                if usize::from(row.group) == g && row.visible(self.env.pilot_present) {
+                    if !visit(n, Entry::Row(r)) {
+                        return;
+                    }
+                    n += 1;
+                }
+            }
+        }
+    }
+
+    /// Entries on `page` (headers included).
+    pub fn entry_count(&self, page: Page) -> usize {
+        let mut count = 0;
+        self.scan(page, |n, _| {
+            count = n + 1;
+            true
+        });
+        count
+    }
+
+    pub fn entry(&self, page: Page, index: usize) -> Option<Entry> {
+        let mut found = None;
+        self.scan(page, |n, entry| {
+            if n == index {
+                found = Some(entry);
+                false
+            } else {
+                true
+            }
+        });
+        found
+    }
+
+    /// A header can be focused only when it opens or closes an advanced group.
+    fn focusable(&self, entry: Entry) -> bool {
+        match entry {
+            Entry::Row(_) => true,
+            Entry::Group(g) => GROUPS[g].advanced,
+        }
+    }
+
+    fn clamp_cursor(&mut self) {
+        let page = self.page;
+        let count = self.entry_count(page);
+        let mut at = self.cursor[page.index()].min(count.saturating_sub(1));
+        for _ in 0..count {
+            if self.entry(page, at).is_some_and(|e| self.focusable(e)) {
+                break;
+            }
+            at = (at + 1) % count;
+        }
+        self.cursor[page.index()] = at;
+    }
+
+    /// The focused entry of the current page.
+    pub fn focus(&self) -> Option<Entry> {
+        self.entry(self.page, self.cursor[self.page.index()])
+    }
+
+    /// The focused entry's index in the page's list.
+    pub fn cursor(&self) -> usize {
+        self.cursor[self.page.index()]
+    }
+
+    /// The focused row, if the focus is on a row.
+    pub fn focused_row(&self) -> Option<usize> {
+        match self.focus() {
+            Some(Entry::Row(r)) => Some(r),
+            _ => None,
+        }
+    }
+
+    pub fn group_is_open(&self, group: usize) -> bool {
+        self.group_open(group)
+    }
+
+    /// The Developer rows are inert while the page is hidden: a consumer asks for the effective
+    /// value, `stored AND enabled` (SPEC-core-02 §2.8).
+    pub fn developer_effective(&self, id: &str) -> bool {
+        self.env.developer_page && self.toggle_by_id(id)
+    }
+
+    // ---- reading values ----------------------------------------------------------------------
+
+    fn get(&self, id: &str) -> &[u8] {
+        self.settings.menu.get(id).unwrap_or(&[])
+    }
+
+    fn toggle_by_id(&self, id: &str) -> bool {
+        self.get(id).first().is_some_and(|v| *v != 0)
+    }
+
+    /// The settings as they stand (what the commit publishes and writes).
+    pub fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    /// The commit: record the page last used (Q5) and hand the settings out.
+    pub fn commit(&mut self) -> &Settings {
+        self.settings.set_last_page(self.page.id());
+        &self.settings
+    }
+
+    pub fn into_settings(mut self) -> Settings {
+        self.settings.set_last_page(self.page.id());
+        self.settings
+    }
+
+    /// The JSON the commit writes (`{"menu": …, "defaults_menu": …}` and the other top-level keys).
+    pub fn serialized(&mut self) -> String {
+        self.commit().to_json()
+    }
+
+    /// The value of a row for the renderer.
+    pub fn value(&self, row: usize) -> RowValue {
+        let row = &ROWS[row];
+        let array = self.get(row.id);
+        match row.control {
+            Control::Toggle => RowValue::Toggle(array.first().is_some_and(|v| *v != 0)),
+            Control::ReplayCapture => RowValue::Toggle(self.env.replay_capture),
+            Control::Dropdown(_) | Control::Number { .. } => {
+                let at = array.iter().position(|v| *v != 0);
+                match row.control {
+                    Control::Number { first, step } => RowValue::Number(at.map(|i| first + step * i as u16)),
+                    _ => RowValue::Choice(at),
+                }
+            }
+            Control::YesNoRandom => RowValue::Choice(yes_no_random(array)),
+            Control::MultiSelect(labels) => {
+                RowValue::Checklist { ticked: array.iter().filter(|v| **v != 0).count(), total: labels.len() }
+            }
+            Control::MultiSelectRange { first, step, range_id } => {
+                RowValue::Delay(match self.range_of(range_id, first, step) {
+                    Some(range) => DelayView::Range(range),
+                    None => match array.iter().filter(|v| **v != 0).count() {
+                        0 => DelayView::Empty,
+                        n => DelayView::Ticked(n),
+                    },
+                })
+            }
+            Control::Slider => RowValue::Slider { lower: array.first().copied().unwrap_or(0), upper: array.get(1).copied().unwrap_or(0) },
+            Control::DirectionGrid { .. } => {
+                RowValue::Chips(array.iter().enumerate().fold(0u16, |mask, (i, v)| mask | (u16::from(*v != 0) << i)))
+            }
+            Control::SwapGroups => RowValue::Checklist {
+                ticked: SWAP_GROUP_IDS.iter().filter(|id| self.toggle_by_id(id)).count(),
+                total: SWAP_GROUP_IDS.len(),
+            },
+            Control::Editor(Editor::SituationOverrides) => RowValue::OverridesSet(
+                SITUATIONS.iter().filter(|(_, id)| self.get(id).iter().any(|v| *v != 0)).count(),
+            ),
+            Control::Editor(Editor::ShortcutSlot(slot)) => RowValue::Chord(self.env.shortcuts[usize::from(slot & 1)]),
+            Control::Editor(_) | Control::Info(_) => RowValue::None,
+        }
+    }
+
+    fn range_of(&self, range_id: &str, first: u16, step: u16) -> Option<DelayRange> {
+        match self.get(range_id) {
+            [lo, hi] => Some(DelayRange { min: first + step * u16::from(*lo), max: first + step * u16::from(*hi), step }),
+            _ => None,
+        }
+    }
+
+    /// What a consumer reads from the delay row called `id` (SPEC-core-02 §2.8).
+    pub fn delay_spec(&self, id: &str) -> Option<DelaySpec<'_>> {
+        let row = ROWS.iter().find(|row| row.id == id)?;
+        let Control::MultiSelectRange { first, step, range_id } = row.control else {
+            return None;
+        };
+        if let Some(range) = self.range_of(range_id, first, step) {
+            return Some(DelaySpec::Range(range));
+        }
+        let weights = self.get(id);
+        if weights.iter().any(|v| *v != 0) {
+            Some(DelaySpec::Set { weights, first, step })
+        } else {
+            Some(DelaySpec::Empty)
+        }
+    }
+
+    /// The number of options of a list-like row.
+    pub fn option_count(&self, row: usize) -> usize {
+        match ROWS[row].control {
+            Control::Dropdown(labels) | Control::MultiSelect(labels) => labels.len(),
+            Control::YesNoRandom => 3,
+            Control::Number { .. } => self.get(ROWS[row].id).len(),
+            Control::MultiSelectRange { .. } => self.get(ROWS[row].id).len(),
+            _ => 0,
+        }
+    }
+
+    /// Why the row is greyed, if it is.
+    pub fn grey(&self, row: usize) -> Option<Grey> {
+        match ROWS[row].id {
+            "respawn_invincibility" if self.toggle_by_id("save_state_autoload") => Some(Grey::AutoLoadOn),
+            "save_damage_limits_player" if self.get("save_damage_player").get(2).copied().unwrap_or(0) == 0 => {
+                Some(Grey::DamageNotRandom)
+            }
+            "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
+                Some(Grey::DamageNotRandom)
+            }
+            _ => None,
+        }
+    }
+
+    /// Why a swap-group entry is greyed. Group Swap is the master switch of the group entries; the
+    /// pair groups also need the pair bank; the pair bank needs three bodies (MENU-DRAFT §1 notes).
+    pub fn swap_entry_grey(&self, entry: usize) -> Option<Grey> {
+        let on = |id: &str| self.toggle_by_id(id);
+        match entry {
+            0 if self.get("cycle_preload_bank_members").get(2).copied().unwrap_or(0) == 0 => Some(Grey::NeedsThreeBodies),
+            2..=6 if !on("cycle_preload_group_swap") => Some(Grey::GroupSwapOff),
+            3 | 5 if !on("cycle_preload_ic_pair_bank") => Some(Grey::PairBankOff),
+            _ => None,
+        }
+    }
+
+    /// For a delay popup: the checklist is greyed while a range is set, the range while any value is
+    /// ticked. Returns `(checklist, range)`.
+    pub fn delay_grey(&self, row: usize) -> (Option<Grey>, Option<Grey>) {
+        let Control::MultiSelectRange { range_id, .. } = ROWS[row].control else {
+            return (None, None);
+        };
+        let ticked = self.get(ROWS[row].id).iter().any(|v| *v != 0);
+        let ranged = !self.get(range_id).is_empty();
+        (ranged.then_some(Grey::RangeSet), ticked.then_some(Grey::ChecklistSet))
+    }
+
+    // ---- writing values ----------------------------------------------------------------------
+
+    /// Replace a row; notes the change, and the re-rolls it causes (Q18 A, B11).
+    fn put(&mut self, id: &str, elements: &[u8]) {
+        let unchanged = self.get(id) == elements;
+        if unchanged || self.settings.menu.set(id, elements).is_err() {
+            return;
+        }
+        self.outbox.changed = true;
+        for (reroll_id, bit) in REROLL_IDS {
+            if reroll_id == id {
+                self.outbox.rerolls |= bit;
+            }
+        }
+    }
+
+    fn put_one_hot(&mut self, id: &str, index: usize) {
+        let mut row = vec![0u8; self.get(id).len()];
+        if let Some(slot) = row.get_mut(index) {
+            *slot = 1;
+        }
+        self.put(id, &row);
+    }
+
+    /// Take what the menu asked the runtime to do.
+    pub fn take_outbox(&mut self) -> Outbox {
+        core::mem::take(&mut self.outbox)
+    }
+
+    pub fn outbox(&self) -> &Outbox {
+        &self.outbox
+    }
+
+    /// The player's saved defaults, replaced by `save_defaults` (the current values are copied).
+    pub fn save_defaults(&mut self) {
+        self.settings.defaults = self.settings.menu.clone();
+    }
+
+    /// Bulk update from a map of id to array (SPEC-core-02 §5, the fork's `update_from_vec` rule):
+    /// each id present replaces its row wholly, so a shorter array leaves the appended options off;
+    /// an id missing is left as it is; an id that is not a row is ignored. A delay row's checklist
+    /// and range are one row: updating either clears the other first.
+    pub fn bulk_update(&mut self, entries: &[(&str, &[u8])]) {
+        for (id, array) in entries {
+            let Some((_, def)) = settings::def(id) else { continue };
+            // The array is read like a file's row: padded with zeros or cut to the row's length, so a
+            // shorter one leaves the appended options off; a bad one (a slider without two elements)
+            // is refused and the row stays as it was.
+            let value = serde_json::Value::Array(array.iter().map(|b| serde_json::Value::from(*b)).collect());
+            let Ok(parsed) = settings::parse_row(def, &value) else { continue };
+            if def.kind == settings::Kind::Range {
+                // The range arrives: the checklist of its row is cleared first.
+                let row = ROWS.iter().find(|row| matches!(row.control, Control::MultiSelectRange { range_id, .. } if range_id == *id));
+                if let Some(row) = row {
+                    let zeros = vec![0u8; self.get(row.id).len()];
+                    self.put(row.id, &zeros);
+                }
+            } else if let Some(Control::MultiSelectRange { range_id, .. }) =
+                ROWS.iter().find(|row| row.id == *id).map(|row| row.control)
+            {
+                self.put(range_id, &[]);
+            }
+            self.put(id, &parsed);
+        }
+    }
+
+    // ---- the sub-screen stack ----------------------------------------------------------------
+
+    /// The screen on top of the stack, `None` when the page itself is showing.
+    pub fn screen(&self) -> Option<&Screen> {
+        self.stack.last()
+    }
+
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// The console's operation mode changed (docked or undocked). A grid already open keeps the
+    /// layout it opened with; the next one opened takes the new mode (SPEC-core-03 §2.5).
+    pub fn set_console(&mut self, mode: ConsoleMode) {
+        self.env.console = mode;
+    }
+
+    /// Whether the footer offers *Clear* (Y) on the screen showing: the delay popup, a direction
+    /// grid and the chord editor clear their value; a plain checklist has no clear.
+    pub fn clear_hint(&self) -> bool {
+        matches!(
+            self.stack.last(),
+            Some(Screen::Delay { .. } | Screen::Directions { .. } | Screen::ChordEntry { .. })
+        )
+    }
+
+    /// The menu was closed (B on the page); the runtime commits.
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+
+    /// The row whose help text the two-line panel shows: the focused row of the page, or the row a
+    /// popup or grid belongs to.
+    pub fn help_row(&self) -> Option<&'static Row> {
+        let row = match self.stack.last() {
+            None => self.focused_row()?,
+            Some(Screen::List { row, .. })
+            | Some(Screen::Checklist { row, .. })
+            | Some(Screen::Delay { row, .. })
+            | Some(Screen::Slider { row, .. })
+            | Some(Screen::Directions { row, .. }) => *row,
+            Some(_) => return None,
+        };
+        Some(&ROWS[row])
+    }
+
+    // ---- input -------------------------------------------------------------------------------
+
+    /// One logical button press (an accepted press edge, or a stick repeat).
+    pub fn press(&mut self, button: Button) {
+        match self.stack.last().copied() {
+            None => self.press_page(button),
+            Some(Screen::List { row, cursor }) => self.press_list(button, row, cursor),
+            Some(Screen::Checklist { row, cursor }) => self.press_checklist(button, row, cursor),
+            Some(Screen::Delay { row, cursor, editing }) => self.press_delay(button, row, cursor, editing),
+            Some(Screen::Slider { row, state }) => self.press_slider(button, row, state),
+            Some(Screen::Directions { row, chip }) => self.press_directions(button, row, chip),
+            Some(Screen::SwapGroups { cursor }) => self.press_swap_groups(button, cursor),
+            Some(Screen::Overrides { situation, cursor }) => self.press_overrides(button, situation, cursor),
+            Some(Screen::Chords { cursor }) => self.press_chords(button, cursor),
+            Some(Screen::ChordEntry { target, captured }) => self.press_chord_entry(button, target, captured),
+            Some(Screen::Grid { layout, page, cell }) => self.press_grid(button, layout, page, cell),
+            Some(Screen::External(_)) => {
+                if button == Button::B {
+                    self.stack.pop();
+                }
+            }
+        }
+    }
+
+    fn top(&mut self, screen: Screen) {
+        if let Some(top) = self.stack.last_mut() {
+            *top = screen;
+        }
+    }
+
+    fn move_cursor(&mut self, forward: bool) {
+        let page = self.page;
+        let count = self.entry_count(page);
+        if count == 0 {
+            return;
+        }
+        let mut at = self.cursor[page.index()];
+        for _ in 0..count {
+            at = if forward { (at + 1) % count } else { (at + count - 1) % count };
+            if self.entry(page, at).is_some_and(|e| self.focusable(e)) {
+                break;
+            }
+        }
+        self.cursor[page.index()] = at;
+    }
+
+    fn change_page(&mut self, forward: bool) {
+        let ring: Vec<Page> = self.ring().collect();
+        let Some(at) = ring.iter().position(|p| *p == self.page) else { return };
+        let next = if forward { (at + 1) % ring.len() } else { (at + ring.len() - 1) % ring.len() };
+        self.page = ring[next];
+        self.clamp_cursor();
+    }
+
+    fn press_page(&mut self, button: Button) {
+        match button {
+            Button::Up => self.move_cursor(false),
+            Button::Down => self.move_cursor(true),
+            Button::L => self.change_page(false),
+            Button::R => self.change_page(true),
+            Button::B => self.closed = true,
+            Button::X => self.reset_page(),
+            Button::A => match self.focus() {
+                Some(Entry::Group(g)) => {
+                    self.expanded ^= 1 << g;
+                    self.clamp_cursor();
+                }
+                Some(Entry::Row(row)) => self.activate(row),
+                None => {}
+            },
+            Button::Left | Button::Right => {
+                if let Some(row) = self.focused_row() {
+                    self.cycle(row, button == Button::Right);
+                }
+            }
+            Button::Y | Button::ZL | Button::ZR => {}
+        }
+    }
+
+    /// A on a row of the page.
+    fn activate(&mut self, row: usize) {
+        if self.grey(row).is_some() {
+            return;
+        }
+        let r = &ROWS[row];
+        match r.control {
+            Control::Toggle => {
+                let on = self.toggle_by_id(r.id);
+                self.put(r.id, if on { &[0, 1] } else { &[1, 0] });
+            }
+            Control::ReplayCapture => {
+                self.env.replay_capture = !self.env.replay_capture;
+                self.outbox.replay_capture = Some(self.env.replay_capture);
+            }
+            Control::Dropdown(_) | Control::YesNoRandom | Control::Number { .. } => {
+                let cursor = match r.control {
+                    Control::YesNoRandom => yes_no_random(self.get(r.id)),
+                    _ => self.get(r.id).iter().position(|v| *v != 0),
+                }
+                .unwrap_or(0);
+                self.stack.push(Screen::List { row, cursor });
+            }
+            Control::MultiSelect(_) => self.stack.push(Screen::Checklist { row, cursor: 0 }),
+            Control::MultiSelectRange { .. } => self.stack.push(Screen::Delay { row, cursor: 0, editing: false }),
+            Control::Slider => self.stack.push(Screen::Slider { row, state: SliderState::LowerHover }),
+            Control::DirectionGrid { .. } => self.stack.push(Screen::Directions { row, chip: DIRECTION_START }),
+            Control::SwapGroups => self.stack.push(Screen::SwapGroups { cursor: 0 }),
+            Control::Editor(editor) => self.open_editor(editor),
+            Control::Info(_) => {}
+        }
+    }
+
+    fn open_editor(&mut self, editor: Editor) {
+        let screen = match editor {
+            Editor::SituationOverrides => Screen::Overrides { situation: 0, cursor: 0 },
+            Editor::ButtonChords => Screen::Chords { cursor: 0 },
+            Editor::ShortcutSlot(slot) => {
+                let slot = slot & 1;
+                Screen::ChordEntry { target: ChordTarget::Shortcut(slot), captured: self.env.shortcuts[usize::from(slot)] }
+            }
+            // The console mode is read now and the layout stays until the grid closes.
+            Editor::GiveItem => Screen::Grid { layout: GridLayout::new(GridKind::Items, self.env.console), page: 0, cell: 0 },
+            Editor::StageGrid => Screen::Grid { layout: GridLayout::new(GridKind::Stages, self.env.console), page: 0, cell: 0 },
+            other => Screen::External(other),
+        };
+        self.stack.push(screen);
+    }
+
+    /// Left / Right on a row of the page: a dropdown cycles in place and wraps (Q2); a number steps
+    /// and stops at its ends.
+    fn cycle(&mut self, row: usize, forward: bool) {
+        if self.grey(row).is_some() {
+            return;
+        }
+        let r = &ROWS[row];
+        match r.control {
+            Control::Dropdown(labels) => {
+                let len = labels.len();
+                let at = self.get(r.id).iter().position(|v| *v != 0);
+                let next = match at {
+                    None => 0,
+                    Some(i) if forward => (i + 1) % len,
+                    Some(i) => (i + len - 1) % len,
+                };
+                self.put_one_hot(r.id, next);
+            }
+            Control::YesNoRandom => {
+                let next = match yes_no_random(self.get(r.id)) {
+                    None => 0,
+                    Some(i) if forward => (i + 1) % 3,
+                    Some(i) => (i + 2) % 3,
+                };
+                self.put_yes_no_random(r.id, next);
+            }
+            Control::Number { .. } => {
+                let len = self.get(r.id).len();
+                let at = self.get(r.id).iter().position(|v| *v != 0).unwrap_or(0);
+                let next = if forward { (at + 1).min(len - 1) } else { at.saturating_sub(1) };
+                self.put_one_hot(r.id, next);
+            }
+            _ => {}
+        }
+    }
+
+    fn put_yes_no_random(&mut self, id: &str, choice: usize) {
+        match choice {
+            0 => self.put(id, &[1, 0]),
+            1 => self.put(id, &[0, 1]),
+            _ => self.put(id, &[1, 1]),
+        }
+    }
+
+    /// X on a page: every setting row of the page returns to the saved defaults (the defaults
+    /// snapshot, which is the factory table until the player saves their own). Rows kept in INI
+    /// files (the menu shortcuts, Replay capture) are not part of the settings and stay.
+    fn reset_page(&mut self) {
+        let page = self.page;
+        for row in &ROWS {
+            if row.page() != page || !row.visible(self.env.pilot_present) {
+                continue;
+            }
+            let mut ids: [&str; 2] = [row.id, ""];
+            if let Control::MultiSelectRange { range_id, .. } = row.control {
+                ids[1] = range_id;
+            }
+            if matches!(row.control, Control::SwapGroups) {
+                for id in SWAP_GROUP_IDS {
+                    self.reset_row(id);
+                }
+            }
+            if matches!(row.control, Control::Editor(Editor::SituationOverrides)) {
+                for (_, id) in SITUATIONS {
+                    self.reset_row(id);
+                }
+            }
+            if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
+                for (_, id) in CHORD_ROWS {
+                    self.reset_row(id);
+                }
+            }
+            for id in ids {
+                self.reset_row(id);
+            }
+        }
+    }
+
+    fn reset_row(&mut self, id: &str) {
+        if id.is_empty() {
+            return;
+        }
+        if let Some(saved) = self.settings.defaults.get(id) {
+            let saved = saved.to_vec();
+            self.put(id, &saved);
+        }
+    }
+
+    fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
+        let len = self.option_count(row);
+        match button {
+            Button::Up => self.top(Screen::List { row, cursor: (cursor + len - 1) % len }),
+            Button::Down => self.top(Screen::List { row, cursor: (cursor + 1) % len }),
+            Button::A => {
+                match ROWS[row].control {
+                    Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),
+                    _ => self.put_one_hot(ROWS[row].id, cursor),
+                }
+                self.stack.pop();
+            }
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    /// A tick: set to 1 when off; clear when on (an older weight is cleared too).
+    fn toggle_entry(&mut self, id: &str, index: usize) {
+        let mut array = self.get(id).to_vec();
+        let Some(slot) = array.get_mut(index) else { return };
+        *slot = u8::from(*slot == 0);
+        self.put(id, &array);
+    }
+
+    /// ZL: tick all, or clear all when every entry is already ticked.
+    fn all_or_none(&mut self, id: &str) {
+        let mut array = self.get(id).to_vec();
+        let all = array.iter().all(|v| *v != 0);
+        for slot in &mut array {
+            *slot = if all { 0 } else { (*slot).max(1) };
+        }
+        self.put(id, &array);
+    }
+
+    fn press_checklist(&mut self, button: Button, row: usize, cursor: usize) {
+        let len = self.option_count(row);
+        let id = ROWS[row].id;
+        match button {
+            Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
+            Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
+            Button::A => self.toggle_entry(id, cursor),
+            Button::ZL => self.all_or_none(id),
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn press_delay(&mut self, button: Button, row: usize, cursor: usize, editing: bool) {
+        let Control::MultiSelectRange { range_id, .. } = ROWS[row].control else { return };
+        let id = ROWS[row].id;
+        let len = self.get(id).len();
+        let (checklist_grey, range_grey) = self.delay_grey(row);
+        let on_handle = cursor >= len;
+        let screen = |cursor: usize, editing: bool| Screen::Delay { row, cursor, editing };
+        match button {
+            Button::Up | Button::Down => {
+                let forward = button == Button::Down;
+                if editing {
+                    let amount = RANGE_FAST;
+                    self.move_handle(range_id, cursor - len, if forward { -(amount as isize) } else { amount as isize });
+                } else {
+                    let count = len + 2;
+                    let next = if forward { (cursor + 1) % count } else { (cursor + count - 1) % count };
+                    self.top(screen(next, false));
+                }
+            }
+            Button::Left | Button::Right => {
+                let forward = button == Button::Right;
+                if editing {
+                    self.move_handle(range_id, cursor - len, if forward { 1 } else { -1 });
+                } else if on_handle {
+                    self.top(screen(if cursor == len { len + 1 } else { len }, false));
+                }
+            }
+            Button::A if on_handle => {
+                if range_grey.is_some() {
+                    return;
+                }
+                if editing {
+                    self.top(screen(cursor, false));
+                } else {
+                    if self.get(range_id).is_empty() {
+                        self.put(range_id, &[0, 0]);
+                    }
+                    self.top(screen(cursor, true));
+                }
+            }
+            Button::A => {
+                if checklist_grey.is_none() {
+                    self.toggle_entry(id, cursor);
+                }
+            }
+            Button::Y => {
+                // Clear the active control: a set range is removed, else the checklist is emptied.
+                if checklist_grey.is_some() {
+                    self.put(range_id, &[]);
+                    self.top(screen(cursor, false));
+                } else if range_grey.is_some() {
+                    let zeros = vec![0u8; len];
+                    self.put(id, &zeros);
+                }
+            }
+            Button::ZL => {
+                if checklist_grey.is_none() {
+                    self.all_or_none(id);
+                }
+            }
+            Button::B => {
+                if editing {
+                    self.top(screen(cursor, false));
+                } else {
+                    self.stack.pop();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Move one handle (`0` Min, `1` Max) of a delay range by `delta` option steps; Min never passes
+    /// Max and Max never passes Min, both stay inside the row's value set.
+    fn move_handle(&mut self, range_id: &str, handle: usize, delta: isize) {
+        let [lo, hi] = match self.get(range_id) {
+            [lo, hi] => [*lo as isize, *hi as isize],
+            _ => return,
+        };
+        let top = isize::from(settings::RANGE_INDEX_MAX);
+        let (lo, hi) = if handle == 0 { ((lo + delta).clamp(0, hi), hi) } else { (lo, (hi + delta).clamp(lo, top)) };
+        self.put(range_id, &[lo as u8, hi as u8]);
+    }
+
+    fn press_slider(&mut self, button: Button, row: usize, state: SliderState) {
+        let id = ROWS[row].id;
+        let [lower, upper] = match self.get(id) {
+            [lo, hi] => [*lo, *hi],
+            _ => return,
+        };
+        let selected = matches!(state, SliderState::LowerSelected | SliderState::UpperSelected);
+        let lower_handle = matches!(state, SliderState::LowerHover | SliderState::LowerSelected);
+        let screen = |state: SliderState| Screen::Slider { row, state };
+        let adjust = |delta: i16| -> [u8; 2] {
+            let apply = |v: u8, lo: i16, hi: i16| (i16::from(v) + delta).clamp(lo, hi) as u8;
+            if lower_handle {
+                [apply(lower, 0, i16::from(upper)), upper]
+            } else {
+                [lower, apply(upper, i16::from(lower), i16::from(settings::SLIDER_MAX))]
+            }
+        };
+        match button {
+            Button::A => self.top(screen(match state {
+                SliderState::LowerHover => SliderState::LowerSelected,
+                SliderState::UpperHover => SliderState::UpperSelected,
+                SliderState::LowerSelected => SliderState::LowerHover,
+                SliderState::UpperSelected => SliderState::UpperHover,
+            })),
+            Button::B => {
+                if selected {
+                    self.top(screen(if lower_handle { SliderState::LowerHover } else { SliderState::UpperHover }));
+                } else {
+                    self.stack.pop();
+                }
+            }
+            Button::Up if selected => self.put(id, &adjust(i16::from(SLIDER_FAST))),
+            Button::Down if selected => self.put(id, &adjust(-i16::from(SLIDER_FAST))),
+            Button::Right if selected => self.put(id, &adjust(i16::from(SLIDER_SLOW))),
+            Button::Left if selected => self.put(id, &adjust(-i16::from(SLIDER_SLOW))),
+            Button::Left | Button::Right if !selected => self.top(screen(if lower_handle {
+                SliderState::UpperHover
+            } else {
+                SliderState::LowerHover
+            })),
+            _ => {}
+        }
+    }
+
+    fn press_directions(&mut self, button: Button, row: usize, chip: usize) {
+        let single = matches!(ROWS[row].control, Control::DirectionGrid { single: true });
+        let id = ROWS[row].id;
+        match button {
+            Button::Up | Button::Down | Button::Left | Button::Right => {
+                let direction = match button {
+                    Button::Up => Move::Up,
+                    Button::Down => Move::Down,
+                    Button::Left => Move::Left,
+                    _ => Move::Right,
+                };
+                self.top(Screen::Directions { row, chip: chip_step(chip, direction) });
+            }
+            Button::A => {
+                let mut array = self.get(id).to_vec();
+                if array.len() <= chip {
+                    return;
+                }
+                if single {
+                    let was = array[chip] != 0;
+                    array.iter_mut().for_each(|v| *v = 0);
+                    array[chip] = u8::from(!was);
+                } else {
+                    // One weight per press; past the largest weight the chip clears again.
+                    array[chip] = (array[chip] + 1) % (settings::WEIGHT_MAX + 1);
+                }
+                self.put(id, &array);
+            }
+            Button::Y => {
+                let mut array = self.get(id).to_vec();
+                if single {
+                    array.iter_mut().for_each(|v| *v = 0);
+                } else if let Some(slot) = array.get_mut(chip) {
+                    *slot = 0;
+                }
+                self.put(id, &array);
+            }
+            Button::ZL => {
+                let mut array = self.get(id).to_vec();
+                let all = !single && array.iter().all(|v| *v != 0);
+                for slot in &mut array {
+                    *slot = if single || all { 0 } else { (*slot).max(1) };
+                }
+                self.put(id, &array);
+            }
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn press_swap_groups(&mut self, button: Button, cursor: usize) {
+        let len = SWAP_GROUP_IDS.len();
+        match button {
+            Button::Up => self.top(Screen::SwapGroups { cursor: (cursor + len - 1) % len }),
+            Button::Down => self.top(Screen::SwapGroups { cursor: (cursor + 1) % len }),
+            Button::A => {
+                if self.swap_entry_grey(cursor).is_none() {
+                    let id = SWAP_GROUP_IDS[cursor];
+                    let on = self.toggle_by_id(id);
+                    self.put(id, if on { &[0, 1] } else { &[1, 0] });
+                }
+            }
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn press_overrides(&mut self, button: Button, situation: usize, cursor: usize) {
+        let len = options::ACTIONS.len() + 1;
+        let id = SITUATIONS[situation].1;
+        let screen = |situation: usize, cursor: usize| Screen::Overrides { situation, cursor };
+        match button {
+            Button::Up => self.top(screen(situation, (cursor + len - 1) % len)),
+            Button::Down => self.top(screen(situation, (cursor + 1) % len)),
+            Button::Left if cursor == 0 => {
+                self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0));
+            }
+            Button::Right if cursor == 0 => self.top(screen((situation + 1) % SITUATIONS.len(), 0)),
+            Button::A if cursor > 0 => self.toggle_entry(id, cursor - 1),
+            Button::ZL if cursor > 0 => self.all_or_none(id),
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn press_chords(&mut self, button: Button, cursor: usize) {
+        let len = CHORD_ROWS.len();
+        match button {
+            Button::Up => self.top(Screen::Chords { cursor: (cursor + len - 1) % len }),
+            Button::Down => self.top(Screen::Chords { cursor: (cursor + 1) % len }),
+            Button::A => {
+                let captured = Chord::from_row(self.get(CHORD_ROWS[cursor].1));
+                self.stack.push(Screen::ChordEntry { target: ChordTarget::Row(cursor as u8), captured });
+            }
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    /// The input adapter's chord capture (hold one button, press the others, SPEC-input-04 §2.2):
+    /// replaces what the editor will write. Ignored outside a chord editor.
+    pub fn chord_entry(&mut self, chord: Chord) {
+        if let Some(Screen::ChordEntry { target, .. }) = self.stack.last().copied() {
+            self.top(Screen::ChordEntry { target, captured: chord });
+        }
+    }
+
+    fn press_chord_entry(&mut self, button: Button, target: ChordTarget, captured: Chord) {
+        match button {
+            // Confirm.
+            Button::A => {
+                self.confirm_chord(target, captured);
+                self.stack.pop();
+            }
+            // Empty the chord (a menu shortcut with an empty chord is disabled).
+            Button::Y => self.top(Screen::ChordEntry { target, captured: Chord::NONE }),
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn confirm_chord(&mut self, target: ChordTarget, chord: Chord) {
+        match target {
+            ChordTarget::Row(i) => {
+                let id = CHORD_ROWS[usize::from(i)].1;
+                self.put(id, &chord.to_row());
+            }
+            ChordTarget::Shortcut(slot) => {
+                let slot = usize::from(slot & 1);
+                if self.env.shortcuts[slot] != chord {
+                    self.env.shortcuts[slot] = chord;
+                    self.outbox.button_config = Some(self.env.shortcuts);
+                }
+            }
+        }
+    }
+
+    fn press_grid(&mut self, button: Button, layout: GridLayout, page: usize, cell: usize) {
+        let screen = |page: usize, cell: usize| Screen::Grid { layout, page, cell };
+        match button {
+            Button::Up => self.top(screen(page, layout.step(page, cell, Move::Up))),
+            Button::Down => self.top(screen(page, layout.step(page, cell, Move::Down))),
+            Button::Left => self.top(screen(page, layout.step(page, cell, Move::Left))),
+            Button::Right => self.top(screen(page, layout.step(page, cell, Move::Right))),
+            Button::L | Button::R => {
+                let pages = layout.pages();
+                let next = if button == Button::R { (page + 1) % pages } else { (page + pages - 1) % pages };
+                let cell = cell.min(layout.page_len(next).saturating_sub(1));
+                self.top(screen(next, cell));
+            }
+            Button::B => {
+                self.stack.pop();
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Where the focus starts in a direction grid: the Neutral chip.
+const DIRECTION_START: usize = 8;
+
+/// Position (column, row) of each chip, by array index: In · Neutral · Out across and Up · - · Down
+/// down as 3 x 3 (In on the left), then the two absolute chips in a column of their own.
+const CHIP_POS: [(u8, u8); 11] = [
+    (2, 1), // Out
+    (2, 0), // Up Out
+    (1, 0), // Up
+    (0, 0), // Up In
+    (0, 1), // In
+    (0, 2), // Down In
+    (1, 2), // Down
+    (2, 2), // Down Out
+    (1, 1), // Neutral
+    (3, 0), // Left (absolute)
+    (3, 1), // Right (absolute)
+];
+
+fn chip_at(col: u8, row: u8) -> Option<usize> {
+    CHIP_POS.iter().position(|pos| *pos == (col, row))
+}
+
+/// Move between chips; rows and columns wrap and empty cells are skipped.
+fn chip_step(chip: usize, direction: Move) -> usize {
+    let (mut col, mut row) = CHIP_POS[chip];
+    for _ in 0..4 {
+        match direction {
+            Move::Left => col = (col + 3) % 4,
+            Move::Right => col = (col + 1) % 4,
+            Move::Up => row = (row + 2) % 3,
+            Move::Down => row = (row + 1) % 3,
+        }
+        if let Some(next) = chip_at(col, row) {
+            return next;
+        }
+    }
+    chip
+}
+
+/// The Yes / No / Random choice of a weighted `[True, False]` array: both set is Random.
+fn yes_no_random(array: &[u8]) -> Option<usize> {
+    match (array.first().copied().unwrap_or(0) != 0, array.get(1).copied().unwrap_or(0) != 0) {
+        (true, false) => Some(0),
+        (false, true) => Some(1),
+        (true, true) => Some(2),
+        (false, false) => None,
+    }
+}
