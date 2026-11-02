@@ -4,6 +4,26 @@
 
 ## QUESTIONS
 
+- **Compiled stack root17:5xZ, shared hos-lock interface request:** diag59986e0 stack table FAIL
+  menu97776B against57344B. Exact path port::worker_tick15616 -> worker_events70608 ->
+  replay_capture::close_editor_revision3680. Mailbox::drain allocates [(u64,usize);N] on stack;
+  pkg4 Vault/Live4096-slot queues therefore instantiate65536B sort scratch, even for an empty drain.
+  Proposed root fix: additive drain_with_scratch API taking caller-owned mutable sequence/index storage,
+  retaining exact sequence ordering/drop semantics; existing drain stays for small hook mailboxes.
+  Pkg4 worker allocates/reuses scratch on its own heap, outside hooks. Need lead authorization for narrow
+  crates/hos-lock/src/mailbox.rs interface hunk (no weakening bounds or worker stack-size workaround).
+  Prepared /tmp/pkg4-mailbox-scratch.patch (additive API + ordered/reuse/drop regression) and
+  /tmp/pkg4-worker-scratch-manifest.patch (two worker-owned reusable Vec scratch consumers).
+  Shared patch passes git apply --check; unapplied/untested, no shared-crate edit yet.
+  No Eden boot on this unsafe compiled worker path.
+
+- **UI fiber stack finding17:5xZ:** same59986e0 ELF hooks budget checks134 callbacks,1FAIL:
+  ui_pass_calculate25104>16384; tick1792 -> chips::request10784 -> effect_texture::pictures11424.
+  Raw eden/runs/build-59986e0/{hook-stack,ui-hook-stack}.txt. Please route to UI owner / exact
+  gated fix integration; no foreign UI edits or fiber budget relaxation. This is separate from
+  pkg4 large mailbox worker scratch. Hook static budget is not runtime zero-allocation evidence.
+
+
 - **Pkg6-owned remaining shared replay job lock17:2xZ:** mii_replay::resolve (called by pkg4 worker)
   allocates a channel and pushes VecDeque under mii_replay::STATE; native mii_replay::service also locks
   that STATE. current_mii_configuration/ready/refusal reads are being bridged in pkg4, but this existing
@@ -52,6 +72,7 @@
 
 - Shared-interface note: pkg4 extends ui::facts (CPU status/situation and scene/waiting snapshots) for worker ownership, without editing ui-screens editor implementations. Scene facts refresh in existing game/layout callbacks and invalidate on session retirement. Please preserve these additions in integration.
 
+- F11 consumer prepared in /tmp/pkg4-f11-consumer.patch (body_of + active-body comments), unapplied pending exact gated provider integration authorization. Current HEAD9b26b7a/Rust59986e0 still uses entry_body; no PT acceptance claimed.
 - Lead: please provide the exact authorized integration SHA for pkg6's guarded `entry_active_body` F11 slice when gated. pkg4 Rust snapshot8268f0f is staged for the next Switch build; independent ownership changes are implemented, gating continues.
 - Live replay ownership request resolved by implementation: hook-side tokens/Copy mailboxes now replace pool Vec/Arc/String work; no per_load remains in macros. Worker-owned archive/metadata changes are committed through5425aee; fresh Switch/runtime validation remains OPEN.
 - Lead: final online replay A/B and two-console evidence is allocated to package 7 by implementation-packages; please identify the integration evidence owner for pkg4's resident capture change. No READY claim will cite absent evidence.
@@ -119,6 +140,14 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- 17:5xZ model gate reverified exact Astra/medium; existing hidden watcher active3167564, no alert.
+  Host59986e0 staged gate/target-gate; wrapper confirmed cargo test --no-fail-fast and queuedEND Yoga
+  behind pkg6/slim/imgui. No own claim. Local diag NRO/ELF hashes match build evidence.
+  Stack table retained eden/runs/build-59986e0/stack-table.txt, paths stack-paths.txt. FAIL menu97776,
+  heartbeat4720>4272 and replay-save32448>31616; no acceptance. Menu root is owned4096-slot drains
+  instantiating generic mailbox stack scratch; fix needed before Eden. First resumed MY_MODEL read
+  again lacked memory scope; subsequent commands bounded.
+- RELEASED17:43Z Yoga Switch diag59986e0 PASS exit0/41.85s, ordered diag-59986e0.log/exit and dist/59986e0/diag.nro. Warnings remain, no zero-warning or runtime acceptance. Compiler ended; no own claim/profile mutation. Next artifact hash/stack audit and full host gate on current source.
 - Prepared fresh /tmp/pkg4-s409-seed from the owned legacy seed:8files16349434B, manifest
   /tmp/pkg4-s409-seed-manifest.json; replay_capture.ini explicitlyOff; no profile staged/changed.
   Driver now requires Off+ready at entry, then existing diag-capture.req writer On receipt/armed/INI.
