@@ -19,6 +19,16 @@
 //! on instructions that are not PC-relative. The other scenes that have a `StatePause` (the home-run
 //! contest and the staff roll) call the same begin routine from their own classes and are not hooked: the
 //! owner mask only matters in native Training.
+//!
+//! **Eden result (2026-11-02, labels r1-03 to r1-06, diag probes at the begin routine, both enter slots, the
+//! exit and the routine's other callers, with a hook on `is_training_mode` as the control that fired):
+//! the native Training pause menu ("Quit Training", opened with Plus) does NOT run this state.** None
+//! of these sites fired while the menu was opened and closed, and the per-frame fighter hooks kept running
+//! at the same rate throughout (the Training menu does not stop the frame loop). The chain above is
+//! right for the scene's `StatePause` (the Versus-style pause; not exercised in Eden), so the two hooks
+//! are installed and guarded but have no effect in Training. The authoritative Training pause signal is
+//! not found yet: the menu is the layout-driven object family at `main+0x13af5f0` / `0x13e4ca0..0x13e6fe0`
+//! (per-page callbacks, page index at `+0x1fc`), not a scene state.
 
 use super::guard::{HookForm, Placement, SeamKind};
 use super::sites::{Feature, Site};
