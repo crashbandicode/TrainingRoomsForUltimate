@@ -57,6 +57,11 @@ const BOUNDARIES: &[Boundary] = &[
     // Package 6's CPU-as-P1 call-ins from the CPU core's frame wrapper and the input hooks: nothing runs until its install says so.
     Boundary { function: "p1::frame", owner: Some(Feature::P1Cpu), gate: Gate::Flag("installed") },
     Boundary { function: "p1::input", owner: Some(Feature::P1Cpu), gate: Gate::Flag("installed") },
+    // Package 4, S4-4: the named-macro layer's per-frame and input call-ins from the CPU core's frame wrapper and the input stage: nothing runs until
+    // its install (`macros::install`, only when the unit's whole closure passed) has set READY.
+    Boundary { function: "macros::frame_before", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
+    Boundary { function: "macros::frame_after", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
+    Boundary { function: "macros::on_p1_input", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
@@ -97,6 +102,8 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
         "states" | "state_restore" => Some(Feature::StateCore),
         "anchors" | "archive" => Some(Feature::Ui),
         "cpu_pilot" => Some(Feature::P1Cpu),
+        // Package 4, S4-4: the live replay capture adapter's hooks (the named-macro layer's unit).
+        "live_replay" => Some(Feature::NamedMacros),
         _ => None,
     }
 }
@@ -323,6 +330,7 @@ fn every_native_the_runtime_names_is_a_guarded_row() {
         "FIGHTER_MANAGER_SLOT_OFFSET",
         "ITEM_MANAGER_SLOT_OFFSET",
         "UI_MANAGER_SLOT_OFFSET",
+        "BATTLE_OBJECT_MANAGER_SLOT_OFFSET",
         "FLAG_OFFSET",
         "FIGHTER_ENTRY_ID_FIELD",
         "WORK_CURSOR_OFFSET",

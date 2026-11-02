@@ -248,7 +248,8 @@ pub fn run() {
     // Package 4, S4-4: the named-macro layer and the live replay capture (its guards and hooks are the seam installer's: hooks only when
     // replay_capture.ini says on). The roster cycle and the menu's panel screens are behind the layer's port, named in the install line.
     let named_source = loaded.menu.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
-    let macros_rows_ok = recording_on && sites_pkg4::sites_of(Feature::NamedMacros).all(|site| row4_usable(site.name));
+    // R2-1: the layer's whole closure (its own rows and the cross-feature rows its code calls) must have passed.
+    let macros_rows_ok = recording_on && capabilities::unit_usable(Feature::NamedMacros, &usable);
     let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
     // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
     // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its

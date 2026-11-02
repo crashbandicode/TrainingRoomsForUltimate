@@ -186,25 +186,13 @@ pub fn try_get_module_accessor(id: crate::runtime::compat::consts::FighterId) ->
     // SAFETY: `natives` answers `None` until the entry rows passed their guards and reads the live game on every call.
     unsafe { natives::module_accessor(entry) }.map(|accessor| accessor as *mut BattleObjectModuleAccessor)
 }
-/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.
-const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;
-/// `BattleObjectManager::is_active_find_battle_object(manager, object id)` (the `lua_bind` thunk, row `roster_find_battle_object`).
-const FIND_BATTLE_OBJECT_OFFSET: usize = 0x1fca0b0;
 
 /// The active battle object with `object_id`, `None` for an unknown or inactive id. The roster cycle starts only when the row
-/// `roster_find_battle_object` passed its guard (`roster::CALLED_ROWS`), and this runs only from the cycle.
+/// `roster_find_battle_object` passed its guard (`roster::CALLED_ROWS`), and this runs only from the cycle; the native layer
+/// answers nothing when the call was not granted (R2-1).
 pub fn try_get_battle_object(object_id: u32) -> Option<&'static smash::app::BattleObject> {
-    let base = game::text_base();
-    // SAFETY: the slot is a pointer-sized `.bss` word of the main image; the function is the guarded thunk and a null answer is
-    // an unknown id.
-    unsafe {
-        let manager = ((base + BATTLE_OBJECT_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return None;
-        }
-        let find: extern "C" fn(usize, u32) -> *const smash::app::BattleObject = std::mem::transmute(base + FIND_BATTLE_OBJECT_OFFSET);
-        find(manager, object_id).as_ref()
-    }
+    // SAFETY: a guarded called function; the answer is a live battle object or null (an unknown id).
+    unsafe { (natives::find_battle_object(object_id) as *const smash::app::BattleObject).as_ref() }
 }
 
 /// The mapped input record the carried files read and write.
