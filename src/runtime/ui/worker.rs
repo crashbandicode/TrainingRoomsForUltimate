@@ -150,6 +150,9 @@ fn run() {
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
+        // A settings publish (this thread's commit, or the diag reload) noted a roster re-plan: it runs here, on a thread, not in the
+        // publish and never in a game hook (stream/stack).
+        crate::runtime::compat::menu::run_roster_change();
         std::thread::park();
     }
 }
