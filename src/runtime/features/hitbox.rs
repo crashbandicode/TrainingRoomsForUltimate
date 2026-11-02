@@ -188,10 +188,16 @@ impl Effects for GameEffects {
         // SAFETY: as above.
         unsafe {
             let tail = (true, self.attribute, 0, 0, 0, 0, true, true);
+            #[cfg(feature = "diag")]
+            let pool_before = stats::pool_snapshot();
             let handle = natives::effect_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, &[0.0; 3], sphere.scale, tail);
             if handle != 0 {
                 natives::sphere_set_rgb(self.accessor, sphere.tint);
                 natives::sphere_set_rate(self.accessor, hitbox::RATE);
+            }
+            #[cfg(feature = "diag")]
+            if handle == 0 {
+                stats::refused(self.accessor, sphere, pool_before);
             }
             handle
         }
@@ -529,6 +535,27 @@ mod stats {
     static START: AtomicU64 = AtomicU64::new(0);
     static LAST: AtomicU64 = AtomicU64::new(u64::MAX);
     const REPORT_EVERY: u32 = 600;
+    static REFUSALS_REPORTED: AtomicU32 = AtomicU32::new(0);
+
+    /// The two hitbox_pool_* relied rows guard these owned-native facts. Called
+    /// only inside the installed hitbox unit, on the game thread; no mutation.
+    pub unsafe fn pool_snapshot() -> Option<(u32, bool)> {
+        let singleton = ((crate::runtime::game::text_base() + 0x5334920) as *const usize).read();
+        if singleton == 0 || singleton % 8 != 0 { return None; }
+        let manager = (singleton as *const usize).read();
+        if manager == 0 || manager % 8 != 0 { return None; }
+        Some((((manager + 0x19468) as *const u32).read(),
+            ((manager + 0x19460) as *const usize).read() != 0))
+    }
+
+    pub unsafe fn refused(accessor: usize, sphere: &crate::model::hitbox::Sphere, before: Option<(u32, bool)>) {
+        if REFUSALS_REPORTED.fetch_add(1, Ordering::Relaxed) >= 8 { return; }
+        let after = pool_snapshot();
+        diagnostic(format_args!(
+            "[Hitbox] refused accessor={accessor:#x} key={} joint={:#x} scale={} free_head_before={before:?} free_head_after={after:?}",
+            sphere.key, sphere.joint, sphere.scale
+        ));
+    }
 
     fn now() -> u64 {
         // SAFETY: `GetSystemTick` has no preconditions.

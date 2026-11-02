@@ -16,6 +16,10 @@ CALLED = "SeamKind::Called"
 RELIED = "SeamKind::Relied"
 
 ROWS = [
+    ("hitbox_pool_manager", 0x44FBE4, RELIED,
+     "Diagnostic refusal attribution: req_follow loads the EffectManager singleton at main+0x5334920 and its manager pointer. Read-only; no game effect capacity is changed."),
+    ("hitbox_pool_free_list", 0x35636B8, RELIED,
+     "Diagnostic refusal attribution: EffectManager creation reads free-list head +0x19460, refuses a null head, and decrements free count +0x19468. Read-only; the lower emitter constructor can also refuse after taking a node."),
     ("hitbox_attack", 0x2284B20, HOOK,
      "`app::sv_animcmd::ATTACK(lua_State*)`: the animation command that creates a hitbox. Replace hook at the entry: the plugin part runs first (it only reads the Lua stack and draws), then the original."),
     ("hitbox_catch", 0x22AC290, HOOK,

@@ -64,6 +64,25 @@ the CPU package's. Sharing v1 / chain: N/A (the scan showed nobody at the sites)
 
 ## Decisions made without the lead (reported at the gate)
 
+### Lead refusal investigation, 2026-11-02 17:2xZ — not a fix
+
+Owned-native trace: the req_follow thunk dispatches through EffectModule slot
+0x80. RELA for vtable0x4f6ccb8 maps it to0x44f880; is_exist slot0x188 maps
+to0x451800 (explicitly rejects handle0), and get_last_handle slot0x3a0 to0x4530a0.
+req_follow calls EffectManager creation0x3563430 at0x44fc30 and returns its
+zero result unchanged. That creation has several refusal paths: missing effect
+resource mappings, null free-list head at manager+0x19460, and failure of the
+lower constructor0x356cec0 after a free node was taken. Free count+0x19468 is
+decremented at0x35636e0. Thus hb04's zero return does **not** by itself establish
+pool exhaustion, and no spawn cap/spreading change is justified yet.
+
+Two new64-byte relied guards cover singleton resolution at0x44fbe4 and free-list
+layout at0x35636b8. All16 NROs in the saved2026-11-01 pilot/after card copy had
+no reference to either site (playbook scan-offsets.py,17:2xZ; physicalcard untouched).
+Diagnostic-only snapshots report free count/head before a request and after a
+refusal, limited to8failures perboot. No pool write or rendering behavior change.
+Host ELF assertions check these instructions; Cargo/Switch/Eden gates pending.
+
 - Q4 (per-frame restore while Off): done as the spec recommends: one `set_sleep_effect(false)` on the first pass after the setting goes Off (a per-fighter
   record of the fighters put to sleep), no game call per frame while Off.
 - Q2 (shield-damage rewrite in the `ATTACK` hook): not here. Package 2 applies the Infinite shield through the game's own parameters

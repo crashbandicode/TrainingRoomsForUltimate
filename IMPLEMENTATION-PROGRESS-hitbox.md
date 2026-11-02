@@ -9,6 +9,21 @@ under lead `0caa72b8` (spawned by the lead's `MEMENTO-DELEGATE-FROM: 0caa72b8-b7
 
 ## Done (host)
 
+## Lead continuation17:2xZ — diagnostic candidate, NOT GATED
+Lead01a19c96 now owns this idle stream from6525d54. Full progress/provenance,
+runtimehitbox and native generator read; no upstream/mixedimplementation opened.
+New guarded pool snapshots distinguish globalfree-list exhaustion from other
+native creation refusals. Owned-native facts and savedcard scan in
+docs/test-provenance/core-06.md. No behavior workaround or accepted fix yet.
+Operator requested bounded-turn handoff17:4xZ: preserved as WIP; no gates run.
+Next review/freeze, queued singlehost test/core06 + Switchdiag, then freshRidley
+firstspawn runtime evidence. Originalhb04 failure remains OPEN. No hitboxclaim,
+compile orEden run by thislead. F6 stopped/restored/releasedSurface17:35Z.
+Check raw encoding assertion35637d4 and diagnostic layout reads before gating;
+new relied guards and tests are candidates, not accepted evidence.
+
+## Earlier host implementation
+
 - Layouts derived from the owned ELF with evidence (`docs/test-provenance/core-06.md`, `tools/re_hitbox_layout.py`, `tests/core06_hitbox.rs` asserts every instruction):
   `AttackData` (0x130-byte slots at module `+0x68`: offset vector `+0`, second vector `+0x10`, size `+0x24`, node hash `+0x48`, active word `+0x108`), the Lua stack
   of the animation commands (`base + 0x10 * i`, tags 3 float / 0x13 integer) and the `ATTACK` / `CATCH` parameter indices.

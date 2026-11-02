@@ -342,7 +342,7 @@ fn core06_site_guards() {
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 9);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 5);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 7);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -626,6 +626,23 @@ fn core06_hurtbox_layout_matches_the_owned_elf() {
     assert_eq!(w(0x469540), 0xb9807818, "ldrsw x24, [x0, #0x78]");
     // get_part_size(group) answers the group's count (slot 0x170): `ldrsh w0, [x8, #0x6]`.
     assert_eq!(w(0x46a8bc), 0x79c0_0d00);
+}
+
+#[test]
+fn core06_effect_pool_refusal_facts_match_the_owned_elf() {
+    let Some(main) = common::owned_main("core06_effect_pool_refusal_facts_match_the_owned_elf") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    assert_eq!(w(0x44fbe4), 0xb002_773a, "adrp x26, main+0x5334000");
+    assert_eq!(w(0x44fbf4), ldr_x(9, 26, 0x920), "singleton at main+0x5334920");
+    assert_eq!(w(0x44fc14), ldr_x(0, 9, 0), "manager is singleton's first pointer");
+    assert_eq!(w(0x35636b8), movz_w(8, 0x9460));
+    assert_eq!(w(0x35636bc), 0x72a0_0028, "free head offset high16 = 1");
+    assert_eq!(w(0x35636c4), ldr_x(0, 10, 0));
+    assert_eq!(w(0x35636c8), 0xb4ff_fca0, "null free head branches to zero result");
+    assert_eq!(w(0x35636d4), movz_w(10, 0x9468));
+    assert_eq!(w(0x35636d8), 0x72a0_002a, "free count offset high16 = 1");
+    assert_eq!(w(0x35636e0), 0x5100_056b, "taking a node decrements the free count");
+    assert_eq!(w(0x35637d4), 0x2a1f_03fc, "lower constructor failure also returns zero");
 }
 
 // ---- persistent spheres: the handle-set state machine (lead ruling on Q3) ---------------------------------------------
