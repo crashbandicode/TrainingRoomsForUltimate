@@ -3,10 +3,10 @@
 screenshots are taken at each step for the evidence doc.
 
   boot <label> host|nohost     install line `deluxe_row=` and the registration / adapter lines
-  page <label> <downs>         open the Deluxe window (L+R) and step its page cycle with D-pad Down, a shot per page
+  page <label> <n>             Deluxe window cycle: n presses of D-pad Down while L+R are held (the k04 chord), a shot each
+  select <label> <n>           n plain D-pad Down presses (row selection inside the open page), a shot
   deluxe <label> on|off        ZR + Right/Left on the selected row; gate: the writer's INI line and the file's value
   menu <label> on|off          the menu row's path (diag request file -> writer::request_replay_capture); same gates
-  close <label>                L+R closes the Deluxe window
 """
 import sys
 import time
@@ -33,14 +33,29 @@ def boot(label, host):
         rt.wait_line(rt.DIAG, "deluxe_row not registered reason=host_missing", 10, "no-host line")
 
 
-def page(label, downs):
-    rt.press(label, "l,r", 200)
-    time.sleep(1.0)
-    rt.shot(label, "deluxe-open")
-    for i in range(int(downs)):
-        rt.press(label, "down", 150)
+def chord(label, buttons, hold=250):
+    """Hold `buttons` (comma list) together; the last one is pressed after the others are down."""
+    names = buttons.split(",")
+    for b in names[:-1]:
+        rt.se.client_call(label, "input.button", {"button": b, "state": "press", "lease_ms": hold + 900})
+    time.sleep(0.15)
+    rt.press(label, names[-1], hold)
+    for b in names[:-1]:
+        rt.se.client_call(label, "input.button", {"button": b, "state": "release"})
+
+
+def page(label, n):
+    for i in range(int(n)):
+        chord(label, "l,r,down")
         time.sleep(0.8)
-        rt.shot(label, f"deluxe-page{i + 1}")
+        rt.shot(label, f"deluxe-cycle{i + 1}")
+
+
+def select(label, n):
+    for _ in range(int(n)):
+        rt.press(label, "down", 150)
+        time.sleep(0.4)
+    rt.shot(label, "deluxe-select")
 
 
 def ini_value():
@@ -66,7 +81,7 @@ def expect(label, value, before):
 
 def deluxe(label, value):
     before = len(rt.lines(rt.DIAG))
-    rt.press(label, "zr," + ("right" if value == "on" else "left"), 200)
+    chord(label, "zr," + ("right" if value == "on" else "left"), 200)
     expect(label, value, before)
 
 
@@ -80,12 +95,6 @@ def menu(label, value):
     expect(label, value, before)
 
 
-def close(label):
-    rt.press(label, "l,r", 200)
-    time.sleep(1.0)
-    rt.shot(label, "deluxe-closed")
-
-
 if __name__ == "__main__":
     op, label, *rest = sys.argv[1:]
-    {"boot": boot, "page": page, "deluxe": deluxe, "menu": menu, "close": lambda lb: close(lb)}[op](label, *rest)
+    {"boot": boot, "page": page, "select": select, "deluxe": deluxe, "menu": menu}[op](label, *rest)

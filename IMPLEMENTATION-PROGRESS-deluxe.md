@@ -110,8 +110,8 @@ eden-solo/{gv.py,solo.ps1,step.ps1}, eden-pair/solo_surface.ps1.
 | cdylib only | M | pass | `Cargo.toml` `crate-type = ["cdylib"]`; the SDK is an `rlib` dependency (LTO applies) |
 | Release profile s/lto/cgu 1/abort; skyline =0.6.0; toolchain 1.98.1 | M | pass | `Cargo.toml`, `rust-toolchain.toml` unchanged |
 | Pure logic in model with host tests; runtime only for the Switch | M | pass | `src/model/deluxe_row.rs` (9 tests), `src/runtime/deluxe_row.rs` under `runtime` (`cfg(target_os = "switch")`) |
-| Gates: test, clippy -D warnings, no-default-features, release, diag | M | partial | host gates 2026-11-02 11:23–11:27Z: test 7706 passed 0 failed, clippy 0, no-default-features ok (`/tmp/dx-work/{test,clippy,nodefault}.log`); release + diag: **open** (queued) |
-| No heap in hooks (`heap_allocations=0`) | M | open | no hook added; draw-thread callbacks are atomics only; Eden install line pending |
+| Gates: test, clippy -D warnings, no-default-features, release, diag | M | pass | merged tree `14016fe`: test 7844 passed + the fixed target 9/9, clippy 0, no-default-features ok (Surface 13:1xZ); Switch release `3b1a39c2` (reproducible, 0 warnings) and diag `a7c0c648` (Yoga 12:49Z) |
+| No heap in hooks (`heap_allocations=0`) | M | pass (Deluxe path) | install line `heap_allocations=0` in dx-02 and dx-03; `hook_stats` deltas unchanged across both Deluxe edits (`eden/EDEN-DELUXE.md`); the steady Training-scene allocations belong to areas without sync slice 2 / pkg6 R5 in this tree (lead) |
 | Fixed buffers, writer thread, stack paths | M | pass | the INI write stays on the existing writer thread (`features::writer`), the row only sets an atomic flag |
 | Root cause or approved workaround | M | pass | no workaround; host persistence dropped for one writer (R5), the fork's 2.0.0 file superseded (CARRY-OVER "deluxe"); the menu-row adapter gap is reported, not worked around (Open items) |
 | Version guard 13.0.5 | M | pass | unchanged boot guard (`runtime::boot` step 1); registration runs after it |
@@ -119,25 +119,25 @@ eden-solo/{gv.py,solo.ps1,step.ps1}, eden-pair/solo_surface.ps1.
 | Card scan for the site | M | N/A | no game offset is used; the card's Deluxe NRO was analysed for its export and `register` instead (section 2) |
 | Hook sharing / chaining, stand-ins, load orders | C | N/A | no hook; this is HOOK-SHARING's provider pattern (exported registration API, plugin runs without the provider) |
 | Hook after the prologue / call instead | M | N/A | no hook |
-| No diag code/strings in the shipped NRO | M | open | `compliance.py --nro <release>` after the release build |
+| No diag code/strings in the shipped NRO | M | pass | `compliance.py --nro` release `3b1a39c2`: no diag markers |
 | Shipped NRO writes its install line and nothing per frame | M | pass (code) | the row adds an install-line field and one boot `diagnostic` line (`[TrainingRooms]`, shipped tag, once) |
 | Online: read-only rules hook by hook | C | open → pkg7 | the Deluxe row is also reachable online; package 7 owns the online rows |
 | Online: replay A/B with the desync detector | C | open → pkg7 | |
 | Online: two consoles past the changed path | C | open → pkg7 | no LDN here (brief) |
-| Eden: claim before Up, release after Down | M | open | dx-01/dx-02 queued (Surface) |
-| Eden: one per host, ≥ 10 GiB, not profile a / :61 | M | open | harness asserts both (`eden/dx_eden.py` `up`/`launch`), display :94 |
-| Eden: hard-linked profile copy, only the copy changed | M | open | `dx_eden.py prep` (gv.py's copy rule) |
-| Copies: identical linked, written-in-place copied | M | open | same |
+| Eden: claim before Up, release after Down | M | pass | dx-01 (Surface 13:38Z, released at once after a failed Up), dx-02 and dx-03 (Yoga, released 13:4xZ/13:49Z), `dx_eden.py` writes both lines |
+| Eden: one per host, ≥ 10 GiB, not profile a / :61 | M | pass | `up`/`launch` asserts (MemAvailable 23.4 GB at launch), display :94, profile dx |
+| Eden: hard-linked profile copy, only the copy changed | M | pass | `du -sh` of source b and dx together: 6.4G / 591M |
+| Copies: identical linked, written-in-place copied | M | pass | game content linked (`prep` READ_ONLY), config/saves/plugins copied |
 | Disk: one target per copy, shared cargo home, df ≥ 40 GB, products deleted with manifest | M | partial | Surface target `cargo-targets/trainingrooms-deluxe`, Yoga target `/home/intpa/trainingrooms-build-deluxe/target`; df 178 GB (Surface) / 248 GB (Yoga); deletion at stream end: open |
-| Eden: waits gated on a log line or screenshot | M | open | `route_dx.py` (gated route), row waits on the diag lines |
-| Eden: failed precondition aborted and retried | M | open | |
+| Eden: waits gated on a log line or screenshot | M | pass | route gates (install line, menu/SSS/CSS/ready references, tile-cursor `settled`), row gates on diag lines and the INI file; the Training-scene reference never matched this profile's stage (Kongo Jungle 64), checked by screenshot instead |
+| Eden: failed precondition aborted and retried | M | pass | dx-01 aborted at `prep`, retried as dx-02 |
 | Ruleset short | M | N/A | Training mode only, no match to finish |
-| Eden: profile restored, host released | M | open | `dx_eden.py restore` / `down` |
-| console.log scan, run.json, memory.peak kept | M | open | `dx_eden.py scan` / `collect` |
+| Eden: profile restored, host released | M | pass | `restore` after dx-03 (source plugins back), Eden processes left 0 |
+| console.log scan, run.json, memory.peak kept | M | pass | 11 lines per boot, all the F7 boot fault (stack fix not in this tree), none in the plugin's Deluxe windows; files under `eden/runs/dx-0{2,3}/` |
 | Every local command under memory/time guard | M | pass | cargo under `systemd-run --scope -p MemoryMax=6G timeout 1800` (`/tmp/dx-work/gate.ps1`); Eden under `eden-run.py` (8 GiB, bounded) |
-| Each run's outputs kept under its label | M | open | `eden/runs/dx-NN/` |
+| Each run's outputs kept under its label | M | pass | `eden/runs/dx-02/`, `dx-03/` (gitignored), Yoga copy `/home/intpa/trainingrooms-eden-deluxe/tool/eden/runs/` |
 | README GIF / license / disclaimer | M | N/A here | the repo README is the lead's; one third-party line is a lead decision (CARRY-OVER "deluxe" records the licence) |
-| Dated evidence doc | M | partial | this file and `eden/EDEN-DELUXE.md` (with the runs) |
+| Dated evidence doc | M | pass | this file and `eden/EDEN-DELUXE.md` |
 | Numbers from tested scripts | C | N/A | no numbers computed from logs are cited |
 | No operator quotes, no claims beyond tests | M | pass | |
 | Handoff current | M | pass | this file (branch, commit, evidence, next steps); the lead keeps TRAININGROOMS-HANDOFF.md |
