@@ -139,6 +139,9 @@ fn in_load() -> bool {
 /// Count one allocation made on this thread: nothing outside a hook; inside one, the steady-state counter (the lane gate
 /// wants delta 0) or, inside per_load, the per-load counter.
 fn count_allocation() {
+    if UNCOUNTED_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false) {
+        return;
+    }
     if in_hook() {
         if in_load() {
             LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
