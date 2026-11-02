@@ -155,6 +155,7 @@ fn handle(code: u8, menu: &mut Option<Menu>) {
             None => *menu = Some(Menu::new(settings, env())),
         }
         CLOSING.store(false, Ordering::Release);
+        crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(true);
         publish_frame(menu.as_ref());
         diagnostic(format_args!("[Ui] menu opened"));
         return;
@@ -188,6 +189,7 @@ fn publish_frame(menu: Option<&Menu>) {
 fn close(menu: &mut Menu) {
     let outbox = menu.take_outbox();
     let settings = menu.commit().clone();
+    // Package 6's compat::menu::apply(&settings) goes on the next line (declaration commit, item 8): keep this call site.
     published::publish(&settings.menu, outbox.rerolls);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
@@ -215,6 +217,7 @@ fn close(menu: &mut Menu) {
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
+    crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(false);
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
     let _ = input_delay::clear;

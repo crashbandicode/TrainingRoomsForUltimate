@@ -12,6 +12,7 @@ pub mod anchors;
 pub mod archive;
 pub mod hud;
 pub mod input;
+pub mod menu_app;
 pub mod pane;
 #[cfg(feature = "diag")]
 pub mod probe;
