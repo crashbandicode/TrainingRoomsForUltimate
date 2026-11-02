@@ -73,6 +73,7 @@ def main():
     p.add_argument("--p1", type=int, default=8)
     p.add_argument("--cpu", type=int, default=4)
     p.add_argument("--p1-steps", default="up")
+    p.add_argument("--then-always", action="store_true", help="run the second launch whatever the first build showed")
     p.add_argument("--resume", action="store_true", help="the first launch is already up under our claim")
     a = p.parse_args()
     started = time.time()
@@ -82,7 +83,7 @@ def main():
         cause = first_build_cause(a.label)
         result["first_build_largest_step"] = cause
         if a.then and a.nro2:
-            if cause == "control_64f820":
+            if cause == "control_64f820" or a.then_always:
                 result["then_exit"] = one_launch(a.then, a.nro2, a.settings2 or a.settings, a, claim=False)
                 first_build_cause(a.then)
             else:

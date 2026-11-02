@@ -2,7 +2,7 @@
 
 Writes the boot settings with `settings` (before `up`), or drives laps with `laps`: waits until the preload has prefetched the
 groups (`[GroupSwap] prefetched`), then presses the P1 cycle chord (ZL + D-pad Right) and, with --cpu, the CPU chord (ZL + D-pad
-Left) N times each, every press gated on `[CharacterRoster] complete` (or a cap), with a screenshot after each group build.
+Left) N times each, every press gated on the role's `[BodyBank] ready owner=<role>` line (or a 20 s cap: a native Reload has no bank line), with a screenshot after each group build.
 Never opens the TrainingRooms menu (known hang on menu close, 2026-11-02): every option comes from the settings file.
 
 Usage: f6_rows.py settings <out.json>
@@ -94,7 +94,8 @@ def laps(args):
             m = count()
             rt.press(args.label, "zl,right" if role == 0 else "zl,left", 200)
             queued = wait_for(m, "[CharacterRoster] queued", 8)
-            done = wait_for(m, "[CharacterRoster] complete", 40)
+            # this tree logs no `[CharacterRoster] complete`; the bank's ready line ends a bank swap (f6-03)
+            done = wait_for(m, f"[BodyBank] ready owner={role}", 20)
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
             rec = {"role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,
