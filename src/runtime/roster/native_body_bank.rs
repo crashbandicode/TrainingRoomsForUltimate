@@ -1690,6 +1690,7 @@ enum Action { None, Swap, Lifecycle, Construct }
 pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     let Some(role) = role(owner) else { return; };
     let observed = snapshot(entry);
+    split::tick_any(role, owner, now_us(), &observed);
     if GROUPS_ENABLED.load(Ordering::Acquire) {
         sample_pool();
         // A Reload begins at loader state 0 right after this pre-dispatch (§4.2):

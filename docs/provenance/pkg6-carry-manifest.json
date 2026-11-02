@@ -1536,7 +1536,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "48fef7d2100277d6280ff025c150a37aa918c4b926fe013fc821405b70029fb6",
+   "dest_sha256": "7f85e6920653929ff2d00ab80ac31c03b6ac6279de1b9cf01f1a62185ae03ce8",
    "edits": [
     {
      "old": "use crate::runtime::roster::special_articles as articles;\n",
@@ -1652,6 +1652,11 @@
      "old": "    let Some((group, via)) = rollback else { return; };\n    // PT-TRAINER-PARK: a failed warm attach",
      "new": "    split::mark(split::Step::Ledger);\n    let Some((group, via)) = rollback else { return; };\n    // PT-TRAINER-PARK: a failed warm attach",
      "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the post-build release and ledger reconcile"
+    },
+    {
+     "old": "    let Some(role) = role(owner) else { return; };\n    let observed = snapshot(entry);\n",
+     "new": "    let Some(role) = role(owner) else { return; };\n    let observed = snapshot(entry);\n    split::tick_any(role, owner, now_us(), &observed);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): `[BuildSplit] stall`: every entry tick's gap above 60 ms with the loader state, the baseline of a native Reload's stall"
     },
     {
      "old": "const CONSTRUCT_FUNCTOR: usize = 0x3cb2a0;\n",

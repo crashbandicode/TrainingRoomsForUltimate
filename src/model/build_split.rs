@@ -281,9 +281,39 @@ impl fmt::Display for Gaps {
     }
 }
 
+/// Gaps above this between two ticks of one entry are reported by the always-on stall line (diag): about four displayed frames.
+pub const STALL_US: u64 = 60_000;
+
+/// Every entry tick of one role, whatever the plugin does (diag): the gap since the role's previous tick, when it exceeds the
+/// threshold. The baseline for a stall the game makes itself (a native Reload building a fighter) next to the plugin's swaps.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TickClock {
+    last_us: u64,
+}
+
+impl TickClock {
+    pub const IDLE: TickClock = TickClock { last_us: 0 };
+
+    pub fn tick(&mut self, now_us: u64, threshold_us: u64) -> Option<u64> {
+        let last = std::mem::replace(&mut self.last_us, now_us);
+        let gap = now_us.saturating_sub(last);
+        (last != 0 && gap > threshold_us).then_some(gap)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tick_clock_reports_only_gaps_above_the_threshold_and_never_the_first_tick() {
+        let mut c = TickClock::IDLE;
+        assert_eq!(c.tick(5_000_000, STALL_US), None, "no previous tick");
+        assert_eq!(c.tick(5_016_000, STALL_US), None);
+        assert_eq!(c.tick(5_191_000, STALL_US), Some(175_000));
+        assert_eq!(c.tick(5_191_000 + STALL_US, STALL_US), None, "exactly the threshold is not a stall");
+        assert_eq!(c.tick(5_000_000, STALL_US), None, "a clock step back reports nothing");
+    }
 
     #[test]
     fn marks_charge_the_time_since_the_previous_mark_to_their_step() {
