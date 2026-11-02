@@ -10,13 +10,13 @@ use std::thread::Thread;
 use parking_lot::Mutex;
 
 use crate::model::menu::grid::ConsoleMode;
+use crate::model::notify::DEFAULT_COLOR;
 use crate::model::menu::input::Button;
 use crate::model::menu::{Env, Menu};
 use crate::model::settings::Settings;
-use crate::model::storage::{self, FixedPath};
 use crate::model::screens::frame_of;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::input_delay;
+use crate::runtime::features::{chords, input_delay, notices, writer};
 use crate::runtime::published;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, OPEN};
 
@@ -30,6 +30,8 @@ pub static DROPPED: AtomicU32 = AtomicU32::new(0);
 
 const EV_OPEN: u8 = 1;
 const EV_PRESS: u8 = 2;
+/// The session ended (leaving Training): drop the model, so the next opening starts a fresh one.
+const EV_RESET: u8 = 32;
 
 fn encode(button: Button) -> u8 {
     EV_PRESS + button as u8
@@ -78,6 +80,12 @@ pub fn push_open() {
     push(EV_OPEN);
 }
 
+/// The menu session ends: the worker drops its model (uncommitted edits go with it).
+pub fn push_reset() {
+    push(EV_RESET);
+    wake();
+}
+
 pub fn push_press(button: Button) {
     push(encode(button));
 }
@@ -116,6 +124,8 @@ fn env() -> Env {
         developer_page: published::developer_page(),
         pilot_present: crate::runtime::ui::state::PILOT_PRESENT.load(Ordering::Acquire),
         console: console_mode(),
+        shortcuts: chords::shortcuts(),
+        replay_capture: writer::replay_capture(),
         ..Env::default()
     }
 }
@@ -133,6 +143,11 @@ fn run() {
 }
 
 fn handle(code: u8, menu: &mut Option<Menu>) {
+    if code == EV_RESET {
+        *menu = None;
+        diagnostic(format_args!("[Ui] menu session cleared"));
+        return;
+    }
     if code == EV_OPEN {
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         match menu {
@@ -176,16 +191,26 @@ fn close(menu: &mut Menu) {
     published::publish(&settings.menu, outbox.rerolls);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
+    // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
     if outbox.changed {
-        write_settings(&json);
+        writer::request_settings(json);
     }
-    // The INI files the menu edits are written by the input package's chord code (N7: chords::commit_shortcut;
-    // Q7: the replay capture file); until that lands the requests are only recorded.
-    if let Some(chords) = outbox.button_config {
-        diagnostic(format_args!("[Ui] outbox button_config shortcut1={} shortcut2={} (write pending the input package)", chords[0], chords[1]));
+    // The menu shortcuts (N7): each changed slot is checked and applied at once; the writer rewrites
+    // `button_config.ini`. A refused edit changes nothing and says why.
+    if let Some(wanted) = outbox.button_config {
+        for (slot, chord) in wanted.into_iter().enumerate() {
+            if chords::shortcuts()[slot] == chord {
+                continue;
+            }
+            if let Err(refusal) = chords::commit_shortcut(slot, chord) {
+                notices::post("Menu shortcuts", refusal.text(), 120, DEFAULT_COLOR);
+                diagnostic(format_args!("[Ui] shortcut {} refused: {}", slot + 1, refusal.text()));
+            }
+        }
     }
+    // Q7: the Replay capture toggle is live at once; the writer rewrites `replay_capture.ini`.
     if let Some(on) = outbox.replay_capture {
-        diagnostic(format_args!("[Ui] outbox replay_capture={on} (write pending the input package)"));
+        writer::request_replay_capture(on);
     }
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
@@ -195,23 +220,3 @@ fn close(menu: &mut Menu) {
     let _ = input_delay::clear;
 }
 
-/// Write `settings.json` through a temporary file and a rename. (The storage-transaction API of the
-/// package-1 review fix replaces this when it lands; SPEC-core-04 §3.3.)
-fn write_settings(json: &str) {
-    let (Some(temp), Some(target)) =
-        (FixedPath::<128>::in_root("settings.json.tmp"), FixedPath::<128>::in_root(storage::file::SETTINGS))
-    else {
-        return;
-    };
-    if let Err(error) = std::fs::write(temp.as_str(), json) {
-        diagnostic(format_args!("[Ui] settings write failed: {error}"));
-        return;
-    }
-    if std::fs::rename(temp.as_str(), target.as_str()).is_err() {
-        // The Switch's rename does not replace: remove the old file, then move the new one in.
-        let _ = std::fs::remove_file(target.as_str());
-        if let Err(error) = std::fs::rename(temp.as_str(), target.as_str()) {
-            diagnostic(format_args!("[Ui] settings rename failed: {error}"));
-        }
-    }
-}

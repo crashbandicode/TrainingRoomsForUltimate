@@ -160,3 +160,7 @@ pub unsafe fn set_text_color(pane: *mut Pane, color: [u8; 4]) {
 pub unsafe fn pos_y(pane: *const Pane) -> f32 {
     (*pane).pos_y
 }
+
+pub unsafe fn pos_x(pane: *const Pane) -> f32 {
+    (*pane).pos_x
+}

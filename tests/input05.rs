@@ -197,3 +197,118 @@ fn missing_accessor_zero() {
     assert_eq!(digits_or_none(None), None, "nothing is written for a missing fighter");
     assert_eq!(digits_or_none(Some(12.3)), Some(Digits { hundreds: 0, tens: 1, ones: 2, tenths: 3 }));
 }
+
+fn drawn_bodies(q: &mut Queue, ticks: usize) -> Vec<String> {
+    (0..ticks).filter_map(|_| q.tick(true, false).draw.map(|d| d.body.as_str().to_owned())).collect()
+}
+
+#[test]
+fn a_standing_notice_waits_behind_plain_ones_and_is_updated_in_place() {
+    let mut q = Queue::new();
+    q.upsert(7, "Ready", Body::copied("one"), 3, DEFAULT_COLOR);
+    q.post_static("H", "plain", 2, DEFAULT_COLOR);
+    // The plain notice goes ahead of the standing one that has not been drawn yet.
+    assert_eq!(drawn_bodies(&mut q, 2), ["plain"]);
+    assert!(q.is_queued(7));
+    // An update replaces text and length, keeps the one entry and redraws.
+    q.upsert(7, "Ready", Body::copied("two"), 2, DEFAULT_COLOR);
+    assert_eq!(q.len(), 1);
+    assert_eq!(drawn_bodies(&mut q, 1), ["two"]);
+    q.upsert(7, "Ready", Body::copied("three"), 2, DEFAULT_COLOR);
+    assert_eq!(drawn_bodies(&mut q, 1), ["three"], "an update of the entry on screen redraws it");
+    assert_eq!(q.len(), 1);
+}
+
+#[test]
+fn a_plain_notice_posted_behind_a_drawn_standing_one_waits_for_it() {
+    let mut q = Queue::new();
+    q.upsert(1, "S", Body::copied("standing"), 3, DEFAULT_COLOR);
+    assert_eq!(drawn_bodies(&mut q, 1), ["standing"]);
+    q.post_static("H", "plain", 2, DEFAULT_COLOR);
+    assert_eq!(drawn_bodies(&mut q, 4), ["plain"]);
+    assert!(!q.is_queued(1));
+    assert_eq!(q.take_delivered(), Some(1));
+}
+
+#[test]
+fn delivery_needs_the_whole_visible_time() {
+    let mut q = Queue::new();
+    q.upsert(3, "S", Body::copied("x"), 3, DEFAULT_COLOR);
+    // While the menu covers the pane the countdown stops (decision B8 question 3).
+    for _ in 0..5 {
+        assert!(!q.tick(true, true).visible);
+    }
+    assert!(q.is_queued(3));
+    assert_eq!(q.take_delivered(), None);
+    for _ in 0..3 {
+        q.tick(true, false);
+    }
+    assert!(!q.is_queued(3));
+    assert_eq!(q.take_delivered(), Some(3));
+    assert_eq!(q.take_delivered(), None, "a delivery is taken once");
+}
+
+#[test]
+fn clear_and_session_clear_deliver_nothing_and_an_update_drops_an_old_record() {
+    let mut q = Queue::new();
+    q.upsert(4, "S", Body::copied("x"), 2, DEFAULT_COLOR);
+    q.clear_id(4);
+    assert!(!q.is_queued(4));
+    assert_eq!(q.take_delivered(), None, "a cleared notice was not seen");
+    // Session clear wipes the queue but keeps a record that already exists.
+    q.upsert(5, "S", Body::copied("y"), 1, DEFAULT_COLOR);
+    q.tick(true, false);
+    q.upsert(6, "S", Body::copied("z"), 5, DEFAULT_COLOR);
+    q.clear();
+    assert!(!q.is_queued(6));
+    assert_eq!(q.take_delivered(), Some(5));
+    // New content of an id forgets its earlier delivery.
+    q.upsert(5, "S", Body::copied("y"), 1, DEFAULT_COLOR);
+    q.tick(true, false);
+    q.upsert(5, "S", Body::copied("again"), 4, DEFAULT_COLOR);
+    assert_eq!(q.take_delivered(), None);
+    // Clearing an id clears its record too.
+    q.upsert(8, "S", Body::copied("w"), 1, DEFAULT_COLOR);
+    q.tick(true, false);
+    q.clear_id(8);
+    assert_eq!(q.take_delivered(), None);
+}
+
+#[test]
+fn the_standing_api_is_bounded_and_allocation_free() {
+    let mut q = Queue::new();
+    let before = ALLOCS.with(Cell::get);
+    // More standing notices than the queue holds: the extra ids are ignored, nothing grows.
+    for id in 0..(CAPACITY as u8 + 4) {
+        q.upsert(id, "S", Body::copied("a body that is copied into the entry"), 5, DEFAULT_COLOR);
+    }
+    assert_eq!(q.len(), CAPACITY);
+    assert!(q.is_queued(0) && !q.is_queued(CAPACITY as u8));
+    // An existing id is still updated when the queue is full; a plain post finds nothing to drop.
+    q.upsert(0, "S", Body::copied("new"), 5, DEFAULT_COLOR);
+    q.post_static("H", "plain", 2, DEFAULT_COLOR);
+    assert_eq!(q.len(), CAPACITY);
+    // Delivery records are a small ring: the oldest goes.
+    let mut q = Queue::new();
+    for id in 0..6u8 {
+        q.upsert(id, "S", Body::copied("x"), 1, DEFAULT_COLOR);
+        q.tick(true, false);
+    }
+    let taken = [q.take_delivered(), q.take_delivered(), q.take_delivered(), q.take_delivered(), q.take_delivered()];
+    assert_eq!(ALLOCS.with(Cell::get), before, "no allocation in the standing API");
+    assert_eq!(taken, [Some(2), Some(3), Some(4), Some(5), None]);
+}
+#[test]
+fn a_registered_layout_draws_the_showing_notice_again() {
+    let mut q = Queue::new();
+    q.post_static("H", "text", 5, DEFAULT_COLOR);
+    assert!(q.tick(true, false).draw.is_some());
+    assert_eq!(q.tick(true, false).draw, None);
+    q.on_layout_registered();
+    assert_eq!(q.tick(true, false).draw.map(|d| d.body.as_str().to_owned()), Some("text".to_owned()));
+    assert_eq!(q.tick(true, false).draw, None);
+    // Nothing queued: nothing to draw.
+    let mut empty = Queue::new();
+    empty.on_layout_registered();
+    assert!(!empty.tick(true, false).visible);
+}
