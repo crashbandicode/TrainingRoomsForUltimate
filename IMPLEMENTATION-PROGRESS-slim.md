@@ -52,6 +52,19 @@ crc32/hash40 and one constant table; rebased onto `566780a` at the lead's reques
 (stream/sync's two `declare_interior_mutable_const` allows: lock_api's traits require `const INIT`) added to
 `tests/lint_allows.rs`, and the budget ratcheted to 114,000 (107,341 at the stream head).
 
+### 5. Lead rulings (2026-11-02 ~12:3xZ) and what followed
+
+- Never-compiled carried files: `e79019b` deletes `automation_helper/native.rs`, `automation_helper/plugin.rs`,
+  `roster/effect_hook_chain.rs` (556 lines; pkg6 manifest `not_carried`, three ledger rows, CARRY-OVER.md "slim");
+  pkg6 asked to keep the three Mii adapter files (its `mii_fullconfig_probe` reaches them); deluxe deletes
+  `capture_plugin.rs` itself (`166d3cd`). `carry_pkg6.py verify --dest-only`: verified 258 files. A mistaken
+  relative-path write while editing the ledger created `docs/provenance/pkg6-carry-ledger.md` (1 byte, untracked) in
+  the main work tree `TrainingRoomsForUltimate`; found at once by `git status` there and removed (status clean again).
+- Layout-only reductions ruled out; no fmt gate now. The tree is not rustfmt-formatted (444 of 508 files).
+- Three numbers per milestone (`4ad43c8`: `tools/sloc.py --test-fixed / --normalize`, `size_gate.py --normalize`):
+  at `e79019b` 106,785 as measured / 103,047 test-fixed / 131,781 rustfmt-normalized + test-fixed.
+- hos-lock's two allows: pending the operator (kept in KNOWN). The practice_stage_request double init goes to pkg6.
+
 ## Gates
 
 (open: queued on the Surface; the lead's order: integrator-3 → pkg6 rows → stack → harness → deluxe → f6 → slim)

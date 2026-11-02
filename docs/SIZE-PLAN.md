@@ -34,7 +34,10 @@ operator's rules until the operator decides.
 **Never compiled but counted (M, `/tmp/slim_orphans.py`: no `mod` line or `#[path]` reaches them).**
 `runtime/lobby/automation_helper/native.rs` 425, `…/plugin.rs` 58, `runtime/mii/mii_native_adapter.rs` 218,
 `mii_cpu_adapter.rs` 199, `mii_closed_ack.rs` 143, `runtime/roster/effect_hook_chain.rs` 73 = **1,116**, all in the
-pkg6 carry manifest; `runtime/macros/capture_plugin.rs` 84 waits for the Deluxe SDK decision (L1, stream/deluxe).
+pkg6 carry manifest; `runtime/macros/capture_plugin.rs` 84. Status: `native.rs`, `plugin.rs` and
+`effect_hook_chain.rs` deleted (`e79019b`, recorded as not carried); the three Mii adapter files stay because
+stream/pkg6's new `mii_fullconfig_probe` reaches them by `#[path]` (they leave with that probe if it retires);
+`capture_plugin.rs` is deleted on stream/deluxe (`166d3cd`) with its carry record.
 
 ## 2. Per area
 
@@ -127,7 +130,16 @@ Area: **0.37k** without a ruling; **1.5k** with the smash-match-data ruling.
 
 Area: **0.6k** without the site compaction; **2.3-2.6k** more with it (§3).
 
-## 3. Data tables written long (policy question, not counted in the realistic total)
+## 3. Data tables written long (lead ruling 2026-11-02: no layout-only reductions)
+
+Ruling: reformatting rows to cut lines is not a reduction; the count assumes rustfmt's default layout. Table-driven rows
+that remove real code are welcome. Kept below as the finding it was.
+
+**Layout finding.** The tree is not rustfmt-formatted (`cargo fmt --all -- --check -l`: 444 of 508 tracked `.rs`
+files). On a scratch `git archive` copy of `e79019b` laid out by rustfmt the count is 136,814 against 106,785 as
+committed. Until the operator rules on the method, each milestone reports three numbers
+(`python3 -I tools/size_gate.py --normalize`): as measured (gated), test-fixed, rustfmt-normalized + test-fixed.
+At `e79019b`: **106,785 / 103,047 / 131,781**. The fork must be measured the same three ways for a fair comparison.
 
 Site rows (M): 239 rows in `sites*.rs`, 13 lines each, guard as 4 lines of 16 bytes; seam rows 5-10 lines each. One
 header line plus the 64 guard bytes on one line keeps `compliance.py`'s `guard: [0x.. ×64]` row passing (a byte string
@@ -185,14 +197,16 @@ facade; `InputFrame` vs `MappedInputs`; diag hook counters 3×; natives wrapped 
 | A. Rulings not needed beyond file ownership: never-compiled files 1.1k, the "without a ruling" rows of §2 (roster 0.8-1.4k, mii 0.85-1.05k, seams/lobby 1.9-2.3k, macros 0.37k, core 0.6k incl. 129 done) | 5.6-6.8k | ~107-108k |
 | B. Probe and D11 rulings: roster/Mii probes and observers ~7k, pkg6's new probes 2.4k if they serve their run and retire, Mii D11 fold 0.2k, automation-helper parking 1.5k | ~9-11k | ~97-99k |
 | C. Behaviour/structure rulings: player/cpu generic, saved_alpha fallback, smash-match-data trim, seam-label lookup, one site type, config switch table | ~2-2.5k | ~95-96k |
-| D. Data tables written compactly (§3) | ~4.9-5.1k | ~90-91k |
-| E. Counter correction (§1), applied to both trees | ~3.7-4.5k | ~86-87k |
+| D. Data tables written compactly (§3) | ruled out (layout only) | — |
+| E. Counter correction (§1), applied to both trees | ~3.7k (M: 3,738 at `7bb86fd`) | reported as "test-fixed" |
 
-**Is 90k reachable?** Not by removals alone: A, B and C give about **95-96k** (about 15 % under the fork's 112.5k).
-90k needs D (a layout decision) or E (a counting decision that also lowers the fork's number). Recommended target:
-**≤ 96,000 at RC from real reductions**, with the budget ratcheted per slice; 90k (or about 87k) if the operator
-accepts D and/or E. Stream additions still to come (wiring, screens) push the other way; every addition above the
-budget needs a recorded raise.
+**Is 90k reachable?** Not by removals alone: A, B and C give about **95-96k** as measured (about 15 % under the
+fork's 112.5k); the target the lead reports is that number. 90k would need a measurement decision (E, which also
+lowers the fork's number), not a code change. Stream additions still to come (wiring, screens) push the other way;
+every addition above the budget needs a recorded raise.
+
+Done so far (as measured): `7bb86fd` 106,983 → stream head 106,785 on `566780a` (107,470): the lint-allow roots and
+one-implementation wins (129) and three never-compiled files (556).
 
 ## 6. Phase B order (after stream/sync and stream/stack are merged)
 

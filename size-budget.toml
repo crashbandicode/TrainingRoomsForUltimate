@@ -16,3 +16,9 @@ scope = "total"
 ceiling = 114000
 date = "2026-11-02"
 reason = "cut: the slim stream's first wins (lint-allow roots in model/cpu and panes, one crc32/hash40, one game-constant table, Store::write_atomic = write_replace) remove 129 lines: 107,341 at stream/slim on 566780a (107,470) plus the 6,566 still pending, rounded up"
+
+[[budget]]
+scope = "total"
+ceiling = 113400
+date = "2026-11-02"
+reason = "cut: three never-compiled carried files deleted (e79019b, 556 lines): 106,785 at stream/slim plus the 6,566 still pending, rounded up"
