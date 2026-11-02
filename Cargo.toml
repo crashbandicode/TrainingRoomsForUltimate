@@ -31,10 +31,10 @@ parking_lot = "0.12"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
 
 [features]
-# The shipped closure: the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
+# The shipped closure MINUS deluxe-sdk (pending deviation, operator decision L1: the SDK repository has no license, D3): the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
 # `m5o1-switch-root-full-release`), evaluated through the table below. `cargo skyline build --release`
 # (default features) therefore builds the shipped product; tests/pkg6_features.rs checks it.
-default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
+default = ["enhancements-alpha", "native-unlink-guard", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
 
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
