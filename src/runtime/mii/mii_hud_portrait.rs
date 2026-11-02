@@ -52,7 +52,7 @@ use crate::engine::swap::source_lifetime::Holder;
 use crate::runtime::mii::mii_native_access::PoolLock;
 use skyline::hooks::InlineCtx;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use crate::engine::mii::lifetime::Configuration;
 
 /// Verified four-word windows (13.0.5 main). Twenty from mii-hud48, six added by hud54/hud57
@@ -484,7 +484,7 @@ pub(super) unsafe fn request(
     let o = logical;
     let mut released = None;
     let accepted = {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         if s.bootstrap.is_some_and(|p| p.phase != PipelinePhase::Live) { return false; }
         if !in_scope {
             refuse_once(&mut s, o, REFUSE_SCOPE, "portrait scope is native Training or a qualified waiting room (local wireless, Quickplay); other scenes are unsupported");
@@ -529,7 +529,7 @@ pub(super) fn should_defer_hud(owner: u32, kind: u32, intent: PortraitIntent) ->
         PortraitIntent::Original { .. } => policy::HudIntent::Original,
         PortraitIntent::NotMii => policy::HudIntent::NotMii,
     };
-    let halted = STATE.lock().unwrap().halted;
+    let halted = STATE.lock().halted;
     policy::hud_refresh(kind, hud_intent, ACTIVE.load(Ordering::Acquire), practice_scope(owner), halted)
         == policy::HudRefresh::DeferUntilPortrait
 }
@@ -560,7 +560,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     }
     let svc = Some(ServiceCallback);
     scene_tick(base);
-    if STATE.lock().unwrap().own.in_flight.is_some() {
+    if STATE.lock().own.in_flight.is_some() {
         drain_tick(base, svc);
     }
     if !ACTIVE.load(Ordering::Acquire) {
@@ -577,12 +577,12 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
 /// render can no longer bind and is drained out.
 pub(super) unsafe fn on_destroy(entry: *const u8, owner: u32) {
     if !ACTIVE.load(Ordering::Acquire) { return; }
-    let departure = owner == 0 && STATE.lock().unwrap().bootstrap
+    let departure = owner == 0 && STATE.lock().bootstrap
         .is_some_and(|p| p.layout.waiting() && p.player_entry == entry as usize);
     if departure { request_pipeline_retirement(); }
     let mut released = None;
     {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         for o in 0..policy::VISIBLE_OWNERS {
             let Some(job) = s.jobs[o] else { continue; };
             if job.entry == entry as usize {
@@ -635,7 +635,7 @@ pub(super) unsafe fn on_destroy(entry: *const u8, owner: u32) {
 pub(super) fn scene_changed() {
     if !ACTIVE.load(Ordering::Acquire) { return; }
     request_pipeline_retirement();
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     // The arm is kept: the hook only compares it with live registers and fresh globals. It is
     // cleared by the helper's own destructor, a batch change, or the end of the drain.
     s.own.depart();
@@ -661,7 +661,7 @@ pub(super) fn scene_changed() {
 
 unsafe fn scene_tick(base: usize) {
     let batch = read::<usize>(base as *const u8, BATCH_HOLDER);
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.batch != batch {
         if s.batch != 0 {
             // Ownership here addresses only the current batch. Never reuse an old batch's
@@ -678,7 +678,7 @@ unsafe fn scene_tick(base: usize) {
 }
 
 unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceCallback>) {
-    let Some(job) = STATE.lock().unwrap().jobs[owner] else { return; };
+    let Some(job) = STATE.lock().jobs[owner] else { return; };
     if job.entry != entry {
         return;
     }
@@ -702,11 +702,11 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
             match restore_original(base, owner, &job) {
                 Ok(done) => {
                     // restore_original returns Ok only with the pane read back on 0x12+owner.
-                    STATE.lock().unwrap().own.unbind(owner);
+                    STATE.lock().own.unbind(owner);
                     trace!("[MiiPortrait] owner={} original restored: construction texture {}", owner, done);
                 }
                 Err(reason) => {
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     refuse_once(&mut s, owner, REFUSE_RESTORE, reason);
                 }
             }
@@ -717,12 +717,12 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
             // a bust never gets a helper installed for it. The first refusal logs its words.
             if let Err(reason) = presentation_ready(base, &job) {
                 let bit = if reason == NO_PIPELINE { REFUSE_PIPELINE } else { REFUSE_PANE };
-                let first = STATE.lock().unwrap().refused[owner] & bit == 0;
+                let first = STATE.lock().refused[owner] & bit == 0;
                 if first {
                     log_presentation_words(base, &job);
                 }
                 {
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     refuse_once(&mut s, owner, bit, reason);
                 }
                 finish_job(base, svc, owner, policy::HudTerminal::Refusal, reason);
@@ -733,14 +733,14 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
             match ensure_pipeline(base, job.layout, job.kind) {
                 Ok(true) => {}
                 Ok(false) if job.pipeline_waits < 1200 => {
-                    if let Some(current) = STATE.lock().unwrap().jobs[owner].as_mut() {
+                    if let Some(current) = STATE.lock().jobs[owner].as_mut() {
                         current.pipeline_waits += 1;
                     }
                     return;
                 }
                 result => {
                     let reason = result.err().unwrap_or("native portrait setup did not finish within its callback budget");
-                    refuse_once(&mut STATE.lock().unwrap(), owner, REFUSE_PIPELINE, reason);
+                    refuse_once(&mut STATE.lock(), owner, REFUSE_PIPELINE, reason);
                     let terminal = if result.is_ok() {
                         policy::HudTerminal::Budget
                     } else if reason.contains("retir") || reason.contains("changed") {
@@ -754,7 +754,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
             }
             // One bust row per owner: never lease or install the helper whose row the other
             // owner's pane is bound to (`row_free_for` stays as the invariant check).
-            let avoid = STATE.lock().unwrap().own.bound.iter().enumerate()
+            let avoid = STATE.lock().own.bound.iter().enumerate()
                 .filter(|(o, _)| *o != owner)
                 .find_map(|(_, b)| b.as_ref().map(|b| b.request.row));
             match sources::prepare_portrait(CHANNEL_BASE + owner, job.kind, c, job.holder, avoid) {
@@ -764,7 +764,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
                         return;
                     };
                     sources::retain_portrait(lease);
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     if let Some(current) = s.jobs[owner].as_mut() {
                         if current.generation == job.generation && current.stage == Stage::Requested {
                             current.stage = Stage::Leased;
@@ -785,7 +785,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
                     // portrait. Log only changed reasons, never every callback.
                     let reason = blocker.unwrap_or("waiting for qualified helper");
                     {
-                        let mut s = STATE.lock().unwrap();
+                        let mut s = STATE.lock();
                         if let Some(current) = s.jobs[owner].as_mut() {
                             if current.generation == job.generation && current.deferral != reason {
                                 current.deferral = reason;
@@ -799,7 +799,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
                 }
                 Err(reason) => {
                     {
-                        let mut s = STATE.lock().unwrap();
+                        let mut s = STATE.lock();
                         refuse_once(&mut s, owner, REFUSE_LEASE, reason);
                     }
                     finish_job(base, svc, owner, policy::HudTerminal::Refusal, reason);
@@ -814,7 +814,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
                 // Terminal, not a deferral: the lease is returned at once so the helper is not
                 // held against hats while the other owner's bust occupies the row.
                 {
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     refuse_once(&mut s, owner, REFUSE_ROW, reason);
                 }
                 finish_job(base, svc, owner, policy::HudTerminal::Refusal, reason);
@@ -822,7 +822,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
             Err(reason) => {
                 // The exclusive lease is held while deferring: every distinct reason is visible.
                 {
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     if let Some(current) = s.jobs[owner].as_mut() {
                         if current.generation == job.generation && current.stage == Stage::Leased && current.deferral != reason {
                             current.deferral = reason;
@@ -849,7 +849,7 @@ unsafe fn owner_current(logical: u32, layout: Layout, physical: u32, entry: usiz
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     mii_backend::current() == Some(layout)
         && scope(role).is_some_and(|s| s.owner == physical && (layout != Layout::Training || s.mode == 0x04040000))
-        && state_for(role).lock().unwrap().observed == Some((entry, kind))
+        && state_for(role).lock().observed == Some((entry, kind))
         && mii_saved_alpha::current_generation(logical) == generation
         && active_body(entry as *const u8, physical, kind)
 }
@@ -869,7 +869,7 @@ unsafe fn ensure_pipeline(base: usize, layout: Layout, kind: u32) -> Result<bool
     let source = pointer_chain(root, &SOURCE).ok_or("native portrait source unavailable")?;
     let batch = pointer_chain(root, &BATCH);
     let ready = read::<u8>(source, 0x328);
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     if let Some(expected) = state.bootstrap.as_mut() {
         if expected.source != source as usize { return Err("native portrait source changed during setup"); }
         if expected.phase != PipelinePhase::Live { return Err("owned portrait pipeline is retiring"); }
@@ -924,7 +924,7 @@ unsafe fn ensure_pipeline(base: usize, layout: Layout, kind: u32) -> Result<bool
 fn request_pipeline_retirement() {
     let mut leases = [None; policy::VISIBLE_OWNERS];
     {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let Some(p) = s.bootstrap.as_mut() else { return; };
         if !p.layout.waiting() || p.phase != PipelinePhase::Live { return; }
         p.phase = PipelinePhase::Departed;
@@ -967,7 +967,7 @@ fn retirement_failed(reason: &str) {
 
 fn retirement_complete(reason: &str) {
     let leases = {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let leases = s.jobs.map(|j| j.and_then(|j| j.lease));
         s.jobs = [None, None];
         s.bootstrap = None;
@@ -991,11 +991,11 @@ fn retirement_complete(reason: &str) {
 /// context. Never call the native dispatcher or destructor from entry teardown.
 unsafe fn begin_pipeline_retirement(base: usize, source: *const u8) -> bool {
     if !RETIRE_PIPELINE.load(Ordering::Acquire) { return false; }
-    let Some(p) = STATE.lock().unwrap().bootstrap else { return false; };
+    let Some(p) = STATE.lock().bootstrap else { return false; };
     if p.phase != PipelinePhase::Departed { return false; }
     if p.thread != skyline::nn::os::GetCurrentThread() as usize {
         if !p.thread_deferred {
-            if let Some(current) = STATE.lock().unwrap().bootstrap.as_mut() { current.thread_deferred = true; }
+            if let Some(current) = STATE.lock().bootstrap.as_mut() { current.thread_deferred = true; }
             trace!("[MiiPortrait] pipeline retirement deferred to captured native service thread");
         }
         return false;
@@ -1017,7 +1017,7 @@ unsafe fn begin_pipeline_retirement(base: usize, source: *const u8) -> bool {
         return false;
     }
     let (player_bound, cpu_bound) = {
-        let s = STATE.lock().unwrap(); (s.own.bound[0].is_some(), s.own.bound[1].is_some())
+        let s = STATE.lock(); (s.own.bound[0].is_some(), s.own.bound[1].is_some())
     };
     if player_bound {
         retirement_failed("unexpected waiting P1 portrait binding");
@@ -1032,19 +1032,19 @@ unsafe fn begin_pipeline_retirement(base: usize, source: *const u8) -> bool {
             retirement_failed("waiting pane could not return to its kind icon before teardown");
             return false;
         }
-        if hud_gone { STATE.lock().unwrap().waiting_crop = None; }
+        if hud_gone { STATE.lock().waiting_crop = None; }
         else { restore_waiting_uv(base, 4); }
-        STATE.lock().unwrap().own.unbind(1);
+        STATE.lock().own.unbind(1);
     }
-    if STATE.lock().unwrap().own.in_flight.is_some() { drain_tick(base, None); }
+    if STATE.lock().own.in_flight.is_some() { drain_tick(base, None); }
     let words = pipeline_words(base, source);
-    let flight = STATE.lock().unwrap().own.in_flight.is_some();
+    let flight = STATE.lock().own.in_flight.is_some();
     if !words.retirable(read(source, 0xe8), read(source, 0x144), flight) { return false; }
     if batch == 0 { return false; }
     // No locks span the native dispatcher/destructor. An interrupted callback
     // cannot start another render once phase becomes Resetting.
     {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let Some(current) = s.bootstrap.as_mut() else { return false; };
         if current.source != p.source || current.phase != PipelinePhase::Departed { return false; }
         current.batch = batch;
@@ -1058,7 +1058,7 @@ unsafe fn begin_pipeline_retirement(base: usize, source: *const u8) -> bool {
 
 unsafe fn finish_pipeline_retirement(base: usize, source: *const u8) {
     if !RETIRE_PIPELINE.load(Ordering::Acquire) { return; }
-    let Some(p) = STATE.lock().unwrap().bootstrap else { return; };
+    let Some(p) = STATE.lock().bootstrap else { return; };
     if p.phase != PipelinePhase::Resetting || p.thread != skyline::nn::os::GetCurrentThread() as usize { return; }
     if p.source != source as usize || pointer_chain(base as *const u8, &SOURCE) != Some(source) {
         retirement_failed("source changed during native reset");
@@ -1080,7 +1080,7 @@ unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {
     crate::runtime::threads::headroom("pipeline_before_tick");
     if RETIRE_PIPELINE.load(Ordering::Acquire) {
         let exhausted = {
-            let mut s = STATE.lock().unwrap();
+            let mut s = STATE.lock();
             if s.bootstrap.is_none() {
                 RETIRE_PIPELINE.store(false, Ordering::Release);
                 return;
@@ -1127,7 +1127,7 @@ unsafe fn tick_bind(base: usize, ticked_source: usize) {
     }
     let thread = skyline::nn::os::GetCurrentThread() as usize;
     let (owner, job, flight) = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         let candidate = s.own.in_flight
             .and_then(|flight| s.jobs[flight.owner].map(|job| (flight.owner, job, flight)))
             .filter(|(_, job, flight)| {
@@ -1161,7 +1161,7 @@ unsafe fn tick_bind(base: usize, ticked_source: usize) {
     let descriptor = req as usize + 0x180;
     // Peek exactly as drain_tick does; ownership is consumed only on the service callback.
     let prospective = {
-        let mut own = STATE.lock().unwrap().own;
+        let mut own = STATE.lock().own;
         own.complete(policy::Completion { queue, table, descriptor }, words, same_target)
     };
     let policy::Outcome::Bind { owner: bound_owner, index } = prospective else { return; };
@@ -1170,7 +1170,7 @@ unsafe fn tick_bind(base: usize, ticked_source: usize) {
     }
     match bind_target(base, &job, index, descriptor) {
         Ok(slot) => {
-            let mut s = STATE.lock().unwrap();
+            let mut s = STATE.lock();
             let mut recorded = false;
             if let Some(current) = s.jobs[owner].as_mut() {
                 if current.generation == job.generation && current.stage == Stage::Issued && current.hud_key == Some(key) {
@@ -1192,7 +1192,7 @@ unsafe fn tick_bind(base: usize, ticked_source: usize) {
         }
         Err(reason) => {
             // The service callback repeats the bind and owns the refusal.
-            TICK_BIND.store(STATE.lock().unwrap().rebinds.iter().any(Option::is_some), Ordering::Release);
+            TICK_BIND.store(STATE.lock().rebinds.iter().any(Option::is_some), Ordering::Release);
             trace!("[MiiPortrait] owner={} source-tick bind left to the service callback: {}", job.physical, reason);
         }
     }
@@ -1209,7 +1209,7 @@ unsafe fn try_issue(base: usize, owner: usize, job: &Job, c: Configuration) -> R
     if mii_backend::current().is_none_or(|l| !l.helpers().contains(&h)) {
         return Err("leased slot is not a helper row");
     }
-    if !policy::row_free_for(&STATE.lock().unwrap().own.bound, owner, h) {
+    if !policy::row_free_for(&STATE.lock().own.bound, owner, h) {
         return Err(ROW_SHARED);
     }
     if !sources::portrait_lease_valid(lease, job.holder) {
@@ -1254,7 +1254,7 @@ unsafe fn try_issue(base: usize, owner: usize, job: &Job, c: Configuration) -> R
     };
     policy::admit(admission, owner as u32, h)?;
     let words = policy::PORTRAIT_SUBS.map(|sub| request_words(request_at(batch, h, sub)));
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.jobs[owner].is_none_or(|j| j.generation != job.generation || j.stage != Stage::Leased) {
         return Err("job changed");
     }
@@ -1305,11 +1305,11 @@ unsafe fn issue(base: usize, source: *mut u8, row: u32, sub: u32) {
 }
 
 unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
-    let Some(job) = STATE.lock().unwrap().own.in_flight else { return; };
+    let Some(job) = STATE.lock().own.in_flight else { return; };
     let root = base as *const u8;
     let Some(source) = pointer_chain(root, &SOURCE) else {
         // The native source object itself is gone: nothing can drain. Authoritative.
-        let abandoned = { let mut s = STATE.lock().unwrap(); let a = s.own.abandon_in_flight(); s.sync_pending(); a };
+        let abandoned = { let mut s = STATE.lock(); let a = s.own.abandon_in_flight(); s.sync_pending(); a };
         if abandoned.is_some() {
             disarm();
             trace!("[MiiPortrait] owner={} native source object gone; queued render abandoned", job.owner);
@@ -1319,16 +1319,16 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
     };
     // The render belongs to the S' and batch observed at issue. Any other object is not the
     // queue or request this job published: latch departure (never bind) and keep waiting.
-    let issued = STATE.lock().unwrap().jobs[job.owner].map(|j| (j.source, j.batch));
+    let issued = STATE.lock().jobs[job.owner].map(|j| (j.source, j.batch));
     let batch_now = pointer_chain(root, &BATCH).map_or(0, |b| b as usize);
     if issued.is_none_or(|(issued_source, _)| issued_source != source as usize) {
         // A different source's idle queue cannot complete the old source's work. This
         // unqualified lifetime disables this private feature until restart; otherwise a
         // later scene could acquire new leases behind an orphaned in-flight record.
         // Existing leases remain in the book until its native departure/destruction cleanup.
-        let saved = STATE.lock().unwrap().jobs;
+        let saved = STATE.lock().jobs;
         {
-            let mut s = STATE.lock().unwrap();
+            let mut s = STATE.lock();
             s.own.depart();
             if !s.halted {
                 trace!("[MiiPortrait] owner={} source identity changed; portrait feature disabled until restart, native cleanup retains ownership", job.owner);
@@ -1355,12 +1355,12 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
         return;
     }
     if issued != Some((source as usize, batch_now)) && !job.departed {
-        STATE.lock().unwrap().own.depart();
+        STATE.lock().own.depart();
         disarm();
         trace!("[MiiPortrait] owner={} issue-time source/batch identity changed; render will not bind", job.owner);
     }
     let withheld = {
-        let state = STATE.lock().unwrap();
+        let state = STATE.lock();
         state.jobs[job.owner].zip(state.own.in_flight).is_some_and(|(adapter, flight)|
             flight.hud_service_required(adapter.hud.is_withheld(), adapter.hud_key.is_some()))
     };
@@ -1380,7 +1380,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
     // helper makes the shared native snapshot temporarily unavailable. Preserve
     // the exact failure instead of treating BUSY as corrupted payload and
     // permanently quarantining a valid portrait. The next callback re-proves it.
-    let current = STATE.lock().unwrap().jobs[job.owner];
+    let current = STATE.lock().jobs[job.owner];
     let helper_busy = queue.drained() && current.is_some_and(|current|
         current.stage == Stage::Issued && current.lease.is_some()
             && matches!(helper_release_proof(&current),
@@ -1391,11 +1391,11 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
     // framing key. Keep the same in-flight job so supersede/departure/teardown
     // continue using the existing retirement protocol throughout this wait.
     let prospective = {
-        let mut own = STATE.lock().unwrap().own;
+        let mut own = STATE.lock().own;
         own.complete_when_helper_idle(policy::Completion { queue, table, descriptor }, words, same_target, helper_busy)
     };
     if let policy::Outcome::Bind { owner, .. } = prospective {
-        let current = STATE.lock().unwrap().jobs[owner];
+        let current = STATE.lock().jobs[owner];
         if let Some(current) = current.filter(|j| j.layout == Layout::Training
             && j.stage == Stage::Issued && owner_valid(j))
         {
@@ -1407,15 +1407,15 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
             }
             if let Some(key) = current.hud_key {
                 if hud_assets_ready(base, current.physical, key) {
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     if let Some(j) = s.jobs[owner].as_mut() { j.hud_key = None; }
                     s.sync_pending();
                 } else if current.hud_waits < 1200 {
-                    if let Some(j) = STATE.lock().unwrap().jobs[owner].as_mut() { j.hud_waits += 1; }
+                    if let Some(j) = STATE.lock().jobs[owner].as_mut() { j.hud_waits += 1; }
                     return;
                 } else {
                     trace!("[MiiPortrait] owner={} native HUD assets did not settle; exact texture left unbound", owner);
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     if let Some(j) = s.jobs[owner].as_mut() {
                         j.hud_key = None;
                         j.hud_bind_refused = true;
@@ -1426,7 +1426,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
         }
     }
     let outcome = {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let outcome = s.own.complete_when_helper_idle(policy::Completion { queue, table, descriptor }, words, same_target, helper_busy);
         if !matches!(outcome, policy::Outcome::Wait) {
             disarm();
@@ -1443,7 +1443,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
             finish_job(base, svc, job.owner, policy::hud_terminal_for_discard(reason), reason);
         }
         policy::Outcome::Bind { owner, index } => {
-            let adapter = STATE.lock().unwrap().jobs[owner];
+            let adapter = STATE.lock().jobs[owner];
             let proof = match adapter {
                 Some(current) if current.stage == Stage::Issued => after_render_proof(&current),
                 _ => Err("no issued adapter job"),
@@ -1452,7 +1452,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
                 if current.stage == Stage::Issued && current.lease.is_some() {
                     // Fail closed: no bind, and the helper is not returned to the book. Its
                     // portrait lease is held until scene departure clears every lease.
-                    let mut s = STATE.lock().unwrap();
+                    let mut s = STATE.lock();
                     s.halted = true;
                     if let Some(j) = s.jobs[owner].as_mut() { j.lease = None; }
                     drop(s);
@@ -1486,7 +1486,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
                         match bind_target(base, &current, index, descriptor) {
                             Ok(slot) => {
                                 let binding = policy::Binding { request: job.request, descriptor };
-                                let mut s = STATE.lock().unwrap();
+                                let mut s = STATE.lock();
                                 s.own.bound(owner, binding);
                                 if current.layout == Layout::Training {
                                     s.shown[owner] = Some(policy::Shown {
@@ -1498,7 +1498,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
                                 trace!("[MiiPortrait] owner={} bound index=0x{:x} slot={} layout={:?} request=({},{}) descriptor=0x{:x}", current.physical, index, slot, current.layout, job.request.row, job.request.sub, descriptor);
                             }
                             Err(reason) => {
-                                let mut s = STATE.lock().unwrap();
+                                let mut s = STATE.lock();
                                 refuse_once(&mut s, owner, REFUSE_PANE, reason);
                             }
                         }
@@ -1506,7 +1506,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
                 }
                 _ => trace!("[MiiPortrait] owner={} render completed but the owner changed; not bound, request kept free", owner),
             }
-            let still_withheld = STATE.lock().unwrap().jobs[owner].is_some_and(|current| current.hud.is_withheld());
+            let still_withheld = STATE.lock().jobs[owner].is_some_and(|current| current.hud.is_withheld());
             let terminal = if still_withheld { policy::HudTerminal::Refusal } else { policy::HudTerminal::Completed };
             finish_job(base, svc, owner, terminal, "render completed");
         }
@@ -1516,7 +1516,7 @@ unsafe fn drain_tick(base: usize, svc: Option<ServiceCallback>) {
 /// End the owner's job: after-render proof once, lease release outside every lock, then
 /// start a superseding intent if one was queued.
 unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, terminal: policy::HudTerminal, reason: &str) {
-    let preview = STATE.lock().unwrap().jobs[owner];
+    let preview = STATE.lock().jobs[owner];
     let terminal = policy::terminal_for_finish(terminal, preview.is_some_and(|job| job.next.is_some()));
     let fallback = preview.is_some_and(|job| {
         let owner_current = owner_valid(&job);
@@ -1524,7 +1524,7 @@ unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, te
             == policy::HudStep::RefreshFallback
     });
     let job = {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         let job = s.jobs[owner].take();
         s.sync_pending();
         job
@@ -1564,7 +1564,7 @@ unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, te
         match proof {
             Ok(()) => sources::release(lease),
             Err(reason) => {
-                STATE.lock().unwrap().halted = true;
+                STATE.lock().halted = true;
                 trace!("[MiiPortrait] owner={} helper release refused: {}; slot={} retained until scene departure", owner, reason, job.helper);
             }
         }
@@ -1593,7 +1593,7 @@ fn withheld_wait_expired(owner: usize, job: &Job, admission_blocked: bool) -> bo
     if !job.hud.is_withheld() {
         return false;
     }
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     let Some(current) = state.jobs[owner].as_mut() else { return false; };
     if current.generation != job.generation || !current.hud.is_withheld() {
         return false;
@@ -1631,13 +1631,13 @@ unsafe fn deliver_exact_hud(base: usize, job: &Job, svc: Option<ServiceCallback>
     }
     trace!("[MiiPortrait] owner={} HUD refresh after exact portrait kind=0x{:x} generation={}", job.physical, job.kind, job.generation);
     paint_hud(job.entry, job.physical, job.kind);
-    if let Some(current) = STATE.lock().unwrap().jobs[job.logical as usize].as_mut() {
+    if let Some(current) = STATE.lock().jobs[job.logical as usize].as_mut() {
         current.hud = next;
     }
     if job.layout == Layout::Training {
         let key = slot_of_owner(base, job.physical).ok().map(|(_, slot)| read::<u64>(slot, 0x120))
             .filter(|key| key >> 56 == 0xc1 && key & 0xffffffffff != 0);
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         if let Some(current) = s.jobs[job.logical as usize].as_mut() {
             current.hud_key = key;
             current.hud_bind_refused = key.is_none();
@@ -1667,7 +1667,7 @@ unsafe fn paint_hud(entry: usize, physical: u32, kind: u32) {
 /// Forget the exact portrait retained for native reset, and any rebind armed for it.
 fn forget_shown(physical: u32) {
     let Some(logical) = mii_backend::current().and_then(|l| l.logical(physical)) else { return; };
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.shown[logical].is_none() && s.rebinds[logical].is_none() {
         return;
     }
@@ -1698,7 +1698,7 @@ pub(super) unsafe fn represent(entry: *const u8, physical: u32, kind: u32) {
         entry: entry as usize, physical, kind, generation: mii_saved_alpha::current_generation(o as u32),
     };
     let (pending, shown, halted) = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         (s.jobs[o].map(|job| job.hud.is_withheld()), s.shown[o], s.halted)
     };
     let retained = shown.is_some_and(|shown| retained_texture(base, o, shown.binding));
@@ -1722,7 +1722,7 @@ pub(super) unsafe fn represent(entry: *const u8, physical: u32, kind: u32) {
             let batch = pointer_chain(base as *const u8, &BATCH).map(|p| p as usize);
             let thread = skyline::nn::os::GetCurrentThread() as usize;
             let armed = {
-                let mut s = STATE.lock().unwrap();
+                let mut s = STATE.lock();
                 let armed = key.filter(|_| source.is_some() && batch.is_some()
                     && s.shown[o] == Some(shown) && s.jobs[o].is_none());
                 if let Some(key) = armed {
@@ -1746,7 +1746,7 @@ pub(super) unsafe fn represent(entry: *const u8, physical: u32, kind: u32) {
 /// descriptor is compared, never dereferenced.
 unsafe fn retained_texture(base: usize, logical: usize, binding: policy::Binding) -> bool {
     {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         if s.own.bound[logical] != Some(binding) || !s.own.is_owned(binding.request) {
             return false;
         }
@@ -1763,7 +1763,7 @@ unsafe fn retained_texture(base: usize, logical: usize, binding: policy::Binding
 /// Service owns the finite wait and retirement; it never binds late in the frame.
 /// The source tick below does the bind after the native asset update, as for hud151.
 unsafe fn rebind_tick(_base: usize, owner: usize, entry: *mut u8) {
-    let Some(armed) = STATE.lock().unwrap().rebinds.get(owner).copied().flatten() else { return; };
+    let Some(armed) = STATE.lock().rebinds.get(owner).copied().flatten() else { return; };
     let shown = armed.wait.shown;
     let live = (shown.entry == entry as usize
         && owner_current(owner as u32, Layout::Training, shown.physical, shown.entry, shown.kind, shown.generation))
@@ -1772,7 +1772,7 @@ unsafe fn rebind_tick(_base: usize, owner: usize, entry: *mut u8) {
     // Only the source tick may complete the wait. Count a service callback even
     // when assets are ready but the original native phase/thread is unavailable.
     let step = next.wait.step(live, false, false);
-    let mut s = STATE.lock().unwrap();
+    let mut s = STATE.lock();
     if s.rebinds[owner] != Some(armed) { return; }
     s.rebinds[owner] = match step {
         policy::RebindStep::Wait => Some(next),
@@ -1795,7 +1795,7 @@ unsafe fn tick_rebind(base: usize, ticked_source: usize) {
     if source != ticked_source { return; }
     for owner in 0..policy::VISIBLE_OWNERS {
         let armed = {
-            let s = STATE.lock().unwrap();
+            let s = STATE.lock();
             if s.halted || s.jobs[owner].is_some() { continue; }
             s.rebinds[owner]
         };
@@ -1813,7 +1813,7 @@ unsafe fn tick_rebind(base: usize, ticked_source: usize) {
         if !matches!(wait.step(live, settled, retained), policy::RebindStep::Bind(_)) { continue; }
         let index = policy::table_index(shown.binding.request.row);
         let result = bind_training_slot(base, shown.physical, owner, index);
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         if s.rebinds[owner] != Some(armed) { continue; }
         if result.is_ok() { s.own.bound(owner, shown.binding); }
         s.rebinds[owner] = None;
@@ -1973,16 +1973,16 @@ unsafe fn bind_target(base: usize, job: &Job, index: u32, descriptor: usize) -> 
         Layout::Ldn | Layout::Quickplay => {
             let (pane, coordinates) = waiting_uv(base, job.physical)?;
             let current = read::<[f32; 8]>(coordinates, 0);
-            let saved = STATE.lock().unwrap().waiting_crop;
+            let saved = STATE.lock().waiting_crop;
             let original = saved.filter(|s| s.pane == pane as usize && s.coordinates == coordinates as usize
                 && s.applied == current).map_or(current, |s| s.original);
             let applied = policy::waiting_portrait_uv(original).ok_or("waiting UV coordinates invalid")?;
             let overlay: unsafe extern "C" fn(*const u8, usize, i32) = std::mem::transmute(base + PANE_OVERRIDE);
             overlay(pane, descriptor, 0);
             set_waiting_uv(base, pane, &applied);
-            STATE.lock().unwrap().waiting_crop = Some(WaitingCrop { pane: pane as usize,
+            STATE.lock().waiting_crop = Some(WaitingCrop { pane: pane as usize,
                 coordinates: coordinates as usize, original, applied });
-            if let Some(p) = STATE.lock().unwrap().bootstrap.as_mut() { p.kind = job.kind; }
+            if let Some(p) = STATE.lock().bootstrap.as_mut() { p.kind = job.kind; }
             Ok(-1)
         }
     }
@@ -2016,7 +2016,7 @@ unsafe fn bind_training_slot(base: usize, physical: u32, logical: usize, index: 
         return Err(reason);
     }
     if first_bind {
-        let mut s = STATE.lock().unwrap();
+        let mut s = STATE.lock();
         if s.flipped[logical].is_none() {
             s.flipped[logical] = Some(original);
         }
@@ -2052,7 +2052,7 @@ unsafe fn set_waiting_uv(base: usize, pane: *const u8, quad: &[f32; 8]) {
 }
 
 unsafe fn restore_waiting_uv(base: usize, physical: u32) {
-    let Some(saved) = STATE.lock().unwrap().waiting_crop.take() else { return; };
+    let Some(saved) = STATE.lock().waiting_crop.take() else { return; };
     let Ok((pane, coordinates)) = waiting_uv(base, physical) else { return; };
     // Do not overwrite a different pane, a resized quad, or a later native/other
     // owner's edit. Stored addresses are never dereferenced to perform the undo.
@@ -2103,7 +2103,7 @@ unsafe fn release_presentation(base: usize, layout: Layout, physical: u32, logic
     // Ordinary publication keeps +0x1a8. Event 0x1d paints the new key. The bound record
     // stays until a verified bind, a verified original rebind, or batch teardown.
     let (flipped, was_bound) = {
-        let s = STATE.lock().unwrap();
+        let s = STATE.lock();
         (s.flipped[logical], s.own.bound[logical].is_some())
     };
     let _ = base;
@@ -2248,7 +2248,7 @@ unsafe fn owned_render_preset(request: usize, observed_sub: u32, helper_hint: Op
     if !aligned(entry) || entry as usize != ARMED_ENTRY.load(Ordering::Acquire)
         || helper_hint.is_some_and(|hint| hint != entry as usize)
         || read::<u32>(entry, 0xe0) != key.row { return None; }
-    let s = STATE.try_lock().ok()?;
+    let s = STATE.try_lock()?;
     let flight = s.own.in_flight?;
     let job = s.jobs.get(flight.owner).copied().flatten()?;
     if job.stage != Stage::Issued || job.helper_entry != entry as usize
@@ -2319,7 +2319,7 @@ unsafe fn template_skip(ctx: &mut InlineCtx) {
         fresh_request: fresh_request as usize,
     };
     // Same thread as the service callback (run42: thread 80); try_lock only fails closed.
-    let Ok(state) = STATE.try_lock() else { return; };
+    let Some(state) = STATE.try_lock() else { return; };
     if policy::skip_template(view, state.own.in_flight) {
         ctx.registers[9].set_x(0);
         HOOK_SKIPS.fetch_add(1, Ordering::Relaxed);
@@ -2361,7 +2361,7 @@ unsafe fn stage_hide_skip(ctx: &mut InlineCtx) {
     }
     let fresh_batch = pointer_chain(base as *const u8, &BATCH).map_or(0, |b| b as usize);
     // Same thread as the service callback; try_lock only fails closed.
-    let Ok(state) = STATE.try_lock() else { return; };
+    let Some(state) = STATE.try_lock() else { return; };
     let Some(flight) = state.own.in_flight else { return; };
     let issued_batch = state.jobs.get(flight.owner).copied().flatten()
         .filter(|job| job.stage == Stage::Issued && job.lease.is_some())

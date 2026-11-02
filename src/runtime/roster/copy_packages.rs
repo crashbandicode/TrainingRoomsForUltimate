@@ -13,7 +13,7 @@
 
 use crate::engine::seams::native_fields as fields;
 use crate::engine::compat::fixed::DebugIter;
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition, Holdings, PackageSets, empty_holdings};
 use crate::engine::swap::swap_model::copy_registry::{Record, Roster, ENTRIES, SUBS};
 
@@ -81,7 +81,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
     let Some(g68) = g68(base) else { return false; };
     let wanted = wanted(base, owner, r, sets);
     let plan = {
-        let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+        let held = HELD[role].lock();
         model::sync_bounded(&held, &wanted)
     };
     if plan.acquire.is_empty() && plan.release.is_empty() { return false; }
@@ -91,7 +91,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
         call(acquire, g68, acquisition);
     }
     let released = {
-        let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+        let mut held = HELD[role].lock();
         let mut released = empty_holdings();
         for index in plan.release.iter() { assert!(released.push(held.remove(*index))); }
         released
@@ -100,7 +100,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
         call(release, g68, gone);
     }
     {
-        let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+        let mut held = HELD[role].lock();
         let added = plan.acquire.len();
         for acquisition in plan.acquire.iter() { assert!(held.push(*acquisition)); }
         trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, &**sets, added,
@@ -118,13 +118,13 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
 /// As for [`sync`].
 pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets: &PackageSets) -> bool {
     sync(base, role, owner, r, sets, "admission");
-    if HELD[role].lock().unwrap_or_else(|p| p.into_inner()).is_empty() { return true; }
+    if HELD[role].lock().is_empty() { return true; }
     let Some(g68) = g68(base) else { return false; };
     let Some(ready) = fields::child(g68, 0).and_then(|vtable| fields::read::<usize>(vtable, 0x30)).filter(|f| *f != 0) else { return false; };
     let ready: unsafe extern "C" fn(usize) -> bool = std::mem::transmute(ready);
     let resident = ready(g68);
     if !resident {
-        let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+        let held = HELD[role].lock();
         trace!("[CopyPkg] loading owner={} keys={:x?}", owner, DebugIter(model::referenced_keys(held.iter().copied())));
     }
     resident
@@ -133,7 +133,7 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
 /// Drop the role's holdings without native calls: the scene is ending and its loop resets every
 /// holder, G68 included (`0x134efb4`, FEASIBILITY §4.2).
 pub(crate) fn forget(role: usize, owner: u32, reason: &str) {
-    let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+    let mut held = HELD[role].lock();
     if !held.is_empty() {
         trace!("[CopyPkg] forget owner={} held={} reason={}", owner, held.len(), reason);
         held.clear();

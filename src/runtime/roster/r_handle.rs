@@ -25,7 +25,7 @@
 use super::observe;
 use crate::engine::compat::fixed::DebugIter;
 use crate::engine::seams::native_fields as fields;
-use std::sync::{Mutex, MutexGuard};
+use hos_lock::{Mutex, MutexGuard};
 use crate::engine::swap::swap_model::request_bit as bit0;
 use crate::engine::swap::swap_model::ledger::{
     AcqToken, BatchId, Holder, Ledger, LedgerRefusal, LiveConsumers, NativeCall, NativeRequest, RFlags,
@@ -55,7 +55,7 @@ pub(crate) struct RHandle {
 static LEDGERS: [Mutex<Option<RHandle>>; 2] = [Mutex::new(None), Mutex::new(None)];
 
 fn lock(role: Role) -> MutexGuard<'static, Option<RHandle>> {
-    LEDGERS[role.index()].lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    LEDGERS[role.index()].lock()
 }
 
 impl RHandle {

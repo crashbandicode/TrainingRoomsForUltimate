@@ -162,7 +162,7 @@ use crate::engine::seams::native_fields as fields;
 use skyline::hooks::InlineCtx;
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
@@ -478,7 +478,7 @@ fn mii_identity_for(bank: &Bank, lane: &[Option<crate::runtime::roster::cycle_pr
 /// its prefetch registered this hat (`HatPublication::validate_bank`).
 pub(super) fn reachable_mii_group(owner: u32, kind: u32) -> Option<(MiiIdentity, Configuration)> {
     let role = role(owner)?;
-    BANKS[role].lock().unwrap().as_ref().and_then(|bank| bank.groups.iter()
+    BANKS[role].lock().as_ref().and_then(|bank| bank.groups.iter()
         .find(|g| g.state.reachable() && g.members.special() == Special::Mii && g.members.index_of(kind).is_some())
         .and_then(|g| g.identity.zip(g.configuration)))
 }
@@ -493,7 +493,7 @@ pub(super) fn reachable_mii_group(owner: u32, kind: u32) -> Option<(MiiIdentity,
 pub(super) fn mii_setup_admitted(entry: usize, owner: u32, kind: u32) -> Result<(), &'static str> {
     let role = role(owner).ok_or("Mii setup: owner has no bank role")?;
     let (alias, identity, c) = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let bank = state.as_ref().filter(|b| b.owner == owner && !b.departed).ok_or("Mii setup: bank absent")?;
         let (identity, c) = bank.groups.iter()
             .find(|g| g.state.reachable() && g.members.special() == Special::Mii && g.members.index_of(kind).is_some())
@@ -511,7 +511,7 @@ pub(super) fn mii_setup_admitted(entry: usize, owner: u32, kind: u32) -> Result<
 /// (G, its own receipt adopts them) before the bank prefetches the group.
 pub(super) fn pending_mii_publication(owner: u32) -> Option<(usize, MiiIdentity, Configuration)> {
     let role = role(owner)?;
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     let bank = state.as_ref().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed
         && b.swap.is_none() && b.prefetch.is_none())?;
     bank.groups.iter().enumerate().find_map(|(i, g)| {
@@ -532,7 +532,7 @@ pub(super) fn pending_mii_publication(owner: u32) -> Option<(usize, MiiIdentity,
 pub(super) fn mii_charinfo_published(owner: u32, group: usize, identity: MiiIdentity, outcome: Result<(), PublishRefusal>) -> Option<&'static str> {
     let role = role(owner)?;
     let (failed, note) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let bank = state.as_mut().filter(|b| b.owner == owner)?;
         let g = bank.groups.get_mut(group).filter(|g| g.state == GroupState::Planned && g.identity == Some(identity))?;
         match outcome {
@@ -694,7 +694,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     RESERVED.store(helper_reserved.min(usize::from(u8::MAX)) as u8, Ordering::Release);
     // A planned kind alone is not a loaded body. This is a value receipt from
     // the current native callbacks; no pointer is followed on the planner thread.
-    std::array::from_fn(|role| BANKS[role].lock().unwrap().as_ref()
+    std::array::from_fn(|role| BANKS[role].lock().as_ref()
         // This filter reserves occupied native resources, not UI readiness.
         // A failed/lapsed receipt still owns its cells until native retirement.
         .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
@@ -721,7 +721,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
     for role in 0..2 {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         if let Some(bank) = state.as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
             windows[role] = Some(*bank.members);
             alias[role] = bank.alias;
@@ -755,7 +755,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), hats_wanted, pool_free, special });
     let mut bodies = 0usize;
     for role in 0..2 {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) else { continue; };
         for members in planned[role].iter().flatten() {
             if bank.groups.len() >= MAX_EXTRA_GROUPS { break; }
@@ -802,7 +802,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
-        let counts = match state.lock().unwrap().as_ref()
+        let counts = match state.lock().as_ref()
             .filter(|bank| bank.phase != Phase::Retired && !bank.departed) {
             Some(bank) => {
                 let (kinds, count) = bank.members.logical_kinds();
@@ -846,7 +846,7 @@ pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
     // The same rule as `plan()`/`switch()` (WP-I): the holding window or group serves the kind in
     // the requested form (`group_serves`), so a parked pair-lead window reads as ready for the
     // pair and never for Solo. Every window can be left warm (a one-member one by its self-commit).
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.phase == Phase::Ready && !bank.departed && !bank.failed
             && bank.observed.is_some_and(|(_, active)| active != kind)
             && (group_serves(*bank.members, kind, forms).is_some()
@@ -857,7 +857,7 @@ pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
 /// A kind held by any of this role's groups (window or extra): helper look-ahead
 /// must not duplicate it.
 pub(crate) fn group_member(role: usize, kind: u32) -> bool {
-    role < BANKS.len() && BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    role < BANKS.len() && BANKS[role].lock().as_ref().is_some_and(|bank|
         !bank.departed && bank.groups.iter().any(|g| g.state.counts_bodies() && g.members.index_of(kind).is_some()))
 }
 
@@ -869,7 +869,7 @@ pub(crate) fn group_member(role: usize, kind: u32) -> bool {
 /// its native domain (`GroupExchange::permits`); a refusal here fails both roles'
 /// walks, since the Player walk checks every physical owner (C118 D5).
 pub(super) unsafe fn group_header(entry: usize, owner: u32, resource: usize) -> Option<bool> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref().filter(|b| b.entry == entry && b.owner == owner)?;
     let exchange = bank.exchange?;
     Some(ready_group_owner(entry as *const u8, bank)
@@ -881,7 +881,7 @@ pub(super) unsafe fn group_header(entry: usize, owner: u32, resource: usize) -> 
 pub(super) unsafe fn group_rebaseline(entry: usize, owner: u32, epoch: u64,
     before: &[u8; 0x70], after: &[u8; 0x70]) -> bool {
     let Some(role) = role(owner) else { return false; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     let Some(bank) = state.as_ref().filter(|b| b.entry == entry && b.owner == owner) else { return false; };
     bank.exchange.is_some_and(|exchange| ready_group_owner(entry as *const u8, bank)
         .is_some_and(|now| now.epoch == epoch && now.descriptor == *after && exchange.rebaseline(before, now)))
@@ -1165,7 +1165,7 @@ fn occupancy_of(bank: &Bank, role: usize, copy: Option<u32>) -> Occupancy {
 
 /// [`occupancy_of`] for the role's current bank (takes and releases the bank lock).
 fn occupancy_snapshot(role: usize, copy: Option<u32>) -> Occupancy {
-    BANKS[role].lock().unwrap().as_ref().map_or_else(Occupancy::default, |bank| occupancy_of(bank, role, copy))
+    BANKS[role].lock().as_ref().map_or_else(Occupancy::default, |bank| occupancy_of(bank, role, copy))
 }
 
 /// Release the prefetch keys the ledger holds for `group` (`None` = every group), restricted to
@@ -1186,7 +1186,7 @@ unsafe fn release_group_keys(base: usize, role: usize, group: Option<usize>, kin
 
 /// The Mii identity a detached group carries (`None` for every other group).
 fn group_identity(role: usize, group: usize) -> Option<MiiIdentity> {
-    BANKS[role].lock().unwrap().as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.identity)
+    BANKS[role].lock().as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.identity)
 }
 
 /// [`release_group_keys`] for one group, with that group's Mii identity in `r` while its keys go
@@ -1237,7 +1237,7 @@ fn member_recipe(members: Members, kind: u32) -> ReleaseRecipe {
 /// prefetch is in flight for this role.
 fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     let Some(role) = role(owner) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.swap.is_none() && bank.prefetch.is_none() && !bank.departed
             && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()))
 }
@@ -1247,7 +1247,7 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
 fn group_identity_matches(owner: u32, kind: u32, descriptor: &[u8; 0x70]) -> bool {
     let Some(role) = role(owner) else { return false; };
     let Some(wanted) = MiiIdentity::from_descriptor(descriptor) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.groups.iter().any(|g| g.state.reachable() && g.members.index_of(kind).is_some() && g.identity == Some(wanted)))
 }
 
@@ -1529,7 +1529,7 @@ unsafe fn ready_group_owner(entry: *const u8, bank: &Bank) -> Option<GroupOwner>
 /// Does not infer ownership from flags4. Only an owned immutable descriptor plus
 /// a current complete body receipt admits a bank to shared readiness readers.
 pub(crate) unsafe fn ready_members(entry: *const u8, owner: u32) -> Option<Members> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref()?;
     if bank.owner != owner || bank.phase != Phase::Ready || !descriptor(entry, bank) {
         return None;
@@ -1563,7 +1563,7 @@ unsafe fn pair_lead_owner(entry: *const u8) -> Option<u32> {
 unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
     if !aligned(entry) { return None; }
     let owner = read::<u32>(entry, 0xe0);
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     state.as_ref().filter(|bank| bank.members.is_pair() && descriptor(entry, bank)).map(|bank| (owner, *bank.members))
 }
 
@@ -1573,7 +1573,7 @@ unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
 /// receipt, so a native CPU Behavior change keeps the active member's identity
 /// for the next cycle instead of falling back to the group's first kind.
 pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> Option<u32> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref()?;
     if bank.entry != entry || bank.owner != owner || bank.departed || bank.phase != Phase::Ready {
         return None;
@@ -1588,7 +1588,7 @@ pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> 
 /// No timeout, address alone, or partly constructed entry makes a refusal.
 pub(super) fn failed(entry: *const u8, owner: u32) -> bool {
     let Some(role) = role(owner) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.entry == entry as usize && bank.owner == owner && bank.failed)
 }
 
@@ -1600,7 +1600,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         || super::ready_forms(entry, owner).is_none() { return false; }
     // The incoming Reload destroys only the window; detached groups go first.
     before_reload(entry);
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     // Reload is asynchronous. Even if the outgoing canonical descriptor still
     // looks ready, do not replace storage borrowed by an in-flight constructor.
     if state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Building | Phase::Changing)) {
@@ -1608,7 +1608,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
     }
     let mut storage = match state.take() {
         Some(bank) => BankStorage { members: bank.members, groups: bank.groups },
-        None => BANK_STORAGE[role].lock().unwrap().take().expect("boot-reserved bank storage"),
+        None => BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"),
     };
     *storage.members = members;
     storage.groups.clear();
@@ -1664,7 +1664,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     // refuses a group request below, as before; the window's own live member decides the copy.
     let copy = live_kirby_copy_kind(entry, owner, members);
     let drain = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref() else { return false; };
         let target_group = bank.groups.iter().position(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some());
         let kirby_target = !capabilities(form_class(kind, forms)).prefetch_while_live;
@@ -1683,7 +1683,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         if resource(base, owner) == Some(alias) && resource_ready(alias) {
             for group in holders.iter().copied() {
                 let (released, kept) = release_group_keys_of(base, role, alias, group, &occupancy, owner, why);
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 let Some(bank) = state.as_mut() else { return false; };
                 let Some(g) = bank.groups.get_mut(group) else { continue; };
                 g.state = GroupState::Planned;
@@ -1696,7 +1696,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
             }
         }
     }
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return false; };
     if bank.departed || bank.phase != Phase::Ready || !descriptor(entry, bank) { return false; }
     let (target, swap) = match group_serves(members, kind, forms) {
@@ -1769,7 +1769,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
 }
 
 unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return Action::None; };
     if bank.owner != owner || bank.entry != entry as usize || bank.phase == Phase::Retired {
         return Action::None;
@@ -2067,7 +2067,7 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
     // before `reload_at_pose` runs this teardown, while the outgoing window's bodies are still in
     // the cells (Eden M4b `m4b2` #85/#86: the bank's `[6, 5, 7]` over the canonical Mario body
     // read as a Kirby with `kirby_branch_mismatch=1`).
-    let window = role(owner).and_then(|role| BANKS[role].lock().unwrap().as_ref()
+    let window = role(owner).and_then(|role| BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner && descriptor(entry, bank))
         .map(|bank| (bank.members.kinds(), bank.members.count(), bank.activated)));
     let (kinds, count, activated) = match window {
@@ -2362,13 +2362,13 @@ unsafe fn current_holder_valid(base: usize, entry: usize, owner: u32) -> bool {
 unsafe fn exchange_articles(base: usize, role: usize, entry: usize, owner: u32, prepared: Prepared, activates: bool) {
     let group = match prepared { Prepared::Warm { group, .. } | Prepared::Build { group, .. } => group };
     let outgoing = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         state.as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.saved).map(|w| (w.flags, w.records[0]))
     };
     if let Some((flags, holder)) = outgoing {
         let valid = holder != 0 && valid_special_object(base, holder, owner);
         if articles::retire_saved(base, owner, flags, holder, valid, "detach") {
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             if let Some(saved) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)).and_then(|g| g.saved.as_mut()) {
                 saved.records[1] = 0;
             }
@@ -2559,7 +2559,7 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
     let base = BASE.load(Ordering::Acquire);
     let now = now_us();
     let construction = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let Some(c) = bank.construction.as_mut() else { return; };
         c.ticks = c.ticks.saturating_add(1);
@@ -2601,7 +2601,7 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
     use construction_task as task;
     let base = BASE.load(Ordering::Acquire);
     let construction = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         match bank.construction.take() { Some(construction) => construction, None => return }
     };
@@ -2659,7 +2659,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     // copy relations load Kirby's hat models (`0x17f06a0`); their packages must be resident first, as
     // native's completion and its holders wait guarantee (`swap_model::copy_packages`). No bank lock
     // is held across the native calls.
-    let copies = BANKS[role].lock().unwrap().as_ref().filter(|bank| bank.swap.is_some())
+    let copies = BANKS[role].lock().as_ref().filter(|bank| bank.swap.is_some())
         .map(|bank| (copy_package_sets(bank), bank.alias));
     let copies_resident = match copies {
         Some((sets, alias)) if alias != 0 && resource(base, owner) == Some(alias) =>
@@ -2667,7 +2667,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         _ => true,
     };
     let (prepared, before, alias) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let Some(swap) = bank.swap else { return; };
         let before = group_owner(entry, bank).filter(|now| match bank.exchange {
@@ -2901,7 +2901,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             match start_async_construction(base, entry, owner, members) {
                 Ok((tasks, setup_done)) => {
                     let queued_us = now_us();
-                    let mut state = BANKS[role].lock().unwrap();
+                    let mut state = BANKS[role].lock();
                     match state.as_mut() {
                         Some(bank) => {
                             bank.construction = Some(Construction {
@@ -2954,7 +2954,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     let elapsed = now_us().saturating_sub(started);
     // Verify under the lock; roll back on any failure.
     let rollback = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let members = *bank.members;
         let (group, member, via, ok) = match prepared {
@@ -3068,7 +3068,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     // member — through the one teardown protocol (routes, bodies, contexts,
     // dispatcher arrays, records, then the unbuilt members' keys; finalize's order).
     let (bundle, alias, records, current) = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref() else { return; };
         let members = *bank.members;
         let mut detached = DetachedSnapshot::new(owner);
@@ -3139,7 +3139,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         Prepared::Warm { dispatch, .. } => DispatchNote::Leaked(dispatch),
     };
     let (failed, restored) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let target_identity = bank.identity;
         let record = &mut bank.groups[group];
@@ -3192,7 +3192,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a
     // group holds keys or bodies, so they are resident before any registration; release them when
     // no group does or the bank retired (`swap_native::copy_packages`). Outside a swap only.
-    let copy_sets = BANKS[role].lock().unwrap().as_ref()
+    let copy_sets = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.swap.is_none())
         .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) }
             else { CopyPackageSets::new([u32::MAX; NATIVE_MEMBERS]) }, bank.alias));
@@ -3209,7 +3209,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
         Release(usize, Members, Members, usize), Idle }
     let step = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
             && !bank.departed && bank.swap.is_none()) else { return; };
         let live = bank.members.ready_live(snapshot(entry)).map(|(_, kind)| kind);
@@ -3247,7 +3247,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let copy = live_kirby_copy_kind(entry, owner, window);
             let (kinds, count) = members.prefetch_kinds();
             if copy.is_some_and(|kind| kinds[..count].contains(&kind)) {
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                     if !g.kirby_logged {
                         g.kirby_logged = true;
@@ -3259,7 +3259,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             }
             let occupancy = occupancy_snapshot(role, copy);
             let (released, kept) = release_group_keys_of(base, role, r, group, &occupancy, owner, "live Kirby");
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { return; };
             let Some(g) = bank.groups.get_mut(group) else { return; };
             g.state = GroupState::Planned;
@@ -3287,7 +3287,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     release_group_keys_of(base, role, r, group, &occupancy, owner, "prefetch failed");
                 }
             }
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { return; };
             bank.groups[group].state = outcome;
             bank.prefetch = None;
@@ -3331,7 +3331,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             match decision.admission {
                 Admission::Admit => {}
                 Admission::Defer => {
-                    let mut state = BANKS[role].lock().unwrap();
+                    let mut state = BANKS[role].lock();
                     if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                         if !g.memory_logged {
                             g.memory_logged = true;
@@ -3355,7 +3355,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // Only a running task
             // or an unloaded handle defers the prefetch.
             if !resource_ready(r) {
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                     if !g.busy_logged {
                         g.busy_logged = true;
@@ -3406,7 +3406,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 super::finish_install(token, "group prefetch refused by the ledger");
                 return;
             }
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { super::finish_install(token, "group prefetch bank vanished"); return; };
             bank.groups[group].state = GroupState::Prefetching;
             bank.groups[group].since_us = now;
@@ -3424,7 +3424,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
 /// (`body_bank::memory::outstanding`): a prefetch in flight its whole cost, a prefetched group its build. A built
 /// group's bodies are in the headroom. Takes each role's bank lock in turn; never call it with a bank lock held.
 pub(super) fn group_outstanding() -> u64 {
-    BANKS.iter().map(|state| state.lock().unwrap().as_ref().map_or(0, |bank| bank.groups.iter()
+    BANKS.iter().map(|state| state.lock().as_ref().map_or(0, |bank| bank.groups.iter()
         .map(|g| memory::outstanding(g.state, memory::group_cost(&g.members.kinds()[..g.members.count()])))
         .fold(0u64, u64::saturating_add)))
         .fold(0u64, u64::saturating_add)
@@ -3443,7 +3443,7 @@ fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Opti
 }
 
 fn fail_group(role: usize, group: usize, _reason: &str) {
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     if let Some(bank) = state.as_mut() {
         if let Some(g) = bank.groups.get_mut(group) { g.state = GroupState::Failed; }
         GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
@@ -3470,13 +3470,13 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // Phase B′: a construction in flight settles into the window first, so native's destroyer finds its bodies.
     drain_construction(entry, owner, role, reason);
     // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
-    let window = BANKS[role].lock().unwrap().as_ref()
+    let window = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
     // U18: each detached body's group, for the per-group header during the destroys.
     let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
     let (mut bundles, identities, token, alias, groups) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
@@ -3650,7 +3650,7 @@ pub(super) unsafe fn before_reload(entry: *const u8) {
 unsafe fn pair_teardown(entry: *const u8, reason: &str) {
     let Some(owner) = pair_lead_owner(entry) else { return; };
     {
-        let state = BANKS[role(owner).unwrap_or(0)].lock().unwrap();
+        let state = BANKS[role(owner).unwrap_or(0)].lock();
         if !state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Ready | Phase::Changing)) { return; }
     }
     let flags = read::<u8>(entry, 0x591f);
@@ -3674,7 +3674,7 @@ pub(super) fn scene_changed() {
     for value in &ROLE_BUDGET { value.store(0, Ordering::Release); }
     for value in &PLANNED_TARGETS { value.store(0, Ordering::Release); }
     for state in &BANKS {
-        if let Some(bank) = state.lock().unwrap().as_mut() { bank.departed = true; }
+        if let Some(bank) = state.lock().as_mut() { bank.departed = true; }
     }
     for role in 0..2 { r_handle::reset(ledger_role(role), "scene changed"); }
     // The scene loop resets every holder, G68 included: the copy holdings end without native calls.
@@ -3683,7 +3683,7 @@ pub(super) fn scene_changed() {
 
 pub(super) fn on_destroy(entry: *const u8) {
     for (role, state) in BANKS.iter().enumerate() {
-        if let Some(bank) = state.lock().unwrap().as_mut() {
+        if let Some(bank) = state.lock().as_mut() {
             if bank.entry == entry as usize {
                 bank.phase = Phase::Retired; bank.departed = true;
                 bank.exchange = None;
@@ -3709,7 +3709,7 @@ unsafe fn prepare_models(entry: *mut u8) {
     original!()(entry);
     if !aligned(entry) { return; }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
         // A pair-lead window (or pair group) is always constructed with the pair
         // active (cell 0): bit 1 as vanilla `654dc0` set it for two actors, plus
@@ -3847,7 +3847,7 @@ unsafe fn table(ctx: &mut InlineCtx, register: usize) {
     let entry = ctx.registers[19].x() as *const u8;
     if !aligned(entry) { return; }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
         ctx.registers[register].set_x(bank.members.table().as_ptr() as u64);
     }
@@ -3870,7 +3870,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
     // Copy values before native calls. The resource worker never borrows a
     // table pointer or holds a Rust lock while native acquisition runs.
     let members = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.owner == owner && bank.phase != Phase::Retired) else { return; };
         *bank.members
     };
@@ -3990,7 +3990,7 @@ pub(super) unsafe fn install(base: usize) {
         return;
     }
     for storage in &BANK_STORAGE {
-        let mut storage = storage.lock().unwrap();
+        let mut storage = storage.lock();
         if storage.is_none() { *storage = Some(BankStorage::new()); }
     }
     skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);

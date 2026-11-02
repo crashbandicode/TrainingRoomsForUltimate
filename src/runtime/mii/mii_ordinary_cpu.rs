@@ -304,7 +304,7 @@ fn refuse_request(request:Request,reason:&'static str) {
     }
     drop(s);
     if restore_refused {
-        WAITING_MEMORY.lock().unwrap().manual_request(Role::Cpu as usize);
+        WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);
         notify(Role::Cpu,"Practice fighter could not be restored".into());
     } else if cycle_refused {
         notify(Role::Cpu,"This CPU character cannot be loaded".into());
@@ -348,7 +348,7 @@ pub(super) fn menu_close(context:MenuContext,action:Action)->bool {
     let request=Request::from_menu(mii_saved_alpha::menu_epoch(),context.epoch,
         context.active.cpu,o.live.target.publish(o.origin_saved).map(|c|c.canonical()),action);
     s.request=request;s.restore=None;
-    if request.is_some() {WAITING_MEMORY.lock().unwrap().manual_request(Role::Cpu as usize);}
+    if request.is_some() {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
     if request.is_none() {drop(s);note("CPU menu-close refused: active configuration/epoch changed");}
     true
 }
@@ -358,7 +358,7 @@ fn clear_request(request:Request) {
     if s.request==Some(request) {s.request=None;s.restore=None;}
     drop(s);
     if restore_refused {
-        WAITING_MEMORY.lock().unwrap().manual_request(Role::Cpu as usize);
+        WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);
         notify(Role::Cpu,"Practice fighter could not be restored".into());
     }
 }
@@ -379,7 +379,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     if !needed {return false;}
     if s.departed || s.capture || s.busy() || s.request.is_some()
         || s.owner.as_ref().is_none_or(|o|o.origin.binding.epoch!=epoch()) {return true;}
-    if WAITING_MEMORY.lock().unwrap().restore_target(Role::Cpu as usize)!=Some(value) {return true;}
+    if WAITING_MEMORY.lock().restore_target(Role::Cpu as usize)!=Some(value) {return true;}
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
@@ -435,7 +435,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     let replace_restore=manual_direct && s.restore.is_some();
     if !s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
         s.restore=None;
-        if user_request {WAITING_MEMORY.lock().unwrap().manual_request(Role::Cpu as usize);}
+        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
         s.request=request;
         s.waiting=Waiting::new();
         drop(s);
@@ -462,7 +462,7 @@ unsafe fn begin_blocker()->Option<Blocker> {
     else if training::save_states::is_loading() {Some(Blocker::SaveState)}
     else if training::recording_or_playback() {Some(Blocker::Recording)}
     else if crate::runtime::compat::replay_preview::occupied() {Some(Blocker::ReplayPreview)}
-    else if !STATES.iter().all(|s| {let s=s.lock().unwrap();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}
+    else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}
     else {None}
 }
 unsafe fn permitted()->bool {begin_blocker().is_none()}
@@ -651,7 +651,7 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                     publish_mii_presentation(entry,t.before.binding.owner,t.ticket.epoch,target);
                     crate::runtime::roster::cycle_preload::foreground_settled();
                     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,target),lease:t.token},t.ticket,None,true);
-                    if t.replay.is_none() {state_for(Role::Cpu).lock().unwrap().cursor=t.destination.cursor;}
+                    if t.replay.is_none() {state_for(Role::Cpu).lock().cursor=t.destination.cursor;}
                     let forms=if t.bank {bank_member_forms(&t.descriptor,target)}
                         else {descriptor_forms(&t.descriptor)};
                     publish_partners(Role::Cpu,forms);
@@ -933,7 +933,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                 // Keep the actually qualified payload; only its cycle position changes.
                 o.live=Destination {cursor:destination.cursor,..o.live};
                 s.replay_result=request.replay().map(|selection|crate::engine::mii::replay::SelectionReceipt {selection,outcome:Ok(())});s.request=None;s.restore=None;drop(registry);drop(s);
-                if request.replay().is_none() {state_for(Role::Cpu).lock().unwrap().cursor=destination.cursor;}
+                if request.replay().is_none() {state_for(Role::Cpu).lock().cursor=destination.cursor;}
                 publish_partners(Role::Cpu,descriptor_forms(&descriptor));
                 if request.replay().is_none() {remember_owned(Role::Cpu,current.binding.epoch,descriptor_kind(&descriptor),descriptor_forms(&descriptor),
                     active,destination.cursor,destination.target==Target::ORIGINAL);}
@@ -1186,7 +1186,7 @@ unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
     publish_mii_presentation(entry,b.before.binding.owner,b.ticket.epoch,logical);
     crate::runtime::roster::cycle_preload::foreground_settled();
     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);
-    if b.replay.is_none() {state_for(Role::Cpu).lock().unwrap().cursor=b.destination.cursor;}
+    if b.replay.is_none() {state_for(Role::Cpu).lock().cursor=b.destination.cursor;}
     let forms=bank_member_forms(&now.descriptor,logical);
     let original=b.destination.target==Target::ORIGINAL;
     publish_partners(Role::Cpu,forms);

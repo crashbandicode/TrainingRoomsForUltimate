@@ -219,7 +219,7 @@ pub(super) fn menu_close(context:MenuContext,action:Action)->bool {
     let request=Request::from_menu(mii_saved_alpha::menu_epoch(),context.epoch,
         context.original,context.active.player,owner.active.map(|c|c.canonical()),action);
     s.request=request;s.restore=None;
-    if request.is_some() {WAITING_MEMORY.lock().unwrap().manual_request(Role::Player as usize);}
+    if request.is_some() {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}
     if request.is_none() {
         drop(s);note("menu-close request refused: ordinary active configuration changed or out of scope");
     }
@@ -248,7 +248,7 @@ fn clear_request(request:Request) {
     if s.request==Some(request) {s.request=None;s.restore=None;}
     drop(s);
     if restore_refused {
-        WAITING_MEMORY.lock().unwrap().manual_request(Role::Player as usize);
+        WAITING_MEMORY.lock().manual_request(Role::Player as usize);
         notify(Role::Player,"Practice fighter could not be restored".into());
     }
 }
@@ -273,7 +273,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     if !needed {return false;}
     if s.capture || s.busy() || s.request.is_some()
         || s.owner.as_ref().is_none_or(|o|o.origin.binding.epoch!=epoch()) {return true;}
-    if WAITING_MEMORY.lock().unwrap().restore_target(Role::Player as usize)!=Some(value) {return true;}
+    if WAITING_MEMORY.lock().restore_target(Role::Player as usize)!=Some(value) {return true;}
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
@@ -341,7 +341,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     let replace_restore=manual_direct && s.restore.is_some();
     if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
         s.restore=None;
-        if user_request {WAITING_MEMORY.lock().unwrap().manual_request(Role::Player as usize);}
+        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}
         s.request=request;
     } else {
         drop(s);note("request refused: owned Player request busy or unsupported");
@@ -358,7 +358,7 @@ unsafe fn permitted()->bool {
         && !button_config::has_pending_request() && !INSTALL.active()
         && !training::save_states::is_loading() && !training::recording_or_playback()
         && !crate::runtime::compat::replay_preview::occupied()
-        && STATES.iter().all(|s| {let s=s.lock().unwrap();s.active.is_none()&&s.pending.is_none()})
+        && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})
 }
 unsafe fn ready(entry:*const u8,kind:u32)->bool {
     if MiiClass::from_kind(kind).is_some() {ready_single_mii(entry,0)==Some(kind)}
@@ -536,7 +536,7 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                     crate::runtime::roster::cycle_preload::foreground_settled();
                     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,target),lease:t.token},t.ticket,None,true);
                     crate::runtime::roster::cycle_preload::completed(0,false,target);
-                    state_for(Role::Player).lock().unwrap().cursor=t.destination.cursor;
+                    state_for(Role::Player).lock().cursor=t.destination.cursor;
                     let forms=if t.bank {bank_member_forms(&t.descriptor,target)}
                         else {descriptor_forms(&t.descriptor)};
                     publish_partners(Role::Player,forms);
@@ -681,7 +681,7 @@ unsafe fn begin(entry:*mut u8)->bool {
         // A completed generic ordinary swap updates the roster slot, but does
         // not grant this adapter a cursor. Use the same proven live slot as the
         // refresh trigger; the normal snapshot/INSTALL checks still gate commit.
-        let slot=state_for(Role::Player).lock().unwrap().cursor;
+        let slot=state_for(Role::Player).lock().cursor;
         mii_cycle::refresh_partners(logical_kind(&expected),origin.original_kind,slot,true)
             .and_then(|step|match qualify(step) {
                 Ok(value)=>Some((step,value)),
@@ -754,7 +754,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                 o.expected==expected && o.active==active && o.cursor==cursor) {
                 let Ok(registry)=native::final_registry(current.helpers,None) else{return false;};
                 o.cursor=destination.cursor;s.request=None;s.restore=None;drop(registry);drop(s);
-                state_for(Role::Player).lock().unwrap().cursor=destination.cursor;
+                state_for(Role::Player).lock().cursor=destination.cursor;
                 publish_partners(Role::Player,descriptor_forms(&descriptor));
                 remember_owned(Role::Player,current.binding.epoch,descriptor_kind(&descriptor),descriptor_forms(&descriptor),
                     active,destination.cursor,destination.target==mii_cycle::Target::Original);
@@ -1002,7 +1002,7 @@ unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
     crate::runtime::roster::cycle_preload::foreground_settled();
     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);
     crate::runtime::roster::cycle_preload::completed(0,false,logical);
-    state_for(Role::Player).lock().unwrap().cursor=b.destination.cursor;
+    state_for(Role::Player).lock().cursor=b.destination.cursor;
     let forms=bank_member_forms(&now.descriptor,logical);
     let original=b.destination.target==mii_cycle::Target::Original;
     publish_partners(Role::Player,forms);
