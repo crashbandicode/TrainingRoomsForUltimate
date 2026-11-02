@@ -22,6 +22,7 @@ pub mod pane;
 pub mod probe;
 pub mod registry;
 pub mod requests;
+pub mod setups;
 pub mod state;
 pub mod texture;
 pub mod thumbs;
