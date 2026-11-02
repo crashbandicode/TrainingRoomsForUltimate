@@ -24,8 +24,32 @@ pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
 pub(crate) mod replay_store;
 
-// The fork's `training` names the carried files reach through `super::`.
-pub(crate) use port::{input_record, lobby, practice, save_states};
+// The fork's `training` names the carried files reach through `super::`: package 6's practice session and lobby facade, the recorder
+// (`port::input_record`) and the save-state flag of package 3.
+pub(crate) use crate::runtime::lobby::training::{lobby, practice};
+pub(crate) use port::input_record;
+
+/// The fork's `save_states` as the named layer and the clip preview call it: package 3's own functions, and the preview restore, which
+/// package 3 does not provide yet (`install_report` names it).
+pub(crate) mod save_states {
+    pub(crate) use crate::runtime::features::states::cancel_pending;
+    pub(crate) use crate::runtime::lobby::training::save_states::is_loading;
+
+    /// Restore the saved state; the restore's completion calls `recorder::on_state_restored`, which starts the named macro.
+    pub(crate) fn request_macro_restore() -> Result<(), &'static str> {
+        crate::runtime::features::states::request_load();
+        Ok(())
+    }
+
+    /// The clip preview's temporary setup restore (a restore of the clip's own start state, then the saved state again).
+    pub(crate) fn request_preview_restore(_start: bool) -> Result<(), &'static str> {
+        Err("Native preview is unavailable until the preview restore is provided")
+    }
+
+    pub(crate) fn finish_preview_restore() {}
+
+    pub(crate) fn end_preview_restore() {}
+}
 
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::published;

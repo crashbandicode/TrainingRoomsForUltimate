@@ -582,6 +582,12 @@ pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) ->
 }
 
 /// P1's next `frames` polls read as neutral (see `SWALLOW`).
+/// The CPU's fighter kind now (diag lines of the named layer's roster row).
+pub fn cpu_kind() -> Option<i32> {
+    // SAFETY: the natives answer only once their guards passed; the read is of the live body.
+    unsafe { cpu_body() }.map(|body| unsafe { ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read() })
+}
+
 /// The recorder's phase (diag lines).
 pub fn phase() -> Phase {
     REC.lock().phase()
@@ -599,12 +605,6 @@ pub fn set_current_facing(facing: f32) {
 
 pub fn swallow_p1(frames: u8) {
     SWALLOW.store(frames, Ordering::Release);
-}
-
-/// The CPU's accessor for the named layer's restore pose and speed (never retained).
-pub(crate) fn cpu_accessor() -> Option<usize> {
-    // SAFETY: the natives passed their guards when this answers.
-    unsafe { cpu_body() }.map(|body| body.accessor)
 }
 
 // ---- entry points for the other features ---------------------------------------------------------------

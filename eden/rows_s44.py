@@ -87,8 +87,29 @@ def view(m=None, cap=8):
 
 def parse_view(line):
     selected = re.search(r"selected=(\d+)", line or "")
-    labels = re.search(r"labels=\[(.*)\]$", line or "")
+    labels = re.search(r"labels=(\[.*\])$", line or "")
     return (int(selected.group(1)) if selected else -1), (labels.group(1) if labels else "")
+
+
+def label_list(raw):
+    try:
+        return json.loads(raw)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def move_to(text, tries=14):
+    """Press Down until the panel's cursor is on a label containing `text`; returns the row or None."""
+    line = view()
+    for _ in range(tries):
+        sel, raw = parse_view(line)
+        items = label_list(raw)
+        if 0 <= sel < len(items) and text in items[sel]:
+            return sel
+        cmd("pad down")
+        time.sleep(0.6)
+        line = view()
+    return None
 
 
 def main():
@@ -138,7 +159,7 @@ def main():
     # the release path: the real software keyboard applet, answered through Eden's control API (ui.tree / ui.set / ui.click)
     r.remote(f"Set-Content -Path {SD}/diag-keyboard.on -Value 'on'", 30)
     time.sleep(1)
-    cmd("save_slot 0 ignored")
+    cmd("export_slot 0")
     dialog = None
     for _ in range(20):
         time.sleep(1.5)
@@ -186,16 +207,7 @@ def main():
     sel, labels = parse_view(line)
     (OUT / "library-view.txt").write_text(line or "")
     row("Named library lists the saved macro and the seeded ones", bool(line) and "evtest" in labels, (line or "no view")[:300])
-    target = None
-    for _ in range(12):
-        sel, labels = parse_view(line)
-        items = [s.strip().strip("'\"") for s in labels.split("', '")]
-        if 0 <= sel < len(items) and "evtest" in items[sel]:
-            target = sel
-            break
-        cmd("pad down")
-        time.sleep(0.6)
-        line = view()
+    target = move_to("evtest")
     m = cmd("pad confirm")
     ln = line_after(m, "pad confirm", 6)
     time.sleep(1.2)
@@ -252,6 +264,38 @@ def main():
             detail2 = f"unparsable: {error}"
     (OUT / "evtest2.json").write_text(body2)
     row("named capture saved to the library with the captured frames", ok2, detail2)
+
+    # roster path: load a named macro of another fighter, answer the prompt Switch, the roster cycle's real provider changes the CPU
+    try:
+        dh = json.loads(read_file(f"{SD}/macros/duck-hunt-dash.json"))["start"]["fighter_kind"]
+    except Exception:  # noqa: BLE001
+        dh = None
+    st = cmd("status")
+    before = line_after(st, "[NamedMacroDiag] status", 6) or ""
+    cmd("open_library 0")
+    time.sleep(1.0)
+    at = move_to("Duck Hunt dash")
+    cmd("pad confirm")
+    time.sleep(2.0)
+    line = view()
+    (OUT / "roster-prompt-view.txt").write_text(line or "")
+    row("Loading a macro of another fighter asks (Fighter Mismatch)", bool(line) and "Fighter Mismatch" in line, (line or "no view")[:260])
+    cmd("pad down")
+    time.sleep(0.6)
+    cmd("pad confirm")  # Switch to recorded fighter
+    switched = None
+    for _ in range(25):
+        time.sleep(3.0)
+        st = cmd("status")
+        ln = line_after(st, "[NamedMacroDiag] status", 6) or ""
+        mm = re.search(r"cpu_kind=Some\((-?\d+)\)", ln)
+        if mm and dh is not None and int(mm.group(1)) == dh:
+            switched = ln
+            break
+    roster_lines = [x for x in read_diag() if "[CharacterRoster]" in x or "[MiiOrdinaryCpu]" in x][-6:]
+    (OUT / "roster-lines.txt").write_text("\n".join(roster_lines))
+    row("Switch to recorded fighter: the roster cycle's provider changes the CPU to the macro's fighter", switched is not None, (switched or "cpu kind did not become " + str(dh) + "; before: " + before[-120:])[-260:])
+    shot("after-fighter-switch")
 
     # replay window over the seeded capture
     m = cmd("list_captures")

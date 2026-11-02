@@ -40,12 +40,13 @@ const NAME: u8 = 6;
 const REPLAY_WINDOW: u8 = 7;
 const CLIP: u8 = 8;
 const LIST_CAPTURES: u8 = 9;
+const EXPORT_SLOT: u8 = 10;
 
 fn parse(line: &str) -> Option<Command> {
     let mut words = line.split_whitespace();
     let verb = words.next()?;
     let mut command = Command { kind: 0, number: 0, text: [0; MAX_TEXT], len: 0 };
-    let mut set_text = |text: &str, command: &mut Command| {
+    let set_text = |text: &str, command: &mut Command| {
         let bytes = text.as_bytes();
         let n = bytes.len().min(MAX_TEXT);
         command.text[..n].copy_from_slice(&bytes[..n]);
@@ -57,6 +58,10 @@ fn parse(line: &str) -> Option<Command> {
             command.number = words.next()?.parse().ok()?;
             let rest: Vec<&str> = words.collect();
             set_text(&rest.join(" "), &mut command);
+        }
+        "export_slot" => {
+            command.kind = EXPORT_SLOT;
+            command.number = words.next()?.parse().ok()?;
         }
         "open_library" => {
             command.kind = OPEN_LIBRARY;
@@ -153,6 +158,10 @@ fn run(command: Command) {
             named_macros::diag_confirm_name(text);
             diagnostic(format_args!("[NamedMacroDiag] save_slot slot={} name={text:?}", command.number));
         }
+        EXPORT_SLOT => {
+            named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));
+            diagnostic(format_args!("[NamedMacroDiag] export_slot slot={}", command.number));
+        }
         OPEN_LIBRARY => {
             named_macros::open_library(usize::try_from(command.number).ok());
             diagnostic(format_args!("[NamedMacroDiag] open_library slot={}", command.number));
@@ -197,14 +206,15 @@ fn run(command: Command) {
         },
         STATUS => {
             diagnostic(format_args!(
-                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?}",
+                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?} cpu_kind={:?}",
                 named_macros::source_is_named(),
                 named_macros::panel_visible(),
                 replay_capture::browser_visible(),
                 replay_capture::panel_visible(),
                 replay_store::toggle().is_armed(),
                 replay_store::toggle().is_ready(),
-                crate::runtime::features::recorder::phase()
+                crate::runtime::features::recorder::phase(),
+                crate::runtime::features::recorder::cpu_kind()
             ));
         }
         _ => {}

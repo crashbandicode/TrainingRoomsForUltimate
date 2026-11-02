@@ -124,7 +124,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
     if !primary_cpu(module) {
         return;
     }
-    if crate::runtime::macros::port::roster::busy() || !Fighter::is_ready_go() {
+    if crate::runtime::roster::character_roster::busy() || !Fighter::is_ready_go() {
         if occupied() { input_record::stop_playback(); save_states::cancel_pending(); }
         clear_session();
         return;

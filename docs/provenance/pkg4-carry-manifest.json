@@ -22,9 +22,9 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::macros::port::practice",
-   "training::ui::notifications": "crate::runtime::macros::port::notifications",
-   "training::recording_or_playback": "crate::runtime::macros::port::recording_or_playback",
+   "training::practice": "crate::runtime::lobby::training::practice",
+   "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
+   "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
    "common": "crate::runtime::compat::common",
    "common::consts::FighterId": "crate::runtime::compat::consts::FighterId",
    "common::consts::MENU": "crate::runtime::compat::menu::MENU",
@@ -33,14 +33,14 @@
    "consts": "crate::runtime::compat::consts",
    "common::game_mode": "crate::runtime::lobby::game_mode",
    "native_keyboard": "crate::runtime::mii::native_keyboard",
-   "character_roster": "crate::runtime::macros::port::roster",
-   "mii_editor_bridge": "crate::runtime::macros::port::editor_bridge",
+   "character_roster": "crate::runtime::roster::character_roster",
+   "mii_editor_bridge": "crate::runtime::mii::mii_editor_bridge",
    "logging": "crate::runtime::diag_log",
    "native_fields": "crate::engine::seams::native_fields",
    "swap_native::seam_install": "crate::runtime::seams::seam_install",
    "input": "crate::runtime::macros::port::input",
    "training::input_record": "crate::runtime::macros::port::input_record",
-   "training::save_states": "crate::runtime::macros::port::save_states",
+   "training::save_states": "crate::runtime::macros::save_states",
    "common::input": "crate::runtime::macros::port::input",
    "common::menu": "crate::runtime::compat::common::menu",
    "training": "crate::runtime::macros",
@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "d9f4ca75ff8405311d72b801cd97f9ba76614a6f3082edd0eab9c038e5311a18",
+   "dest_sha256": "9b3a46eae270a87e3c765e4d75d60ec9c81d9d5bf63d4fe7bf71fef603fb61eb",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -541,8 +541,8 @@
      "reason": "keep the reserved playback buffer (moving the recording's Vec in would drop it)"
     },
     {
-     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
-     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "old": "unsafe { crate::runtime::macros::save_states::is_loading() }",
+     "new": "crate::runtime::macros::save_states::is_loading()",
      "count": 2,
      "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
     },
@@ -558,6 +558,11 @@
     {
      "append": "\n/// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).\n#[cfg(feature = \"diag\")]\npub fn diag_export_slot(slot: usize) {\n    export_record_slot(Some(slot));\n}\n",
      "reason": "named entry point of the diag request file"
+    },
+    {
+     "old": "notification(\"Named Macro\".to_owned(), message.to_owned(), 180);",
+     "new": "notification(std::borrow::Cow::Borrowed(\"Named Macro\"), std::borrow::Cow::Owned(message.to_owned()), 180);",
+     "reason": "package 6's notification facade takes Cow arguments (static text allocates nothing)"
     }
    ]
   },
@@ -566,14 +571,14 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "4da80c37ed166bde0b13cee0c5c2c33651013aeca19a2bc2b1314953137c647b"
+   "dest_sha256": "e44d716e2cf14daaa7c6d3b78e886e6fc26c57b0dd3a1e5ae7a007c4f874d49d"
   },
   {
    "src": "src/replay_capture.rs",
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "024fb7305eb598c0762be789fe100dae3fbe97315712149fb20af755e3e901b4",
+   "dest_sha256": "363a779e4511ac8c0e341aab4e116ae6e17895f4ac08eba90da8e26ab82fe0be",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -586,10 +591,15 @@
      "reason": "the game's pause menu is an input owner of the clean-room mask (SPEC-input-03), not the fork's VANILLA_MENU_ACTIVE flag"
     },
     {
-     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
-     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "old": "unsafe { crate::runtime::macros::save_states::is_loading() }",
+     "new": "crate::runtime::macros::save_states::is_loading()",
      "count": 1,
      "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
+    },
+    {
+     "old": "notification(\"Clip Editor\".into(), message, 180);",
+     "new": "notification(\"Clip Editor\".into(), message.into(), 180);",
+     "reason": "package 6's notification facade takes Cow arguments"
     }
    ]
   },
@@ -598,7 +608,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "3c8437de822c275c6aa225440b172da97924afef6b4f9b3bc5acb33976aa2895"
+   "dest_sha256": "fe00ce93cf01557122567574a0d7879becb540cbf47ecbf2ad824c7b155cff2b"
   },
   {
    "src": "src/replay_move_start.rs",
