@@ -13,10 +13,11 @@ use model::guard::{SeamKind, GUARD_BYTES};
 use model::sites;
 use model::sites_pkg4::{self as pkg4, SITES};
 
-const SYMBOLS: [(&str, &str); 6] = [
+// `work_get_int` is package 2's row (`sites_pkg2`, symbol checked in `tests/cpu_sites.rs`); the recorder
+// calls that row, so this table does not repeat it.
+const SYMBOLS: [(&str, &str); 5] = [
     ("posture_lr", "_ZN3app8lua_bind22PostureModule__lr_implEPNS_26BattleObjectModuleAccessorE"),
     ("stop_is_stop", "_ZN3app8lua_bind24StopModule__is_stop_implEPNS_26BattleObjectModuleAccessorE"),
-    ("work_get_int", "_ZN3app8lua_bind24WorkModule__get_int_implEPNS_26BattleObjectModuleAccessorEi"),
     ("work_set_int", "_ZN3app8lua_bind24WorkModule__set_int_implEPNS_26BattleObjectModuleAccessorEii"),
     ("model_set_color_rgb", "_ZN3app8lua_bind31ModelModule__set_color_rgb_implEPNS_26BattleObjectModuleAccessorEfffNS_16MODEL_COLOR_TYPEE"),
     ("fighter_manager_get_entry", "_ZN3app8lua_bind38FighterManager__get_fighter_entry_implEPNS_14FighterManagerENS_14FighterEntryIDE"),
@@ -155,6 +156,6 @@ fn combo_display_pins_are_the_specs_words() {
 
 #[test]
 fn every_feature_has_rows() {
-    assert_eq!(pkg4::sites_of(sites::Feature::Recording).count(), 7);
+    assert_eq!(pkg4::sites_of(sites::Feature::Recording).count(), 6);
     assert_eq!(pkg4::sites_of(sites::Feature::Notices).count(), 5);
 }

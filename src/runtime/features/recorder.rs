@@ -181,8 +181,9 @@ pub(crate) mod natives {
         std::mem::transmute_copy(&(game::text_base() + offset))
     }
 
+    /// A package 4 row, or (`work_get_int`) the shared row of `sites.rs` that package 2 owns.
     fn offset(name: &str) -> usize {
-        sites_pkg4::SITES.iter().find(|s| s.name == name).map_or(0, |s| s.offset)
+        sites_pkg4::SITES.iter().find(|s| s.name == name).or_else(|| sites::find(name)).map_or(0, |s| s.offset)
     }
 
     pub unsafe fn lr(accessor: usize) -> f32 {

@@ -162,7 +162,9 @@ pub fn run() {
     let state_reports = state_boot::reports(&state_found, &state_written);
     // Package 4: the recorder, the chords' poll and the notices.
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
-    let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
+    // The recorder calls package 2's `work_get_int` row (the ledge rest timer): its own guard gates the recorder.
+    let get_int_ok = sites::find("work_get_int").is_some_and(usable);
+    let (recording_on, notices_on) = install_pkg4(input_delay_on && get_int_ok, cpu_core_on, &found4, &mut written4);
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers.
     let ui_install = ui::install(&loaded, input_delay_on);
