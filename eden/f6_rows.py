@@ -38,7 +38,15 @@ def roster(*names):
 
 
 def settings(out):
-    menu = {"trio_practice": [1, 0], "player_roster": roster(*P1_ORDER), "cpu_roster": roster(*CPU_ORDER)}
+    # One-hot option rows (On is option 0): preload 5 slots, Both sources, 3 bank members, 12 ready fighters, Group Swap On,
+    # every group class On (the factory values, written out so the first boot does not depend on the INI cache's default).
+    on = [1, 0]
+    menu = {"trio_practice": on, "player_roster": roster(*P1_ORDER), "cpu_roster": roster(*CPU_ORDER),
+            "cycle_preload_slots": [0, 0, 0, 0, 0, 1], "cycle_preload_sources": [0, 0, 1],
+            "cycle_preload_bank_members": [0, 0, 1], "cycle_preload_ready_fighters": [0] * 10 + [1],
+            "cycle_preload_group_swap": on, "cycle_preload_original_bank": on, "cycle_preload_native_groups": on,
+            "cycle_preload_pair_groups": on, "cycle_preload_ic_pair_bank": on, "cycle_preload_ic_pair_groups": on,
+            "cycle_preload_mii_groups": on, "cycle_preload_solo_popo_groups": on}
     Path(out).write_text(json.dumps({"menu": menu}), encoding="utf-8")
     print(out, len(CATALOG), "catalog entries")
 
