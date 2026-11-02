@@ -251,6 +251,47 @@ def r_solo2():
     row("Solo Popo: the machine is idle after the load (a new save is accepted)", again is not None, again)
 
 
+def pause_dump(tag):
+    m = mark()
+    (SD / "diag-pausedump.req").write_text(tag, encoding="utf-8")
+    return wait_for(m, f"diag_pause_dump tag={tag}", 8)
+
+
+def r_pause():
+    """F9 research: dump the native pause menu around a No. of CPUs change (1 -> 2 -> 3 -> 1), closing the menu last."""
+    tap("plus", wait=2.0)
+    lines = [pause_dump("open-cpus1")]
+    tap("right", wait=0.8)
+    lines.append(pause_dump("cpus2"))
+    tap("right", wait=0.8)
+    lines.append(pause_dump("cpus3"))
+    tap("left", wait=0.8)
+    tap("left", wait=0.8)
+    lines.append(pause_dump("back-cpus1"))
+    shot("pause-cpus1")
+    tap("plus", wait=2.0)
+    time.sleep(2)
+    lines.append(pause_dump("closed-cpus1"))
+    row("F9 research: pause menu dumps around No. of CPUs 1/2/3/1", all(x and "written=true" in x for x in lines), lines)
+
+
+def r_lease():
+    lines = [x for x in read_diag() if "practice_session" in x]
+    row("practice lease: why native Training holds no session (refusal reason)", bool(lines), lines[-3:])
+
+
+def r_r5_split():
+    lines = [x for x in read_diag() if "hook_stats allocations=" in x]
+    last = lines[-1] if lines else ""
+    split = re.search(r" allocs=(\S+)", last)
+    row("R5 attribution: allocations per innermost hook scope", split is not None or "allocations=0 " in last, split.group(1) if split else last[:200])
+
+
+def r_popo_path():
+    lines = [x for x in read_diag() if "state popo" in x]
+    row("Solo Popo: the load took the no-Nana path (nana_removed=true)", any("nana_removed=true" in x for x in lines), lines[-3:])
+
+
 def r_pt():
     m, queued, done = cycle(0, cap=60)
     shot("swap-pt")
@@ -276,7 +317,7 @@ def r_r5():
 
 
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
 
 
 def main():

@@ -379,6 +379,37 @@ mod tests {
         assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::OFF, OnOff::OFF));
     }
 
+    /// Every row-shaped field of the view (`rows()`), whether the settings table defines it (a row) or not (a kept key the
+    /// write-back stores in the same shape): a non-factory value in the snapshot reaches the typed view and comes back unchanged.
+    /// The Solo Popo cycle rows were the kept keys this missed (Eden s6-04); the test lists the others with them.
+    #[test]
+    fn every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key() {
+        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
+        let mut snapshot = Snapshot::factory();
+        let mut wanted = Vec::new();
+        let mut kept_ids = Vec::new();
+        for (id, elements) in factory.rows() {
+            let mut changed = elements.clone();
+            changed.rotate_right(1);
+            if changed == elements {
+                continue;
+            }
+            if snapshot.get(id).is_some() {
+                snapshot.set(id, &changed).unwrap();
+            } else {
+                kept_ids.push(id);
+                snapshot.set_kept(id, serde_json::json!(changed)).unwrap();
+            }
+            wanted.push((id, changed));
+        }
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        let got: std::collections::HashMap<_, _> = view.rows().into_iter().collect();
+        for (id, changed) in &wanted {
+            assert_eq!(got.get(id), Some(changed), "{id} did not reach the typed view");
+        }
+        assert!(kept_ids.contains(&"solo_popo_player_cycle") && kept_ids.contains(&"solo_popo_cpu"), "kept: {kept_ids:?}");
+    }
+
     #[test]
     fn a_snapshot_round_trips_through_the_view() {
         let mut snapshot = Snapshot::factory();
