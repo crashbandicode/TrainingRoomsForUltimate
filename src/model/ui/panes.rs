@@ -191,7 +191,7 @@ pub const IDX_CHIP_LABEL: usize = IDX_CHIP_NEEDLE + CHIPS;
 pub const IDX_CHIP_BADGE: usize = IDX_CHIP_LABEL + CHIPS;
 /// The item and stage grids' tiles (up to 5 x 8): a tile and a label each, and the focus ring. Their size and place
 /// are set when a grid opens (the layout follows the console mode).
-pub const TILES: usize = 40;
+pub const TILES: usize = 88;
 pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
 pub const IDX_TILE: usize = IDX_TILE_HI + 1;
 pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;

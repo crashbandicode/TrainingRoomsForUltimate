@@ -26,6 +26,14 @@ mod grid_matches_catalog {
         assert_eq!(crate::model::menu::grid::STAGE_TILES, crate::engine::stages::catalog::TILE_COUNT);
     }
 
+    /// The roster grid's tile count (a model constant) is the portrait grid's cell count.
+    #[test]
+    fn the_roster_grid_has_a_tile_per_portrait_cell() {
+        assert_eq!(crate::model::menu::grid::ROSTER_TILES, crate::engine::swap::roster_grid::CELLS);
+        assert_eq!(usize::from(crate::model::menu::grid::ROSTER_COLS), crate::engine::swap::roster_grid::COLUMNS);
+        assert_eq!(usize::from(crate::model::menu::grid::ROSTER_ROWS), crate::engine::swap::roster_grid::ROWS);
+    }
+
     /// Every texture row is a lobby stage, and the stages without a texture are only those the game has no stage_1 file for.
     #[test]
     fn the_stage_textures_belong_to_catalog_stages() {

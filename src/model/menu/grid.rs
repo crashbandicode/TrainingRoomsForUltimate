@@ -16,6 +16,21 @@ pub enum ConsoleMode {
 pub enum GridKind {
     Items,
     Stages,
+    /// The portrait roster (Player/CPU Character, Character Cycles, Kirby Hats): the approved one-page 13 x 7 grid of the character
+    /// select screen in both console modes, the last row of 9 centred (`engine::swap::roster_grid`).
+    Roster(RosterUse),
+}
+
+/// Which roster the portrait grid edits (one approved grid, four rows of the menu).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RosterUse {
+    /// Player Character / CPU Character: one fighter (`player_character`, `cpu_character`).
+    PlayerPick,
+    CpuPick,
+    /// Character Cycles: the ordered rosters (`player_roster`, `cpu_roster`; ZR switches).
+    Cycles,
+    /// Kirby Hats: the ordered hat lists (`player_kirby_hats`, `cpu_kirby_hats`; ZR switches).
+    Hats,
 }
 
 /// The give-item grid's tiles (`ITEM_NAMES`: 38 items, turnip faces included).
@@ -23,6 +38,11 @@ pub const ITEM_TILES: usize = 38;
 /// The stage grid's tiles: the All tile and every stage of the catalog (never a hard-coded count: lead ruling
 /// 2026-11-02; the carried catalog has 115 stages, package 6 supplies the authoritative list).
 pub const STAGE_TILES: usize = 118;
+/// The roster grid's cells: six rows of 13 and a centred last row of 9 (`engine::swap::roster_grid::CELLS`, checked in lib.rs).
+pub const ROSTER_TILES: usize = 87;
+/// The roster grid's columns and rows.
+pub const ROSTER_COLS: u8 = 13;
+pub const ROSTER_ROWS: u8 = 7;
 
 /// A direction of cursor movement in a grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +66,9 @@ pub struct GridLayout {
 
 impl GridLayout {
     pub const fn new(kind: GridKind, mode: ConsoleMode) -> GridLayout {
+        if let GridKind::Roster(_) = kind {
+            return GridLayout { kind, mode, cols: ROSTER_COLS, rows: ROSTER_ROWS, short_names: true };
+        }
         match mode {
             ConsoleMode::Docked => GridLayout { kind, mode, cols: 5, rows: 8, short_names: true },
             ConsoleMode::Handheld => GridLayout { kind, mode, cols: 4, rows: 4, short_names: false },
@@ -57,6 +80,7 @@ impl GridLayout {
         match self.kind {
             GridKind::Items => ITEM_TILES,
             GridKind::Stages => STAGE_TILES,
+            GridKind::Roster(_) => ROSTER_TILES,
         }
     }
 

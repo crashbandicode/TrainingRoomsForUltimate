@@ -10,7 +10,7 @@ use super::frame::{page_frame, ChipVisual, Frame, RangeView, RowLine, Text, Tone
 use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
 use super::catalog::ITEMS;
-use super::menu::grid::{GridKind, GridLayout};
+use super::menu::grid::{GridKind, GridLayout, RosterUse};
 use super::menu::table::{Control, Row, GROUPS, ROWS};
 use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
@@ -285,6 +285,8 @@ fn tile_label(kind: GridKind, n: usize, short: bool, stage: StageLabel, out: &mu
         GridKind::Items => ITEMS.get(n).copied().unwrap_or("-"),
         GridKind::Stages if n == 0 => "All",
         GridKind::Stages => stage(n - 1),
+        // The roster editor (engine::swap::roster_grid) writes the names, ranks and picks: this module has no engine.
+        GridKind::Roster(_) => "",
     };
     if short {
         // Docked tiles are narrow (14 characters at the small font). A longer name is cut to 12 characters and ends in
@@ -315,18 +317,28 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     }
     frame.tile_count = len as u8;
     frame.tile_stage_grid = layout.kind == GridKind::Stages;
+    frame.tile_centre_last = matches!(layout.kind, GridKind::Roster(_));
     frame.tile_sig = ((page as u32) << 8) | u32::from(layout.cols) | (u32::from(layout.rows) << 4);
     frame.tile_focus = cell as u8;
     let title = match layout.kind {
         GridKind::Items => "Give item",
         GridKind::Stages => "Stage grid",
+        GridKind::Roster(RosterUse::PlayerPick) => "Player Character",
+        GridKind::Roster(RosterUse::CpuPick) => "CPU Character",
+        GridKind::Roster(RosterUse::Cycles) => "Character Cycles",
+        GridKind::Roster(RosterUse::Hats) => "Kirby Hats",
     };
     let _ = write!(frame.crumb, "  >  {title}   page {} of {}", page + 1, layout.pages());
     let _ = frame.help[0].write_str(match layout.kind {
         GridKind::Items => "A gives Player 1 this item now.",
         GridKind::Stages => "Stages the lobby cycles through; All takes every stage.",
+        GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => "A picks the fighter; X shows the next form of a shared slot.",
+        GridKind::Roster(_) => "A adds in order (All takes everyone), Y removes, X shows the next form, ZR switches Player and CPU.",
     });
-    let _ = frame.hint.write_str("D-pad move   L/R page   B back");
+    let _ = frame.hint.write_str(match layout.kind {
+        GridKind::Roster(_) => "D-pad move   A pick   Y remove   X form   ZR role   B back",
+        _ => "D-pad move   L/R page   B back",
+    });
 }
 /// Cells of a panel of the named-macro / replay layer: 4 columns by 8 rows (the layer's own page, `NX_SUBMENU_*`).
 pub const PANEL_COLS: usize = 4;

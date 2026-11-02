@@ -18,7 +18,7 @@ pub mod table;
 
 use chord::Chord;
 use delay::{DelayRange, DelaySpec};
-use grid::{ConsoleMode, GridKind, GridLayout, Move};
+use grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
 use input::Button;
 use options::{CHORD_ROWS, SITUATIONS, SWAP_GROUP_IDS};
 use table::{Control, Editor, Page, Row, GROUPS, ROWS};
@@ -98,6 +98,9 @@ pub struct Outbox {
     /// A, X or Y on a tile of the Lobby Stages grid (tile 0 is All): the stage editor (ditors::stages, which knows the carried
     /// stage catalog) applies it. Taken at once with Menu::take_stage_press.
     pub stage_press: Option<(u16, Button)>,
+    /// A, X, Y, ZR on the portrait roster grid: the tile and the button; the roster editor (package 6's roster rules) applies it.
+    /// Taken at once with Menu::take_roster_press.
+    pub roster_press: Option<(u16, Button)>,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -799,6 +802,10 @@ impl Menu {
             // The console mode is read now and the layout stays until the grid closes.
             Editor::GiveItem => Screen::Grid { layout: GridLayout::new(GridKind::Items, self.env.console), page: 0, cell: 0 },
             Editor::StageGrid => Screen::Grid { layout: GridLayout::new(GridKind::Stages, self.env.console), page: 0, cell: 0 },
+            Editor::PortraitPlayer => self.roster_screen(RosterUse::PlayerPick),
+            Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
+            Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
+            Editor::KirbyHats => self.roster_screen(RosterUse::Hats),
             other => Screen::External(other),
         };
         self.stack.push(screen);
@@ -1251,6 +1258,12 @@ impl Menu {
                     self.outbox.stage_press = u16::try_from(tile).ok().map(|tile| (tile, button));
                 }
             }
+            // A, X, Y, ZR on the portrait roster grid: the roster editor applies them (pick, rank, remove, form preview, role).
+            Button::A | Button::X | Button::Y | Button::ZR if matches!(layout.kind, GridKind::Roster(_)) => {
+                if let Some(tile) = layout.tile(page, cell) {
+                    self.outbox.roster_press = u16::try_from(tile).ok().map(|tile| (tile, button));
+                }
+            }
             // A on the Give item grid: give the item now (every press, the already-chosen item included).
             Button::A if layout.kind == GridKind::Items => {
                 if let Some(item) = layout.tile(page, cell) {
@@ -1272,6 +1285,16 @@ impl Menu {
     /// The press on the Lobby Stages grid since the last call, if any: (tile, button), tile 0 being All.
     pub fn take_stage_press(&mut self) -> Option<(u16, Button)> {
         self.outbox.stage_press.take()
+    }
+
+    /// The roster grid's press since the last call, if any.
+    pub fn take_roster_press(&mut self) -> Option<(u16, Button)> {
+        self.outbox.roster_press.take()
+    }
+
+    /// The portrait roster grid (one page, the same in both console modes).
+    fn roster_screen(&self, use_: RosterUse) -> Screen {
+        Screen::Grid { layout: GridLayout::new(GridKind::Roster(use_), self.env.console), page: 0, cell: 0 }
     }
 
     /// A kept key of the menu snapshot (a non-array row: the rosters, the hats, the stage order).

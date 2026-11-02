@@ -300,8 +300,13 @@ impl Panes {
         let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
         let (cell_w, cell_h) = ((p::ROW_RIGHT - p::ROW_LEFT) / cols, 620.0 / rows);
         let centre = |i: usize| {
-            let (c, r) = (i % usize::from(frame.tile_cols.max(1)), i / usize::from(frame.tile_cols.max(1)));
-            (p::ROW_LEFT + (c as f32 + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
+            let per_row = usize::from(frame.tile_cols.max(1));
+            let (c, r) = (i % per_row, i / per_row);
+            // The roster's short last row sits centred under the full rows (the character select's own layout).
+            let count = usize::from(frame.tile_count);
+            let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
+            let shift = if frame.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
+            (p::ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
         };
         for i in 0..p::TILES {
             if !shown || i >= usize::from(frame.tile_count) || frame.tile_state[i] == TILE_HIDDEN {
