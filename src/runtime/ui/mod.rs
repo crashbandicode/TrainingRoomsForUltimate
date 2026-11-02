@@ -12,6 +12,7 @@ pub mod anchors;
 pub mod archive;
 pub mod hud;
 pub mod input;
+pub mod menu_app;
 pub mod pane;
 #[cfg(feature = "diag")]
 pub mod probe;
@@ -97,6 +98,8 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     }
     let archive_hook = usable("ui_archive_alloc");
     if archive_hook {
+        // R2-7: everything a hand-out would otherwise allocate in the hook (the retire thread, the parked list) is made here.
+        archive::prepare();
         archive::install();
     } else {
         diagnostic(format_args!("[TrainingRooms] ui archive hook skipped: site not usable"));
@@ -120,6 +123,7 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
         registry::set_manager_slot(slot.unwrap_or_default() as usize);
         worker::start(settings.clone());
         anchors::install();
+        state::INSTALLED.store(true, std::sync::atomic::Ordering::Release);
         diagnostic(format_args!("[Ui] anchors installed manager_slot=main+{:#x} pilot_present={}", slot.unwrap_or_default() - game::text_base() as u64, state::PILOT_PRESENT.load(std::sync::atomic::Ordering::Acquire)));
     } else {
         diagnostic(format_args!(

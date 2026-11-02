@@ -13,7 +13,7 @@ use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, MENU_SHOWN, OPEN, PAUSE_ACTIVE};
+use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
@@ -66,6 +66,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
     }
     if !game::is_training_mode() {
+        renderer_lost("not in Training");
         return;
     }
     TICKS.fetch_add(1, Ordering::Relaxed);
@@ -75,7 +76,13 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     let r = &mut *r;
     let Resolved { panes, status_r, help, drawn_seq, shown, .. } = r;
-    let Some(panes) = panes.as_ref() else { return };
+    let Some(panes) = panes.as_ref() else {
+        // The injected archive was refused or the panes are absent: no renderer, so the menu cannot own input (R2-2).
+        renderer_lost("panes unresolved");
+        return;
+    };
+    LAYOUT_READY.store(true, Ordering::Release);
+    POLLS_AT_TICK.store(crate::runtime::ui::input::POLLS.load(Ordering::Relaxed), Ordering::Release);
 
     if !help.is_null() {
         let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
@@ -115,9 +122,26 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             panes.draw(&frame);
             *drawn_seq = seq;
             if DRAWS.fetch_add(1, Ordering::Relaxed) == 0 {
-                diagnostic(format_args!("[Ui] first draw seq={seq}"));
+                log(format_args!("[Ui] first draw seq={seq}"));
             }
         }
+    }
+}
+
+/// A log line from the tick. The tick runs inside the UI hooks; its lines are the once-per-registration kind (layout
+/// resolved, panes absent, renderer lost, first draw): counted as per-load allocations, not as steady-state ones.
+fn log(args: core::fmt::Arguments<'_>) {
+    crate::model::hook_stats::per_load(|| diagnostic(args));
+}
+
+/// The layout cannot draw the menu now: drop the readiness and, if the menu owns Player 1's input, give it back.
+fn renderer_lost(reason: &str) {
+    let was_ready = LAYOUT_READY.swap(false, Ordering::AcqRel);
+    if state::readiness_facts(0).owns_input {
+        state::release_menu();
+        log(format_args!("[Ui] menu released: renderer lost ({reason})"));
+    } else if was_ready {
+        log(format_args!("[Ui] renderer lost ({reason})"));
     }
 }
 
@@ -140,11 +164,11 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
         missing += usize::from(slot.is_null());
     }
     if container.is_null() {
-        diagnostic(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
+        log(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
         return;
     }
     let capacity = if all[p::row_label_index(0)].is_null() { 0 } else { pane::text_capacity(all[p::row_label_index(0)]) };
-    diagnostic(format_args!(
+    log(format_args!(
         "[Ui] layout=info_training resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
         registry::holders().len(),
         p::MENU_COUNT,
@@ -168,7 +192,7 @@ unsafe fn dump_text_box(pane: *mut Pane) {
     for (i, slot) in line.iter_mut().enumerate() {
         *slot = words.sub(4).add(i).read_unaligned();
     }
-    diagnostic(format_args!(
+    log(format_args!(
         "[Ui] text_box buf_len={} len={} bits={:#x} pos={} size_of_pane={} buffer={:#x} around={:04x?}",
         (*tb).text_buf_len,
         (*tb).text_len,

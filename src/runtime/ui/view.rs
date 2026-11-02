@@ -43,6 +43,15 @@ impl Panes {
         pane::set_text_color(pane, p::linear(color));
     }
 
+    /// Position and width of a text pane (the row panes serve the list and the direction grid's panel).
+    unsafe fn place(&self, index: usize, x: f32, y: f32, w: f32) {
+        let pane = self.all[index];
+        if !pane.is_null() {
+            pane::set_pos(pane, x, y);
+            pane::set_width(pane, w);
+        }
+    }
+
     unsafe fn at(&self, index: usize, x: f32, y: f32) {
         let pane = self.all[index];
         if !pane.is_null() {
@@ -96,16 +105,35 @@ impl Panes {
         self.show(p::IDX_GROUP_HI, frame.group_count > 0);
         self.at(p::IDX_GROUP_HI, p::GROUP_X, p::group_y(usize::from(frame.group_active)));
 
-        let list = frame.view == View::List;
+        // The overrides screen keeps its situation line as the list's first row.
+        let list = matches!(frame.view, View::List | View::Overrides);
         self.draw_chips(frame);
         self.draw_tiles(frame);
-        // Rows.
+        self.draw_delay(frame);
+        self.draw_overrides(frame);
+        // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
+        let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; p::ROWS] };
         for i in 0..p::ROWS {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
+                self.place(p::row_label_index(i), p::ROW_LEFT + p::ROW_LABEL_W / 2.0, p::row_y(i), p::ROW_LABEL_W);
+                self.place(p::row_value_index(i), p::ROW_RIGHT - p::ROW_VALUE_W / 2.0, p::row_y(i) - p::VALUE_DROP, p::ROW_VALUE_W);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
                 self.text(p::row_value_index(i), row.value.units(), tone_color(row.value_tone));
-                self.at(p::row_value_index(i), p::ROW_RIGHT - p::ROW_VALUE_W / 2.0, p::row_y(i) - p::VALUE_DROP);
+            } else if frame.view == View::Delay && i < 4 {
+                // The delay popup's four text lines: the checklist header and count, the range header and value, and the
+                // two handle labels under their handles.
+                let line = &frame.rows[i];
+                let (lx, lw, ly, vx, vw, vy) = delay_text_slot(i, frame);
+                self.place(p::row_label_index(i), lx, ly, lw);
+                self.place(p::row_value_index(i), vx, vy, vw);
+                self.text(p::row_label_index(i), line.label.units(), tone_color(line.label_tone));
+                self.text(p::row_value_index(i), line.value.units(), tone_color(line.value_tone));
+            } else if let Some((name, weight, tone)) = panel[i] {
+                self.place(p::row_label_index(i), PANEL_X + PANEL_NAME_W / 2.0, p::row_y(i), PANEL_NAME_W);
+                self.place(p::row_value_index(i), PANEL_X + PANEL_NAME_W + PANEL_WEIGHT_W / 2.0, p::row_y(i) - p::VALUE_DROP, PANEL_WEIGHT_W);
+                self.text(p::row_label_index(i), name.units(), tone_color(tone));
+                self.text(p::row_value_index(i), weight.units(), tone_color(tone));
             } else {
                 self.text(p::row_label_index(i), &[], p::TEXT);
                 self.text(p::row_value_index(i), &[], p::TEXT);
@@ -123,6 +151,43 @@ impl Panes {
         self.text(p::IDX_HELP + 1, frame.help[1].units(), p::TEXT);
         self.text(p::IDX_HINT, frame.hint.units(), p::TEXT_DIM);
     }
+}
+
+/// Where the "Selected (weight)" panel of the direction grids sits: right of the chips (they end at x = 480).
+const PANEL_X: f32 = 520.0;
+const PANEL_NAME_W: f32 = 240.0;
+const PANEL_WEIGHT_W: f32 = 110.0;
+
+type PanelLine = Option<(crate::model::frame::Text<24>, crate::model::frame::Text<8>, Tone)>;
+
+/// The panel's lines (mockup 09): a header, then each chip with a weight in chip order, `xN` at the right;
+/// "none selected" while the grid is empty.
+fn selected_panel(frame: &Frame) -> [PanelLine; p::ROWS] {
+    use core::fmt::Write;
+    let mut lines: [PanelLine; p::ROWS] = [None; p::ROWS];
+    let mut put = |at: usize, name: &str, weight: Option<u8>, tone: Tone| {
+        if let Some(slot) = lines.get_mut(at) {
+            let mut n = crate::model::frame::Text::<24>::new();
+            let mut w = crate::model::frame::Text::<8>::new();
+            let _ = n.write_str(name);
+            if let Some(weight) = weight {
+                let _ = write!(w, "x{weight}");
+            }
+            *slot = Some((n, w, tone));
+        }
+    };
+    put(0, "Selected (weight)", None, Tone::Normal);
+    let mut next = 1;
+    for (i, weight) in frame.chip_weights.iter().enumerate().take(p::CHIPS) {
+        if *weight != 0 {
+            put(next, DIRECTIONS[i], Some(*weight), Tone::On);
+            next += 1;
+        }
+    }
+    if next == 1 {
+        put(1, "none selected", None, Tone::Dim);
+    }
+    lines
 }
 /// Where a chip's pointer stub sits and how far it is turned: the direction each chip stands for, in degrees
 /// (counter-clockwise from the right; In / Out are the screen's left / right here, the menu mirrors them
@@ -238,6 +303,118 @@ impl Panes {
         if shown && frame.tile_count > 0 {
             let (x, y) = centre(usize::from(frame.tile_focus));
             self.rect(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, p::ACCENT);
+        } else {
+            self.hide(p::IDX_TILE_HI);
+        }
+    }
+}
+
+// ---- the delay popup (mockup 19): a grid of boxes over the min-max range control ----------------------------
+const DELAY_CELL_W: f32 = (p::ROW_RIGHT - p::ROW_LEFT) / 8.0;
+const DELAY_FIRST_Y: f32 = 250.0;
+const DELAY_PITCH: f32 = 58.0;
+const DELAY_BAR_L: f32 = -300.0;
+const DELAY_BAR_W: f32 = 1000.0;
+const DELAY_BAR_Y: f32 = -95.0;
+const DELAY_RANGE_HEAD_Y: f32 = -10.0;
+const DELAY_HANDLE_LABEL_Y: f32 = -165.0;
+
+/// The x of the handle standing on value index `index` of a set whose last index is `top`.
+fn delay_handle_x(index: u8, top: u8) -> f32 {
+    DELAY_BAR_L + DELAY_BAR_W * f32::from(index) / f32::from(top.max(1))
+}
+
+/// Label slot (x, width, y) and value slot (x, width, y) of the popup's text line `i`.
+fn delay_text_slot(i: usize, frame: &Frame) -> (f32, f32, f32, f32, f32, f32) {
+    let right = |y: f32| (p::ROW_RIGHT - 150.0, 300.0, y - p::VALUE_DROP);
+    match i {
+        0 => (p::ROW_LEFT + 300.0, 600.0, 312.0, right(312.0).0, right(312.0).1, right(312.0).2),
+        1 => (p::ROW_LEFT + 300.0, 600.0, DELAY_RANGE_HEAD_Y, right(DELAY_RANGE_HEAD_Y).0, right(DELAY_RANGE_HEAD_Y).1, right(DELAY_RANGE_HEAD_Y).2),
+        _ => {
+            let at = if i == 2 { frame.range.min } else { frame.range.max };
+            let x = delay_handle_x(at, frame.range.top);
+            (x, 220.0, DELAY_HANDLE_LABEL_Y, x, 10.0, DELAY_HANDLE_LABEL_Y)
+        }
+    }
+}
+
+impl Panes {
+    unsafe fn draw_delay(&self, frame: &Frame) {
+        let shown = frame.view == View::Delay;
+        if !shown {
+            return;
+        }
+        let rows = usize::from(frame.tile_rows.max(1));
+        for i in 0..p::TILES {
+            if i >= usize::from(frame.tile_count) {
+                continue; // draw_tiles hid it
+            }
+            let (c, r) = (i / rows, i % rows);
+            let (x, y) = (p::ROW_LEFT + (c as f32 + 0.5) * DELAY_CELL_W, DELAY_FIRST_Y - r as f32 * DELAY_PITCH);
+            let (fill, text) = match frame.tile_state[i] {
+                1 => (p::ACCENT, p::TEXT),
+                2 => (p::HIGHLIGHT, p::TEXT_OFF),
+                _ => (p::HIGHLIGHT, p::TEXT),
+            };
+            self.rect(p::IDX_TILE + i, x, y, DELAY_CELL_W - 12.0, DELAY_PITCH - 10.0, fill);
+            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, DELAY_CELL_W - 20.0, text);
+        }
+        if frame.tile_focus != 255 && frame.tile_count > 0 {
+            let i = usize::from(frame.tile_focus);
+            let (c, r) = (i / rows, i % rows);
+            self.rect(p::IDX_TILE_HI, p::ROW_LEFT + (c as f32 + 0.5) * DELAY_CELL_W, DELAY_FIRST_Y - r as f32 * DELAY_PITCH, DELAY_CELL_W - 2.0, DELAY_PITCH - 2.0, p::ACCENT_RING);
+        } else {
+            self.hide(p::IDX_TILE_HI);
+        }
+        // The range control: a track, the span between the handles, the two handles, a ring on the focused one.
+        let range = frame.range;
+        let (track, span, handle) = if range.grey { (p::HIGHLIGHT, p::HIGHLIGHT, p::TEXT_OFF) } else { ([70, 78, 92, 255], p::ACCENT, p::TEXT) };
+        self.rect(p::IDX_CHIP, DELAY_BAR_L + DELAY_BAR_W / 2.0, DELAY_BAR_Y, DELAY_BAR_W, 8.0, track);
+        let (lo, hi) = if range.set { (delay_handle_x(range.min, range.top), delay_handle_x(range.max, range.top)) } else { (DELAY_BAR_L, DELAY_BAR_L + DELAY_BAR_W) };
+        if range.set {
+            self.rect(p::IDX_CHIP + 1, (lo + hi) / 2.0, DELAY_BAR_Y, (hi - lo).max(4.0), 8.0, span);
+        } else {
+            self.hide(p::IDX_CHIP + 1);
+        }
+        let held = if range.editing { p::ACCENT } else { handle };
+        self.rect(p::IDX_CHIP + 2, lo, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 1 { held } else { handle });
+        self.rect(p::IDX_CHIP + 3, hi, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 2 { held } else { handle });
+        match range.focus {
+            1 => self.rect(p::IDX_CHIP_HI, lo, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
+            2 => self.rect(p::IDX_CHIP_HI, hi, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
+            _ => self.hide(p::IDX_CHIP_HI),
+        }
+        for i in 4..p::CHIPS {
+            self.hide(p::IDX_CHIP + i);
+        }
+    }
+}
+
+// ---- the situation overrides screen (mockup 06): columns of action boxes under the situation line -------
+const OVERRIDE_COL_W: f32 = 420.0;
+const OVERRIDE_COL_X: [f32; 3] = [-230.0, 210.0, 650.0];
+const OVERRIDE_FIRST_Y: f32 = 250.0;
+const OVERRIDE_PITCH: f32 = 54.0;
+
+impl Panes {
+    unsafe fn draw_overrides(&self, frame: &Frame) {
+        if frame.view != View::Overrides {
+            return;
+        }
+        let rows = usize::from(frame.tile_rows.max(1));
+        let at = |i: usize| (OVERRIDE_COL_X[(i / rows).min(2)], OVERRIDE_FIRST_Y - (i % rows) as f32 * OVERRIDE_PITCH);
+        for i in 0..p::TILES {
+            if i >= usize::from(frame.tile_count) {
+                continue; // draw_tiles hid it
+            }
+            let (x, y) = at(i);
+            let on = frame.tile_state[i] == 1;
+            self.rect(p::IDX_TILE + i, x, y, OVERRIDE_COL_W - 12.0, OVERRIDE_PITCH - 12.0, if on { p::ACCENT } else { p::HIGHLIGHT });
+            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, OVERRIDE_COL_W - 24.0, p::TEXT);
+        }
+        if frame.tile_focus != 255 {
+            let (x, y) = at(usize::from(frame.tile_focus));
+            self.rect(p::IDX_TILE_HI, x, y, OVERRIDE_COL_W, OVERRIDE_PITCH - 4.0, p::ACCENT_RING);
         } else {
             self.hide(p::IDX_TILE_HI);
         }

@@ -7,6 +7,8 @@
 
 #[path = "model/ui/adapter.rs"]
 pub mod adapter;
+#[path = "model/ui/readiness.rs"]
+pub mod readiness;
 #[path = "model/ui/catalog.rs"]
 pub mod catalog;
 #[path = "model/archive_name.rs"]
