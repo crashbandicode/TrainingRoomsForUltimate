@@ -120,7 +120,7 @@ impl Settings {
         slots: default_slot_count(),
         fighters: true,
         hats: true,
-        measurements: true,
+        measurements: false,
         bank_members: BANK_MEMBERS_MAX,
         group_swap: true,
         ready_fighters: READY_FIGHTERS_DEFAULT,
@@ -429,7 +429,7 @@ pub fn default_sources() -> CyclePreloadSources {
 }
 
 pub fn default_measurements() -> crate::engine::compat::menu::OnOff {
-    crate::engine::compat::menu::OnOff::ON
+    crate::engine::compat::menu::OnOff::OFF
 }
 
 /// Menu JSON may still store the older three-choice array. Missing tail entries
@@ -1255,10 +1255,9 @@ fn write_new(path: &str, text: &str) -> Result<(), &'static str> {
         .truncate(true)
         .open(path)
         .map_err(|_| "could not write cycle preload ini")?;
-    if file.write_all(text.as_bytes()).is_err() {
+    if file.write_all(text.as_bytes()).is_err() || file.sync_all().is_err() {
         return Err("could not write cycle preload ini");
     }
-    let _ = file.sync_all();
     Ok(())
 }
 
@@ -1330,7 +1329,7 @@ mod tests {
         assert_eq!(Settings::FAIL_CLOSED.slots, 0);
         assert!(Settings::FAIL_CLOSED.selectable());
         assert_ne!(Settings::FAIL_CLOSED, Settings::DEFAULT);
-        const { assert!(Settings::DEFAULT.measurements) };
+        const { assert!(!Settings::DEFAULT.measurements) };
         assert_eq!(usize::from(Settings::DEFAULT.bank_members), crate::engine::swap::body_bank::NATIVE_MEMBERS);
         assert_eq!(Settings::FAIL_CLOSED.bank_members, 0);
         assert_eq!(Settings::CLOSED.bank_members, 0);

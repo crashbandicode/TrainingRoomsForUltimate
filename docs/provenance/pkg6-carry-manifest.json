@@ -1015,7 +1015,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "c4a1e933df47c0eeae62a83dc0a5bec7b2d2db5668adf46a0c34d1fe5770880b",
+   "dest_sha256": "985f142ef73c32955afab08e7a51c2afa130ed2c8fbaf1fab25709d5be160c25",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -1036,6 +1036,26 @@
      "old": "        let mut app = unsafe { crate::create_app() };\n        app.update_all_from_json(&serde_json::to_string(&selected).unwrap());\n        let committed: crate::engine::compat::menu::TrainingModpackMenu =\n            serde_json::from_str(&app.current_settings_to_json()).unwrap();\n",
      "new": "        let committed: crate::engine::compat::menu::TrainingModpackMenu =\n            serde_json::from_str(&serde_json::to_string(&selected).unwrap()).unwrap();\n",
      "reason": "the commit round trip no longer goes through the fork's `create_app` table (`update_all_from_json` / `current_settings_to_json`): the typed menu is serialised and read back directly, the same serde path"
+    },
+    {
+     "old": "        measurements: true,\n        bank_members: BANK_MEMBERS_MAX,",
+     "new": "        measurements: false,\n        bank_members: BANK_MEMBERS_MAX,",
+     "reason": "the approved fresh-install default (lead 2026-11-02, MENU-DRAFT Q8/N1): Preload Samples is Off; the fork started On (`Settings::DEFAULT`)"
+    },
+    {
+     "old": "pub fn default_measurements() -> crate::engine::compat::menu::OnOff {\n    crate::engine::compat::menu::OnOff::ON",
+     "new": "pub fn default_measurements() -> crate::engine::compat::menu::OnOff {\n    crate::engine::compat::menu::OnOff::OFF",
+     "reason": "the approved fresh-install default (lead 2026-11-02, MENU-DRAFT Q8/N1): Preload Samples is Off; the fork started On (`default_measurements`)"
+    },
+    {
+     "old": "        const { assert!(Settings::DEFAULT.measurements) };",
+     "new": "        const { assert!(!Settings::DEFAULT.measurements) };",
+     "reason": "test follows the approved fresh-install default (Preload Samples Off)"
+    },
+    {
+     "old": "    if file.write_all(text.as_bytes()).is_err() {\n        return Err(\"could not write cycle preload ini\");\n    }\n    let _ = file.sync_all();\n    Ok(())",
+     "new": "    if file.write_all(text.as_bytes()).is_err() || file.sync_all().is_err() {\n        return Err(\"could not write cycle preload ini\");\n    }\n    Ok(())",
+     "reason": "R1 durable publish: the temporary file is flushed to storage and a failed flush fails the store before the rename retires the live file (the fork ignored the sync_all result); offered back to the fork through the fix ledger"
     }
    ]
   }

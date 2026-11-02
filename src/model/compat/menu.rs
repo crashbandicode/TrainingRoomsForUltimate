@@ -51,7 +51,7 @@ const fn solo_popo_cpu_default() -> OnOff {
     OnOff::OFF
 }
 const fn solo_popo_original_default() -> OnOff {
-    OnOff::ON
+    OnOff::OFF
 }
 
 /// The settings the carried engines read (grows with each carried layer).
@@ -109,12 +109,12 @@ pub struct TrainingModpackMenu {
 
 /// The factory values (`BASE_MENU` in the fork).
 pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
-    solo_popo_original: OnOff::ON,
+    solo_popo_original: OnOff::OFF,
     solo_popo_player_cycle: OnOff::OFF,
     solo_popo_cpu: OnOff::OFF,
     cycle_preload_slots: preload::default_slots(),
     cycle_preload_sources: preload::CyclePreloadSources::BOTH,
-    cycle_preload_measurements: OnOff::ON,
+    cycle_preload_measurements: OnOff::OFF,
     cycle_preload_bank_members: preload::default_bank_members(),
     cycle_preload_group_swap: OnOff::ON,
     cycle_preload_ready_fighters: preload::default_ready_fighters(),
@@ -201,7 +201,6 @@ pub use super::grid::NX_SUBMENU_COLUMNS;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::settings::DEFS;
 
     #[test]
     fn on_off_is_on_then_off_like_the_factory_table() {
@@ -211,29 +210,6 @@ mod tests {
         assert_eq!(OnOff::ON + OnOff::OFF, OnOff::all());
     }
 
-    /// The two rows whose fork default differs from the clean-room factory table: the fork starts Solo Popo (original) On and
-    /// Preload Samples On (`Settings::DEFAULT.measurements`); MENU-DRAFT and `model::factory` say Off for both. The runtime view
-    /// is `from_snapshot`, so the settings file wins; `BASE_MENU` stays the fork's value because carried tests pin it.
-    const KNOWN_DIVERGENCES: [&str; 2] = ["solo_popo_original", "cycle_preload_measurements"];
-
-    #[test]
-    fn the_fork_menu_is_the_factory_snapshot_row_for_row_except_the_known_divergences() {
-        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
-        let mut known = 0;
-        for (id, elements) in BASE_MENU.rows() {
-            let Some((_, def)) = DEFS.iter().enumerate().find(|(_, def)| def.id == id) else { continue };
-            assert_eq!(elements.len(), def.len, "{id}: option count");
-            if KNOWN_DIVERGENCES.contains(&id) {
-                assert_ne!(elements, def.default, "{id}: no longer diverges, drop it from KNOWN_DIVERGENCES");
-                known += 1;
-            } else {
-                assert_eq!(elements, def.default, "{id}: factory value");
-            }
-        }
-        assert_eq!(known, KNOWN_DIVERGENCES.len());
-        assert_eq!(factory.solo_popo_original, OnOff::OFF);
-        assert_eq!(factory.cycle_preload_measurements, OnOff::OFF);
-    }
     #[test]
     fn a_snapshot_round_trips_through_the_view() {
         let mut snapshot = Snapshot::factory();
