@@ -110,7 +110,7 @@ fn target_ready(target:Target,current:Option<i32>)->bool {
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {target.ready(_kind as u32,None)}
 }
-use crate::model::macro_handoff::{VaultArchive as Capture, VaultEvent};
+use crate::engine::macros::handoff::{VaultArchive as Capture, VaultEvent};
 static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
 
 // Only native callbacks own the in-flight pair and native replay epoch.

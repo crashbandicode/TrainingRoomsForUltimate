@@ -251,7 +251,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "01e0d408003edd6cf38bd561066f27cde1fb64aadea7ba9c13fe6b204b6a792c",
+   "dest_sha256": "ba81ed489cb401391bd34e96350fbc70fcd1f40a7c074d4e46b675ff8f8bccae",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -276,6 +276,11 @@
     {
      "append": "\n#[cfg(test)]\nmod move_crop_continuation_tests;\n",
      "reason": "the fork's integration test tests/move_crop_continuation.rs runs as a unit test here: this crate is a cdylib, no integration test can link it"
+    },
+    {
+     "old": "mod capture_archive;",
+     "new": "pub mod handoff;\nmod capture_archive;",
+     "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
     }
    ]
   },
@@ -962,7 +967,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "4878c421a36df58dcc8bd3c175d6ec1badd09de1865f32743d7bc2b501c14330",
+   "dest_sha256": "2638c5e7b43d3da11366e8480f4217c5c93970251f43fe9fc5fd466e773e9bf0",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1173,6 +1178,11 @@
      "old": "fn target_ready(target:Target,current:Option<i32>)->bool {\n    let Some(kind)=current else {return false;};\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    { crate::runtime::macros::identity::clip_ready(target) }\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    {target.ready(kind as u32,None)}\n}",
      "new": "fn target_ready(target:Target,current:Option<i32>)->bool {\n    let Some(_kind)=current else {return false;};\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    { crate::runtime::macros::identity::clip_ready(target) }\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    {target.ready(_kind as u32,None)}\n}",
      "reason": "Keep the fallback kind binding explicit when the exact identity query is compiled for Mii support."
+    },
+    {
+     "old": "use crate::model::macro_handoff::{VaultArchive as Capture, VaultEvent};",
+     "new": "use crate::engine::macros::handoff::{VaultArchive as Capture, VaultEvent};",
+     "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
     }
    ]
   },
@@ -1351,7 +1361,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "12e744275d1c59d21b55145378a98c5f8edca7da704caa4411ccc6c4048ed2ed",
+   "dest_sha256": "3257f2dbea5fe8c7c60cf8b5b8a6c8569ee07b516468df97206dd6d412a098b4",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1533,6 +1543,11 @@
      "new": "CAPTURE.lock()",
      "reason": "Use the non-poisoning static callback lock for CAPTURE; preserve every protected access.",
      "count": 23
+    },
+    {
+     "old": "use crate::model::macro_handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};",
+     "new": "use crate::engine::macros::handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};",
+     "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
     }
    ]
   },

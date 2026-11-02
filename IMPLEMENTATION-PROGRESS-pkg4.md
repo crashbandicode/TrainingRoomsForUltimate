@@ -140,6 +140,16 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Host compile root corrected: archive handoff types and their four unchanged regression tests moved
+  from model/macro_handoff.rs to model/macros/handoff.rs, registered under engine::macros via carry.
+  Generic model buffers no longer depend on engine; standalone model tests need no facade workaround.
+  All42 carry derivations verified, rustfmt parsing passed. New fullhost retry pending freeze/stage;
+  no claim/compiler/Eden. Stack scratch patches remain prepared/unapplied; no runtime acceptance.
+- RELEASED17:59Z Yoga fullhost59986e0 compileFAIL exit1, zero tests ran; controller50346 ended. E0433 cannot find engine in crate at model/macro_handoff.rs:272:40 (and33others) in standalone cpu07/migration/state_sites/input01/ui_readiness/input_sites/cpu06 test crates. Raw ordered host-59986e0.log/exit preserved. Root fix in model ownership/test module boundary next; no own claim. Prior wrapper
+  /home/intpa/trainingrooms-build-pkg4/host-59986e0.ps1, ordered .log/.exit,6GiB/1800s.
+  All1111 staged files hash-match tar; queuehead/fullledger/interleave/process clear;235GBfree,
+  buildroots31GiB+local19GiB upperbound below60. Release immediately when wrapper ends.
+  No Eden/profile mutation. Prepared scratch/F11 patches remain unapplied pending lead ownership.
 - 17:5xZ model gate reverified exact Astra/medium; existing hidden watcher active3167564, no alert.
   Host59986e0 staged gate/target-gate; wrapper confirmed cargo test --no-fail-fast and queuedEND Yoga
   behind pkg6/slim/imgui. No own claim. Local diag NRO/ELF hashes match build evidence.

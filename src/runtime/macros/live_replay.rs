@@ -10,7 +10,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{atomic::{AtomicU64, AtomicUsize, Ordering}, Mutex};
-use crate::model::macro_handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};
+use crate::engine::macros::handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use smash::{app::{self, lua_bind::WorkModule, Fighter}, lib::lua_const::*};
