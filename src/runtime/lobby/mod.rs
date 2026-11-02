@@ -53,6 +53,16 @@ pub(crate) unsafe fn frame(fighter: usize) {
     let entry = ((fighter + FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     if entry_id_valid(entry) && entry == 0 {
         training::practice::refresh();
+        // The roster cycle's once-per-game-frame steps run on Player 1's body (each returns at once when nothing is pending): the
+        // source leases, the Kirby hat requests, the item engine (a granted or restored item) and the preload planner.
+        let accessor = game::natives::fighter_accessor(fighter);
+        if accessor != 0 {
+            let body = accessor as *mut BattleObjectModuleAccessor;
+            crate::runtime::roster::character_roster::sources::on_frame(body);
+            crate::runtime::roster::kirby_hats::on_frame(body);
+            crate::runtime::roster::character_items::on_frame(body);
+            crate::runtime::roster::cycle_preload::on_frame(&mut *body);
+        }
     }
     // Diag build: the character-item table's constants as the game resolves them (once).
     #[cfg(feature = "diag")]

@@ -148,6 +148,14 @@ pub fn apply(settings: &Settings) {
     *CURRENT.write() = Some(next);
 }
 
+/// The committed settings after the menu closed: `apply`, then the roster cycle compares the menu it had with the committed one (a
+/// changed roster, hat order or pick re-plans the cycle and may queue a swap; an unrelated change does nothing).
+pub fn apply_commit(settings: &Settings) {
+    let previous = MENU.read_value();
+    apply(settings);
+    crate::runtime::roster::character_roster::settings_changed(&previous, None);
+}
+
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
 pub fn stage_preferences() -> StagePreferences {
     CURRENT.read().as_ref().map_or_else(StagePreferences::default, |current| current.stage)

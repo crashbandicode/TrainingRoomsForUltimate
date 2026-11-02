@@ -492,7 +492,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 diagnostic(format_args!("[TrainingRooms] state olimar entry={} line={:?}", raw.entry, state_restore::olimar_line(accessor, &ids)));
             }
             if raw.entry == 0 && !nana {
-                diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", state_restore::item_snapshot(accessor, &ids)));
+                diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", crate::runtime::features::item_bridge::snapshot(accessor)));
             }
             diagnostic(format_args!(
                 "[TrainingRooms] state charge entry={} {:?}",
@@ -766,10 +766,7 @@ unsafe fn finish(raw: &Raw, done: &Done) {
     }
     // The player's held-item snapshot (SPEC-state-04 §5.1): the player record only, never Nana.
     if let Some(item) = &done.item {
-        if let Some(ids) = with(|s| s.ids.clone()) {
-            let other = with(|s| s.last_kinds).unwrap_or([-1, -1]);
-            state_restore::restore_item(accessor, &ids, item, other);
-        }
+        crate::runtime::features::item_bridge::restore(accessor, item);
     }
     // Pokemon Trainer (SPEC-state-05 §5.1 step 4): the trainer may switch again.
     if done.pokemon_switch {
@@ -968,7 +965,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         copy_charge,
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
-        held_item: ids.as_ref().filter(|_| role == Role::Player).map(|ids| state_restore::item_snapshot(accessor, ids)),
+        held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
         saved_stage: Some(n::stage_id()),
         mii: None,
     };
