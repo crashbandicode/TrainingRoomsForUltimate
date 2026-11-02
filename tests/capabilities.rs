@@ -62,6 +62,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "macros::frame_before", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     Boundary { function: "macros::frame_after", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     Boundary { function: "macros::on_p1_input", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
+    // ui-screens: the layer's after-draw call-in from the Training layout tick (the clip editor's held scrub).
+    Boundary { function: "macros::after_layout_draw", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.

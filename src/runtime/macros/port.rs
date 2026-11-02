@@ -177,7 +177,7 @@ pub(crate) mod practice {
     /// # Safety
     /// None needed; kept `unsafe` because the carried callers name it so.
     pub(crate) unsafe fn acquire() -> bool {
-        crate::runtime::ui::facts::fighters_present()
+        crate::runtime::ui::facts::fact_fighters_present()
     }
 
     /// The waiting room's practice session (lobby practice, package 6).

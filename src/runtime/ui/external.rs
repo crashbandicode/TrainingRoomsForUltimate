@@ -14,13 +14,13 @@ use crate::model::menu::table::Editor;
 use crate::runtime::macros::{named_macros, replay_capture};
 
 /// The editors this module drives.
-pub fn is_panel(editor: Editor) -> bool {
+pub fn is_layer_panel(editor: Editor) -> bool {
     matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary | Editor::EditPlacement | Editor::ReplayWindow)
 }
 
 /// Open the panel of `editor`. `slot` is the Record Slot of the page (`recording_slot`), which the library and the export freeze.
 /// True when a panel is on screen afterwards; false when the layer refused (its notice says why).
-pub fn open(editor: Editor, slot: Option<usize>) -> bool {
+pub fn open_panel(editor: Editor, slot: Option<usize>) -> bool {
     match editor {
         Editor::NamedLibrary => named_macros::open_library(slot),
         Editor::SaveSlotToLibrary => named_macros::export_record_slot(slot),
@@ -28,16 +28,16 @@ pub fn open(editor: Editor, slot: Option<usize>) -> bool {
         Editor::ReplayWindow => replay_capture::open_editor(),
         _ => {}
     }
-    visible()
+    panel_up()
 }
 
 /// Any panel of the layer is up (the name page, the library, the placement page, the capture browser or the clip editor).
-pub fn visible() -> bool {
+pub fn panel_up() -> bool {
     named_macros::panel_visible()
 }
 
 /// The clip editor is up: it owns Player 1's controls, so the menu closes and the editor draws over the Training HUD.
-pub fn clip_visible() -> bool {
+pub fn clip_up() -> bool {
     !named_macros::suspended() && replay_capture::panel_visible()
 }
 
@@ -56,21 +56,21 @@ pub fn pad_of(button: Button) -> Option<Pad> {
 }
 
 /// A button on a panel.
-pub fn press(button: Button) {
+pub fn press_panel(button: Button) {
     if let Some(pad) = pad_of(button) {
         named_macros::on_pad(pad);
     }
 }
 
 /// What the panel shows now (the layer's own view: title, footer, the labels of its 4 x 8 page).
-pub fn view() -> Option<View> {
+pub fn panel_view_now() -> Option<View> {
     named_macros::panel_view()
 }
 
 /// Step back out of a panel the menu can no longer show (the menu lost its renderer, the session ended): B until it is gone.
-pub fn close() {
+pub fn close_panel() {
     for _ in 0..4 {
-        if !visible() || clip_visible() {
+        if !panel_up() || clip_up() {
             break;
         }
         named_macros::on_pad(Pad::Back);
@@ -79,12 +79,12 @@ pub fn close() {
 
 /// Why `editor`'s panel did not open, in the words of the layer's own refusals (its notice is hidden while the menu is open, so the
 /// menu says it on the row's help line). The predicates are the layer's: the published facts, the recorder and the save states.
-pub fn refusal(editor: Editor, slot: Option<usize>) -> &'static str {
+pub fn refusal_of(editor: Editor, slot: Option<usize>) -> &'static str {
     use crate::runtime::macros::port;
     if matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary) && slot.is_none() {
         return "Choose a Record Slot first";
     }
-    if !crate::runtime::ui::facts::fighters_present() {
+    if !crate::runtime::ui::facts::fact_fighters_present() {
         return "Wait for both practice fighters";
     }
     if port::recording_or_playback() || port::save_states::is_loading() {

@@ -6,12 +6,13 @@ the host a claim is ON comes from its "on <host>" phrase, so a line names ONLY t
     python3 -I ledger.py release ally "<text>"
 """
 import calendar
+import os
 import re
 import subprocess
 import sys
 import time
 
-OWNER = "Claude 0caa72b8/pkg5-eden"
+OWNER = os.environ.get("LEDGER_OWNER", "Claude 0caa72b8/pkg5-eden")
 LEDGER = "/tmp/deluxe-surface-1007/OWNER-COORDINATION.md"
 SSH = ["/usr/bin/ssh", "-o", "BatchMode=yes", "-i", "/home/intpa/.ssh/id_rsa", "memento-claw-yoga-ubuntu"]
 STALE_HOURS = 12

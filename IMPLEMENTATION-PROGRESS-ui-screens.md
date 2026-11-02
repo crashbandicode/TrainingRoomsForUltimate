@@ -90,3 +90,16 @@ No Eden or Switch build while another stream's claim is open on the host (ledger
    hash-checked, B3-style vanilla base), using the fork's ours-new waiting-UI design files as the reference for contents (check origins in provenance-files.json first); then the tick.
 3. Item icons: yes. Q13: the item grid uses the fork's own 38 icons (our own assets, allowed in our recipe).
 4. Design otherwise accepted. Branching waits for the lead's notice of integrator-2's final merge commit.
+
+## Restart 2026-11-02 ~10:40Z (lead session ended 10:17Z; WIP c0dd217 split and re-committed)
+- Model change: the stream was launched as claude-sonnet-5-5/high; after the resume the transcript shows claude-opus-5-5/high. Stopped and asked;
+  the lead confirmed (operator's explicit choice, routing precedence 1). New hidden watcher `/tmp/ui-screens-watch/watch-opus.ps1` (pair opus-5-5/high,
+  owner = the claude process of this session, log `watch-opus.log`).
+- Restart rules: Ally rows only on the lent rig `C:\Eden\c1162-w5-ally` (stage_a.ps1, restore + verify after each run); never the trainingrooms-pkg2/-pkg5
+  rigs, never answer a firewall prompt; batch rows per boot; commit and release every claim before stopping.
+- Committed: `a67c349` (Recording page panels), `8658812` (install line rendered whole at boot; host test; lead carries it to work/implementation).
+- Eden so far (pkg5 rig, before the ruling; evidence `eden/runs/ui-05/`): Named library empty and with a saved macro, Save slot refusal with an empty slot,
+  Save slot name page, keyboard-confirmed save (diag `name`) written by the worker (`macros/evtest.json`), Edit placement refusal. The run froze behind a
+  firewall prompt before the Replay window row. console.log: 10 `Unmapped` lines at 5 s at 0x109f5f3b7x: outside the plugin window, above 0x1000:
+  attributed stock emulator noise (lead).
+- In the tree, not yet gated: Give item A -> `character_items::request` from the tick (`ui::requests`), B3 vanilla read through `nn::fs` (no heap).

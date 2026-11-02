@@ -466,7 +466,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "721d26c063539b30761aff70878c3c4587ec6dae6020a3f335e41b46454d079c",
+   "dest_sha256": "0c1998bbccb27f8a4165680e6416574d7fd5c89d4b7048d6652d4878354766b8",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -554,7 +554,7 @@
     },
     {
      "old": "fn cpu_kind() -> Option<i32> {\n    unsafe {\n        let cpu = try_get_module_accessor(FighterId::CPU)?;\n        Some(utility::get_kind(&mut *cpu))\n    }\n}",
-     "new": "fn cpu_kind() -> Option<i32> {\n    crate::runtime::ui::facts::cpu_kind()\n}",
+     "new": "fn cpu_kind() -> Option<i32> {\n    crate::runtime::ui::facts::fact_cpu_kind()\n}",
      "reason": "ui-screens: the panels' entry points run on the menu worker, which must not read the game (lead ruling 2026-11-02): the CPU kind is the fact the frame wrapper published (ui::facts), at most a frame old"
     },
     {
@@ -581,7 +581,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "bb4109640211af655c09dd346f3761d2c58a288efe91826d595aa9c72c82cc94",
+   "dest_sha256": "543ee205bbfdaef5dc6c6704a529b242759ce89b3a5c17328aa0cf267534cb81",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -601,7 +601,7 @@
     },
     {
      "old": "unsafe { !Fighter::is_ready_go() || !crate::runtime::macros::port::practice::acquire() }",
-     "new": "!crate::runtime::ui::facts::ready_go() || unsafe { !crate::runtime::macros::port::practice::acquire() }",
+     "new": "!crate::runtime::ui::facts::fact_ready_go() || unsafe { !crate::runtime::macros::port::practice::acquire() }",
      "reason": "ui-screens: opening the replay window runs on the menu worker, which must not read the game (lead ruling 2026-11-02): ready-go is the fact the frame wrapper published (ui::facts), at most a frame old"
     }
    ]

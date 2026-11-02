@@ -1,6 +1,6 @@
 //! The game facts the menu's entry points need, published from game-synchronized context (lead ruling 2026-11-02: game-state
 //! reads run in the frame wrapper or the UI layout tick, never on the free-running menu worker thread, where they would race the
-//! game). `macros::frame_after` calls [`refresh`] once per game frame on the primary CPU body, so a reader on any thread sees an
+//! game). `macros::frame_after` calls [`publish_frame_facts`] once per game frame on the primary CPU body, so a reader on any thread sees an
 //! atomic that is at most one frame old; when no frame has refreshed them for [`FRESH_MS`] (the scene ended, the CPU body is gone)
 //! every fact reads as "not ready". No allocation.
 
@@ -25,7 +25,7 @@ static CPU_KIND: AtomicI32 = AtomicI32::new(NO_KIND);
 ///
 /// # Safety
 /// Called from the frame wrapper of the primary CPU body (`cpu` is that body's live accessor), the game thread.
-pub unsafe fn refresh(cpu: &mut BattleObjectModuleAccessor) {
+pub unsafe fn publish_frame_facts(cpu: &mut BattleObjectModuleAccessor) {
     READY_GO.store(Fighter::is_ready_go(), Ordering::Release);
     PRESENT.store(recorder::body_of(0).is_some(), Ordering::Release);
     CPU_KIND.store(utility::get_kind(cpu), Ordering::Release);
@@ -33,7 +33,7 @@ pub unsafe fn refresh(cpu: &mut BattleObjectModuleAccessor) {
 }
 
 /// The scene ended or the bodies were destroyed: nothing is ready until the next frame says so.
-pub fn clear() {
+pub fn forget_frame_facts() {
     STAMP_MS.store(0, Ordering::Release);
 }
 
@@ -43,17 +43,17 @@ fn fresh() -> bool {
 }
 
 /// `Fighter::is_ready_go()` as of the last frame.
-pub fn ready_go() -> bool {
+pub fn fact_ready_go() -> bool {
     fresh() && READY_GO.load(Ordering::Acquire)
 }
 
 /// Player 1's body and the CPU's body both exist (the practice session's two fighters).
-pub fn fighters_present() -> bool {
+pub fn fact_fighters_present() -> bool {
     fresh() && PRESENT.load(Ordering::Acquire)
 }
 
 /// The CPU's fighter kind as of the last frame.
-pub fn cpu_kind() -> Option<i32> {
+pub fn fact_cpu_kind() -> Option<i32> {
     let kind = CPU_KIND.load(Ordering::Acquire);
     (fresh() && kind != NO_KIND).then_some(kind)
 }

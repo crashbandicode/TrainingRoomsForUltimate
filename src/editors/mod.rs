@@ -3,3 +3,5 @@
 //! include `model` alone), so these live beside it; the menu worker (`runtime::ui::worker`) is their only caller.
 
 pub mod clip;
+#[cfg(any(test, target_os = "switch"))]
+pub mod stages;

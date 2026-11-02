@@ -14,6 +14,7 @@ use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
+use crate::runtime::ui::requests;
 use crate::runtime::ui::thumbs;
 use crate::runtime::ui::view::Panes;
 use crate::runtime::ui::{hud, pane, registry};
@@ -130,11 +131,11 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             }
         }
     }
+    // What the menu worker asked of the game (the Give item grid's item): made here, where the game is.
+    requests::run_menu_requests();
     // The clip editor's held scrub repeats once per drawn frame of the Training layout (the layer's fter_draw, a no-op unless the
     // editor is in the foreground).
-    if crate::runtime::macros::ready() {
-        crate::runtime::macros::replay_capture::after_draw();
-    }
+    crate::runtime::macros::after_layout_draw();
     // The stage grid's thumbnails (SPEC-core-07 section 4.5): requested when a stage page shows, released when it changes or
     // the menu closes; `thumbs::run` also lets the helper retire released textures, once per UI frame.
     if !visible {

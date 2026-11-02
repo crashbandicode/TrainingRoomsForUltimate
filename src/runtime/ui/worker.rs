@@ -23,7 +23,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, input_delay, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
-use crate::runtime::ui::external;
+use crate::runtime::ui::{external, requests};
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, OPEN};
 
 const RING: usize = 64;
@@ -177,7 +177,7 @@ fn run() {
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
-        sync(&mut session);
+        sync_panels(&mut session);
         if session.watching() {
             std::thread::park_timeout(POLL);
         } else {
@@ -226,9 +226,15 @@ fn handle(code: u8, s: &mut Session) {
         m.set_console(console_mode());
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
-            external::press(button);
+            external::press_panel(button);
         } else {
             m.press(button);
+            if let Some(item) = m.take_give_item() {
+                requests::give_item(item);
+            }
+            if let Some((tile, button)) = m.take_stage_press() {
+                stage_press(m, tile, button, &mut s.refusal);
+            }
         }
         m.is_closed()
     };
@@ -237,13 +243,13 @@ fn handle(code: u8, s: &mut Session) {
             close(m);
         }
     } else {
-        sync(s);
+        sync_panels(s);
     }
 }
 
 /// Follow the layer's panels (`model::flow`): open the one the menu just entered, hand the menu over to the clip editor, step back out
 /// of a panel that closed, and publish the frame when it changed.
-fn sync(s: &mut Session) {
+fn sync_panels(s: &mut Session) {
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
     named_macros::run_deferred();
     if s.menu.is_none() {
@@ -252,30 +258,30 @@ fn sync(s: &mut Session) {
     let open = OPEN.load(Ordering::Acquire);
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
-            Some(Screen::External(editor)) if external::is_panel(*editor) => Some(*editor),
+            Some(Screen::External(editor)) if external::is_layer_panel(*editor) => Some(*editor),
             _ => None,
         });
         if let Some(editor) = entered {
             let slot = s.menu.as_ref().and_then(record_slot);
-            if external::open(editor, slot) {
+            if external::open_panel(editor, slot) {
                 s.phase = Phase::Panel;
                 s.panel = Some(editor);
             } else {
-                s.refusal = Some(external::refusal(editor, slot));
+                s.refusal = Some(external::refusal_of(editor, slot));
                 if let Some(m) = s.menu.as_mut() {
                     m.press(Button::B);
                 }
             }
         }
     }
-    let seen = Seen { menu_open: open, panel_visible: external::visible(), clip_visible: external::clip_visible() };
+    let seen = Seen { menu_open: open, panel_visible: external::panel_up(), clip_visible: external::clip_up() };
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
     match step {
         Step::Nothing => {}
         Step::CloseLayer => {
             // The menu lost its renderer or the session ended: the layer's panel goes with it.
-            external::close();
+            external::close_panel();
             s.panel = None;
         }
         Step::PopRow => {
@@ -304,6 +310,25 @@ fn sync(s: &mut Session) {
         publish_frame(s);
     }
 }
+/// A, X or Y on the Lobby Stages grid: the stage editor applies it to the menu's kept values; a Direct pick is requested from the
+/// waiting room's practice stage (state only: the request is made by the stage hooks on the game's side).
+fn stage_press(m: &mut Menu, tile: u16, button: Button, note: &mut Option<&'static str>) {
+    use crate::editors::stages::{Effect, StageEditor, ORDER_KEY, PREFERENCES_KEY};
+    let mut editor = StageEditor::read(m.kept(ORDER_KEY), m.top_extra(PREFERENCES_KEY));
+    let effect = editor.press(usize::from(tile), button);
+    if effect == Effect::Nothing {
+        return;
+    }
+    m.set_kept(ORDER_KEY, editor.order_value());
+    m.set_top_extra(PREFERENCES_KEY, editor.preferences_value());
+    if let Effect::Request(selection) = effect {
+        *note = Some(match crate::runtime::lobby::practice_stage_request::request(selection) {
+            Ok(_) => "Stage requested: it loads in the waiting room",
+            Err(why) => why,
+        });
+    }
+}
+
 /// The page's Record Slot (the row `recording_slot`, one-hot over the five slots).
 fn record_slot(menu: &Menu) -> Option<usize> {
     menu.settings().menu.get("recording_slot")?.iter().position(|v| *v != 0)
@@ -324,10 +349,19 @@ fn publish_frame(s: &Session) {
         clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
     } else if s.phase == Phase::Panel {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
-        let Some(view) = external::view() else { return };
+        let Some(view) = external::panel_view_now() else { return };
         panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
     } else {
         frame_of(menu, &mut next, stage_label);
+        if let Some(Screen::Grid { layout, page, cell }) = menu.screen().copied() {
+            if layout.kind == crate::model::menu::grid::GridKind::Stages {
+                let editor = crate::editors::stages::StageEditor::read(
+                    menu.kept(crate::editors::stages::ORDER_KEY),
+                    menu.top_extra(crate::editors::stages::PREFERENCES_KEY),
+                );
+                editor.decorate(&mut next, layout.tile(page, cell).unwrap_or(0));
+            }
+        }
         if let Some(reason) = s.refusal {
             next.help[1].clear();
             let _ = core::fmt::Write::write_str(&mut next.help[1], reason);

@@ -1447,7 +1447,7 @@ fn request_kind(kind: i32) {
 }
 
 fn cpu_kind() -> Option<i32> {
-    crate::runtime::ui::facts::cpu_kind()
+    crate::runtime::ui::facts::fact_cpu_kind()
 }
 
 pub(crate) fn fighter_label(kind: i32) -> String {

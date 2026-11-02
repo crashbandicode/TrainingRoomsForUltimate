@@ -318,7 +318,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     };
     let _ = write!(frame.crumb, "  >  {title}   page {} of {}", page + 1, layout.pages());
     let _ = frame.help[0].write_str(match layout.kind {
-        GridKind::Items => "Pick the item the CPU or you carry on load.",
+        GridKind::Items => "A gives Player 1 this item now.",
         GridKind::Stages => "Stages the lobby cycles through; All takes every stage.",
     });
     let _ = frame.hint.write_str("D-pad move   L/R page   B back");
@@ -627,6 +627,28 @@ mod tests {
         let mut m = Menu::new(Settings::factory(), Env { console: mode, ..Env::default() });
         open(&mut m, title);
         m
+    }
+
+    #[test]
+    fn a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing() {
+        use crate::model::menu::grid::ConsoleMode;
+        let mut m = open_grid(ConsoleMode::Docked, "Give item");
+        m.press(Button::Right);
+        m.press(Button::Right);
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(2));
+        assert_eq!(m.take_give_item(), None, "taken once");
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(2), "the already-chosen item is asked for again");
+        // Handheld: the third page starts at item 32.
+        let mut m = open_grid(ConsoleMode::Handheld, "Give item");
+        m.press(Button::R);
+        m.press(Button::R);
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), Some(32));
+        let mut m = open_grid(ConsoleMode::Docked, "Lobby Stages");
+        m.press(Button::A);
+        assert_eq!(m.take_give_item(), None);
     }
 
     #[test]

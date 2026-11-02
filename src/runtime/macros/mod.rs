@@ -104,7 +104,7 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             replay_preview::after_frame(module);
             named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
-            crate::runtime::ui::facts::refresh(module);
+            crate::runtime::ui::facts::publish_frame_facts(module);
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
             named_macros::service_keyboard();
             named_macros::service_character();
@@ -114,6 +114,15 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             diag::run_pending();
         }
     }
+}
+
+/// After the Training layout drew (the UI tick, once per drawn frame): the clip editor's held scrub repeats (the layer's `after_draw`).
+/// A boundary of the layer like `frame_after`: nothing runs until its install set READY.
+pub(crate) fn after_layout_draw() {
+    if !ready() {
+        return;
+    }
+    replay_capture::after_draw();
 }
 
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.

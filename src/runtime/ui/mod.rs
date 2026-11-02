@@ -19,6 +19,7 @@ pub mod pane;
 #[cfg(feature = "diag")]
 pub mod probe;
 pub mod registry;
+pub mod requests;
 pub mod state;
 pub mod texture;
 pub mod thumbs;
@@ -91,7 +92,7 @@ pub fn clear_session_state() {
     state::PAUSE_ACTIVE.store(false, Ordering::Release);
     crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
     input::reset_session();
-    facts::clear();
+    facts::forget_frame_facts();
     worker::push_reset();
     state::FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
