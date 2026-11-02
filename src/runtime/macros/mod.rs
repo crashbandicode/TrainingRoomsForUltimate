@@ -19,6 +19,7 @@ pub(crate) mod diag;
 pub(crate) mod live_replay;
 pub(crate) mod named_macros;
 pub(crate) mod port;
+pub(crate) mod identity;
 pub(crate) mod replay_preview;
 pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
@@ -69,13 +70,12 @@ pub(crate) fn named_active() -> bool {
 }
 
 /// Boot: the replay-capture preference and writer, the named library's selected macro, the capture adapter's guards and hooks (the seam
-/// installer decides; hooks only when the INI says on). Returns `(named layer ready, live capture adapter ready)`.
+/// installer decides; the guarded adapter remains resident regardless of the initial preference). Returns `(named layer ready, live capture adapter ready)`.
 pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
     // R2-1: every game call the layer makes is a guarded row (NamedMacros, plus the recorder's own); a rejected row leaves the whole layer off.
     if !rows_ok {
         return (false, false);
     }
-    READY.store(true, Ordering::Release);
     replay_store::init();
     named_macros::init();
     replay_capture::init();
@@ -83,6 +83,9 @@ pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
         named_macros::prepare_buffers();
     }
     live_replay::init();
+    // Publish only after boot has finished mutating the worker-owned layer state.
+    READY.store(true, Ordering::Release);
+    crate::runtime::ui::worker::wake();
     #[cfg(feature = "diag")]
     diag::start();
     (true, replay_store::toggle().is_ready())
@@ -100,7 +103,6 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
     step(11);
-    live_replay::before_frame(fighter);
     step(12);
     replay_capture::before_frame(fighter);
     step(13);
@@ -126,7 +128,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
     step(21);
-    live_replay::after_frame(fighter);
     step(22);
     replay_capture::after_frame(fighter);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
@@ -145,22 +146,22 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
             crate::runtime::ui::facts::publish_frame_facts(module);
+            crate::runtime::ui::worker::wake();
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
             step(28);
             let _scope = HookScope::enter_hook(HookId::NamedService);
-            named_macros::service_keyboard();
             step(29);
-            named_macros::service_character();
             step(30);
-            replay_capture::service_reload();
             step(31);
-            sync_owner();
             #[cfg(feature = "diag")]
             {
                 step(32);
-                diag::run_pending();
                 diag::frame_done();
             }
+            identity::service();
+            named_macros::service_character_request();
+            replay_capture::service_reload_request();
+            port::slots::service_slot_request();
         }
     }
     step(0);
@@ -180,11 +181,12 @@ pub(crate) fn after_layout_draw() {
     if !ready() {
         return;
     }
-    replay_capture::after_draw();
+    crate::runtime::ui::facts::publish_scene_facts();
+    port::post_clip_draw();
 }
 
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.
-fn sync_owner() {
+pub(crate) fn sync_owner() {
     use crate::model::input_delay::Owners;
     let held = replay_capture::panel_visible() || replay_capture::browser_visible() || replay_preview::occupied();
     if held {
@@ -199,9 +201,9 @@ fn sync_owner() {
 /// # Safety
 /// `controller` is the live `Controller` of the mapping call (or 0); `out` the record the game just mapped.
 pub(crate) unsafe fn on_p1_input(controller: usize, out: *mut crate::model::input_delay::MappedInputs) {
-    if controller == 0 || !ready() || !named_macros::clip_foreground() {
+    if controller == 0 || !ready() || !named_macros::hook_queries().clip_foreground {
         return;
     }
-    replay_capture::on_input(&port::input::Controller::read(controller));
+    port::post_clip_input(port::input::Controller::read(controller));
     *out = crate::model::input_delay::MappedInputs::NEUTRAL;
 }

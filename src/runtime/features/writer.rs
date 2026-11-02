@@ -50,8 +50,11 @@ pub fn request_shortcuts(shortcuts: MenuShortcuts) {
     *SHORTCUTS.lock() = Some(shortcuts);
 }
 
-/// Queue a `replay_capture.ini` rewrite with the toggle's new value (Q7). The value is live at once.
+/// Queue a `replay_capture.ini` rewrite (Q7) and request the same live preference.
+/// The adapter preserves the current record's latch; this governs the next record.
 pub fn request_replay_capture(enabled: bool) {
+    let result = crate::runtime::macros::replay_store::toggle().request_choice(usize::from(enabled));
+    diagnostic(format_args!("[ReplayCapture] menu preference enabled={enabled} result={result:?}"));
     CAPTURE_ENABLED.store(enabled, Ordering::Release);
     *REPLAY_CAPTURE.lock() = Some(enabled);
 }

@@ -55,7 +55,9 @@ pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {
 /// unplugged, SPEC-core-03 §2.3); the worker's model is rebuilt from the committed settings at the next opening.
 pub fn release_menu() {
     use crate::model::input_delay::Owners;
-    OPEN.store(false, Ordering::Release);
+    if OPEN.swap(false, Ordering::AcqRel) {
+        crate::runtime::ui::menu_app::note_open();
+    }
     CLOSING.store(false, Ordering::Release);
     CLOSE_COUNT.store(0, Ordering::Release);
     MENU_SHOWN.store(false, Ordering::Release);

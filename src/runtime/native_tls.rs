@@ -36,4 +36,3 @@ impl Tls for NativeTls {
         unsafe { set_tls_value(key, value) };
     }
 }
-

@@ -51,3 +51,29 @@ Build: diag `dcf52de3` (stream/pkg6 `98d6f5b`; resident 3,158,016 B) + standalon
 | Install line | **fail** (not package 6's code) | the one install line is 8,142 characters and is cut before `result=` and `heap_allocations=` (the s6-02 defect again, with the merged packages' rows) |
 
 Findings for the lead: (1) install line cut by the line limit; (2) entry-2 collision between the cycle's helper source and a native extra CPU (the fork's `legacy_training_owner_reserved`: "this feature reserves only native Training entry2"); (3) R5: allocations in hook scopes while specific fighters are active, not yet attributed to a hook (`hook_stats` has no per-scope allocation counter; next diag build splits them); (4) the practice lease is never acquired in native Training.
+## s6-05, 2026-11-02 12:30-12:37Z, Surface: the merged tree's NRO (work/implementation 566780a, diag `3d7a9215`, integrator-3's request)
+Cold boot: install line about 23 s after `game.load`, main menu about 40 s, no plugin-silent stall; install line 9,207 characters ending `result=installed ... heap_allocations=0`. Pass: roster started, diag settings reload with periodic lines after it, `[CyclePreload] applied` (through `before_publish`), preload status, P1 hot swap (Kirby), record (50 frames) and playback, menu open/close x3 last (closed and alive each time). FAIL: R5, hook allocations rising about 180-210 per 10 s (2,302 at the end). `console.log` 12,414 lines, 0 matches.
+
+## s6-06, 2026-11-02 12:47-13:00Z, Surface: stream/pkg6 diag `a3bcb55e` (R5 attribution, Solo Popo kept keys, F9 research)
+- **R5 attributed:** `allocs=...,cpu_frame:192,input_caller_a_note:25,live_replay:5,roster_input:6,roster_preload:3943`: package 6's preload planner (its 1 Hz planning tick builds Vecs: `OrderedFighterRoster::fighters()`, `ordered_kirby_hat_kinds`, collects in `character_roster::preload_targets`). Root fix next.
+- **Solo Popo fixed:** `state popo entry=0 nana_removed=true`, load done, a new save accepted; screenshot `shots/*-solo-popo-after-load.png` shows Popo alone.
+- **Lease:** `practice_session held=true` in native Training; a Training hot swap keeps the native entry, so the session stays (the fork's design: the lease retires when entries are replaced). The retirement row belongs to the lobby set.
+- **F9 research:** pause-menu dumps (`pausemenu-*.bin`): byte `+0xb40` of the pause menu object is No. of CPUs (1, 2, 3, 1 as changed; it changes while paused, before the game activates the parked entry on close).
+- Pass again: install line, item grant/save/restore with the owner absent, Kirby hat restore through the hat engine, preload commit, swaps, menu open/close x3 last. `console.log` 12,421 lines, 0 matches.
+## s6-07, 2026-11-02 13:18-13:32Z, Surface: stream/pkg6 diag `4938d913` (R5 v1, F9 give-back, F11 active body)
+- Pass: install line (`heap_allocations=0`), preload, swaps, Kirby hat, items.
+- **R5 still failing:** `roster_preload` was about 20/s (2,253). A bisection by diag settings reload (`eden/r5_bisect_s6.py`) gave:
+  - preload slots 0: 0/s
+  - hats only: about 3/s
+  - fighters only: about 22/s
+  - group swap off: about 23/s
+  The source is the ordinary-Mii owner lane of the planner (`cycle_preload::mixed_targets`: a `Vec` from `fighters()` and a `MiiPreferences` clone per planning step). It is fixed in 215dbfd (R5 v2).
+- **Lease:** not retired by a Training swap, which is the fork's design. The row moves to lobby set D.
+- **F9 give-back crashed the game, and it is backed out in 215dbfd.**
+  - Diag clock to console clock: diag ms - 526,436,281. This was checked on three settings/save_states writes.
+  - The diag log shows `#703 cpu_quantity=3 seen_by_service` and then `#704 give_back slot=3 cpu_quantity=Some(3) helper=0x2 native=0x5` at console 701.61 s. `#705 [TrioBoundary] reload entry=0x11e5710000 owner=3 incoming=[5] active=[2]` follows.
+  - At 701.68 s, 70 ms later, the console shows `Cannot execute instruction at unmapped address 0x0`. LR is main+0x6222a0. The call site is main+0x62229c: `ldr x0,[x19,#0x438]; ldr x8,[x0]; ldr x8,[x8,#0x2f0]; blr x8`, a module vtable slot that is null. R27 is the entry we reloaded (0x11e5710000).
+  - The stack holds game frames only, with no plugin frame: scene update → main+0x155c954 → main+0x6573f0 (in main+0x655080, an entry-level function: it writes entry +0x597c/+0x5980) → main+0x60fc6c → main+0x6222a0.
+  - Reading: the game activates or re-initialises entry 3 for the raised count while our native reload of that entry is in flight. Our reload was started from the entry's loader callback in the same frame the count changed. This matches the "reload under activation" hypothesis.
+  - Entry 2's helper was leased by a Kirby hat (`Wait`), so it was not given back. Without a give-back it shows as the extra CPU at count 2 (the open F9 defect).
+- **Unexplained, new in this build:** 1,152 `Unmapped Read16 @ 0xfffe7683fffe76a2..a8` (four halfwords: one misaligned 8-byte load), one burst per frame. They run from console 84.18 s to 89.58 s, which is diag 526,520,459 onward: 5 ms after the Training scene's first loader callback (`#85 cpu_quantity=4294967294`, unreadable at scene init) and during its load. They are absent in s6-04/05/06 (same Eden binary). The address is misaligned, so it is not one of our guarded chain reads (every step is 8-aligned). Not attributed yet: s6-08 shows whether they recur without the F9 code.

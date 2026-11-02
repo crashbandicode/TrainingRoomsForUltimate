@@ -1,7 +1,7 @@
 //! A small source scanner for the runtime's call graph (review R2-1): it reads `src/runtime/**/*.rs` as text
 //! (the runtime is Switch-only and cannot be compiled or run on the host), finds every function, its calls and
 //! the game-offset constants it names, and answers "which sites can this function reach". It over-approximates
-//! on purpose (a method call reaches every function of that name; a bare name reaches the functions of that
+//! on purpose (a method call reaches every receiver function of that name; a bare name reaches the functions of that
 //! name in its own file or in a file it imports from), so a missed edge is unlikely and an extra edge shows up
 //! as an unexpected capability the table has to name.
 //!
@@ -29,6 +29,8 @@ pub struct Func {
     /// The innermost `mod` of the definition, else the file's stem (`cpu`; `mod.rs` takes its folder's name).
     pub module: String,
     pub name: String,
+    /// A declared `self` receiver; free/associated functions cannot be dot-call targets.
+    pub has_receiver: bool,
     /// The text of the attributes before it (`skyline::hook(offset = sites_pkg2::SDI_HOOK_OFFSET)`).
     pub attrs: String,
     pub body: Vec<Tok>,
@@ -291,8 +293,14 @@ impl Parser<'_> {
                     // The body: the first `{` before a `;` outside every group.
                     let mut k = name_at + 1;
                     let mut body = None;
+                    let mut has_receiver = false;
                     while k < toks.len() {
                         if is_punct(&toks[k], '(') || is_punct(&toks[k], '[') {
+                            if is_punct(&toks[k], '(') {
+                                has_receiver |= toks[k + 1..matching(toks, k)].iter()
+                                    .take_while(|t| !is_punct(t, ',') && !is_punct(t, ':') && **t != Tok::PathSep)
+                                    .any(|t| ident(t) == Some("self"));
+                            }
                             k = matching(toks, k) + 1;
                         } else if is_punct(&toks[k], '{') {
                             body = Some((k, matching(toks, k)));
@@ -306,7 +314,7 @@ impl Parser<'_> {
                     match body {
                         Some((open, close)) => {
                             let inner = &toks[open + 1..close];
-                            self.funcs.push(Func { file: self.file.to_owned(), module: module.to_owned(), name, attrs: attrs.clone(), body: inner.to_vec() });
+                            self.funcs.push(Func { file: self.file.to_owned(), module: module.to_owned(), name, has_receiver, attrs: attrs.clone(), body: inner.to_vec() });
                             // Nested items (a local `fn`, a `mod`) are found too; the outer function keeps them.
                             self.items(inner, module);
                             i = close + 1;
@@ -555,7 +563,7 @@ impl Graph {
         let Some(last) = segments.last() else { return Vec::new() };
         let Some(candidates) = self.by_name.get(last) else { return Vec::new() };
         if method {
-            return candidates.clone();
+            return candidates.iter().copied().filter(|&index| self.funcs[index].has_receiver).collect();
         }
         if segments.len() >= 2 {
             let mut module = segments[segments.len() - 2].as_str();
@@ -707,4 +715,71 @@ pub fn model_offsets(model_dir: &Path) -> BTreeMap<String, usize> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod receiver_tests {
+    use super::*;
+
+    fn fixture() -> Graph {
+        let mut parser = Parser { file: "fixture.rs", funcs: Vec::new(), in_macro: false };
+        parser.items(&lex(r#"
+            fn entry(value: &Runtime) { value.finish(); }
+            fn direct() { finish(); }
+            fn qualified() { fixture::finish(); }
+            fn finish() { unrelated_native(); }
+            fn unrelated_native() {}
+            fn real_native() {}
+            fn other_native() {}
+            fn associated_native() {}
+            impl Runtime { fn finish(&self) { real_native(); } }
+            impl Other { fn finish(self: &Self) { other_native(); } }
+            impl Associated { fn finish() { associated_native(); } }
+        "#), "fixture");
+        let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for (index, func) in parser.funcs.iter().enumerate() {
+            by_name.entry(func.name.clone()).or_default().push(index);
+        }
+        Graph { funcs: parser.funcs, aliases: BTreeMap::new(), imports: BTreeMap::new(), by_name, dynamic: Vec::new() }
+    }
+
+    fn reachable_names(graph: &Graph, entry: &str) -> BTreeSet<String> {
+        let mut pending = graph.find(&format!("fixture::{entry}"));
+        assert_eq!(pending.len(), 1);
+        let mut seen = BTreeSet::new();
+        while let Some(index) = pending.pop() {
+            if seen.insert(index) {
+                pending.extend(graph.callees(index));
+            }
+        }
+        seen.into_iter().map(|index| graph.funcs[index].name.clone()).collect()
+    }
+
+    #[test]
+    fn dot_call_excludes_unrelated_free_and_associated_functions() {
+        let graph = fixture();
+        let reachable = reachable_names(&graph, "entry");
+        assert!(!reachable.contains("unrelated_native"));
+        assert!(!reachable.contains("associated_native"));
+    }
+
+    #[test]
+    fn dot_call_retains_all_ambiguous_receivers_and_their_native_dependencies() {
+        let graph = fixture();
+        let entry = graph.find("fixture::entry")[0];
+        let targets = graph.callees(entry);
+        assert_eq!(targets.len(), 2);
+        assert!(targets.iter().all(|&index| graph.funcs[index].has_receiver));
+        let reachable = reachable_names(&graph, "entry");
+        assert!(reachable.contains("real_native"));
+        assert!(reachable.contains("other_native"));
+    }
+
+    #[test]
+    fn direct_and_qualified_calls_still_reach_free_functions() {
+        let graph = fixture();
+        for entry in ["direct", "qualified"] {
+            assert!(reachable_names(&graph, entry).contains("unrelated_native"), "{entry}");
+        }
+    }
 }

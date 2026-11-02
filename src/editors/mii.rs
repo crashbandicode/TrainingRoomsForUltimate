@@ -14,6 +14,7 @@ pub struct MiiList {
     catalog: CatalogMenu,
     preferences: Preferences,
     opened: Option<u8>,
+    epoch: u64,
 }
 
 impl MiiList {
@@ -28,7 +29,7 @@ impl MiiList {
             #[cfg(not(feature = "mii-editor-alpha"))]
             None => return None,
         };
-        Some(Self { catalog, preferences, opened: None })
+        Some(Self { catalog, preferences, opened: None, epoch })
     }
 
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
@@ -42,6 +43,8 @@ impl MiiList {
         self.catalog.open_list(*class_kind, &self.preferences);
         self.opened = Some(class);
     }
+
+    pub fn epoch(&self) -> u64 { self.epoch }
 
     pub fn leave(&mut self) { self.opened = None; }
 

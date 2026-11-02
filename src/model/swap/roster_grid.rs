@@ -445,6 +445,13 @@ pub fn select_all(kinds: &[u32], values: &mut [u8]) {
 
 /// CSS row-major order, once per native group, with selected starting forms.
 pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {
+    let mut out = Vec::new();
+    css_order_each(kinds, values, excluded, |kind| out.push(kind));
+    out
+}
+
+/// `css_order` without heap: each kind in CSS order is handed to `each` (the planner's per-tick form).
+pub fn css_order_each(kinds: &[u32], values: &[u8], excluded: Option<u32>, mut each: impl FnMut(u32)) {
     GRID.iter()
         .filter_map(|slot| match slot {
             Slot::Fighter(kind, _) => Some(*kind),
@@ -459,7 +466,7 @@ pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32
             _ => None,
         })
         .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))
-        .collect()
+        .for_each(&mut each);
 }
 
 impl RosterGrid {

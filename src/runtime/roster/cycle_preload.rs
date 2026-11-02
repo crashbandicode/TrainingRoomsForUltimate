@@ -369,11 +369,11 @@ pub(crate) fn mixed_targets(
 ) -> [Option<Target>; MAX_TARGETS] {
     use crate::engine::swap::mii_cycle::{self, Identity, Live};
     let roster = if role == 0 {
-        menu.player_roster.fighters()
+        menu.player_roster.fighters_excluding_fixed(None)
     } else {
-        menu.cpu_roster.fighters()
+        menu.cpu_roster.fighters_excluding_fixed(None)
     };
-    let preferences = crate::runtime::compat::common::menu::mii_preferences();
+    let preferences = crate::runtime::compat::menu::mii_preferences_view();
     let qualify = |step: mii_cycle::Step| match step.target {
         mii_cycle::Target::Fighter(kind) => Some(Target::fighter(kind)),
         mii_cycle::Target::Original => Some(match original {

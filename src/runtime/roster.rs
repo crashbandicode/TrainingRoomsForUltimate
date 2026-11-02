@@ -128,6 +128,20 @@ pub(crate) unsafe fn handle_operator_input(out: *mut crate::model::input_delay::
 /// engines serve (package 3's save-state load hands Kirby's hat to the hat engine) check it before they ask.
 static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// F9: the guarded rows of the No. of CPUs path (`sites_pkg6`): the game's root load, its reader of the field and the pause menu's
+/// writer. `native_source::training_cpu_quantity` reads the field only when all three passed at boot.
+pub(crate) const CPU_QUANTITY_ROWS: [&str; 3] = ["roster_cpu_quantity_root", "roster_cpu_quantity_reader", "roster_cpu_quantity_writer"];
+static CPU_QUANTITY_GUARDED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_cpu_quantity_guarded(ok: bool) {
+    CPU_QUANTITY_GUARDED.store(ok, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether the No. of CPUs field may be read (its rows passed their guards).
+pub(crate) fn cpu_quantity_guarded() -> bool {
+    CPU_QUANTITY_GUARDED.load(std::sync::atomic::Ordering::Acquire)
+}
+
 /// Whether the roster cycle is running.
 pub(crate) fn running() -> bool {
     STARTED.load(std::sync::atomic::Ordering::Acquire)
@@ -156,8 +170,8 @@ extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
     unsafe { turnip_identity::on_load(info) };
 }
 
-/// Start the cycle, in the order the fork's `main` did: the preload cache first (the INI is read once, before anything asks for a
-/// snapshot), the trace recorder, the native patches (unlink guard, Lua GC guard), the lifecycle observations and last the roster
+/// Start the cycle: sync the preload cache from the already published settings.json before anything asks for a snapshot,
+/// then the trace recorder, native patches (unlink guard, Lua GC guard), lifecycle observations and last the roster
 /// itself, whose `init` installs the service callback, the sources, the body bank and the Mii gates. Each file checks its own seam
 /// rows through `seams::seam_install::gate` and installs nothing when they are refused. Called once from boot, before the install
 /// line.
