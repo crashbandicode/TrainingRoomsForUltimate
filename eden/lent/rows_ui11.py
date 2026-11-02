@@ -60,11 +60,14 @@ def main():
     r6.row("Player Character: one fighter picked (player_character one-hot)", len(picked) == 1, f"index={picked}")
     # Read whole lines from the retained file: the plug transport truncates each
     # line, which can hide coverage and the per-hook allocation attribution.
-    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=' | ForEach-Object {{ $_.Line }}")
+    stats = r6.ps(f"Get-Content '{r6.SD}\\practice-diagnostics.log' | Select-String -Pattern 'hook_stats allocations=|\\[LayoutArchive\\]' | ForEach-Object {{ $_.Line }}")
     (r6.OUT / "roster-hook-stats.log").write_text(stats, encoding="utf-8")
     ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
     r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
            "; ".join(reasons) if reasons else f"{len(hook_stats.parse(stats))} complete samples")
+    ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
+    r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
+           "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
     (r6.OUT / "rows-roster.json").write_text(json.dumps(r6.ROWS, indent=1))
     print("ROWS DONE", flush=True)
     if not all(row["ok"] for row in r6.ROWS):

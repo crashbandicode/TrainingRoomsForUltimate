@@ -3,6 +3,39 @@
 Dated 2026-11-02. Stream `ui-screens` (lead 0caa72b8). Screenshots and logs: `eden/runs/<label>/` (gitignored); the shots of the
 rows are listed per run.
 
+## Current acceptance status (ui-screens successor, 2026-11-02)
+
+The historical runs below are not acceptance evidence for the current candidate.
+In particular, their `Unmapped` failures must not be dismissed in the final gate:
+every retained final run requires zero `Unmapped` and zero hook allocation deltas.
+
+Waiting archive/tick/HUD source through `cd09454` is **not yet runtime accepted**.
+Builder `44177d8` built and passed 11 tests; private generation/payload/pane evidence
+is in `runs/ui-waiting-build-44177d8/`. The 549 added panes preserve all 63 stock
+pane records and all 183 non-layout archive payloads. This establishes artifact
+construction, not rendering or native lifetime safety.
+
+The ui-11 driver now uses `hook_stats.gate` on complete log lines and requires
+archive/menu-draw coverage, every delta zero and the final allocation total zero.
+`gate_layout_archives` checks the separate per-load counter, matching releases
+and the 5,000 ms minimum grace; no skipped injection passes. All raw lines and
+row results are retained. A failure exits the row driver nonzero.
+
+Still required in admitted, muted, batched Eden runs:
+
+| Rows | Required evidence |
+| --- | --- |
+| ui-11 roster and Solo Popo | selections and role-specific marks persist; open/close and swap remain responsive |
+| Portraits | native costume/mod-aware image, absent-image text fallback, repeated pages and layout retirement |
+| Mii lists | all three classes, saved/replay entries, role switch, available busts, selection and Add New/editor actions |
+| Waiting host | menu/input/notices; native pause/dialog ownership; request off/on hides/restores the host; Training/waiting transitions and same-address registration refresh |
+| B3 and archive lifetime | modified archive injected via vanilla base; zero per-load allocations; every release >=5 s; boot/re-enter/stage/mode/hot-swap/reset hand-outs and any buffer-pressure refusal counted |
+
+Each final run retains source/NRO identity, full diagnostics and console log,
+`run.json`, `memory.peak`, reviewed screenshots and verified profile restoration.
+Waiting-room hosting must use an authorized host; this stream does not host from
+the Ally.
+
 ## ui-01 .. ui-05: Ally, rig `C:\Eden\trainingrooms-pkg5` (before the restart rules; that rig had no firewall rule)
 Build: diag of `a67c349` + the install-line fix (`81fcfdce…`), CPU pilot, tile cursor, nro_hook, param_hook. Route: Final Destination,
 Steve vs the CPU. Rows that ran (ui-05, shots in `eden/runs/ui-05/shots/`):
