@@ -44,6 +44,10 @@ pub enum HookId {
     CpuStickXNoClamp,
     CpuStickYNoClamp,
     CpuShieldParam,
+    /// Package 5: the layout archive hook and the two UI anchors (R2-7).
+    UiArchive,
+    UiPassCalculate,
+    UiRegisterCalculate,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -74,6 +78,9 @@ impl HookId {
         HookId::CpuStickXNoClamp,
         HookId::CpuStickYNoClamp,
         HookId::CpuShieldParam,
+        HookId::UiArchive,
+        HookId::UiPassCalculate,
+        HookId::UiRegisterCalculate,
         HookId::Other,
     ];
 
@@ -100,6 +107,9 @@ impl HookId {
             HookId::CpuStickXNoClamp => "cpu_stick_x_no_clamp",
             HookId::CpuStickYNoClamp => "cpu_stick_y_no_clamp",
             HookId::CpuShieldParam => "cpu_shield_param",
+            HookId::UiArchive => "ui_archive",
+            HookId::UiPassCalculate => "ui_pass_calculate",
+            HookId::UiRegisterCalculate => "ui_register_calculate",
             HookId::Other => "other",
         }
     }
@@ -109,13 +119,33 @@ thread_local! {
     /// Nesting depth of hooks on this thread. A const-initialised `Cell` without a destructor needs
     /// no allocation to exist.
     static HOOK_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// Nesting depth of per_load sections on this thread.
+    static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
 }
 
 static HOOK_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+/// Allocations of the one-per-load kind inside a hook (per_load), counted apart from the steady-state ones.
+static LOAD_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ENTRIES: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
 
 fn in_hook() -> bool {
     HOOK_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false)
+}
+
+fn in_load() -> bool {
+    LOAD_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false)
+}
+
+/// Count one allocation made on this thread: nothing outside a hook; inside one, the steady-state counter (the lane gate
+/// wants delta 0) or, inside per_load, the per-load counter.
+fn count_allocation() {
+    if in_hook() {
+        if in_load() {
+            LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        } else {
+            HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        }
+    }
 }
 
 /// The counting allocator: forwards to the system allocator, counts the calls made inside a hook.
@@ -123,16 +153,12 @@ pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if in_hook() {
-            HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_allocation();
         System.alloc(layout)
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        if in_hook() {
-            HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_allocation();
         System.alloc_zeroed(layout)
     }
 
@@ -141,9 +167,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        if in_hook() {
-            HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_allocation();
         System.realloc(ptr, layout, new_size)
     }
 }
@@ -171,9 +195,29 @@ impl Drop for HookScope {
     }
 }
 
-/// Allocations made inside hooks since boot.
+/// Allocations made inside hooks since boot (the per-load ones of per_load are not in this number).
 pub fn hook_allocations() -> u64 {
     HOOK_ALLOCATIONS.load(Ordering::Relaxed)
+}
+
+/// Allocations made inside per_load sections of hooks since boot.
+pub fn load_allocations() -> u64 {
+    LOAD_ALLOCATIONS.load(Ordering::Relaxed)
+}
+
+/// Run work as the once-per-load part of a hook (the layout archive the game hands over once per Training load): its
+/// allocations are counted apart (load_allocations), so the steady-state counter stays the proof that no hook allocates
+/// per frame or per input. Allocations that can be made earlier (threads, queues) belong at boot, not here.
+pub fn per_load<R>(work: impl FnOnce() -> R) -> R {
+    struct Leave;
+    impl Drop for Leave {
+        fn drop(&mut self) {
+            let _ = LOAD_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
+        }
+    }
+    let _ = LOAD_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
+    let _leave = Leave;
+    work()
 }
 
 /// The counters at one moment.
@@ -267,6 +311,19 @@ mod tests {
             assert_eq!(*id as usize, i);
             assert!(HookId::ALL.iter().filter(|other| other.name() == id.name()).count() == 1);
         }
+    }
+
+    #[test]
+    fn a_per_load_allocation_is_counted_apart_from_the_steady_state_ones() {
+        // The host test binary has no counting allocator, so drive the counting rule directly.
+        let (hooks, loads) = (hook_allocations(), load_allocations());
+        count_allocation();
+        assert_eq!((hook_allocations(), load_allocations()), (hooks, loads), "outside a hook nothing is counted");
+        let _scope = HookScope::enter_hook(HookId::UiArchive);
+        per_load(count_allocation);
+        assert_eq!((hook_allocations(), load_allocations()), (hooks, loads + 1));
+        count_allocation();
+        assert_eq!((hook_allocations(), load_allocations()), (hooks + 1, loads + 1), "a hook allocation outside per_load is the steady-state kind");
     }
 
     #[test]
