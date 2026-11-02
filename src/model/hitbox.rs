@@ -638,7 +638,7 @@ impl HandleSet {
         let mut i = 0;
         while i < self.len {
             let h = self.held[i];
-            let wanted = if h.once { keep_grabs } else { wants.iter().any(|w| *w == h.sphere) };
+            let wanted = if h.once { keep_grabs } else { wants.contains(&h.sphere) };
             let alive = fx.sphere_alive(h.handle);
             if wanted && alive {
                 c.kept += 1;
