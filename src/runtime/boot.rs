@@ -116,6 +116,18 @@ pub fn run() {
     let usable = |site: &sites::Site| {
         SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
     };
+    // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
+    let row_usable = |name: &str| sites::find(name).is_some_and(usable);
+    let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
+    if row4_usable("fighter_manager_get_entry") {
+        game::allow_natives(game::NativeGroup::Entry);
+    }
+    if row_usable("fighter_information") && row_usable("is_operation_cpu") {
+        game::allow_natives(game::NativeGroup::Operator);
+    }
+    if row_usable("utility_get_category") && row_usable("utility_get_kind") {
+        game::allow_natives(game::NativeGroup::Category);
+    }
     if sites::find("is_training_mode").is_some_and(usable) {
         game::allow_training_predicate();
     }

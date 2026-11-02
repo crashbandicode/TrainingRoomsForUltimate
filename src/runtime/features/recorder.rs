@@ -41,11 +41,11 @@ use crate::model::recording::{
 #[cfg(feature = "diag")]
 use crate::model::recording::LoadAction;
 use crate::model::settings::Snapshot;
-use crate::model::sites;
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::features::{chords, cpu, input_display, notices};
-use crate::runtime::{game, published};
+use crate::runtime::game::{self, natives};
+use crate::runtime::published;
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 static SETTINGS: Mutex<RecorderSettings> = Mutex::new(RecorderSettings::factory());
@@ -65,11 +65,9 @@ static INT_COLOR: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static LAST_PHASE: AtomicU8 = AtomicU8::new(0);
 
 /// Fighter object and entry layout (read from the owned 13.0.5 `main`; `tests/input_sites.rs` and the
-/// on-init notes): the fighter kind at +0xc, the module accessor at +0x20; the entry's body pointers
-/// from +0x4160 and its controller at +0x4178.
+/// on-init notes): the fighter kind at +0xc; the entry's controller at +0x4178 (the body and accessor
+/// fields are in `game::natives`).
 pub(crate) const FIGHTER_KIND_FIELD: usize = 0xc;
-const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
-const ENTRY_BODY_FIELD: usize = 0x4160;
 const ENTRY_CONTROLLER_FIELD: usize = 0x4178;
 /// The CPU's controller struct (`*(ai + 8)`): the written fields (SPEC-input-01 §4). Never +0x50/+0x54.
 const CTRL_BUTTONS: usize = 0xc;
@@ -172,65 +170,6 @@ fn load_consts() -> bool {
     true
 }
 
-/// The lua_bind natives of package 4 (guarded `Called` rows of `sites_pkg4`).
-pub(crate) mod natives {
-    use super::{game, sites, sites_pkg4};
-
-    unsafe fn at<F: Copy>(offset: usize) -> F {
-        debug_assert_eq!(std::mem::size_of::<F>(), std::mem::size_of::<usize>());
-        std::mem::transmute_copy(&(game::text_base() + offset))
-    }
-
-    /// A package 4 row, or (`work_get_int`) the shared row of `sites.rs` that package 2 owns.
-    fn offset(name: &str) -> usize {
-        sites_pkg4::SITES.iter().find(|s| s.name == name).or_else(|| sites::find(name)).map_or(0, |s| s.offset)
-    }
-
-    pub unsafe fn lr(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(offset("posture_lr"))(accessor)
-    }
-
-    pub unsafe fn is_stop(accessor: usize) -> bool {
-        at::<extern "C" fn(usize) -> bool>(offset("stop_is_stop"))(accessor)
-    }
-
-    pub unsafe fn get_int(accessor: usize, id: i32) -> i32 {
-        at::<extern "C" fn(usize, i32) -> i32>(offset("work_get_int"))(accessor, id)
-    }
-
-    pub unsafe fn set_int(accessor: usize, id: i32, value: i32) {
-        at::<extern "C" fn(usize, i32, i32)>(offset("work_set_int"))(accessor, value, id)
-    }
-
-    pub unsafe fn set_color_rgb(accessor: usize, r: f32, g: f32, b: f32, kind: i32) {
-        at::<extern "C" fn(usize, f32, f32, f32, i32)>(offset("model_set_color_rgb"))(accessor, r, g, b, kind)
-    }
-
-    /// `FighterManager::get_fighter_entry(manager, entry id)`.
-    pub unsafe fn fighter_entry(entry: i32) -> usize {
-        let manager = ((game::text_base() + super::lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return 0;
-        }
-        at::<extern "C" fn(usize, i32) -> usize>(offset("fighter_manager_get_entry"))(manager, entry)
-    }
-
-    /// `FighterInformation::is_operation_cpu` of an entry (the game's own operator flag).
-    pub unsafe fn operated_by_cpu(entry: i32) -> bool {
-        let manager = ((game::text_base() + super::lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return false;
-        }
-        let information: extern "C" fn(usize, i32) -> usize = std::mem::transmute(game::text_base() + sites::FIGHTER_INFORMATION_OFFSET);
-        let information = information(manager, entry);
-        if information == 0 {
-            return false;
-        }
-        let is_cpu: extern "C" fn(usize) -> bool = std::mem::transmute(game::text_base() + sites::IS_OPERATION_CPU_OFFSET);
-        is_cpu(information)
-    }
-}
-
 /// A fighter entry's first body, resolved now (no pointer is kept between frames).
 #[derive(Clone, Copy)]
 pub(crate) struct Body {
@@ -250,14 +189,11 @@ unsafe fn cpu_body() -> Option<Body> {
 /// The package 4 natives must have passed their guards.
 pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     let entry_ptr = natives::fighter_entry(entry_id);
-    if entry_ptr == 0 {
-        return None;
-    }
-    let fighter = ((entry_ptr + ENTRY_BODY_FIELD) as *const usize).read();
+    let fighter = natives::entry_body(entry_ptr);
     if fighter == 0 {
         return None;
     }
-    let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
+    let accessor = natives::fighter_accessor(fighter);
     (accessor != 0).then_some(Body { entry_ptr, fighter, accessor, entry_id })
 }
 
@@ -475,7 +411,7 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
 
 unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
     // B4: while an AI drives P1 the recorder is refused with a notice, nothing is recorded.
-    let refusal = if natives::operated_by_cpu(0) {
+    let refusal = if natives::is_operation_cpu(0) {
         Some(RecordRefusal::P1DrivenByAi)
     } else if natives::fighter_entry(0) == 0 {
         Some(RecordRefusal::FightersMissing)

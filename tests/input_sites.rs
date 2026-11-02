@@ -43,6 +43,19 @@ fn rows_are_the_symbols_they_name() {
 }
 
 #[test]
+fn the_named_offsets_are_the_rows() {
+    for (name, offset) in [
+        ("posture_lr", pkg4::POSTURE_LR_OFFSET),
+        ("stop_is_stop", pkg4::STOP_IS_STOP_OFFSET),
+        ("work_set_int", pkg4::WORK_SET_INT_OFFSET),
+        ("model_set_color_rgb", pkg4::MODEL_SET_COLOR_RGB_OFFSET),
+        ("fighter_manager_get_entry", pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET),
+    ] {
+        assert_eq!(find(name).offset, offset, "{name}");
+    }
+}
+
+#[test]
 fn every_row_matches_the_owned_elf() {
     let Some(owned) = common::owned_main("every_row_matches_the_owned_elf") else { return };
     for site in &SITES {

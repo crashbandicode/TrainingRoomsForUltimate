@@ -29,18 +29,7 @@ pub(crate) unsafe fn cpu_operated(fighter: usize) -> bool {
     if !lra_reset::entry_id_valid(entry) {
         return false;
     }
-    let base = game::text_base();
-    let manager = ((base + lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-    if manager == 0 {
-        return false;
-    }
-    let information: extern "C" fn(usize, i32) -> usize = std::mem::transmute(base + sites::FIGHTER_INFORMATION_OFFSET);
-    let information = information(manager, entry);
-    if information == 0 {
-        return false;
-    }
-    let is_cpu: extern "C" fn(usize) -> bool = std::mem::transmute(base + sites::IS_OPERATION_CPU_OFFSET);
-    is_cpu(information)
+    game::natives::is_operation_cpu(entry)
 }
 
 extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> usize {

@@ -9,6 +9,11 @@ pub const AI_EPILOGUE_OFFSET: usize = 0x2dbc38;
 pub const COMBO_DISPLAY_A_OFFSET: usize = 0x13e549c;
 pub const COMBO_DISPLAY_B_OFFSET: usize = 0x13e54d8;
 pub const STALE_MOVES_TOGGLE_OFFSET: usize = 0x13e88c4;
+pub const POSTURE_LR_OFFSET: usize = 0x206_af10;
+pub const STOP_IS_STOP_OFFSET: usize = 0x208_91f0;
+pub const WORK_SET_INT_OFFSET: usize = 0x208_dbd0;
+pub const MODEL_SET_COLOR_RGB_OFFSET: usize = 0x205_7790;
+pub const FIGHTER_MANAGER_GET_ENTRY_OFFSET: usize = 0x214_0f90;
 
 pub static SITES: [Site; 11] = [
     Site {

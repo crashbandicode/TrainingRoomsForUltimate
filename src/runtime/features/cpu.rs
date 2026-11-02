@@ -51,6 +51,7 @@ static CONSTS_READY: AtomicBool = AtomicBool::new(false);
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
 static NANA_KIND: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static SITUATION_CLIFF: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static SITUATION_GROUND: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_CLIMB: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_CLIFF_ATTACK: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static FLAG_CATCH_CLIFF: AtomicI32 = AtomicI32::new(UNRESOLVED);
@@ -300,6 +301,11 @@ pub fn ids() -> Option<Table> {
     CPU.lock().as_ref().map(|cpu| cpu.ids.clone())
 }
 
+/// `SITUATION_KIND_GROUND` once the game's constants are resolved, else `UNRESOLVED`.
+pub fn situation_ground() -> i32 {
+    SITUATION_GROUND.load(Ordering::Acquire)
+}
+
 /// The entry of the primary CPU body for the current scene.
 pub fn primary_entry_now() -> u8 {
     primary_entry(LOBBY.load(Ordering::Acquire))
@@ -349,6 +355,7 @@ fn ensure_consts() -> bool {
     }
     NANA_KIND.store(table.get(C::KindNana), Ordering::Release);
     SITUATION_CLIFF.store(table.get(C::SituationCliff), Ordering::Release);
+    SITUATION_GROUND.store(table.get(C::SituationGround), Ordering::Release);
     TERM_CLIMB.store(table.get(C::TermContCliffClimb), Ordering::Release);
     TERM_CLIFF_ATTACK.store(table.get(C::TermContCliffAttack), Ordering::Release);
     FLAG_CATCH_CLIFF.store(table.get(C::WorkFlagCatchCliff), Ordering::Release);
