@@ -54,6 +54,12 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 - READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
   pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
+### 2026-11-02 ~04:4xZ — standing push order; package 1 complete on origin
+
+- Operator (via the primary): general push permission until the first version ships to the card — fast-forward
+  pushes of gated work only, no force, no tags, no releases, nothing on the card (the card swap keeps its own order).
+  Each push is logged with its sha in `/home/intpa/smash-training-lobby/TRAININGROOMS-STATUS.md`.
+- Pushed by the lead: `origin/work/implementation` `e8dbcc9..473da26` (fast-forward) = package 1 complete.
 ### 2026-11-02 — first code push (operator's order, executed by the primary)
 
 - `origin/work/implementation` = `e8dbcc9` (verified with `git ls-remote`): package 1 without the menu model —
