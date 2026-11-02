@@ -117,3 +117,10 @@ Only the `hitbox_vis` setting (SPEC-core-04).
 5. **Colour comment mismatch** (orange `#ff9900` vs components `1.0, 0.4, 0.0`). Recommendation: pick the components (what the player saw); the designer may retune the eight tints for colour-blind contrast.
 
 **Decided 2026-11-02 (operator, HB1 (a)): hurtboxes are drawn too**, in yellow, as the approved menu proposal shows (`docs/MENU-PROPOSAL.md`, on-screen indicators). The hurtbox shapes are read from the game per fighter per frame on the same per-frame entry as the hitboxes; the per-frame cost is measured in the diag build before shipping and recorded in §8. Help text: "On: hitboxes, grab boxes and hurtboxes are drawn." Test-provenance rows: hurtbox shapes per fighter (host model), an Eden screenshot with hurtboxes, the cost row.
+
+**Decided 2026-11-02 (lead, Q3; Eden hb-01 evidence):** with hurtboxes drawn (HB1), killing and respawning every sphere every frame (about 74 follow effects per frame for Steve + Ridley) left Ridley's hurtboxes, tether-grab boxes and later all spheres undrawn. The pool-exhaustion proof (counted zero handles) comes with the fix. §5 changes from "respawned every frame" to **persistent follow effects**:
+- each shape (hurtbox part, attack-slot sphere, grab sphere) keeps its `req_follow` handle per fighter;
+- a handle is killed and the shape respawned only when the shape set changes: a slot or part changes, the status concludes, the setting goes Off, a save state loads or resets, or the scene leaves Training;
+- kills are always by handle, never `kill_kind("sys_shield")`, so the shield bubble and other `sys_shield` users are untouched;
+- handles the game has already ended are detected before reuse.
+The game's own effects (hit sparks, shield bubble, charge) must still appear with the setting On. The persistent count against the pool size is recorded in §8. If every hurtbox cannot fit with headroom, it goes back to the operator. Nothing changes visibly.
