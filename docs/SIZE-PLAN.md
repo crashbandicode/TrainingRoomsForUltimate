@@ -296,5 +296,6 @@ allocation failure.
 
 The28 Feature variants and name lookup now share one declaration with all variant
 docs retained. All Site rows, bytes, rules and later definitions are byte-identical.
-Raw98865 (-20vs8f762e1); normalized andcompiler gates pending. Ceiling103200
+Raw98865 (-20vs8f762e1); normalized126452excludingtools (-20). Allfivecompiler
+gatesPASS at a6e4d07. Release3444736/diag3784704 residentbytes unchangedvs8f. Ceiling103200
 retains4318 pending merge allowance (98865+4318=103183 rounded up).

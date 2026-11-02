@@ -1,26 +1,25 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
-## Current worker checkpoint — 2026-11-02 20:36Z
+## Current worker checkpoint — 2026-11-02 20:43Z
 Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
-Branch stream/slim, codeHEAD8f762e1; only progress dirty. Sole authorized merge
-ebfcb98 via dae0787. HookId enum/ALL/name unified with all40 ordinals/labels exact;
-counter/TLS/allocator tail byte-identical. Raw98,885; normalized126472 excluding
-tools, both -77. Ceiling103,300 unchanged. Four unapproved native enum rows remain,
-hos2 approved. Native Text proposal remains UNAPPLIED pending lead baseline/ownership.
-All FIVE8f gates PASS: fullhost72.93s, clippy18.70s zero warnings, no-default1.87s;
-Switch diag40existingwarnings/release41existingwarnings. Source1110 hashes unchanged
-before/after everyjob. All claims RELEASED and own queue rows removed latest20:35Z.
-Artifacts slim/8f762e1-{host,clippy,no-default,diag,release,preflight}.
-Release6867957a resident3444736 (+4096vs61); diag a9c766ea resident3784704 unchanged.
-Stack exact8f retainsfive thread-table failures andonefiberfailure; no table/budget
-relaxation. Menu49392 required81920>57344; fiber25104>16384.
-Runtime sl-02 remainsFAIL818/delta100 on10a8232; no8f runtime/no acceptance inferred.
-Helperpathhold respected; no ownEden/profile. Async primary-resume-lead requestpending.
-Fresh20:24/25 global57.691GB lessownYoga retired0.917GB=56.774GB conservativebefore
-8f freshSurface0.323GB; Yoga target reused. All retiredNRO/ELF/manifests archived.
-Next: exact8f compliance, clean progress commit/handoff, continue authorized size
-reductions; await exact lead native/integration/stack decisions. NoREADY.
-One ownerboundwatcher2674699 alive/noalert; exactthread gate Astra/medium20:31.
+Branch stream/slim codeHEADa6e4d07 Featuretable; prior8fHookId slice fully gated.
+Raw98865, normalized126452excludingtools (-20bothfrom8f); ceiling103200 preserves
+4318pendingmergeallowance. Onlyauthorizedmerge ebfcb98 via dae0787.
+ALLFIVEa6gatesPASS: fullhost67.81s,clippy18.40s0warnings,no-default2.53s,
+Switchdiag40existingwarnings/release41existingwarnings;1110sourcehashesunchanged.
+Allclaims/queues RELEASED/removed20:42; NOowncompiler/Eden/profile.
+Releasec6229b70 resident3444736 unchangedvs8f; diag9c167b423784704 unchanged.
+Exacta6stack same5thread-tableFAIL and1fiberFAIL; no budget/tablewaiver.
+Menu49392 required81920>57344; fiber25104>16384. Noa6runtimeacceptance.
+Artifacts slim/a6e4d07-{host,clippy,no-default,diag,release,preflight}.
+Latestallhosttargetcensus20:39total57,128,742,311B (<60GB). Yogaowna6target moved
+from8f idle; Surfaceownreusedtarget. Allprevious8fNRO/ELF/logsarchived.
+NativeTextproposalUNAPPLIED pendingbaseline/ownership;4unapprovedenumrows/hos2approved.
+HelperpathEdenheld;sl02allocationFAIL818/delta100on10stillopen. LatestleadSTATUS
+mtime19:38:20at20:42check; asyncprimaryresumeleadquestionpending. NoREADY.
+Nexta6complianceaftercleanprogresscommit, exacthandoff tolead viaQUESTIONS; continue
+independentworkwithinownership andawaitnative/integration/stack decisions.
+Watcher2674699 ownerboundalive/noalert at20:31; exactthreadAstra/mediumconfirmed.
 Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
 
 Lead `0caa72b8`; slim = Claude Opus 5.5 high (`claude-opus-5-5`, effort `high` from this agent's own transcript
@@ -855,3 +854,21 @@ matchedlead/pkg4/UI; postedownershipnoticebeforeedit. No carrieddata changed,
 no manifesttransformneeded. UNCOMPILED; no claims/Eden/profile currently.
 8fcomplianceatcleanf4fc2e0 exit1 samefourmandatorymachinefailures/29agentrows;
 release no-diagmarkersPASS, cleanPASS. Report8f762e1-release/compliance.md.
+
+## Feature table gated evidence — 2026-11-02 20:43Z
+a6e4d07 fivegatesPASS with1110before/afterhashesunchanged. Fullhost raw
+12009d7ade29a8a8d55ee80c3a9a6d5f31628b3338ed483a98a34d4efc487da4,67.8065s.
+Clippy --all-targets -- -D warnings raw86aab6a129aea6b142e7b1cae8d8c4dc144b01903d88e382f8455fba95bd1c27,
+18.3956s0warnings. No-default7eed54d7f5cc5f1287a072dc30fe7c7b7081e9d533416042830ba16ab1d13c88,
+2.5329s. Hostreceipts archiveda6e4d07-{host,clippy,no-default}.
+Diag raw e95b255bb443e1916ddf3427e86736fcf670a2b91fde5ce631ac279f03b569c6,
+NRO9c167b424f3fc455f408bd5f0f93df4b51b2ffca375b9af766c7a6bb71fb091c,
+ELF515b72d7eceed2d1edbffee79adfe65bab20bffe892ab362e116bbdd83f98d04.
+Resident3784704 unchanged;40existingwarnings. Exactstacktable5FAIL/fiber1FAIL.
+Release raw78c8e7616e584021f4c99a1691b54296d423cab4a078e78dbb26407fa6243e92,
+NROc6229b70125e52a9d65bbb545a157b986ebf82ff48e93d448f534fa71154b062,
+ELF81fc3c74f91caeefc65fee16b06f5fa8514520493bbf131b050ef2e45dc15051.
+Resident3444736 unchangedvs8f;41existingwarnings. No8for a6runtimeaccepted.
+Alljobs ownsource/target6G1800/incremental0, exactonecargo/claim; latestRELEASED20:42.
+No thirdpartyclaim/process/profile changed. Initialstaging typo timeout40 failed
+beforeexecution, retried timeout40seconds spelledtimeout 40. No mutation fromfailure.
