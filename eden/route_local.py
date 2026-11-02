@@ -8,6 +8,7 @@ Usage: route_local.py <label>   (run with /usr/bin/python3 -I eden/route_local.p
 """
 import base64
 import json
+import os
 import subprocess
 import sys
 import time
@@ -17,11 +18,15 @@ from PIL import Image, ImageChops, ImageStat
 
 HERE = Path(__file__).resolve().parent
 YOGA = "memento-claw-yoga-ubuntu"
-WORK = "/home/intpa/trainingrooms-eden-p1"
+# Package 1's work root and profile; another stream passes its config file (TR_EDEN_CONFIG, e.g.
+# `tr_eden.r1fix.config.json`: the same file its `tr_eden.py` is deployed with).
+_CFG = json.loads(Path(os.environ["TR_EDEN_CONFIG"]).read_text(encoding="utf-8")) if os.environ.get("TR_EDEN_CONFIG") else {}
+WORK = _CFG.get("root", "/home/intpa/trainingrooms-eden-p1")
+PROFILE_NAME = _CFG.get("profile", "t1")
 SSH = ["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/trssh-%C",
        "-o", "ControlPersist=900", YOGA]
 REFS = HERE / "refs"
-PROFILE_SD = f"{WORK}/profiles/t1/user/sdmc/ultimate"
+PROFILE_SD = f"{WORK}/profiles/{PROFILE_NAME}/user/sdmc/ultimate"
 
 
 def remote(command, timeout=120):
@@ -149,4 +154,5 @@ def main():
     print("ROUTE DONE", flush=True)
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -115,13 +115,72 @@ mod delay {
         assert_eq!(q.step(2, rec(23)), rec(21));
     }
 
+    /// The decreasing-nonzero transition against the spec's observable rule (§5, "Decreasing d from
+    /// a to b: the a - b oldest records are discarded unplayed; the output jumps forward in time by
+    /// a - b frames"): the records between the last one played at the old delay and the first one
+    /// played at the new delay are exactly the a - b discarded ones.
+    #[test]
+    fn change_down_matches_the_observable_rule() {
+        for (a, b) in [(5u8, 2u8), (30, 1), (3, 2), (10, 9)] {
+            let mut q = DelayQueue::new();
+            let last = u32::from(a) * 3 + 10;
+            let before = run(&mut q, a, 1, last);
+            let steady = before[before.len() - 1].buttons;
+            assert_eq!(steady, last - u32::from(a));
+            let after = run(&mut q, b, last + 1, u32::from(a) + 5);
+            // This poll still plays the oldest record, `a` polls old: no skipped input yet.
+            assert_eq!(after[0].buttons, last + 1 - u32::from(a));
+            // From the next poll the output is `b` polls old.
+            for (i, out) in after.iter().enumerate().skip(1) {
+                assert_eq!(out.buttons, last + 1 + i as u32 - u32::from(b), "{a}->{b} poll {i}");
+            }
+            // Played inputs skip exactly the a - b discarded records.
+            let skipped = after[1].buttons - after[0].buttons - 1;
+            assert_eq!(skipped, u32::from(a - b), "{a}->{b}");
+        }
+    }
+
     #[test]
     fn delay_zero_empties_the_queue_and_passes_through() {
+        // Review R3: the transition poll returns the CURRENT record, not the oldest queued one.
         let mut q = DelayQueue::new();
         run(&mut q, 4, 1, 10);
-        assert_eq!(q.step(0, rec(11)), rec(7));
+        assert_eq!(q.len(), 4);
+        assert_eq!(q.step(0, rec(11)), rec(11));
         assert!(q.is_empty());
         assert_eq!(q.step(0, rec(12)), rec(12));
+        assert!(q.is_empty());
+    }
+
+    /// A stale attack or release must not pass at the 0-delay transition: the queue holds an
+    /// attack press the player has already let go of (and a release the other way round).
+    #[test]
+    fn delay_zero_transition_with_press_and_release_records() {
+        const A: u32 = 1;
+        let press = MappedInputs { buttons: A, ..MappedInputs::NEUTRAL };
+        let release = MappedInputs { buttons: 0, lstick_x: 3, ..MappedInputs::NEUTRAL };
+        // The queue (delay 3) is about to play a press; the current poll is the release.
+        let mut q = DelayQueue::new();
+        for _ in 0..3 {
+            q.step(3, MappedInputs::NEUTRAL);
+        }
+        for _ in 0..3 {
+            q.step(3, press);
+        }
+        assert_eq!(q.len(), 3);
+        assert_eq!(q.step(0, release), release, "a stale attack press must not come out");
+        assert!(q.is_empty());
+        // The queue holds neutral/release records; the current poll is a press: it plays now.
+        let mut q = DelayQueue::new();
+        for _ in 0..6 {
+            q.step(3, release);
+        }
+        assert_eq!(q.step(0, press), press, "a stale release must not hide the press");
+        assert!(q.is_empty());
+        assert_eq!(q.step(0, release), release);
+        // And back up: delay 3 starts filling from empty (3 neutral polls), nothing old survives.
+        let out: Vec<_> = (0..4).map(|_| q.step(3, press)).collect();
+        assert_eq!(out, [MappedInputs::NEUTRAL, MappedInputs::NEUTRAL, MappedInputs::NEUTRAL, press]);
     }
 
     #[test]

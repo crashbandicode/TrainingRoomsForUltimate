@@ -21,8 +21,8 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | Diagnostics ring admission and rotation | §7, §9 | `core01_diag_ring_admission`, `core01_diag_ring_rotation`, `runtime_diag_log::shipped_lines_enter_the_ring_and_others_do_not`; carried `carried_diag_ring.rs` (7 tests) | core01-E8 | host pass |
 | Per-frame driver order, accessor none-paths | §5.2, §9 | - | core01-E9, E10 | deferred (packages 2-3) |
 | No network symbols | §9 | `core01_no_network_symbols` (Cargo.lock) | core01-E11 | host pass |
-| No heap in hooks (counting allocator, `heap_allocations=`) | §8 | `delay::ring_allocates_nothing` (queue); `src/runtime/alloc.rs` | - | host pass (queue); runtime unbuilt |
-| `developer.ini` (decision N1) | N1 | `core01_developer_ini` | - | host pass |
+| No heap in hooks (counting allocator, `heap_allocations=`) | §8 | `delay::ring_allocates_nothing` (queue); detector proven by `hook_alloc::the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not` (R5, below); `src/model/hook_stats.rs` | - | host pass; Eden: diag `hook_stats` lines, see the R1-fix section |
+| `developer.ini` (decision N1), fail-closed (R4) | N1 | `core01_developer_ini`, `core01_developer_ini_fails_closed`, `core01_developer_ini_load_from_files`, `install_line::the_developer_gate_outcome_is_on_the_line` | - | host pass; Eden: `developer=off reason=…` on the install line, see the R1-fix section |
 
 ## SPEC-core-04 (settings.json)
 
@@ -32,7 +32,8 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | Factory round trip, defaults independent | §9 | `core04_roundtrip_factory`, `core04_defaults_independent` | core04-E2 | host pass |
 | Unknown keys, retired keys | §3.2 | `core04_unknown_keys_ignored`, `core04_unknown_keys_kept_on_rewrite` | - | host pass (see note 1) |
 | Missing keys take defaults; short/long arrays | §3.2 | `core04_missing_keys_default` | core04-E3 | host pass |
-| Corrupt file: factory + field by field + copy name (decision S2) | §6 | `core04_corrupt_file_policy`, `core04_non_utf8_file_is_corrupt`, `core04_slider_rows`, `core01_paths` (copy names) | core04-E4 | host pass; the rename itself is runtime, unbuilt |
+| Corrupt file: factory + field by field + copy name (decision S2) | §6 | `core04_corrupt_file_policy`, `core04_non_utf8_file_is_corrupt`, `core04_slider_rows`, `core01_paths` (copy names) | core04-E4 | host pass |
+| Recovery is a boot-time storage transaction: untouched backup, sanitized complete settings (defaults, unknown keys) written to the active path before the original is retired; write failure leaves the original active (R1) | §6, S2 | `core04_recovery_two_boots_keep_the_recovered_settings_and_the_backup`, `core04_recovery_write_failure_leaves_the_original_active_and_logs_it`, `core04_recovery_without_a_free_backup_name_keeps_the_original_active`, `core04_recovery_of_a_file_that_is_not_json_keeps_it_and_writes_a_valid_one`, `core04_recovery_of_the_forks_old_file_name_retires_it_after_the_write`, `core04_a_clean_file_and_a_missing_file_are_left_alone`, `core04_an_interrupted_replace_is_restored_before_loading`, `core04_save_publishes_through_the_same_replace` (`tests/core04_recovery.rs`, real files in a temp dir, through `model::settings_file::load`, the code the runtime calls) | core04-E4 | host pass; Eden: two boots with a partially bad file, see the R1-fix section |
 | Duplicate key | §3.2 | `core04_duplicate_key_error` | - | host pass |
 | Fork file imports unchanged | §6 | `core04_import_upstream_file` | core04-E5 | host pass |
 | Publish before write; writer fallback; no write on unplug | §5, §9 | `core04_publish_order`, `core04_writer_fallback`, `core04_no_write_on_unplug` | core04-E6..E8 | host pass (model); writer thread not in package 1 (nothing writes yet) |
@@ -43,8 +44,9 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | --- | --- | --- | --- | --- |
 | Menu row, values, default 0 | §2.1 | `delay::menu_default_zero` | IN03-E01 | host pass (the row itself arrives with the menu) |
 | Steady state, initial fill | §5 | `delay::steady_state_offsets`, `delay::initial_fill_neutral` | IN03-E02 | host pass |
-| Change up / down | §5 | `delay::change_up_refills`, `delay::change_down_drops_oldest`, `delay::delay_zero_empties_the_queue_and_passes_through` | IN03-E03 | host pass |
-| Clear on owner change; save-state load; reset (B8) | §5.1 | `delay::clear_on_input_owner_change` | IN03-E04 | host pass; owners and the reset hub are not wired in the runtime (see progress file) |
+| Change up / down | §5 | `delay::change_up_refills`, `delay::change_down_drops_oldest`, `delay::delay_zero_empties_the_queue_and_passes_through` (R3: the transition poll returns the current record), `delay::delay_zero_transition_with_press_and_release_records`, `delay::change_down_matches_the_observable_rule` | IN03-E03 | host pass |
+| Clear on owner change; save-state load; reset (B8) | §5.1 | `delay::clear_on_input_owner_change` | IN03-E04 | host pass; the reset hub clears the queue (Eden `hub_run`); the menu, chord, replay and waiting-room owners arrive with their packages |
+| The native Training menu is an input owner (R2; signal: the game's `L_staying_help` layout state, SPEC-core-03 §2.4): begin sets the bit and empties the queue even if polls stop, polls while paused are neutral, end releases, first *d* polls after resume neutral; driven through the real producer | §4, §5.1, question 3 | `input_pause::a_pause_empties_the_queue_owns_the_input_and_nothing_old_reaches_gameplay`, `input_pause::takeover_empties_the_queue_even_when_polls_stop_while_paused`, `input_pause::the_unwired_producer_lets_the_stale_and_menu_records_through`, `input_pause::other_owners_still_work_beside_the_pause_and_survive_its_release`, `input_pause::delay_zero_and_repeated_transitions_are_harmless`, `input_pause::the_ui_flag_edges_drive_the_owner_and_nothing_old_reaches_gameplay` (the UI-flag path through the real adapter) | IN03-E06 (diag pause lane) | host pass; Eden: see the R1-fix section |
 | Chords not delayed; display and recorder see delayed input | §5.2 | `delay::ordering_with_chords_display_recorder` | IN03-E05 | host pass |
 | Zero allocations | §8 | `delay::ring_allocates_nothing` | - | host pass |
 | Hooks in the two callers of the final input mapping (note before each call, apply right after it returns; no hook in or on the function, whose inner points are the CPU pilot's) | §4 | `input_mapping_callers::the_sites_are_in_the_callers_and_not_near_the_pilot`, `input_mapping_callers::the_function_has_two_callers_and_the_registers_are_still_ours_at_the_sites`, `core01_sites_match_owned_elf` | IN03-E02 (run with and without the pilot NRO, both load orders) | host pass; Switch-built |
@@ -90,7 +92,7 @@ updater record; the settings are in `training_modpack_menu.conf` (CARRY-OVER.md,
 `storage::file::LEGACY_SETTINGS` use the real name; copying the updater file as `settings.json` would have
 loaded factory settings over the player's own. Lead: please correct the spec.
 
-Note 3: `developer.ini` compares the key and the value exactly (`developer_page`, lower-case `on`), last line wins, first 8 KiB read, a leading UTF-8 BOM skipped; `ON`, `1`, `yes` and an inline comment after the value read as hidden (lead, 2026-11-02: exact lower-case `on` is accepted).
+Note 3 (replaced by review R4, 2026-11-02): `developer.ini` compares the key and the value exactly (`developer_page`, lower-case `on`; lead, 2026-11-02), skips a leading UTF-8 BOM, and now **fails closed**: the loader reads at most 8 KiB + 1 byte and an over-limit file hides the page, a read error hides it, bytes that are not UTF-8 anywhere hide it, and a repeated `developer_page` key (in any order, any values) hides it. The earlier last-line-wins and prefix-truncation behaviour is gone. The install line says why: `developer=off reason=missing|unreadable|too_large|not_utf8|duplicate_key|key_absent|not_on`, or `developer=on reason=on`.
 
 Note 1: the spec says unknown keys are dropped on rewrite. This build knows 3 of the ~90 rows, so dropping
 them would erase the player's other settings until their packages land; they are kept verbatim instead
@@ -131,3 +133,16 @@ requirement survives in the new structure, adapted as noted. Names with the `cho
 
 Not covered by the model (later packages): the fork's grid contents (portraits, hats, Mii lists, stage and
 item actions), the named-macro and setup libraries, rendering of every screen, the INI text writer.
+## Review R1 fixes (2026-11-02, stream `r1fix`, base 4895ea3; review `artifacts/trainingrooms-reviews/R1-astra-pkg1/REVIEW.md`)
+
+One commit per finding on `stream/r1fix`; `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo build --no-default-features` green after each.
+
+| Finding | Root cause | Fix | Regression |
+| --- | --- | --- | --- |
+| R1 settings recovery lost the recovered file | `keep_copy` renamed the active file away and nothing wrote the sanitized settings back | `model::settings_file::load`: write the sanitized complete settings to `settings.json.tmp`, write and read back the backup `settings.invalid-<n>.json`, only then replace the active file (`store::replace_file`); any failure leaves the original active and is logged | `tests/core04_recovery.rs` (two boots, write failure, no free backup name, non-JSON, old file name, orphaned `.bak`) |
+| R2 native pause never owned the input | `published::INPUT_OWNERS` was never written. The scene's `StatePause` (first candidate) is not used by the Training menu: Eden probes r1-03 to r1-06 never fired at its begin routine, enter slots or exit | `InputAdapter::pause_flag` over `pause_begin/pause_end`, fed by the UI tick from `ui::state::PAUSE_ACTIVE` (the game's `L_staying_help` layout state, SPEC-core-03 §2.4; lead ruling); the `StatePause` hooks and sites were removed | `tests/input_pause.rs` (six tests, the UI-flag path through the real adapter), Eden pause lane |
+| R3 delay 0 played a stale record | the oldest queued record was read before the queue was trimmed | `DelayQueue::step` handles 0 first (clear, return the current record); the decreasing-nonzero transition satisfies the spec's observable rule and is pinned | `tests/input_delay.rs` (three tests) |
+| R4 developer gate accepted duplicates, oversize, read errors | last-line-wins parse of an 8 KiB prefix, `read_to_end` error ignored | `developer_ini::load` fails closed (above) | `tests/core01.rs` (three tests), install-line test |
+| R5 no post-exercise allocation observation | the counter was read only at boot | `model::hook_stats` (allocator, per-hook counters), diag-only `hook_stats` line from the heartbeat thread, Eden gate `eden/hook_stats.py` | `tests/hook_alloc.rs` (allocating stub), `tests/eden/test_analyze.py` (gate) |
+
+The Eden rows (labels `r1-NN`) are in `eden/EDEN-PACKAGE-1.md`, section "R1-fix".
