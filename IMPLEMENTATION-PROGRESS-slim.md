@@ -236,3 +236,54 @@ Roster/Mii refactors require pkg6 baseline rows and integrated fixes.
 READY remains absent. All final acceptance criteria remain open; no operator blocker identified.
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
+## QUESTIONS
+
+- Admission coordination: Surface has been reported free since ~14:41Z, but pkg6 remains queue head
+  ahead of slim. I am honoring that line, not removing or bypassing it. If pkg6 has deferred its test,
+  please have the owner release its queue position; otherwise I will take the slot after its run/interleave.
+
+- Compliance preflight at 7974c7c: /tmp/slim/compliance-source-preflight.md, exit 1. The guard scanner
+  reports sizes [0,64] because Site::EMPTY uses [0; GUARD_BYTES] (native_seams/mod.rs:143);
+  compliance.py:182-186 counts only hexadecimal literal tokens. This is a 64-byte initializer,
+  not an absent guard. No source layout workaround or scanner weakening applied. Lead/tool owner:
+  please coordinate a repeat-array-aware scanner fix or evidence resolution. README GIF/HANDOFF
+  remain integration/package-7 deliverables; no final compliance pass claimed.
+
+- Coordination for lead tr-lead-astra: slim has merged only the authorized ebfcb98, as dae0787.
+  Please identify the pkg6 gated integration commit and baseline A/B/D receipts when available;
+  roster/Mii behavior refactors remain gated on those facts. Approved probe inline removals will use
+  the pkg6 manifest and avoid overwriting its moving files; I will report the touched file list before that slice.
+- Bootstrap correction: the prior temporary watcher had a Python syntax error caused by shell quoting;
+  it was not a working watcher. Repaired it this turn and confirmed live owner 2589455 in exec session 11182.
+  Exact current rollout remains gpt-6-astra / medium. No unexpected model change observed.
+
+### Carry verification on 7974c7c
+Both full source derivations passed after the authorized merge: pkg6 261 files and pkg4 42 files,
+against stage m5q. These are carry integrity results only, not compilation or runtime acceptance.
+Previous goal turn classification: progress (authorized merge, first compile evidence, committed root fixes).
+
+### Admission wait and retirement census — 2026-11-02
+Surface ledger reports imgui-nvn-sol capture-v1 Eden e02 active; queue has pkg6 before slim.
+No cargo started beside Eden. tools/test_size_gate.py: 6 tests passed; full size gate:
+104,350 implementation (src 100,843; crates 3,356; tools 151), simulator 1,118 excluded,
+tests 28,675 excluded; interim ceiling 107,900. Still 14,350 over the final 90,000 criterion.
+Completed the previously uncertain CARRY-OVER stack/C7 range; read CPU/input/core/state indexes,
+SPEC-cpu-01 and SPEC-cpu-03 for inherited refactors.
+
+Probe slice file notice for lead/pkg6 (read-only census; no retirement edits yet):
+- capacity: roster/{character_items,character_roster,character_sources,kirby_hats,native_service,
+  native_source_actors,native_source_capacity,source_capacity_probe,source_lifecycle_probe,
+  source_ldn_capacity_probe}.rs.
+- Mii: mii/{mod,mii_fullconfig_probe,mii_native_access,mii_native_adapter,mii_native_cpu_scope,
+  mii_saved_file_probe,mii_identity_probe,mii_cpu_adapter,mii_closed_ack}.rs and character_roster.rs.
+- Empty features: Cargo.toml, tests/pkg6_features.rs; retained seam metadata references require review,
+  not deletion merely because the feature name goes. Texture probe: ui/{mod,tick,texture_probe}.rs.
+- Conditional observer retirement also reaches macros/{live_replay,named_macros,replay_capture}.rs;
+  coordinate pkg4 before changing those. Do not erase any product consumer.
+All carried edits will be manifest transforms plus regenerated ledgers.
+Latest lead STATUS keeps empty KNOWN and <=90k; pkg6's older note of L2 approval/next-version size
+does not override this worker brief or the current lead status.
+
+Temporary build wrappers now propagate cargo exit status; sw-inner.ps1 copies an NRO only after cargo success and fails if it is absent. No build was run during this wrapper correction.
+
+Official sloc4 cross-check: 7974c7c=104350; authorized base ebfcb98=106952; net slim contribution -2602. Both simulator counts 1118. Disk preflight 246G free; cargo-targets aggregate 16G.
