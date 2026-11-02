@@ -21,7 +21,8 @@ pub struct Tokens {
 #[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "StoredConfiguration", into = "StoredConfiguration")]
 pub struct Configuration {
-    canonical: Canonical,
+    class: MiiClass,
+    hashes: [u64; 3],
     charinfo: [u8; CHARINFO_LEN],
     tokens: Tokens,
 }
@@ -37,7 +38,7 @@ struct StoredConfiguration {
 }
 impl From<Configuration> for StoredConfiguration {
     fn from(value: Configuration) -> Self {
-        let c = value.canonical;
+        let c = value.canonical();
         let tag = |kind, row, hash| (u64::from(kind) << 56) | (u64::from(row) << 40) | hash;
         Self { canonical: c, charinfo: value.charinfo.to_vec(), tags: [
             tag(TAG_OUTFIT, value.tokens.outfit, c.appearance.outfit),
@@ -60,8 +61,8 @@ impl TryFrom<StoredConfiguration> for Configuration {
 impl core::fmt::Debug for Configuration {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Configuration")
-            .field("class", &self.canonical.class)
-            .field("canonical_hash", &self.canonical.hash())
+            .field("class", &self.class)
+            .field("canonical_hash", &self.canonical().hash())
             .field("tokens", &self.tokens)
             .finish_non_exhaustive()
     }
@@ -130,7 +131,8 @@ impl Configuration {
             return Err(Error::InvalidConfiguration);
         }
         Ok(Self {
-            canonical: c,
+            class: c.class,
+            hashes: [c.appearance.outfit, c.appearance.hat, c.appearance.chara],
             charinfo: config.charinfo,
             tokens: Tokens {
                 outfit: outfit.row_hint(),
@@ -143,7 +145,20 @@ impl Configuration {
     }
 
     pub fn canonical(&self) -> Canonical {
-        self.canonical
+        let mut masked = self.charinfo;
+        masked[..CHARINFO_MASK_END].fill(0);
+        Canonical {
+            class: self.class,
+            appearance: Appearance {
+                charinfo_masked: masked,
+                specials: self.tokens.specials,
+                colour: self.tokens.colour as u8,
+                voice: self.tokens.voice as u8,
+                outfit: self.hashes[0],
+                hat: self.hashes[1],
+                chara: self.hashes[2],
+            },
+        }
     }
     pub fn charinfo(&self) -> &[u8; CHARINFO_LEN] {
         &self.charinfo
@@ -410,21 +425,22 @@ impl MiiOverride {
         target: Configuration,
     ) -> Result<Option<Transaction>, Error> {
         self.ready(live)?;
-        if choice.canonical != target.canonical {
+        let canonical = target.canonical();
+        if choice.canonical != canonical {
             return Err(Error::ChoiceMismatch);
         }
-        if target.canonical.class != self.original.canonical.class {
+        if target.class != self.original.class {
             return Err(Error::DifferentClass);
         }
         if target.tokens.hat != self.original.tokens.hat
-            || target.canonical.appearance.hat != self.original.canonical.appearance.hat
+            || target.hashes[1] != self.original.hashes[1]
         {
             return Err(Error::DifferentHat);
         }
-        if target.canonical == self.original.canonical {
+        if canonical == self.original.canonical() {
             return Err(Error::OriginRequiresRestore);
         }
-        if target.canonical == self.expected.canonical {
+        if canonical == self.expected.canonical() {
             return Ok(None);
         }
         self.prepare(target, Operation::Apply).map(Some)
@@ -747,7 +763,7 @@ mod tests {
             Err(Error::ChoiceMismatch)
         );
         let mut other = b;
-        other.canonical.class = MiiClass::Gunner;
+        other.class = MiiClass::Gunner;
         assert_eq!(
             state.apply(live(a), choice(other), other),
             Err(Error::DifferentClass)

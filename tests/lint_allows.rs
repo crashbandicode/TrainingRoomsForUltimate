@@ -16,8 +16,6 @@ use std::path::Path;
 const KNOWN: &[(&str, &str, usize, &str)] = &[
     ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "approved: operator 2026-11-02 14:2xZ, L2; lock_api RawMutex/RawRwLock require const INIT"),
     ("src/runtime/mii/mii_editor_bridge/draft.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
-    ("src/runtime/mii/mii_hud_portrait.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
-    ("src/runtime/roster/character_roster.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<std::path::PathBuf>) {

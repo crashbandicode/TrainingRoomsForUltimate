@@ -225,7 +225,6 @@ struct Bootstrap {
 
 #[derive(Clone, Copy)]
 // Exactly two fixed jobs plus their replacements; inline values avoid allocation in service.
-#[allow(clippy::large_enum_variant)]
 enum Intent { Exact(Configuration), Original { original_kind: u32 } }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

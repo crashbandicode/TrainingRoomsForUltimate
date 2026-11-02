@@ -1659,3 +1659,6 @@ Next continuation must launch via an owner-bound hidden systemd user service (no
 tool process tree), verify actual PID liveness, and stop it before yield. Do not repeat the failed
 Start-Process lifetime assumption. No model drift was observed, but continuous watcher compliance
 cannot be claimed for this turn.
+
+### Successor Configuration candidate
+Live exact-thread Astra/medium PASS; systemd watcher PID1413457 active. Lead23:48:38 authorized exact cb5af6f2, applied with nine carry transforms; full m5q253 PASS. Two portrait suppressions/KNOWN rows removed. New tests/mii_configuration.rs pins independent JSON bytes, exact equality, invalid values and fresh-child allocation with positive control. UNCOMPILED candidate; native runtime and fresh gates pending. Draft proposal sent to lead, unchanged pending review. No own claim/compiler/Eden/profile. No READY; work continues in this session.
