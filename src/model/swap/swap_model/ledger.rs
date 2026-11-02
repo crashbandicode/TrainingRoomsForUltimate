@@ -98,7 +98,7 @@ impl KeySet {
     pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }
     pub const fn is_empty(self) -> bool { self.0 == 0 }
     pub const fn len(self) -> usize { self.0.count_ones() as usize }
-    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {
+    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> + Clone {
         (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })
     }
 }
@@ -231,10 +231,18 @@ pub struct NativeRequest {
 /// kinds get exactly the keys native registers for them (`0x72` → `+0`; `0x75` → `+0, +1`),
 /// not the generic set the bank's prefetch would.
 pub fn native_window_requests(cells: [u32; 3], flags: RFlags) -> Vec<NativeRequest> {
+    native_window_requests_fixed(cells, flags).iter().copied().collect()
+}
+
+/// Three descriptor cells and at most one special-object request.
+pub fn native_window_requests_fixed(cells: [u32; 3], flags: RFlags)
+    -> crate::engine::compat::fixed::FixedList<NativeRequest, 4> {
+    let mut out = crate::engine::compat::fixed::FixedList::new(
+        NativeRequest { kind: NO_KIND, keys: KeySet::EMPTY, nro: false });
     let primary = cells[0];
-    if primary == NO_KIND { return Vec::new(); }
+    if primary == NO_KIND { return out; }
     let member = |kind: u32| NativeRequest { kind, keys: registration_set(kind, flags), nro: true };
-    let mut out = vec![member(primary)];
+    out.push(member(primary));
     match primary {
         0x24..=0x26 => {
             out.push(NativeRequest { kind: PT_OBJECT_KIND, keys: KeySet::of(&[0]), nro: true });
@@ -247,7 +255,7 @@ pub fn native_window_requests(cells: [u32; 3], flags: RFlags) -> Vec<NativeReque
             // so a pair's Nana is modelled as an ordinary registration of `0x4c`.
             if cells[1] != NO_KIND { out.push(member(cells[1])); }
         }
-        NANA => out.push(member(POPO)),
+        NANA => { out.push(member(POPO)); }
         0x5a | 0x5b => {
             out.push(NativeRequest { kind: AEGIS_OBJECT_KIND, keys: KeySet::of(&[0, 1]), nro: true });
             if cells[1] != NO_KIND { out.push(member(cells[1])); }

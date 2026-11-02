@@ -25,7 +25,7 @@ static SEEN: AtomicU32 = AtomicU32::new(0);
 static PREPARED: AtomicU32 = AtomicU32::new(0);
 
 /// Boot only, before callbacks and the UI worker can submit intents.
-pub(super) fn init() {
+pub(crate) fn init() {
     if CLOSE.get().is_some() { return; }
     let (producer, consumer) = close_handoff::channel(2);
     let _ = READER.set(Mutex::new(consumer));

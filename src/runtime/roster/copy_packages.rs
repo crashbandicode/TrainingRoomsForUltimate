@@ -12,6 +12,7 @@
 //! `[CopyPkg] loading owner={} keys={:x?}`, `[CopyPkg] forget owner={} held={} reason={}`.
 
 use crate::engine::seams::native_fields as fields;
+use crate::engine::compat::fixed::DebugIter;
 use std::sync::Mutex;
 use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition, ROSTER_BYTES};
 use crate::engine::swap::swap_model::copy_registry::{Record, Roster, ENTRIES, SUBS};
@@ -100,7 +101,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
         trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, sets, added,
             released.len(), held.len());
         trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, held.len(),
-            model::KeyList(held.iter().map(|h| h.acquisition)));
+            DebugIter(model::referenced_keys(held.iter().map(|h| h.acquisition))));
     }
     true
 }
@@ -119,7 +120,7 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
     let resident = ready(g68);
     if !resident {
         let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, model::KeyList(held.iter().map(|h| h.acquisition)));
+        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, DebugIter(model::referenced_keys(held.iter().map(|h| h.acquisition))));
     }
     resident
 }

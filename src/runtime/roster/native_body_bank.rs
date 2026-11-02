@@ -179,11 +179,11 @@ use crate::engine::swap::character_forms::{EntryState, Forms};
 use crate::engine::mii::lifetime::Configuration;
 use crate::engine::swap::swap_model::{capabilities, form_class, group_serves, previous_cell_index};
 use crate::engine::swap::swap_model::lifecycle::{attached_plan, BodyRef, ContextRef, DetachedPlan, DetachedView, DispatcherRef, RecordsRef};
-use crate::engine::compat::fixed::{FixedList, FixedVec};
+use crate::engine::compat::fixed::{DebugIter, FixedList, FixedVec};
 use crate::engine::swap::swap_model::copy_registry::{self, RegistryOps};
 use crate::engine::swap::swap_model::fallback::{self, Disposition, Fallback};
 use crate::engine::swap::swap_model::request_bit::{End as LeaseEnd, Lease};
-use crate::engine::swap::swap_model::ledger::{native_window_requests, GroupId, Holder, LedgerRefusal, ReleaseRecipe, Role as LedgerRole};
+use crate::engine::swap::swap_model::ledger::{native_window_requests_fixed as native_window_requests, GroupId, Holder, LedgerRefusal, ReleaseRecipe, Role as LedgerRole};
 use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules};
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
@@ -1037,7 +1037,7 @@ pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], 
             // the live entry (an Original request carries the origin descriptor):
             // the request takes the Reload path below; name the bytes for triage.
             if let Some(current) = fields::read::<[u8; 0x70]>(entry as usize, 0) {
-                let differing: Vec<usize> = (0..0x70).filter(|i| current[*i] != physical.bytes()[*i]).collect();
+                let differing = DebugIter((0..0x70).filter(|i| current[*i] != physical.bytes()[*i]));
                 trace!("[BodyBank] reuse declined owner={} kind={:#x} reason=descriptor bytes differ at {:x?}; Reload path",
                     owner, target, differing);
             }
@@ -3896,17 +3896,17 @@ unsafe fn prepare_resources(resource: *mut u8) {
     if empty_before { r_handle::settle_stale_on_empty(lrole, "configure on an empty R"); }
     r_handle::record_native(lrole, &native_window_requests(members.kinds(), flags));
     let occupancy = Occupancy::default();
-    let mut supplemental: Vec<u32> = Vec::new();
+    let mut supplemental = FixedList::<u32, NATIVE_MEMBERS>::new(0);
     for kind in members.kinds().iter().take(members.count()) {
         match r_handle::acquire(base, lrole, r_handle::WINDOW, *kind, Holder::Build(GroupId(u8::MAX)),
             member_recipe(members, *kind), &occupancy) {
-            Ok(()) => supplemental.push(*kind),
+            Ok(()) => { supplemental.push(*kind); }
             Err(LedgerRefusal::AlreadyHeld { .. }) => {}
             Err(other) => trace!("[Ledger] window acquisition refused owner={} kind={:#x} reason={:?}", owner, kind, other),
         }
     }
     trace!("[BodyBank] resource owner={} alias={:p} supplemental={:x?} native={:x?} flags r48={} r7d={} r7f={}",
-        owner, resource, supplemental, native_window_requests(members.kinds(), flags).iter().map(|r| r.kind).collect::<Vec<_>>(),
+        owner, resource, &*supplemental, DebugIter(native_window_requests(members.kinds(), flags).iter().map(|r| r.kind)),
         flags.r48, flags.r7d, flags.r7f);
     // Pair rule: the construction tail `0x60de60-0x60deb8` decrements `R+0x50` for
     // every body of an entry whose cells 0/1 are `[0x4b, 0x4c]` and resets the whole
@@ -3923,7 +3923,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
             Ok(before) => trace!("[IcPair] resource owner={} alias={:p} refs {}->{} kinds={:x?} flags={:#x}",
                 owner, resource, before, references, members.kinds(), read::<u32>(resource, 0x4c)),
             Err(others) => trace!("[IcPair] resource owner={} alias={:p} refs NOT written: other batches {:?} hold keys on R",
-                owner, resource, others.iter().map(|b| b.0).collect::<Vec<_>>()),
+                owner, resource, DebugIter(others.iter().map(|b| b.0))),
         }
     }
 }

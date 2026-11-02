@@ -4,6 +4,14 @@
 
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
+/// Format a repeatable iterator as a debug list without collecting its items.
+pub struct DebugIter<I>(pub I);
+impl<I: Iterator + Clone> std::fmt::Debug for DebugIter<I> where I::Item: std::fmt::Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.0.clone()).finish()
+    }
+}
+
 /// Up to `N` copies of `T`.
 #[derive(Clone, Copy, Debug)]
 pub struct FixedVec<T: Copy, const N: usize> {

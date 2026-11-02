@@ -29,6 +29,32 @@ unsafe impl GlobalAlloc for CountAlloc {
 static ALLOCATOR: CountAlloc = CountAlloc;
 
 #[test]
+fn native_request_receipts_and_diagnostic_iterators_allocate_nothing() {
+    use crate::engine::compat::fixed::DebugIter;
+    use crate::engine::swap::swap_model::ledger::{native_window_requests_fixed, RFlags};
+    use std::fmt::Write;
+    struct Sink(usize);
+    impl std::fmt::Write for Sink {
+        fn write_str(&mut self, text: &str) -> std::fmt::Result { self.0 += text.len(); Ok(()) }
+    }
+    let mut sink = Sink(0);
+    COUNT.with(|count| count.set(0));
+    TRACK.with(|track| track.set(true));
+    let mut formatted = true;
+    for primary in 0..=0x75 {
+        let requests = native_window_requests_fixed([primary, 0x25, 0x26], RFlags::TRAINING);
+        formatted &= write!(sink, "{:x?}", DebugIter(requests.iter().map(|r| r.kind))).is_ok();
+        std::hint::black_box(requests);
+    }
+    TRACK.with(|track| track.set(false));
+    assert!(formatted && sink.0 > 0);
+    assert_eq!(COUNT.with(Cell::get), 0);
+    assert_eq!(native_window_requests_fixed([0x24, 0x25, 0x26], RFlags::TRAINING).iter()
+        .map(|r| r.kind).collect::<Vec<_>>(), [0x24, 0x72, 0x25, 0x26]);
+    assert_eq!(format!("{:x?}", DebugIter([10, 15].into_iter())), "[a, f]");
+}
+
+#[test]
 fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
     use crate::engine::swap::swap_model::lifecycle::*;
     for mask in 0..64u32 {

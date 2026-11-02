@@ -23,6 +23,7 @@
 //! missing={:x?}` (WP2's format).
 
 use super::observe;
+use crate::engine::compat::fixed::DebugIter;
 use crate::engine::seams::native_fields as fields;
 use std::sync::{Mutex, MutexGuard};
 use crate::engine::swap::swap_model::request_bit as bit0;
@@ -133,7 +134,7 @@ pub(crate) unsafe fn acquire(base: usize, role: Role, group: usize, kind: u32, h
         acquire(r as *mut u8, kind);
     }
     trace!("[Ledger] acquire owner={} kind={:#x} keys={:x?} holder={:?} recipe={:?} batch={} issued={}",
-        owner, kind, keys.iter(kind).map(|k| k.value()).collect::<Vec<_>>(), holder, recipe, batch.0, call.is_some());
+        owner, kind, DebugIter(keys.iter(kind).map(|k| k.value())), holder, recipe, batch.0, call.is_some());
     Ok(())
 }
 
@@ -196,7 +197,7 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
         }
         receipt.released += 1;
         trace!("[Ledger] release owner={} kind={:#x} calls={:x?} reason={}", owner, kind,
-            calls.iter().map(|c| match c { NativeCall::ReleaseKey(k) => k.value(), NativeCall::ReleaseKind { kind } => *kind, _ => 0 }).collect::<Vec<_>>(), reason);
+            DebugIter(calls.iter().map(|c| match c { NativeCall::ReleaseKey(k) => k.value(), NativeCall::ReleaseKind { kind } => *kind, _ => 0 })), reason);
     }
     for (kind, text) in &receipt.kept {
         trace!("[Ledger] retained owner={} kind={:#x} reason={} ({})", owner, kind, text, reason);
@@ -296,7 +297,7 @@ pub(crate) fn reset_exclusive(role: Role, group: usize) -> Result<(), Vec<BatchI
     match handle.ledger.reset_batch_permit(batch) {
         Ok(_) => Ok(()),
         Err(others) => {
-            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", handle.owner, batch.0, others.iter().map(|b| b.0).collect::<Vec<_>>());
+            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", handle.owner, batch.0, DebugIter(others.iter().map(|b| b.0)));
             Err(others)
         }
     }
@@ -323,7 +324,7 @@ pub(crate) unsafe fn set_pair_refs(role: Role, r: usize, group: usize, reference
             Ok(before)
         }
         Err(others) => {
-            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", owner, batch.0, others.iter().map(|b| b.0).collect::<Vec<_>>());
+            trace!("[Ledger] reset deferred owner={} batch={} others={:?}", owner, batch.0, DebugIter(others.iter().map(|b| b.0)));
             Err(others)
         }
     }
