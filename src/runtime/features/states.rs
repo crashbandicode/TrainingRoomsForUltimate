@@ -981,7 +981,7 @@ pub fn start_diag_triggers() {
             if let Ok(bytes) = std::fs::read(path.as_str()) {
                 let _ = std::fs::remove_file(path.as_str());
                 let loaded = crate::model::settings::parse_bytes(&bytes);
-                crate::runtime::published::publish(&loaded.menu, 0);
+                crate::runtime::published::publish(&loaded.settings.menu, 0);
                 diagnostic(format_args!("[TrainingRooms] state diag_settings applied issues={}", loaded.issues.len()));
             }
         }
