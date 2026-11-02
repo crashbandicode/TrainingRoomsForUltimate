@@ -51,6 +51,26 @@ an archive whose length and FNV-1a fingerprint differ (`model::archive_recipe`).
     layout-builder build <stock info_training.arc> <out dir>                  # target.arc (private), info_training.tra1, report.json
     cp <out dir>/info_training.tra1 assets/info_training.tra1
 
+The waiting-room host uses the same pane table and builder:
+
+    layout-builder build-waiting <stock info_waiting.arc> <out dir>
+    cp <out dir>/info_waiting.tra1 assets/info_waiting.tra1
+
+Its menu, notification and input-log roots live beneath `TrModPort`. The runtime
+recognizes each archive by its directory member and applies that layout's recipe.
+The two boot buffers each fit the larger recipe's stock/output size; both layouts
+share the pool and retain the five-second hand-out grace. A vanilla fallback uses
+the second buffer as scratch, so reload timing remains an Eden acceptance gate.
+
+Waiting recipe candidate generated with builder `44177d8`: stock 1,284,116 B,
+SHA256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`;
+recipe 65,784 B, SHA256 `599c7d6fe61568efae283356e237eac05784f817c8b2c02db12682b873a35261`;
+output 1,378,180 B. All 183 non-layout archive members and all 63 original pane
+records remain byte-identical. The builder adds 549 panes including the host.
+Raw generation and independent payload/hierarchy checks are retained privately
+under `eden/runs/ui-waiting-build-44177d8/`; this is build evidence, not runtime
+acceptance. Never commit `target.arc` or the stock archive.
+
 The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git dependency, host only (it is not linked into the plugin):
 
 - origin `https://github.com/crashbandicode/Toolbox-Cli` (crate `nx-layout-toolbox` 0.1.0, MIT, `LICENSE` in the repository); no Forgejo mirror exists (`git.syntaxbyexample.com/intpa/Toolbox-Cli` is not found)

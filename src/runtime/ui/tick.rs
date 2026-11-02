@@ -59,26 +59,32 @@ const HELP_REST_Y: f32 = -80.0;
 
 pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(name) = registry::layout_name(layout) else { return };
+    let waiting = name == INFO_WAITING;
+    let practice_layout = name == INFO_TRAINING || waiting;
+    if practice_layout && registration {
+        // HUD consumers compare this generation before using cached containers.
+        // Publish it before dispatch, including when a layout address is reused.
+        INVALIDATE.store(true, Ordering::Release);
+        REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
+    }
     hud::run(layout, name);
     hud::hud_rule(layout, name);
-    let waiting = name == INFO_WAITING;
-    if name != INFO_TRAINING && !waiting {
+    if !practice_layout {
         return;
     }
     // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
     let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuDraw);
-    if registration {
-        INVALIDATE.store(true, Ordering::Release);
-        REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
-    }
     let lobby = crate::runtime::lobby::training::lobby::requested();
     if (waiting && !lobby) || (!waiting && !game::is_training_mode()) {
         renderer_lost("practice layout inactive");
         return;
     }
     TICKS.fetch_add(1, Ordering::Relaxed);
-    // One retirement clock for thumbnails, chips and the optional diagnostic probe.
-    crate::runtime::ui::texture::tick();
+    // Registration is an initial calculate, not another rendered frame. Only
+    // the regular pass advances the shared texture retirement grace.
+    if !registration {
+        crate::runtime::ui::texture::tick();
+    }
     let Some(mut r) = RESOLVED.try_lock() else { return };
     if r.layout != layout as usize || INVALIDATE.swap(false, Ordering::AcqRel) {
         resolve(&mut r, layout, waiting);
@@ -210,6 +216,10 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     r.status_r = pane::find(root, b"status_R");
     r.help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
     let menu_root = if waiting { pane::find(root, b"TrModPort") } else { root };
+    // Waiting readiness covers every hosted panel, including the notification
+    // and input-log consumers (SPEC-input-02 §6), not just the menu subtree.
+    let host_complete = !waiting || [p::IDX_NOTICE, p::IDX_LOG].iter()
+        .all(|&index| !pane::find(menu_root, p::name_of(index).as_bytes()).is_null());
     let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
     let mut missing = 0;
     let container = pane::find(menu_root, p::ROOT.as_bytes());
@@ -223,13 +233,13 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     }
     let capacity = if all[p::row_label_index(0)].is_null() { 0 } else { pane::text_capacity(all[p::row_label_index(0)]) };
     log(format_args!(
-        "[Ui] layout={layout_name} resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
+        "[Ui] layout={layout_name} resolved total={total} holders={} menu_panes={} missing={missing} host_complete={host_complete} text_capacity={capacity} help={} status_r={}",
         registry::holders().len(),
         p::MENU_COUNT,
         !r.help.is_null(),
         !r.status_r.is_null()
     ));
-    if missing == 0 {
+    if missing == 0 && host_complete {
         #[cfg(feature = "diag")]
         dump_text_box(all[p::row_label_index(0)]);
         let container = all[p::IDX_MENU];
