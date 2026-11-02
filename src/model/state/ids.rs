@@ -4,21 +4,7 @@
 //! game does not know stays `UNRESOLVED` and is reported, so the install line and the log say which
 //! feature lost it. Each milestone adds its names; the order is the order of `C`, nothing depends on it.
 
-use crate::model::cpu::hash::lua_bind_hash;
-
-macro_rules! constants {
-    ($($variant:ident = $name:literal,)*) => {
-        /// One game constant.
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        #[repr(u16)]
-        pub enum C { $($variant),* }
-
-        /// The identifiers, in `C` order.
-        pub const NAMES: &[&str] = &[$($name),*];
-    };
-}
-
-constants! {
+crate::model::cpu::ids::game_constants! {
     // Situations (SPEC-state-01 §5.3).
     SituationGround = "SITUATION_KIND_GROUND",
     SituationAir = "SITUATION_KIND_AIR",
@@ -262,12 +248,6 @@ constants! {
     SoraChangeMagicFlag = "FIGHTER_TRAIL_STATUS_SPECIAL_N1_FLAG_CHANGE_MAGIC",
 }
 
-/// Number of constants.
-pub const COUNT: usize = NAMES.len();
-
-/// The value of a constant the game did not answer for. No status, kind or work id is this value.
-pub const UNRESOLVED: i32 = i32::MIN;
-
 /// The articles a respawn cleanup keeps, as `(kind, article)` pairs (SPEC-state-05 §4.1).
 pub const KEEP_LIST: [(C, C); 9] = [
     (C::KindMiiFighter, C::ArticleMiiFighterHat),
@@ -284,46 +264,7 @@ pub const KEEP_LIST: [(C, C); 9] = [
 /// Article indices a cleanup visits (SPEC-state-01 §4: `0..=0x25`).
 pub const ARTICLE_COUNT: i32 = 0x26;
 
-/// The resolved values.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Table {
-    values: [i32; COUNT],
-}
-
-impl Default for Table {
-    fn default() -> Self {
-        Self::unresolved()
-    }
-}
-
 impl Table {
-    pub const fn unresolved() -> Self {
-        Self { values: [UNRESOLVED; COUNT] }
-    }
-
-    /// Ask `lookup` for every name (by its key). Returns how many it did not answer.
-    pub fn resolve(&mut self, mut lookup: impl FnMut(u64) -> Option<i32>) -> usize {
-        let mut missing = 0;
-        for (slot, name) in self.values.iter_mut().zip(NAMES.iter()) {
-            match lookup(lua_bind_hash(name)) {
-                Some(value) => *slot = value,
-                None => {
-                    *slot = UNRESOLVED;
-                    missing += 1;
-                }
-            }
-        }
-        missing
-    }
-
-    pub fn with(values: &[(C, i32)]) -> Self {
-        let mut table = Self::unresolved();
-        for (c, value) in values {
-            table.values[*c as usize] = *value;
-        }
-        table
-    }
-
     /// Every constant resolved to `base + its index` (host tests: distinct, known values).
     pub fn sequential(base: i32) -> Self {
         let mut table = Self::unresolved();
@@ -331,24 +272,6 @@ impl Table {
             *slot = base + i as i32;
         }
         table
-    }
-
-    pub fn get(&self, c: C) -> i32 {
-        self.values[c as usize]
-    }
-
-    pub fn resolved(&self, c: C) -> bool {
-        self.get(c) != UNRESOLVED
-    }
-
-    /// `value == c` and `c` resolved.
-    pub fn is(&self, c: C, value: i32) -> bool {
-        self.resolved(c) && self.get(c) == value
-    }
-
-    /// The names that stayed unresolved.
-    pub fn missing(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v == UNRESOLVED).map(|(_, n)| *n)
     }
 
     /// The situation constants the machine classifies with.

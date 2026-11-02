@@ -93,19 +93,6 @@ pub fn lua_bind_hash(name: &str) -> u64 {
     xxh64(name.as_bytes(), SEED)
 }
 
-/// CRC-32 (IEEE 802.3, the zlib polynomial), bitwise: the low half of the game's `Hash40`.
-pub fn crc32(bytes: &[u8]) -> u32 {
-    let mut crc = !0u32;
-    for byte in bytes {
-        crc ^= u32::from(*byte);
-        for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
-        }
-    }
-    !crc
-}
-
-/// The game's `phx::Hash40` of a name: the CRC-32 in the low 32 bits and the length in bits 32..40.
-pub fn hash40(name: &str) -> u64 {
-    u64::from(crc32(name.as_bytes())) | ((name.len() as u64) << 32)
-}
+/// The game's `phx::Hash40` of a name (the CRC-32 in the low 32 bits, the length in bits 32..40): one
+/// implementation, `model::hash40`.
+pub use crate::model::hash40::{crc32, hash40};
