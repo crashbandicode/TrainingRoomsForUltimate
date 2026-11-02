@@ -100,8 +100,8 @@ unsafe fn descriptor(raw: *const u8) -> (u32, [u32; 3], u32, u8) {
 
 #[skyline::hook(offset = 0x678174, inline)]
 unsafe fn allocation_trace(ctx: &mut InlineCtx) {
-    crate::runtime::swap::practice_trace::checkpoint(30, [ctx.registers[0].x(), ctx.registers[1].x(), ctx.registers[2].x(), ctx.registers[30].x(), 0]);
-    crate::runtime::swap::hang_trace::ALLOCATION.hit();
+    crate::runtime::roster::practice_trace::checkpoint(30, [ctx.registers[0].x(), ctx.registers[1].x(), ctx.registers[2].x(), ctx.registers[30].x(), 0]);
+    crate::runtime::roster::hang_trace::ALLOCATION.hit();
     let desc = ctx.registers[2].x() as *const u8;
     if aligned(desc) && bounded_log(&BOUNDARY_LOGS, 384) {
         trace!(
@@ -118,8 +118,8 @@ unsafe fn allocation_trace(ctx: &mut InlineCtx) {
 
 #[skyline::hook(offset = 0x65325c, inline)]
 unsafe fn reload_trace(ctx: &mut InlineCtx) {
-    crate::runtime::swap::practice_trace::checkpoint(31, [ctx.registers[0].x(), ctx.registers[1].x(), ctx.registers[2].x(), ctx.registers[30].x(), 0]);
-    crate::runtime::swap::hang_trace::RELOAD.hit();
+    crate::runtime::roster::practice_trace::checkpoint(31, [ctx.registers[0].x(), ctx.registers[1].x(), ctx.registers[2].x(), ctx.registers[30].x(), 0]);
+    crate::runtime::roster::hang_trace::RELOAD.hit();
     let entry = ctx.registers[0].x() as *const u8;
     let desc = ctx.registers[1].x() as *const u8;
     if aligned(entry) && aligned(desc) && bounded_log(&BOUNDARY_LOGS, 384) {
@@ -129,11 +129,11 @@ unsafe fn reload_trace(ctx: &mut InlineCtx) {
 
 #[skyline::hook(offset = 0x652174, inline)]
 unsafe fn destruction_trace(ctx: &mut InlineCtx) {
-    crate::runtime::swap::practice_trace::event(32, [ctx.registers[0].x(), ctx.registers[30].x(), 0, 0, 0]);
-    crate::runtime::swap::hang_trace::DESTROY.hit();
+    crate::runtime::roster::practice_trace::event(32, [ctx.registers[0].x(), ctx.registers[30].x(), 0, 0, 0]);
+    crate::runtime::roster::hang_trace::DESTROY.hit();
     let entry = ctx.registers[0].x() as *const u8;
-    crate::runtime::swap::character_roster::on_destroy(entry);
-    crate::runtime::swap::practice_trace::checkpoint(33, [entry as u64, 0, 0, 0, 0]);
+    crate::runtime::roster::character_roster::on_destroy(entry);
+    crate::runtime::roster::practice_trace::checkpoint(33, [entry as u64, 0, 0, 0, 0]);
     if aligned(entry) && bounded_log(&BOUNDARY_LOGS, 384) {
         trace!("[TrioBoundary] destroy entry=0x{:x} owner={} active={:x?} pending={:x?} installed={} mode={:?}", entry as usize, read::<u32>(entry, 0xe0), descriptor(entry), descriptor(entry.add(0x70)), read::<u64>(entry, 0x4150), game_mode::current());
     }
@@ -197,7 +197,7 @@ unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64) {
     }
     let entry = FighterManager::get_fighter_entry(manager, app::FighterEntryID(entry_id as i32))
         as *const u8;
-    crate::runtime::swap::character_roster::allow_portrait(ctx, entry_id, entry);
+    crate::runtime::roster::character_roster::allow_portrait(ctx, entry_id, entry);
 }
 
 #[skyline::hook(offset = 0x1510d3c, inline)]

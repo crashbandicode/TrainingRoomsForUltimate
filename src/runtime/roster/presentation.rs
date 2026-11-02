@@ -26,7 +26,7 @@ macro_rules! trace {
 pub(crate) struct CardObservation { pub slot: i32, pub bust_mode: u8, pub bound: u8, pub table_index: u32 }
 
 pub(crate) unsafe fn observe(base: usize, owner: u32) -> Result<CardObservation, &'static str> {
-    let (slot, slot_ptr) = crate::runtime::swap::character_roster::mii_hud_portrait::slot_of_owner(base, owner)?;
+    let (slot, slot_ptr) = crate::runtime::roster::character_roster::mii_hud_portrait::slot_of_owner(base, owner)?;
     let p = slot_ptr as usize;
     Ok(CardObservation {
         slot,
@@ -61,7 +61,7 @@ pub(crate) unsafe fn shadow_readback(base: usize, owner: u32, kind: u32, exact: 
     let expected = HudExpectation { kind, bust: exact.then_some(crate::engine::swap::swap_model::presentation::TextureKey(0)), pair: false, waiting_icon: None };
     // Diag only: shipped builds write no `[Hud]` line, so they skip the icon lookup as well.
     let icon = (cfg!(feature = "diag") && owner == WAITING_CPU_OWNER && !exact)
-        .then(|| crate::runtime::swap::character_roster::waiting_icon_observation(base, kind));
+        .then(|| crate::runtime::roster::character_roster::waiting_icon_observation(base, kind));
     let observed = icon.and_then(Result::ok);
     let icon_verdict = observed.as_ref().map(verify_waiting_icon);
     let (icon_state, icon_reason) = match (icon, icon_verdict) {

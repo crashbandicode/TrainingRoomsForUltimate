@@ -57,10 +57,10 @@ unsafe extern "C" fn training_mod_native_service_dispatch(
     let native_sp = context.native_sp() as u64;
     #[cfg(not(feature = "console-swap-trace"))]
     let native_sp = 0;
-    crate::runtime::swap::practice_trace::event(220, [entry as u64, context.caller_lr() as u64, native_sp, 0, 0]);
+    crate::runtime::roster::practice_trace::event(220, [entry as u64, context.caller_lr() as u64, native_sp, 0, 0]);
     // A plugin consumer returning early ends only pre-dispatch, never native work.
     super::service(context, entry);
-    crate::runtime::swap::practice_trace::event(221, [entry as u64, 0, 0, 0, 0]);
+    crate::runtime::roster::practice_trace::event(221, [entry as u64, 0, 0, 0, 0]);
     #[cfg(feature = "mii-ordinary-player-alpha")]
     if !super::mii_ordinary_player::enter_native(entry) {
         return 0;
@@ -72,13 +72,13 @@ unsafe extern "C" fn training_mod_native_service_dispatch(
     let original: unsafe extern "C" fn(*mut u8) -> u64 =
         std::mem::transmute(ORIGINAL.load(Ordering::Acquire));
     let result = original(entry);
-    crate::runtime::swap::practice_trace::event(222, [entry as u64, result, 0, 0, 0]);
+    crate::runtime::roster::practice_trace::event(222, [entry as u64, result, 0, 0, 0]);
     #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::leave_native(entry);
     #[cfg(feature = "mii-ordinary-player-alpha")]
     super::mii_ordinary_player::leave_native(entry);
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     super::mii_ordinary_cpu::leave_native(entry);
-    crate::runtime::swap::practice_trace::event(223, [entry as u64, result, 0, 0, 0]);
+    crate::runtime::roster::practice_trace::event(223, [entry as u64, result, 0, 0, 0]);
     result
 }

@@ -193,7 +193,7 @@ fn remember_owned(role:Role,generation:u64,kind:u32,forms:Forms,
         memory.commit(role as usize,
             WaitingValue {fighter,forms,cursor,configuration,owned:true,original});
         drop(memory);
-        crate::runtime::swap::kirby_hats::fighter_committed(role as usize, kind);
+        crate::runtime::roster::kirby_hats::fighter_committed(role as usize, kind);
     }
 }
 fn restore_owned(role:Role,value:WaitingValue)->bool {
@@ -225,7 +225,7 @@ fn observe_mii_origin(role:Role,generation:u64,kind:u32,forms:Forms,
     let fresh = memory.observe(role as usize,WaitingValue {fighter,forms,cursor:None,
         configuration:Some(configuration),owned:true,original:true});
     drop(memory);
-    if fresh { crate::runtime::swap::kirby_hats::fresh_lobby(); }
+    if fresh { crate::runtime::roster::kirby_hats::fresh_lobby(); }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -359,7 +359,7 @@ pub(crate) fn preload_blocked() -> bool {
     // INSTALL. The same native backend qualification serves Training and waiting.
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
-    if INSTALL.active() || crate::runtime::swap::kirby_hats::preload_pending()
+    if INSTALL.active() || crate::runtime::roster::kirby_hats::preload_pending()
         || STATES.iter().any(|s| {let s=s.lock().unwrap();
             s.pending.is_some() || s.active.is_some()}) {return true;}
     #[cfg(feature="mii-ordinary-player-alpha")]
@@ -387,9 +387,9 @@ pub(crate) fn notice_blocked() -> bool {
 }
 
 pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
-    -> [Option<crate::runtime::swap::cycle_preload::Target>;crate::runtime::swap::cycle_preload::MAX_TARGETS] {
+    -> [Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     let role=if role==0 {Role::Player}else{Role::Cpu};
-    if !role.enabled() {return [None;crate::runtime::swap::cycle_preload::MAX_TARGETS];}
+    if !role.enabled() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}
     #[cfg(feature="mii-ordinary-player-alpha")]
     if role==Role::Player {
         if let Some(targets)=mii_ordinary_player::preload_targets(menu) {return targets;}
@@ -399,15 +399,15 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
         if let Some(targets)=mii_ordinary_cpu::preload_targets(menu) {return targets;}
     }
     let (mut current,mut cursor)={let s=state_for(role).lock().unwrap();
-        let Some((_,kind))=s.observed else {return [None;crate::runtime::swap::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
+        let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
     let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();
     let original=cycle_original(role);
-    let mut targets=[None;crate::runtime::swap::cycle_preload::MAX_TARGETS];
+    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
     for target in &mut targets {
         let at_original=cursor.is_none() && original.is_some_and(|k|cycle_position(&[k],current).is_some());
         let Some((kind,next))=(if at_original {next_from_original(&kinds,original)}
             else {next_cycle(current,cursor,&kinds,original)}) else {break;};
-        *target=Some(crate::runtime::swap::cycle_preload::Target::fighter(kind));
+        *target=Some(crate::runtime::roster::cycle_preload::Target::fighter(kind));
         current=kind;cursor=next;
     }
     targets
@@ -575,7 +575,7 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
         || previous.solo_popo_cpu != current.solo_popo_cpu
         || previous.trio_practice != current.trio_practice
     {
-        crate::runtime::swap::cycle_preload::reset_admission_grace();
+        crate::runtime::roster::cycle_preload::reset_admission_grace();
     }
     for role in [Role::Player, Role::Cpu] {
         if roster(previous, role) != roster(&current, role) {
@@ -625,7 +625,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         }
         return;
     }
-    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::swap::character_lifecycle::native_hooks_ready() {
+    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {
         trace!("[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable", role, selection);
         notify(role, "Unavailable on this game version".into());
         return;
@@ -657,11 +657,11 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         return;
     }
     sources::pause_preload();
-    if crate::runtime::swap::cycle_preload_config::snapshot().measurements
+    if crate::runtime::roster::cycle_preload_config::snapshot().measurements
         && !restoring && !matches!(selection,Selection::RefreshPartners) {
-        let target=match selection {Selection::Direct(f)=>Some(crate::runtime::swap::cycle_preload::Target::fighter(f.kind())),Selection::Cycle=>
+        let target=match selection {Selection::Direct(f)=>Some(crate::runtime::roster::cycle_preload::Target::fighter(f.kind())),Selection::Cycle=>
             preload_targets(&setting(&MENU),role as usize)[0],_=>None};
-        if let Some(target)=target {crate::runtime::swap::cycle_preload::request(role as usize,false,target);}
+        if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}
     }
     #[cfg(any(feature="mii-ordinary-player-alpha",feature="mii-ordinary-cpu-alpha"))]
     let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);
@@ -851,7 +851,7 @@ pub fn scene_changed(mode: game_mode::Mode) {
     mii_hud_portrait::scene_changed();
     #[cfg(feature = "source-owner-probe")]
     source_owner_probe::scene_changed();
-    crate::runtime::swap::character_items::scene_changed();
+    crate::runtime::roster::character_items::scene_changed();
     #[cfg(feature = "mii-identity-probe")]
     crate::mii_identity_probe::forget(std::ptr::null());
     #[cfg(feature = "mii-identical-reload-probe")]
@@ -860,7 +860,7 @@ pub fn scene_changed(mode: game_mode::Mode) {
         .lock()
         .unwrap()
         .scene_changed(mode.initialized, mode.melee, mode.mode);
-    crate::runtime::swap::kirby_hats::scene_changed(same_lobby);
+    crate::runtime::roster::kirby_hats::scene_changed(same_lobby);
     training::named_macros::waiting_scene_changed(same_lobby);
     OWNED_BUTTONS.store(0, Ordering::Relaxed);
     OPERATOR_BUTTONS.store(0, Ordering::Relaxed);
@@ -1065,7 +1065,7 @@ pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
 // below are compared only; no saved fighter/entry/module pointer is dereferenced.
 // Pre-service dispatch only. Returning here never suppresses the native call.
 unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
-    crate::runtime::swap::hang_trace::ROSTER_SERVICE.hit();
+    crate::runtime::roster::hang_trace::ROSTER_SERVICE.hit();
     if !aligned(entry) {
         return;
     }
@@ -1106,7 +1106,7 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
 
 unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::swap::practice_trace::scope(0x1080000);
+    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080000);
     if !matches!(owner, 0 | 1 | 4) {
         return;
     }
@@ -1179,7 +1179,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             }
             drop(state);
             if active.scope.waiting() {
-                crate::runtime::swap::kirby_hats::fighter_committed(role as usize, active.target.kind());
+                crate::runtime::roster::kirby_hats::fighter_committed(role as usize, active.target.kind());
             }
             publish_partners(role, active.forms);
             role.sync_selection(active.target);
@@ -1194,9 +1194,9 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             if role == Role::Cpu {
                 mii_ordinary_cpu::complete_generic(entry, active.install, active.target.kind(), active.slot);
             }
-            crate::runtime::swap::cycle_preload::foreground_settled();
+            crate::runtime::roster::cycle_preload::foreground_settled();
             finish_install(active.install, "roster ready");
-            crate::runtime::swap::cycle_preload::completed(role as usize,false,active.target.kind());
+            crate::runtime::roster::cycle_preload::completed(role as usize,false,active.target.kind());
             trace!("[CharacterRoster] complete owner={} target={} kind=0x{:x} slot={:?} ticks={} body_id=0x{:x}",
                 owner, active.target.name(), active.target.kind(), active.slot.map(|i| i+1),
                 active.ticks, read::<u32>(read::<*const u8>(entry, 0x4160), 8));
@@ -1300,7 +1300,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                             .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));
                     if fresh_lobby {
                         trace!("[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices");
-                        crate::runtime::swap::kirby_hats::fresh_lobby();
+                        crate::runtime::roster::kirby_hats::fresh_lobby();
                         training::named_macros::waiting_scene_changed(false);
                     }
                     role.sync_selection(fighter);
@@ -1322,7 +1322,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         if restore_owned(role,target) {return;}
                         if target.fighter.kind() == kind && target.forms==forms {
                             WAITING_MEMORY.lock().unwrap().commit(role as usize, target);
-                            crate::runtime::swap::kirby_hats::fighter_committed(role as usize, kind);
+                            crate::runtime::roster::kirby_hats::fighter_committed(role as usize, kind);
                             state_for(role).lock().unwrap().cursor=target.cursor;
                             role.sync_selection(target.fighter);
                         } else {
@@ -1409,7 +1409,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         }
         drop(state);
         if request.scope.waiting() {
-            crate::runtime::swap::kirby_hats::fighter_committed(role as usize, target.kind());
+            crate::runtime::roster::kirby_hats::fighter_committed(role as usize, target.kind());
         }
         role.sync_selection(target);
         notify(role, selection_label(role, target, slot));
@@ -1460,7 +1460,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     trace!("[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}",
         owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);
     #[cfg(feature = "console-swap-trace")]
-    crate::runtime::swap::practice_trace::checkpoint(901, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
+    crate::runtime::roster::practice_trace::checkpoint(901, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
     #[cfg(feature = "mii-ordinary-player-alpha")]
     if owner == 0 {
         mii_ordinary_player::begin_generic(entry, install_token, descriptor.bytes());
@@ -1470,13 +1470,13 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         mii_ordinary_cpu::begin_generic(entry, install_token, descriptor.bytes());
     }
     #[cfg(feature = "console-swap-trace")]
-    crate::runtime::swap::practice_trace::checkpoint(902, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
+    crate::runtime::roster::practice_trace::checkpoint(902, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
     let base = BASE.load(Ordering::Acquire);
     #[cfg(feature = "native-unlink-probe")]
-    crate::runtime::swap::native_unlink_probe::arm(entry as usize, owner, current, target.kind());
+    crate::runtime::roster::native_unlink_probe::arm(entry as usize, owner, current, target.kind());
     reload_at_pose(base, entry, &descriptor, pose);
     #[cfg(feature = "console-swap-trace")]
-    crate::runtime::swap::practice_trace::checkpoint(903, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
+    crate::runtime::roster::practice_trace::checkpoint(903, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
 }
 
 /// Called before native entry destruction, while that argument is still owned.
@@ -1598,8 +1598,8 @@ pub unsafe fn on_destroy(entry: *const u8) {
         sources::scene_changed();
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::scene_changed();
-        crate::runtime::swap::kirby_hats::practice_departed(lobby::is_waiting_scene());
-        crate::runtime::swap::character_items::scene_changed();
+        crate::runtime::roster::kirby_hats::practice_departed(lobby::is_waiting_scene());
+        crate::runtime::roster::character_items::scene_changed();
         trace!("[CharacterRoster] practice consumers invalidated on P1 entry destruction");
     }
 }
@@ -1674,7 +1674,7 @@ unsafe fn publish_mii_presentation(
     // and state-load hooks, so only a non-exact publication is judged against "no bust".
     #[cfg(feature="mii-hud-portrait-alpha")]
     if !matches!(portrait, PortraitIntent::Exact(_)) {
-        crate::runtime::swap::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "publish");
+        crate::runtime::roster::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "publish");
     }
     #[cfg(not(feature="mii-hud-portrait-alpha"))]
     refresh_hud(entry, owner, kind);
@@ -1768,7 +1768,7 @@ unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
     {
         mii_hud_portrait::represent(entry, owner, kind);
         // WP-P shadow readback after the native reset republish (the L+R+A class).
-        crate::runtime::swap::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "native reset");
+        crate::runtime::roster::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "native reset");
     }
     #[cfg(not(feature = "mii-hud-portrait-alpha"))]
     {

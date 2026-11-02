@@ -1085,7 +1085,7 @@ pub(super) mod managed {
         pub(crate) identity: bool,
         pub(crate) resource_associated: bool,
         pub(crate) returned: bool,
-        pub(in crate::runtime::swap::character_roster) input: Result<Inputs, (&'static str, usize, usize)>,
+        pub(in crate::runtime::roster::character_roster) input: Result<Inputs, (&'static str, usize, usize)>,
         pub(crate) valid: bool,
     }
 
@@ -1206,7 +1206,7 @@ pub(super) mod managed {
 
     unsafe fn training() -> bool {
         enabled()
-            && crate::runtime::swap::character_lifecycle::native_hooks_ready()
+            && crate::runtime::roster::character_lifecycle::native_hooks_ready()
             && common::is_native_training_mode()
             && matches!(common::game_mode::current(), Some(mode)
                 if mode.initialized && mode.melee == 0x20 && mode.mode == 0x04040000)
@@ -1217,12 +1217,12 @@ pub(super) mod managed {
             Layout::Training => training(),
             #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
             Layout::LdnWaiting => cfg!(feature = "managed-ldn-third-source-alpha")
-                && enabled() && crate::runtime::swap::character_lifecycle::native_hooks_ready()
+                && enabled() && crate::runtime::roster::character_lifecycle::native_hooks_ready()
                 && matches!(common::game_mode::current(), Some(mode)
                     if mode.initialized && mode.melee == 0x0d && mode.mode == 0x02010000)
                 && super::super::lobby::active(),
             #[cfg(feature = "lobby-preload-extended")]
-            Layout::QuickplayWaiting => enabled() && crate::runtime::swap::character_lifecycle::native_hooks_ready()
+            Layout::QuickplayWaiting => enabled() && crate::runtime::roster::character_lifecycle::native_hooks_ready()
                 && matches!(common::game_mode::current(), Some(mode)
                     if mode.initialized && mode.melee == 0x0d && Backend::quickplay_waiting_mode(mode.mode))
                 && super::super::lobby::active(),
@@ -1818,13 +1818,13 @@ pub(super) mod managed {
 
     /// Event-only supplementary reads from this live callback, never saved pointers.
     #[cfg(feature = "source-capacity-probe")]
-    pub(in crate::runtime::swap::character_roster) type AdmissionDetail = (
+    pub(in crate::runtime::roster::character_roster) type AdmissionDetail = (
         bool, bool, Option<(&'static str, usize)>, Option<[u32; 28]>, Option<bool>, Option<bool>,
         Result<Inputs, (&'static str, usize, usize)>,
     );
 
     #[cfg(feature = "source-capacity-probe")]
-    pub(in crate::runtime::swap::character_roster) unsafe fn admission_detail(
+    pub(in crate::runtime::roster::character_roster) unsafe fn admission_detail(
         ctx: &ServiceEntryContext, entry: *const u8, previous: u32, reservation: Option<Reservation>,
     ) -> AdmissionDetail {
         let slot = reservation.map_or(SLOT as u32, |owner| owner.slot);

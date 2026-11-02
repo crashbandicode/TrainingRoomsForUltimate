@@ -202,7 +202,7 @@ fn load_cache() {
         store(settings);
         // After the load, so the line carries the settings this boot applies (E8).
         #[cfg(feature = "native-body-bank-alpha")]
-        crate::runtime::swap::character_roster::body_bank::report_group_swap(&settings);
+        crate::runtime::roster::character_roster::body_bank::report_group_swap(&settings);
     });
 }
 
@@ -214,6 +214,6 @@ fn store(settings: Settings) {
     };
     let value = pack(settings);
     if CACHE.swap(value, Ordering::AcqRel) != value {
-        crate::runtime::swap::cycle_preload::settings_changed();
+        crate::runtime::roster::cycle_preload::settings_changed();
     }
 }

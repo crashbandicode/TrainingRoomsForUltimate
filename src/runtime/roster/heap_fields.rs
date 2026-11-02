@@ -10,7 +10,7 @@ pub(crate) struct HeapFields;
 #[cfg(feature = "plugin-heap-meter")]
 impl core::fmt::Display for HeapFields {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", crate::runtime::swap::heap_metrics::snapshot())
+        write!(f, "{}", crate::runtime::roster::heap_metrics::snapshot())
     }
 }
 

@@ -183,7 +183,7 @@ struct State {
     book: SourceBook<8, LEASES>,
     sources: [Option<Source>; 8],
     wants: [Option<Want>; CHANNELS],
-    preload: [Option<Want>; crate::runtime::swap::cycle_preload::MAX_TARGETS],
+    preload: [Option<Want>; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     preload_failed: u128,
     preload_settled: bool,
     preload_limit: u8,
@@ -203,7 +203,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     book: SourceBook::new(),
     sources: [None; 8],
     wants: [None; CHANNELS],
-    preload: [None; crate::runtime::swap::cycle_preload::MAX_TARGETS],
+    preload: [None; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     preload_failed: 0,
     preload_settled: false,
     preload_limit: 0,
@@ -273,7 +273,7 @@ fn memory_refused(slot: u32, kind: u32, decision: crate::engine::swap::body_bank
 
 /// Retires only speculative intent. Native loads/leases keep their normal owner.
 pub(crate) fn pause_preload() {
-    let mut state=STATE.lock().unwrap(); state.preload=[None;crate::runtime::swap::cycle_preload::MAX_TARGETS];state.preload_settled=false;
+    let mut state=STATE.lock().unwrap(); state.preload=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];state.preload_settled=false;
 }
 pub(crate) fn preload_epoch()->SceneEpoch {STATE.lock().unwrap().book.epoch()}
 
@@ -298,7 +298,7 @@ pub(super) fn warm_occupancy() -> usize {
 }
 
 pub(crate) fn metrics() -> crate::engine::preload::preload_metrics::Preload {
-    let settings=crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings=crate::runtime::roster::cycle_preload_config::snapshot();
     let state=STATE.lock().unwrap();
     let mut result=crate::engine::preload::preload_metrics::Preload {slots:settings.slots,effective:state.preload_limit,
         fighters:settings.fighters,hats:settings.hats,..Default::default()};
@@ -317,7 +317,7 @@ pub(crate) fn metrics() -> crate::engine::preload::preload_metrics::Preload {
     result
 }
 
-pub(crate) fn resident(target:crate::runtime::swap::cycle_preload::Target,hat:bool)->bool {
+pub(crate) fn resident(target:crate::runtime::roster::cycle_preload::Target,hat:bool)->bool {
     let state=STATE.lock().unwrap();
     state.sources.iter().enumerate().any(|(slot,s)|s.is_some_and(|s|
         (s.kind==target.kind || (!hat && target.configuration.is_none()
@@ -334,11 +334,11 @@ pub(crate) fn resident(target:crate::runtime::swap::cycle_preload::Target,hat:bo
 /// unfiltered `desired` plan (index-aligned with it) keeps failed targets in the
 /// denominator instead of letting the plan quietly shrink to "all ready".
 pub(crate) fn preload_readiness(blocked:bool,
-    desired:&[Option<crate::runtime::swap::cycle_preload::Target>;crate::runtime::swap::cycle_preload::MAX_TARGETS])->crate::engine::preload::cycle_preload_policy::Readiness {
-    let configured=crate::runtime::swap::cycle_preload_config::snapshot().slots;
+    desired:&[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS])->crate::engine::preload::cycle_preload_policy::Readiness {
+    let configured=crate::runtime::roster::cycle_preload_config::snapshot().slots;
     let state=STATE.lock().unwrap();
     let failed=state.preload_failed|state.failed;
-    let plan:[Option<(u32,_)>;crate::runtime::swap::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|
+    let plan:[Option<(u32,_)>;crate::runtime::roster::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|
         state.preload[i].map(|want|(want.kind,want.configuration)).or_else(||desired[i]
             .filter(|target|failed&(1u128<<target.kind)!=0)
             .map(|target|(target.kind,target.configuration))));
@@ -362,21 +362,21 @@ fn shown_limit(state:&State)->u8 {
     state.preload_limit
 }
 
-pub(crate) unsafe fn preload_hat_target(role:usize,kind:u32)->Option<crate::runtime::swap::cycle_preload::Target> {
-    if !(0x48..=0x4a).contains(&kind) {return Some(crate::runtime::swap::cycle_preload::Target::fighter(kind));}
+pub(crate) unsafe fn preload_hat_target(role:usize,kind:u32)->Option<crate::runtime::roster::cycle_preload::Target> {
+    if !(0x48..=0x4a).contains(&kind) {return Some(crate::runtime::roster::cycle_preload::Target::fighter(kind));}
     #[cfg(feature="mii-managed-helper-alpha")]
     if super::mii_managed_helper::admission_ready(true) {
         return super::mii_managed_helper::configuration(role,kind).ok()
-            .map(|configuration|crate::runtime::swap::cycle_preload::Target {kind,configuration:Some(configuration)});
+            .map(|configuration|crate::runtime::roster::cycle_preload::Target {kind,configuration:Some(configuration)});
     }
     let _=role;
     None
 }
 
-pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::runtime::swap::cycle_preload::Target>;crate::runtime::swap::cycle_preload::MAX_TARGETS]) {
+pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS]) {
     let Ok(backend)=qualified_backend() else {return;};
     let limit=preload_limit(backend);
-    let targets=std::array::from_fn::<_,{crate::runtime::swap::cycle_preload::MAX_TARGETS},_>(|i|
+    let targets=std::array::from_fn::<_,{crate::runtime::roster::cycle_preload::MAX_TARGETS},_>(|i|
         targets[i].filter(|_|i<limit));
     // Resolve exact helper compatibility outside STATE and without publishing a
     // consumer request. A speculative Mii never substitutes another appearance.
@@ -386,7 +386,7 @@ pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::ru
         let target=if (0x48..=0x4a).contains(&target.kind) {
             if !super::mii_managed_helper::admission_ready(true) {return None;}
             let hats=super::mii_ordinary_cpu::helper_origin_hats()?;
-            crate::runtime::swap::cycle_preload::Target {configuration:Some(
+            crate::runtime::roster::cycle_preload::Target {configuration:Some(
                 crate::engine::mii::ordinary_cpu::helper_configuration(target.configuration?,hats).ok()?),..target}
         }else{target};
         #[cfg(not(feature="mii-managed-helper-alpha"))]
@@ -402,7 +402,7 @@ pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::ru
 }
 
 fn note_preload_settled() {
-    let settings=crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings=crate::runtime::roster::cycle_preload_config::snapshot();
     if !settings.measurements {return;}
     let settled={let mut state=STATE.lock().unwrap();
         let settled=!state.preload_settled && state.preload.iter().any(Option::is_some)
@@ -411,7 +411,7 @@ fn note_preload_settled() {
                     && state.book.is_current(s.token.epoch()) && state.book.phase(i)==Ok(Phase::Ready))));
         if settled {state.preload_settled=true;} settled};
     if settled {crate::engine::preload::preload_metrics::snapshot(true,crate::engine::preload::preload_metrics::Label::Settled,
-        crate::runtime::swap::cycle_preload::frame(),metrics());}
+        crate::runtime::roster::cycle_preload::frame(),metrics());}
 }
 
 fn want_exact(want:Want)->bool {
@@ -431,7 +431,7 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
     if let Some(want)=pending_request_for(state,Some(slot),menu_open).filter(|want|supported(*want)) {
         return Some((want,false));
     }
-    let settings=crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings=crate::runtime::roster::cycle_preload_config::snapshot();
     if menu_open || (!CALLBACK_SLOTS.contains(&slot) && !extra_owned) || settings.slots==0 {
         return None;
     }
@@ -439,7 +439,7 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
         && state.book.phase(s.token.slot())!=Ok(Phase::Failed)).map(|s|Want {
             epoch:s.token.epoch(),kind:s.kind,configuration:s.configuration,
             #[cfg(feature="mii-hud-portrait-alpha")] avoid:None}));
-    let targets:[Option<Want>;crate::runtime::swap::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|state.preload[i].filter(|w|i<usize::from(settings.slots)
+    let targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|state.preload[i].filter(|w|i<usize::from(settings.slots)
         && (state.preload_failed|state.failed)&(1u128<<w.kind)==0));
     // Existing native admission validates the backend pair. Created owners
     // are the only eligible slots that cannot hold an exact Mii.
@@ -479,14 +479,14 @@ fn callback_slot(slot: u32) -> bool {
     CALLBACK_SLOTS.contains(&slot) || (cfg!(feature = "managed-third-source-alpha") && slot == 7)
 }
 
-fn candidates(backend: Backend) -> [u32; crate::runtime::swap::cycle_preload::MAX_TARGETS] {
+fn candidates(backend: Backend) -> [u32; crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     crate::engine::preload::cycle_preload_capacity::slots_with_waiting(backend,
         cfg!(feature="managed-third-source-alpha"),cfg!(feature="managed-ldn-third-source-alpha"),
         cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"))
 }
 
 fn preload_limit(backend: Backend) -> usize {
-    let slots = crate::runtime::swap::cycle_preload_config::snapshot().slots;
+    let slots = crate::runtime::roster::cycle_preload_config::snapshot().slots;
     #[cfg(feature = "native-body-bank-alpha")]
     let slots = super::body_bank::helper_budget(slots);
     crate::engine::preload::cycle_preload_capacity::target_count_with_waiting(
@@ -810,7 +810,7 @@ pub fn waiting_for_capacity(channel: usize) -> bool {
             {
                 return false;
             }
-            let mut sources = [None; crate::runtime::swap::cycle_preload::MAX_TARGETS];
+            let mut sources = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
             for (i, slot) in slots.iter().copied().map(|slot| slot as usize).enumerate() {
                 if slot >= state.sources.len() {continue;}
                 if !backend.helpers().contains(&(slot as u32))
@@ -1214,7 +1214,7 @@ pub fn scene_changed() {
         records
     };
     state.wants = [None; CHANNELS];
-    state.preload = [None; crate::runtime::swap::cycle_preload::MAX_TARGETS];
+    state.preload = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
     state.preload_failed = 0;
     state.preload_settled = false;
     state.preload_limit = 0;
@@ -1245,7 +1245,7 @@ pub fn scene_changed() {
     // In-flight native loads stay owned until their callback completes or the
     // real native destructor runs. No old intent is published after departure.
     drop(state);
-    crate::runtime::swap::cycle_preload::scene_end();
+    crate::runtime::roster::cycle_preload::scene_end();
     #[cfg(feature = "source-lifecycle-probe")]
     observe_released_items(&released, "scene_departure_book_invalidated", None);
 }
@@ -1691,7 +1691,7 @@ struct CreationIntent {extra:u32,wanted:Want,speculative:bool}
 #[cfg(feature="managed-third-source-alpha")]
 fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<CreationIntent> {
     use crate::engine::preload::cycle_preload_capacity as policy;
-    let settings=crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings=crate::runtime::roster::cycle_preload_config::snapshot();
     let slots = settings.slots;
     #[cfg(feature = "native-body-bank-alpha")]
     let slots = super::body_bank::helper_budget(slots);
@@ -1739,7 +1739,7 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
 #[cfg(feature="managed-third-source-alpha")]
 unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,intent:CreationIntent) {
     let grace = if intent.speculative {
-        let Some(generation) = crate::runtime::swap::cycle_preload::speculative_admission() else { return; };
+        let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
         Some(generation)
     } else { None };
     let Ok(backend)=qualified_backend() else {return;};
@@ -1802,7 +1802,7 @@ unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,inte
     {
         let mut state=STATE.lock().unwrap();
         if creation_intent(&state,backend,intent.speculative)!=Some(intent)
-            || grace.is_some_and(|generation| !crate::runtime::swap::cycle_preload::speculative_admission_current(generation)) {
+            || grace.is_some_and(|generation| !crate::runtime::roster::cycle_preload::speculative_admission_current(generation)) {
             drop(state);finish_install(install,"capacity intent changed");return;
         }
         // Creating an extra owner does not consume the speculative install opportunity.
@@ -1922,7 +1922,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         return;
     }
     #[cfg(feature="managed-third-source-alpha")]
-    if usize::from(crate::runtime::swap::cycle_preload_config::snapshot().slots)>crate::engine::preload::cycle_preload_capacity::BASE_HELPERS && !super::preload_blocked()
+    if usize::from(crate::runtime::roster::cycle_preload_config::snapshot().slots)>crate::engine::preload::cycle_preload_capacity::BASE_HELPERS && !super::preload_blocked()
         && !super::menu::captures_input() {
         if let Ok(backend)=qualified_backend() {
             let intent={creation_intent(&STATE.lock().unwrap(),backend,true)};
@@ -1954,7 +1954,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     } else { initial };
     if speculative && super::preload_blocked() { return; }
     let grace = if speculative {
-        let Some(generation) = crate::runtime::swap::cycle_preload::speculative_admission() else { return; };
+        let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
         Some(generation)
     } else { None };
     #[cfg(all(feature = "managed-third-source-alpha", feature = "source-capacity-probe"))]
@@ -2155,13 +2155,13 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         None => if is_capacity {None} else {coexist::helpers::original(entry as usize, slot)},
     };
     let measurement=crate::engine::preload::preload_metrics::OperationStamp::begin(
-        speculative && crate::runtime::swap::cycle_preload_config::snapshot().measurements,
+        speculative && crate::runtime::roster::cycle_preload_config::snapshot().measurements,
         crate::engine::preload::preload_metrics::Operation::Background,crate::engine::preload::preload_metrics::Target::Fighter,
         wanted.kind,false,0);
     let mut state = STATE.lock().unwrap();
     // Same per-slot selection as initiation. Slot 7 capacity probes stay on the global walk.
     if selected_request(&state, slot, menu_open) != Some((wanted,speculative))
-        || grace.is_some_and(|generation| !crate::runtime::swap::cycle_preload::speculative_admission_current(generation))
+        || grace.is_some_and(|generation| !crate::runtime::roster::cycle_preload::speculative_admission_current(generation))
         || state.sources[index] != previous
         || ready_still_requested(&state, index)
         || state.book.can_replace(index) != Ok(true)
@@ -2205,7 +2205,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         }
     };
     if let Some(generation) = grace {
-        crate::runtime::swap::cycle_preload::speculative_admission_committed(generation);
+        crate::runtime::roster::cycle_preload::speculative_admission_committed(generation);
     }
     state.sources[index] = Some(Source {
         token: load.source(),
@@ -2575,8 +2575,8 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
     if source.prefetched && current {
         let now=metrics();
         if now.resident==0 && !now.busy {
-            crate::engine::preload::preload_metrics::snapshot(crate::runtime::swap::cycle_preload_config::snapshot().measurements,
-                crate::engine::preload::preload_metrics::Label::Retired,crate::runtime::swap::cycle_preload::frame(),now);
+            crate::engine::preload::preload_metrics::snapshot(crate::runtime::roster::cycle_preload_config::snapshot().measurements,
+                crate::engine::preload::preload_metrics::Label::Retired,crate::runtime::roster::cycle_preload::frame(),now);
         }
     }
     crate::engine::compat::logging::diagnostic(format_args!(

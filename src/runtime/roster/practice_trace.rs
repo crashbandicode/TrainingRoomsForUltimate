@@ -53,7 +53,7 @@ impl Drop for Scope {
 
 #[cfg(feature = "console-practice-trace")]
 mod enabled {
-    use crate::runtime::swap::practice_trace_core::{
+    use crate::runtime::roster::practice_trace_core::{
         self as core, Error, Metadata, Progress, Queue, Recorder, Stats, Storage,
     };
     use std::alloc::{GlobalAlloc, Layout, System};

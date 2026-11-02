@@ -55,7 +55,7 @@ fn clock() -> (u64, u64) {
 
 pub fn arm(entry: usize, owner: u32, from: u32, to: u32) {
     if READY.load(Ordering::Acquire) {
-        crate::runtime::swap::practice_trace::checkpoint(1207, [entry as u64, owner as u64, from as u64, to as u64, 0]);
+        crate::runtime::roster::practice_trace::checkpoint(1207, [entry as u64, owner as u64, from as u64, to as u64, 0]);
         ARMED.store(true, Ordering::Release);
     }
 }
@@ -63,9 +63,9 @@ pub fn arm(entry: usize, owner: u32, from: u32, to: u32) {
 fn emit(code: u64, observation: &Observation, pair: u64, site: u64) {
     // Sequence and native TLS are in both halves: queue admission/loss is not
     // assumed atomic. Pair is the entry sequence, or zero for missing evidence.
-    crate::runtime::swap::practice_trace::event(code, [observation.sequence, observation.thread, observation.stack, observation.node, pair]);
-    crate::runtime::swap::practice_trace::event(code + 1, [observation.sequence, observation.links[0], observation.links[1], observation.links[2], observation.links[3]]);
-    crate::runtime::swap::practice_trace::event(code + 2, [observation.sequence, observation.links[4], observation.links[5], site, 0]);
+    crate::runtime::roster::practice_trace::event(code, [observation.sequence, observation.thread, observation.stack, observation.node, pair]);
+    crate::runtime::roster::practice_trace::event(code + 1, [observation.sequence, observation.links[0], observation.links[1], observation.links[2], observation.links[3]]);
+    crate::runtime::roster::practice_trace::event(code + 2, [observation.sequence, observation.links[4], observation.links[5], site, 0]);
 }
 
 fn put_observation(words: &mut [u64], record: &Observation) {
@@ -173,7 +173,7 @@ fn persist(reason: u64, entry: &Observation, current: &Observation, losses: [u64
     };
     // Zero means the write/flush RETURNED successfully. Missing event remains
     // unknown; the checksummed file is independent evidence of retained bytes.
-    crate::runtime::swap::practice_trace::checkpoint(1208, [reason, result as u64, entry.sequence, current.sequence, losses[0]]);
+    crate::runtime::roster::practice_trace::checkpoint(1208, [reason, result as u64, entry.sequence, current.sequence, losses[0]]);
 }
 
 #[inline(never)]
@@ -290,7 +290,7 @@ pub(crate) fn prepare(main: usize) -> bool {
         let words = unsafe { &mut *OUTPUT.0.get() };
         words.fill(0);
         words[..5].copy_from_slice(&[MAGIC, 3, SESSION_BYTES, main as u64, clock().0]);
-        if let Some(build) = crate::runtime::swap::practice_trace_core::parse_build_id(option_env!("PRACTICE_TRACE_BUILD_ID").unwrap_or("")) {
+        if let Some(build) = crate::runtime::roster::practice_trace_core::parse_build_id(option_env!("PRACTICE_TRACE_BUILD_ID").unwrap_or("")) {
             let bytes = unsafe { std::slice::from_raw_parts_mut(words.as_mut_ptr().add(8).cast::<u8>(), 32) };
             bytes.copy_from_slice(&build);
         } else {

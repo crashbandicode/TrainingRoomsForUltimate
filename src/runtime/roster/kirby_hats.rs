@@ -13,7 +13,7 @@ use crate::runtime::p1::compat::common::input::{Buttons, MappedInputs};
 use crate::runtime::p1::compat::common::{self, button_config, menu, try_get_module_accessor};
 use crate::engine::kirby::kirby_hat_cycle::{operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};
 use crate::runtime::p1::compat::training;
-use crate::runtime::swap::character_roster::sources::{self, Lease};
+use crate::runtime::roster::character_roster::sources::{self, Lease};
 use crate::engine::swap::source_lifetime::Holder;
 
 #[derive(Clone, Copy)]
@@ -96,7 +96,7 @@ fn notice(role: usize, text: String) {
 unsafe fn permitted() -> bool {
     common::is_training_mode()
         && common::is_ready_go()
-        && !crate::runtime::swap::character_roster::busy()
+        && !crate::runtime::roster::character_roster::busy()
         && !menu::captures_input()
         && !training::lobby::native_ui_busy()
         && !button_config::has_pending_request()
@@ -123,15 +123,15 @@ pub(crate) fn preload_pending() -> bool { PENDING_ROLES.load(Ordering::Acquire)!
 
 /// Predict with a copy of the real hat cursor. No shortcut or equipped state changes.
 pub(crate) unsafe fn preload_targets(menu: &crate::engine::compat::menu::TrainingModpackMenu,
-    role: usize) -> [Option<crate::runtime::swap::cycle_preload::Target>;crate::runtime::swap::cycle_preload::MAX_TARGETS] {
-    let Some(body)=role_body(role) else {return [None;crate::runtime::swap::cycle_preload::MAX_TARGETS];};
+    role: usize) -> [Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
+    let Some(body)=role_body(role) else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];};
     let mut cycle={let state=STATES[role].lock().unwrap();
-        if state.pending.is_some() {return [None;crate::runtime::swap::cycle_preload::MAX_TARGETS];} state.cycle};
+        if state.pending.is_some() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];} state.cycle};
     let choices=menu.ordered_kirby_hat_kinds(if role==0 {
         crate::engine::swap::roster_grid::Role::Player
     } else {crate::engine::swap::roster_grid::Role::Cpu});
     let mut equipped=equipped(body);
-    let mut targets=[None;crate::runtime::swap::cycle_preload::MAX_TARGETS];
+    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
     for target in &mut targets {
         let Some(kind)=cycle.target(&choices,equipped) else {break;};
         *target=sources::preload_hat_target(role,kind);
@@ -183,7 +183,7 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
     let body = bodies[role].expect("eligible Kirby body");
     #[cfg(feature = "source-owner-probe")]
     if !cfg!(feature = "managed-sources")
-        && crate::runtime::swap::character_roster::source_owner_probe::request_replacement(body) {
+        && crate::runtime::roster::character_roster::source_owner_probe::request_replacement(body) {
         return;
     }
     let settings = read(&MENU);
@@ -216,7 +216,7 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
     PENDING_ROLES.fetch_or(1 << role, Ordering::Release);
     sources::pause_preload();
     if let Some(target)=sources::preload_hat_target(role,kind) {
-        crate::runtime::swap::cycle_preload::request(role,true,target);
+        crate::runtime::roster::cycle_preload::request(role,true,target);
     }
     #[cfg(feature = "source-capacity-probe")]
     {
@@ -243,7 +243,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     // Resolve roster ownership before the hat mutex: roster completion can clear
     // this role's memory. Never restore onto the temporary character-select body.
     let settled = waiting && common::is_ready_go()
-        && crate::runtime::swap::character_roster::waiting_choice_settled(role);
+        && crate::runtime::roster::character_roster::waiting_choice_settled(role);
     let mut state = STATES[role].lock().unwrap();
     if state.pending.is_none() && settled {
         if state.continuation.pending() {
@@ -300,7 +300,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
         state.pending = Some(pending);
         clear_pending(role, &mut state);
         drop(state);
-        crate::runtime::swap::cycle_preload::completed(role,true,pending.kind);
+        crate::runtime::roster::cycle_preload::completed(role,true,pending.kind);
         crate::engine::compat::logging::diagnostic(format_args!(
             "[KirbyHats] confirmed role={} kind=0x{:x} body=0x{:x}",
             role, pending.kind, pending.body_id
@@ -381,7 +381,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
         let slot = source.map(|source|
             WorkModule::get_int(source, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID));
         #[cfg(feature = "source-owner-probe")]
-        let slot = slot.or_else(|| crate::runtime::swap::character_roster::source_owner_probe::source_slot(pending.kind));
+        let slot = slot.or_else(|| crate::runtime::roster::character_roster::source_owner_probe::source_slot(pending.kind));
         slot
         };
         let Some(slot) = slot else {

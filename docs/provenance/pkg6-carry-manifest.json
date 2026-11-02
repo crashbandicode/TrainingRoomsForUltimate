@@ -21,7 +21,7 @@
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
    "stage_menu": "crate::engine::stages::stage_menu",
-   "character_items": "crate::runtime::swap::character_items",
+   "character_items": "crate::runtime::roster::character_items",
    "cpu_pilot::pilot": "crate::engine::p1",
    "preload_metrics": "crate::engine::preload::preload_metrics",
    "logging": "crate::engine::compat::logging",
@@ -29,38 +29,38 @@
    "common": "crate::runtime::p1::compat::common",
    "training": "crate::runtime::p1::compat::training",
    "replay_preview": "crate::runtime::p1::compat::replay_preview",
-   "character_roster": "crate::runtime::swap::character_roster",
-   "swap_native::special_articles": "crate::runtime::swap::special_articles",
-   "swap_native::heap_fields": "crate::runtime::swap::heap_fields",
-   "swap_native::r_handle": "crate::runtime::swap::r_handle",
-   "swap_native::body_graph": "crate::runtime::swap::body_graph",
-   "swap_native::copy_packages": "crate::runtime::swap::copy_packages",
-   "swap_native::identity_view": "crate::runtime::swap::identity_view",
-   "swap_native::scope_gate": "crate::runtime::swap::scope_gate",
-   "swap_native::presentation": "crate::runtime::swap::presentation",
-   "swap_native::mii_setup": "crate::runtime::swap::mii_setup",
-   "swap_native::observe": "crate::runtime::swap::observe",
-   "native_reload_pose": "crate::runtime::swap::native_reload_pose",
-   "native_source_actors": "crate::runtime::swap::native_source_actors",
-   "native_source": "crate::runtime::swap::native_source",
-   "native_gc_guard": "crate::runtime::swap::native_gc_guard",
-   "turnip_identity": "crate::runtime::swap::turnip_identity",
-   "native_service": "crate::runtime::swap::native_service",
-   "native_unlink_install": "crate::runtime::swap::native_unlink_install",
-   "character_lifecycle": "crate::runtime::swap::character_lifecycle",
-   "cycle_preload": "crate::runtime::swap::cycle_preload",
-   "cycle_preload_config": "crate::runtime::swap::cycle_preload_config",
-   "kirby_hats": "crate::runtime::swap::kirby_hats",
-   "character_sources": "crate::runtime::swap::character_sources",
-   "native_body_bank": "crate::runtime::swap::native_body_bank",
-   "native_source_capacity": "crate::runtime::swap::native_source_capacity",
-   "effect_hook_chain": "crate::runtime::swap::effect_hook_chain",
-   "practice_trace": "crate::runtime::swap::practice_trace",
-   "practice_trace_core": "crate::runtime::swap::practice_trace_core",
-   "hang_trace": "crate::runtime::swap::hang_trace",
-   "native_unlink_probe": "crate::runtime::swap::native_unlink_probe",
-   "source_owner_probe": "crate::runtime::swap::source_owner_probe",
-   "heap_metrics": "crate::runtime::swap::heap_metrics"
+   "character_roster": "crate::runtime::roster::character_roster",
+   "swap_native::special_articles": "crate::runtime::roster::special_articles",
+   "swap_native::heap_fields": "crate::runtime::roster::heap_fields",
+   "swap_native::r_handle": "crate::runtime::roster::r_handle",
+   "swap_native::body_graph": "crate::runtime::roster::body_graph",
+   "swap_native::copy_packages": "crate::runtime::roster::copy_packages",
+   "swap_native::identity_view": "crate::runtime::roster::identity_view",
+   "swap_native::scope_gate": "crate::runtime::roster::scope_gate",
+   "swap_native::presentation": "crate::runtime::roster::presentation",
+   "swap_native::mii_setup": "crate::runtime::roster::mii_setup",
+   "swap_native::observe": "crate::runtime::roster::observe",
+   "native_reload_pose": "crate::runtime::roster::native_reload_pose",
+   "native_source_actors": "crate::runtime::roster::native_source_actors",
+   "native_source": "crate::runtime::roster::native_source",
+   "native_gc_guard": "crate::runtime::roster::native_gc_guard",
+   "turnip_identity": "crate::runtime::roster::turnip_identity",
+   "native_service": "crate::runtime::roster::native_service",
+   "native_unlink_install": "crate::runtime::roster::native_unlink_install",
+   "character_lifecycle": "crate::runtime::roster::character_lifecycle",
+   "cycle_preload": "crate::runtime::roster::cycle_preload",
+   "cycle_preload_config": "crate::runtime::roster::cycle_preload_config",
+   "kirby_hats": "crate::runtime::roster::kirby_hats",
+   "character_sources": "crate::runtime::roster::character_sources",
+   "native_body_bank": "crate::runtime::roster::native_body_bank",
+   "native_source_capacity": "crate::runtime::roster::native_source_capacity",
+   "effect_hook_chain": "crate::runtime::roster::effect_hook_chain",
+   "practice_trace": "crate::runtime::roster::practice_trace",
+   "practice_trace_core": "crate::runtime::roster::practice_trace_core",
+   "hang_trace": "crate::runtime::roster::hang_trace",
+   "native_unlink_probe": "crate::runtime::roster::native_unlink_probe",
+   "source_owner_probe": "crate::runtime::roster::source_owner_probe",
+   "heap_metrics": "crate::runtime::roster::heap_metrics"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -1240,7 +1240,7 @@
      "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
     },
     {
-     "old": "crate::runtime::swap::character_roster::busy()",
+     "old": "crate::runtime::roster::character_roster::busy()",
      "new": "crate::runtime::p1::compat::character_roster::busy()",
      "reason": "TEMPORARY until the roster cycle is declared (`runtime::swap::character_roster` is carried but not compiled yet): the roster's busy flag is answered by `compat::character_roster` (HOT_SWAP_IN_PROGRESS); removed with the declaration commit"
     }
@@ -1248,238 +1248,238 @@
   },
   {
    "src": "src/swap_native/special_articles.rs",
-   "dest": "src/runtime/swap/special_articles.rs",
+   "dest": "src/runtime/roster/special_articles.rs",
    "crate": "root",
    "src_sha256": "eafd06fcb6a9017204ddafca7f7a0e922c810366a11682b38e5ed187f06bd7cc",
    "dest_sha256": "6ce81bfbc43c6158a18839e9052e236f9432bb84126ea96da8033da2da626f97"
   },
   {
    "src": "src/swap_native/heap_fields.rs",
-   "dest": "src/runtime/swap/heap_fields.rs",
+   "dest": "src/runtime/roster/heap_fields.rs",
    "crate": "root",
    "src_sha256": "8d83c43a3a140b19b9fc297e6f82af469117a8c1b98738542cfb178fbbabea79",
-   "dest_sha256": "df8de71e4b359120435c702b18a020e38fa1cead8aed38affac9b839a42572e8"
+   "dest_sha256": "8bf4165c1a10d34ca78e8111ff5ed3e3c16f8d2591667c73fb62b0ffe8dee53d"
   },
   {
    "src": "src/swap_native/r_handle.rs",
-   "dest": "src/runtime/swap/r_handle.rs",
+   "dest": "src/runtime/roster/r_handle.rs",
    "crate": "root",
    "src_sha256": "8587dbd71d79f9fa17e0d1593bea86ab349b38b673e634a810081c9382bf7781",
    "dest_sha256": "cea1f97d45150ea39a14fb756bcdb343c9a860f3f2af3fea2df0b3ef10f9ea7d"
   },
   {
    "src": "src/swap_native/body_graph.rs",
-   "dest": "src/runtime/swap/body_graph.rs",
+   "dest": "src/runtime/roster/body_graph.rs",
    "crate": "root",
    "src_sha256": "e701462e66e878ef1ad0b3ff491d283b77524d7b9cae4132f5b989f7feeb7a91",
    "dest_sha256": "ce25978e4b53dfaa8fbca9820f63862795c381ec5de8ab103ecd0a5b526ee5d8"
   },
   {
    "src": "src/swap_native/copy_packages.rs",
-   "dest": "src/runtime/swap/copy_packages.rs",
+   "dest": "src/runtime/roster/copy_packages.rs",
    "crate": "root",
    "src_sha256": "ba20b01f8183e5b3d3316135e502686ae28fdcb0e74c44e084aa147d12a735f8",
    "dest_sha256": "1f5656351a2042da711fe6fd538d17f82216b5943fb1cbd1a33c66f069db345d"
   },
   {
    "src": "src/swap_native/identity_view.rs",
-   "dest": "src/runtime/swap/identity_view.rs",
+   "dest": "src/runtime/roster/identity_view.rs",
    "crate": "root",
    "src_sha256": "4bcbe662956266240085ae4d719d876653c2dda2214bfeddd6a0b48a217b0ebb",
    "dest_sha256": "52a19b8f0b15d07fa09d8757c6145617d0a3667bb93da34bbbfc1154bb1c8a46"
   },
   {
    "src": "src/swap_native/scope_gate.rs",
-   "dest": "src/runtime/swap/scope_gate.rs",
+   "dest": "src/runtime/roster/scope_gate.rs",
    "crate": "root",
    "src_sha256": "37118c1eb8dcc97cb9214a50b08dc9a8fc219fd86c3a233d195a9d456277b3ec",
    "dest_sha256": "35eeca2ede3959d3110d1e2b13cea020599ee9119a311c33ef238fd877c5b880"
   },
   {
    "src": "src/swap_native/presentation.rs",
-   "dest": "src/runtime/swap/presentation.rs",
+   "dest": "src/runtime/roster/presentation.rs",
    "crate": "root",
    "src_sha256": "1f8ff0c722b7ba62e4b70ff6afde7d378f30ec20723cc8f541d0403004f3aa87",
-   "dest_sha256": "47755b9723e62e480bfd23a4db3bce274b5288b0fa86759db0d2aa3b5f28d2ca"
+   "dest_sha256": "0ca7ef23532b73b59ef43be6ad2ecfc416f4b56ad69a7c5ffbcb62a42421e268"
   },
   {
    "src": "src/swap_native/mii_setup.rs",
-   "dest": "src/runtime/swap/mii_setup.rs",
+   "dest": "src/runtime/roster/mii_setup.rs",
    "crate": "root",
    "src_sha256": "0f3c623bb1ef0a9150235dc899f0af8b295dceda7b6587a529fcfb2cb3e1c1bc",
    "dest_sha256": "45c5aea5690df2c87ae5392a21844f7ddd10f05a2103c2a68ef1a94b505f790d"
   },
   {
    "src": "src/swap_native/observe.rs",
-   "dest": "src/runtime/swap/observe.rs",
+   "dest": "src/runtime/roster/observe.rs",
    "crate": "root",
    "src_sha256": "cba5ec7868f1c03d20dbd97a586115115f69cb5707ef03e856a40aa97a4770ae",
    "dest_sha256": "606d0dce75fe26d1cfb74e7fa198a6e29c6321e8098b79a310cce4b16ea49ebb"
   },
   {
    "src": "src/native_reload_pose.rs",
-   "dest": "src/runtime/swap/native_reload_pose.rs",
+   "dest": "src/runtime/roster/native_reload_pose.rs",
    "crate": "root",
    "src_sha256": "dd6f0ef6aa6dbc7d7f5dd1a86bcf8d4bc678ce58856bc3d760cfdb1d5c1ccd15",
    "dest_sha256": "9ededa61f3fd42e4dea4b5697c813faf313a3f68d0799d914bf4cdf1025e6714"
   },
   {
    "src": "src/native_source_actors.rs",
-   "dest": "src/runtime/swap/native_source_actors.rs",
+   "dest": "src/runtime/roster/native_source_actors.rs",
    "crate": "root",
    "src_sha256": "27faf933ac59b022af5509dd2a104f6cb383214d6563bb151a147bf05fe2552e",
    "dest_sha256": "7f5ab8cb3a7760812cb5fe9643a9961294ee288ddbc34129f00154a1d340733a"
   },
   {
    "src": "src/native_source.rs",
-   "dest": "src/runtime/swap/native_source.rs",
+   "dest": "src/runtime/roster/native_source.rs",
    "crate": "root",
    "src_sha256": "d2032bebfb4f473403e59ba25632d2000ba80efb17de006d9d13bff2dad4767b",
    "dest_sha256": "dc97e17d472858e350fdccf0f156a2fa14f8f597edd9c9e11a307f58219f300f"
   },
   {
    "src": "src/native_gc_guard.rs",
-   "dest": "src/runtime/swap/native_gc_guard.rs",
+   "dest": "src/runtime/roster/native_gc_guard.rs",
    "crate": "root",
    "src_sha256": "214afbe59b2383868d5c0548cd034b763e5349d1c23da820004e41a6a32bb4e6",
    "dest_sha256": "86e1960080d434b848bcfedea02890b9b3afe0c0be68f5b90676d313543b7d7f"
   },
   {
    "src": "src/turnip_identity.rs",
-   "dest": "src/runtime/swap/turnip_identity.rs",
+   "dest": "src/runtime/roster/turnip_identity.rs",
    "crate": "root",
    "src_sha256": "561334326aa4eb2c73c713a7cba8d9defc48e2340124f15167fc39176e88649f",
    "dest_sha256": "ac10397577f87be7f10b3fcfd1a1a00b9f77c24457a54efb83055d8728571b58"
   },
   {
    "src": "src/native_service.rs",
-   "dest": "src/runtime/swap/native_service.rs",
+   "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "68981b103d79bfb58076f56d51a0e5172c3421e7f2d13ca436f5e4707d7762d9"
+   "dest_sha256": "22718f1f019e6106de8ce88cf4daa53abebf8a69fa9f8f0b9d8802d2d80003ee"
   },
   {
    "src": "src/native_unlink_install.rs",
-   "dest": "src/runtime/swap/native_unlink_install.rs",
+   "dest": "src/runtime/roster/native_unlink_install.rs",
    "crate": "root",
    "src_sha256": "f1f7f6372a6e40b707a3aef468217055a477e0d6164ab212ec9d4af23cf9ed74",
-   "dest_sha256": "0906f0f1e4ec0904f4f0634ae1b0ff2b80c8b3c14be6fd3456c6d290831c387f"
+   "dest_sha256": "8fcd4cfc2e74b9a12161e4078607a3b246f534132c48c887a2985c948f3bd247"
   },
   {
    "src": "src/character_lifecycle.rs",
-   "dest": "src/runtime/swap/character_lifecycle.rs",
+   "dest": "src/runtime/roster/character_lifecycle.rs",
    "crate": "root",
    "src_sha256": "d3dc2989eabad2608dfa0841828103b3f8c32ce709426c57b6b9197d0a3af453",
-   "dest_sha256": "f9dcc8434ec1e12189baa90837454233fb22fd68784a6a0eb1eaec050456732d"
+   "dest_sha256": "dff54c00e4d11bb3b8cf1b16719a8defd8484366679c5d8efc27372a03a3269a"
   },
   {
    "src": "src/character_roster.rs",
-   "dest": "src/runtime/swap/character_roster.rs",
+   "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "4143c63a4b69bc78004da35207947361160b508a3db19d03d524bc98e9d22ef1"
+   "dest_sha256": "81e579f306da8eaa7a723cfd0b89f43596750921154db30efc7823783b1af52c"
   },
   {
    "src": "src/cycle_preload.rs",
-   "dest": "src/runtime/swap/cycle_preload.rs",
+   "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "2264fe394ede974efeab066f9e337febb34bec1fe0707e5ce898634575ea9065"
+   "dest_sha256": "3c01fccea507571e47ada2493eed226f67d59f819c6c6ba3918e20889fd5ebda"
   },
   {
    "src": "src/cycle_preload_config.rs",
-   "dest": "src/runtime/swap/cycle_preload_config.rs",
+   "dest": "src/runtime/roster/cycle_preload_config.rs",
    "crate": "root",
    "src_sha256": "c53891e68084204802add8d19aae87e0f32c37882d34a736ec63ea037e5dccb5",
-   "dest_sha256": "c66d164e65efa3824d83742c107785ac6f30b885b7a9ccfdf7d82245a136bedf"
+   "dest_sha256": "ae73df1bffd92d991960fb7ad336e28a926e70f1bc4589326d2042b2b64909b3"
   },
   {
    "src": "src/kirby_hats.rs",
-   "dest": "src/runtime/swap/kirby_hats.rs",
+   "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "f07bb5f7cdaf48430bade661a694aca7785e1e3b786d0a4d8babe9348da5069b"
+   "dest_sha256": "ffd682aa3d0d44553ca0ef2118f28242c0ae2b37e93ca23a2a56dabd5409b5b1"
   },
   {
    "src": "src/character_items.rs",
-   "dest": "src/runtime/swap/character_items.rs",
+   "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "2d0dc2bc37925b94103401ee553e7a2827cd06cbcdd8a5a7472b79b565bc4243"
+   "dest_sha256": "ebb3f0f740042f1911c5e13b0f0dcfe77e8228afc49022e5caf5b6ab8cd5f446"
   },
   {
    "src": "src/character_sources.rs",
-   "dest": "src/runtime/swap/character_sources.rs",
+   "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "512dacf0b45b4785ab6b90a5784e7d3d86fdfab780a0ee9adb963020f0a468ae"
+   "dest_sha256": "abd2b46f94e953049c3a036f7f9bdb0ef8bd73723563fa02a26b433d33271bab"
   },
   {
    "src": "src/native_body_bank.rs",
-   "dest": "src/runtime/swap/native_body_bank.rs",
+   "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "06e3a3688c276a6bae5d39370b492bed7abe928a31d4a99a7b829e571ddee746"
+   "dest_sha256": "ea1443ca6d9b6bd360a763071934710e554182ed35958851f002cbb584a5d543"
   },
   {
    "src": "src/native_source_capacity.rs",
-   "dest": "src/runtime/swap/native_source_capacity.rs",
+   "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "7dc266c9440b2d526302e9338af13554f777e693a764b570374a0d97592aa571"
+   "dest_sha256": "f0bb5b1c95c208f08ad2a6989248bc72ad6be5443b18ef4d840e2588963a3abf"
   },
   {
    "src": "src/effect_hook_chain.rs",
-   "dest": "src/runtime/swap/effect_hook_chain.rs",
+   "dest": "src/runtime/roster/effect_hook_chain.rs",
    "crate": "root",
    "src_sha256": "100929d53a938c4e98a87a5294c1cdb61d112d94ff23058d53ee7a4a186944b9",
    "dest_sha256": "9d2312aa6a1672c73d8c42ed70f58462f6aa72a73fac398533cb85e3a5f87b7d"
   },
   {
    "src": "src/native_service.S",
-   "dest": "src/runtime/swap/native_service.S",
+   "dest": "src/runtime/roster/native_service.S",
    "crate": "root",
    "src_sha256": "012175eafa0e56a58f01e95645c696c482461c430eb4ad25f08bfb0cd656dc7b",
    "dest_sha256": "012175eafa0e56a58f01e95645c696c482461c430eb4ad25f08bfb0cd656dc7b"
   },
   {
    "src": "src/practice_trace.rs",
-   "dest": "src/runtime/swap/practice_trace.rs",
+   "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "80a241c45dd5ac5975efeab04254350ad10f07909c504dcce72ca6a4ea888a68"
+   "dest_sha256": "654eced63ee07314761d4d4d368c538179788a89eb66f354e45b22bea928505c"
   },
   {
    "src": "src/practice_trace_core.rs",
-   "dest": "src/runtime/swap/practice_trace_core.rs",
+   "dest": "src/runtime/roster/practice_trace_core.rs",
    "crate": "root",
    "src_sha256": "54d110515a0525ff44d8703e310792869ea92405c17698ee842a61b315c0e0f7",
    "dest_sha256": "54d110515a0525ff44d8703e310792869ea92405c17698ee842a61b315c0e0f7"
   },
   {
    "src": "src/hang_trace.rs",
-   "dest": "src/runtime/swap/hang_trace.rs",
+   "dest": "src/runtime/roster/hang_trace.rs",
    "crate": "root",
    "src_sha256": "5144b709285b3c2ed01d4bfa0c98e327430385e83433348b8d36c8878e97dce5",
    "dest_sha256": "32e2b0195f55c47660ae723fa4119f7ef61334e6e5d2ee4c993506b0d9c0561c"
   },
   {
    "src": "src/native_unlink_probe.rs",
-   "dest": "src/runtime/swap/native_unlink_probe.rs",
+   "dest": "src/runtime/roster/native_unlink_probe.rs",
    "crate": "root",
    "src_sha256": "fb90a4e72ac9ddb5b0b0acd827d7ff46d19b379830c6f2826780f47ec1be8f9c",
-   "dest_sha256": "f50a7b66f6847558255dfe652e450314a429b1473be84273a880e75ec7c223bf"
+   "dest_sha256": "936f87d816d3ae37ec5e248e0ef07b282020843de418f7b41886715ebc631192"
   },
   {
    "src": "src/source_owner_probe.rs",
-   "dest": "src/runtime/swap/source_owner_probe.rs",
+   "dest": "src/runtime/roster/source_owner_probe.rs",
    "crate": "root",
    "src_sha256": "511b72f076e488f101a2e0ec4aa607f8934b6dd6e5533cbdeefe534d49585239",
    "dest_sha256": "15f924145c38a094e04c0e392e15affea9dff138aac7aba65d32ba90aaa711fe"
   },
   {
    "src": "src/heap_metrics.rs",
-   "dest": "src/runtime/swap/heap_metrics.rs",
+   "dest": "src/runtime/roster/heap_metrics.rs",
    "crate": "root",
    "src_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33",
    "dest_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33"

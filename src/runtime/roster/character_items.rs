@@ -10,7 +10,7 @@ use {crate::runtime::p1::compat::sync::assign, crate::runtime::p1::compat::sync:
 
 use crate::runtime::p1::compat::common::{self, consts::FighterId, try_get_module_accessor};
 use crate::runtime::p1::compat::training::{self, character_specific::items::{ALL_CHAR_ITEMS, TURNIP_CHOSEN}};
-use crate::runtime::swap::character_roster::sources;
+use crate::runtime::roster::character_roster::sources;
 use crate::engine::swap::source_lifetime::Holder;
 
 const LEGACY_INDICES: [usize; 38] = [
@@ -85,7 +85,7 @@ fn notice(text: impl Into<String>) {
 
 unsafe fn permitted() -> bool {
     common::is_training_mode() && common::is_ready_go()
-        && !crate::runtime::swap::character_roster::busy() && !training::lobby::native_ui_busy()
+        && !crate::runtime::roster::character_roster::busy() && !training::lobby::native_ui_busy()
         && !training::save_states::is_loading() && !training::recording_or_playback()
         && !crate::runtime::p1::compat::replay_preview::occupied()
 }
@@ -252,7 +252,7 @@ unsafe fn grant(body: *mut app::BattleObjectModuleAccessor, spec: Spec, source_l
         .any(|source| app::utility::get_kind(&mut *source) == spec.source);
     #[cfg(feature = "source-owner-probe")]
     let source_present = source_present
-        || crate::runtime::swap::character_roster::source_owner_probe::item_source(spec.source as u32);
+        || crate::runtime::roster::character_roster::source_owner_probe::item_source(spec.source as u32);
     if !common_item(spec) && !source_present && !source_loaded {
         let name = ITEM_NAMES[spec.choice].split(':').next().unwrap_or("Source fighter");
         return Err(format!("Load {name} as Player or CPU first"));
@@ -293,7 +293,7 @@ pub unsafe fn snapshot(body: *mut app::BattleObjectModuleAccessor) -> HeldItemSn
     // Turnips persist their actual native face, independently of the generic
     // item variation (which is -1 for naturally pulled turnips).
     let variation = if kind == *ITEM_KIND_PEACHDAIKON || kind == *ITEM_KIND_DAISYDAIKON {
-        let Some(face) = crate::runtime::swap::turnip_identity::held_face(body, id, item) else {
+        let Some(face) = crate::runtime::roster::turnip_identity::held_face(body, id, item) else {
             return HeldItemSnapshot::Unsupported;
         };
         face

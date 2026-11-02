@@ -144,14 +144,14 @@ pub(crate) fn frame() -> u32 {
 /// UI readiness is built-body readiness; an asset-helper hit is not sufficient.
 pub(crate) fn fighter_ready(role: usize, kind: u32, solo: bool) -> bool {
     #[cfg(feature = "native-body-bank-alpha")]
-    { crate::runtime::swap::character_roster::body_bank::cycle_ready(role, kind, solo) }
+    { crate::runtime::roster::character_roster::body_bank::cycle_ready(role, kind, solo) }
     #[cfg(not(feature = "native-body-bank-alpha"))]
     { let _ = (role, kind, solo); false }
 }
 
 pub(crate) fn settings_changed() {
     reset_admission_grace();
-    crate::runtime::swap::character_roster::sources::pause_preload();
+    crate::runtime::roster::character_roster::sources::pause_preload();
     close_requests(crate::engine::preload::preload_metrics::Outcome::Abandoned);
     POLL.store(0, Ordering::Relaxed);
     reset_status();
@@ -210,8 +210,8 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
         }
         status.desired
     };
-    let readiness = crate::runtime::swap::character_roster::sources::preload_readiness(blocked, &desired);
-    if crate::runtime::swap::cycle_preload_config::snapshot().measurements {
+    let readiness = crate::runtime::roster::character_roster::sources::preload_readiness(blocked, &desired);
+    if crate::runtime::roster::cycle_preload_config::snapshot().measurements {
         let changed = {
             let mut status = STATUS.lock().unwrap();
             let changed = status.assets_logged != Some(readiness);
@@ -226,7 +226,7 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
         }
     }
     #[cfg(feature = "native-body-bank-alpha")]
-    let fighters = crate::runtime::swap::character_roster::body_bank::progress();
+    let fighters = crate::runtime::roster::character_roster::body_bank::progress();
     #[cfg(not(feature = "native-body-bank-alpha"))]
     let fighters = crate::engine::preload::cycle_preload_policy::BuiltFighters::default();
     show_status(crate::engine::preload::cycle_preload_policy::CacheStatus::new(readiness, fighters, notice_blocked), blocked);
@@ -280,7 +280,7 @@ fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, s
 }
 
 pub(crate) fn request(role: usize, hat: bool, target: Target) {
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !settings.measurements {
         return;
     }
@@ -293,7 +293,7 @@ pub(crate) fn request(role: usize, hat: bool, target: Target) {
             crate::engine::preload::preload_metrics::Target::Fighter
         },
         target.kind,
-        crate::runtime::swap::character_roster::sources::resident(target, hat),
+        crate::runtime::roster::character_roster::sources::resident(target, hat),
         FRAME.load(Ordering::Relaxed),
     );
     let old = std::mem::replace(
@@ -304,7 +304,7 @@ pub(crate) fn request(role: usize, hat: bool, target: Target) {
         old.finish(
             frame(),
             crate::engine::preload::preload_metrics::Outcome::Abandoned,
-            crate::runtime::swap::character_roster::sources::metrics(),
+            crate::runtime::roster::character_roster::sources::metrics(),
         );
     }
 }
@@ -315,7 +315,7 @@ fn close_requests(outcome: crate::engine::preload::preload_metrics::Outcome) {
         stamp.finish(
             frame(),
             outcome,
-            crate::runtime::swap::character_roster::sources::metrics(),
+            crate::runtime::roster::character_roster::sources::metrics(),
         );
     }
 }
@@ -334,7 +334,7 @@ pub(crate) fn completed(role: usize, hat: bool, kind: u32) {
         stamp.finish(
             FRAME.load(Ordering::Relaxed),
             crate::engine::preload::preload_metrics::Outcome::Ready,
-            crate::runtime::swap::character_roster::sources::metrics(),
+            crate::runtime::roster::character_roster::sources::metrics(),
         );
     }
 }
@@ -347,7 +347,7 @@ pub(crate) fn scene_end() {
         enabled,
         crate::engine::preload::preload_metrics::Label::SceneEnd,
         FRAME.load(Ordering::Relaxed),
-        crate::runtime::swap::character_roster::sources::metrics(),
+        crate::runtime::roster::character_roster::sources::metrics(),
     );
     POLL.store(0, Ordering::Relaxed);
     reset_status();
@@ -426,7 +426,7 @@ pub(crate) fn mixed_targets(
 /// Called once on the visible Player's frame. Disabled costs one settings read;
 /// enabled planning is bounded to once per second, not per loader/body callback.
 pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if settings.slots == 0 && !settings.measurements {
         return;
     }
@@ -438,7 +438,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     }
     let frame = FRAME.fetch_add(1, Ordering::Relaxed);
     if settings.measurements && REQUESTS.lock().unwrap().iter().any(Option::is_some) {
-        let busy = crate::runtime::swap::character_roster::sources::metrics().busy;
+        let busy = crate::runtime::roster::character_roster::sources::metrics().busy;
         for stamp in REQUESTS.lock().unwrap().iter_mut().flatten() {
             stamp.frame(busy);
         }
@@ -455,14 +455,14 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
         || crate::runtime::p1::compat::training::save_states::is_loading()
         || crate::runtime::p1::compat::training::recording_or_playback()
         || crate::runtime::p1::compat::replay_preview::occupied();
-    if ui_blocked || crate::runtime::swap::character_roster::preload_blocked() {
-        poll_status(true, ui_blocked || crate::runtime::swap::character_roster::notice_blocked(), None);
+    if ui_blocked || crate::runtime::roster::character_roster::preload_blocked() {
+        poll_status(true, ui_blocked || crate::runtime::roster::character_roster::notice_blocked(), None);
         return;
     }
     // Rejected/no-op requests have no completion callback. Never carry their
     // timers into a later operation or count them as successful swaps.
     close_requests(crate::engine::preload::preload_metrics::Outcome::Abandoned);
-    crate::runtime::swap::character_roster::sources::refresh_preload_capacity();
+    crate::runtime::roster::character_roster::sources::refresh_preload_capacity();
     let key = settings;
     let label = {
         let mut condition = CONDITION.lock().unwrap();
@@ -481,7 +481,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
             settings.measurements,
             label,
             frame,
-            crate::runtime::swap::character_roster::sources::metrics(),
+            crate::runtime::roster::character_roster::sources::metrics(),
         );
     }
     if settings.slots == 0 && label == Some(crate::engine::preload::preload_metrics::Label::Settings) {
@@ -489,29 +489,29 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
             settings.measurements,
             crate::engine::preload::preload_metrics::Label::Retired,
             frame,
-            crate::runtime::swap::character_roster::sources::metrics(),
+            crate::runtime::roster::character_roster::sources::metrics(),
         );
     }
     if settings.slots == 0 {
         poll_status(false, false, Some([None; MAX_TARGETS]));
         return;
     }
-    let epoch = crate::runtime::swap::character_roster::sources::preload_epoch();
+    let epoch = crate::runtime::roster::character_roster::sources::preload_epoch();
     let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
     let mut lanes = [[None; MAX_TARGETS]; 4];
     if settings.hats {
-        lanes[0] = crate::runtime::swap::kirby_hats::preload_targets(&menu, 0);
-        lanes[1] = crate::runtime::swap::kirby_hats::preload_targets(&menu, 1);
+        lanes[0] = crate::runtime::roster::kirby_hats::preload_targets(&menu, 0);
+        lanes[1] = crate::runtime::roster::kirby_hats::preload_targets(&menu, 1);
     }
     if settings.fighters {
-        lanes[2] = crate::runtime::swap::character_roster::preload_targets(&menu, 0)
+        lanes[2] = crate::runtime::roster::character_roster::preload_targets(&menu, 0)
             .map(|t| t.map(Target::fighter_cache));
-        lanes[3] = crate::runtime::swap::character_roster::preload_targets(&menu, 1)
+        lanes[3] = crate::runtime::roster::character_roster::preload_targets(&menu, 1)
             .map(|t| t.map(Target::fighter_cache));
     }
     #[cfg(feature = "native-body-bank-alpha")]
     {
-        let banks = crate::runtime::swap::character_roster::body_bank::plan_budget(&menu, &lanes);
+        let banks = crate::runtime::roster::character_roster::body_bank::plan_budget(&menu, &lanes);
         // Only ordinary fighter look-ahead is covered by a body bank or one of
         // its extra groups. A hat consumer still needs its independent source
         // lease, even for that kind.
@@ -519,13 +519,13 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
             for target in lane {
                 if target.is_some_and(|t| t.configuration.is_none()
                     && (bank.is_some_and(|b| b.index_of(t.kind).is_some())
-                        || crate::runtime::swap::character_roster::body_bank::group_member(role, t.kind))) { *target = None; }
+                        || crate::runtime::roster::character_roster::body_bank::group_member(role, t.kind))) { *target = None; }
             }
         }
-        crate::runtime::swap::character_roster::sources::refresh_preload_capacity();
+        crate::runtime::roster::character_roster::sources::refresh_preload_capacity();
     }
     #[cfg(feature = "native-body-bank-alpha")]
-    let helper_slots = crate::runtime::swap::character_roster::body_bank::helper_budget(settings.slots);
+    let helper_slots = crate::runtime::roster::character_roster::body_bank::helper_budget(settings.slots);
     #[cfg(not(feature = "native-body-bank-alpha"))]
     let helper_slots = settings.slots;
     // `kirby_hats::preload_targets` yields Player hats only while the Player's current fighter is
@@ -535,6 +535,6 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     } else {
         crate::engine::preload::cycle_preload_policy::merge(lanes, helper_slots)
     };
-    crate::runtime::swap::character_roster::sources::set_preload_plan(epoch, desired);
+    crate::runtime::roster::character_roster::sources::set_preload_plan(epoch, desired);
     poll_status(false, false, Some(desired));
 }

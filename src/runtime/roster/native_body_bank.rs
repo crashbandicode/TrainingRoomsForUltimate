@@ -21,7 +21,7 @@
 //! Prefetched groups hand their keys back (`group_lifecycle`), and every key
 //! release is refused for the kind a live Kirby copies (the ledger's live-consumer
 //! check, `release_group_keys`). Since WP4 every acquisition and release goes through
-//! the per-R ledger (`crate::engine::swap::swap_model::ledger`, `crate::runtime::swap::r_handle`):
+//! the per-R ledger (`crate::engine::swap::swap_model::ledger`, `crate::runtime::roster::r_handle`):
 //! a token per kind with its release recipe, drained before a Kirby becomes live and
 //! suspended while it is (`swap_model::occupancy`), the pair-rule `R+0x50` write only under
 //! an exclusive reset batch, and a `[Ledger] reconcile` line after every build and teardown.
@@ -184,9 +184,9 @@ use crate::engine::swap::swap_model::fallback::{self, Disposition, Fallback};
 use crate::engine::swap::swap_model::request_bit::{End as LeaseEnd, Lease};
 use crate::engine::swap::swap_model::ledger::{native_window_requests, GroupId, Holder, LedgerRefusal, ReleaseRecipe, Role as LedgerRole};
 use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules};
-use crate::runtime::swap::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
-use crate::runtime::swap::r_handle;
-use crate::runtime::swap::special_articles as articles;
+use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
+use crate::runtime::roster::r_handle;
+use crate::runtime::roster::special_articles as articles;
 
 macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
@@ -459,7 +459,7 @@ unsafe fn write_identity(entry: usize, r: usize, identity: MiiIdentity) -> MiiEn
 /// canonical exact-Mii request would INSTALL (`staged_descriptor_for_owner`:
 /// Player0 keeps the window's record index, a selector takes its slot). `None`
 /// leaves the Mii canonical (no layout, no configuration, an unstageable owner).
-fn mii_identity_for(bank: &Bank, lane: &[Option<crate::runtime::swap::cycle_preload::Target>; crate::runtime::swap::cycle_preload::MAX_TARGETS],
+fn mii_identity_for(bank: &Bank, lane: &[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     kind: u32) -> Option<(MiiIdentity, Configuration)> {
     let layout = super::mii_backend::current()?;
     let (observed, _) = bank.observed?;
@@ -498,7 +498,7 @@ pub(super) fn mii_setup_admitted(entry: usize, owner: u32, kind: u32) -> Result<
     };
     let base = BASE.load(Ordering::Acquire);
     if base == 0 || alias == 0 { return Err("Mii setup: bank not installed"); }
-    unsafe { crate::runtime::swap::mii_setup::admitted(base, entry, owner, alias, &identity, &c) }
+    unsafe { crate::runtime::roster::mii_setup::admitted(base, entry, owner, alias, &identity, &c) }
 }
 
 /// A planned Mii group whose configuration's CharInfo is not yet on the owner's
@@ -582,7 +582,7 @@ fn members_for(settings: &training_mod_consts::cycle_preload_config::Settings, f
 /// the canonical Reload (`original_bankable(0x4b)` is false). The form of every kept `0x4b` is still
 /// re-proven per request (`group_serves`). No allocation.
 fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize, upcoming: &[u32])
-    -> ([u32; crate::runtime::swap::cycle_preload::MAX_TARGETS], usize) {
+    -> ([u32; crate::runtime::roster::cycle_preload::MAX_TARGETS], usize) {
     let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
     let solo = canonical_original(menu, role) != Some(POPO)
         && super::requested_forms_at(menu, logical, POPO, Some(0)) == Forms::solo_popo();
@@ -597,9 +597,9 @@ fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: us
 /// neighbours of a Kirby role, then extra groups by cycle depth; helper slots
 /// get what remains of that budget, capped by the saved slot count.
 pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMenu,
-    lanes: &[[Option<crate::runtime::swap::cycle_preload::Target>; crate::runtime::swap::cycle_preload::MAX_TARGETS]; 4])
+    lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4])
     -> [Option<Members>; 2] {
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let mut wanted = [0; 2];
     let mut wanted_banks = [None; 2];
     let grouped = groups_enabled(&settings);
@@ -697,7 +697,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
 fn plan_groups(settings: &training_mod_consts::cycle_preload_config::Settings,
     menu: &crate::engine::compat::menu::TrainingModpackMenu,
-    lanes: &[[Option<crate::runtime::swap::cycle_preload::Target>; crate::runtime::swap::cycle_preload::MAX_TARGETS]; 4],
+    lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4],
     originals: [Option<u32>; 2], targets: &mut [u8; 2]) -> usize {
     let capacity = POOL_CAPACITY.load(Ordering::Acquire) as usize;
     let live = POOL_LIVE.load(Ordering::Acquire) as usize;
@@ -781,7 +781,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     use crate::engine::preload::cycle_preload_policy::BuiltFighters;
     use crate::engine::swap::body_bank::{role_counts, WindowStatus};
     use crate::engine::preload::cycle_preload_capacity::reusable_extras;
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let mut result = BuiltFighters::default();
     if settings.slots == 0 || !settings.fighters || settings.bank_members < 2 { return result; }
     let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
@@ -820,7 +820,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
 /// reload; a banked original (`original_bank`) is a member like any other.
 /// A built member of a detached group is a warm swap target too.
 pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if role >= BANKS.len() || settings.slots == 0 || !settings.fighters
         || settings.bank_members < 2 { return false; }
     let forms = if kind == 0x4b && solo { Forms::solo_popo() } else { Forms::starting(kind) };
@@ -878,7 +878,7 @@ pub(crate) fn helper_budget(slots: u8) -> u8 { slots.saturating_sub(RESERVED.loa
 
 pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Members> {
     let role = role(owner)?;
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 { return None; }
     let other = usize::from(EXTRAS[1 - role].load(Ordering::Acquire));
     // A new window bank for this role replaces its own extra groups (torn down
@@ -936,7 +936,7 @@ pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], 
     let target = u32::from_le_bytes(descriptor[0x18..0x1c].try_into().unwrap());
     let mut result = Plan { descriptor, target, forms: Forms::starting(target), cells: [u32::MAX; NATIVE_MEMBERS], active: 0,
         reuse: false, members: None };
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if settings.slots == 0 || !settings.fighters || settings.bank_members < 2
         || !ENABLED.load(Ordering::Acquire) { return result; }
     // Both reuse and construction require the complete requested form. Checking
@@ -1592,7 +1592,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
             return false;
         }
     }
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     // WP4 (Astra §4.3 drain, §4.2 exclusive reset batch): before the commit, Prefetched groups other
     // than the target hand their keys back and return to Planned when the target is a member whose
     // row suspends prefetch while live (Kirby: no debt may be on R when it becomes live) or when the
@@ -1772,7 +1772,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 trace!("[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?}",
                     owner, index, members.kinds()[index as usize], bank.phase, now);
                 #[cfg(feature = "diag")]
-                crate::runtime::swap::identity_view::report(owner, resource(BASE.load(Ordering::Acquire), owner).unwrap_or(0), "ready");
+                crate::runtime::roster::identity_view::report(owner, resource(BASE.load(Ordering::Acquire), owner).unwrap_or(0), "ready");
                 if members.is_pair_lead() {
                     trace!("[IcPair] ready owner={} {} flags={:#x} states=[{},{},{}] +0x4178={:#x} +0x4180={:#x} ids=[{:#x},{:#x},{:#x}]",
                         owner, if index == 0 { "pair active" } else { "extra active" }, observed.flags,
@@ -1976,7 +1976,7 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
 }
 
 // `0x17e64d0` / `0x17e8610` / `0x17e2fe0` and the `R+0x4c`/`R+0x50` writes are issued only by
-// `crate::runtime::swap::r_handle` after a ledger decision (WP4); the constants above stay for the
+// `crate::runtime::roster::r_handle` after a ledger decision (WP4); the constants above stay for the
 // install-time fingerprints. Every release of a prefetched kind (post-build object release,
 // failed prefetch, build rollback, teardown, live-Kirby drain) goes through `release_group_keys`.
 // WP-R's identity-view publication (`identity_view::publish` before a group kind's first native
@@ -2519,7 +2519,7 @@ unsafe fn mii_build_preflight(base: usize, entry: usize, owner: u32, bank: &Bank
     let g = bank.groups.get(group)?;
     if g.state != GroupState::Prefetched || g.members.special() != Special::Mii { return None; }
     let (identity, c) = g.identity.zip(g.configuration)?;
-    Some(crate::runtime::swap::mii_setup::phase_b_admitted(base, entry, owner, bank.alias, &identity, &c))
+    Some(crate::runtime::roster::mii_setup::phase_b_admitted(base, entry, owner, bank.alias, &identity, &c))
 }
 
 unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
@@ -2535,7 +2535,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         .map(|bank| (copy_package_sets(bank), bank.alias));
     let copies_resident = match copies {
         Some((sets, alias)) if alias != 0 && resource(base, owner) == Some(alias) =>
-            crate::runtime::swap::copy_packages::admit(base, role, owner, alias, &sets),
+            crate::runtime::roster::copy_packages::admit(base, role, owner, alias, &sets),
         _ => true,
     };
     let (prepared, before, alias) = {
@@ -2546,7 +2546,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             Some(exchange) => exchange.permits(*now),
             None => now.header[1] == u32::from_le_bytes(now.descriptor[0x18..0x1c].try_into().unwrap()),
         });
-        let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+        let settings = crate::runtime::roster::cycle_preload_config::snapshot();
         let reason = if before.is_none() { Some(Fallback::OwnerReceiptChanged) }
             else if !groups_enabled(&settings) { Some(Fallback::GroupSwapDisabled) }
             else if swap.group >= bank.groups.len() || !bank.groups[swap.group].state.reachable() { Some(Fallback::NotReachable) }
@@ -2754,7 +2754,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     // ordinary rollback restores the window. No lock is held across the calls.
     let setup = match (&prepared, &mii_build) {
         (Prepared::Build { .. }, Some((identity, c))) if registry_ok =>
-            Some(crate::runtime::swap::mii_setup::prepare_mii_group(base, entry as usize, owner, alias, identity, c)),
+            Some(crate::runtime::roster::mii_setup::prepare_mii_group(base, entry as usize, owner, alias, identity, c)),
         _ => None,
     };
     let setup_ok = registry_ok && !matches!(setup, Some(crate::engine::mii::mii_setup::Outcome::Refused(_)
@@ -3055,7 +3055,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
 
 unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     let base = BASE.load(Ordering::Acquire);
-    let settings = crate::runtime::swap::cycle_preload_config::snapshot();
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let now = now_us();
     // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a
     // group holds keys or bodies, so they are resident before any registration; release them when
@@ -3065,7 +3065,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) } else { Vec::new() }, bank.alias));
     if let Some((sets, alias)) = copy_sets {
         if sets.is_empty() || (alias != 0 && resource(base, owner) == Some(alias)) {
-            crate::runtime::swap::copy_packages::sync(base, role, owner, alias, &sets, "tick");
+            crate::runtime::roster::copy_packages::sync(base, role, owner, alias, &sets, "tick");
         }
     }
     // D-KIRBY1: no bank prefetch key rests on this R while its live member is
@@ -3178,7 +3178,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         }
         Step::Start(group, members, alias) => {
             if !groups_enabled(&settings) || super::INSTALL.active() { return; }
-            if crate::runtime::swap::cycle_preload::speculative_admission().is_none() { return; }
+            if crate::runtime::roster::cycle_preload::speculative_admission().is_none() { return; }
             let Some(r) = resource(base, owner).filter(|r| *r == alias && alias != 0) else { return; };
             let (capacity, live) = pool_counts(base).unwrap_or((0, 0));
             let pool_free = (capacity as usize).saturating_sub(usize::from(live)).saturating_sub(POOL_RESERVE);
@@ -3236,14 +3236,14 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // WP-E row `native_body_bank::group_prefetch` (U14): a prefetch starts acquiring native map keys;
             // outside Training and waiting rooms it does not start and the group stays Planned, as for
             // every deferral above (nothing acquired yet, no INSTALL taken).
-            if !crate::runtime::swap::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
+            if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
             let Some(token) = super::INSTALL.try_begin(false) else { return; };
             // Every acquisition goes through the ledger (WP4): a token per kind, the pair rule or
             // the construction tail as its recipe, the object kind owned; a refusal (a live consumer,
             // a kind already held on this R) stops the prefetch before any further native request
             // and returns what this group already acquired.
             let lrole = ledger_role(role);
-            r_handle::bind(lrole, owner, r, crate::runtime::swap::observe::owner_flags(r));
+            r_handle::bind(lrole, owner, r, crate::runtime::roster::observe::owner_flags(r));
             let copy = ready_members(entry, owner).and_then(|window| live_kirby_copy_kind(entry, owner, window));
             let occupancy = occupancy_snapshot(role, copy);
             let (kinds, count) = members.prefetch_kinds();
@@ -3543,7 +3543,7 @@ pub(super) fn scene_changed() {
     }
     for role in 0..2 { r_handle::reset(ledger_role(role), "scene changed"); }
     // The scene loop resets every holder, G68 included: the copy holdings end without native calls.
-    for role in 0..2 { crate::runtime::swap::copy_packages::forget(role, role as u32, "scene changed"); }
+    for role in 0..2 { crate::runtime::roster::copy_packages::forget(role, role as u32, "scene changed"); }
 }
 
 pub(super) fn on_destroy(entry: *const u8) {
@@ -3553,7 +3553,7 @@ pub(super) fn on_destroy(entry: *const u8) {
                 bank.phase = Phase::Retired; bank.departed = true;
                 bank.exchange = None;
                 r_handle::reset(ledger_role(role), "entry destroyed");
-                crate::runtime::swap::copy_packages::forget(role, bank.owner, "entry destroyed");
+                crate::runtime::roster::copy_packages::forget(role, bank.owner, "entry destroyed");
                 EXTRAS[role].store(0, Ordering::Release);
                 GROUP_BODIES[role].store(0, Ordering::Release);
                 if !bank.groups.is_empty() || bank.prefetch.is_some() {
@@ -3754,7 +3754,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
     // rule `supplemental_acquisitions` encoded by hand. The per-body `0x17e8610` releases then
     // empty the map (native reset) and the tokens settle at the window's Ready.
     let lrole = ledger_role(role);
-    let flags = crate::runtime::swap::observe::owner_flags(resource as usize);
+    let flags = crate::runtime::roster::observe::owner_flags(resource as usize);
     r_handle::bind(lrole, owner, resource as usize, flags);
     // Native is the authority on R's keys: on a configure that found the map empty, nothing the
     // ledger predicts for this R exists (each settled token prints a `[Ledger] stale …` line).
@@ -3856,7 +3856,7 @@ pub(super) unsafe fn install(base: usize) {
     skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);
     ENABLED.store(true, Ordering::Release);
     // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).
-    crate::runtime::swap::identity_view::install(base);
+    crate::runtime::roster::identity_view::install(base);
     // Both extensions and the attached window's route clear (D-PTA1c at finalize) tear down through the
     // finalize hook, so it is installed on its own row (WP3). Every gate below is evaluated (gate first, no
     // short circuit) so the install line records each row once.
