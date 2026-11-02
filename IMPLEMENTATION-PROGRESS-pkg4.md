@@ -228,4 +228,6 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
   published toggle (`toggle().is_armed()` already gates before_frame/after_frame; check the record-start/save hooks gate on it too, and that the
   worker's Q7 path (`ui/worker.rs:254`, `writer::request_replay_capture`) reaches `replay_store::toggle()`). Host test (toggle off at boot,
   adapter ready, On arms it live) + s4-09 row: toggle On without a reboot, a match is captured.
-- Resume trigger: integrator-3's work sha with ui-screens 71ba1f7 and pkg6's entry_active_body landed.
+- Resume trigger: integrator-3's work sha with ui-screens 71ba1f7 and pkg6's entry_active_body landed.- Note (slim, eb8e034): smash-match-data's capture.rs, clip.rs, Capture::load/save and validate_capture moved to the test-only oracle crate
+  crates/smash-match-data/tests/oracle (recorded as pkg4-manifest edits, pkg4 ledger regenerated). Take it with the work merge; if design C touches
+  those files, build on that commit.
