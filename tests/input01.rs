@@ -522,3 +522,17 @@ fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
     assert_eq!(SLOTS * SLOT_FRAMES * std::mem::size_of::<MappedInputs>(), 24_000);
     assert!(std::mem::size_of::<Recorder>() < 24_000 + 512);
 }
+
+/// Lead decision (2026-11-02): the transition-term ranges are inclusive at both ends (question 3), and
+/// every other starting status keeps the described behaviour, the side-special term, for parity with the
+/// fork. A later change to either is deliberate: this test and docs/test-provenance/package-4.md say so.
+#[test]
+fn other_status_keeps_the_placeholder_term() {
+    let t = table();
+    for status in [0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
+        assert_eq!(Recorder::term_for_status(&t, status), C::TermContSpecialS, "status {status}");
+    }
+    // Both ends of the two ranges are inside them (the half-open upstream ranges left these out).
+    assert_eq!(Recorder::term_for_status(&t, 51), C::TermContEscapeAir);
+    assert_eq!(Recorder::term_for_status(&t, 82), C::TermContEscapeF);
+}

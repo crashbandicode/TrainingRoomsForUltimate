@@ -32,17 +32,19 @@ use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
-use crate::model::input_delay::MappedInputs;
+use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::lra_reset;
 use crate::model::recording::{
-    ChordAction, ControlCtx, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ChordAction, ControlCtx, Ended, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
+#[cfg(feature = "diag")]
+use crate::model::recording::LoadAction;
 use crate::model::settings::Snapshot;
 use crate::model::sites;
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::features::{chords, cpu, notices};
+use crate::runtime::features::{chords, cpu, input_display, notices};
 use crate::runtime::{game, published};
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
@@ -65,7 +67,7 @@ static LAST_PHASE: AtomicU8 = AtomicU8::new(0);
 /// Fighter object and entry layout (read from the owned 13.0.5 `main`; `tests/input_sites.rs` and the
 /// on-init notes): the fighter kind at +0xc, the module accessor at +0x20; the entry's body pointers
 /// from +0x4160 and its controller at +0x4178.
-const FIGHTER_KIND_FIELD: usize = 0xc;
+pub(crate) const FIGHTER_KIND_FIELD: usize = 0xc;
 const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
 const ENTRY_BODY_FIELD: usize = 0x4160;
 const ENTRY_CONTROLLER_FIELD: usize = 0x4178;
@@ -161,7 +163,7 @@ fn load_consts() -> bool {
 }
 
 /// The lua_bind natives of package 4 (guarded `Called` rows of `sites_pkg4`).
-mod natives {
+pub(crate) mod natives {
     use super::{game, sites, sites_pkg4};
 
     unsafe fn at<F: Copy>(offset: usize) -> F {
@@ -218,17 +220,24 @@ mod natives {
     }
 }
 
-/// The CPU entry's primary body, resolved now (no pointer is kept between frames).
+/// A fighter entry's first body, resolved now (no pointer is kept between frames).
 #[derive(Clone, Copy)]
-struct Body {
+pub(crate) struct Body {
     entry_ptr: usize,
-    fighter: usize,
-    accessor: usize,
+    pub(crate) fighter: usize,
+    pub(crate) accessor: usize,
     entry_id: i32,
 }
 
 unsafe fn cpu_body() -> Option<Body> {
-    let entry_id = i32::from(cpu::primary_entry_now());
+    body_of(i32::from(cpu::primary_entry_now()))
+}
+
+/// The first body of ntry_id (0 is P1).
+///
+/// # Safety
+/// The package 4 natives must have passed their guards.
+pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     let entry_ptr = natives::fighter_entry(entry_id);
     if entry_ptr == 0 {
         return None;
@@ -360,6 +369,10 @@ unsafe fn on_ai_frame(ai: usize) {
     let state = REC.lock().playback_state(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
+    // Interim HUD tick (package 5 moves these two calls to the layout's tick).
+    input_display::tick_frame();
+    let owners = published::input_owners();
+    input_display::hud_tick(owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE));
     notices::hud_tick();
     report_counts();
 }
@@ -402,6 +415,18 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 
 /// The record and playback chords (SPEC-input-01 §2.2): consumed on the CPU body's frame.
 unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
+    // Eden stand-ins (diag build only, removed when packages 3 and 5 own these): the save-state chords stand
+    // for "a save state was restored" and for the menu's shortcut edit.
+    #[cfg(feature = "diag")]
+    {
+        if chords::consume(Request::SaveState) {
+            on_state_restored(false);
+        }
+        if chords::consume(Request::LoadState) {
+            let result = chords::commit_shortcut(1, crate::model::menu::chord::Chord((1 << 2) | (1 << 3)));
+            crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] standin shortcut_edit slot=2 chord=X+Y result={result:?}"));
+        }
+    }
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
     if cpu::save_loading() {
@@ -479,8 +504,10 @@ pub fn request_playback(start: PlaybackStart) {
     }
 }
 
-/// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4; package 3 calls it
-/// once per restore): record or play per the settings. `saved_on_ledge` is the saved situation.
+/// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
+/// settings. `saved_on_ledge` is the saved situation. Package 3 will call it once per restore; until that
+/// caller exists the Eden stand-in below does (diag build only), so the release build has no dead code.
+#[cfg(feature = "diag")]
 pub fn on_state_restored(saved_on_ledge: bool) {
     let settings = *SETTINGS.lock();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
@@ -518,4 +545,5 @@ pub fn session_clear() {
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     chords::session_clear();
     notices::session_clear();
+    input_display::session_clear();
 }

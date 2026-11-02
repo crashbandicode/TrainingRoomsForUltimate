@@ -15,6 +15,7 @@ use parking_lot::Mutex;
 use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
 use crate::model::ini_files;
 use crate::model::input_delay::Owners;
+#[cfg(feature = "diag")]
 use crate::model::menu::chord::Chord;
 use crate::model::menu_shortcuts;
 use crate::model::settings::Snapshot;
@@ -98,9 +99,11 @@ pub fn load_ini() {
     STATE.lock().chords.shortcuts = shortcuts;
 }
 
-/// The menu's confirmed shortcut change (draft 9, N7): the new chords are live at once, and the file
+/// The menu's confirmed shortcut change (draft 9, N7); package 5's menu calls it, the diag build's stand-in
+/// (`recorder::chord_step`) until then: the new chords are live at once, and the file
 /// is rewritten as a transaction. A refused edit changes nothing; a failed write keeps the change in
 /// memory for the session and says so (SPEC-input-04 question 6 (b), (c)).
+#[cfg(feature = "diag")]
 pub fn commit_shortcut(slot: usize, chord: Chord) -> Result<(), ini_files::EditRefusal> {
     let current = STATE.lock().chords.shortcuts;
     let next = ini_files::check_edit(current, slot, chord)?;

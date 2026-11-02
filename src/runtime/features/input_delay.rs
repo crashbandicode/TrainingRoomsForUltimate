@@ -13,7 +13,7 @@ use skyline::hooks::InlineCtx;
 use crate::model::input_delay::{self, Clear, DelayQueue, MappedInputs};
 use crate::model::sites;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::features::{chords, recorder};
+use crate::runtime::features::{chords, input_display, recorder};
 use crate::runtime::{game, published};
 
 static QUEUE: Mutex<DelayQueue> = Mutex::new(DelayQueue::new());
@@ -64,7 +64,12 @@ fn apply() {
     drop(queue);
     // After the delay: the input display and the recorder see the delayed record (SPEC-input-03 §5.2).
     if slot == 0 {
-        unsafe { recorder::on_p1_poll(out) };
+        let controller = CONTROLLER.try_with(|cell| cell.replace(0)).unwrap_or(0);
+        // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
+        unsafe {
+            input_display::on_p1_poll(controller, out);
+            recorder::on_p1_poll(out);
+        }
     }
 }
 

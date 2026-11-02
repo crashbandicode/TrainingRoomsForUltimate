@@ -23,6 +23,8 @@ pub mod guard;
 pub mod ini_files;
 #[path = "model/input_delay.rs"]
 pub mod input_delay;
+#[path = "model/input_display.rs"]
+pub mod input_display;
 #[path = "model/install_line.rs"]
 pub mod install_line;
 #[path = "model/lra_reset.rs"]

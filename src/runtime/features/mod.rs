@@ -3,6 +3,7 @@
 pub mod chords;
 pub mod cpu;
 pub mod input_delay;
+pub mod input_display;
 pub mod lra_reset;
 pub mod notices;
 pub mod recorder;
