@@ -80,9 +80,6 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        // The menu opens from package 5's own reading of the same chords (the permanent one and these shortcuts), so
-        // nothing consumes this request; it is dropped at once instead of staying pending for ever.
-        detector.consume(Request::OpenMenu);
         !block && chords::plus_shortcut_accepted(set, sample)
     };
     if chords::clear_plus_bits(modal, accepted) {
@@ -96,6 +93,12 @@ pub unsafe fn on_poll(controller: usize) {
 /// `combo_passes`: the request is pending; clears it.
 pub fn consume(request: Request) -> bool {
     STATE.lock().detector.consume(request)
+}
+
+/// The menu shortcut chord passed since the last call (the INI shortcuts, detected from the raw controller before
+/// the Plus bits are cleared for an accepted Plus shortcut): package 5's input adapter opens the menu from it.
+pub fn take_open_menu() -> bool {
+    STATE.lock().detector.consume(Request::OpenMenu)
 }
 
 /// Session clear: all pending requests go.

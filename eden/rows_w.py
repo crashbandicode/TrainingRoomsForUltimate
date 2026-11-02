@@ -20,6 +20,7 @@ from pathlib import Path
 import route_w as r
 
 LABEL = sys.argv[1]
+PLUS = len(sys.argv) > 2 and sys.argv[2] == "plus"  # boot with button_config.ini: shortcut_1=Plus (R2-6)
 SD = f"{r.PROFILE_SD}/TrainingRooms"
 DIAG = f"{SD}/practice-diagnostics.log"
 DIAG_PREV = f"{SD}/practice-diagnostics.previous.log"
@@ -109,6 +110,24 @@ def main():
     ln = line_after(0, "hud_draw layout registrations", 15)
     row("1 the HUD draw runs on the info_training layout (registered after ui::install)", ln is not None, ln or "no hud_draw line")
 
+    # ---- R2-6: the loaded INI shortcut opens the real menu -------------------------------------------------------
+    if PLUS:
+        m = mark()
+        tap("plus", wait=1.5)
+        opened = line_after(m, "[Ui] menu opened", 8)
+        shot("menu-plus-shortcut")
+        row("R2-6 the imported shortcut (Plus, button_config.ini before the first open) opens the menu", opened is not None, opened or "no menu opened line")
+        m = mark()
+        tap("b", wait=1.5)
+        row("R2-6 the menu closes again (input owner released)", line_after(m, "[Ui] menu closed", 8) is not None, "menu closed")
+        m = mark()
+        tap("minus", wait=1.2)
+        row("R2-6 the default shortcut (Minus) no longer opens it", line_after(m, "[Ui] menu opened", 3) is None, "no menu opened line")
+        m = mark()
+        tap("b,up", wait=1.5)
+        row("R2-6 the permanent B + D-pad Up still opens it", line_after(m, "[Ui] menu opened", 8) is not None, "menu opened")
+        tap("b", wait=1.5)
+
     # ---- 2: a notice and the input log on screen ---------------------------------------------------------------
     m = mark()
     for b in ("a", "x", "b"):
@@ -152,6 +171,20 @@ def main():
     xa, xb, xc = xof(pos_a), xof(pos_b), xof(pos_c)
     row("3 P1 is back at the saved position", None not in (xa, xb, xc) and abs(xc - xa) < 1.0 and abs(xb - xa) > 5.0,
         f"saved x={xa}, moved x={xb}, loaded x={xc}")
+
+    # ---- R2-4: the CPU sees the loading fact; the record chord is ignored throughout the load ------------------------
+    reload({"input_record": ones(16, 2, 3)}, "record chord = X + Y")
+    time.sleep(0.5)
+    m = mark()
+    tap("zl,up,x,y", hold=200, wait=1.0)
+    on = line_after(m, "cpu_event save_loading=true", 8)
+    off = line_after(m, "cpu_event save_loading=false", 8)
+    row("R2-4 the CPU runtime sees save_loading=true during the load and false after (one authoritative fact)", on is not None and off is not None and stamp_of(on) <= stamp_of(off), f"{on} | {off}")
+    ign = line_after(m, "chord_ignored_loading", 4)
+    lock = [x for x in lines_after(m) if "record_lockout" in x]
+    row("R2-4 the record chord pressed with the load is ignored while it loads", ign is not None and not lock, f"{ign} | record_lockout lines: {len(lock)}")
+    reload({}, "default chords")
+    time.sleep(1.5)
 
     # ---- 4: recorder stop on a load request, state restored -> record ---------------------------------------------
     m = mark()
@@ -204,6 +237,14 @@ def main():
     ln = line_after(m, "playback_interrupt", 20)
     stop = line_after(m, "playback_stop entry=1", 5)
     row("5 Playback Mash Interrupt stops the playback (pkg2 inbox -> pkg4 recorder)", ln is not None, f"{ln} | {stop}")
+    reload({"mash_state": [0, 1] + [0] * 28, "mash_triggers": ones(17, 16), "playback_loop": [1, 0], "playback_mash": [0, 1]}, "mash Jump, always; loop; interrupt Off")
+    time.sleep(1.0)
+    m = mark()
+    tap("zr,up", wait=3.0)
+    done = [x for x in lines_after(m) if "playback_complete" in x]
+    row("5 with Playback Mash Interrupt Off the playback continues (loops) under the same mash",
+        line_after(m, "playback_shortcut", 5) is not None and len(done) >= 2 and not [x for x in lines_after(m) if "playback_interrupt" in x],
+        f"{len(done)} completions, no playback_interrupt")
     reload({"mash_state": [0] * 30, "mash_triggers": ones(17, 0, 1, 3, 7), "playback_loop": [0, 1]}, "mash off")
 
     # ---- 6: the writer thread ------------------------------------------------------------------------------------
@@ -213,8 +254,12 @@ def main():
     ln = line_after(m, "button_config.ini written by the writer thread", 12)
     ini = r.remote(f"Get-Content {SD}/button_config.ini")[1]
     (OUT / "button_config.ini").write_text(ini + "\n")
-    row("6 a shortcut edit is written to button_config.ini by the writer thread", ln is not None and "shortcut_2=X + Y" in ini,
+    row("6 a shortcut edit is written to button_config.ini by the writer thread", ln is not None and "shortcut_2=X + Y" in ini and (not PLUS or "shortcut_1=Plus" in ini),
         f"{ln} | {ini.replace(chr(10), ' | ')}")
+    m = mark()
+    tap("x,y", wait=1.5)
+    row("R2-6 the edited shortcut (X + Y) opens the menu at once", line_after(m, "[Ui] menu opened", 8) is not None, "menu opened")
+    tap("b", wait=1.5)
     m = mark()
     touch("diag-capture.req", "on")
     ln = line_after(m, "replay_capture.ini written by the writer thread", 12)

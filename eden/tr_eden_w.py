@@ -105,7 +105,7 @@ def eden_processes():
     return [l for l in out.splitlines() if "pgrep" not in l]
 
 
-def prep(label, nros, settings, diag_txt):
+def prep(label, nros, settings, diag_txt, extras=()):
     receipt = {"label": label, "time": time.time(), "source": str(SOURCE), "profile": str(PROFILE),
                "set_aside": [], "archived": []}
     assert SOURCE.name != "a" and SOURCE.is_dir()
@@ -168,6 +168,10 @@ def prep(label, nros, settings, diag_txt):
     if settings:
         shutil.copyfile(settings, out / "settings.json")  # a real file, never a link
         receipt["settings"] = (out / "settings.json").read_text(encoding="utf-8")
+    for spec in extras:  # <path>:<name in the output folder>: a real file placed before the first boot
+        src, _, name = spec.partition(":")
+        shutil.copyfile(src, out / (name or Path(src).name))
+        receipt.setdefault("extras", []).append(name or Path(src).name)
     if diag_txt:
         shutil.copyfile(diag_txt, out / "diag.txt")
         receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
@@ -260,8 +264,8 @@ def up(args):
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
-        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
-                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
+        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.extra).items()
+                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt", "extras")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
                         "-Action", "Start", "-Unit", f"trw-{label}-display", "-Socket", f"wayland-trw-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
@@ -389,6 +393,7 @@ def main():
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
+    p.add_argument("--extra", action="append", default=[])
     p.set_defaults(fn=up)
     p = sub.add_parser("prep")  # profile copy only: touches nothing but this tool's own work root
     p.add_argument("label", type=label_ok)
