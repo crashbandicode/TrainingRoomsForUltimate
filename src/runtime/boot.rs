@@ -361,7 +361,7 @@ fn diag_poison_text() -> String {
 #[cfg(feature = "diag")]
 fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
     let text = diag_poison_text();
-    let mut poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
+    let poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
         match rows.iter().position(|row| row.name == name) {
             Some(i) => {
                 outcomes[i] = GuardOutcome::Foreign { first_diff: 0 };

@@ -31,7 +31,7 @@ fn core06_colour_table() {
     for (id, tint) in spec.iter().enumerate() {
         assert_eq!(hitbox::hitbox_tint(id as i32), *tint, "id {id}");
         assert_eq!(hitbox::hitbox_tint(id as i32 + 8), *tint, "id {} wraps", id + 8);
-        assert!(tint.iter().any(|c| *c == 1.0), "fully saturated: {tint:?}");
+        assert!(tint.contains(&1.0), "fully saturated: {tint:?}");
     }
     // A negative id wraps the same way.
     assert_eq!(hitbox::hitbox_tint(-1), spec[7]);
@@ -133,7 +133,7 @@ fn core06_command_param_indices() {
 
     // CATCH: 1 id, 2 joint, 3 size, 4..6 centre, 7..9 second centre.
     assert_eq!(hitbox::CATCH, Indices { id: 1, joint: 2, size: 3, centre: 4, second: 7 });
-    let mut grab = vec![Cell::NIL; 10];
+    let mut grab = [Cell::NIL; 10];
     grab[1] = int(2);
     grab[2] = int(0x0000_0004_aaaa_bbbb);
     grab[3] = f(2.0);
