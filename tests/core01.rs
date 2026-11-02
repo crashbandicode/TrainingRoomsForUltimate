@@ -75,7 +75,7 @@ fn core01_unsupported_logs_and_returns() {
 #[test]
 fn core01_install_line_format() {
     let sites = [
-        SiteReport { site: "final_input_mapping", found: GuardOutcome::Stock, written: Written::Far },
+        SiteReport { site: "input_mapping_begin", found: GuardOutcome::Stock, written: Written::Near },
         SiteReport { site: "hazard_flag", found: GuardOutcome::HookedByOther { at: 4, usable: true }, written: Written::Checked },
         SiteReport { site: "reset_check", found: GuardOutcome::Foreign { first_diff: 8 }, written: Written::Skipped },
     ];
@@ -99,7 +99,7 @@ fn core01_install_line_format() {
     assert_eq!(
         line.to_string(),
         "123456 plugin=training_rooms/0.1.0 game=13.0.5 build=21450c647b8c5940ed5b68218ea128fd3c5d597d \
-         final_input_mapping=stock/far hazard_flag=other/checked reset_check=foreign/skipped \
+         input_mapping_begin=stock/near hazard_flag=other/checked reset_check=foreign/skipped \
          input_delay=installed lra_reset=not_installed settings: input_delay=5 lra_reset=off stage_hazards=on \
          migration=none result=installed heap_allocations=0"
     );
@@ -130,7 +130,7 @@ fn core01_site_table_guards_present() {
     assert!(sites::find("is_training_mode").is_some());
     // A feature is usable only when all of its sites and the predicate are.
     assert!(sites::feature_usable(Feature::InputDelay, |_| true));
-    assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "final_input_mapping"));
+    assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "input_mapping_end"));
     assert!(!sites::feature_usable(Feature::InputDelay, |s| s.name != "is_training_mode"));
     assert!(sites::feature_usable(Feature::StageHazards, |s| s.feature != Feature::InputDelay));
 }
@@ -138,7 +138,8 @@ fn core01_site_table_guards_present() {
 #[test]
 fn core01_site_offsets_named_by_hooks_are_table_rows() {
     for (name, offset) in [
-        ("final_input_mapping", sites::FINAL_INPUT_MAPPING_OFFSET),
+        ("input_mapping_begin", sites::INPUT_MAPPING_BEGIN_OFFSET),
+        ("input_mapping_end", sites::INPUT_MAPPING_END_OFFSET),
         ("reset_check", sites::RESET_CHECK_OFFSET),
         ("on_init_slot", sites::ON_INIT_SLOT_OFFSET),
         ("on_init", sites::ON_INIT_OFFSET),
@@ -171,10 +172,10 @@ fn core01_overlapping_windows_checked_first() {
 
 #[test]
 fn core01_chain_entry_classification() {
-    // The replace hook at the final input mapping entry: stock, another plugin's one-word branch,
-    // and a far jump (Skyline's two forms, HOOK-SHARING).
-    let site = sites::find("final_input_mapping").unwrap();
-    assert!(matches!(site.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }));
+    // The inline hook after the prologue of the final input mapping: stock, another plugin's
+    // one-word branch, and a far jump (Skyline's two forms, HOOK-SHARING) over its first word.
+    let site = sites::find("input_mapping_begin").unwrap();
+    assert!(matches!(site.kind, SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }));
     assert_eq!(site.outcome(&site.guard), GuardOutcome::Stock);
     let mut branch = site.guard;
     branch[..4].copy_from_slice(&0x1400_0456u32.to_le_bytes());
@@ -183,7 +184,10 @@ fn core01_chain_entry_classification() {
     far[..4].copy_from_slice(&model::guard::LDR_X17_LITERAL_8.to_le_bytes());
     far[4..8].copy_from_slice(&model::guard::BR_X17.to_le_bytes());
     assert_eq!(site.outcome(&far), GuardOutcome::HookedByOther { at: 0, usable: false });
-    // The slot row: right target is stock, any other is foreign.
+    // Another plugin's hook past the span we replace is tolerated.
+    let mut past = site.guard;
+    past[40..44].copy_from_slice(&0x1400_0456u32.to_le_bytes());
+    assert!(site.outcome(&past).usable());    // The slot row: right target is stock, any other is foreign.
     let slot = sites::find("on_init_slot").unwrap();
     assert_eq!(slot.slot_outcome(0x60dfa0), GuardOutcome::Stock);
     assert!(!slot.slot_outcome(0x123456).usable());

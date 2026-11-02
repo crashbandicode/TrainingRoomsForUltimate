@@ -195,3 +195,4 @@ fn state06_hub_trigger_facts_match_the_guarded_words() {
     assert!(sites::feature_usable(sites::Feature::ResetHub, |_| true));
     assert!(!sites::feature_usable(sites::Feature::ResetHub, |s| s.name != "is_operation_cpu"));
 }
+
