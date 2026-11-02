@@ -66,9 +66,9 @@ switch ($Mode) {
             if ((Sha256Of "$PL\$name") -ne $want[$name]) { throw "copy hash $name" }
         }
         if ((Sha256Of "$EX\subsdk9") -ne $SKY_STOCK) { throw 'exefs subsdk9 changed' }
-        $set = [ordered]@{}; Get-ChildItem -LiteralPath $PL -File | Sort-Object Name | ForEach-Object { $set[$_.Name] = Sha256Of $_.FullName }
-        $set | ConvertTo-Json | Set-Content "$W\installed-$Set.json"
-        "installed $Set`: $($set.Count) NROs"; $set.GetEnumerator() | ForEach-Object { "  $($_.Value.Substring(0,16)) $($_.Key)" }
+        $inst = [ordered]@{}; Get-ChildItem -LiteralPath $PL -File | Sort-Object Name | ForEach-Object { $inst[$_.Name] = Sha256Of $_.FullName }
+        $inst | ConvertTo-Json | Set-Content "$W\installed-$Set.json"
+        "installed $Set`: $($inst.Count) NROs"; $inst.GetEnumerator() | ForEach-Object { "  $($_.Value.Substring(0,16)) $($_.Key)" }
     }
     'restore' {
         if ((Get-Content "$O\CLAIM" -Raw).Trim() -ne $OWNER) { throw 'not my claim' }

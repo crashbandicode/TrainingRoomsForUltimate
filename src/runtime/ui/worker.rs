@@ -402,15 +402,27 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
+/// Diag build only: which step of the close ran (the menu-close hang, 2026-11-02).
+#[inline]
+fn probe_close(step: u8) {
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!("[Ui] probe close {step}"));
+    let _ = step;
+}
+
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu) {
     let outbox = menu.take_outbox();
     let settings = menu.commit().clone();
+    probe_close(1);
     published::publish(&settings.menu, outbox.rerolls);
+    probe_close(2);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
+    probe_close(3);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
+    probe_close(4);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
     if outbox.changed {
         writer::request_settings(json);
@@ -432,10 +444,12 @@ fn close(menu: &mut Menu) {
     if let Some(on) = outbox.replay_capture {
         writer::request_replay_capture(on);
     }
+    probe_close(5);
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     OPEN.store(false, Ordering::Release);
     crate::runtime::ui::menu_app::QUICK_MENU_APP.lock().set_open(false);
+    probe_close(6);
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
     let _ = input_delay::clear;

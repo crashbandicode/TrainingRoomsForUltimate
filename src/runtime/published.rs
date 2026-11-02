@@ -13,18 +13,34 @@ static STAGE_HAZARDS: AtomicBool = AtomicBool::new(false);
 static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 static HUD: AtomicBool = AtomicBool::new(true);
 
+/// Diag build only: which step of a publish ran (the menu-close hang, 2026-11-02: the commit never logged `menu closed`).
+#[inline]
+fn probe(step: u8) {
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!("[Ui] probe publish {step}"));
+    let _ = step;
+}
+
 /// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
 /// B11); the first publish at boot has none.
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::remember(snapshot);
+    probe(1);
     crate::runtime::features::cpu::publish(snapshot, rerolls);
+    probe(2);
     crate::runtime::features::states::publish(crate::model::state::settings::StateSettings::from_snapshot(snapshot));
+    probe(3);
     crate::runtime::features::recorder::publish(snapshot);
+    probe(4);
     crate::runtime::compat::menu::apply_snapshot(snapshot);
+    probe(5);
     crate::runtime::features::chords::publish(snapshot);
+    probe(6);
     crate::runtime::p1::publish(snapshot);
+    probe(7);
     crate::runtime::features::input_display::publish(snapshot);
+    probe(8);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);

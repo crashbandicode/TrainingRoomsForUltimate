@@ -113,7 +113,7 @@ def deploy():
 def stage(name, nro):
     sha = hashlib.sha256(Path(nro).read_bytes()).hexdigest()
     d = f"{W}\\payload\\{name}"
-    print(ps(f"New-Item -ItemType Directory -Force '{d}' | Out-Null; foreach ($n in '{','.join(AIDS)}'.Split(',')) {{ Copy-Item '{AID}\\'+$n '{d}\\'+$n -Force }}; 'aids ok'", 90))
+    print(ps(f"New-Item -ItemType Directory -Force '{d}' | Out-Null; foreach ($n in '{','.join(AIDS)}'.Split(',')) {{ Copy-Item ('{AID}\\'+$n) ('{d}\\'+$n) -Force }}; 'aids ok'", 90))
     scp(nro, f"C:/Eden/c1162-w5-ally/uiq/payload/{name}/libtraining_rooms.nro")
     print(ps(f"$d='{d}'; $lines = foreach ($f in Get-ChildItem $d -Filter *.nro) {{ '{{0}}  {{1}}' -f (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower(), $f.Name }}; "
              f"[IO.File]::WriteAllText($d + '\\sha256.txt', ($lines -join [Environment]::NewLine) + [Environment]::NewLine); Get-Content $d\\sha256.txt", 90))
@@ -141,22 +141,26 @@ def kill(phase):
     print(ps(f"& '{PY}' '{W}\\wui.py' kill {phase}; 'eden.exe: ' + ((Get-Process eden -ErrorAction SilentlyContinue | Measure-Object).Count)", 120))
 
 
-def route(phase):
+def route(phase, install_gate="result=installed", from_menu=False):
     """Mute, load, title -> main menu (A until it shows), the stage-select macro, Final Destination, Steve, Training. Gated on the tile
     cursor's log and the plugin's lines; a miss stops."""
-    ops(phase, [["mute"], ["load"]], 200)
-    ops(phase, [["waitstatus", "loading_complete", True, 180]], 260)
-    wait_count(phase, "TrainingRooms/events.log", "result=installed", 1, 60, "install line")
-    ops(phase, [["sleep", 8]])
-    for attempt in range(6):
+    if not from_menu:
+        ops(phase, [["mute"], ["load"]], 200)
+        ops(phase, [["waitstatus", "loading_complete", True, 180]], 260)
+        wait_count(phase, "TrainingRooms/events.log", install_gate, 1, 60, "install line")
+        ops(phase, [["sleep", 8]])
+    for attempt in range(0 if from_menu else 6):
         keys(phase, "a w50")
         png = shot(phase, f"title-{attempt}")
         from PIL import Image
-        if Image.open(png).convert("RGB").getpixel((60, 250))[0] > 150 and Image.open(png).convert("RGB").getpixel((60, 250))[1] < 80:
-            print("GATE ok main menu (the red Smash panel)", flush=True)
+        img = Image.open(png).convert("RGB")
+        green, blue = img.getpixel((100, 580)), img.getpixel((900, 60))
+        if green[1] > 120 and green[0] < 60 and blue[2] > 200:
+            print("GATE ok main menu (the green Spirits and blue Games & More panels)", flush=True)
             break
     else:
-        raise SystemExit("GATE FAIL main menu")
+        if not from_menu:
+            raise SystemExit("GATE FAIL main menu")
     ops(phase, [["macro", W + r"\macros\tr-main-to-stage-select.edenmacro.json", 120], ["sleep", 2]], 240)
     wait_count(phase, TILE, "screen=sss", 1, 20, "stage select")
     ops(phase, [["hold", ["lstick", "right"], 150, 0.6]] * 4 + [["sleep", 1]])
@@ -194,7 +198,7 @@ def main():
     elif op == "kill":
         kill(sys.argv[2])
     elif op == "route":
-        route(sys.argv[2])
+        route(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "result=installed", "from-menu" in sys.argv)
 
 
 if __name__ == "__main__":
