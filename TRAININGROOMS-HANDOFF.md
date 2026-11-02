@@ -534,3 +534,21 @@ on the operator's menu decisions.
    source copy; `df` ≥ 40 GB; playbook gates one cargo call each.
 4. Keep this file current at every checkpoint; the lead's scratchpad watcher
    (PID 1724155) dies with the harness process and is not part of the repo.
+
+## Checkpoint 2026-11-02 ~13:4xZ (lead 0caa72b8)
+- **Integration:** `work/implementation` (local, not pushed since `7735000`) at `8b73694` = sync slices 1–2, stack (F7), the (b2) install line, pkg4 `4286dc8`, u4b `02aa91e`, stack2 (roster re-plan as a menu-worker event). **Not gated:** `tests/hook_locks.rs` finds 4 plugin-thread → hook-lock paths (ui-screens fixes them as sync slice 3).
+- **The push waits for:** green gates (hook_locks, `boot::run` ≤ 39,321 B), R5 = 0 (pkg6 planner fix F10 `be27c6f`; pkg4 design C), and no dead-code warnings.
+- **Streams:**
+  - ui-screens `ade1dd9`: merged with 8b73694, sync slice 3 next.
+  - pkg6: R5/F9/F11 compile, then s6-07 (has queue priority).
+  - pkg4 `5085317`: parked; integrator-3 messages it when ui-screens and pkg6 land.
+  - hitbox `eca0f81`: hb-04/05 pending.
+  - deluxe `14016fe`: dx-01/02 on the Surface.
+  - f6 `8c8e7e9`: f6-05/06 queued.
+  - slim: Phase A on `566780a`; Phase B after the stack merge (now allowed).
+  - harness `0c7020a`: smoke hx-01 done? (pending report), then merge.
+  - pbaudit `0275f27`: docs, to merge.
+- **Done and removed:** stack (F7), u4b. Agents map: `/tmp/trlead-0caa72b8-agents.txt`.
+- **Fix ledger:** F6 (in progress), F7 (fixed), F8 (both trees, independent), F9/F10/F11 (in progress, fork deferred).
+- **Operator decisions pending:** L2 (two hos-lock lint allows), size-counter method (the test-module fix and rustfmt normalisation), the playbook tool parameterisation proposal, Deluxe `hide_pages` on the card (the operator's own change).
+- **Rules added today:** Playbook § (every brief), size goal, host sharing and interleave (imgui-nvn-sol and tm-f8-terra, with a 3-minute window), `CARGO_INCREMENTAL=0`, firewall Block rules allowed (never touch Allow rules), ledger stamps with seconds.
