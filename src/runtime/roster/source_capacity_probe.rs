@@ -93,10 +93,6 @@ fn plugin_consumers_idle() -> bool {
     {
         return false;
     }
-    #[cfg(feature = "item-state-probe")]
-    if !crate::runtime::roster::item_state_probe::capacity_probe_idle() {
-        return false;
-    }
     // The older independent CPU2 experiment would compete for the same scene.
     !cfg!(feature = "source-owner-probe") || cfg!(feature = "managed-sources")
 }

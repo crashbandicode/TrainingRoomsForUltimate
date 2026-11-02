@@ -78,8 +78,6 @@
    "common::filesystem": "crate::runtime::compat::filesystem",
    "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
    "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT",
-   "item_state_probe": "crate::runtime::roster::item_state_probe",
-   "turnip_face_caller_probe": "crate::runtime::roster::turnip_face_caller_probe",
    "mii_identity_probe": "crate::runtime::mii::mii_identity_probe",
    "mii_fullconfig_probe": "crate::runtime::mii::mii_fullconfig_probe",
    "mii_saved_file_probe": "crate::runtime::mii::mii_saved_file_probe"
@@ -1518,7 +1516,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "2c35f72b17fd644f31f8c59eac5937a00109d3ce42bb111eb49fa317850553d6",
+   "dest_sha256": "e1e5a05d5fc6724829cbe4535b2227adce3bd552948909ae45be6bb2d672f53d",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -1529,6 +1527,11 @@
      "old": "fn notice(text: impl Into<String>) {",
      "new": "fn notice(text: impl Into<std::borrow::Cow<'static, str>>) {",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "#[cfg(feature = \"turnip-save-probe\")]\npub(crate) fn turnip_probe_idle() -> bool {\n    !HAS_PENDING.load(Ordering::Acquire) && PENDING.lock().unwrap().is_none()\n}\n\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
     }
    ]
   },
@@ -2617,7 +2620,7 @@
    "dest": "src/runtime/roster/source_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "0596838415402aa93c09c2132caeedd54d37c1c94a41ece19e04ffe0e54cd47a",
+   "dest_sha256": "3ee067ff3732c8af334af6c7c234047ec9e5724c9e7fc9dfaf2536f74e09cb01",
    "edits": [
     {
      "old": "Layout::Training => scene_permitted(),",
@@ -2638,6 +2641,11 @@
      "old": "Layout::Training => snapshot(ctx, entry, SLOT as u32),",
      "new": "Layout::Training => snapshot(ctx, entry, SLOT as u32),\n            #[cfg(feature = \"lobby-preload-extended\")]\n            Layout::QuickplayWaiting => None,",
      "reason": "the probe predates `Layout::QuickplayWaiting` (`lobby-preload-extended`, a default feature): its matches over the layout missed that arm, so every source-capacity probe failed to compile on the default set (E0004); quickplay waiting is outside the probe's scope (Training and LDN waiting), so the new arm refuses / measures nothing, as the LDN arm does without the empty probe. Offered back through the fix ledger"
+    },
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    if !crate::item_state_probe::capacity_probe_idle() {\n        return false;\n    }\n",
+     "new": "",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
     }
    ]
   },
@@ -2646,7 +2654,14 @@
    "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "f33adb5a4c849b810303f51bdb2e53c9e23b28b504563d119ddf28e3c8db5a5c"
+   "dest_sha256": "2a1d01699a2b8508334a61d4a69cb6c0057dc0f438581e046317f1792be2a2bb",
+   "edits": [
+    {
+     "old": "    #[cfg(feature = \"item-state-probe\")]\n    {\n        crate::item_state_probe::capacity_probe_idle()\n    }\n    #[cfg(not(feature = \"item-state-probe\"))]\n    {\n        true\n    }\n",
+     "new": "    true\n",
+     "reason": "the held-item probes (`item-state-probe`, `turnip-save-probe`, `gyro-variation-probe`) are removed with their features (lead ruling 2026-11-02: a declared feature builds or goes; probes that served are deleted for the size goal): the item engine they explored is carried and Eden-proven without them (s6-04: grant, save, restore with the owner absent; [ItemTable] dump)"
+    }
+   ]
   },
   {
    "src": "src/mii_pool_observer.rs",
@@ -2668,20 +2683,6 @@
    "crate": "root",
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
-  },
-  {
-   "src": "src/item_state_probe.rs",
-   "dest": "src/runtime/roster/item_state_probe.rs",
-   "crate": "root",
-   "src_sha256": "aded55fcc945b7258b63d90c697edf457a1ec840c0bfbb7b51fd5dd86633a92c",
-   "dest_sha256": "60477d60f59638cdc852aa720c36afd03069f661a892f3b9ae6709a5710bdb4f"
-  },
-  {
-   "src": "src/turnip_face_caller_probe.rs",
-   "dest": "src/runtime/roster/turnip_face_caller_probe.rs",
-   "crate": "root",
-   "src_sha256": "f5bc70811fc01e6abd46dbb7f0438cf7eac78b1c203b0d6fcc73751d79c33238",
-   "dest_sha256": "64e14a8d31cd6d8e6d6b13cf9fa43b7edea1c20ecbfd7d6e44f82a04a71261eb"
   },
   {
    "src": "src/mii_identity_probe.rs",

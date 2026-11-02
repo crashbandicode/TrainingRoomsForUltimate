@@ -145,14 +145,7 @@ unsafe fn idle() -> Result<(), Refusal> {
 }
 
 fn item_probe_idle() -> bool {
-    #[cfg(feature = "item-state-probe")]
-    {
-        crate::runtime::roster::item_state_probe::capacity_probe_idle()
-    }
-    #[cfg(not(feature = "item-state-probe"))]
-    {
-        true
-    }
+    true
 }
 
 fn refuse(generation: u64, (code, reason, first, second): Refusal) -> bool {

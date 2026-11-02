@@ -82,26 +82,29 @@ fn the_byte_meter_counts_what_the_one_global_allocator_serves() {
     let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
     // Other test threads (the harness) allocate too: measure with blocks far larger than anything they make and compare deltas
     // that only this thread's calls can explain, by holding the turn (the other test also holds it).
+    // The block (64 MiB) dwarfs what the harness threads allocate or free meanwhile; `SLACK` absorbs their traffic.
+    const BLOCK: usize = 64 << 20;
+    const SLACK: isize = 4 << 20;
     let before = model::hook_stats::heap_bytes();
-    let first = Layout::from_size_align(1 << 20, 8).unwrap();
+    let first = Layout::from_size_align(BLOCK, 8).unwrap();
     // SAFETY: the layouts are valid and every block is freed with the layout it was allocated or reallocated with.
     unsafe {
         let pointer = ALLOCATOR.alloc(first);
         assert!(!pointer.is_null());
         let held = model::hook_stats::heap_bytes();
-        assert!(held.live >= before.live + (1 << 20), "live holds the block");
-        assert!(held.peak >= held.live.min(before.live + (1 << 20)));
-        assert!(held.total >= before.total + (1 << 20) && held.calls > before.calls && held.largest >= 1 << 20);
+        assert!(held.live >= before.live + BLOCK as isize - SLACK, "live holds the block: {before:?} -> {held:?}");
+        assert!(held.peak >= held.live);
+        assert!(held.total >= before.total + BLOCK && held.calls > before.calls && held.largest >= BLOCK);
         let moved = ALLOCATOR.realloc(pointer, first, 1 << 10);
         assert!(!moved.is_null());
         let shrunk = model::hook_stats::heap_bytes();
-        assert!(shrunk.live < held.live, "the old block left `live` at the realloc");
+        assert!(shrunk.live <= held.live - BLOCK as isize + SLACK, "the old block left `live` at the realloc");
         assert!(shrunk.total >= held.total + (1 << 10), "the new size counts as requested");
         assert!(shrunk.peak >= held.peak, "peak never falls");
         ALLOCATOR.dealloc(moved, Layout::from_size_align(1 << 10, 8).unwrap());
     }
     let after = model::hook_stats::heap_bytes();
-    assert!(after.live < before.live + (1 << 19), "the freed block is not live any more");
+    assert!(after.live < before.live + SLACK, "the freed block is not live any more");
 }
 
 /// Attribution (R5): a steady-state allocation is charged to the innermost open scope, and the enclosing scope is current again
