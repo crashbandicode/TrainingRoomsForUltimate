@@ -105,3 +105,5 @@ The swap places only `libtraining_rooms.nro` and `developer.ini`; the clean room
  + libtraining_rooms.nro           new data written here only          TrainingRooms/ kept, unused
  + TrainingRooms/developer.ini                                         (U1: no carry-back unless ordered)
 ```
+
+**Note 2026-11-02 (deluxe stream ABI check):** the card's Deluxe host is 0.10.1 (`0.10.1-03e9d42ad2ef`), and SDK 5.0.0 registers with it directly. The card's Deluxe `config.ini` has `hide_pages=plugins,performance`, so the Deluxe **Plugins** page is hidden and our "Replay capture sync" row does not show on the card. The swap does not change the Deluxe config. If the operator wants the row visible, they remove `plugins` from `hide_pages` themselves. The row's absence on the card is therefore expected and not a swap failure.
