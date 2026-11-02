@@ -136,3 +136,10 @@ after files and screenshots. Host controller tests do not satisfy these rows.
 Any failed precondition ends that row under its current label. Runtime fixture
 changes require an owned manifest and verified cleanup before the full lent
 profile restore. The helper-path boot hold is still binding.
+
+### Stage opening identity and status (pending native acceptance)
+
+- Open the Lobby Stages grid in a verified practice scene; Direct A requests the selected form immediately. Observe queued/loading/ready status for that request only.
+- Keep the menu open while the practice identity changes: Direct A must refuse without addressing the replacement scene. Reopen to capture the new identity.
+- An opening without a qualified practice stage must refuse; no later silent retarget. Reset clears the opening context and request display.
+- A refused second request keeps its refusal visible; prior accepted work remains native-owned and completion notifications remain active.

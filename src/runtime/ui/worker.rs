@@ -151,6 +151,8 @@ struct Session {
     menu: Option<Menu>,
     setups: super::setups::Ui,
     setup_note: Option<String>,
+    stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
+    stage_request: Option<u64>,
     phase: Phase,
     /// The panel row the menu is on while `phase` is `Panel`.
     panel: Option<Editor>,
@@ -169,6 +171,8 @@ impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
         if self.setups.watching() { return true; }
+        if self.stage_request.is_some() && self.menu.as_ref().is_some_and(|m| matches!(m.screen(),
+            Some(Screen::Grid { layout, .. }) if layout.kind == crate::model::menu::grid::GridKind::Stages)) { return true; }
         #[cfg(feature = "mii-saved-alpha")]
         if self.pending_close.is_some() { return true; }
         self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
@@ -208,6 +212,8 @@ fn run() {
 fn handle(code: u8, s: &mut Session) {
     if code == EV_RESET {
         s.menu = None;
+        s.stage_context = None;
+        s.stage_request = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
         // external-name owner distinguish actual retirement on the worker.
         s.setup_note = None;
@@ -225,6 +231,8 @@ fn handle(code: u8, s: &mut Session) {
         return;
     }
     if code == EV_OPEN {
+        s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
+        s.stage_request = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         match &mut s.menu {
             Some(m) => m.reopen(settings, env()),
@@ -292,7 +300,7 @@ fn handle(code: u8, s: &mut Session) {
                 requests::give_item(item);
             }
             if let Some((tile, button)) = m.take_stage_press() {
-                stage_press(m, tile, button, &mut s.refusal);
+                stage_press(m, tile, button, s.stage_context, &mut s.stage_request, &mut s.refusal);
             }
             if let Some((tile, button)) = m.take_roster_press() {
                 roster_press(m, &mut s.roster, tile, button);
@@ -433,7 +441,9 @@ fn sync_mii(s: &mut Session) {
 }
 /// A, X or Y on the Lobby Stages grid: the stage editor applies it to the menu's kept values; a Direct pick is requested from the
 /// waiting room's practice stage (state only: the request is made by the stage hooks on the game's side).
-fn stage_press(m: &mut Menu, tile: u16, button: Button, note: &mut Option<&'static str>) {
+fn stage_press(m: &mut Menu, tile: u16, button: Button,
+    context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
+    request: &mut Option<u64>, note: &mut Option<&'static str>) {
     use crate::editors::stages::{Effect, StageEditor, ORDER_KEY, PREFERENCES_KEY};
     let mut editor = StageEditor::read(m.kept(ORDER_KEY), m.top_extra(PREFERENCES_KEY));
     let effect = editor.press(usize::from(tile), button);
@@ -443,8 +453,10 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button, note: &mut Option<&'stat
     m.set_kept(ORDER_KEY, editor.order_value());
     m.set_top_extra(PREFERENCES_KEY, editor.preferences_value());
     if let Effect::Request(selection) = effect {
-        *note = Some(match crate::runtime::lobby::practice_stage_request::request(selection) {
-            Ok(_) => "Stage requested: it loads in the waiting room",
+        let result = context.ok_or("No practice stage when this menu opened")
+            .and_then(|context| crate::runtime::lobby::practice_stage_request::request_in(context, selection));
+        *note = Some(match result {
+            Ok(id) => { *request = Some(id); return; },
             Err(why) => why,
         });
     }
@@ -504,6 +516,19 @@ fn publish_frame(s: &Session) {
                     menu.top_extra(crate::editors::stages::PREFERENCES_KEY),
                 );
                 editor.decorate(&mut next, layout.tile(page, cell).unwrap_or(0));
+                if let Some(status) = crate::runtime::lobby::practice_stage_request::status()
+                    .filter(|status| s.stage_request == Some(status.id)) {
+                    use crate::runtime::lobby::practice_stage_request::Phase;
+                    let text = match status.phase {
+                        Phase::Queued => "Stage request queued",
+                        Phase::NativeOwned => "Stage loading",
+                        Phase::Complete => "Stage ready",
+                        Phase::Refused(why) | Phase::Retained(why) => why,
+                        Phase::Departed { .. } => "Stage request ended with the practice scene",
+                    };
+                    next.help[1].clear();
+                    let _ = core::fmt::Write::write_str(&mut next.help[1], text);
+                }
             }
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
                 let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));

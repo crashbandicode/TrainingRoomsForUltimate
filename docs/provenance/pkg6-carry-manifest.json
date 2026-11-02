@@ -6967,7 +6967,7 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "bad625acb0d279131a60df738daa88b42d670c945c19ccd50b2ac40a79d07aa2",
+   "dest_sha256": "f99c84e802f81efefefea3391c7733c9b522b30f0d3815d622d6fe0c497a3471",
    "edits": [
     {
      "old": "notification(\"Practice Stage\".into(), message, 180);",
@@ -7008,6 +7008,31 @@
      "old": "}\n\n/// Same native entry callback as the passive observer; no competing hook.\npub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_object:usize) {\n    if !VERIFIED.load(Ordering::Acquire) { return; }\n    let Ok(mut state)=STATE.try_lock() else { return };\n    let scene=Scene { epoch:EPOCH.load(Ordering::Acquire),wrapper,core,mode,melee };\n    if state.seen.is_some_and(|(old,_)|old!=scene) { state.retire(); }\n    state.seen=Some((scene,active_object));\n    if let Some(c)=state.live {\n        if matches!(state.status.map(|s|s.phase),Some(Phase::Retained(_))) { return; }\n",
      "new": "}\n\n/// Same native entry callback as the passive observer; no competing hook.\npub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_object:usize) {\n    if !VERIFIED.load(Ordering::Acquire) { return; }\n    let Some(mut state)=STATE.try_lock() else { return };\n    let scene=Scene { epoch:EPOCH.load(Ordering::Acquire),wrapper,core,mode,melee };\n    if state.seen.is_some_and(|(old,_)|old!=scene) { state.retire(); }\n    state.seen=Some((scene,active_object));\n    if let Some(c)=state.live {\n        if matches!(state.status.map(|s|s.phase),Some(Phase::Retained(_))) { return; }\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "/// Submit once from the existing UI after choosing a catalog stage. Queued means\n/// no native mutation yet. The next current update either commits or refuses;\n/// nothing retries automatically. The original stage is not a global preference.\npub fn request(stage: impl Into<Selection>) -> Result<u64, &'static str> { queue(stage.into(), None) }\n\n",
+     "new": "",
+     "reason": "UI stage requests now always use the captured menu-opening identity; remove the unqualified request facade, preserving native queue ownership and phase notices."
+    },
+    {
+     "old": "queue(stage.into(), Some(context))",
+     "new": "queue(stage.into(), context)",
+     "reason": "Require the captured opening identity for every UI stage request."
+    },
+    {
+     "old": "fn queue(selection: Selection, context: Option<MenuContext>)",
+     "new": "fn queue(selection: Selection, context: MenuContext)",
+     "reason": "Require the captured opening identity for every UI stage request."
+    },
+    {
+     "old": "if context.is_some_and(|old| !policy::current_request(old.scene, scene, old.original, original)) {",
+     "new": "if !policy::current_request(context.scene, scene, context.original, original) {",
+     "reason": "Require the captured opening identity for every UI stage request."
+    },
+    {
+     "old": "/// A UI close may only address the scene/active stage that opened that menu.",
+     "new": "/// A UI request may only address the scene/active stage that opened that menu.",
+     "reason": "Direct A submits immediately; opening identity qualification does not defer the request to menu close."
     }
    ]
   },
