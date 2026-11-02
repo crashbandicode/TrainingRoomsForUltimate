@@ -12,6 +12,7 @@ Allow rules are the operator's (never added, changed or removed by the harness);
     client.py stage <set> <nro>...         payload <set>: the NROs and their sha256.txt
     client.py setaside | restore           stage.ps1 (restore verifies against the pre manifest)
     client.py boot <set> [<prev phase>]    stage.ps1 boot
+    client.py scan <label> [T0:T1]        console.log from the rig through gv.verdict (exit 1 when the lane fails)
     client.py launch <label> | kill <label> | game <label>     (game: mute, game.load, wait for loading_complete)
     client.py ops <label> '<json list>' | ps '<pwsh snippet>' | get <label> <rel path> [dest]
 Importable: `import client; client.ops(p, label, [...])`, `client.AllyTransport(p, label)` for route.py.
@@ -190,6 +191,17 @@ def main(argv=None):
         launch(p, argv[1])
     elif op == "kill":
         kill(p, argv[1])
+    elif op == "scan":  # console.log from the rig, judged by gv.verdict (Unmapped below 0x1000 or in a window fails)
+        import gv
+        log = get(p, argv[1], "console.log", HERE.parent.parent / "runs" / argv[1])
+        text = log.read_text(encoding="utf-8", errors="replace").splitlines()
+        window = tuple(float(x) for x in argv[2].split(":")) if len(argv) > 2 else None
+        result = gv.verdict(text, window)
+        for title, rows in (("FAIL", result["fail"]), ("unmapped (attribute)", result["unmapped_other"]), ("review", result["review"])):
+            for n, line in rows[:50]:
+                print(f"{title} {n}: {line[:300]}")
+        print(f"-- {len(text)} lines, {len(result['fail'])} failing, {len(result['unmapped_other'])} other Unmapped, {len(result['review'])} panic/abort/crash")
+        sys.exit(1 if result["fail"] else 0)
     elif op == "game":  # muted and saved before the game boots, then load and wait for it
         ops(p, argv[1], [["mute"], ["load"]], 200)
         print(json.dumps(ops(p, argv[1], [["waitstatus", "loading_complete", True, 180]], 260)))
