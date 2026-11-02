@@ -243,7 +243,7 @@ pub unsafe fn motion_add_partial_dragon(accessor: usize, part: i32, motion: u64)
 /// `StatusModule::change_status_force(accessor, status, block)` (the CPU core's native always passes
 /// `true`; the buffs need `false` for Wii Fit).
 pub unsafe fn status_force(accessor: usize, status: i32, block: bool) {
-    at::<extern "C" fn(usize, i32, bool)>(crate::model::sites::CHANGE_STATUS_FORCE_OFFSET)(accessor, status, block)
+    at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_pkg2::CHANGE_STATUS_FORCE_OFFSET)(accessor, status, block)
 }
 
 /// `WorkModule::get_param_int(accessor, kind, name)` through the save states' hook (a pass-through for
