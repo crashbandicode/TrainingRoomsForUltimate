@@ -269,13 +269,15 @@ pub(crate) fn mount_opened_catalog(catalog: std::sync::Arc<Snapshot>, opening: u
     if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {
         return OpenedCatalog::Later(catalog);
     }
-    if app.publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {
+    drop(app);
+    match crate::runtime::ui::menu_app::publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {
         catalog, epoch: opening, context: None, ordinary_cpu: false,
     }) {
-        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
-        OpenedCatalog::Shown
-    } else {
-        OpenedCatalog::Dropped
+        Ok(()) => {
+            crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
+            OpenedCatalog::Shown
+        }
+        Err(publication) => OpenedCatalog::Later(publication.catalog),
     }
 }
 

@@ -17,6 +17,7 @@ pub struct CloseIntent {
 }
 static CLOSE: Mutex<Option<CloseIntent>> = Mutex::new(None);
 static SEEN: AtomicU32 = AtomicU32::new(0);
+static PREPARED: AtomicU32 = AtomicU32::new(0);
 
 /// UI worker only. The native consumer uses try_lock and never waits for this.
 pub fn post_close(intent: CloseIntent) {
@@ -51,4 +52,10 @@ pub(crate) fn service() {
             mii_saved_alpha::menu_close(None);
         }
     }
+    PREPARED.store(sequence, Ordering::Release);
+}
+
+/// Publications belong only to an opening already observed on the native side.
+pub(crate) fn opening_current(sequence: u32) -> bool {
+    PREPARED.load(Ordering::Acquire) == sequence
 }

@@ -54,10 +54,9 @@ enum WriteJob {
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
     ReadCatalog(CatalogJob),
     #[cfg(feature = "mii-ordinary-cpu-alpha")]
-    // Keep ordinary catalog requests small; only an actual import owns this payload.
-    Import { name: Option<String>, configuration: Box<crate::engine::mii::lifetime::Configuration>,
-        native: Arc<crate::engine::mii::inventory::Snapshot>,
-        reply: mpsc::Sender<Result<Arc<crate::engine::mii::draft::Library>, String>> },
+    // The box and reply endpoint are reserved at boot and returned after each job.
+    Import(Box<crate::runtime::roster::character_roster::mii_replay::ImportPayload>,
+        crate::runtime::roster::character_roster::mii_replay::ImportReply),
 }
 
 pub fn archive() -> CaptureArchive {
@@ -131,13 +130,24 @@ pub fn start_writer() -> Result<(), String> {
                         reply.complete(Arc::new(native));
                     }
                     #[cfg(feature = "mii-ordinary-cpu-alpha")]
-                    WriteJob::Import {name, configuration, native, reply} => {
-                        let result = presets.as_mut().map_err(|error| error.clone()).and_then(|store| {
-                            let name = name.unwrap_or_else(|| format!("Replay {:?}", configuration.canonical().class));
-                            store.import(*configuration, &name, &native).map_err(|error| error.to_string())?;
-                            Ok(Arc::new(store.library().clone()))
-                        });
-                        let _ = reply.send(result);
+                    WriteJob::Import(mut payload, reply) => {
+                        use crate::runtime::roster::character_roster::mii_replay::Error;
+                        let result = if let Some(library) = payload.library.as_ref() {
+                            Ok(Arc::clone(library))
+                        } else {
+                            presets.as_mut().map_err(|error| error.clone()).and_then(|store| {
+                                let configuration = payload.configuration.expect("native import configuration");
+                                let name = format!("Replay {:?}", configuration.canonical().class);
+                                store.import(configuration, &name, payload.native.as_ref().unwrap())
+                                    .map_err(|error| error.to_string())?;
+                                Ok(Arc::new(store.library().clone()))
+                            })
+                        };
+                        match result {
+                            Ok(library) => payload.merge(library),
+                            Err(error) => payload.error = Some(Error::Worker(Arc::from(error))),
+                        }
+                        reply.complete(payload);
                     }
                 }
             }
@@ -237,11 +247,18 @@ fn fallback_catalog(reply: CatalogJob) -> CatalogQueue {
 }
 
 #[cfg(feature = "mii-ordinary-cpu-alpha")]
-pub(crate) fn import_mii(configuration: crate::engine::mii::lifetime::Configuration,
-    native: Arc<crate::engine::mii::inventory::Snapshot>,
-    reply: mpsc::Sender<Result<Arc<crate::engine::mii::draft::Library>, String>>) -> Result<(), String> {
-    WRITER.get().ok_or("Mii preset owner unavailable")?
-        .try_send(WriteJob::Import {name: None, configuration: Box::new(configuration), native, reply}).map_err(|error| error.to_string())
+pub(crate) fn import_mii(
+    payload: Box<crate::runtime::roster::character_roster::mii_replay::ImportPayload>,
+    reply: crate::runtime::roster::character_roster::mii_replay::ImportReply,
+) -> crate::runtime::roster::character_roster::mii_replay::ImportQueue {
+    use crate::runtime::roster::character_roster::mii_replay::ImportQueue;
+    let Some(writer) = WRITER.get() else { return ImportQueue::Unavailable(payload, reply); };
+    match writer.try_send(WriteJob::Import(payload, reply)) {
+        Ok(()) => ImportQueue::Queued,
+        Err(mpsc::TrySendError::Full(WriteJob::Import(payload, reply))) => ImportQueue::Full(payload, reply),
+        Err(mpsc::TrySendError::Disconnected(WriteJob::Import(payload, reply))) => ImportQueue::Unavailable(payload, reply),
+        Err(_) => unreachable!("import submission returned another job variant"),
+    }
 }
 
 /// Called after the Training data directory and legacy migration are ready, and

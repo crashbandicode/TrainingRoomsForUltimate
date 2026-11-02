@@ -2402,6 +2402,8 @@ pub fn init() {
     mii_saved_alpha::init(base);
     #[cfg(feature="mii-managed-helper-alpha")]
     mii_managed_helper::init_storage();
+    #[cfg(feature="mii-ordinary-cpu-alpha")]
+    mii_replay::init();
         // Validate the original destructor range before capacity installs its
         // listener-removed hook at 0x652214 inside that range. The Mii gate's
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.

@@ -4,7 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use crate::model::catalog_reply::{Job, Replies};
-use crate::runtime::ui::menu_app::{CatalogPublication, QUICK_MENU_APP, MENU_RECEIVED_INPUT};
+use crate::runtime::ui::menu_app::{CatalogPublication, MENU_RECEIVED_INPUT};
 
 use crate::engine::mii::{
     catalog_request::{Effect, Kind, Live, Requests, Step, Verdict},
@@ -42,6 +42,7 @@ impl Broker {
 
 /// Startup only, before native callbacks are installed.
 pub(super) fn init() {
+    crate::runtime::ui::menu_app::init_publications();
     let mut broker = STATE.lock().unwrap();
     if broker.reply.is_none() { broker.reply = Some(Replies::new()); }
 }
@@ -242,22 +243,19 @@ fn apply(verdict: Verdict, snapshot: Arc<Snapshot>) {
     }
 }
 
-/// Capture has completed. A contended UI lock retains the value for the next
-/// native service callback; close/retire cancels it through the existing broker.
+/// Capture has completed. Full/unavailable publication retains the identical
+/// value for the next native callback; the existing close/retire policy cancels it.
 pub(super) fn publish_menu(publication: CatalogPublication) {
     if !crate::runtime::ui::menu_app::active()
         || publication.epoch != super::mii_saved_alpha::menu_epoch() { return; }
-    if let Some(mut app) = QUICK_MENU_APP.try_lock() {
-        app.follow_open();
-        if publication.epoch == super::mii_saved_alpha::menu_epoch()
-            && app.publish_catalog(publication) {
-            MENU_RECEIVED_INPUT.store(true, Ordering::Release);
+    match crate::runtime::ui::menu_app::publish_catalog(publication) {
+        Ok(()) => { MENU_RECEIVED_INPUT.store(true, Ordering::Release); }
+        Err(publication) => {
+            let mut broker = STATE.lock().unwrap();
+            broker.held_menu = Some(publication);
+            PENDING.store(true, Ordering::Release);
         }
-        return;
     }
-    let mut broker = STATE.lock().unwrap();
-    broker.held_menu = Some(publication);
-    PENDING.store(true, Ordering::Release);
 }
 
 fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {
