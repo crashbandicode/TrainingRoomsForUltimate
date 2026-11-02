@@ -1,5 +1,5 @@
 {
- "stage": "m5o",
+ "stage": "m5q",
  "comment": "Package 6 carry manifest (tools/carry_pkg6.py). Do not edit carried files by hand: change this manifest and re-run `carry`.",
  "modules": {
   "root": {
@@ -145,8 +145,8 @@
    "src": "training_mod_consts/src/native_seams/rows_a1.rs",
    "dest": "src/model/seams/native_seams/rows_a1.rs",
    "crate": "consts",
-   "src_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495",
-   "dest_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495"
+   "src_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d",
+   "dest_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d"
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a2.rs",
@@ -461,8 +461,8 @@
    "src": "training_mod_consts/src/body_bank.rs",
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
-   "src_sha256": "7d4b5bef320e9defe1826279c55da655339b21d34369a03c608d6f557debdd9f",
-   "dest_sha256": "09f658d37f696ab267a61f331b5677778de7bb0f6eff8908e15cf0f25b08dbb5"
+   "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
+   "dest_sha256": "62820b3d682e0ce62e172dced10b0c6f644b00e8603515588d52b2e2549a122d"
   },
   {
    "src": "training_mod_consts/src/body_bank/memory.rs",
@@ -874,8 +874,8 @@
    "src": "src/cycle_preload_policy.rs",
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
-   "src_sha256": "930d1c02d7c3278190a2e5e55ed7155a4adbfc792ad753750c51a5137592678d",
-   "dest_sha256": "1d18ec99c964790c53eec5c8e4d6eec681cc74cd8b099c02ec62d01c140f4f2a"
+   "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
+   "dest_sha256": "9fcd0ab12912570dbaf9b125c936c97aaf1640ef4db2d5a39c8225a0ab01274e"
   },
   {
    "src": "src/character_memory.rs",
