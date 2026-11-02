@@ -96,8 +96,23 @@ fn every_covered_row_exists() {
 #[test]
 fn every_smash_call_of_the_carried_runtime_sources_is_covered_by_a_guarded_row() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    // Only code that is compiled: a top-level area of `src/runtime` counts once `runtime.rs` declares it (`mod <area>;`). Carried
+    // sources that are staged but not declared yet (the roster cycle) are not compiled, so their calls are not made; their list of
+    // unguarded calls is in IMPLEMENTATION-PROGRESS-pkg6.md and this test takes them in the moment their module is declared.
+    let declared = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime.rs")).unwrap();
     let mut files = Vec::new();
-    rust_files(&root, &mut files);
+    for entry in std::fs::read_dir(&root).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+        if !declared.lines().any(|line| line.trim_start_matches("pub(crate) ").trim_start_matches("pub ") == format!("mod {name};")) {
+            continue;
+        }
+        if path.is_dir() {
+            rust_files(&path, &mut files);
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            files.push(path);
+        }
+    }
     let covered: BTreeSet<&str> = COVERED.iter().map(|(call, _)| *call).collect();
     let mut scanned = 0;
     let mut calls = BTreeSet::new();
