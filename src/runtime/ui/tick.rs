@@ -75,6 +75,14 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
     let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuDraw);
     let lobby = crate::runtime::lobby::training::lobby::requested();
+    if waiting {
+        // The waiting layout can outlive a practice request. Hide its whole
+        // plugin host when that request ends, even though the layout remains.
+        let host = pane::find((*layout).root_pane, b"TrModPort");
+        if !host.is_null() {
+            pane::set_visible(host, lobby);
+        }
+    }
     if (waiting && !lobby) || (!waiting && !game::is_training_mode()) {
         renderer_lost("practice layout inactive");
         return;
