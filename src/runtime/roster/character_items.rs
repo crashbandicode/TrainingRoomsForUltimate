@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use smash::app::{self, lua_bind::*, sv_battle_object};
 use smash::lib::lua_const::*;
 use crate::engine::items::character_items::{valid_variation, HeldItemSnapshot, ITEM_NAMES};
-use {crate::runtime::compat::menu_app::assign, crate::runtime::compat::sync::read};
+use {crate::runtime::compat::sync::assign, crate::runtime::compat::sync::read};
 
 use crate::runtime::compat::common::{self, consts::FighterId, try_get_module_accessor};
 use crate::runtime::lobby::training::{self, character_specific::items::{ALL_CHAR_ITEMS, TURNIP_CHOSEN}};
@@ -14,9 +14,7 @@ use crate::runtime::roster::character_roster::sources;
 use crate::engine::swap::source_lifetime::Holder;
 
 const LEGACY_INDICES: [usize; 38] = [
-    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,
-    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
 ];
 
 #[derive(Clone, Copy)]
@@ -78,7 +76,7 @@ fn spec(choice: usize) -> Option<Spec> {
         variation: item.variation.as_ref().map(|v| **v).unwrap_or(0) })
 }
 
-fn notice(text: impl Into<String>) {
+fn notice(text: impl Into<std::borrow::Cow<'static, str>>) {
     training::ui::notifications::clear_notification("Character Item");
     training::ui::notifications::notification("Character Item".into(), text.into(), 180);
 }

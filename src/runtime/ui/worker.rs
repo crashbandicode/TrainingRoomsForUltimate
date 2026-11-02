@@ -3,7 +3,7 @@
 //! publishes each new frame for the layout tick to draw. The model allocates on input events, so that
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
-use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
@@ -90,6 +90,15 @@ pub fn push_press(button: Button) {
     push(encode(button));
 }
 
+/// A typed view of the menu changed outside the menu (`compat::menu`): the worker writes it back into the settings.
+static WRITEBACK: AtomicBool = AtomicBool::new(false);
+
+/// Ask the worker to write the changed typed views back (any thread; no allocation).
+pub fn request_writeback() {
+    WRITEBACK.store(true, Ordering::Release);
+    wake();
+}
+
 pub fn wake() {
     if let Some(thread) = WORKER.get() {
         thread.unpark();
@@ -138,6 +147,9 @@ fn run() {
         while let Some(code) = pop() {
             handle(code, &mut menu);
         }
+        if WRITEBACK.swap(false, Ordering::AcqRel) {
+            crate::runtime::compat::menu::flush_writeback();
+        }
         std::thread::park();
     }
 }
@@ -185,12 +197,41 @@ fn publish_frame(menu: Option<&Menu>) {
     FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 
+/// The write-back of decision D1: the carried engines changed their typed view of the menu (`compat::menu`, a roster pick the
+/// cycle made, the preload rows after the INI overlay). The rows and kept keys that differ from the stored settings replace them, and
+/// the settings file is rewritten by the writer thread. `defaults` addresses the saved-defaults snapshot instead of the current one.
+/// Nothing is published to the other packages: they read none of these rows.
+pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'static str, serde_json::Value)]) {
+    let json = {
+        let mut guard = SETTINGS.lock();
+        let Some(settings) = guard.as_mut() else { return };
+        let target = if defaults { &mut settings.defaults } else { &mut settings.menu };
+        let mut changed = false;
+        for (id, elements) in rows {
+            // A row this build has no definition for stays a kept key of the file (the Solo Popo cycle rows).
+            if target.get(id).is_some_and(|current| current != elements.as_slice()) && target.set(id, elements).is_ok() {
+                changed = true;
+            }
+        }
+        for (key, value) in kept {
+            if target.extra().get(*key) != Some(value) && target.set_kept(key, value.clone()).is_ok() {
+                changed = true;
+            }
+        }
+        changed.then(|| settings.to_json())
+    };
+    if let Some(json) = json {
+        writer::request_settings(json);
+    }
+}
+
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu) {
     let outbox = menu.take_outbox();
     let settings = menu.commit().clone();
-    // Package 6's compat::menu::apply(&settings) goes on the next line (declaration commit, item 8): keep this call site.
     published::publish(&settings.menu, outbox.rerolls);
+    // The carried engines read the typed view of the committed settings (decision D1).
+    crate::runtime::compat::menu::apply(&settings);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.

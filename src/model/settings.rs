@@ -189,6 +189,16 @@ impl Snapshot {
         &self.extra
     }
 
+    /// Replace a kept key (a row whose value is not a plain array: the fighter rosters, the hats, the stage list). A key the factory
+    /// table knows is a row and goes through [`Snapshot::set`].
+    pub fn set_kept(&mut self, key: &str, value: Value) -> Result<(), Reason> {
+        if def(key).is_some() {
+            return Err(Reason::UnknownId);
+        }
+        self.extra.insert(key.to_string(), value);
+        Ok(())
+    }
+
     /// Input Delay in frames: the first selected option; an empty selection means 0
     /// (SPEC-input-03 §2.1).
     pub fn input_delay(&self) -> u8 {

@@ -1,6 +1,6 @@
-//! Package 6 CPU-as-P1 (Q11 fallback): the carried `cpu_pilot.rs`, the thin adapter that answers the names it takes from outside
-//! (`compat`), and the boot, frame, input and settings call-ins. Switch only. `compat` and the call-ins are the only code here that
-//! is not carried.
+//! Package 6 CPU-as-P1 (Q11 fallback): the carried `cpu_pilot.rs` and the boot, frame, input and settings call-ins (the only code
+//! here that is not carried). Everything the carried file names from outside is answered by the shared `runtime::compat` and the
+//! declared roster and lobby facades. Switch only.
 //!
 //! The fallback runs only while the standalone CPU pilot plugin is ABSENT (decision Q11, the fork's handoff design): with the pilot
 //! present nothing is installed and P1 is driven once, by the pilot. The hook is the carried seam row `cpu_pilot.ai_process_begin`
@@ -13,17 +13,17 @@ use crate::model::guard::GuardOutcome;
 use crate::model::input_delay::MappedInputs;
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::settings::Snapshot;
+use crate::model::sites::Feature;
 use crate::model::sites_pkg6::SITES;
 use crate::runtime::game::{self, natives};
 use crate::runtime::ui::state::PILOT_PRESENT;
 
-pub(crate) mod compat;
 pub(crate) mod cpu_pilot;
 
 /// Number of rows of `sites_pkg6`.
 pub(crate) const N: usize = SITES.len();
 
-/// Compare every row of `sites_pkg6` (before anything is written).
+/// Compare every row of `sites_pkg6` (before anything is written): the fallback's, the roster cycle's and the diag probes'.
 pub(crate) fn check() -> [GuardOutcome; N] {
     std::array::from_fn(|i| SITES[i].outcome(&game::read_window(SITES[i].offset)))
 }
@@ -40,7 +40,7 @@ pub(crate) fn install(found: &[GuardOutcome; N], prerequisites: bool) -> (bool, 
     if PILOT_PRESENT.load(std::sync::atomic::Ordering::Acquire) {
         return (false, Some("standalone_pilot_present"), written);
     }
-    if !found.iter().all(|f| f.usable()) {
+    if !SITES.iter().zip(found).filter(|(site, _)| site.feature == Feature::P1Cpu).all(|(_, f)| f.usable()) {
         return (false, Some("site_guard"), written);
     }
     if !prerequisites {
@@ -86,6 +86,6 @@ pub(crate) unsafe fn frame(fighter: usize) {
 /// `out` is the 8-byte record the game wrote for `slot`.
 pub(crate) unsafe fn input(slot: i32, out: *mut MappedInputs) {
     if cpu_pilot::installed() {
-        cpu_pilot::input(slot, out);
+        cpu_pilot::input(slot, out.cast());
     }
 }

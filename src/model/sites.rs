@@ -64,6 +64,10 @@ pub enum Feature {
     CpuCommon,
     /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
     P1Cpu,
+    /// Package 6: the roster cycle's game calls that no other package guards (sites_pkg6.rs `roster_*` rows); the cycle's hooks are carried seam rows.
+    Roster,
+    /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
+    Probes,
 }
 
 impl Feature {
@@ -91,6 +95,8 @@ impl Feature {
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
             Feature::P1Cpu => "p1_cpu",
+            Feature::Roster => "roster",
+            Feature::Probes => "probes",
         }
     }
 }

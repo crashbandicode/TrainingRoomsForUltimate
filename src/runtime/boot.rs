@@ -21,19 +21,20 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::model::sites_pkg4;
+use crate::model::{sites_pkg3, sites_pkg4, sites_pkg6};
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
     chords, cpu, cpu_common, hud_draw, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
-use crate::runtime::p1;
+use crate::runtime::{lobby, mii, p1, roster};
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
 pub fn run() {
     diag_log::init_diagnostics();
+    diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.
@@ -104,6 +105,8 @@ pub fn run() {
     writer::start();
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
+    // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
+    crate::runtime::compat::menu::apply(&loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
 
@@ -208,6 +211,19 @@ pub fn run() {
     let named_source = loaded.menu.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
     let macros_rows_ok = recording_on && sites_pkg4::sites_of(Feature::NamedMacros).all(|site| row4_usable(site.name));
     let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
+    // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
+    // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
+    // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
+    let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
+    let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
+    let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
+    if roster_on {
+        roster::init();
+        mii::init();
+        lobby::init();
+    } else {
+        diagnostic(format_args!("[TrainingRooms] roster cycle not started: a game function it calls failed its site guard"));
+    }
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
@@ -244,6 +260,7 @@ pub fn run() {
         FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") } },
         FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") } },
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()) },
+        FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard") },
     ];
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {

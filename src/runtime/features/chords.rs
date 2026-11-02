@@ -95,6 +95,11 @@ pub fn consume(request: Request) -> bool {
     STATE.lock().detector.consume(request)
 }
 
+/// Some shortcut request is pending (package 6's roster cycle waits for it to be handled).
+pub fn any_pending() -> bool {
+    STATE.lock().detector.any_pending()
+}
+
 /// The menu shortcut chord passed since the last call (the INI shortcuts, detected from the raw controller before
 /// the Plus bits are cleared for an accepted Plus shortcut): package 5's input adapter opens the menu from it.
 pub fn take_open_menu() -> bool {

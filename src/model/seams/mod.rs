@@ -8,8 +8,7 @@
 
 #[cfg(any(test, target_os = "switch"))]
 pub mod native_fields;
-#[cfg(test)]
 pub mod native_unlink_core;
-#[cfg(test)]
+#[cfg(any(test, all(target_os = "switch", feature = "native-unlink-guard")))]
 pub mod native_unlink_guard;
 pub mod native_seams;

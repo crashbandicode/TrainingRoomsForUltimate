@@ -43,9 +43,10 @@ fn poll() {
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());
     let loaded = settings::parse_bytes(&bytes);
-    let next = loaded.settings.menu;
+    let next = loaded.settings.menu.clone();
     let old = CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone().unwrap_or_else(Snapshot::factory);
     let rerolls = menu::rerolls_between(&old, &next);
     diagnostic(format_args!("[TrainingRooms] diag_settings_reload rerolls={rerolls:#x} issues={}", loaded.issues.len()));
     published::publish(&next, rerolls);
+    crate::runtime::compat::menu::apply(&loaded.settings);
 }

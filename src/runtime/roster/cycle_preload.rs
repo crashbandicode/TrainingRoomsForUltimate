@@ -31,7 +31,7 @@ impl Target {
 static POLL: AtomicU32 = AtomicU32::new(0);
 static FRAME: AtomicU32 = AtomicU32::new(0);
 static REQUESTS: Mutex<[Option<crate::engine::preload::preload_metrics::OperationStamp>; 4]> = Mutex::new([None; 4]);
-static CONDITION: Mutex<Option<training_mod_consts::cycle_preload_config::Settings>> = Mutex::new(None);
+static CONDITION: Mutex<Option<crate::engine::preload::cycle_preload_config::Settings>> = Mutex::new(None);
 // This mutex owns values only. No source/roster/native lock is acquired here.
 // Final admission while source STATE is held reads only the atomic snapshot.
 struct GraceCoordinator {

@@ -711,7 +711,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                     if let mii_cycle::Target::Saved(choice)=step.target {
                         trace!("[MiiOrdinaryPlayer] skipped unqualified cycle choice class={:?} slot={:?} reason={}",
                             choice.canonical.class,choice.slot_id,reason);
-                        notify(Role::Player,format!("Player {:?} choice skipped",choice.canonical.class));
+                        notify(Role::Player,format!("Player {:?} choice skipped",choice.canonical.class).into());
                     }
                     None
                 }
@@ -1186,7 +1186,7 @@ pub(super) unsafe fn prequeue(entry:usize,selected:usize)->bool {
     };
     // WP-E (U14): the Player Mii publication writes native records/scalars; it runs in Training and
     // waiting rooms only. A refusal is the ordinary prequeue refusal (forward continuation follows).
-    if !crate::runtime::roster::swap_native::scope_gate::admitted("mii_ordinary_player::prequeue") {
+    if !crate::runtime::roster::scope_gate::admitted("mii_ordinary_player::prequeue") {
         refuse(entry,"publication outside Training/waiting rooms (scope)");return false;
     }
     // Player `native::publish` refuses an initialised O before any O index/token compare, so the gate's

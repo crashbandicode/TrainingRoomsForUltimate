@@ -269,6 +269,21 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     with(|cpu| cpu.publish(settings, rerolls));
 }
 
+/// The CPU takes the choices of the `reroll::*` bits again (package 6: the waiting room's practice start re-rolls every cached choice
+/// from the live menu).
+pub fn request_rerolls(rerolls: u8) {
+    with(|cpu| cpu.request_rerolls(rerolls));
+}
+
+/// A practice body departed (package 6): its hidden-tech record is dropped.
+pub fn forget_hidden_entry(entry: usize) {
+    with(|cpu| cpu.forget_hidden_entry(entry));
+}
+
+/// The practice scene ended (package 6): no hidden-tech record survives it.
+pub fn forget_hidden_scene() {
+    with(Cpu::forget_hidden);
+}
 /// Package 6 sets this when the waiting room's practice is active.
 pub fn set_lobby(on: bool) {
     LOBBY.store(on, Ordering::Release);
@@ -455,6 +470,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         crate::runtime::features::states::frame(a0);
         // Package 6: the CPU-as-P1 fallback's step (nothing when the pilot is absent-and-not-installed or present).
         unsafe { crate::runtime::p1::frame(a0) };
+        // Package 6: Player 1's body refreshes the waiting-room practice entry lease, once per game frame.
+        unsafe { crate::runtime::lobby::frame(a0) };
     }
     result
 }

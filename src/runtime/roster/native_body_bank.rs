@@ -174,7 +174,7 @@ use crate::engine::swap::body_bank::{
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
 use crate::engine::preload::preload_metrics::MemorySample;
-use training_mod_consts::cycle_preload_config::Settings;
+use crate::engine::preload::cycle_preload_config::Settings;
 use crate::engine::swap::character_forms::{EntryState, Forms};
 use crate::engine::mii::lifetime::Configuration;
 use crate::engine::swap::swap_model::{capabilities, form_class, group_serves, previous_cell_index};
@@ -344,7 +344,7 @@ fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::Tr
     canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled() && original_bankable(*kind)))
 }
 
-fn groups_enabled(settings: &training_mod_consts::cycle_preload_config::Settings) -> bool {
+fn groups_enabled(settings: &crate::engine::preload::cycle_preload_config::Settings) -> bool {
     settings.groups_enabled() && GROUPS_ENABLED.load(Ordering::Acquire)
 }
 
@@ -558,14 +558,14 @@ pub(super) fn mii_charinfo_published(owner: u32, group: usize, identity: MiiIden
 /// body (see `prepare_resources` and `body_bank::pair_resource_references`).
 const IC_PAIR_BANK_SHIPPED: bool = true;
 
-fn pair_enabled(settings: &training_mod_consts::cycle_preload_config::Settings) -> bool {
+fn pair_enabled(settings: &crate::engine::preload::cycle_preload_config::Settings) -> bool {
     IC_PAIR_BANK_SHIPPED && settings.pair_bank_enabled() && PAIR_ENABLED.load(Ordering::Acquire)
 }
 
 /// Window members for a requested form: the normal pair gets a pair-lead bank
 /// (first eligible upcoming kind in cell 2) when the pair bank is on; every other
 /// single form uses the ordinary planner.
-fn members_for(settings: &training_mod_consts::cycle_preload_config::Settings, forms: Forms,
+fn members_for(settings: &crate::engine::preload::cycle_preload_config::Settings, forms: Forms,
     upcoming: &[u32], extra_budget: usize) -> Option<Members> {
     if forms == Forms::starting(POPO) {
         return if pair_enabled(settings) { Members::from_pair(upcoming, extra_budget) } else { None };
@@ -695,7 +695,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
 /// Value-only group planning on the sparse planner: appends `Planned` groups to
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
-fn plan_groups(settings: &training_mod_consts::cycle_preload_config::Settings,
+fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings,
     menu: &crate::engine::compat::menu::TrainingModpackMenu,
     lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4],
     originals: [Option<u32>; 2], targets: &mut [u8; 2]) -> usize {
@@ -3236,7 +3236,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // WP-E row `native_body_bank::group_prefetch` (U14): a prefetch starts acquiring native map keys;
             // outside Training and waiting rooms it does not start and the group stays Planned, as for
             // every deferral above (nothing acquired yet, no INSTALL taken).
-            if !crate::runtime::roster::swap_native::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
+            if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
             let Some(token) = super::INSTALL.try_begin(false) else { return; };
             // Every acquisition goes through the ledger (WP4): a token per kind, the pair rule or
             // the construction tail as its recipe, the object kind owned; a refusal (a live consumer,

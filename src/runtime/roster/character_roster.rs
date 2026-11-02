@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingModpackMenu, crate::engine::swap::trio::TrioFighter, crate::runtime::compat::menu::MENU};
-use {crate::runtime::compat::menu_app::lock_write, crate::runtime::compat::sync::read as setting};
+use {crate::runtime::compat::sync::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
 use crate::runtime::compat::common::{
@@ -515,11 +515,11 @@ fn cycle_original(role: Role) -> Option<u32> {
     Some(kind)
 }
 
-fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> String {
+fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> std::borrow::Cow<'static, str> {
     match slot {
-        Some(index) => format!("{}. {}", index + 1, fighter.name()),
+        Some(index) => format!("{}. {}", index + 1, fighter.name()).into(),
         None if cycle_original(role) == Some(fighter.kind()) => {
-            format!("0. {}", fighter.name())
+            format!("0. {}", fighter.name()).into()
         }
         None => fighter.name().into(),
     }
@@ -550,7 +550,7 @@ fn locate(m: &TrainingModpackMenu, role: Role, kind: u32) -> Option<usize> {
     cycle_position(&kinds, kind)
 }
 
-fn notify(role: Role, message: String) {
+fn notify(role: Role, message: std::borrow::Cow<'static, str>) {
     let title = if role == Role::Player {
         "Player Character"
     } else {

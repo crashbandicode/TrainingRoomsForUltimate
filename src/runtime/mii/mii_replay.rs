@@ -11,7 +11,7 @@ use crate::engine::mii::{
     replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},
 };
 
-const MAX_PENDING: usize = training_mod_macros::MAX_RETAINED_CAPTURES * 8;
+const MAX_PENDING: usize = crate::runtime::compat::replay_store::MAX_RETAINED_CAPTURES * 8;
 static WORK: AtomicBool = AtomicBool::new(false);
 static STATE: Mutex<State> = Mutex::new(State {
     pending: VecDeque::new(),

@@ -872,7 +872,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                     if let mii_cycle::Target::Saved(choice)=step.target {
                         trace!("[MiiOrdinaryCpu] skipped unqualified cycle choice class={:?} slot={:?} reason={}",
                             choice.canonical.class,choice.slot_id,reason);
-                        notify(Role::Cpu,format!("CPU {:?} choice skipped",choice.canonical.class));
+                        notify(Role::Cpu,format!("CPU {:?} choice skipped",choice.canonical.class).into());
                     }
                     None
                 }
@@ -1359,7 +1359,7 @@ pub(super) unsafe fn prequeue(entry:usize,selected:usize,
     };
     // WP-E (U14): the CPU Mii publication writes native records/scalars; it runs in Training and
     // waiting rooms only. A refusal is the ordinary prequeue refusal (forward continuation follows).
-    if !crate::runtime::roster::swap_native::scope_gate::admitted("mii_ordinary_cpu::prequeue") {
+    if !crate::runtime::roster::scope_gate::admitted("mii_ordinary_cpu::prequeue") {
         refuse(entry,"publication outside Training/waiting rooms (scope)");return false;
     }
     let allowed=installed.map_or(crate::engine::mii::identity::ExpectedMutation::None,
