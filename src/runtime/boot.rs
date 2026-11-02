@@ -11,6 +11,7 @@ use std::path::Path;
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
+use crate::model::capabilities::{self, Granted};
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
@@ -21,19 +22,24 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
+use crate::model::sites_pkg3::{self, STATE_SITES};
 use crate::model::sites_pkg4;
+use crate::model::sites_pkg6;
+use crate::model::sites_u4;
+use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, cpu_common, hud_draw, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
+    chords, cpu, cpu_common, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
-use crate::runtime::p1;
+use crate::runtime::{lobby, mii, p1, roster};
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
 pub fn run() {
     diag_log::init_diagnostics();
+    diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.
@@ -104,11 +110,14 @@ pub fn run() {
     writer::start();
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
+    // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
+    crate::runtime::compat::menu::apply_kept(&loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
-    let state_found = state_boot::check();
+    #[allow(unused_mut)]
+    let mut state_found = state_boot::check();
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
         *slot = if site.compared() {
@@ -121,9 +130,35 @@ pub fn run() {
     for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
     }
+    // Package 5's rows are compared here too, before anything is written: a feature's closure (R2-1) can hold
+    // a row of any table.
+    let mut ui_found = [GuardOutcome::Stock; UI_SITES.len()];
+    for (slot, site) in ui_found.iter_mut().zip(UI_SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
+    // Eden proof of R2-1 (diag only): rows named in `diag-poison.txt` are treated as foreign, as if another plugin
+    // or an unknown patch had changed those bytes, so the install decisions run on a rejected row.
+    #[cfg(feature = "diag")]
+    apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
+    // Package 6's CPU-as-P1 rows and the run-time texture helper's rows are compared here too (R2-1): both are capabilities.
+    let found6 = p1::check();
+    let mut u4_found = [GuardOutcome::Stock; sites_u4::SITES.len()];
+    for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
+    // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
     let usable = |site: &sites::Site| {
-        SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
+        let by_name = |rows: &[sites::Site], outcomes: &[GuardOutcome]| rows.iter().position(|s| s.name == site.name).map(|i| outcomes[i].usable());
+        by_name(&SITES, &found)
+            .or_else(|| by_name(&STATE_SITES, &state_found))
+            .or_else(|| by_name(&sites_pkg4::SITES, &found4))
+            .or_else(|| by_name(&UI_SITES, &ui_found))
+            .or_else(|| by_name(&sites_pkg6::SITES, &found6))
+            .or_else(|| by_name(&sites_u4::SITES, &u4_found))
+            .unwrap_or(false)
     };
+    // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
+    game::grant(Granted::from_usable(&usable));
     // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
     let row_usable = |name: &str| sites::find(name).is_some_and(usable);
     let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
@@ -178,16 +213,28 @@ pub fn run() {
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
     let mut state_written = [Written::Skipped; state_boot::N];
-    let state_on = state_boot::install(&state_found, cpu_core_on, &mut state_written);
+    let state_on = state_boot::install(&state_found, cpu_core_on && capabilities::unit_usable(Feature::StateCore, &usable), &mut state_written);
     let state_reports = state_boot::reports(&state_found, &state_written);
     // Package 4: the recorder, the chords' poll and the notices.
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
     // The recorder calls package 2's `work_get_int` row (the ledge rest timer): its own guard gates the recorder.
-    let get_int_ok = sites::find("work_get_int").is_some_and(usable);
-    let (recording_on, notices_on) = install_pkg4(input_delay_on && get_int_ok, cpu_core_on, &found4, &mut written4);
+    // R2-1: the recorder's closure (its own rows and the other features' rows its code calls) is checked as a
+    // whole; the notices keep their own per-observer rows and only need the cross-feature part here.
+    // The input display's reads in the input-delay hook have their own flag, so Input Delay does not depend on them.
+    let display_on = capabilities::unit_usable(Feature::InputDisplay, &usable);
+    input_display::set_enabled(display_on);
+    let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
+    let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
+    let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
+    recorder::set_enabled(recording_on);
 
-    // Package 5: the menu's layout archive hook, UI anchors and input callers.
-    let ui_install = ui::install(&loaded, input_delay_on);
+    // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
+    let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
+        ui::install(&loaded, input_delay_on)
+    } else {
+        diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
+        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found }
+    };
     // Package 4's notices and input log draw from the layout tick package 5 just installed.
     if !ui::hud::register(hud_draw::draw) {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
@@ -195,19 +242,28 @@ pub fn run() {
 
     // Package 6: the CPU-as-P1 fallback (Q11). It installs only while the standalone CPU pilot is absent (`ui::install` found out
     // above) and only when the CPU core, the input hooks, the save-state natives and every game function it calls passed their guards.
-    let found6 = p1::check();
-    let p1_prerequisites = cpu_core_on
-        && input_delay_on
-        && state_on
-        && get_int_ok
-        && ["status_kind", "prev_status_kind", "pos_x", "pos_y", "damage_of", "utility_get_kind"].iter().all(|name| row_usable(name))
-        && row4_usable("fighter_manager_get_entry");
+    // The natives it calls are its closure (R2-1, `capabilities`): the package 2-4 rows its code reaches, with its own rows.
+    let p1_prerequisites = cpu_core_on && input_delay_on && state_on && capabilities::unit_usable(Feature::P1Cpu, &usable);
     let (p1_on, p1_reason, written6) = p1::install(&found6, p1_prerequisites);
     // Package 4, S4-4: the named-macro layer and the live replay capture (its guards and hooks are the seam installer's: hooks only when
     // replay_capture.ini says on). The roster cycle and the menu's panel screens are behind the layer's port, named in the install line.
     let named_source = loaded.menu.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
-    let macros_rows_ok = recording_on && sites_pkg4::sites_of(Feature::NamedMacros).all(|site| row4_usable(site.name));
+    // R2-1: the layer's whole closure (its own rows and the cross-feature rows its code calls) must have passed.
+    let macros_rows_ok = recording_on && capabilities::unit_usable(Feature::NamedMacros, &usable);
     let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
+    // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
+    // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
+    // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
+    let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
+    let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
+    let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
+    if roster_on {
+        roster::init();
+        mii::init();
+        lobby::init();
+    } else {
+        diagnostic(format_args!("[TrainingRooms] roster cycle not started: a game function it calls failed its site guard"));
+    }
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
@@ -223,27 +279,39 @@ pub fn run() {
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
+    // A feature that is not installed names the first row of its closure that was rejected, when there is one.
+    let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
+    let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
+        feature: feature.name(),
+        installed,
+        reason,
+        site: if installed || reason.is_some() { None } else { blocked(feature) },
+    };
+    let common_blocked = cpu_common_reason == Some("site_guard_failed");
     let features = [
-        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
-        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
-        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on, reason: None },
-        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on, reason: None },
-        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on, reason: None },
-        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on, reason: None },
-        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on, reason: None },
-        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on, reason: None },
-        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on, reason: None },
-        FeatureReport { feature: Feature::CpuMash.name(), installed: cpu_mash_on, reason: None },
-        FeatureReport { feature: Feature::CpuCommon.name(), installed: false, reason: cpu_common_reason },
-        FeatureReport { feature: Feature::StateCore.name(), installed: state_on, reason: None },
-        FeatureReport { feature: "chords", installed: input_delay_on, reason: None },
-        FeatureReport { feature: Feature::Recording.name(), installed: recording_on, reason: None },
-        FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
-        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
-        FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason },
-        FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") } },
-        FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") } },
-        FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()) },
+        report(Feature::InputDelay, input_delay_on, None),
+        report(Feature::LraReset, lra_on, None),
+        report(Feature::StageHazards, hazards_on, None),
+        report(Feature::ResetHub, hub_on, None),
+        report(Feature::CpuCore, cpu_core_on, None),
+        report(Feature::CpuDefence, cpu_defence_on, None),
+        report(Feature::CpuLedge, cpu_ledge_on, None),
+        report(Feature::CpuTech, cpu_tech_on, None),
+        report(Feature::CpuShield, cpu_shield_on, None),
+        report(Feature::CpuMash, cpu_mash_on, None),
+        report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
+        report(Feature::StateCore, state_on, None),
+        FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
+        report(Feature::InputDisplay, display_on, None),
+        report(Feature::Recording, recording_on, None),
+        report(Feature::Notices, notices_on, None),
+        report(Feature::Ui, ui_install.anchors, None),
+        FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason, site: if p1_on || p1_reason.is_some_and(|r| r != "prerequisite_feature") { None } else { blocked(Feature::P1Cpu) } },
+        report(Feature::UiTexture, capabilities::unit_usable(Feature::UiTexture, &usable), None),
+        FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") }, site: None },
+        FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") }, site: None },
+        FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
+        FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
@@ -266,6 +334,27 @@ pub fn run() {
     };
     install::write(&line);
     diag_log::flush();
+}
+
+/// Diag builds: `diag-poison.txt` (names separated by blanks, commas or lines) marks those rows foreign before any
+/// install decision, each name logged (`diag_poison <name> found=<bool>`).
+#[cfg(feature = "diag")]
+fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
+    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
+    let Ok(text) = fs::read_to_string(path.as_str()) else { return };
+    let mut poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
+        match rows.iter().position(|row| row.name == name) {
+            Some(i) => {
+                outcomes[i] = GuardOutcome::Foreign { first_diff: 0 };
+                true
+            }
+            None => false,
+        }
+    };
+    for name in text.split(|c: char| c.is_whitespace() || c == ',').filter(|n| !n.is_empty()) {
+        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name);
+        diagnostic(format_args!("[TrainingRooms] diag_poison {name} found={hit}"));
+    }
 }
 
 /// Read `save_states.json` on a thread with a 128 KiB stack, joined here (the settings reader's rule).
@@ -293,6 +382,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
         skyline::install_hook!(cpu::cpu_stick_x_hook);
         skyline::install_hook!(cpu::cpu_stick_y_hook);
         skyline::install_hook!(cpu::cpu_clatter_start_hook);
+        cpu::set_defence_on(true);
         for name in ["sdi_hook", "stick_x_hook", "stick_y_hook", "clatter_start_hook"] {
             mark(name, Written::Far);
         }
@@ -300,6 +390,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     let ledge = sites::feature_usable(Feature::CpuLedge, usable);
     if ledge {
         skyline::install_hook!(cpu::cpu_transition_term_hook);
+        cpu::set_ledge_on(true);
         mark("transition_term_hook", Written::Far);
     }
     let tech = sites::feature_usable(Feature::CpuTech, usable);
@@ -352,7 +443,7 @@ fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(
 /// that carry the chords and the P1 stage, and the CPU core's per-frame facts), and the notice
 /// observers. Every row of a feature must have passed its guard. Returns whether the recorder and the
 /// notice hooks were installed.
-fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
+fn install_pkg4(poll_ok: bool, cpu_core_on: bool, notices_closure: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
     let usable4 = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
     for (slot, site) in written4.iter_mut().zip(sites_pkg4::SITES.iter()) {
         if usable4(site.name) {
@@ -370,9 +461,9 @@ fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], writt
         mark("ai_epilogue", Written::Near);
     }
     // Each observer is its own site and its own pin: a mismatch leaves notices visible (SPEC-input-05 §4).
-    let combo_a = usable4("combo_display_a_pin") && usable4("combo_display_a");
-    let combo_b = usable4("combo_display_b_pin") && usable4("combo_display_b");
-    let stale = usable4("stale_moves_toggle");
+    let combo_a = notices_closure && usable4("combo_display_a_pin") && usable4("combo_display_a");
+    let combo_b = notices_closure && usable4("combo_display_b_pin") && usable4("combo_display_b");
+    let stale = notices_closure && usable4("stale_moves_toggle");
     if combo_a {
         skyline::install_hook!(notices::combo_display_a);
         mark("combo_display_a", Written::Near);

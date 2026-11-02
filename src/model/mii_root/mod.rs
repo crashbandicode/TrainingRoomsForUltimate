@@ -6,3 +6,4 @@
 pub mod mii_hud_portrait_policy;
 pub mod mii_menu;
 pub mod resume;
+pub mod mii_pool_observer_policy;

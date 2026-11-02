@@ -82,8 +82,8 @@ fn core01_install_line_format() {
         SiteReport { site: "reset_check", found: GuardOutcome::Foreign { first_diff: 8 }, written: Written::Skipped },
     ];
     let features = [
-        FeatureReport { feature: "input_delay", installed: true, reason: None },
-        FeatureReport { feature: "lra_reset", installed: false, reason: None },
+        FeatureReport { feature: "input_delay", installed: true, reason: None, site: None },
+        FeatureReport { feature: "lra_reset", installed: false, reason: None, site: None },
     ];
     let settings = SettingsReport { input_delay: 5, lra_reset: false, stage_hazards: true };
     let line = InstallLine {

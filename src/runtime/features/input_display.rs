@@ -13,6 +13,8 @@
 //!
 //! NOT YET SWITCH-RUN.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use parking_lot::Mutex;
 
 use crate::model::chords::field;
@@ -21,6 +23,16 @@ use crate::model::input_display::{raw_axis, Candidate, Log, Mode, Plan, RawInput
 use crate::model::settings::Snapshot;
 use crate::runtime::features::recorder;
 use crate::runtime::published;
+
+/// The display's natives (the P1 body's status, found through the fighter manager) passed their guards (`model::capabilities`,
+/// review R2-1): until boot says so, the poll hook's call into the display does nothing and reads no native, so Input Delay installs on
+/// its own rows and the display degrades by itself.
+static ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Boot: the input display's closure passed its guards.
+pub fn set_enabled(on: bool) {
+    ENABLED.store(on, Ordering::Release);
+}
 
 static LOG: Mutex<Log> = Mutex::new(Log::new());
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
@@ -42,6 +54,9 @@ pub fn publish(snapshot: &Snapshot) {
 /// # Safety
 /// `controller` is the live `Controller` of player 0 (or 0); `out` is the delayed mapped record.
 pub unsafe fn on_p1_poll(controller: usize, out: *const MappedInputs) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
     let settings = *SETTINGS.lock();
     if settings.mode == Mode::None || controller == 0 || published::input_owners().contains(Owners::MENU) {
         return;

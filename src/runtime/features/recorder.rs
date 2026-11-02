@@ -21,7 +21,7 @@
 //!
 //! NOT YET SWITCH-RUN.
 
-use std::sync::atomic::{AtomicI32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 
 use parking_lot::Mutex;
 use skyline::hooks::InlineCtx;
@@ -47,6 +47,15 @@ use crate::runtime::published;
 use crate::runtime::scene;
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
+/// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
+/// boot says so, the entry points the other features call (`on_p1_poll`, `request_playback`,
+/// `on_state_restored`) do nothing and read no native.
+static ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Boot: the recorder's closure passed its guards and `ai_epilogue` is installed.
+pub fn set_enabled(on: bool) {
+    ENABLED.store(on, Ordering::Release);
+}
 static SETTINGS: Mutex<RecorderSettings> = Mutex::new(RecorderSettings::factory());
 static RNG: Mutex<Rng> = Mutex::new(Rng::new(0x5EED));
 
@@ -224,6 +233,9 @@ fn facing_of(lr: f32) -> i8 {
 /// # Safety
 /// `out` is the record the game just mapped.
 pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
     bump(COUNT_POLL);
     if SWALLOW.load(Ordering::Relaxed) > 0 {
         SWALLOW.fetch_sub(1, Ordering::Relaxed);
@@ -599,6 +611,9 @@ pub(crate) fn cpu_accessor() -> Option<usize> {
 
 /// A playback the CPU behaviours ask for (the ledge options, SPEC-cpu-03): `FrameOut::playback`.
 pub fn request_playback(start: PlaybackStart) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
     // SAFETY: called from the CPU runtime's frame wrapper on a live CPU body.
     unsafe {
         let Some(body) = cpu_body() else { return };
@@ -613,6 +628,9 @@ pub fn request_playback(start: PlaybackStart) {
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
 /// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
 pub fn on_state_restored(saved_on_ledge: bool) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
     if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
         // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
         // SAFETY: both fighters were just restored.

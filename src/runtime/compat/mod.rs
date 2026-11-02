@@ -11,3 +11,7 @@ pub(crate) mod consts;
 pub(crate) mod menu;
 pub(crate) mod replay_preview;
 pub(crate) mod sync;
+pub(crate) mod filesystem;
+pub(crate) mod hazard_manager;
+pub(crate) mod input;
+pub(crate) mod menu_app;

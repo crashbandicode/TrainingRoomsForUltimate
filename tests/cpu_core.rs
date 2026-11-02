@@ -525,6 +525,20 @@ fn cpu_core_publish_consumes_the_menu_rerolls() {
 }
 
 #[test]
+fn cpu_core_request_rerolls_is_the_publish_half_without_new_settings() {
+    let mut cpu = Cpu::factory(5);
+    let key = FighterKey::new(1, false).unwrap();
+    cpu.fighters[key.index()].pending = 0;
+    cpu.fighters[key.index()].ledge.case = Some(4);
+    cpu.fighters[key.index()].throw.case = Some(2);
+    let before = cpu.settings;
+    cpu.request_rerolls(reroll::SDI_DIRECTION | reroll::SHIELD_TILT | reroll::LEDGE_OPTIONS | reroll::THROW_OPTIONS);
+    let f = &cpu.fighters[key.index()];
+    assert_eq!(f.pending, reroll::SDI_DIRECTION | reroll::SHIELD_TILT);
+    assert_eq!((f.ledge.case, f.throw.case), (None, None));
+    assert_eq!(cpu.settings, before, "no settings change");
+}
+#[test]
 fn state06_hub_order_clears_cpu_state() {
     let s = settings_with(&[("sdi_state", &[0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])]);
     let mut cpu = Cpu::new(s, 3);

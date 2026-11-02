@@ -17,6 +17,9 @@ use super::choice::byteflags;
 
 use crate::engine::preload::cycle_preload_config as preload;
 use crate::engine::stages::lobby_stages::LobbyStageOrder;
+use crate::engine::swap::ordered_roster::{OrderedFighterRoster, DEFAULT_CPU_ROSTER, DEFAULT_KIRBY_HATS, DEFAULT_PLAYER_ROSTER};
+use crate::engine::swap::roster_grid::Role as RosterRole;
+use crate::engine::swap::trio::TrioFighter;
 use crate::model::settings::Snapshot;
 
 byteflags! {
@@ -73,6 +76,26 @@ const fn lobby_practice_default() -> OnOff {
 }
 const fn training_stage_rotation_default() -> OnOff {
     OnOff::OFF
+}
+const fn trio_practice_default() -> OnOff {
+    OnOff::OFF
+}
+const fn character_default() -> TrioFighter {
+    TrioFighter::MARIO
+}
+const fn player_roster_default() -> OrderedFighterRoster {
+    DEFAULT_PLAYER_ROSTER
+}
+const fn cpu_roster_default() -> OrderedFighterRoster {
+    DEFAULT_CPU_ROSTER
+}
+const fn kirby_hats_default() -> OrderedFighterRoster {
+    DEFAULT_KIRBY_HATS
+}
+
+/// A kept key of the snapshot (a row whose value is not a plain array) as a typed value; a missing or malformed one is `fallback`.
+fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallback: T) -> T {
+    snapshot.extra().get(id).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or(fallback)
 }
 
 /// The settings the carried engines read (grows with each carried layer).
@@ -141,6 +164,24 @@ pub struct TrainingModpackMenu {
     /// The ordered stage list (`lobby_stages`: a kept key of the settings file, not a setting row).
     #[serde(default)]
     pub lobby_stages: LobbyStageOrder,
+    /// Player Swapping (`trio_practice`): the Player 1 cycle chord changes the fighter.
+    #[serde(default = "trio_practice_default")]
+    pub trio_practice: OnOff,
+    /// The fighter picked for Player 1 / the CPU (`player_character`, `cpu_character`: kept keys, one-hot over the roster catalog).
+    #[serde(default = "character_default")]
+    pub player_character: TrioFighter,
+    #[serde(default = "character_default")]
+    pub cpu_character: TrioFighter,
+    /// The cycle orders (`player_roster`, `cpu_roster`: kept keys, `[all, ranks...]`).
+    #[serde(default = "player_roster_default")]
+    pub player_roster: OrderedFighterRoster,
+    #[serde(default = "cpu_roster_default")]
+    pub cpu_roster: OrderedFighterRoster,
+    /// The Kirby hat orders (`player_kirby_hats`, `cpu_kirby_hats`: kept keys).
+    #[serde(default = "kirby_hats_default")]
+    pub player_kirby_hats: OrderedFighterRoster,
+    #[serde(default = "kirby_hats_default")]
+    pub cpu_kirby_hats: OrderedFighterRoster,
 }
 
 /// The factory values (`BASE_MENU` in the fork).
@@ -166,6 +207,13 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     lobby_practice: OnOff::OFF,
     training_stage_rotation: OnOff::OFF,
     lobby_stages: LobbyStageOrder::NATIVE,
+    trio_practice: OnOff::OFF,
+    player_character: TrioFighter::MARIO,
+    cpu_character: TrioFighter::MARIO,
+    player_roster: DEFAULT_PLAYER_ROSTER,
+    cpu_roster: DEFAULT_CPU_ROSTER,
+    player_kirby_hats: DEFAULT_KIRBY_HATS,
+    cpu_kirby_hats: DEFAULT_KIRBY_HATS,
 };
 
 impl TrainingModpackMenu {
@@ -220,12 +268,43 @@ impl TrainingModpackMenu {
                 .get("lobby_stages")
                 .and_then(|value| serde_json::from_value(value.clone()).ok())
                 .unwrap_or(BASE_MENU.lobby_stages),
+            trio_practice: on_off("trio_practice", BASE_MENU.trio_practice),
+            player_character: kept_or(snapshot, "player_character", BASE_MENU.player_character),
+            cpu_character: kept_or(snapshot, "cpu_character", BASE_MENU.cpu_character),
+            player_roster: kept_or(snapshot, "player_roster", BASE_MENU.player_roster),
+            cpu_roster: kept_or(snapshot, "cpu_roster", BASE_MENU.cpu_roster),
+            player_kirby_hats: kept_or(snapshot, "player_kirby_hats", BASE_MENU.player_kirby_hats),
+            cpu_kirby_hats: kept_or(snapshot, "cpu_kirby_hats", BASE_MENU.cpu_kirby_hats),
         }
+    }
+
+    /// The Kirby hat order of `role` as fighter kinds (Kirby removed, the Mii classes only with the helper build).
+    pub fn ordered_kirby_hat_kinds(&self, role: RosterRole) -> Vec<u32> {
+        match role {
+            RosterRole::Player => self.player_kirby_hats.hat_kinds(),
+            RosterRole::Cpu => self.cpu_kirby_hats.hat_kinds(),
+        }
+    }
+
+    /// The kept keys of this view as JSON values (the settings file's non-array rows), in field order: the write-back of D1.
+    pub fn kept_values(&self) -> Vec<(&'static str, serde_json::Value)> {
+        fn value<T: Serialize>(typed: &T) -> serde_json::Value {
+            serde_json::to_value(typed).unwrap_or(serde_json::Value::Null)
+        }
+        vec![
+            ("lobby_stages", value(&self.lobby_stages)),
+            ("player_character", value(&self.player_character)),
+            ("cpu_character", value(&self.cpu_character)),
+            ("player_roster", value(&self.player_roster)),
+            ("cpu_roster", value(&self.cpu_roster)),
+            ("player_kirby_hats", value(&self.player_kirby_hats)),
+            ("cpu_kirby_hats", value(&self.cpu_kirby_hats)),
+        ]
     }
 
     /// Every row this view holds as (setting id, elements), in the order of the fields: the write-back of D1 (package 5's commit
     /// path persists them; `compat::menu::write_back(row_id, value)` is one of these pairs).
-    pub fn rows(&self) -> [(&'static str, Vec<u8>); 20] {
+    pub fn rows(&self) -> [(&'static str, Vec<u8>); 21] {
         [
             ("solo_popo_original", self.solo_popo_original.to_byte_vec()),
             ("solo_popo_player_cycle", self.solo_popo_player_cycle.to_byte_vec()),
@@ -247,6 +326,7 @@ impl TrainingModpackMenu {
             ("macro_source", self.macro_source.to_byte_vec()),
             ("lobby_practice", self.lobby_practice.to_byte_vec()),
             ("training_stage_rotation", self.training_stage_rotation.to_byte_vec()),
+            ("trio_practice", self.trio_practice.to_byte_vec()),
         ]
     }
 }

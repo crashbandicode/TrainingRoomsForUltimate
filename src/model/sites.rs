@@ -57,6 +57,12 @@ pub enum Feature {
     NamedMacros,
     /// Package 5: the layout archive hook, the UI anchors and the manager global (`sites_ui.rs`).
     Ui,
+    /// The input display's reads in the input-delay hook (the P1 body's status, found through the fighter manager): no
+    /// rows of its own, only the natives it calls (R2-1). Input Delay installs on its own rows; the display degrades apart.
+    InputDisplay,
+    /// The run-time texture helper's rows (`sites_u4.rs`, `runtime/ui/texture.rs`): a unit of its own (they are the Ui feature's rows in
+    /// their table), so the menu does not depend on a helper that is optional (R2-1 merge with u4).
+    UiTexture,
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
     /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
@@ -64,6 +70,10 @@ pub enum Feature {
     CpuCommon,
     /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
     P1Cpu,
+    /// Package 6: the roster cycle's game calls that no other package guards (sites_pkg6.rs `roster_*` rows); the cycle's hooks are carried seam rows.
+    Roster,
+    /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
+    Probes,
 }
 
 impl Feature {
@@ -88,9 +98,13 @@ impl Feature {
             Feature::Notices => "notices",
             Feature::NamedMacros => "named_macros",
             Feature::Ui => "ui",
+            Feature::InputDisplay => "input_display",
+            Feature::UiTexture => "ui_texture",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
             Feature::P1Cpu => "p1_cpu",
+            Feature::Roster => "roster",
+            Feature::Probes => "probes",
         }
     }
 }
@@ -373,14 +387,12 @@ pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
     SITES.iter().filter(move |site| site.feature == feature)
 }
 
-/// Whether a feature can be installed: every one of its sites and the shared Training predicate
-/// must come out usable.
+/// Whether a feature can be installed: every row of its closure must come out usable (R2-1,
+/// `capabilities`): its own rows, the shared Training predicate, the CPU core's rows for the CPU features and
+/// the rows of other features its entry points reach.
 pub fn feature_usable(feature: Feature, usable: impl Fn(&Site) -> bool) -> bool {
-    // The CPU features read their facts through the core's natives, so they need its sites too.
-    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon).then_some(Feature::CpuCore);
-    sites_of(feature).chain(sites_of(Feature::Training)).chain(core.into_iter().flat_map(sites_of)).all(usable)
+    super::capabilities::unit_usable(super::capabilities::unit_of(feature), &usable)
 }
-
 /// What boot does with the table for a game verdict: nothing for an unsupported game
 /// (SPEC-core-01 §2: install nothing and log one line), every site otherwise.
 pub fn install_plan(verdict: Verdict) -> &'static [Site] {

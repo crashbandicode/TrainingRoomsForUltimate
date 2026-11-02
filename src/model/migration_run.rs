@@ -6,10 +6,21 @@
 //!
 //! Rules (SPEC-core-08 §4, review R1): the fork's folder is only ever read; an existing destination is
 //! never overwritten; a copy is complete or absent (a leftover `.part` is overwritten next run); a read or
-//! write error skips that one file and the result is `partial`; the marker is the only thing that means
+//! write error skips that one file, the result is `partial` and the marker is withheld (the next boot
+//! retries; only deterministic by-design skips allow it); the marker is the only thing that means
 //! "already imported" (a pre-installed `developer.ini` does not count and is never touched); the marker
 //! itself is written through the store's atomic replace, and when that fails the import runs again next
 //! boot (harmless: what exists is kept).
+//!
+//! Absent is not unreadable (review R2-8): a missing optional path is simply not imported, but a path
+//! that is present and cannot be enumerated, stat-ed or typed (a directory that cannot be opened, an
+//! entry whose metadata fails, a source folder that is not a folder) is an error. It goes to the
+//! receipt's `unlisted` list and the log with its path and the error, the result is `partial`, the other
+//! paths are still imported, and **no marker is written**, so the next boot tries again and the exists
+//! rule keeps what was copied. A listed file that fails while it is copied is the same: an I/O error
+//! withholds the marker, so a failed `save_states.json` copy is retried and not lost for good. The
+//! deterministic skips (a capture staging folder, an existing destination, a file over the cap) are
+//! counted and allow the marker.
 
 use std::fs;
 use std::io::{self, Read, Write};
@@ -54,6 +65,9 @@ pub struct Receipt {
     pub files: Vec<FileResult>,
     /// `(path, reason)`: `exists`, `too_large`, `io:<code>`.
     pub skipped: Vec<(String, String)>,
+    /// `(path, error)`: present paths that could not be listed, stat-ed or typed (R2-8). Any entry makes
+    /// the result `partial` and withholds the marker, so the next boot imports again.
+    pub unlisted: Vec<(String, String)>,
     /// How many capture staging folders were left alone.
     pub skipped_staging: usize,
     /// Player save-state records that got an item snapshot (N6).
@@ -93,6 +107,13 @@ impl Blocking {
     pub fn pending_captures(&self) -> usize {
         self.background.len()
     }
+
+    /// Whether some present path could not be listed, or a listed file failed while it was copied (an I/O
+    /// error): the marker is not written, the next boot imports again. Only deterministic skips by design (a
+    /// capture staging folder, a destination that exists, a file over the cap) allow the marker.
+    pub fn marker_withheld(&self) -> bool {
+        self.receipt.outcomes.contains(&Outcome::IoError)
+    }
 }
 
 fn io_reason(error: &io::Error) -> String {
@@ -102,44 +123,79 @@ fn io_reason(error: &io::Error) -> String {
     }
 }
 
+/// A listing of the source folder: the files found, and the present paths that could not be examined
+/// (`(path, error)`, R2-8). Only `NotFound` means absent.
+struct Listing {
+    files: Vec<(String, u64)>,
+    unlisted: Vec<(String, String)>,
+}
+
+fn error_text(error: &io::Error) -> String {
+    format!("{} ({})", io_reason(error), error)
+}
+
 /// Every file of the imported names inside `source` (relative, `/` separated), with its size.
-fn list_source(source: &Path) -> io::Result<Vec<(String, u64)>> {
-    let mut out = Vec::new();
+fn list_source(source: &Path) -> Listing {
+    let mut listing = Listing { files: Vec::new(), unlisted: Vec::new() };
     for name in [file::LEGACY_SETTINGS, "button_config.ini", "replay_capture.ini", "save_states.json", "mii-presets.json"] {
-        if let Ok(meta) = fs::metadata(source.join(name)) {
-            if meta.is_file() {
-                out.push((name.to_owned(), meta.len()));
-            }
+        match fs::metadata(source.join(name)) {
+            Ok(meta) if meta.is_file() => listing.files.push((name.to_owned(), meta.len())),
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => listing.unlisted.push((name.to_owned(), error_text(&error))),
         }
     }
     for dir in ["setups", "macros", "replay_captures"] {
-        walk(&source.join(dir), dir, &mut out)?;
+        walk(&source.join(dir), dir, &mut listing);
     }
-    Ok(out)
+    listing
 }
 
-fn walk(path: &Path, rel: &str, out: &mut Vec<(String, u64)>) -> io::Result<()> {
-    let Ok(entries) = fs::read_dir(path) else { return Ok(()) };
-    let mut names: Vec<_> = entries.filter_map(Result::ok).collect();
+fn walk(path: &Path, rel: &str, out: &mut Listing) {
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return,
+        Err(error) => {
+            out.unlisted.push((rel.to_owned(), error_text(&error)));
+            return;
+        }
+    };
+    let mut names = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => names.push(entry),
+            Err(error) => out.unlisted.push((format!("{rel}/"), error_text(&error))),
+        }
+    }
     names.sort_by_key(|e| e.file_name());
     for entry in names {
         let child = format!("{rel}/{}", entry.file_name().to_string_lossy());
-        let Ok(kind) = entry.file_type() else { continue };
+        let kind = match entry.file_type() {
+            Ok(kind) => kind,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                out.unlisted.push((child, error_text(&error)));
+                continue;
+            }
+        };
         if kind.is_dir() {
             if migration::is_staging(&child) {
                 // A staging folder is listed as one marker entry for the plan to count; nothing in it
                 // is opened, listed or read.
-                out.push((format!("{child}/"), 0));
+                out.files.push((format!("{child}/"), 0));
                 continue;
             }
-            walk(&entry.path(), &child, out)?;
+            walk(&entry.path(), &child, out);
         } else if kind.is_file() {
-            out.push((child, entry.metadata().map(|m| m.len()).unwrap_or(0)));
+            match entry.metadata() {
+                Ok(meta) => out.files.push((child, meta.len())),
+                // Gone between the listing and the stat: nothing to import.
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => out.unlisted.push((child, error_text(&error))),
+            }
         }
     }
-    Ok(())
 }
-
 /// Copy `from` to `to` through `<to>.part` and a rename, hashing both sides. `transform` may change the
 /// bytes (the converted `save_states.json`); it needs the whole file in memory (the blocking part is
 /// capped at 8 MiB). Never overwrites: if `to` exists when the copy is done it is kept.
@@ -199,10 +255,33 @@ fn copy_file(from: &Path, to: &Path, transform: Option<&dyn Fn(Vec<u8>) -> Vec<u
 }
 
 /// The `character_item` index in the fork's settings file, when it names an item (N6).
-fn item_setting(source: &Path) -> Option<usize> {
-    let bytes = fs::read(source.join(file::LEGACY_SETTINGS)).ok()?;
-    let value: Value = serde_json::from_slice(&bytes).ok()?;
-    convert::setting_index(value.get("menu")?.get("character_item")?)
+/// An unreadable settings file (not an absent one) is an error: the conversion would be lost for good once
+/// the marker exists.
+fn item_setting(source: &Path) -> io::Result<Option<usize>> {
+    let bytes = match fs::read(source.join(file::LEGACY_SETTINGS)) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let index = serde_json::from_slice::<Value>(&bytes)
+        .ok()
+        .and_then(|value| convert::setting_index(value.get("menu")?.get("character_item")?));
+    Ok(index)
+}
+
+/// The source folder: absent (`None`), listed, or present but unusable (a file, or a stat error): then
+/// nothing can be listed and the path is reported.
+fn examine_source(source: &Path) -> Option<Listing> {
+    match fs::metadata(source) {
+        Ok(meta) if meta.is_dir() => Some(list_source(source)),
+        Ok(_) => Some(Listing { files: Vec::new(), unlisted: vec![(".".to_owned(), "not a folder".to_owned())] }),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => Some(Listing { files: Vec::new(), unlisted: vec![(".".to_owned(), error_text(&error))] }),
+    }
+}
+
+fn withheld_reason(failed: usize) -> String {
+    format!("{failed} path(s) could not be listed or copied (I/O errors); the import runs again next boot")
 }
 
 fn record(receipt: &mut Receipt, action: &Action<'_>, result: io::Result<Option<(u64, String, String)>>) {
@@ -233,8 +312,9 @@ pub fn run_blocking(roots: Roots<'_>, now: u64, plugin: &str, log: &mut dyn FnMu
     if roots.dest.join(file::MIGRATION).exists() {
         return Stage::MarkerPresent;
     }
-    let listing = if roots.source.is_dir() { list_source(roots.source).ok() } else { None };
-    let sources: Option<Vec<Source<'_>>> = listing.as_ref().map(|l| l.iter().map(|(rel, bytes)| Source { rel, bytes: *bytes }).collect());
+    let mut listing = examine_source(roots.source);
+    let unlisted = listing.as_mut().map(|l| std::mem::take(&mut l.unlisted)).unwrap_or_default();
+    let sources: Option<Vec<Source<'_>>> = listing.as_ref().map(|l| l.files.iter().map(|(rel, bytes)| Source { rel, bytes: *bytes }).collect());
     let destination_exists = |to: &str| roots.dest.join(to).exists();
     let plan = migration::plan(false, sources.as_deref(), destination_exists);
     let actions = match plan {
@@ -248,9 +328,28 @@ pub fn run_blocking(roots: Roots<'_>, now: u64, plugin: &str, log: &mut dyn FnMu
         Plan::Copy(actions) => actions,
     };
     let mut receipt = Receipt::default();
+    for (path, error) in unlisted {
+        log(&format!("[Migration] cannot list {path}: {error}; the import stays incomplete and runs again next boot"));
+        receipt.skipped.push((path.clone(), error.clone()));
+        receipt.outcomes.push(Outcome::IoError);
+        receipt.unlisted.push((path, error));
+    }
     let mut background = Vec::new();
     let mut staging_folders: Vec<String> = Vec::new();
-    let item_index = item_setting(roots.source);
+    // Only a settings file the listing found is read for the conversion (a source that is not a folder was
+    // reported above).
+    let has_settings = listing.as_ref().is_some_and(|l| l.files.iter().any(|(rel, _)| rel == file::LEGACY_SETTINGS));
+    let item_index = match if has_settings { item_setting(roots.source) } else { Ok(None) } {
+        Ok(index) => index,
+        Err(error) => {
+            let error = error_text(&error);
+            log(&format!("[Migration] cannot read {}: {error}; the import stays incomplete and runs again next boot", file::LEGACY_SETTINGS));
+            receipt.skipped.push((file::LEGACY_SETTINGS.to_owned(), error.clone()));
+            receipt.outcomes.push(Outcome::IoError);
+            receipt.unlisted.push((file::LEGACY_SETTINGS.to_owned(), error));
+            None
+        }
+    };
     for action in &actions {
         if action.skip == Some(Skip::Staging) {
             // `replay_captures/.<id>.smd-N.tmp/…`: count the folder once, read nothing.
@@ -294,7 +393,7 @@ pub fn run_blocking(roots: Roots<'_>, now: u64, plugin: &str, log: &mut dyn FnMu
     }
     receipt.skipped_staging = staging_folders.len();
     let blocking = Blocking { receipt, background, now, plugin: plugin.to_owned() };
-    let marker = blocking.background.is_empty().then(|| write_marker(roots.dest, &blocking).map_err(|e| e.to_string()));
+    let marker = blocking.background.is_empty().then(|| write_marker_unless_withheld(roots.dest, &blocking));
     Stage::Imported { blocking, marker }
 }
 
@@ -309,8 +408,17 @@ pub fn run_background(roots: Roots<'_>, mut blocking: Blocking, log: &mut dyn Fn
         }
         record(&mut blocking.receipt, &action, result);
     }
-    let marker = write_marker(roots.dest, &blocking).map_err(|e| e.to_string());
+    let marker = write_marker_unless_withheld(roots.dest, &blocking);
     (blocking.receipt, marker)
+}
+
+/// The marker, unless a present path could not be listed (R2-8): then `Err` and no file, like a marker
+/// that could not be written, and the next boot imports again.
+fn write_marker_unless_withheld(dest: &Path, blocking: &Blocking) -> Result<(), String> {
+    if blocking.marker_withheld() {
+        return Err(withheld_reason(blocking.receipt.outcomes.iter().filter(|o| **o == Outcome::IoError).count()));
+    }
+    write_marker(dest, blocking).map_err(|e| e.to_string())
 }
 
 /// `migration.json` (SPEC-core-08 §4 rule 5), written through the atomic replace.
@@ -343,6 +451,7 @@ pub fn status_word(stage: &Stage) -> &'static str {
         Stage::MarkerPresent => "skipped",
         Stage::NoSource { marker: Ok(()) } => "none",
         Stage::NoSource { marker: Err(_) } => "skipped",
+        Stage::Imported { blocking, .. } if blocking.marker_withheld() => "partial",
         Stage::Imported { marker: Some(Err(_)), .. } => "skipped",
         Stage::Imported { blocking, .. } => blocking.receipt.result().word(),
     }

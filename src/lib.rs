@@ -20,4 +20,15 @@ mod grid_matches_catalog {
     fn the_stage_grid_has_a_tile_per_catalog_stage_and_the_all_tile() {
         assert_eq!(crate::model::menu::grid::STAGE_TILES, crate::engine::stages::catalog::TILE_COUNT);
     }
+
+    /// Every texture row is a lobby stage, and the stages without a texture are only those the game has no stage_1 file for.
+    #[test]
+    fn the_stage_textures_belong_to_catalog_stages() {
+        use crate::engine::stages::lobby_stages::STAGES;
+        for (id, name, _) in crate::model::stage_textures::STAGE_TEXTURES {
+            assert!(STAGES.iter().any(|(stage, _)| stage == id), "texture row {id} {name} is not a lobby stage");
+        }
+        let without: Vec<_> = STAGES.iter().filter(|(id, _)| crate::model::stage_textures::texture_of(*id).is_none()).collect();
+        assert!(without.len() <= 3, "{without:?}");
+    }
 }

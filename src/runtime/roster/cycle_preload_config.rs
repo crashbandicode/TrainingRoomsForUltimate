@@ -10,14 +10,14 @@
 use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use std::sync::Once;
 
-use training_mod_consts::cycle_preload_config::{
+use crate::engine::preload::cycle_preload_config::{
     adopt_unset, apply_settings, load_ini_unset, pack, publish_decision, startup_settings,
     store_ini, unpack, IniLoad, Publish, Unset, PATH,
 };
 use crate::engine::compat::menu::TrainingModpackMenu;
-use {crate::runtime::compat::menu_app::assign, crate::runtime::compat::sync::read};
+use {crate::runtime::compat::sync::assign, crate::runtime::compat::sync::read};
 
-use training_mod_consts::cycle_preload_config::Settings;
+use crate::engine::preload::cycle_preload_config::Settings;
 
 static CACHE: AtomicU32 = AtomicU32::new(0);
 static LOADED: Once = Once::new();
@@ -52,7 +52,7 @@ pub(crate) fn reconcile_loaded_menu() {
         return;
     }
     let mut menu = read(&crate::runtime::compat::menu::MENU);
-    let mut defaults = read(&training_mod_consts::DEFAULTS_MENU);
+    let mut defaults = read(&crate::runtime::compat::menu::DEFAULTS_MENU);
     // Keys an older INI omitted take the saved menu choice once, and the INI is
     // written with them: a menu Off is honoured exactly as after a menu apply.
     // Keys the INI carries keep winning.
@@ -62,7 +62,7 @@ pub(crate) fn reconcile_loaded_menu() {
         if adopted != settings {
             match store_ini(PATH, adopted) {
                 Ok(()) => {
-                    log::info!(
+                    crate::engine::compat::logging::log_info!(
                         "[CyclePreload] adopted saved menu choices for keys missing from cycle_preload.ini: bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}",
                         adopted.bank_members,
                         adopted.group_swap,
@@ -78,7 +78,7 @@ pub(crate) fn reconcile_loaded_menu() {
                     settings = adopted;
                     store(adopted);
                 }
-                Err(reason) => log::warn!(
+                Err(reason) => crate::engine::compat::logging::log_warn!(
                     "[CyclePreload] {reason}; keeping the built-in choices for keys missing from cycle_preload.ini"
                 ),
             }
@@ -87,7 +87,7 @@ pub(crate) fn reconcile_loaded_menu() {
     apply_settings(&mut menu, settings);
     apply_settings(&mut defaults, settings);
     assign(&crate::runtime::compat::menu::MENU, menu);
-    assign(&training_mod_consts::DEFAULTS_MENU, defaults);
+    assign(&crate::runtime::compat::menu::DEFAULTS_MENU, defaults);
 }
 
 /// Persist a normal menu apply. Does not lock the quick menu; the caller may
@@ -104,7 +104,7 @@ pub(crate) fn publish_applied(menu: &mut TrainingModpackMenu) {
             Ok(()) => {
                 apply_settings(menu, settings);
                 store(settings);
-                log::info!(
+                crate::engine::compat::logging::log_info!(
                     "[CyclePreload] applied slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}",
                     settings.slots,
                     settings.fighters,
@@ -128,7 +128,7 @@ pub(crate) fn publish_applied(menu: &mut TrainingModpackMenu) {
                 } else {
                     Settings::FAIL_CLOSED
                 };
-                log::warn!(
+                crate::engine::compat::logging::log_warn!(
                     "[CyclePreload] {reason}; keeping slots={} bank_members={}",
                     fallback.slots,
                     fallback.bank_members
@@ -147,7 +147,7 @@ fn load_cache() {
         UNSET.store(unset.to_bits(), Ordering::Release);
         match load {
             IniLoad::Parsed(settings) => {
-                log::info!(
+                crate::engine::compat::logging::log_info!(
                     "[CyclePreload] loaded slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}",
                     settings.slots,
                     settings.fighters,
@@ -166,7 +166,7 @@ fn load_cache() {
                 );
             }
             IniLoad::Created(settings) => {
-                log::info!(
+                crate::engine::compat::logging::log_info!(
                     "[CyclePreload] wrote default cycle_preload.ini; slots={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}",
                     settings.slots,
                     settings.bank_members,
@@ -182,7 +182,7 @@ fn load_cache() {
                 );
             }
             IniLoad::Unsaved(reason) => {
-                log::error!(
+                crate::engine::compat::logging::log_error!(
                     "[CyclePreload] ERROR {reason}: {PATH} is missing and its default could not be saved; this boot runs the built-in defaults unsaved and the next menu apply or boot tries again"
                 );
                 crate::engine::compat::logging::diagnostic(format_args!(
@@ -191,7 +191,7 @@ fn load_cache() {
                 ));
             }
             IniLoad::Rejected(reason) => {
-                log::error!(
+                crate::engine::compat::logging::log_error!(
                     "[CyclePreload] ERROR {reason}: {PATH} is left unchanged; this boot fails closed (slots 0, bank_members 0, every group off) until the file is fixed or a menu apply replaces it"
                 );
                 crate::engine::compat::logging::diagnostic(format_args!(

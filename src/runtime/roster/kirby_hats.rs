@@ -80,7 +80,7 @@ fn clear_pending(role: usize, state: &mut State) {
     PENDING_ROLES.fetch_and(!(1 << role), Ordering::Release);
 }
 
-fn notice(role: usize, text: String) {
+fn notice(role: usize, text: std::borrow::Cow<'static, str>) {
     training::ui::notifications::notification(
         if role == 0 {
             "Kirby Hats"

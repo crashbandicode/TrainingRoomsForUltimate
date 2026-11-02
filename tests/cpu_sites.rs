@@ -203,7 +203,9 @@ fn cpu_sites_features_need_the_core() {
     assert!(!sites::feature_usable(Feature::CpuShield, |s| s.name != "pos_x"), "shield needs the core natives");
     assert!(!sites::feature_usable(Feature::CpuShield, |s| s.name != "check_button_off_hook"));
     // The core does not need the features' hooks.
-    assert!(sites::feature_usable(Feature::CpuCore, |s| s.feature == Feature::CpuCore || s.feature == Feature::Training));
+    // (R2-1: the core's role test calls the reset hub's two natives, so they are part of its closure.)
+    assert!(sites::feature_usable(Feature::CpuCore, |s| matches!(s.feature, Feature::CpuCore | Feature::Training | Feature::ResetHub)));
+    assert!(!sites::feature_usable(Feature::CpuCore, |s| s.name != "is_operation_cpu"));
     assert!(!sites::feature_usable(Feature::CpuCore, |s| s.name != "cpu_on_frame_slot"));
 }
 

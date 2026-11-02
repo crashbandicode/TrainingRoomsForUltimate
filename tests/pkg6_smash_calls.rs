@@ -30,7 +30,7 @@ const COVERED: &[(&str, &str)] = &[
     ("FighterEntry::current_fighter_id", "p1_entry_current_fighter_id"),
     ("utility::get_kind", "state_object_kind"),
     ("sv_battle_object::module_accessor", "state_object_module_accessor"),
-    // Package 4, S4-4 (the named-macro layer's carried sources): existing rows where the symbol is the same function, new `named_macros` rows of sites_pkg4.rs otherwise.
+   // Package 4, S4-4 (the named-macro layer's carried sources): existing rows where the symbol is the same function, new `named_macros` rows of sites_pkg4.rs otherwise.
     ("PostureModule::lr", "posture_lr"),
     ("PostureModule::set_lr", "state_set_lr"),
     ("PostureModule::set_pos", "state_set_pos"),
@@ -51,7 +51,35 @@ const COVERED: &[(&str, &str)] = &[
     ("KineticModule::get_sum_speed_x", "kinetic_get_sum_speed_x"),
     ("KineticModule::get_sum_speed_y", "kinetic_get_sum_speed_y"),
     ("StopModule::is_special_stop", "stop_is_special_stop"),
-    ("StopModule::set_special_stop", "stop_set_special_stop"),];
+    ("StopModule::set_special_stop", "stop_set_special_stop"),
+    // Package 6 (the roster cycle's carried sources).
+    ("ItemModule::get_have_item_id", "state_get_have_item_id"),
+    ("ItemModule::get_have_item_kind", "roster_have_item_kind"),
+    ("ItemModule::have_item", "state_have_item"),
+    ("ItemModule::is_have_item", "state_is_have_item"),
+    ("ItemModule::remove_item", "state_remove_item"),
+    ("ItemModule::set_have_item_action", "state_set_have_item_action"),
+    ("WorkModule::set_int", "work_set_int"),
+    ("WorkModule::get_int64", "state_work_get_int64"),
+    ("WorkModule::is_flag", "work_is_flag"),
+    ("sv_battle_object::is_active", "state_object_is_active"),
+    ("utility::get_category", "utility_get_category"),
+    ("PostureModule::pos", "roster_posture_pos"),
+    ("StatusModule::is_changing", "roster_status_is_changing"),
+    ("StopModule::is_stop", "stop_is_stop"),
+    ("ArticleModule::get_active_num", "state_article_active_num"),
+    ("ArticleModule::get_article", "state_article_get_article"),
+    ("AttackModule::attack_data", "probe_attack_data"),
+    ("AttackModule::is_attack", "probe_attack_is_attack"),
+    ("AttackModule::power_add_status", "probe_attack_power_add_status"),
+    ("AttackModule::power_mul", "probe_attack_power_mul"),
+    ("AttackModule::power_mul_2nd", "probe_attack_power_mul_2nd"),
+    ("AttackModule::power_mul_3rd", "probe_attack_power_mul_3rd"),
+    ("AttackModule::power_mul_4th", "probe_attack_power_mul_4th"),
+    ("AttackModule::power_mul_5th", "probe_attack_power_mul_5th"),
+    ("AttackModule::power_mul_status", "probe_attack_power_mul_status"),
+    ("DamageModule::is_damage_lock", "probe_damage_is_damage_lock"),
+];
 
 fn all_rows() -> BTreeSet<&'static str> {
     sites::BASE_SITES

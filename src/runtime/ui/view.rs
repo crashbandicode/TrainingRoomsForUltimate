@@ -297,6 +297,27 @@ impl Panes {
                 continue;
             }
             let (x, y) = centre(i);
+            if frame.tile_stage_grid && crate::runtime::ui::thumbs::is_bound(i) {
+                // The tile shows its stage's own picture (108 x 90, aspect kept): docked tiles put it at the left with the
+                // name beside it, handheld tiles (tall) put it over the name.
+                let tall = cell_h >= 100.0;
+                let (image_h, image_x, image_y) = if tall {
+                    (cell_h - 48.0, x, y + 20.0)
+                } else {
+                    (cell_h - 10.0, x - cell_w / 2.0 + 8.0 + (cell_h - 10.0) * 0.6, y)
+                };
+                let image_w = image_h * 1.2;
+                self.rect(p::IDX_TILE + i, image_x, image_y, image_w, image_h, [255, 255, 255, 255]);
+                let (label_x, label_w, label_y) = if tall {
+                    (x, cell_w - 18.0, y - cell_h / 2.0 + 20.0)
+                } else {
+                    let left = x - cell_w / 2.0 + 16.0 + image_w;
+                    let width = cell_w - 24.0 - image_w;
+                    (left + width / 2.0, width, y)
+                };
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_x, label_y, label_w, p::TEXT);
+                continue;
+            }
             self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
             self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0, p::TEXT);
         }

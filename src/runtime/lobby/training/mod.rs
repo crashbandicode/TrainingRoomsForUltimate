@@ -4,12 +4,47 @@
 
 pub(crate) use crate::engine::lobby::practice_policy;
 
+pub(crate) mod character_specific;
 pub(crate) mod lobby;
 pub(crate) mod practice;
 
-// Not declared yet (it joins with worker A's cycle): the providers `named_macros` (package 4, S4-4), `tech` and `cpu_rolls` (package 2)
-// do not exist in the tree. They are `pub(crate) mod` items of this facade that forward to those packages' functions; see
-// IMPLEMENTATION-PROGRESS-pkg6b.md for the names and signatures the carried files call.
+/// The fork's `training::named_macros`: package 4's named-macro runtime (the waiting-room side the carried lobby and roster files call
+/// is `suspend_waiting`, `resume_waiting`, `suspended`, `forget_stopped_entry`, `forget_stopped_scene`, `waiting_scene_changed`).
+pub(crate) use crate::runtime::macros::named_macros;
+
+/// The fork's `tech` module as the lobby names it: package 2's CPU state drops the hidden-tech record of a departed body.
+pub(crate) mod tech {
+    pub fn forget_hidden_entry(entry: usize) {
+        crate::runtime::features::cpu::forget_hidden_entry(entry);
+    }
+    pub fn forget_hidden_scene() {
+        crate::runtime::features::cpu::forget_hidden_scene();
+    }
+}
+
+/// The fork's `cpu_rolls` module as the lobby names it: every cached CPU choice is taken again from the live menu.
+pub(crate) mod cpu_rolls {
+    use crate::model::menu::reroll;
+
+    pub fn request_all() {
+        crate::runtime::features::cpu::request_rerolls(
+            reroll::SDI_DIRECTION | reroll::SHIELD_TILT | reroll::LEDGE_OPTIONS | reroll::THROW_OPTIONS,
+        );
+    }
+}
+
+/// The fork's `training::charge`, as far as the Kirby hats call it: package 3's guarded Kirby copy setup.
+pub(crate) mod charge {
+    /// `FighterSpecializer_Kirby::copy_setup`: Kirby (`body`) gets the copy ability of `kind` from the fighter of entry `opponent`.
+    ///
+    /// # Safety
+    /// `body` is Kirby's live module accessor.
+    pub unsafe fn setup_copy_ability(body: *mut smash::app::BattleObjectModuleAccessor, opponent: impl TryInto<i32>, kind: i32) {
+        if let Ok(opponent) = opponent.try_into() {
+            crate::runtime::state_natives::kirby_copy_setup(body as usize, opponent, kind);
+        }
+    }
+}
 
 /// The fork's `input_delay` module as the lobby names it.
 pub(crate) mod input_delay {
@@ -37,10 +72,34 @@ pub(crate) mod save_states {
         // SAFETY: a guarded called function with no arguments.
         unsafe { crate::runtime::state_natives::stage_id() }
     }
+
+    /// A save state is loading (package 3's fact, `features::states::is_loading`).
+    pub fn is_loading() -> bool {
+        crate::runtime::features::states::is_loading()
+    }
 }
 
-/// The fork's `ui` module, as far as the lobby uses it.
+/// The fork's `ui` module, as far as the lobby and the carried files use it.
 pub(crate) mod ui {
+    /// The fork's `ui::menu`, as far as the carried files read it: whether the game's own pause menu is open.
+    pub(crate) mod menu {
+        use crate::model::input_delay::Owners;
+        use crate::runtime::compat::sync::Readable;
+        use crate::runtime::published;
+
+        /// The native (vanilla) pause menu is open (`Owners::VANILLA_PAUSE`).
+        pub struct VanillaPause;
+
+        impl Readable for VanillaPause {
+            type Value = bool;
+            fn read_value(&self) -> bool {
+                published::input_owners().contains(Owners::VANILLA_PAUSE)
+            }
+        }
+
+        pub static VANILLA_MENU_ACTIVE: VanillaPause = VanillaPause;
+    }
+
     /// The native pause menu's Combo Display copy (package 4's observers own it).
     pub(crate) mod native_menu {
         /// A scene boundary: the copied value is forgotten (Combo Display reads as enabled again).
@@ -64,6 +123,23 @@ pub(crate) mod ui {
             if let Some(slot) = id_of(&header) {
                 notices::upsert(HEADERS[slot].0, HEADERS[slot].1, &body, frames, DEFAULT_COLOR);
             }
+        }
+
+        /// Show or update the standing notice of `header` with `body` for `frames`, kept behind every other notice.
+        pub fn upsert(header: &'static str, body: impl AsRef<str>, frames: u32) {
+            if let Some(slot) = id_of(header) {
+                notices::upsert(HEADERS[slot].0, HEADERS[slot].1, body.as_ref(), u16::try_from(frames).unwrap_or(u16::MAX), DEFAULT_COLOR);
+            }
+        }
+
+        /// The standing notice of `header` was visible for its whole time (once per delivery).
+        pub fn take_delivered(header: &str) -> bool {
+            id_of(header).is_some_and(|slot| notices::take_delivered() == Some(HEADERS[slot].0))
+        }
+
+        /// The standing notice of `header` is queued (not yet delivered, not cleared).
+        pub fn is_queued(header: &str) -> bool {
+            id_of(header).is_some_and(|slot| notices::is_queued(HEADERS[slot].0))
         }
 
         /// Remove the notice of `header`.

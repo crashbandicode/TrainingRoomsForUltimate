@@ -311,6 +311,22 @@ fn cpu04_tech_triggers_mash() {
     assert_eq!(cpu.fighters[key.index()].mash.queue.current().map(|a| a.0), Some(18));
 }
 
+#[test]
+fn cpu04_a_departed_entry_forgets_its_hidden_record_and_the_scene_forgets_any() {
+    let (mut cpu, key) = cpu_with(&[("tech_hide", vec![1, 0])]);
+    cpu.frame(key, &hide_facts(DOWN, 2, 40, 12.5));
+    let entry = usize::from(cpu.hidden.expect("record made").entry);
+    // Another entry leaving does not touch the record; its own entry's departure drops it.
+    cpu.forget_hidden_entry(entry + 1);
+    assert!(cpu.hidden.is_some());
+    cpu.forget_hidden_entry(entry);
+    assert!(cpu.hidden.is_none());
+    // A scene end drops whatever is left.
+    cpu.frame(key, &hide_facts(DOWN, 2, 40, 12.5));
+    assert!(cpu.hidden.is_some());
+    cpu.forget_hidden();
+    assert!(cpu.hidden.is_none());
+}
 fn hide_facts(status: i32, frame: i32, end: i32, cursor: f32) -> FrameFacts {
     FrameFacts { status, motion_frame: frame, tech: TechFacts { end_frame: end, cursor_offset: cursor, ..TechFacts::default() }, ..FrameFacts::default() }
 }

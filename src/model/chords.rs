@@ -291,6 +291,11 @@ impl Detector {
     }
 
     /// Observe without consuming (the character loader asks whether P1 is mid-request).
+    /// Any request is pending (a shortcut is being handled: the roster cycle does not start a swap then).
+    pub fn any_pending(&self) -> bool {
+        self.pending != 0
+    }
+
     pub fn is_pending(&self, request: Request) -> bool {
         self.pending & request.bit() != 0
     }

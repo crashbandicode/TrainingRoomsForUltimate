@@ -1,7 +1,7 @@
 //! Pure validation of a managed descriptor against current native evidence.
 //! The caller authorizes reset references only for an owned Training replacement.
 //! This module never reads or writes native memory.
-pub(super) fn matches(
+pub(crate) fn matches(
     current: [u32; 28],
     mut expected: [u32; 28],
     originals: Option<[[u64; 2]; 4]>,

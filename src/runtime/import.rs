@@ -40,9 +40,14 @@ pub fn start() -> FixedPath<96> {
             if let Some(Err(error)) = &marker {
                 diagnostic(format_args!("[Migration] marker not written ({error}); the import runs again next boot"));
             }
+            // A present path that could not be listed withholds the marker (R2-8): the import is incomplete and
+            // the next boot runs it again.
+            let withheld = blocking.marker_withheld();
             if blocking.pending_captures() > 0 {
                 spawn_background(blocking);
                 words(word, Some("running"), staging)
+            } else if withheld {
+                words(word, Some("incomplete"), staging)
             } else {
                 words(word, Some("done"), staging)
             }
