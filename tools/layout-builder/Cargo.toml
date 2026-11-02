@@ -10,10 +10,9 @@ description = "Host tool: builds the TrainingRooms layout archive recipe from th
 [workspace]
 
 [dependencies]
-# The operator's own MIT crate (https://github.com/crashbandicode/Toolbox-Cli, formerly Toolbox-Cli): BFLYT,
-# BNTX and SARC reading and writing. Library use only. A checkout is expected at ../../../pkg5-scratch/Toolbox-Cli
-# beside the worktrees (see README.md in this folder).
-nx-layout-toolbox = { path = "../../../pkg5-scratch/Toolbox-Cli", default-features = false }
+# The operator's own MIT crate nx-layout-toolbox (https://github.com/crashbandicode/Toolbox-Cli; BFLYT, BNTX and SARC reading and
+# writing), library use only, pinned to the commit the layout recipe was built with (docs/BUILD.md).
+nx-layout-toolbox = { git = "https://github.com/crashbandicode/Toolbox-Cli", rev = "9010ca890b6339346758fa68bb53075d24aa0f95", default-features = false }
 serde_json = "1"
 
 [[bin]]

@@ -51,8 +51,8 @@ an archive whose length and FNV-1a fingerprint differ (`model::archive_recipe`).
     layout-builder build <stock info_training.arc> <out dir>                  # target.arc (private), info_training.tra1, report.json
     cp <out dir>/info_training.tra1 assets/info_training.tra1
 
-The tool uses the operator's own MIT crate **nx-layout-toolbox** (repository `crashbandicode/Toolbox-Cli`, crate 0.1.0) as a
-path dependency, host only: it is not linked into the plugin. The copy used 2026-11-02 is at
-`/home/intpa/toolbox-cli-aux/Toolbox-Cli` on the Yoga (no `.git` in the copy; `Cargo.toml` sha256 `277c6db5a7c2b2835df2343d93dc9d61f5ac025f279edc99fe84b46910e553da`,
-`Cargo.lock` `15d4c9567926c5f926a5d72034c7dfba3d28c13005ea729e21c6d4bc0ab38396`, `LICENSE` (MIT) `9e92a41dfcbe9d29997aba9c5cfbb9d2fa15287e2d5184b66dd8565d16f38e9b`, `src/` tar sha256 `bcf09cdd560b4cce6b5e7d418644623dab1784744920e5759440348bb67b2396`) and was copied to
-`../pkg5-scratch/Toolbox-Cli` beside the worktrees, the path `tools/layout-builder/Cargo.toml` names.
+The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git dependency, host only (it is not linked into the plugin):
+
+- origin `https://github.com/crashbandicode/Toolbox-Cli` (crate `nx-layout-toolbox` 0.1.0, MIT, `LICENSE` in the repository); no Forgejo mirror exists (`git.syntaxbyexample.com/intpa/Toolbox-Cli` is not found)
+- pinned revision `9010ca890b6339346758fa68bb53075d24aa0f95` (2026-06-01, "Document MeshCodec mesh-framing RE"), in `tools/layout-builder/Cargo.toml` and `Cargo.lock`; the Yoga copy `/home/intpa/toolbox-cli-aux/Toolbox-Cli` used for the first builds is this revision (identical `src/` apart from CRLF line endings)
+- reproducible from a clean checkout: 2026-11-02 the recipe built from the git dependency is byte-identical to the committed `assets/info_training.tra1` (sha256 `a1f3ee13...`, target archive fnv `e8a5a9ce3f4ec968`) given the same stock archive.

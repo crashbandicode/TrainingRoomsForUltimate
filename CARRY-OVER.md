@@ -94,8 +94,7 @@ Not carried: `anchors.rs` (its pins and decode are written from SPEC-core-05 §4
 
 Game data and the committed recipe: `assets/info_training.tra1` (about 11 KB) holds copy ranges of the stock archive and
 the plugin's own panes only; the dumped stock archive lives only under gitignored `eden/runs/` / scratch folders
-(`tests/ui_sites.rs` and the recipe tests never read it). `tools/layout-builder` is a host tool over the operator's MIT
-`nx-layout-toolbox` (docs/BUILD.md).
+(`tests/ui_sites.rs` and the recipe tests never read it). `tools/layout-builder` is a host tool over the operator's MIT `nx-layout-toolbox` (git dependency pinned to a revision, docs/BUILD.md).
 
 ## pkg3 (save states), 2026-11-02
 
