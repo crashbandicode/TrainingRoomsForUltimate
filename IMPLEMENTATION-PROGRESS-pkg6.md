@@ -147,3 +147,40 @@ Scripts of this worker, against the playbook's tools:
 - `eden/rows_s6.py`, `eden/extra_cpus_s6.py`, `eden/mk_s6_settings.py` (row logic for this plugin's diag lines and settings rows: not covered by the playbook; presses go through the same control API as `gv.py press`).
 - `tools/feature_matrix.py` (the D11 feature matrix: not covered by the playbook).
 - `/tmp/pkg6-watch/a3_{gate,claims,check,chain,matrix,sw2,up}.ps1|py` (temporary claim-per-build wrappers around `s6_eden.open_claims` and the ledger; not in the repo; the playbook's claims cover Eden only).
+## Handover (operator order: lead role to the Codex GPT-6 Astra lead), 2026-11-02 14:05Z
+- **Branch / worktree:** `stream/pkg6` in `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6`.
+  - Head: the commit "WIP: handover to Astra lead" on top of d517dab.
+  - Code head 215dbfd (R5 v2) is **uncompiled**: no host test, clippy or Switch build has run on it yet.
+- **Target:** `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-pkg6`, 310 MB after deleting debug/ and */incremental.
+  - Evidence NROs are in `/home/intpa/smash-training-lobby/cargo-targets/pkg6-nro/` (latest: `a3-diag-4938d913.nro` / `a3-release-82c98b70.nro`, which s6-07 ran).
+- **Proven (eden/EDEN-PACKAGE-6.md, eden/runs/s6-04..07):**
+  - One global allocator (rulings 1/2; tests/pkg6_features.rs, tests/hook_alloc.rs).
+  - The install line has `heap_allocations=0`.
+  - Solo Popo kept-key fix (s6-06 screenshot).
+  - Preload, swaps, Kirby hat restore, items.
+  - The guard rows `roster_cpu_quantity_*` and `entry_active_cell` pass on 13.0.5 (s6-07 install line).
+  - The R5 attribution and bisection: the Mii owner lane of `cycle_preload::mixed_targets` (s6-07, eden/r5_bisect_s6.py).
+- **Not proven / open:**
+  - R5 v2 (215dbfd) must show every hook_stats delta 0 in Eden.
+  - Residual allocations to check after R5 v2: `input_caller_a_note:28, roster_input:2, named_service:2, live_replay:1`, flat. Bring them to 0 as well.
+  - F9 is open (fix-ledger row in progress). Current behaviour: a helper admitted at count 1 still appears as the extra CPU when No. of CPUs rises.
+    - The give-back crashed s6-07: our native reload was in flight while the game activated the same entry (main+0x62229c null vtable call, stack via main+0x655080).
+    - It is backed out. The lead wants a design proposal before any coding. Requirements: the reload completes while paused (before unpause), or the activation sees the native fighter; the game thread never waits; the count choice is never blocked; a leased hat source is released first (hat engine fallback, no new notice).
+  - Unattributed `Unmapped Read16 @0xfffe7683fffe76a2..a8` bursts during the Training scene load in s6-07 (not in s6-04..06). If s6-08 shows them again, attribute them as a separate defect.
+  - Remaining items:
+    - `practice_stage_request::init` runs twice: `lobby/mod.rs::init` calls it unconditionally, and `practice_stage_observer::init` calls it again when verified, under practice-stage-request-alpha. Fix: one owner (the observer, whose update callback drives it). Make the `ui_wired=true` diag line truthful (`request`/`request_in`/`menu_context`/`status` have no caller; the Lobby Stages screen owns that).
+    - mii-editor-last.json: put it behind diag, or make it a bounded product write.
+    - The 57 dead-code items (Mii menu hooks to the ui worker open/close, or rows).
+    - The lease retirement row moves to lobby set D (LDN, two hosts arranged by the lead).
+  - Slim (acd076f24796f9c6b) owns the approved probe deletions (groups A/B/C, texture-probe, observers) and the inline cfg sites in roster/Mii files (option 1). Rebase on slim's work.
+  - automation-results-observer: wire it or delete it after the deluxe SDK merge (e4432ad), decided with slim.
+- **Next commands (pwsh; one claim per build, interleave rule: imgui-nvn-sol*, tm-f8-terra*, tm-f8-sol* get a host turn after each TrainingRooms compile or Eden run):**
+  1. `cargo test --no-fail-fast`
+  2. `cargo clippy --all-targets -- -D warnings`
+  3. `cargo build --no-default-features`
+  4. Switch release + diag.
+  Gates 1-4 run under the Surface claim helpers in /tmp/pkg6-watch (a3_prio.ps1 → a3_gate.ps1 / a3_sw2.ps1; target as above; CARGO_INCREMENTAL=0).
+  5. Then Eden s6-08 with the diag NRO: `/usr/bin/python3 -I eden/s6_eden.py ...` (profile s6, display :98, muted). Run the rows `install r5 reloadalive menu` from eden/rows_s6.py. The pass criterion is every hook_stats delta 0 for at least 3 minutes with preload fighters+hats on.
+  6. Send the sha to integrator-3 (aaf990350073a351c), which unblocks the push.
+- **Blockers:** none for R5 (the host queue only). F9 waits for the design proposal.
+- **Open claims:** none. Queue lines deleted. Eden profile s6 restored (`s6_eden.py restore`). Watcher stopped.
