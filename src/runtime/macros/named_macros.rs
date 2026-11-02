@@ -1462,14 +1462,28 @@ pub fn frame_for(index: usize) -> Option<MappedInputs> {
 /// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate
 /// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).
 pub fn prepare_buffers() {
-    let mut motion = lock_write(&MOTION);
+    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped
+    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.
     let wanted = training_mod_macros_max_frames();
-    let (captured, played) = (motion.captured.len(), motion.play.len());
-    if motion.captured.capacity() < wanted {
-        motion.captured.reserve_exact(wanted - captured);
+    let (grow_captured, grow_play) = {
+        let motion = lock_read(&MOTION);
+        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)
+    };
+    if !grow_captured && !grow_play {
+        return;
     }
-    if motion.play.capacity() < wanted {
-        motion.play.reserve_exact(wanted - played);
+    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };
+    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };
+    {
+        let mut motion = lock_write(&MOTION);
+        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {
+            captured.append(&mut motion.captured);
+            std::mem::swap(&mut motion.captured, &mut captured);
+        }
+        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {
+            play.append(&mut motion.play);
+            std::mem::swap(&mut motion.play, &mut play);
+        }
     }
 }
 
