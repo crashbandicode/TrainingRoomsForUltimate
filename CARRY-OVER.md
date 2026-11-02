@@ -76,3 +76,12 @@ Facts read from outside the specs, all public game or third-party MIT facts and 
 Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party `smash` constants crate may be
 used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
 `Cargo.toml`.
+
+## pkg3 (save states), 2026-11-02
+
+Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`
+(origin `ours-new` checked in `docs/provenance/provenance-files.json` before opening; nothing under `upstream-ref/`, no mixed file).
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/store.rs` (shared: package 4's named macros reuse it, do not carry `library.rs` again) | `training_mod_macros/src/library.rs` (ours-new) | `f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275` | whole file except the macro-specific parts | (1) the fork's `MacroError` became `StoreError` (only the variants the store itself raises: version, size, id, not found, no free id, parse, I/O); (2) `Library`, `MacroEntry` and `Record for MacroRecording` removed (package 4 adds its own `Record` impl); (3) `Listing<S>` lost its `MacroEntry` default; (4) the `Header` serde derive in `decode` is a hand read of `schema_version` (this crate has no serde derive: resident size); (5) the id slug fallback is `entry`, not `macro`; (6) the fork's `library/tests.rs` is not carried (macro recordings); new host tests with a toy record cover ids, atomic overwrite, version/size/corruption listing, orphaned backup, sort order. |
