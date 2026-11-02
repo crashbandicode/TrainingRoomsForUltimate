@@ -988,3 +988,58 @@ Native ABI/lease/callback buffers unchanged. Only keyboard KNOWN row removed.
 Carry253 verify PASS; ledger regenerated. Tests and exact compiled stack pending.
 Next: freeze candidate, fresh ledger/cache admission, host gates + native feature
 matrix/release/diag/static-stack; independent lead review. No READY claim.
+
+## Slim cache admission blocked21:39Z — fresh global64.878GB
+Actual frozen f7b8f4a keyboard probe reproduced14first/896repeated allocations
+(positivecontrol1;1112sourcesunchanged); Yoga released21:34, ownqueue removed.
+Fix78f440d uses bounded encoding/streamingUTF16/checkedu8; carry253PASS;
+raw98877 (+12vs a6, with4318pending=103195 within unchanged103200).
+Fresh three-host census now Surface14822858884B/Yoga15091467850B/
+Ally34963447614B =>64877774348B, OVER global60GB. Ally grew~8.894GB since21:29.
+Receipts slim/78f440d-preflight/cache-*.json include each root; no new compiler
+claimed/launched. Please coordinate owner retirement/admission reconciliation.
+Own frozen78 source staged with moved/reused f7 target; no duplicate target.
+I continue source/ABI/normalized review while waiting. Native gates remain owed.
+
+
+## Slim cache classification correction — 2026-11-02T21:37:58.747033+00:00
+The apparent8.894GB Ally growth is NOT TrainingRooms: the broad census additionally
+included cargo-targets/{tm-f8-sol-f8-locks-sol-ally,tm-f8-sol-control-ally,
+tm-f8-sol-minimal-ally}. Read-only child census proves6032193201+508157098+
+2353215917=8893566216B foreign fork targets. Six TrainingRooms Ally roots remain
+26069881398B. Correct TrainingRooms global55984208132B (<60GB); reserve2GB.
+Classified receipts preserve the broad originals. No owner cleanup needed for
+that false alarm; no foreign files touched. I will resume normal queue admission.
+ABI declarations/layout assertions/SDK signatures match a6 byte-for-byte (9blocks).
+
+
+## Slim independent review request — 2026-11-02T21:38:58.470709+00:00
+Exact candidate78f440d (baseline extractionf7b8f4a; prior gateda6e4d07):
+please independently review actual model/mii/inline_keyboard.rs, native adapter,
+tests/inline_keyboard.rs, and exact carry transforms. Focus UTF16/scalar/cursor
+contract, invalid callback atomicity, frozen Enter after change, emptyMii/Macro,
+native ABI/storage lifetime. Before-fix14/896 allocation reproduced and archived.
+Fix uses u8 checkedmetadata + fixed96 encoding + streaming decode_utf16; native
+ABI9blocks byte-identical. New hostfull gate running ownedYoga6G claim21:38.
+Normalized126470excludingtools (+18vs a6), raw98877 (+12), no budgetraise.
+No wholecallback/SDK zeroallocation or compiledstack pass claimed yet.
+
+
+## Keyboard host gates complete — 2026-11-02T21:42:45.126981+00:00
+Source78f440d: cargo test --all-targets PASS70.121s, raw
+493d6de555a031a27240b778736a3c38c80b0057a85987488f5c0bae6a9f1fa6.
+70 successful result lines; raw totals9445passed/0failed/6ignored include nested
+output and are not a certified unique-test count. Actual new keyboard tests
+pass, including zero-first/repeated allocation assertion and positive control.
+Clippy --all-targets -- -D warnings PASS20.753s/0warnings,
+raw6319fd47cf918f8564a4eeed932f70615ed895cc8ee341a1808a8e556732c6de.
+Build --no-default-features PASS3.125s,
+raw21d2f4620cf2874a8b93deac64467eb86180dd39dab657d2029d6b1da729d13c.
+All1112files unchanged for everyjob; archived78f440d-{host,clippy,no-default}.
+Normalized126470excltools/126637incltools167,0rustfmtfailures.
+Own Yoga Switchrelease nowCLAIMED21:42 (exec44183), samefrozen source/target,
+6G1800/incremental0. No otherownclaim/Eden/profile. Diag/matrix/compiledstack,
+crate-owned tests and independentleadreview remain pending.
+Temporary admission/release adapters /tmp/slim/yoga-{admit,release}.py only
+compose already-read ledger primitives, fresh resource/queue checks and archive
+receipts; needed because old single-compile parser predates operator two-slot.
