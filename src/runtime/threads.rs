@@ -92,15 +92,16 @@ mod imp {
     /// threads have their stacks only in those builds. Each arm takes its thread's name as an inline const, so only the
     /// names of threads this build has reach the binary (the table itself is not read at run time).
     macro_rules! slots {
-        (shared $sname:ident = [$($sid:ident),+]; $( $(#[$attr:meta])* $name:ident = [$id:ident]; )*) => {
+        (shared $sname:ident = [$($sid:ident),+]; $( $(#[cfg($cfg:meta)])? $name:ident = [$id:ident]; )*) => {
             static $sname: Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$sid),+]) }> = Slot::new();
-            $( $(#[$attr])* static $name: Slot<{ thread_stacks::of(ThreadId::$id).bytes }> = Slot::new(); )*
+            $( $(#[cfg($cfg)])? static $name: Slot<{ thread_stacks::of(ThreadId::$id).bytes }> = Slot::new(); )*
+            // One arm per thread in every build (a thread without its slot in this build answers `None`), so the match
+            // stays exhaustive and a new `ThreadId` without a slot does not compile.
             fn parts(id: ThreadId) -> Option<(Parts, &'static core::ffi::CStr)> {
-                #[allow(unreachable_patterns)]
                 match id {
                     $( ThreadId::$sid => Some(($sname.parts(), const { thread_stacks::of(ThreadId::$sid).c_name })), )+
-                    $( $(#[$attr])* ThreadId::$id => Some(($name.parts(), const { thread_stacks::of(ThreadId::$id).c_name })), )*
-                    _ => None,
+                    $( $(#[cfg($cfg)])? ThreadId::$id => Some(($name.parts(), const { thread_stacks::of(ThreadId::$id).c_name })), )*
+                    $( $( #[cfg(not($cfg))] ThreadId::$id => None, )? )*
                 }
             }
         };

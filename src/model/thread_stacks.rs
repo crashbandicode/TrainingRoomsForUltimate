@@ -56,50 +56,48 @@ pub struct ThreadStack {
     pub measured_in: &'static str,
     /// A part of the entry symbol's name that picks this thread's `spawn_unchecked` shim in the ELF.
     pub symbol: &'static str,
-    pub runs: &'static str,
 }
 
 const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_272, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}",
-        "the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports"),
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed",
-        "settings.json read, recovery and the JSON parse, joined by the boot thread"),
-    row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 14_192, 18_624, "Eden st-02..st-12", "states::load_file",
-        "save_states.json read and parse, joined by the boot thread"),
-    row(ThreadId::StateWriter, c"tr-state-writer", 36 * KIB, 10_432, 15_408, "Eden st-02..st-12", "states::start_writer::{closure#0}",
-        "save_states.json serialise and atomic replace"),
-    row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_592, "Eden st-02..st-12", "states::start_diag_triggers::{closure#0}",
-        "diag: request files, diag-settings.json parse, publish and apply"),
-    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_184, 9_344, "Eden st-02..st-12", "features::writer::run",
-        "button_config.ini, replay_capture.ini and settings.json atomic writes"),
-    row(ThreadId::TraceWriter, c"tr-trace-writer", 20 * KIB, 2_720, 1_696, "Eden st-02..st-12", "compat::filesystem::init::{closure#0}",
-        "mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace"),
-    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 9_840, "Eden st-02..st-12", "diag_reload::start::{closure#0}",
-        "diag: diag-settings-next.json parse, publish and apply"),
-    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}",
-        "first-boot import of the fork's files (blocking part), joined with a deadline"),
-    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}",
-        "first-boot import of the fork's captures in the background"),
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 31_472, 13_488, "Eden st-02..st-12", "ui::worker::run",
-        "the menu worker: model steps, screens, settings JSON on close"),
-    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_576, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#1}",
-        "returns parked layout archives to the pool after their grace"),
-    row(ThreadId::Probe, c"tr-probe", 24 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}",
-        "ARCropolis mount wait and the layout file probe"),
-    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}",
-        "diag: diag-macro.req read and parse"),
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 31_616, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}",
-        "the replay capture archive and Mii preset writer"),
-    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::fallback_catalog::{closure#0}::{closure#0}",
-        "the saved Mii catalog read for the library"),
-    row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer",
-        "console-practice-trace builds only: the practice trace file writer"),
+    // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_272, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
+    // settings.json read, recovery and the JSON parse, joined by the boot thread
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed"),
+    // save_states.json read and parse, joined by the boot thread
+    row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 14_192, 18_624, "Eden st-02..st-12", "states::load_file"),
+    // save_states.json serialise and atomic replace
+    row(ThreadId::StateWriter, c"tr-state-writer", 36 * KIB, 10_432, 15_408, "Eden st-02..st-12", "states::start_writer::{closure#0}"),
+    // diag: request files, diag-settings.json parse, publish and apply
+    row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_592, "Eden st-02..st-12", "states::start_diag_triggers::{closure#0}"),
+    // button_config.ini, replay_capture.ini and settings.json atomic writes
+    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_184, 9_344, "Eden st-02..st-12", "features::writer::run"),
+    // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
+    row(ThreadId::TraceWriter, c"tr-trace-writer", 20 * KIB, 2_720, 1_696, "Eden st-02..st-12", "compat::filesystem::init::{closure#0}"),
+    // diag: diag-settings-next.json parse, publish and apply
+    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 9_840, "Eden st-02..st-12", "diag_reload::start::{closure#0}"),
+    // first-boot import of the fork's files (blocking part), joined with a deadline
+    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
+    // first-boot import of the fork's captures in the background
+    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}"),
+    // the menu worker: model steps, screens, settings JSON on close
+    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 31_472, 13_488, "Eden st-02..st-12", "ui::worker::run"),
+    // returns parked layout archives to the pool after their grace
+    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_576, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#1}"),
+    // ARCropolis mount wait and the layout file probe
+    row(ThreadId::Probe, c"tr-probe", 24 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}"),
+    // diag: diag-macro.req read and parse
+    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),
+    // the replay capture archive and Mii preset writer
+    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 31_616, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}"),
+    // the saved Mii catalog read for the library
+    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::fallback_catalog::{closure#0}::{closure#0}"),
+    // console-practice-trace builds only: the practice trace file writer
+    row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
 ];
 
-#[allow(clippy::too_many_arguments)]
 const fn row(
     id: ThreadId,
     c_name: &'static core::ffi::CStr,
@@ -108,13 +106,12 @@ const fn row(
     measured: usize,
     measured_in: &'static str,
     symbol: &'static str,
-    runs: &'static str,
 ) -> ThreadStack {
     let name = match c_name.to_str() {
         Ok(name) => name,
         Err(_) => panic!("thread names are ASCII"),
     };
-    ThreadStack { id, c_name, name, bytes, static_bound, measured, measured_in, symbol, runs }
+    ThreadStack { id, c_name, name, bytes, static_bound, measured, measured_in, symbol }
 }
 
 /// The row of a thread.
