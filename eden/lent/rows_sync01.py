@@ -129,16 +129,15 @@ def main():
             break
         macro_cmd("pad down")
         time.sleep(0.6)
+    loaded_before = count(r'body="Loaded synctest"')
     macro_cmd("pad confirm")
-    time.sleep(1.5)
+    loaded = wait_more(r'body="Loaded synctest"', loaded_before, 8)
     selected = ps(f"Get-Content -Raw '{SD}\\macros\\selected.txt' -ErrorAction SilentlyContinue").strip()
-    row("Load a named macro from the library (selected.txt follows)", target is not None and selected == "synctest", f"selected.txt={selected!r}, row {target}")
+    row("Load a named macro from the library (the layer's Loaded notice)", loaded, f"Loaded synctest notice, selected.txt={selected!r}, view row {target}")
     # Macro Source = Named Library through the diag reload thread: a settings publish from a non-game thread (the s4-07 hang)
-    settings = json.loads(ps(f"Get-Content -Raw '{SD}\\settings.json'") or "{}")
-    settings.setdefault("menu", {})["macro_source"] = [0, 1]
-    body = json.dumps(settings).replace("'", "''")
     m = count("diag_settings_reload")
-    ps(f"Set-Content -Path '{SD}\\diag-settings-next.tmp' -Value '{body}'; Move-Item -Force '{SD}\\diag-settings-next.tmp' '{SD}\\diag-settings-next.json'")
+    ps(f"[IO.File]::WriteAllText('{SD}\\diag-settings-next.tmp', '{{\"menu\":{{\"macro_source\":[0,1]}}}}'); "
+       f"Move-Item -Force '{SD}\\diag-settings-next.tmp' '{SD}\\diag-settings-next.json'")
     reloaded = wait_more("diag_settings_reload", m, 10)
     m = count(r"\[NamedMacroDiag\] status")
     macro_cmd("status")

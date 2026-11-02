@@ -1,5 +1,5 @@
 """ui-screens (TrainingRooms, lead 0caa72b8): the pkg5 Ally adapter (wa_s5.py) re-rooted on the LENT rig C:\\Eden\\c1162-w5-ally (restart rules 2026-11-02:
-the only Ally rig TrainingRooms may run; it has an inbound firewall Block rule). Runs ON the Ally as C:\\Eden\\c1162-w5-ally\\uiq\\wui.py while the
+the only Ally rig TrainingRooms may run; operator-added inbound Allow rules (never change them); Block rules may be added, recorded). Runs ON the Ally as C:\\Eden\\c1162-w5-ally\\uiq\\wui.py while the
 rig's CLAIM is set to this OWNER by uiq\\stage_ui.ps1 setaside (restore puts the original CLAIM back). Original docstring follows.
 """
 """TrainingRooms package-5 Ally adapter: a copy of the Ally owned-rig adapters (W20's w20.py, the m5q wa.py; lineage W8/W5/W11 and the Windows port in

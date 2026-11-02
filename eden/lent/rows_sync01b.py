@@ -33,8 +33,14 @@ def main():
     r.row("publish from the diag reload thread (Macro Source = Named Library) completes; the game keeps running",
           reloaded and "named_source=true" in st, f"{rl[:90]} | {st[:120]}")
     r.fps_sample("after-named-publish")
+    before = u.ps(f"(Get-Item '{SD}\\save_states.json' -ErrorAction SilentlyContinue).LastWriteTimeUtc.Ticks", 60).strip()
+    m = r.count("file_written")
     u.ps(f"Set-Content -Path '{SD}\\diag-save.req' -Value 'x'", 60)
-    time.sleep(2.5)
+    written = r.wait_more("file_written", m, 10)
+    after = u.ps(f"(Get-Item '{SD}\\save_states.json' -ErrorAction SilentlyContinue).LastWriteTimeUtc.Ticks", 60).strip()
+    r.row("Save State: the writer thread writes save_states.json from its own copy (stream/sync (a))", written and after != before,
+          f"file_written line {written}, mtime {before or 'none'} -> {after}")
+    time.sleep(1.0)
     m = r.count("named_playback")
     u.keys(PHASE, "zr+up")
     played = r.wait_more("named_playback", m, 20)
