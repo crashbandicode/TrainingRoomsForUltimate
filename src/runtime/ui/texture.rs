@@ -207,6 +207,19 @@ unsafe fn read_usize(address: usize) -> usize {
 }
 
 impl Texture {
+    /// The shared pointer's two words, for a holder that keeps it in atomics (the chips page: no lock on the UI thread).
+    pub fn to_words(self) -> (usize, usize) {
+        (self.holder, self.control)
+    }
+
+    /// The texture `to_words` gave, or `None` for the empty pair.
+    ///
+    /// # Safety
+    /// The words come from `to_words` of a texture that was not released since.
+    pub unsafe fn from_words(holder: usize, control: usize) -> Option<Texture> {
+        (holder != 0 && control != 0).then_some(Texture { holder, control })
+    }
+
     /// The game's 0x68-byte UI texture object (`[holder + 8]`).
     fn object(&self) -> *mut u8 {
         // SAFETY: the holder was built by the game's constructor (checked by `load`) and lives while the shared pointer does.

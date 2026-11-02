@@ -5,13 +5,13 @@
 //! the pointers are unbound and the texture retired (released a few frames later); when the layout goes away (`lose_layout`, the
 //! layout's teardown signal) the texture is released at once without touching a pane. Any failure leaves the clean room's arrows.
 //!
-//! The decisions are `model::effect_chips::plan` (host-tested); this module carries them out on the UI job thread.
+//! The decisions are `model::effect_chips::plan` (host-tested); this module carries them out on the UI job thread. Its state is a
+//! handful of atomic words (the stream/sync rule: no lock on a game-thread path), written and read only by the layout tick and the
+//! view it draws from.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
-use hos_lock::Mutex;
-
-use crate::model::effect_chips::{self as m, Candidate, Held, Step};
+use crate::model::effect_chips::{self as m, Candidate, Held, LayerWord, Step};
 use crate::model::effect_texture::Visual;
 use crate::model::frame::{ChipVisual, Frame, View};
 use crate::model::panes as p;
@@ -23,50 +23,34 @@ use crate::runtime::ui::view::Panes;
 /// The chip whose pointer stays the ring (Neutral, `options::DIRECTIONS` index 8).
 pub const NEUTRAL: usize = 8;
 
-/// What the view needs to draw a bound chip: the visual, its tint and the texture's size.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Layer {
-    pub visual: ChipVisual,
-    pub tint: [u8; 4],
-    pub width: u32,
-    pub height: u32,
-}
-
-struct State {
-    wanted: ChipVisual,
-    held: Held,
-    texture: Option<Texture>,
-    layer: Option<Layer>,
-}
-
-static STATE: Mutex<State> = Mutex::new(State { wanted: ChipVisual::None, held: Held::Nothing, texture: None, layer: None });
-/// Whether the pointers carry the effect now (read by the view without the lock order mattering).
-static BOUND: AtomicBool = AtomicBool::new(false);
+/// The visual the last drawn frame wants (`effect_chips::visual_code`).
+static WANTED: AtomicU8 = AtomicU8::new(0);
+/// What the page holds (`effect_chips::held_code`).
+static HELD: AtomicU8 = AtomicU8::new(0);
+/// The bound texture's shared-pointer words (0, 0 when none).
+static TEXTURE_HOLDER: AtomicUsize = AtomicUsize::new(0);
+static TEXTURE_CONTROL: AtomicUsize = AtomicUsize::new(0);
+/// What the view draws on the pointers (`effect_chips::pack_layer`; 0 when nothing is bound).
+static LAYER: AtomicU64 = AtomicU64::new(0);
 
 fn log(args: core::fmt::Arguments<'_>) {
     crate::model::hook_stats::per_load(|| diagnostic(args));
 }
 
-/// The layer the pointers carry, if any.
-pub fn layer() -> Option<Layer> {
-    if !BOUND.load(Ordering::Acquire) {
-        return None;
-    }
-    STATE.try_lock().and_then(|s| s.layer)
+/// The layer the pointers carry, if any (one atomic load).
+pub fn layer() -> Option<LayerWord> {
+    m::unpack_layer(LAYER.load(Ordering::Acquire))
 }
 
 /// The frame the menu drew: the DI / SDI grid wants its visual, anything else none.
 pub fn note_frame(frame: &Frame) {
-    if let Some(mut s) = STATE.try_lock() {
-        s.wanted = if frame.view == View::Chips { frame.chip_visual } else { ChipVisual::None };
-    }
+    let wanted = if frame.view == View::Chips { frame.chip_visual } else { ChipVisual::None };
+    WANTED.store(m::visual_code(wanted), Ordering::Release);
 }
 
 /// The menu is not showing: no visual is wanted.
 pub fn hide() {
-    if let Some(mut s) = STATE.try_lock() {
-        s.wanted = ChipVisual::None;
-    }
+    WANTED.store(m::visual_code(ChipVisual::None), Ordering::Release);
 }
 
 /// One UI frame: carry out the page's step. Returns whether the chips changed (the caller redraws).
@@ -74,33 +58,32 @@ pub fn hide() {
 /// # Safety
 /// On the UI job thread, inside the Training layout's tick; `panes` are the resolved panes of that layout.
 pub unsafe fn run(panes: &Panes) -> bool {
-    let Some(mut s) = STATE.try_lock() else { return false };
-    let wanted = s.wanted;
-    match m::plan(s.held, wanted) {
+    let wanted = m::visual_of(WANTED.load(Ordering::Acquire));
+    match m::plan(m::held_of(HELD.load(Ordering::Acquire)), wanted) {
         Step::Keep => false,
         Step::Drop => {
-            drop_layer(&mut s, Some(panes));
+            drop_layer(Some(panes));
             true
         }
         Step::Request(v) => {
-            request(&mut s, panes, v);
+            request(panes, v);
             true
         }
         Step::DropThenRequest(v) => {
-            drop_layer(&mut s, Some(panes));
-            request(&mut s, panes, v);
+            drop_layer(Some(panes));
+            request(panes, v);
             true
         }
     }
 }
 
-unsafe fn request(s: &mut State, panes: &Panes, visual: ChipVisual) {
+unsafe fn request(panes: &Panes, visual: ChipVisual) {
     let effect = match visual {
         ChipVisual::Di => Visual::Di,
         ChipVisual::Sdi => Visual::Sdi,
         ChipVisual::None => return,
     };
-    s.held = Held::Failed(visual);
+    HELD.store(m::held_code(Held::Failed(visual)), Ordering::Release);
     // Diag: what the walk finds, once per grid open (the resident files and the visual's emitters and textures).
     #[cfg(feature = "diag")]
     {
@@ -140,10 +123,14 @@ unsafe fn request(s: &mut State, panes: &Panes, visual: ChipVisual) {
         log(format_args!("[Chips] visual={visual:?} nothing bound (arrows kept)"));
         return;
     }
-    s.texture = Some(built);
-    s.layer = Some(Layer { visual, tint: picture.tint, width: picture.texture.width, height: picture.texture.height });
-    s.held = Held::Bound(visual);
-    BOUND.store(true, Ordering::Release);
+    let (holder, control) = built.to_words();
+    TEXTURE_HOLDER.store(holder, Ordering::Release);
+    TEXTURE_CONTROL.store(control, Ordering::Release);
+    LAYER.store(
+        m::pack_layer(LayerWord { visual, width: picture.texture.width, height: picture.texture.height, tint: picture.tint }),
+        Ordering::Release,
+    );
+    HELD.store(m::held_code(Held::Bound(visual)), Ordering::Release);
     log(format_args!(
         "[Chips] visual={visual:?} bound={bound} texture={}x{} tint={:?} allocations={}",
         picture.texture.width,
@@ -154,11 +141,11 @@ unsafe fn request(s: &mut State, panes: &Panes, visual: ChipVisual) {
 }
 
 /// Unbind the pointers (when the panes still exist) and retire the texture; with no panes (the layout is gone) release it at once.
-unsafe fn drop_layer(s: &mut State, panes: Option<&Panes>) {
-    BOUND.store(false, Ordering::Release);
-    s.layer = None;
-    s.held = Held::Nothing;
-    let Some(t) = s.texture.take() else { return };
+unsafe fn drop_layer(panes: Option<&Panes>) {
+    LAYER.store(0, Ordering::Release);
+    HELD.store(m::held_code(Held::Nothing), Ordering::Release);
+    let (holder, control) = (TEXTURE_HOLDER.swap(0, Ordering::AcqRel), TEXTURE_CONTROL.swap(0, Ordering::AcqRel));
+    let Some(t) = Texture::from_words(holder, control) else { return };
     match panes {
         Some(panes) => {
             for i in (0..p::CHIPS).filter(|i| *i != NEUTRAL) {
@@ -185,7 +172,5 @@ unsafe fn drop_layer(s: &mut State, panes: Option<&Panes>) {
 /// # Safety
 /// On the UI job thread.
 pub unsafe fn lose_layout() {
-    if let Some(mut s) = STATE.try_lock() {
-        drop_layer(&mut s, None);
-    }
+    drop_layer(None);
 }

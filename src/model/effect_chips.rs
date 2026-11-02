@@ -97,9 +97,92 @@ pub fn plan(held: Held, wanted: ChipVisual) -> Step {
     }
 }
 
+/// The page's state as words, so the UI tick and the view read it with plain atomic loads (no lock on the game's UI thread: the
+/// stream/sync rule that a game-thread path never waits on a lock).
+pub fn visual_code(v: ChipVisual) -> u8 {
+    match v {
+        ChipVisual::None => 0,
+        ChipVisual::Di => 1,
+        ChipVisual::Sdi => 2,
+    }
+}
+
+pub fn visual_of(code: u8) -> ChipVisual {
+    match code {
+        1 => ChipVisual::Di,
+        2 => ChipVisual::Sdi,
+        _ => ChipVisual::None,
+    }
+}
+
+pub fn held_code(h: Held) -> u8 {
+    match h {
+        Held::Nothing => 0,
+        Held::Bound(v) => 0x10 | visual_code(v),
+        Held::Failed(v) => 0x20 | visual_code(v),
+    }
+}
+
+pub fn held_of(code: u8) -> Held {
+    match code & 0xf0 {
+        0x10 => Held::Bound(visual_of(code & 0x0f)),
+        0x20 => Held::Failed(visual_of(code & 0x0f)),
+        _ => Held::Nothing,
+    }
+}
+
+/// What the view draws for a bound chip: visual, texture size and tint (alpha is always opaque).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LayerWord {
+    pub visual: ChipVisual,
+    pub width: u32,
+    pub height: u32,
+    pub tint: [u8; 4],
+}
+
+/// `visual` (8 bits) | width (16) | height (16) | tint RGB (24); 0 means no layer.
+pub fn pack_layer(l: LayerWord) -> u64 {
+    if l.visual == ChipVisual::None {
+        return 0;
+    }
+    u64::from(visual_code(l.visual)) << 56
+        | u64::from(l.width.min(0xffff)) << 40
+        | u64::from(l.height.min(0xffff)) << 24
+        | u64::from(l.tint[0]) << 16
+        | u64::from(l.tint[1]) << 8
+        | u64::from(l.tint[2])
+}
+
+pub fn unpack_layer(word: u64) -> Option<LayerWord> {
+    let visual = visual_of((word >> 56) as u8);
+    if visual == ChipVisual::None {
+        return None;
+    }
+    Some(LayerWord {
+        visual,
+        width: ((word >> 40) & 0xffff) as u32,
+        height: ((word >> 24) & 0xffff) as u32,
+        tint: [(word >> 16) as u8, (word >> 8) as u8, word as u8, 255],
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_state_words_round_trip() {
+        for h in [Held::Nothing, Held::Bound(ChipVisual::Di), Held::Bound(ChipVisual::Sdi), Held::Failed(ChipVisual::Di), Held::Failed(ChipVisual::Sdi)] {
+            assert_eq!(held_of(held_code(h)), h);
+        }
+        for v in [ChipVisual::None, ChipVisual::Di, ChipVisual::Sdi] {
+            assert_eq!(visual_of(visual_code(v)), v);
+        }
+        let l = LayerWord { visual: ChipVisual::Sdi, width: 256, height: 128, tint: [200, 244, 255, 255] };
+        assert_eq!(unpack_layer(pack_layer(l)), Some(l));
+        assert_eq!(unpack_layer(0), None);
+        assert_eq!(pack_layer(LayerWord { visual: ChipVisual::None, ..l }), 0);
+    }
 
     /// The 13.0.5 pictures in `pictures()` order: DI tri00, line09, line11, flare01; SDI line00, impact13, mask00, grade00.
     const DI: [Candidate; 4] = [
