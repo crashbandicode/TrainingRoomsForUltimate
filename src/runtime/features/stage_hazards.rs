@@ -18,7 +18,7 @@ pub fn set_flag_address(address: usize) {
 
 #[skyline::hook(offset = HOOK_SITE_OFFSET, inline)]
 pub unsafe fn hazard_rule(_ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter(HookId::HazardRule);
+    let _scope = HookScope::enter_hook(HookId::HazardRule);
     let flag = FLAG.load(Ordering::Acquire);
     if flag == 0 {
         return;

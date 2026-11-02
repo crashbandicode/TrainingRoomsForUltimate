@@ -14,8 +14,11 @@ use super::playback::{covered_setting_applies, PlaybackState};
 use super::rng::Rng;
 use super::role::{FighterKey, RoleTable, Scene};
 use super::settings::{situation, trigger, CpuSettings};
+use super::advantage::FrameAdvantage;
+use super::command::{self, CmdFacts, CmdOut};
 use super::shield::{self, ButtonAnswer, HoldFacts, OosFacts, OosOut, Shield};
 use super::status::{self, Situation};
+use super::throw::{self, Throw};
 use super::tech::{self, Hidden, MotionHashes, Tech, TechChange, TechRequest};
 use crate::model::lra_reset::HubStep;
 use crate::model::menu::reroll;
@@ -51,7 +54,10 @@ pub struct Fighter {
     pub ledge: Ledge,
     pub tech: Tech,
     pub shield: Shield,
+    pub throw: Throw,
     pub seen: Seen,
+    /// The fighter kind the frame wrapper last saw on this body (the character-specific completion table).
+    pub kind: i32,
     /// `reroll::*` bits a menu change left for this body's next CPU frame (decision Q18 A). A fresh
     /// body starts with the SDI roll pending, so its first frame rolls the direction.
     pub pending: u8,
@@ -66,7 +72,9 @@ impl Fighter {
             ledge: Ledge::new(),
             tech: Tech::new(),
             shield: Shield::new(),
+            throw: Throw::new(),
             seen: Seen::new(),
+            kind: super::ids::UNRESOLVED,
             pending: reroll::SDI_DIRECTION | reroll::SHIELD_TILT,
         }
     }
@@ -99,6 +107,8 @@ pub struct Cpu {
     /// The game's shield damage multiplier as first observed (SPEC-cpu-05 §4); it survives a session
     /// clear so leaving Training can restore it.
     pub shield_damage_cache: Option<f32>,
+    /// The frame-advantage measurement (SPEC-cpu-07).
+    pub advantage: FrameAdvantage,
 }
 
 impl Cpu {
@@ -116,6 +126,7 @@ impl Cpu {
             hidden: None,
             save_loading: false,
             shield_damage_cache: None,
+            advantage: FrameAdvantage::new(),
         }
     }
 
@@ -140,11 +151,25 @@ impl Cpu {
     /// left pending for each body's next CPU frame; a changed Ledge Options row clears every body's
     /// held ledge case at once, so the CPU rolls again from the new set during the same hang.
     pub fn publish(&mut self, settings: CpuSettings, rerolls: u8) {
+        // A menu save that leaves both Mash Toggles and Mash Triggers empty, with at least one of them
+        // changed, empties every queue once, so a disabled mash does not keep running (SPEC-cpu-01 §5).
+        let disabled = settings.mash_state.is_empty()
+            && settings.mash_triggers == 0
+            && (self.settings.mash_state != settings.mash_state || self.settings.mash_triggers != settings.mash_triggers);
         self.settings = settings;
+        if disabled {
+            for fighter in &mut self.fighters {
+                fighter.mash.full_reset();
+                fighter.mash.latch = None;
+            }
+        }
         for fighter in &mut self.fighters {
             fighter.pending |= rerolls & (reroll::SDI_DIRECTION | reroll::SHIELD_TILT);
             if rerolls & reroll::LEDGE_OPTIONS != 0 {
                 fighter.ledge.clear_case();
+            }
+            if rerolls & reroll::THROW_OPTIONS != 0 {
+                fighter.throw.clear_case();
             }
         }
     }
@@ -153,11 +178,15 @@ impl Cpu {
 
     /// One step of the Training reset hub (SPEC-state-06 §5.2), for every body.
     pub fn hub_step(&mut self, step: HubStep) {
+        if step == HubStep::Combo {
+            self.advantage.reset();
+        }
         let Self { fighters, settings, rng, .. } = self;
         for fighter in fighters.iter_mut() {
             match step {
                 HubStep::Mash => {
                     fighter.mash.full_reset();
+                    fighter.mash.latch = None;
                     fighter.counters.get(CounterId::Aerial).full_reset();
                 }
                 HubStep::Sdi => {
@@ -166,13 +195,14 @@ impl Cpu {
                 }
                 HubStep::FrameCounters => fighter.counters.reset_all(),
                 HubStep::Ledge => fighter.ledge.reset_delay(),
-                // Combo and Throw belong to the specs that own them; InputDelay is the input-delay
-                // feature's.
+                // Combo belongs to SPEC-cpu-07; InputDelay is the input-delay feature's.
                 HubStep::ShieldTilt => {
                     fighter.shield.reread_tilt(settings);
                     fighter.pending &= !reroll::SHIELD_TILT;
                 }
-                HubStep::Combo | HubStep::Throw | HubStep::InputDelay => {}
+                HubStep::Throw => fighter.throw.reset_delay(),
+                // Frame advantage resets once, after the loop (it is not per body).
+                HubStep::Combo | HubStep::InputDelay => {}
             }
         }
     }
@@ -183,6 +213,7 @@ impl Cpu {
         self.roles.clear();
         // A replacement body must not inherit a stale "hidden" record.
         self.hidden = None;
+        self.advantage.reset();
     }
 
     /// One simulation frame passed: every counter advances once. The runtime calls this from the
@@ -192,6 +223,7 @@ impl Cpu {
         for fighter in &mut self.fighters {
             fighter.counters.tick();
         }
+        self.advantage.elapsed.tick();
     }
 
     // ---- one body's frame ----------------------------------------------------------------------
@@ -201,6 +233,7 @@ impl Cpu {
     pub fn frame(&mut self, key: FighterKey, f: &FrameFacts) -> FrameOut {
         let ctx = self.context();
         let covered = self.covered_applies();
+        let self_playback_running = self.playback.running;
         let primary = !key.partner && key.entry == self.primary_entry();
         let Self { ids, settings, rng, fighters, hidden, .. } = self;
         let fighter = &mut fighters[key.index()];
@@ -258,6 +291,18 @@ impl Cpu {
             status::idle(ids, f.status) || status::in_hitstun(ids, f.status),
             status::in_shieldstun(ids, f.status, f.prev_status),
             ids.is(super::ids::C::StatusGuard, f.status),
+        );
+        out.fast_fall = throw::fast_fall_frame(
+            ids,
+            settings,
+            rng,
+            &mut fighter.counters,
+            &mut fighter.mash,
+            f.situation == Situation::Air,
+            f.falling,
+            f.status,
+            f.reserve_dive,
+            self_playback_running,
         );
         fighter.defence.di_frame(status::in_hitstun(ids, f.status));
         out
@@ -397,5 +442,83 @@ impl Cpu {
     pub fn damage_multiplier(&mut self, in_training: bool, observed: f32) -> Option<f32> {
         let cached = *self.shield_damage_cache.get_or_insert(observed);
         shield::damage_multiplier(self.settings.shield_state, in_training, Some(cached))
+    }
+}
+
+impl Cpu {
+    /// Whether a command query of the body `key` has anything to do (the runtime skips the game reads
+    /// otherwise): a mash is set or queued, or a throw or pummel is set.
+    pub fn wants_commands(&self, key: FighterKey, cat2: bool) -> bool {
+        let s = &self.settings;
+        let fighter = &self.fighters[key.index()];
+        if cat2 {
+            return !s.throw_state.is_empty() || s.pummel_delay.is_set() || fighter.throw.case.is_some();
+        }
+        !fighter.mash.queue.is_empty()
+            || !s.mash_state.is_empty()
+            || s.overrides.iter().any(|o| !o.is_empty())
+            || fighter.mash.queued_aerial.is_some()
+            || fighter.mash.rolled.attack_angle.is_some()
+    }
+
+    /// A command-flag query of the body `key` (`get_command_flag_cat`): the bits to OR into the game's
+    /// answer. Category 1 runs the mash (choose, then perform); category 2 delivers the throw bits.
+    pub fn command_flags(&mut self, key: FighterKey, cat2: bool, f: &CmdFacts) -> CmdOut {
+        let ctx = self.context();
+        let applies = self.covered_applies();
+        let save_loading = self.save_loading;
+        let Self { ids, settings, rng, fighters, .. } = self;
+        let fighter = &mut fighters[key.index()];
+        // The hooks that answer between frames read what the latest query saw.
+        fighter.seen.status = f.status;
+        fighter.seen.situation = f.situation;
+        if cat2 {
+            if !applies {
+                return CmdOut::default();
+            }
+            return fighter.throw.step(ids, settings, rng, &mut fighter.counters, &mut fighter.mash, ctx, true, f);
+        }
+        let mut out = fighter.mash.check_buffer(ids, settings, rng, ctx, f, save_loading);
+        let done = fighter.mash.perform(ids, settings, &mut fighter.counters, f);
+        out.bits = done.bits;
+        out.request_status = done.request_status;
+        out
+    }
+
+    /// `get_attack_air_kind`: the aerial command kind to answer instead of the game's, if any.
+    pub fn attack_air_kind(&self, key: FighterKey) -> Option<i32> {
+        if self.playback.running {
+            return None;
+        }
+        let action = self.fighters[key.index()].mash.queued_aerial?;
+        let v = self.ids.get(command::aerial_kind(action)?);
+        (v != super::ids::UNRESOLVED).then_some(v)
+    }
+
+    /// `get_stick_dir`: the angled-attack value for the body `key`.
+    pub fn attack_angle(&self, key: FighterKey) -> Option<f32> {
+        let fighter = &self.fighters[key.index()];
+        throw::attack_angle_value(&fighter.mash, fighter.seen.situation == Situation::Cliff, self.playback.running)
+    }
+
+    /// `get_stick_y`: crouch.
+    pub fn crouch_stick(&self, key: FighterKey) -> Option<f32> {
+        let fighter = &self.fighters[key.index()];
+        throw::crouch_applies(&self.ids, &self.settings, fighter.seen.status).then_some(-1.0)
+    }
+
+    /// The jump buttons for the full hop.
+    pub fn full_hop_button(&self, key: FighterKey, on_query: bool) -> Option<bool> {
+        let fighter = &self.fighters[key.index()];
+        throw::full_hop_button(&self.ids, &fighter.mash, fighter.seen.status, on_query, self.playback.running)
+    }
+}
+
+impl Cpu {
+    /// Frame advantage on the player entry's frame: whether each fighter is actionable now; the
+    /// advantage to show, if one was measured (SPEC-cpu-07 §5).
+    pub fn frame_advantage(&mut self, player_actionable: bool, cpu_actionable: bool) -> Option<i32> {
+        let (on, empty) = (self.settings.frame_advantage, self.settings.mash_state.is_empty());
+        self.advantage.step(on, empty, player_actionable, cpu_actionable)
     }
 }

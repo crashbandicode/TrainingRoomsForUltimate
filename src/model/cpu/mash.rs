@@ -118,6 +118,7 @@ pub struct Rolled {
     pub full_hop: bool,
     pub fast_fall: bool,
     pub falling_aerial: bool,
+    pub fast_fall_delay: u16,
 }
 
 /// What `buffer_menu_mash` did.
@@ -147,6 +148,10 @@ pub struct Mash {
     pub rolled: Rolled,
     /// The dash-transition latch (SPEC-cpu-01 §5 step 3).
     pub transitioning_dash: bool,
+    /// The aerial the `get_attack_air_kind` hook turns the next attack press into.
+    pub queued_aerial: Option<Action>,
+    /// The trigger situation that last buffered a mash (decision B8: one roll per situation entry).
+    pub latch: Option<super::command::Situ>,
 }
 
 /// The Action row with the fork's effective-action filter applied.
@@ -164,8 +169,10 @@ impl Mash {
     pub const fn new() -> Self {
         Self {
             queue: Queue::new(),
-            rolled: Rolled { attack_angle: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false },
+            rolled: Rolled { attack_angle: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false, fast_fall_delay: 0 },
             transitioning_dash: false,
+            queued_aerial: None,
+            latch: None,
         }
     }
 
@@ -175,6 +182,7 @@ impl Mash {
         self.queue.clear();
         self.rolled.aerial_delay = 0;
         self.transitioning_dash = false;
+        self.queued_aerial = None;
     }
 
     /// The current action completed: pop it and clear the aerial delay. Returns the action.

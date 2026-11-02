@@ -13,7 +13,7 @@ static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 /// A stub hook that follows the rule: it works on the stack only.
 fn well_behaved_hook(id: HookId, n: u32) -> u32 {
-    let _scope = HookScope::enter(id);
+    let _scope = HookScope::enter_hook(id);
     let mut ring = [0u32; 8];
     for (i, slot) in ring.iter_mut().enumerate() {
         *slot = n.wrapping_mul(i as u32 + 1);
@@ -23,7 +23,7 @@ fn well_behaved_hook(id: HookId, n: u32) -> u32 {
 
 /// A stub hook that breaks the rule on purpose: it allocates inside its scope.
 fn allocating_hook(id: HookId, bytes: usize) -> usize {
-    let _scope = HookScope::enter(id);
+    let _scope = HookScope::enter_hook(id);
     let v = vec![1u8; bytes];
     std::hint::black_box(&v);
     v.len()
@@ -79,9 +79,9 @@ fn nested_scopes_count_until_the_outermost_ends() {
     let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
     let before = hook_allocations();
     {
-        let _outer = HookScope::enter(HookId::CpuFrame);
+        let _outer = HookScope::enter_hook(HookId::CpuFrame);
         {
-            let _inner = HookScope::enter(HookId::CpuSdi);
+            let _inner = HookScope::enter_hook(HookId::CpuSdi);
         }
         let v = vec![0u8; 64];
         std::hint::black_box(&v);

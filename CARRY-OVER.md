@@ -59,7 +59,7 @@ three lines of **mixed** files (`training_mod_tui/src/containers/app.rs`: the na
 `"Player Swapping"`), besides ours-new docs. Nothing from them was used: the id came from `menu_json.rs`
 above, and the row title is the one already in MENU-DRAFT. The lead should decide whether that counts as
 opening a mixed file.
-## Package 2 (CPU behaviour), 2026-11-02
+## pkg2
 
 Nothing was carried from the fork: package 2 is clean-room code written from `specs/` and the repo docs. No file
 of the stage or the fork worktree was opened, no search ran over the stage, and nothing under `upstream-ref/` was
@@ -77,6 +77,25 @@ Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party
 used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
 `Cargo.toml`.
 
+## pkg5 (menu rendering and assets)
+
+Carried files (stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`;
+all `ours-new` in `docs/provenance/provenance-files.json`; nothing under `upstream-ref/` and no mixed fork file was opened):
+
+| Here | Fork path | sha256 of the stage file | Taken | Clean-room changes |
+| --- | --- | --- | --- | --- |
+| `src/model/archive_name.rs` | `src/training/ui/archive_name.rs` | `5fc664d1ca98fc7fe008af0a398b0de52cc03c16575221b04e7eb7ab673cff3d` | whole file | none (byte copy) |
+| `src/model/archive_retire.rs` | `src/training/ui/archive_retirement.rs` | `47ae08193cd91aceab2e32a1a88f1702789eff4cdca3b9ba5e042c16d621fd33` | whole file | `retire_expired` made `pub` (was `pub(super)`) |
+| `src/model/archive_recipe.rs` | `src/training/ui/waiting_archive.rs` + `scripts/make_waiting_patch.py` | `2ea3a4f49f5332419a00f1b751cd0f28f1f4188623d1deb1578acac70a5d62f4`, `5d4c546aaebc0016b5cd79bd0c6df4f5beb619d44936da0bb97241a6bde868e3` | the recipe format, the FNV-1a fingerprint and the greedy copy/literal matcher | one source (the stock archive) instead of two, magic `TRA1`, own bound, the matcher in Rust, new tests |
+| `src/runtime/ui/registry.rs` | `src/training/ui/layout_registry.rs` | `137d76960fabcd56f604c3f7f71844f2ed6f582e03b46aa4abd2d4a2f55ffea6` | the holder / manager walk | constants from SPEC-core-05 §4.1 instead of the fork's macro crate; `find` by bytes |
+
+Not carried: `anchors.rs` (its pins and decode are written from SPEC-core-05 §4.1: `model::sites_ui`), the fork's roster, stage and item panel code
+(package 6 wires them to the model), `layout.arc`, `waiting_ui.patch` (the waiting-room archive is package 6).
+
+Game data and the committed recipe: `assets/info_training.tra1` (about 11 KB) holds copy ranges of the stock archive and
+the plugin's own panes only; the dumped stock archive lives only under gitignored `eden/runs/` / scratch folders
+(`tests/ui_sites.rs` and the recipe tests never read it). `tools/layout-builder` is a host tool over the operator's MIT `nx-layout-toolbox` (git dependency pinned to a revision, docs/BUILD.md).
+
 ## pkg3 (save states), 2026-11-02
 
 Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`
@@ -85,3 +104,95 @@ Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/
 | Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
 | --- | --- | --- | --- | --- |
 | `src/model/store.rs` (shared: package 4's named macros reuse it, do not carry `library.rs` again) | `training_mod_macros/src/library.rs` (ours-new) | `f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275` | whole file except the macro-specific parts | (1) the fork's `MacroError` became `StoreError` (only the variants the store itself raises: version, size, id, not found, no free id, parse, I/O); (2) `Library`, `MacroEntry` and `Record for MacroRecording` removed (package 4 adds its own `Record` impl); (3) `Listing<S>` lost its `MacroEntry` default; (4) the `Header` serde derive in `decode` is a hand read of `schema_version` (this crate has no serde derive: resident size); (5) the id slug fallback is `entry`, not `macro`; (6) the fork's `library/tests.rs` is not carried (macro recordings); new host tests with a toy record cover ids, atomic overwrite, version/size/corruption listing, orphaned backup, sort order. |
+## pkg6 (carry-over of the fork's engines), S6-0 plan phase, 2026-11-02
+
+Nothing is carried yet. This section records what S6-0 read, so the lead can audit the boundary.
+
+- Stage **m5o** (`/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`), never edited. `tools/pkg6_inventory.py` hashes (reads bytes of) only paths that `docs/provenance/provenance-files.json` lists as `ours-new` in the package-6 feature groups, plus six paths absent from that scan (a path absent from the scan is not an upstream path): `training_mod_consts/src/notice_queue.rs`, `training_mod_consts/src/body_bank/mii_publish.rs`, `src/log_stress.rs`, `training_mod_consts/src/log_stress.rs`, `docs/skyline-logger-race.md`, `docs/cpu-rolls-apply.md`. It also walks the stage's directory tree for path names only (no content) to list paths missing from the scan.
+- `tools/pkg6_deps.py` parses `use` statements and `crate::` / `training_mod_*::` paths of those same ours-new Rust files and resolves each to a file of the scan; it records which MIXED or upstream-identical file and item a carried file names (no content of a mixed or upstream file is read). Small ad-hoc scans over the same ours-new files counted external crate names, `smash::` paths, menu-struct field accesses, writer calls (`fs::write`, `OpenOptions`, …) and input-owner calls.
+- Read directly as ours-new files: `src/training/seams.rs` (lines 1-120), `src/native_install.rs` (lines 1-60), the row labels of `training_mod_consts/src/native_seams/rows_{a1,a2,a3,a4,a5,identity}.rs` (label counts by prefix) and the first line of each, `training_mod_mii/Cargo.toml`.
+- Campaign evidence (not fork source): `refactor/RC-SUMMARY.md`, `c1162/EDEN-BRIEF-m5o.md`, `c1162/ONLINE-BRIEF-m5o.md`, `stages/m5o/eden/RESULT.md`, `stages/m5m/eden/RESULT.md`.
+- No search over mixed files, none over `upstream-ref/`, none over the fork worktree. No accidental exposure to report.
+- Not carried by package 6 and why: `src/training/cpu_rolls.rs`, `training_mod_consts/src/cpu_rolls.rs` (W11's CPU-ROLLS-APPLY: package 2's SPEC-cpu-02 §5, clean-room); `training/seams.rs` and `native_seams/rows_a3.rs` (the fork's upstream-hook install table: superseded by `src/model/sites.rs` rows of packages 1-5).
+
+### Disclosure: fork root `Cargo.toml` (mixed) read by line range, lead-authorised 2026-11-02
+
+Stage m5o `Cargo.toml` (sha256 `8f6ae99261740220bd90817c92c439b5d14244f6c8448ae6c496e816f3cd6b82`), lines **82-122 and 124-240 only** (the fork-only ranges the provenance scan lists), read with `Select-Object -Skip/-First`; line 123 and everything else not viewed. Taken: the `[features]` table (feature names and their local dependency lists), written into this crate's `Cargo.toml` with the fork's one-line comments shortened. Sub-crate features (`training_mod_consts/x`, `training_mod_tui/x`) became the same-name features of this crate; `dep:ssbu-cpu-pilot-core` and `dep:deluxe-plugin-sdk` were left out until their crates are carried (C6, decision D3). `layout_arc_from_file` (package 5) was not taken. Source of the default set: `RECEIPTS-m5o1.json`, job `m5o1-switch-root-full-release` (`enhancements-alpha,native-unlink-guard,deluxe-sdk,mii-hud-portrait-alpha,cycle-preload-extended,lobby-preload-extended,native-body-bank-alpha`).
+
+### pkg6 carried files (S6-1, tranche 1, 2026-11-02)
+
+Stage **m5o**, all files `ours-new`. The table (here path, fork path, source sha256, resulting sha256, every clean-room edit with its reason) is generated from the carry manifest: `docs/provenance/pkg6-carry-ledger.md`
+(`python3 -I tools/carry_pkg6.py ledger`; manifest `docs/provenance/pkg6-carry-manifest.json`). 22 files: seam table (`native_seams/*` incl. `rows_a3`, `tests.rs`), `native_fields`, `native_unlink_core`, `native_unlink_guard`,
+`source_descriptor`, `source_lifetime`, `source_visible_forms`, `native_hud_refresh`, `source_load`, `roster_grid`, `cycle_admission_grace`, `notice_queue`. Mechanism: a deterministic path rewrite (`crate::x`, `training_mod_consts::x`,
+`training_mod_tui::x` to `crate::model::<area>::x`) plus exact-text edits recorded in the manifest. Edits so far (all in two files, each offered back to the fork through the fix ledger):
+`native_seams/tests.rs` (three path/layout edits: manifest dir is the repo root, the hook-attribute scan covers only the carried runtime areas, the owned-ELF path is one level up; and the whole-tree count of 150 hooks does not apply to the subset, so the ratchet returns while no carried hook exists)
+and `native_unlink_guard.rs` (`# Safety` heading instead of the fork's crate-level `allow(clippy::missing_safety_doc)`).
+
+Deps table (decision D3 conditions; versions are those of the fork's m5o `Cargo.lock`; license fields read from the crates' own manifests in the local cargo registry / git checkouts; resident size = `nro_size.py` of the release NRO built with `cargo skyline build --release` on the Surface at this stage's HEAD):
+
+| Crate | Version / source (m5o lock) | License field | Resident before -> after | Status |
+| --- | --- | --- | --- | --- |
+| serde (feature `derive`) + serde_derive | 1.0.229, crates.io (identical to this repo's lock) | `MIT OR Apache-2.0` (both) | 233,472 -> 233,472 B (release NRO `d2722f4d…` with and without `derive`: byte-identical, nothing in the release build uses it yet) | added (needed by the Mii crate and `trio`/`ordered_roster`) |
+| serde_json | 1.0.151, crates.io (this repo's lock had 1.0.154: `cargo update --precise 1.0.151`, offline) | `MIT OR Apache-2.0` | unchanged (same NRO) | pinned |
+| parking_lot | 0.12.5, crates.io | `MIT OR Apache-2.0` | (package 1) | already present (B9) |
+| byteflags | 0.1.0, git `https://github.com/asimon-1/byteflags.git` rev `e6ac815a9d0dc4665b39fe7849e2baec8bf443cb` | no `license` field; the repository LICENSE file is MIT (lead-accepted 2026-11-02) | **not added** (see "C2a" below): replaced by `model::compat::choice`, clean-room | not added |
+| rand / rand_core / rand_chacha (git `skyline-rs/rand` 8e87ec2a, dependencies of byteflags) | 0.7.4 / 0.5.1 / 0.2.3 | `MIT OR Apache-2.0` | not added (only byteflags needed them) | not added |
+| getrandom (git Raytwo 23a14191, dependency of rand) | 0.2.99 | `MIT OR Apache-2.0` | not added | not added |
+| skyline_smash (lib name `smash`) | 0.1.0, git `https://github.com/ultimate-research/skyline-smash.git` rev `01bf583…` | `MIT` | not yet | not added yet (needed by C7) |
+| ssbu-cpu-pilot-core | 0.1.1, git `git.syntaxbyexample.com/intpa/ssbu-cpu-pilot` tag `v0.2.1` rev `8b03e3b…` | `MIT` (the operator's crate) | not yet | not added yet (C6) |
+| deluxe-plugin-sdk | 2.0.0, no source line in the lock (path dependency); not located yet | – | – | to check at C6 |
+### pkg6 carried files, tranche 2 (C3a: Mii crate, body bank, swap model, preload and kirby policy)
+Generated ledger: `docs/provenance/pkg6-carry-ledger.md` (101 files after this tranche). New in the tool: item-level and longest-prefix module mapping, `include_str!` rewriting through the manifest, `prepend` (by-path test glue) and `delete_from`/`delete_to` edits. Edits to carried files in this tranche (each offered back through the fix ledger): `trio.rs` and `ordered_roster.rs` lose the fork's menu structure (`to_submenu`, the picker/full-menu tests: replaced by package 1's editor rows and package 5's renderer); `draft_store.rs` (re-run-by-name test filter), `practice_policy.rs` (`#[derive(Default)]` for clippy). The fork's menu names the carried code expects (`OnOff`, `TrainingModpackMenu`, `BASE_MENU`) are provided by `engine::compat::menu` (ours, not carried). Carried tests: the 12 `training_mod_mii/tests` integration files that need only the Mii crate (7 carried; `quickplay_backend`, `ldn_backend`, `source_provenance`, `heap_metrics`, `ui_archive_name` and `replay185_headgear` include other root files by path and are carried with those files).
+
+### Disclosure: an `rg` over two mixed fork files (2026-11-02, while carrying the stage menu)
+
+To find how `PAGE_COLUMNS` (carried `training_mod_tui/src/stage_menu.rs`, ours-new) gets its value I ran one `rg 'NX_SUBMENU_COLUMNS|NX_SUBMENU_ROWS'` that named the two MIXED files `training_mod_tui/src/lib.rs` and `training_mod_tui/src/containers/submenu.rs` of stage m5o (my mistake: I should have searched only ours-new paths). It printed three lines of `lib.rs`: the definitions `pub const NX_SUBMENU_ROWS: usize = 8;` (line 14) and `pub const NX_SUBMENU_COLUMNS: usize = 4;` (line 15), and one use at line 64 (`toggles: StatefulTable::with_items(NX_SUBMENU_ROWS, NX_SUBMENU_COLUMNS, toggles),`); it printed nothing for `submenu.rs`. Nothing was copied. The only value used is the stage grid's page width of 4 columns, which is independent of that line: `docs/DECISIONS.md` Q14 and `MENU-DRAFT.md` state the fork's stage paging as 4 x 4 (eight pages), and the carried `PAGE_ROWS = 4` with `PAGE_SIZE = 16` agrees. The compat constant is written as 4 from those documents.
+
+### pkg6 C2a: cycle_preload_config (2026-11-02, `engine::preload::cycle_preload_config`)
+Carried `training_mod_consts/src/cycle_preload_config.rs` (ours-new, m5o `49c8a777d9e7`) by the tool. Manifest edits (each a ledger row): the fork menu-macro modules `bank_submenu` / `ready_submenu` removed, the `create_app` Character Extras test removed (package 1's menu table tests cover the rows), the commit round-trip test serialises the typed menu directly. Path rewrites: `TRAINING_MODPACK_ROOT` to `model::storage::ROOT`, `menu_json` to `compat::menu_json`, the storage-root string. **byteflags decision:** the lead accepted the `byteflags` git dependency; it is not added. Its `byteflags!` macro names a struct field after every choice in capitals, so every user crate gets `non_snake_case` warnings that only a lint `allow` (a workaround needing approval) silences, and it pulls three git dependencies (`rand`, `getrandom`, itself) for a `get_random` the carried code never calls. `model::compat::choice` is the same macro over a `[u8; N]` (constants, `ALL_CONSTS`/`ALL_NAMES`, saturating `+ - *`, `to_byte_vec`, `contains`, `Display`, the same JSON array shape), 5 host tests; the tool rewrites `use byteflags::{byteflags, count}` to it (new `byteflags` head in the tool), so the carried text is unchanged. Written without reading the crate's macro beyond its public API doc and source in the local cargo checkout (MIT). `compat::menu` now holds the 13 `cycle_preload_*` fields and the Solo Popo fields as typed values with the fork's serde attributes (`from_snapshot`, `rows` for the D1 write-back), and `compat::menu_json::parse_menu_file` is the stand-in the carried tests load fork-shaped menu files through. Two fork defaults differ from the clean-room factory table (`solo_popo_original` and `cycle_preload_measurements`: fork On, MENU-DRAFT/factory Off): `BASE_MENU` keeps the fork values, `from_snapshot` gives the settings file's; a host test pins the list. Clean-room tests `src/model/preload/ini_transactions_tests.rs` (9): two-load, failed store, interrupted replace, rejected file untouched across boots, oversize/invalid-UTF-8/duplicate envelope, older-file adopt-and-complete; the carried reader/writer passed all of them unchanged (R1/R4 hold for this file). Open nit offered to the fork: `write_new` ignores the `sync_all` result.
+
+### pkg6 gate-1 rulings applied (2026-11-02)
+- **`byteflags` replacement accepted** by the lead; the rewrite of the carried `use byteflags::{byteflags, count}` to `model::compat::choice` is a recorded carry transform of the tool (`EXTERNAL` head `byteflags`, manifest `modules.byteflags`), applied on every re-sync.
+- **Fresh-install defaults** follow the factory table and MENU-DRAFT: three more recorded edits to `cycle_preload_config.rs` (`Settings::DEFAULT.measurements`, `default_measurements()` and the one test that asserted the old default) make Preload Samples Off; `compat::menu::BASE_MENU` takes `solo_popo_original` Off and `cycle_preload_measurements` Off, so it equals `from_snapshot(&Snapshot::factory())` (host test). Fork defaults that differ from the clean room, as far as package 6 has read them: Solo Popo (original) On in the fork, Off here; Preload Samples On in the fork, Off here (Developer page, inert unless `developer.ini` enables it). No other difference is known; rows of other packages were not compared.
+- **`cycle_preload.ini` is a regenerated boot cache** (`model::preload::boot_cache::sync`): settings.json is the only source of the active choice; the INI is written from it on first boot or when stale, rejected or missing, and is never read back to change the choice (6 host tests: first boot writes the player's settings, stale cache never overrides, rejected cache regenerated, failed write keeps the old file and the active choice, malformed rows fail closed).
+- **R1 durable publish**: recorded edit to `write_new`: `sync_all` failure now fails the store before the rename (the fork ignored it). Risk to check at the first Eden boot: if the Skyline std `File::sync_all` reports an error on the console, every store would fail; the E8 first-boot row exercises it.
+- **Stages unconditional** (`7f7b5f1`): see the commit message; `model::stages::catalog` is the facade for package 5.
+| `src/model/state/held_item.rs` | `training_mod_consts/src/character_items.rs` (ours-new) | `57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf` | `ITEM_NAMES`, `valid_variation`, `HeldItemSnapshot` + `valid`, the rule of `deserialize_saved_item` (lines 5-83) | renamed `HeldItem`; no serde derive (hand-read `from_json`: damaged field -> `Unsupported`, `null` -> absent; hand-written `write_json`); the menu types `CharacterItemChoice` / `to_submenu` and the menu test are not carried. |
+| `src/model/state/record.rs` (`Charge`, `Robin`, `Steve`, `validate`) | `training_mod_consts/src/practice_setup.rs` (ours-new) | `4ec4abf8de44def3b5efc921d8123e82ad2cc1d8bc92e3d1f832254513e7d7a8` | `RobinCharges`, `ChargeState`, `SteveState` and their `validate` rules (lines 44-207) | renamed `Robin`, `Charge`, `Steve`; no serde derive (hand JSON in the fork's field order, absent options written as `null` exactly as the fork's pretty writer does); Steve's tool materials are `u32` code points (the fork's `char`); a Steve record that fails `validate` on read is dropped; the Mii identity is an opaque `serde_json::Value` kept as read (package 6 gives it a type). |
+| `tests/state01_json.rs` + `tests/fixtures/ported-json/` | `training_mod_consts/tests/json_ported_fixtures.rs`, `json_save_state_shape.rs`, `tests/fixtures/ported-json/` (ours-new) | fixtures: the five `*-save_states*.json`, five `expected-a-import/*.imported.json`, `PROVENANCE.json` (byte copies; the `*training_modpack*` updater-record fixtures are not carried) | the assertions of both test files | ported to this crate's reader and writer (the same fixtures, the same byte-for-byte rewrite check); new tests for the filesystem rules (two boots, a corrupt file, a failed write). |
+| `tools/elf_symbols.py` | written here (not carried) | | | symbol and 64-byte window lookup in the owned ELF for the site rows. |
+
+Not carried (read and judged): `src/training/setup_library.rs` (ours-new, 392 lines) is glue over the named-macro keyboard draft (package 4), lobby practice (package 6), the Mii roster (package 6) and a TUI panel; its file format `practice_setup.rs` (`SetupRecord`, `FighterSetup`, validation, the `Store` instantiation) is carried by `src/model/state/setup.rs` (see below) and the glue is re-written against this plugin's interfaces. `training_mod_consts/src/menu_json.rs` holds the menu-settings reader (the package-1 reader is already written from SPEC-core-04); it has no `save_states.json` code. The `save_states.json` reader/writer is new here because the fork's lives in the mixed `save_states.rs`, which was never opened; the shape is SPEC-state-01 §7.2 plus the fork's real files (the fixtures above).
+
+### pkg3 additions (milestones S3-1 to S3-5, SPEC-state-05)
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/state/setup.rs` | `training_mod_consts/src/practice_setup.rs` (ours-new) | `4ec4abf8de44def3b5efc921d8123e82ad2cc1d8bc92e3d1f832254513e7d7a8` | `SetupRecord`, `FighterSetup`, validation, the error type, the listing row, the `Record` impl over the shared `Store` | hand-written JSON (no serde derive); this crate's `Charge` / `Steve` / `HeldItem`; the Mii identity is an opaque value (package 6 types it); the UI glue (`setup_library.rs`) is not carried. |
+| `src/model/state/items.rs`, `src/runtime/features/state_restore.rs` (item part), `held_item.rs` | `src/character_items.rs` (ours-new) | `b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933` | the mechanism: clear the hand, `ItemModule::have_item(kind, variation)`, the turnip special-init action with its power getter, the 16 probability hooks for the face override, a source fighter required for items that need one | re-expressed against the spec's tables and this crate's site rows (guarded `main+offset` calls, no allocation in hooks); the spec's grant paths A to C are superseded by this mechanism. |
+| `src/model/state/convert.rs`, `src/model/migration_run.rs` | none (new here) | | | the N6 conversion and the first-boot import are written from SPEC-state-04 and SPEC-core-08; only the fork's folder layout and file names are known from the fixtures. |
+| `src/model/state/pokemon.rs`, the `copy_charge` field | none (new here) | | | SPEC-state-05 §5.1, §5.2 only; the new optional record field `copy_charge` is this crate's (lead ruling 2026-11-02): fork-compatible, written only when present. |
+
+## pkg4 (package 4: recording, input display, chords, notifications; stream `stream/pkg4`)
+
+Source: stage **m5o** (`.../parked-reuse175/refactor/stages/m5o/stage`, called `<stage>`). Only files whose `origin` is
+`ours-new` in `docs/provenance/provenance-files.json` were opened (`training_mod_consts/src/menu_shortcuts.rs`,
+`training_mod_macros/src/capture_settings.rs`, `training_mod_macros/src/test_util.rs` for its `TempDir`, the heads of
+`training_mod_macros/src/lib.rs` and `src/capture_plugin.rs`, and the import / dependency lines of the other
+`training_mod_macros` files to size the carry). The mixed files (`input_record.rs`, `button_config.rs`, `input_log.rs`,
+`ui/display.rs`) and everything under `upstream-ref/` were not opened; the fork's benchmark fixtures
+(`scripts/input-display-bench/fixtures/*`, upstream copies) were not opened.
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/menu_shortcuts.rs` | `training_mod_consts/src/menu_shortcuts.rs` (ours-new) | `b19b20ac365178ff7ddba0b4801698872048de0081e8955ed4df9e87ea2e6d0d` | whole file (parse, passes, tests) | The fork's `ButtonConfig` byteflags struct is this plugin's `Chord` (`u16`, bit order of the chord rows); button-name tables (`FIELDS`, `LABELS`) replace `ButtonConfig::ALL_FIELDS/ALL_NAMES`; `DEFAULT_INI` doc line no longer says "restart" (N7, a change applies at once); `passes` also needs a non-empty chord; added `to_ini_text` (N7 writer: keeps comments and unknown lines, one line per slot), `with_slot`, `slots`, `ini_name`, `FILE_NAME`, `MAX_BYTES`; tests moved to `Chord` plus round-trip tests. |
+| `src/model/capture_settings.rs` | `training_mod_macros/src/capture_settings.rs` (ours-new) | `5357f35edcdee093075cd7e27e6c206c8a408b8a05ad46b583493213b6dc6af3` | whole file | none to the carried text except the test `TempDir` (the fork's `test_util::TempDir`, reduced, defined in the test module). Added at the end: `FILE_NAME`, `MAX_BYTES`, `to_ini_text` (the menu's Replay capture toggle, Q7: replaces the recognised line in place), `from_bytes` (fail-closed read) and their tests. |
+
+Not carried yet (S4-4, waiting on the lead's sequencing: pkg6's `training_mod_mii` first): `training_mod_macros/src/{recording,library,window,replay,live_frame,move_start,live_capture,capture_archive,capture_toggle,shared_capture,ui_anchor}.rs`,
+`src/training/named_macros.rs`, `src/replay_*.rs`, `src/live_replay.rs`, `src/capture_plugin.rs`, `src/training/ui/clip_editor.rs`,
+`training_mod_tui/src/{clip_*,macro_panel*,replay_panel,resume}.rs`. Dependencies they need (lead rulings 2026-11-02): `training_mod_mii`
+(pkg6), `smash-match-data` (vendored under `crates/`), `deluxe_plugin_sdk` (feature `deluxe-sdk`), `serde` with derive.
+`library.rs`'s generic `Store` is pkg3's `model::store`; the macro `Record` impl follows `recording.rs`.
+
+New code in this stream with no fork origin: everything else under `src/model/{recording,chords,ini_files,notify,damage_display,input_display,sites_pkg4}.rs`
+and `src/runtime/features/{recorder,chords,notices,input_display}.rs`, written from SPEC-input-01/02/04/05 and the owned 13.0.5 ELF.

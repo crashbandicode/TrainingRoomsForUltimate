@@ -9,7 +9,7 @@ use crate::runtime::{published, scene};
 
 #[skyline::hook(offset = sites::RESET_CHECK_OFFSET, inline)]
 pub unsafe fn reset_check(ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter(HookId::ResetCheck);
+    let _scope = HookScope::enter_hook(HookId::ResetCheck);
     if let Some(value) = lra_reset::x8_write(published::lra_reset(), scene::is_training()) {
         ctx.registers[8].set_x(value);
     }

@@ -46,10 +46,13 @@ pub enum HookId {
     CpuStickXNoClamp,
     CpuStickYNoClamp,
     CpuShieldParam,
+    /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
+    /// still counted, their invocations are counted together.
+    Other,
 }
 
 /// Number of `HookId` values.
-pub const HOOK_COUNT: usize = HookId::CpuShieldParam as usize + 1;
+pub const HOOK_COUNT: usize = HookId::Other as usize + 1;
 
 impl HookId {
     pub const ALL: [HookId; HOOK_COUNT] = [
@@ -75,6 +78,7 @@ impl HookId {
         HookId::CpuStickXNoClamp,
         HookId::CpuStickYNoClamp,
         HookId::CpuShieldParam,
+        HookId::Other,
     ];
 
     /// The name the report line uses (the Eden scripts match these).
@@ -102,6 +106,7 @@ impl HookId {
             HookId::CpuStickXNoClamp => "cpu_stick_x_no_clamp",
             HookId::CpuStickYNoClamp => "cpu_stick_y_no_clamp",
             HookId::CpuShieldParam => "cpu_shield_param",
+            HookId::Other => "other",
         }
     }
 }
@@ -149,11 +154,17 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 }
 
-/// Marks the current thread as running the hook `id` until dropped, and counts one invocation of it.
+/// Marks the current thread as running hook code until dropped, and counts one invocation.
 pub struct HookScope;
 
 impl HookScope {
-    pub fn enter(id: HookId) -> Self {
+    /// A hook without a name of its own (counted under `HookId::Other`).
+    pub fn enter() -> Self {
+        Self::enter_hook(HookId::Other)
+    }
+
+    /// The hook `id`.
+    pub fn enter_hook(id: HookId) -> Self {
         ENTRIES[id as usize].fetch_add(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
         HookScope

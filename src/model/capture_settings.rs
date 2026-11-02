@@ -1,0 +1,505 @@
+//! Carried over from the earlier fork's `training_mod_macros/src/capture_settings.rs` (stage m5o, ours-new,
+//! sha256 `5357f35edcdee093075cd7e27e6c206c8a408b8a05ad46b583493213b6dc6af3`). Clean-room changes are listed in
+//! CARRY-OVER.md (`## pkg4`): the additions at the end (`to_ini_text`, `load`, `write`) for the menu's
+//! *Replay capture* toggle (draft 9, Q7); nothing above them changed.
+//!
+//! INI setting that gates live-match capture independently of archive browsing
+//! and native Vault fallback.
+//!
+//! The file is the single startup authority: Training reads it once to seed the
+//! runtime preference and never reads it while sampling. With the Deluxe plugin
+//! built and a host present, the Plugins page changes the in-memory preference
+//! and the host rewrites this file after each accepted edit, provided the layout
+//! is [`CaptureSettings::persistence_compatible`]. Without a host, users hand-edit
+//! the file as before.
+
+use std::{fs, io, path::Path};
+
+/// Example/default capture configuration. An absent setting also defaults off.
+pub const DEFAULT_CAPTURE_INI: &str = "[capture]\nenabled=off\n";
+
+/// INI key the Deluxe host persistence writer replaces (`OptionSpec::config_key`).
+pub const CAPTURE_CONFIG_KEY: &str = "enabled";
+
+/// Whether the runtime should capture a live match for later archiving.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CaptureSettings {
+    pub enabled: bool,
+}
+
+/// Training's reading of one document: the recognised `[capture] enabled` line
+/// (0-based index) and its value.
+struct Scan {
+    enabled: Option<(usize, bool)>,
+}
+
+fn scan(contents: &str) -> Result<Scan, String> {
+    let mut in_capture_section = false;
+    let mut enabled = None;
+
+    for (line_index, raw_line) in contents.lines().enumerate() {
+        let line_number = line_index + 1;
+        let line = raw_line
+            .split([';', '#'])
+            .next()
+            .unwrap_or("")
+            .trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Some(section) = line.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            in_capture_section = section.trim().eq_ignore_ascii_case("capture");
+            continue;
+        }
+
+        if in_capture_section && line.eq_ignore_ascii_case(CAPTURE_CONFIG_KEY) {
+            return Err(format!(
+                "invalid [capture] enabled value on line {line_number}; expected on/off, true/false, or 1/0"
+            ));
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if !in_capture_section || !key.trim().eq_ignore_ascii_case(CAPTURE_CONFIG_KEY) {
+            continue;
+        }
+        if enabled.is_some() {
+            return Err(format!(
+                "duplicate [capture] enabled value on line {line_number}"
+            ));
+        }
+
+        let value = value.trim();
+        let on = if value.eq_ignore_ascii_case("on")
+            || value.eq_ignore_ascii_case("true")
+            || value == "1"
+        {
+            true
+        } else if value.eq_ignore_ascii_case("off")
+            || value.eq_ignore_ascii_case("false")
+            || value == "0"
+        {
+            false
+        } else {
+            return Err(format!(
+                "invalid [capture] enabled value {value:?} on line {line_number}; expected on/off, true/false, or 1/0"
+            ));
+        };
+        enabled = Some((line_index, on));
+    }
+
+    Ok(Scan { enabled })
+}
+
+impl CaptureSettings {
+    /// Parses the capture flag from an INI document without performing I/O.
+    /// Unknown sections and keys are ignored; duplicate `[capture] enabled`
+    /// keys and values outside the supported on/off forms are errors.
+    pub fn parse(contents: &str) -> Result<Self, String> {
+        let scan = scan(contents)?;
+        Ok(Self {
+            enabled: scan.enabled.is_some_and(|(_, on)| on),
+        })
+    }
+
+    /// Whether the pinned Deluxe host may persist menu edits into this document.
+    ///
+    /// The host writer is section-unaware, compares the key exactly and strips
+    /// only `#` comments: it replaces the first line whose key is `enabled`,
+    /// otherwise it appends a line at the end of the file. Training parses
+    /// case-insensitively, strips `;` and `#`, and honours `[capture]` only.
+    /// Compatibility therefore requires that the document parses, that the host
+    /// finds exactly one `enabled` line, and that this line is the one Training
+    /// recognises as `[capture] enabled`. The host's append path is never relied
+    /// on. Any other layout keeps the toggle session-only (no host persistence);
+    /// the error names the reason for the startup log.
+    pub fn persistence_compatible(contents: &str) -> Result<(), String> {
+        let scan = scan(contents)?;
+        let host: Vec<usize> = contents
+            .lines()
+            .enumerate()
+            .filter(|(_, line)| host_persistence_key(line) == Some(CAPTURE_CONFIG_KEY))
+            .map(|(index, _)| index)
+            .collect();
+        match (host.as_slice(), scan.enabled) {
+            ([line], Some((recognised, _))) if *line == recognised => Ok(()),
+            ([], _) => Err("no `enabled=` line for the host to replace; it would append outside Training's parse".into()),
+            ([line], None) => Err(format!(
+                "line {} is `enabled=` for the host but not [capture] enabled for Training",
+                line + 1
+            )),
+            ([line], Some((recognised, _))) => Err(format!(
+                "the host would rewrite line {} but Training reads [capture] enabled from line {}",
+                line + 1,
+                recognised + 1
+            )),
+            (lines, _) => Err(format!(
+                "{} `enabled=` lines; the host would rewrite only the first (line {})",
+                lines.len(),
+                lines[0] + 1
+            )),
+        }
+    }
+}
+
+/// Key the pinned Deluxe host persistence writer derives from one INI line:
+/// the `#` comment is stripped, the line is split at the first `=` and the key
+/// is trimmed. The host compares it exactly (case-sensitive); `;` is not a
+/// comment to it.
+pub fn host_persistence_key(line: &str) -> Option<&str> {
+    let line = line.split('#').next().unwrap_or("");
+    let (key, _) = line.split_once('=')?;
+    Some(key.trim())
+}
+
+/// Outcome of [`recover_previous_ini`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IniRecovery {
+    /// The INI exists; nothing was touched.
+    Present,
+    /// Only the host's `.previous.ini` backup existed and was renamed back.
+    Recovered,
+    /// Neither the INI nor a usable backup exists.
+    Absent,
+}
+
+/// The Deluxe host persists by writing `<stem>.tmp`, renaming the current file
+/// to `<stem>.previous.ini` and renaming the temporary into place. A crash
+/// between those renames leaves only the backup, so restore it before creating
+/// a default file. `*.tmp` is left alone (it may be incomplete). Mirrors the
+/// host's `config_store::recover`; the paths use the host's `with_extension`.
+pub fn recover_previous_ini(path: &Path) -> io::Result<IniRecovery> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => return Ok(IniRecovery::Present),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    let previous = path.with_extension("previous.ini");
+    match fs::symlink_metadata(&previous) {
+        Ok(metadata) if metadata.file_type().is_file() => {
+            fs::rename(&previous, path)?;
+            Ok(IniRecovery::Recovered)
+        }
+        Ok(_) => Ok(IniRecovery::Absent),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(IniRecovery::Absent),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A unique directory under the system temp dir, removed on drop (the fork's test_util::TempDir,
+    /// reduced to what these tests use).
+    struct TempDir(std::path::PathBuf);
+
+    impl TempDir {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "trainingrooms-capture-settings-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+            fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn path(&self) -> &std::path::Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn defaults_to_disabled_and_documents_the_ini_form() {
+        assert_eq!(CaptureSettings::default(), CaptureSettings { enabled: false });
+        assert_eq!(
+            DEFAULT_CAPTURE_INI,
+            "[capture]\nenabled=off\n"
+        );
+        assert_eq!(CaptureSettings::parse("# no setting\n").unwrap(), CaptureSettings::default());
+    }
+
+    #[test]
+    fn parses_supported_values_case_insensitively_with_comments() {
+        for value in ["on", "ON", "true", "TrUe", "1"] {
+            let settings = CaptureSettings::parse(&format!(
+                "[capture]\nenabled = {value} ; live match only\n"
+            ))
+            .unwrap();
+            assert!(settings.enabled, "value {value:?}");
+        }
+        for value in ["off", "OFF", "false", "FaLsE", "0"] {
+            let settings = CaptureSettings::parse(&format!(
+                "[capture]\nenabled={value} # capture disabled\n"
+            ))
+            .unwrap();
+            assert!(!settings.enabled, "value {value:?}");
+        }
+    }
+
+    #[test]
+    fn ignores_unrelated_sections_keys_and_global_values() {
+        let settings = CaptureSettings::parse(
+            "enabled=on\n[other]\nenabled=on\n[capture]\nunknown=value\n[other-again]\nenabled=off\n",
+        )
+        .unwrap();
+        assert_eq!(settings, CaptureSettings::default());
+    }
+
+    #[test]
+    fn rejects_invalid_and_duplicate_capture_values_clearly() {
+        let invalid = CaptureSettings::parse("[capture]\nenabled=maybe\n").unwrap_err();
+        assert!(invalid.contains("invalid [capture] enabled value"));
+        assert!(invalid.contains("on/off, true/false, or 1/0"));
+        assert!(CaptureSettings::parse("[capture]\nenabled\n")
+            .unwrap_err()
+            .contains("invalid [capture] enabled value"));
+
+        let duplicate = CaptureSettings::parse(
+            "[capture]\nenabled=on\n[other]\nenabled=off\n[capture]\nenabled=off\n",
+        )
+        .unwrap_err();
+        assert!(duplicate.contains("duplicate [capture] enabled value"));
+    }
+
+    /// Model of the pinned host writer (`apply_ini_assignment`): `#`-stripped,
+    /// exact key, section-unaware; replaces the first matching line in full,
+    /// else appends `key=value` after a terminating newline.
+    fn host_rewrite(contents: &str, key: &str, value: &str) -> String {
+        let assignment = format!("{key}={value}");
+        let mut lines: Vec<String> = contents.lines().map(str::to_owned).collect();
+        match lines.iter().position(|line| host_persistence_key(line) == Some(key)) {
+            Some(index) => lines[index] = assignment,
+            None => lines.push(assignment),
+        }
+        let mut out = lines.join("\n");
+        out.push('\n');
+        out
+    }
+
+    const COMPATIBLE: &[&str] = &[
+        DEFAULT_CAPTURE_INI,
+        "[capture]\nenabled=on\n",
+        "[capture]\nenabled = on ; live match only\n",
+        "[capture]\nenabled=off # capture disabled\n",
+        "[CAPTURE]\n enabled = On\n",
+        "# header\n[capture]\n# enabled=on is written by Deluxe\nenabled=off\n[other]\nkey=1\n",
+        "[capture]\nenabled=on\n[other]\nmode=b\nunrelated=enabled\n",
+        "[capture]\nenabled=1\n",
+    ];
+
+    const INCOMPATIBLE: &[(&str, &str)] = &[
+        ("", "no `enabled=` line"),
+        ("# nothing\n[capture]\n", "no `enabled=` line"),
+        ("[capture]\n;enabled=on\n", "no `enabled=` line"),
+        ("[capture]\nEnabled=on\n", "no `enabled=` line"),
+        ("enabled=on\n", "not [capture] enabled"),
+        ("[other]\nenabled=on\n", "not [capture] enabled"),
+        ("enabled=on\n[capture]\nenabled=off\n", "2 `enabled=` lines"),
+        ("[other]\nenabled=on\n[capture]\nenabled=off\n", "2 `enabled=` lines"),
+        ("[capture]\nenabled=off\n[other]\nenabled=on\n", "2 `enabled=` lines"),
+        ("[capture]\nenabled=on\n[capture]\nenabled=off\n", "duplicate [capture] enabled"),
+        ("[capture]\nenabled=maybe\n", "invalid [capture] enabled value"),
+        ("[capture]\nenabled=on\n[capture]\nEnabled=off\n", "duplicate [capture] enabled"),
+    ];
+
+    #[test]
+    fn host_rewrite_of_each_value_parses_back_without_duplicates() {
+        for fixture in COMPATIBLE {
+            CaptureSettings::persistence_compatible(fixture)
+                .unwrap_or_else(|reason| panic!("{fixture:?}: {reason}"));
+            let mut text = (*fixture).to_owned();
+            for value in ["on", "off", "off", "on"] {
+                text = host_rewrite(&text, CAPTURE_CONFIG_KEY, value);
+                let parsed = CaptureSettings::parse(&text)
+                    .unwrap_or_else(|error| panic!("{fixture:?} -> {text:?}: {error}"));
+                assert_eq!(parsed.enabled, value == "on", "{fixture:?} -> {text:?}");
+                let matches = text
+                    .lines()
+                    .filter(|line| host_persistence_key(line) == Some(CAPTURE_CONFIG_KEY))
+                    .count();
+                assert_eq!(matches, 1, "{fixture:?} -> {text:?}");
+                assert_eq!(CaptureSettings::persistence_compatible(&text), Ok(()), "{text:?}");
+                assert_eq!(text.lines().count(), fixture.lines().count(), "{text:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn incompatible_layouts_are_refused_with_the_reason() {
+        for (fixture, reason) in INCOMPATIBLE {
+            let error = CaptureSettings::persistence_compatible(fixture)
+                .expect_err(&format!("{fixture:?} must be refused"));
+            assert!(error.contains(reason), "{fixture:?}: {error:?} lacks {reason:?}");
+        }
+        // Why the refusals matter: the host rewrite would not take effect for Training.
+        let mixed_case = host_rewrite("[capture]\nEnabled=on\n", CAPTURE_CONFIG_KEY, "off");
+        assert!(CaptureSettings::parse(&mixed_case).unwrap_err().contains("duplicate"));
+        let other_first = host_rewrite("[other]\nenabled=on\n[capture]\nenabled=on\n", CAPTURE_CONFIG_KEY, "off");
+        assert!(CaptureSettings::parse(&other_first).unwrap().enabled);
+        let commented = host_rewrite("[capture]\n;enabled=on\n", CAPTURE_CONFIG_KEY, "on");
+        assert!(CaptureSettings::parse(&commented).unwrap().enabled);
+        let appended_elsewhere = host_rewrite("[capture]\n;enabled=on\n[other]\n", CAPTURE_CONFIG_KEY, "on");
+        assert!(!CaptureSettings::parse(&appended_elsewhere).unwrap().enabled);
+    }
+
+    #[test]
+    fn host_key_tokenization_matches_the_pinned_writer() {
+        assert_eq!(host_persistence_key("enabled=on"), Some("enabled"));
+        assert_eq!(host_persistence_key("  enabled = on # note"), Some("enabled"));
+        assert_eq!(host_persistence_key("enabled=on ; note"), Some("enabled"));
+        assert_eq!(host_persistence_key(";enabled=on"), Some(";enabled"));
+        assert_eq!(host_persistence_key("Enabled=on"), Some("Enabled"));
+        assert_eq!(host_persistence_key("# enabled=on"), None);
+        assert_eq!(host_persistence_key("[capture]"), None);
+        assert_eq!(host_persistence_key("enabled"), None);
+    }
+
+    #[test]
+    fn previous_ini_is_restored_only_when_the_ini_is_missing() {
+        let temp = TempDir::new();
+        let ini = temp.path().join("replay_capture.ini");
+        let previous = temp.path().join("replay_capture.previous.ini");
+        let tmp = temp.path().join("replay_capture.tmp");
+        assert_eq!(previous, ini.with_extension("previous.ini"));
+        assert_eq!(tmp, ini.with_extension("tmp"));
+
+        assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Absent);
+        fs::write(&tmp, "[capture]\nenabled=on\n").unwrap();
+        assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Absent);
+        assert!(!ini.exists() && tmp.exists(), "an incomplete temporary is never adopted");
+
+        fs::write(&previous, "[capture]\nenabled=on\n").unwrap();
+        assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Recovered);
+        assert!(!previous.exists());
+        assert_eq!(fs::read_to_string(&ini).unwrap(), "[capture]\nenabled=on\n");
+        assert!(tmp.exists());
+
+        fs::write(&previous, "[capture]\nenabled=off\n").unwrap();
+        assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Present);
+        assert_eq!(fs::read_to_string(&ini).unwrap(), "[capture]\nenabled=on\n");
+        assert!(previous.exists());
+
+        fs::remove_file(&ini).unwrap();
+        fs::remove_file(&previous).unwrap();
+        fs::create_dir(&previous).unwrap();
+        assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Absent);
+        assert!(!ini.exists());
+    }
+}
+
+// ---- additions for the menu's Replay capture toggle (draft 9, Q7; package 4) --------------------------
+
+/// The file's name below the storage root and its size cap (as the other small INI files).
+pub const FILE_NAME: &str = "replay_capture.ini";
+pub const MAX_BYTES: usize = 8 * 1024;
+
+impl CaptureSettings {
+    /// The document after the menu's toggle changed to `enabled`: the recognised `[capture] enabled`
+    /// line's value is replaced in place, so the host's persistence writer (which replaces the first
+    /// `enabled=` line) keeps finding the same line; every other line is kept. A document without that
+    /// line gets a `[capture]` section with it appended.
+    pub fn to_ini_text(original: &str, enabled: bool) -> String {
+        let value = if enabled { "on" } else { "off" };
+        let recognised = scan(original).ok().and_then(|s| s.enabled).map(|(index, _)| index);
+        let mut out = String::with_capacity(original.len() + 32);
+        match recognised {
+            Some(target) => {
+                for (index, raw) in original.lines().enumerate() {
+                    if index == target {
+                        // Keep a trailing comment: only the value after the first `=` is replaced.
+                        let (head, _) = raw.split_once('=').unwrap_or((raw, ""));
+                        let comment = raw.find([';', '#']).map(|at| raw[at..].to_owned());
+                        out.push_str(head);
+                        out.push('=');
+                        out.push_str(value);
+                        if let Some(comment) = comment {
+                            out.push(' ');
+                            out.push_str(&comment);
+                        }
+                    } else {
+                        out.push_str(raw);
+                    }
+                    out.push('\n');
+                }
+            }
+            None => {
+                out.push_str(original);
+                if !original.is_empty() && !original.ends_with('\n') {
+                    out.push('\n');
+                }
+                out.push_str("[capture]\nenabled=");
+                out.push_str(value);
+                out.push('\n');
+            }
+        }
+        out
+    }
+
+    /// Fail-closed read of the file's content: a missing, unreadable, oversized, non-UTF-8 or invalid
+    /// document reads as the default (off); the second value says why, for the diagnostics.
+    pub fn from_bytes(bytes: Option<&[u8]>) -> (Self, Option<String>) {
+        let Some(bytes) = bytes else { return (Self::default(), None) };
+        if bytes.len() > MAX_BYTES {
+            return (Self::default(), Some("larger than 8 KiB".to_owned()));
+        }
+        match std::str::from_utf8(bytes) {
+            Err(_) => (Self::default(), Some("not UTF-8".to_owned())),
+            Ok(text) => match Self::parse(text) {
+                Ok(settings) => (settings, None),
+                Err(reason) => (Self::default(), Some(reason)),
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod toggle_tests {
+    use super::*;
+
+    #[test]
+    fn the_toggle_rewrites_the_recognised_line_in_place() {
+        let original = "# notes\n[other]\nenabled=on\n[capture]\nenabled = off ; keep\nextra=1\n";
+        let on = CaptureSettings::to_ini_text(original, true);
+        assert_eq!(CaptureSettings::parse(&on).unwrap(), CaptureSettings { enabled: true });
+        assert!(on.contains("# notes\n") && on.contains("[other]\nenabled=on\n") && on.contains("extra=1\n"));
+        assert!(on.contains("enabled = on ; keep") || on.contains("enabled =on ; keep") || on.contains("enabled =on"));
+        // Round trip, and the layout stays host-persistence compatible when it was.
+        let off = CaptureSettings::to_ini_text(&on, false);
+        assert_eq!(CaptureSettings::parse(&off).unwrap(), CaptureSettings { enabled: false });
+        assert_eq!(on.lines().count(), original.lines().count());
+    }
+
+    #[test]
+    fn a_document_without_the_line_gets_one() {
+        let text = CaptureSettings::to_ini_text("# only a comment", true);
+        assert_eq!(CaptureSettings::parse(&text).unwrap(), CaptureSettings { enabled: true });
+        assert_eq!(CaptureSettings::to_ini_text("", false), "[capture]\nenabled=off\n");
+        let default = CaptureSettings::to_ini_text(DEFAULT_CAPTURE_INI, true);
+        assert_eq!(default, "[capture]\nenabled=on\n");
+        assert!(CaptureSettings::persistence_compatible(&default).is_ok());
+    }
+
+    #[test]
+    fn reads_fail_closed() {
+        assert_eq!(CaptureSettings::from_bytes(None), (CaptureSettings::default(), None));
+        assert_eq!(CaptureSettings::from_bytes(Some(b"[capture]\nenabled=on\n")).0, CaptureSettings { enabled: true });
+        let (settings, why) = CaptureSettings::from_bytes(Some(b"[capture]\nenabled=on\nenabled=off\n"));
+        assert!(!settings.enabled && why.is_some(), "a duplicate key is rejected");
+        let (settings, why) = CaptureSettings::from_bytes(Some(&[b'[', 0xff, 0xfe]));
+        assert!(!settings.enabled && why.as_deref() == Some("not UTF-8"));
+        let mut big = b"[capture]\nenabled=on\n".to_vec();
+        big.resize(MAX_BYTES + 1, b'#');
+        let (settings, why) = CaptureSettings::from_bytes(Some(&big));
+        assert!(!settings.enabled && why.is_some(), "oversized: nothing is used");
+    }
+}

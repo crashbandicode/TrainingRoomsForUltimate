@@ -14,13 +14,13 @@ use crate::runtime::features::input_delay;
 /// `StatePause::enter`, just before the game's pause-begin routine.
 #[skyline::hook(offset = sites_pause::PAUSE_ENTER_OFFSET, inline)]
 pub unsafe fn pause_enter(_ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter(HookId::PauseEnter);
+    let _scope = HookScope::enter_hook(HookId::PauseEnter);
     input_delay::pause_begin();
 }
 
 /// `StatePause::exit`'s epilogue, after the game cleared its pause flags.
 #[skyline::hook(offset = sites_pause::PAUSE_EXIT_OFFSET, inline)]
 pub unsafe fn pause_exit(_ctx: &mut InlineCtx) {
-    let _scope = HookScope::enter(HookId::PauseExit);
+    let _scope = HookScope::enter_hook(HookId::PauseExit);
     input_delay::pause_end();
 }

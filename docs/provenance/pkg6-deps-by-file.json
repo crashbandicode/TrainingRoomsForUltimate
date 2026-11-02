@@ -1,0 +1,1334 @@
+{
+ "scripts/input-display-bench/fixtures/baseline-input_log.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "InputDisplay": 1,
+   "MENU": 1
+  },
+  "src/common/consts.rs": {
+   "status_display_name": 2
+  },
+  "src/lib.rs": {
+   "menu": 2
+  },
+  "src/training/input_log.rs": {
+   "DirectionStrength": 1,
+   "InputLog": 1,
+   "DRAW_LOG_BASE_IDX": 1,
+   "NUM_LOGS": 1,
+   "P1_INPUT_LOGS": 1,
+   "WHITE": 1,
+   "YELLOW": 1,
+   "(module)": 1
+  },
+  "src/training/ui/menu.rs": {
+   "VANILLA_MENU_ACTIVE": 2
+  },
+  "src/training/ui/mod.rs": {
+   "fade_out": 1,
+   "PaneExt": 1,
+   "(module)": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "*": 1
+  }
+ },
+ "scripts/input-display-bench/fixtures/pre-7.1.2-input_log.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "InputDisplay": 1,
+   "MENU": 1
+  },
+  "src/common/consts.rs": {
+   "status_display_name": 2
+  },
+  "src/lib.rs": {
+   "menu": 2
+  },
+  "src/training/input_log.rs": {
+   "DirectionStrength": 1,
+   "InputLog": 1,
+   "DRAW_LOG_BASE_IDX": 1,
+   "NUM_LOGS": 1,
+   "P1_INPUT_LOGS": 1,
+   "WHITE": 1,
+   "YELLOW": 1,
+   "(module)": 1
+  },
+  "src/training/ui/menu.rs": {
+   "VANILLA_MENU_ACTIVE": 2
+  },
+  "src/training/ui/mod.rs": {
+   "fade_out": 1,
+   "PaneExt": 1,
+   "(module)": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "*": 1
+  }
+ },
+ "scripts/input-display-bench/rust/harness.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "InputDisplay": 2,
+   "OnOff": 1,
+   "TrainingModpackMenu": 1,
+   "MENU": 2
+  },
+  "training_mod_sync/src/lib.rs": {
+   "assign": 1,
+   "read": 2,
+   "RwLock": 5,
+   "LazyLock": 1
+  },
+  "src/training/ui/input_log.rs": {
+   "invalidate": 1,
+   "draw": 1
+  }
+ },
+ "scripts/input-display-bench/rust/shims/training_mod_consts.rs": {
+  "training_mod_sync/src/lib.rs": {
+   "RwLock": 2
+  }
+ },
+ "scripts/roster-grid/menu_pictures.rs": {
+  "src/lib.rs": {
+   "*": 1
+  }
+ },
+ "scripts/roster-grid/mips.rs": {
+  "src/lib.rs": {
+   "Result": 2
+  }
+ },
+ "scripts/roster-grid/stage_panel.rs": {
+  "src/lib.rs": {
+   "*": 1
+  }
+ },
+ "scripts/roster-grid/validation.rs": {
+  "src/lib.rs": {
+   "Result": 2
+  }
+ },
+ "src/automation_helper/native.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/automation_helper/observer.rs": {
+  "src/common/filesystem.rs": {
+   "write_results_observer": 1,
+   "init": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 3
+  },
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/automation_helper/plugin.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/body_bank_probe.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2
+  },
+  "src/common/input.rs": {
+   "MappedInputs": 1
+  },
+  "src/common/menu.rs": {
+   "(module)": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "src/training/save_states.rs": {
+   "is_loading": 1
+  }
+ },
+ "src/character_items.rs": {
+  "training_mod_sync/src/lib.rs": {
+   "assign": 1,
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "(module)": 2,
+   "try_get_module_accessor": 1
+  },
+  "src/common/consts.rs": {
+   "FighterId": 1
+  },
+  "src/training/mod.rs": {
+   "(module)": 2
+  },
+  "src/training/character_specific/items.rs": {
+   "ALL_CHAR_ITEMS": 1,
+   "TURNIP_CHOSEN": 1
+  },
+  "src/common/menu.rs": {
+   "captures_input": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 4
+  }
+ },
+ "src/character_lifecycle.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/character_memory.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/character_roster.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "OnOff": 1,
+   "TrainingModpackMenu": 1,
+   "TrioFighter": 1,
+   "MENU": 1,
+   "mii": 9
+  },
+  "training_mod_sync/src/lib.rs": {
+   "lock_write": 1,
+   "read": 1
+  },
+  "src/common/button_config.rs": {
+   "(module)": 1
+  },
+  "src/common/input.rs": {
+   "Buttons": 1,
+   "MappedInputs": 1
+  },
+  "src/common/menu.rs": {
+   "(module)": 1
+  },
+  "src/training/mod.rs": {
+   "(module)": 2
+  },
+  "src/common/mod.rs": {
+   "(module)": 1,
+   "is_ready_go": 3,
+   "FIGHTER_MANAGER_ADDR": 3,
+   "is_native_training_mode": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/character_sources.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 8,
+   "TrioFighter": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 30
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 2,
+   "try_get_battle_object": 1,
+   "try_get_module_accessor": 1,
+   "is_ready_go": 1
+  },
+  "src/common/consts.rs": {
+   "FighterId": 1
+  }
+ },
+ "src/console_load_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 5
+  }
+ },
+ "src/console_map_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "src/cpu_pilot.rs": {
+  "src/common/input.rs": {
+   "MappedInputs": 2
+  },
+  "src/common/menu.rs": {
+   "captures_input": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2
+  },
+  "src/training/ui/menu.rs": {
+   "VANILLA_MENU_ACTIVE": 1
+  },
+  "src/training/mod.rs": {
+   "recording_or_playback": 1
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1,
+   "FIGHTER_MANAGER_ADDR": 1,
+   "is_fighter": 2,
+   "try_get_module_accessor": 2,
+   "is_grounded": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 13
+  },
+  "training_mod_consts/src/lib.rs": {
+   "FighterId": 2
+  }
+ },
+ "src/cycle_preload.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 3,
+   "TrainingModpackMenu": 1,
+   "MENU": 1
+  },
+  "src/training/ui/notifications.rs": {
+   "clear_notification": 2,
+   "is_queued": 1,
+   "take_delivered": 1,
+   "upsert": 1,
+   "(module)": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 9
+  },
+  "src/common/menu.rs": {
+   "mii_preferences": 1,
+   "captures_input": 1
+  },
+  "src/common/mod.rs": {
+   "try_get_module_accessor": 1,
+   "is_ready_go": 1
+  },
+  "src/common/consts.rs": {
+   "FighterId": 1
+  },
+  "src/training/save_states.rs": {
+   "is_loading": 1
+  },
+  "src/training/mod.rs": {
+   "recording_or_playback": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  }
+ },
+ "src/cycle_preload_config.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TrainingModpackMenu": 2,
+   "MENU": 2,
+   "DEFAULTS_MENU": 2
+  },
+  "training_mod_sync/src/lib.rs": {
+   "assign": 1,
+   "read": 1
+  },
+  "src/common/menu.rs": {
+   "refresh_stored_menu_on_quick_app": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/effect_hook_chain.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "src/hang_trace.rs": {
+  "src/logging.rs": {
+   "writer_started": 1,
+   "drain": 1,
+   "diagnostic": 4,
+   "ring_stats": 1
+  },
+  "src/training/ui/mod.rs": {
+   "release_stale_archives": 1
+  }
+ },
+ "src/hazard_manager/policy.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  }
+ },
+ "src/item_state_probe.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2,
+   "try_get_module_accessor": 1
+  },
+  "src/common/consts.rs": {
+   "FighterId": 1
+  },
+  "src/common/input.rs": {
+   "MappedInputs": 1
+  },
+  "src/common/menu.rs": {
+   "(module)": 1
+  },
+  "src/training/character_specific/items.rs": {
+   "TURNIP_CHOSEN": 2
+  },
+  "src/training/save_states.rs": {
+   "is_loading": 1
+  },
+  "src/training/mod.rs": {
+   "recording_or_playback": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 12
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2,
+   "assign": 2
+  },
+  "src/training/ui/notifications.rs": {
+   "notification": 1
+  }
+ },
+ "src/kirby_hats.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "MENU": 2,
+   "TrainingModpackMenu": 1,
+   "TrioFighter": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2
+  },
+  "src/common/consts.rs": {
+   "FighterId": 2
+  },
+  "src/common/input.rs": {
+   "Buttons": 1,
+   "MappedInputs": 1,
+   "(module)": 1
+  },
+  "src/common/mod.rs": {
+   "(module)": 2,
+   "try_get_module_accessor": 1
+  },
+  "src/common/button_config.rs": {
+   "(module)": 1
+  },
+  "src/common/menu.rs": {
+   "(module)": 1
+  },
+  "src/training/mod.rs": {
+   "(module)": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 5
+  }
+ },
+ "src/kirby_resource_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "src/common/offsets.rs": {
+   "OFFSET_COPY_SETUP": 1,
+   "SITE_COPY_SETUP": 1
+  }
+ },
+ "src/lobby_stage_probe.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "OnOff": 1,
+   "MENU": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2
+  },
+  "src/common/menu.rs": {
+   "stage_preferences": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 8
+  },
+  "src/training/save_states.rs": {
+   "stage_id": 1
+  },
+  "src/hazard_manager/mod.rs": {
+   "waiting_hazards": 1
+  }
+ },
+ "src/mii_auto_init.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 6
+  },
+  "src/common/mod.rs": {
+   "is_ready_go": 2
+  }
+ },
+ "src/mii_backend.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 6
+  }
+ },
+ "src/mii_catalog_request.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 9
+  },
+  "src/common/menu.rs": {
+   "quick_menu_active": 1
+  }
+ },
+ "src/mii_cpu_adapter.rs": {
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1
+  }
+ },
+ "src/mii_editor_bridge/connected.rs": {
+  "src/common/menu.rs": {
+   "captures_input": 1
+  }
+ },
+ "src/mii_editor_bridge/connected_native.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/mii_editor_bridge/editor_origin.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/mii_editor_bridge/fingerprints.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "src/mii_editor_bridge/mod.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  },
+  "src/common/filesystem.rs": {
+   "write_mii_editor": 1,
+   "init": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 5
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 3
+  },
+  "src/training/ui/notifications.rs": {
+   "notification": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "lock_write": 1,
+   "assign": 1
+  },
+  "src/common/menu.rs": {
+   "QUICK_MENU_APP": 1,
+   "MENU_RECEIVED_INPUT": 1,
+   "quick_menu_active": 1,
+   "captures_input": 1
+  },
+  "training_mod_tui/src/lib.rs": {
+   "AppPage": 1
+  }
+ },
+ "src/mii_editor_bridge/native.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 4
+  }
+ },
+ "src/mii_editor_bridge/native_default.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/mii_editor_bridge/resume_adapter.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  },
+  "src/common/menu.rs": {
+   "captures_input": 1
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1
+  }
+ },
+ "src/mii_editor_bridge/settings_resume.rs": {
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/mii_editor_bridge/ui_resume.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  }
+ },
+ "src/mii_fullconfig_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 8
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1
+  }
+ },
+ "src/mii_hud_portrait.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  }
+ },
+ "src/mii_hud_portrait_policy.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/mii_identity_binding.rs": {
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1
+  }
+ },
+ "src/mii_identity_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 4
+  }
+ },
+ "src/mii_ldn_qualification.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2
+  },
+  "training_mod_consts/src/lib.rs": {
+   "mii": 4
+  },
+  "src/logging.rs": {
+   "diagnostic": 9
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  }
+ },
+ "src/mii_managed_helper.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  },
+  "src/logging.rs": {
+   "diagnostic": 4
+  }
+ },
+ "src/mii_native_access.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 7
+  }
+ },
+ "src/mii_native_adapter.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 6
+  }
+ },
+ "src/mii_native_cpu_scope.rs": {
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1,
+   "FIGHTER_MANAGER_ADDR": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  }
+ },
+ "src/mii_ordinary_cpu.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 60
+  },
+  "src/common/mod.rs": {
+   "is_ready_go": 1
+  }
+ },
+ "src/mii_ordinary_cpu_native.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 27
+  }
+ },
+ "src/mii_ordinary_gate.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/mii_ordinary_native.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 27
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1
+  }
+ },
+ "src/mii_ordinary_player.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 35
+  },
+  "src/common/mod.rs": {
+   "is_ready_go": 1
+  }
+ },
+ "src/mii_origin_observer.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/mii_pool_observer.rs": {
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1,
+   "is_native_training_mode": 1,
+   "is_ready_go": 1
+  }
+ },
+ "src/mii_preview_observer.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 3
+  },
+  "src/common/filesystem.rs": {
+   "write_mii_preview": 1,
+   "init": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/mii_quit_observer.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  },
+  "src/common/filesystem.rs": {
+   "write_mii_quit": 2,
+   "init": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/mii_replay.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 9
+  },
+  "src/common/mod.rs": {
+   "is_ready_go": 1
+  }
+ },
+ "src/mii_saved_alpha.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 17
+  },
+  "src/common/menu.rs": {
+   "quick_menu_active": 2
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1,
+   "is_ready_go": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "lock_write": 1,
+   "assign": 1
+  }
+ },
+ "src/mii_saved_file_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "src/mii_saved_native.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1,
+   "FIGHTER_MANAGER_ADDR": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  }
+ },
+ "src/mii_selector_native.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 1
+  }
+ },
+ "src/mii_source_provenance.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 41
+  }
+ },
+ "src/native_body_bank.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 7,
+   "TrainingModpackMenu": 5,
+   "MENU": 3
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 3
+  }
+ },
+ "src/native_gc_guard.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "src/native_keyboard.rs": {
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/native_keyboard/inline_keyboard.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/native_source.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 1,
+   "mii": 4
+  },
+  "src/common/mod.rs": {
+   "FIGHTER_MANAGER_ADDR": 2,
+   "is_native_training_mode": 1
+  }
+ },
+ "src/native_source_actors.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/native_source_capacity.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2
+  },
+  "training_mod_consts/src/lib.rs": {
+   "mii": 9
+  },
+  "src/logging.rs": {
+   "diagnostic": 15
+  }
+ },
+ "src/native_unlink_install.rs": {
+  "src/logging.rs": {
+   "diagnostic": 4
+  }
+ },
+ "src/native_unlink_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/practice_stage_observer.rs": {
+  "src/logging.rs": {
+   "diagnostic": 4
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 2
+  }
+ },
+ "src/practice_stage_request.rs": {
+  "src/logging.rs": {
+   "diagnostic": 8
+  },
+  "src/training/ui/notifications.rs": {
+   "clear_notification": 2,
+   "notification": 2
+  },
+  "src/hazard_manager/mod.rs": {
+   "waiting_hazards": 1
+  }
+ },
+ "src/practice_trace.rs": {
+  "src/logging.rs": {
+   "diagnostic": 8
+  }
+ },
+ "src/preload_metrics.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3,
+   "heap_profile": 1
+  }
+ },
+ "src/source_capacity_probe.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2
+  },
+  "src/common/input.rs": {
+   "MappedInputs": 1
+  },
+  "src/common/menu.rs": {
+   "(module)": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "src/training/save_states.rs": {
+   "is_loading": 2
+  },
+  "src/training/mod.rs": {
+   "recording_or_playback": 1
+  },
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 1
+  }
+ },
+ "src/source_ldn_capacity_probe.rs": {
+  "src/common/mod.rs": {
+   "(module)": 2
+  },
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 4
+  }
+ },
+ "src/source_lifecycle_probe.rs": {
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1,
+   "FIGHTER_MANAGER_ADDR": 1,
+   "is_ready_go": 1
+  },
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 10
+  }
+ },
+ "src/source_owner_probe.rs": {
+  "src/common/mod.rs": {
+   "is_native_training_mode": 6,
+   "is_ready_go": 3,
+   "FIGHTER_MANAGER_ADDR": 2,
+   "try_get_module_accessor": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 29
+  },
+  "src/common/consts.rs": {
+   "FighterId": 1
+  }
+ },
+ "src/stage_asset_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 6
+  }
+ },
+ "src/swap_native/body_graph.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/copy_packages.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/identity_view.rs": {
+  "src/logging.rs": {
+   "diagnostic": 6
+  }
+ },
+ "src/swap_native/mii_setup.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/presentation.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/r_handle.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/scope_gate.rs": {
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/swap_native/seam_drill.rs": {
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/swap_native/seam_install.rs": {
+  "src/logging.rs": {
+   "(module)": 2
+  }
+ },
+ "src/swap_native/special_articles.rs": {
+  "src/logging.rs": {
+   "diagnostic": 1
+  }
+ },
+ "src/training/lobby.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "Action": 1,
+   "FighterId": 1,
+   "LedgeOption": 1,
+   "OnOff": 1,
+   "MENU": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 1
+  },
+  "src/common/menu.rs": {
+   "clear_session_state": 1
+  },
+  "src/common/button_config.rs": {
+   "clear_session_state": 1
+  },
+  "src/common/mod.rs": {
+   "is_fighter": 1,
+   "is_operation_cpu": 1,
+   "is_ready_go": 1
+  }
+ },
+ "src/training/practice.rs": {
+  "src/common/mod.rs": {
+   "(module)": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 1
+  },
+  "src/lib.rs": {
+   "consts": 5
+  }
+ },
+ "src/training/practice_policy.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 1
+  }
+ },
+ "src/training/seams.rs": {
+  "src/common/offsets.rs": {
+   "*": 1,
+   "(module)": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 2
+  }
+ },
+ "src/training/ui/anchors.rs": {
+  "src/common/offsets.rs": {
+   "OFFSET_UI_MANAGER_LOCATOR": 1,
+   "OFFSET_UI_PASS_CALCULATE_LOCATOR": 1,
+   "OFFSET_UI_REGISTER_CALCULATE_LOCATOR": 1,
+   "SITE_UI_MANAGER_LOCATOR": 1,
+   "SITE_UI_MANAGER_PROLOGUE": 1,
+   "SITE_UI_PASS_CALCULATE": 1,
+   "SITE_UI_PASS_CALCULATE_LOCATOR": 1,
+   "SITE_UI_REGISTER_CALCULATE": 1,
+   "SITE_UI_REGISTER_CALCULATE_LOCATOR": 1,
+   "(module)": 1
+  },
+  "src/logging.rs": {
+   "diagnostic": 8
+  }
+ },
+ "src/training/ui/native_menu.rs": {
+  "src/logging.rs": {
+   "diagnostic": 2
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 2
+  }
+ },
+ "src/training/ui/roster_grid.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "App": 1,
+   "AppPage": 1
+  }
+ },
+ "src/training/ui/stage_grid.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "App": 1
+  }
+ },
+ "src/training_stage_rotation.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "OnOff": 1,
+   "MENU": 1
+  },
+  "training_mod_sync/src/lib.rs": {
+   "read": 2
+  },
+  "src/logging.rs": {
+   "diagnostic": 2
+  },
+  "src/common/menu.rs": {
+   "stage_preferences": 1
+  },
+  "src/common/mod.rs": {
+   "is_native_training_mode": 1
+  }
+ },
+ "src/turnip_face_caller_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 7
+  }
+ },
+ "src/turnip_visibility_probe.rs": {
+  "src/logging.rs": {
+   "diagnostic": 3
+  }
+ },
+ "training_mod_consts/src/body_bank.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 21
+  }
+ },
+ "training_mod_consts/src/capacity_creation.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  }
+ },
+ "training_mod_consts/src/character_forms.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 3,
+   "TrainingModpackMenu": 1,
+   "OnOff": 8,
+   "BASE_MENU": 1
+  }
+ },
+ "training_mod_consts/src/character_items.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "Toggle": 1,
+   "NX_SUBMENU_COLUMNS": 1,
+   "NX_SUBMENU_ROWS": 1,
+   "BASE_MENU": 1,
+   "create_app": 1,
+   "TrainingModpackMenu": 2,
+   "OnOff": 1
+  },
+  "training_mod_tui/src/lib.rs": {
+   "App": 1,
+   "InputControl": 1
+  }
+ },
+ "training_mod_consts/src/cycle_preload_capacity.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 10
+  }
+ },
+ "training_mod_consts/src/cycle_preload_config.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TOGGLE_MAX": 4,
+   "OnOff": 30,
+   "impl_submenutrait": 2,
+   "TrainingModpackMenu": 5,
+   "TRAINING_MODPACK_ROOT": 2,
+   "BASE_MENU": 50,
+   "create_app": 2
+  },
+  "training_mod_tui/src/lib.rs": {
+   "StatefulSlider": 2,
+   "StatefulTable": 2,
+   "SubMenu": 2,
+   "SubMenuType": 2,
+   "Toggle": 2,
+   "NX_SUBMENU_COLUMNS": 2,
+   "NX_SUBMENU_ROWS": 2
+  },
+  "training_mod_consts/src/options.rs": {
+   "SubMenuTrait": 3
+  }
+ },
+ "training_mod_consts/src/lobby_stages.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "Toggle": 1,
+   "NX_SUBMENU_COLUMNS": 1,
+   "NX_SUBMENU_ROWS": 1,
+   "InputControl": 2,
+   "AppPage": 5,
+   "App": 3
+  },
+  "training_mod_consts/src/lib.rs": {
+   "BASE_MENU": 6,
+   "MenuJsonStruct": 12,
+   "create_app": 1,
+   "TrainingModpackMenu": 2
+  }
+ },
+ "training_mod_consts/src/mii_cycle.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 1
+  }
+ },
+ "training_mod_consts/src/ordered_roster.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "Toggle": 1,
+   "NX_SUBMENU_COLUMNS": 1,
+   "NX_SUBMENU_ROWS": 1,
+   "InputControl": 2
+  },
+  "training_mod_consts/src/lib.rs": {
+   "TrioFighter": 1
+  }
+ },
+ "training_mod_consts/src/practice_setup.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "SETUP_LIBRARY_DIR": 2
+  }
+ },
+ "training_mod_consts/src/roster_menu_tests.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "AppPage": 1
+  }
+ },
+ "training_mod_consts/src/swap_model/capabilities.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2,
+   "TrioFighter": 2
+  }
+ },
+ "training_mod_consts/src/swap_model/hud_model.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 8
+  }
+ },
+ "training_mod_consts/src/swap_model/presentation.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 4
+  }
+ },
+ "training_mod_consts/src/swap_model/target.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2
+  }
+ },
+ "training_mod_consts/src/swap_model/tests.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 2,
+   "TrioFighter": 2
+  }
+ },
+ "training_mod_consts/src/trio.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "Toggle": 1,
+   "NX_SUBMENU_COLUMNS": 1,
+   "NX_SUBMENU_ROWS": 1,
+   "InputControl": 2,
+   "AppPage": 2
+  },
+  "training_mod_consts/src/lib.rs": {
+   "create_app": 1,
+   "BASE_MENU": 2,
+   "OnOff": 1,
+   "TrainingModpackMenu": 1
+  }
+ },
+ "training_mod_consts/tests/scope_callbacks.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "swap_native": 1
+  }
+ },
+ "training_mod_consts/tests/stage_forms_restore.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "MenuJsonStruct": 1,
+   "BASE_MENU": 1,
+   "create_app": 1
+  },
+  "training_mod_tui/src/lib.rs": {
+   "App": 1,
+   "InputControl": 1
+  }
+ },
+ "training_mod_consts/tests/training_rotation_restore.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "MenuJsonStruct": 1,
+   "OnOff": 1,
+   "BASE_MENU": 1,
+   "create_app": 1
+  },
+  "training_mod_tui/src/lib.rs": {
+   "App": 1,
+   "AppPage": 1,
+   "InputControl": 1
+  }
+ },
+ "training_mod_mii/tests/source_provenance.rs": {
+  "training_mod_consts/src/lib.rs": {
+   "mii": 4
+  }
+ },
+ "training_mod_tui/src/mii_menu.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "NX_SUBMENU_COLUMNS": 1,
+   "NX_SUBMENU_ROWS": 1
+  }
+ },
+ "training_mod_tui/src/stage_menu.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "NX_SUBMENU_COLUMNS": 1
+  }
+ },
+ "training_mod_tui/tests/test_mii_catalog.rs": {
+  "training_mod_tui/src/lib.rs": {
+   "App": 1,
+   "AppPage": 1,
+   "InputControl": 1,
+   "StatefulTable": 1,
+   "SubMenu": 1,
+   "SubMenuType": 1,
+   "Tab": 1
+  }
+ }
+}

@@ -354,13 +354,26 @@ fn decode<R: Record>(data: &[u8]) -> Result<R, R::Error> {
     }
 }
 
-pub fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
+/// Write `bytes` to `path` so a reader or an interrupted write never sees a partial file: the bytes go
+/// to `<path>.tmp`, are synced, then replace the target (through a `.bak` where rename cannot
+/// replace). The old file is retired only after the new one is in place; on any failure it stays.
+/// Added for package 3's `save_states.json` (same rule as the store's own writes).
+pub fn write_replace(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let tmp = with_suffix(path, ".tmp");
+    let result = write_synced(&tmp, bytes).and_then(|()| replace_file(&tmp, path));
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result
+}
+
+fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     file.write_all(bytes)?;
     file.sync_all()
 }
 
-pub fn replace_file(tmp: &Path, dest: &Path) -> io::Result<()> {
+fn replace_file(tmp: &Path, dest: &Path) -> io::Result<()> {
     let first = match fs::rename(tmp, dest) {
         Ok(()) => return Ok(()),
         Err(err) => err,

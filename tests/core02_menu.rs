@@ -1475,17 +1475,18 @@ fn chord_text_and_row_conversion() {
 
 #[test]
 fn replay_capture_toggle_writes_its_ini() {
+    // The INI is the file of record and defaults to off (lead ruling 2026-11-02): so does the env.
     let mut m = menu();
     let r = goto(&mut m, "Replay capture");
+    assert_eq!(m.value(r), RowValue::Toggle(false));
+    m.press(Button::A);
     assert_eq!(m.value(r), RowValue::Toggle(true));
-    m.press(Button::A);
-    assert_eq!(m.value(r), RowValue::Toggle(false));
-    assert_eq!(m.take_outbox().replay_capture, Some(false));
-    m.press(Button::A);
     assert_eq!(m.take_outbox().replay_capture, Some(true));
+    m.press(Button::A);
+    assert_eq!(m.take_outbox().replay_capture, Some(false));
     // The file value is the input; the toggle is not a settings row.
-    let m = menu_with(Env { replay_capture: false, ..Env::default() });
-    assert_eq!(m.value(r), RowValue::Toggle(false));
+    let m = menu_with(Env { replay_capture: true, ..Env::default() });
+    assert_eq!(m.value(r), RowValue::Toggle(true));
     assert!(m.settings().menu.get("replay_capture").is_none());
 }
 
@@ -1514,13 +1515,13 @@ fn core03_item_grid_layout_handheld() {
 fn core03_stage_grid_layout_docked() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
     assert_eq!((l.cols, l.rows, l.short_names), (5, 8, true));
-    assert_eq!(l.tiles(), 118, "All + 117");
+    assert_eq!(l.tiles(), STAGE_TILES, "All + the catalog");
 }
 
 #[test]
 fn core03_stage_grid_pages_docked_40_40_38() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
-    assert_eq!(pages_of(&l), [40, 40, 38]);
+    assert_eq!(pages_of(&l), [40, 40, STAGE_TILES - 80]);
 }
 
 #[test]
@@ -1533,7 +1534,7 @@ fn core03_stage_grid_layout_handheld() {
 fn core03_stage_grid_pages_handheld_8() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
     assert_eq!(l.pages(), 8);
-    assert_eq!(pages_of(&l), [16, 16, 16, 16, 16, 16, 16, 6]);
+    assert_eq!(pages_of(&l), [16, 16, 16, 16, 16, 16, 16, STAGE_TILES - 112]);
 }
 
 #[test]
@@ -1546,7 +1547,7 @@ fn core03_item_grid_pages_cover_38_items_once() {
 }
 
 #[test]
-fn core03_stage_grid_pages_cover_118_tiles_once() {
+fn core03_stage_grid_pages_cover_every_tile_once() {
     for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
         let l = GridLayout::new(GridKind::Stages, mode);
         let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.per_page()).filter_map(move |c| l.tile(p, c))).collect();

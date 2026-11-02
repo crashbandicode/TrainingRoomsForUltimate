@@ -125,7 +125,7 @@ fn core04_recovery_write_failure_leaves_the_original_active_and_logs_it() {
 
     let boot = settings_file::load(&dir);
     check_recovered(&boot.settings); // this boot still uses the recovered settings
-    assert!(boot.notes.iter().any(|n| n.contains("recovery abandoned") && n.contains(TEMP_NAME)), "{:?}", boot.notes);
+    assert!(boot.notes.iter().any(|n| n.contains("recovery abandoned") && n.contains("could not write settings.json")), "{:?}", boot.notes);
     assert_eq!(read(&dir, file::SETTINGS), original, "the original stays active, byte for byte");
     assert!(!names(&dir).iter().any(|n| n.starts_with("settings.invalid-")), "no backup without a replacement");
 

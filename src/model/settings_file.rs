@@ -6,18 +6,19 @@
 //! field by field by `settings::parse_bytes`. Recovery then has to leave the player's disk in a state
 //! the next boot reads back to the same settings, so it is a transaction, in this order:
 //!
-//! 1. the sanitized complete settings (both snapshots, saved defaults, unknown keys kept) are written
-//!    and synced to `settings.json.tmp`;
-//! 2. the untouched bytes of the original are written and synced to the first free
-//!    `settings.invalid-<n>.json`, and read back to prove they are identical;
-//! 3. only then is the sanitized file moved over the active path (`store::replace_file`: rename, or
-//!    the old file moved aside and put back on failure where rename cannot replace, as on FAT), and
-//!    for the fork's old file name the old file is retired afterwards.
+//! 1. the untouched bytes of the original are written to the first free `settings.invalid-<n>.json`
+//!    and read back to prove they are identical;
+//! 2. only then are the sanitized complete settings (both snapshots, saved defaults, unknown keys
+//!    kept) written over the active path, and for the fork's old file name the old file is retired
+//!    afterwards.
 //!
-//! Any failure before step 3 leaves the original active and untouched (and leaves no half-made
-//! backup behind), is logged, and is retried at the next boot; the recovered settings are still what
-//! this boot uses. A crash inside step 3's fallback leaves `settings.json.bak`, which the next load
-//! moves back before it reads anything.
+//! Both writes are `store::write_replace`, the Store's one transactional write: the bytes go to
+//! `<path>.tmp`, are synced, then replace the target (through a `.bak` where rename cannot replace,
+//! as on FAT); the old file stays if anything fails. A failure of step 2 removes the backup of step
+//! 1 again, so the original stays active and untouched and nothing is left behind; it is logged and
+//! retried at the next boot, and the recovered settings are still what this boot uses. A crash inside
+//! the replace fallback leaves `settings.json.bak`, which the next load moves back before it reads
+//! anything.
 
 use std::fs;
 use std::io;
@@ -25,9 +26,9 @@ use std::path::Path;
 
 use super::settings::{self, Settings};
 use super::storage::{self, SettingsSource};
-use super::store::{replace_file, write_synced};
+use super::store::write_replace;
 
-/// The sanitized file before it replaces the active one.
+/// The temporary file `write_replace` uses for the active file.
 pub const TEMP_NAME: &str = "settings.json.tmp";
 /// What the replace fallback leaves behind if the process dies inside it.
 pub const BACKUP_NAME: &str = "settings.json.bak";
@@ -90,46 +91,32 @@ fn restore_orphaned_backup(dir: &Path, active: &Path, notes: &mut Vec<String>) {
     }
 }
 
-/// Steps 1 to 3 of the module comment. Never panics, never leaves a half-made backup.
+/// Steps 1 and 2 of the module comment. Never panics, never leaves a half-made backup.
 fn recover(dir: &Path, path: &Path, source: SettingsSource, original: &[u8], recovered: &Settings, notes: &mut Vec<String>) {
-    let temp = dir.join(TEMP_NAME);
     let abandon = |notes: &mut Vec<String>, what: String| {
         notes.push(format!("[TrainingRooms] settings recovery abandoned: {what}; the original file stays active"));
     };
-
-    if let Err(error) = write_synced(&temp, recovered.to_json().as_bytes()) {
-        let _ = fs::remove_file(&temp);
-        return abandon(notes, format!("could not write {TEMP_NAME}: {error}"));
-    }
 
     let Some(backup) = storage::first_free_invalid_copy(|name| exists(&dir.join(name)))
         .and_then(storage::invalid_copy_name)
         .map(|name| dir.join(name.as_str()))
     else {
-        let _ = fs::remove_file(&temp);
         return abandon(notes, "no free settings.invalid-<n>.json".to_owned());
     };
-    let backed_up = write_synced(&backup, original).and_then(|()| match fs::read(&backup) {
+    let backed_up = write_replace(&backup, original).and_then(|()| match fs::read(&backup) {
         Ok(copy) if copy == original => Ok(()),
         Ok(_) => Err(io::Error::other("the backup does not read back identical")),
         Err(error) => Err(error),
     });
     if let Err(error) = backed_up {
-        let _ = fs::remove_file(&temp);
         let _ = fs::remove_file(&backup);
         return abandon(notes, format!("could not keep {}: {error}", file_name(&backup)));
     }
 
     // Publish: the sanitized settings become `settings.json`.
-    let active = dir.join(storage::file::SETTINGS);
-    let published = match source {
-        SettingsSource::Current => replace_file(&temp, &active),
-        _ => fs::rename(&temp, &active),
-    };
-    if let Err(error) = published {
-        let _ = fs::remove_file(&temp);
+    if let Err(error) = write_replace(&dir.join(storage::file::SETTINGS), recovered.to_json().as_bytes()) {
         let _ = fs::remove_file(&backup);
-        return abandon(notes, format!("could not replace {}: {error}", file_name(path)));
+        return abandon(notes, format!("could not write {}: {error}", storage::file::SETTINGS));
     }
     if source == SettingsSource::LegacyName {
         // The fork's old file is retired only now that `settings.json` holds the recovered settings.
@@ -144,12 +131,8 @@ fn file_name(path: &Path) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-/// Write `settings` as the active file: the same temp-file-then-replace publish the recovery uses (the
-/// menu's writer, a later package, calls this).
+/// Write `settings` as the active file: the Store's transactional write (the menu's writer, a later
+/// package, calls this).
 pub fn save(dir: &Path, settings: &Settings) -> io::Result<()> {
-    let temp = dir.join(TEMP_NAME);
-    write_synced(&temp, settings.to_json().as_bytes())?;
-    replace_file(&temp, &dir.join(storage::file::SETTINGS)).inspect_err(|_| {
-        let _ = fs::remove_file(&temp);
-    })
+    write_replace(&dir.join(storage::file::SETTINGS), settings.to_json().as_bytes())
 }

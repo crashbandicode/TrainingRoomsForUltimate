@@ -1,0 +1,10 @@
+{"ev":"flags","role":0,"note":"Training (Ally d-hang1-sep e2)"}
+{"ev":"flags","role":1}
+{"ev":"window","role":1,"cells":[29],"actors":1,"note":"CPU Meta Knight 0x1d placed on the CSS (allocation owner=1), never cycled"}
+{"ev":"window","role":0,"cells":[7,8,9],"actors":1,"active":0,"note":"S-A1 e2 scene 1: pick 1 from the original Mario → Fox window [7,8,9], ready 3,112,483 µs"}
+{"ev":"prefetch","role":0,"group":0,"kinds":[10,11,12],"note":"[a,b,c] prefetched (the teardown later releases keys=3)"}
+{"ev":"expect","role":0,"tree":6}
+{"ev":"reload","role":0,"cells":[27,28,29],"actors":1,"bank":true,"note":"L6590 submit … target=0x1b; L6592 teardown … keys=3 skipped=0; L6594 build [27,28,29]; L6596 reload incoming=(3,[1b,1c,1d]) active=(3,[7,8,9]) — the mirror: 0x1d is the CPU's live kind; L6609–L6627 six unloads"}
+{"ev":"expect","role":0,"tree":3,"map":6,"loader":6,"note":"after state 6: the six unloads cleared the old tree (9 → 0), native requested 0x1b and the hook 0x1c/0x1d ({0,6} each: 6 keys), the three NROs are requested"}
+{"ev":"ready","role":0,"note":"L6633 published; L6714 ready; L6720 PreloadMetrics (request 3,038,450 µs); 0 unmapped reads in the session"}
+{"ev":"expect","role":0,"loader":14,"install":false,"map":0,"tree":3}
