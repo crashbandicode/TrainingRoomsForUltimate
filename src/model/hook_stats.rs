@@ -121,6 +121,8 @@ thread_local! {
     static HOOK_DEPTH: Cell<u32> = const { Cell::new(0) };
     /// Nesting depth of per_load sections on this thread.
     static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// Nesting depth of uncounted sections on this thread.
+    static UNCOUNTED_DEPTH: Cell<u32> = const { Cell::new(0) };
 }
 
 static HOOK_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
@@ -206,6 +208,20 @@ pub fn hook_allocations() -> u64 {
 /// Allocations made inside per_load sections of hooks since boot.
 pub fn load_allocations() -> u64 {
     LOAD_ALLOCATIONS.load(Ordering::Relaxed)
+}
+
+/// Run `work` without counting its allocations at all: diagnostic instrumentation that is not product code (the diag
+/// build's stock-archive dump). Never for code the shipped build runs.
+pub fn uncounted<R>(work: impl FnOnce() -> R) -> R {
+    struct Leave;
+    impl Drop for Leave {
+        fn drop(&mut self) {
+            let _ = UNCOUNTED_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
+        }
+    }
+    let _ = UNCOUNTED_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
+    let _leave = Leave;
+    work()
 }
 
 /// Run work as the once-per-load part of a hook (the layout archive the game hands over once per Training load): its
