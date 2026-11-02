@@ -59,9 +59,49 @@ impl<T: Copy + Serialize, const N: usize> Serialize for FixedVec<T, N> {
     }
 }
 
+/// Up to `N` copies of `T` held in an array (no heap), read as a slice: the roster and hat lists the preload planner builds on
+/// every planning tick inside the fighter-frame hook (R5, fix ledger F10). `fill` is the value of the unused tail.
+#[derive(Clone, Copy, Debug)]
+pub struct FixedList<T: Copy, const N: usize> {
+    items: [T; N],
+    len: usize,
+}
+
+impl<T: Copy, const N: usize> FixedList<T, N> {
+    pub const fn new(fill: T) -> Self {
+        Self { items: [fill; N], len: 0 }
+    }
+
+    /// Append `item`; `false` (and nothing stored) when the list is full.
+    pub fn push(&mut self, item: T) -> bool {
+        if self.len == N {
+            return false;
+        }
+        self.items[self.len] = item;
+        self.len += 1;
+        true
+    }
+}
+
+impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
+    type Target = [T];
+    fn deref(&self) -> &[T] {
+        &self.items[..self.len]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fixed_list_reads_as_the_slice_of_what_was_pushed() {
+        let mut list = FixedList::<u32, 3>::new(0);
+        assert!(list.is_empty());
+        assert!(list.push(7) && list.push(8) && list.push(9) && !list.push(10));
+        assert_eq!(&*list, &[7, 8, 9]);
+        assert_eq!(list.iter().copied().max(), Some(9));
+    }
 
     #[test]
     fn it_fills_to_its_capacity_and_then_refuses() {

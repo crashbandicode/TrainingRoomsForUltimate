@@ -37,3 +37,6 @@ mod grid_matches_catalog {
         assert!(without.len() <= 3, "{without:?}");
     }
 }
+
+#[cfg(test)]
+mod planner_alloc_tests;
