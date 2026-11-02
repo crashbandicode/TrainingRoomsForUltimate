@@ -22,8 +22,7 @@ Playbook followed: `53fd1f2`. Host only; no Eden, no Switch, no push.
 - The Training reset hub is not wired: it needs the fighter on-init wrapper to know the CPU-operated fighter
   (FighterManager and FighterInformation accessors, SPEC-state-01 §3). Until then the input-delay queue is not
   cleared on a reset or save-state load (B8) and the two on-init sites are compared but not hooked.
-- Input owners other than gameplay (menu, stop chord, native UI, replay editor, vanilla pause) are not wired
-  (`Owners::NONE`): they belong to packages 4-5.
+- Input owners: `published::INPUT_OWNERS` (an atomic of `Owners` bits) is read by the input-delay hook on every poll. Nothing sets a bit yet: the menu (package 5), stop chord and replay editor (4), native UI busy (6) and the game's pause menu each need their own detection facts (open/close state, chord consumption, the pause-menu flag), which are not in package 1's specs.
 - Unknown settings rows are kept on rewrite (see `docs/test-provenance/package-1.md` note 1).
 
 ## Exact commands

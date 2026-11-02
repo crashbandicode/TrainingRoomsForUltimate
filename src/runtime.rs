@@ -9,6 +9,7 @@ mod boot;
 mod diag_log;
 mod features;
 mod game;
+mod hub;
 mod install;
 mod published;
 

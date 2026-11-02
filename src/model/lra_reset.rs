@@ -94,9 +94,42 @@ pub fn reset_in_game_counters(counters: &mut [FrameCounter]) {
     }
 }
 
+/// Where the hub reads the fighter on init (facts read from the 13.0.5 `Fighter` on-init function,
+/// `main+0x60dfa0`, whose first instructions are guarded by the `on_init` site: `ldp w9, w8, [x0,
+/// #0xc]` loads the fighter kind and the entry id from the fighter object).
+pub const FIGHTER_ENTRY_ID_FIELD: usize = 0x10;
+/// Fighter entry ids are `0..8` (the game compares against 8 before indexing its table).
+pub const ENTRY_COUNT: i32 = 8;
+/// The `FighterManager` singleton slot (`_ZN3lib9SingletonIN3app14FighterManagerEE9instance_E`, in
+/// `.bss`): holds the manager pointer. Derived from the guarded `adrp`/`ldr` pair of the on-init
+/// function; `manager_slot_offset` recomputes it from those words.
+pub const FIGHTER_MANAGER_SLOT_OFFSET: usize = 0x52b_94f8;
+
+/// A valid entry id.
+pub fn entry_id_valid(entry: i32) -> bool {
+    (0..ENTRY_COUNT).contains(&entry)
+}
+
+/// The offset of the pointer slot an `adrp Xn, page; ldr Xt, [Xn, #imm]` pair at `adrp_site` reads
+/// (the 64-bit unsigned-offset form), or `None` when the words are not that pair.
+pub fn manager_slot_offset(adrp_site: usize, adrp: u32, ldr: u32) -> Option<usize> {
+    use super::stage_hazards::{adrp_offset, is_adrp};
+    if !is_adrp(adrp) || ldr & 0xffc0_0000 != 0xf940_0000 {
+        return None;
+    }
+    let page = i64::try_from(adrp_site & !0xfff).ok()?;
+    let slot = page.checked_add(adrp_offset(adrp))?.checked_add(i64::from((ldr >> 10) & 0xfff) << 3)?;
+    usize::try_from(slot).ok()
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn entry_ids_are_zero_to_seven() {
+        assert!(entry_id_valid(0) && entry_id_valid(7));
+        assert!(!entry_id_valid(-1) && !entry_id_valid(8));
+    }
 
     #[test]
     fn off_clears_x8_in_training_only() {

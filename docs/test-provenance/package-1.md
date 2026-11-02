@@ -54,7 +54,7 @@ later package or needs the Switch runtime; **runtime, unbuilt** = code written, 
 | Requirement | § | Host test | Eden row | Status |
 | --- | --- | --- | --- | --- |
 | Register rule | §4 | `state06_lra_register_rule` | E-state-06-lra-off-no-reset | host pass; runtime unbuilt |
-| Hub trigger rules | §5.1 | `state06_hub_trigger_rules` | E-state-06-reset-clears-mash | host pass; **hub not wired** |
+| Hub trigger rules and the facts they rest on (entry id at fighter+0x10, manager slot, the two thunks) | §5.1 | `state06_hub_trigger_rules`, `state06_hub_trigger_facts_match_the_guarded_words` | E-state-06-reset-clears-mash | host pass; runtime unbuilt |
 | Hub order and contents | §5.2 | `state06_hub_order` | - | host pass |
 | Counter types | §5.2 | `state06_counter_types` | - | host pass |
 | Load calls the hub every PosMove frame | §5.3 | - | E-state-06-load-resets-delays | deferred (package 3) |

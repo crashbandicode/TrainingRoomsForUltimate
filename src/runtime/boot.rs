@@ -2,8 +2,8 @@
 //! settings, a comparison of every site window, then the features whose sites passed, then the one
 //! install line. NOT YET SWITCH-COMPILED.
 //!
-//! Not in package 1: the first-boot import (SPEC-core-08), the provider plugins, the menu, the
-//! notifications, the Training reset hub (it needs the fighter-information accessors of SPEC-state-01).
+//! Not in package 1: the first-boot import runtime (SPEC-core-08; its plan is in `model::migration`),
+//! the provider plugins, the menu, the notifications.
 
 use std::fs;
 use std::io::Read;
@@ -19,7 +19,7 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{input_delay, lra_reset, stage_hazards as hazards};
+use crate::runtime::features::{input_delay, lra_reset, reset_hub, stage_hazards as hazards};
 use crate::runtime::{game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
@@ -107,6 +107,11 @@ pub fn run() {
         skyline::install_hook!(lra_reset::reset_check);
         mark("reset_check", Written::Near);
     }
+    let hub_on = sites::feature_usable(Feature::ResetHub, usable);
+    if hub_on {
+        reset_hub::install();
+        mark("on_init_slot", Written::Far);
+    }
     let hazards_on = install_hazards(&usable, &mut mark);
 
     // 6. The install line.
@@ -116,8 +121,7 @@ pub fn run() {
         FeatureReport { feature: Feature::InputDelay.name(), on: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), on: lra_on },
         FeatureReport { feature: Feature::StageHazards.name(), on: hazards_on },
-        // The Training reset hub is not wired in package 1 (it needs SPEC-state-01's accessors).
-        FeatureReport { feature: Feature::ResetHub.name(), on: false },
+        FeatureReport { feature: Feature::ResetHub.name(), on: hub_on },
     ];
     let line = InstallLine {
         tick: now_ms(),

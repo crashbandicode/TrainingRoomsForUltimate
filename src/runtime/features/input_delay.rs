@@ -7,7 +7,7 @@ use std::ffi::c_void;
 
 use parking_lot::Mutex;
 
-use crate::model::input_delay::{self, DelayQueue, MappedInputs, Owners};
+use crate::model::input_delay::{self, Clear, DelayQueue, MappedInputs};
 use crate::model::sites;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::{game, published};
@@ -27,8 +27,11 @@ pub unsafe fn final_input_mapping(
     if out.is_null() || !input_delay::applies(player_idx, game::is_training_mode()) {
         return;
     }
-    // Input owners other than gameplay (menu, stop chord, native UI, replay editor, pause) join
-    // here as the packages that own them land.
     let mut queue = QUEUE.lock();
-    *out = queue.poll(published::input_delay(), Owners::NONE, *out);
+    *out = queue.poll(published::input_delay(), published::input_owners(), *out);
+}
+
+/// Empty the queue: the reset hub (decision B8) and, from package 3, every save-state load.
+pub fn clear(why: Clear) {
+    QUEUE.lock().clear(why);
 }

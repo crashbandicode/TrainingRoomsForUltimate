@@ -49,6 +49,15 @@ impl Owners {
     /// The game's own pause menu is open (SPEC-input-03 question 3, recommended).
     pub const VANILLA_PAUSE: Owners = Owners(16);
 
+    /// The bits, for an atomic that other packages set (menu, chords, native UI, replay editor).
+    pub const fn bits(self) -> u8 {
+        self.0
+    }
+
+    pub const fn from_bits(bits: u8) -> Owners {
+        Owners(bits)
+    }
+
     pub const fn with(self, other: Owners) -> Owners {
         Owners(self.0 | other.0)
     }

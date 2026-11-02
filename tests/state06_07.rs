@@ -168,3 +168,30 @@ fn state07_missing_address_disables() {
     assert!(Missing::Flag.text().contains("rule byte"));
     assert!(Missing::Hook.text().contains("hook site"));
 }
+
+#[test]
+fn state06_hub_trigger_facts_match_the_guarded_words() {
+    // The on_init function's first words (guarded by the `on_init` row) hold the two facts the
+    // trigger relies on: the entry id is loaded from fighter+0x10, and the FighterManager slot is
+    // read through an adrp/ldr pair that lands on the pinned slot.
+    let on_init = sites::find("on_init").unwrap();
+    let w = words_of(&on_init.guard);
+    // ldp w9, w8, [x0, #0xc]
+    assert_eq!(w[8], 0x2941_a009);
+    assert_eq!(lra_reset::FIGHTER_ENTRY_ID_FIELD, 0x10);
+    assert_eq!(0xc + 4, lra_reset::FIGHTER_ENTRY_ID_FIELD);
+    // adrp x24 / ldr x27, [x24, #0x4f8]
+    assert_eq!(lra_reset::manager_slot_offset(on_init.offset + 9 * 4, w[9], w[10]), Some(lra_reset::FIGHTER_MANAGER_SLOT_OFFSET));
+    assert_eq!(lra_reset::manager_slot_offset(0, 0x1400_0000, w[10]), None);
+    assert_eq!(lra_reset::manager_slot_offset(0, w[9], 0), None);
+    // The two called thunks are the ones the symbols name: `ldr x8, [x0, #8]; ldrb w0, [x8, #0x92]`.
+    let cpu = sites::find("is_operation_cpu").unwrap();
+    let c = words_of(&cpu.guard);
+    assert_eq!((c[0], c[1], c[2]), (0xf940_0408, 0x3942_4900, 0xd65f_03c0));
+    // get_fighter_information(manager, entry): `cmp w1, #8` first.
+    let info = sites::find("fighter_information").unwrap();
+    assert_eq!(words_of(&info.guard)[0], 0x7100_203f);
+    assert_eq!(lra_reset::ENTRY_COUNT, 8);
+    assert!(sites::feature_usable(sites::Feature::ResetHub, |_| true));
+    assert!(!sites::feature_usable(sites::Feature::ResetHub, |s| s.name != "is_operation_cpu"));
+}
