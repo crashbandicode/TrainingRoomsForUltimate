@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use parking_lot::Mutex;
 use skyline::hooks::InlineCtx;
 
-use crate::model::notify::{Draw, Queue, TickOut, DEFAULT_COLOR};
+use crate::model::notify::{Body, Draw, Queue, TickOut, DEFAULT_COLOR};
 use crate::model::recording::{Phase, NOTICE_HEADER};
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
@@ -67,6 +67,28 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
     QUEUE.lock().post_static(header, body, length, color);
+}
+
+/// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
+/// updated in place with this text, colour and a full `length`. `body` is copied (at most `BODY_MAX` bytes).
+/// Allocation-free.
+pub fn upsert(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
+    QUEUE.lock().upsert(id, header, Body::copied(body), length, color);
+}
+
+/// Remove the standing notice `id` (queued or on screen) and its delivery record.
+pub fn clear(id: u8) {
+    QUEUE.lock().clear_id(id);
+}
+
+/// The standing notice `id` is queued (not yet shown for its whole time, not cleared).
+pub fn is_queued(id: u8) -> bool {
+    QUEUE.lock().is_queued(id)
+}
+
+/// The id of a standing notice that was visible for its whole time, once per delivery.
+pub fn take_delivered() -> Option<u8> {
+    QUEUE.lock().take_delivered()
 }
 
 /// A refusal text, shown for two seconds in the default colour.
