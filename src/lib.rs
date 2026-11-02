@@ -34,6 +34,28 @@ mod grid_matches_catalog {
         assert_eq!(usize::from(crate::model::menu::grid::ROSTER_ROWS), crate::engine::swap::roster_grid::ROWS);
     }
 
+    #[test]
+    fn roster_navigation_matches_the_carried_centered_grid_in_every_cell() {
+        use crate::model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
+        use crate::engine::swap::roster_grid::{Direction, Role, RosterGrid, CELLS};
+        for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
+            let layout = GridLayout::new(GridKind::Roster(RosterUse::Cycles), mode);
+            for cell in 0..CELLS {
+                // Reach each cell through the existing roster's public movement API.
+                let mut native = RosterGrid::new(Role::Player);
+                for _ in 0..cell / 13 { native.step(Direction::Down); }
+                for _ in 0..cell % 13 { native.step(Direction::Right); }
+                assert_eq!(native.cursor(), cell);
+                for (input, direction) in [(Move::Up, Direction::Up), (Move::Down, Direction::Down),
+                    (Move::Left, Direction::Left), (Move::Right, Direction::Right)] {
+                    let mut expected = native;
+                    expected.step(direction);
+                    assert_eq!(layout.step(0, cell, input), expected.cursor(), "{mode:?} cell={cell} {input:?}");
+                }
+            }
+        }
+    }
+
     /// Every texture row is a lobby stage, and the stages without a texture are only those the game has no stage_1 file for.
     #[test]
     fn the_stage_textures_belong_to_catalog_stages() {

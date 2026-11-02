@@ -122,6 +122,23 @@ impl GridLayout {
             return 0;
         }
         let (cols, rows) = (usize::from(self.cols), usize::from(self.rows));
+        if matches!(self.kind, GridKind::Roster(_)) {
+            // The renderer and carried roster center the short final row.
+            // Keep the physical column when crossing rows, clamping at an edge.
+            let row_len = |row: usize| len.saturating_sub(row * cols).min(cols);
+            let row_start = |row: usize| (cols - row_len(row)) / 2;
+            let row = cell / cols;
+            let column = cell % cols + row_start(row);
+            return match direction {
+                Move::Left => row * cols + (cell % cols + row_len(row) - 1) % row_len(row),
+                Move::Right => row * cols + (cell % cols + 1) % row_len(row),
+                Move::Up | Move::Down => {
+                    let next = if matches!(direction, Move::Down) { (row + 1) % rows } else { (row + rows - 1) % rows };
+                    let first = row_start(next);
+                    next * cols + column.clamp(first, first + row_len(next) - 1) - first
+                }
+            };
+        }
         let (mut col, mut row) = (cell % cols, cell / cols);
         for _ in 0..cols.max(rows) {
             match direction {
