@@ -34,6 +34,18 @@ impl Default for SaveFile {
 }
 
 impl SaveFile {
+    /// Boot/worker only: prepare the game machine's value records. The writer
+    /// retains the complete file, including opaque imported Mii JSON. Native
+    /// restoration uses the roster's typed identity; it never reads this JSON.
+    /// Keeping it out of the game copy makes record copies and replacement
+    /// independent of allocator work in a hook.
+    pub fn into_game_records(mut self) -> Self {
+        for record in self.player.iter_mut().chain(self.cpu.iter_mut()) {
+            record.mii = None;
+        }
+        self
+    }
+
     /// Read the file's bytes. `Err` is why it is not usable: the caller takes `SaveFile::default()`.
     pub fn parse(bytes: &[u8]) -> Result<Self, Defaulted> {
         let Ok(value) = serde_json::from_slice::<Value>(bytes) else { return Err(Defaulted::NotJson) };

@@ -33,6 +33,46 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
+fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
+    use model::state::file::SaveFile;
+    use model::state::machine::{Machine, Role};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    // An opaque future field must survive storage even though gameplay never
+    // interprets it. Include both roles and a non-default slot.
+    let mut writer = SaveFile::default();
+    writer.player[3].fighter_kind = 0x48;
+    writer.player[3].percent = 47.0;
+    writer.player[3].mii = Some(serde_json::json!({"future": ["player", 7]}));
+    writer.cpu[3].fighter_kind = 0x4a;
+    writer.cpu[3].x = -19.0;
+    writer.cpu[3].mii = Some(serde_json::json!({"future": ["cpu", 9]}));
+    let bytes = writer.to_pretty();
+    let old_before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        std::hint::black_box(writer.player[3].clone());
+    }
+    assert!(hook_allocations() > old_before, "the imported JSON copy must be observable");
+    let mut machine = Machine::new(writer.clone().into_game_records());
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        for _ in 0..20 {
+            for role in [Role::Player, Role::Cpu] {
+                let record = machine.record(role, 3).clone();
+                assert!(record.mii.is_none());
+                assert!(machine.capture(role, 3, record));
+            }
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+    assert_eq!(machine.record(Role::Player, 3).percent, 47.0);
+    assert_eq!(machine.record(Role::Cpu, 3).x, -19.0);
+    assert_eq!(writer.to_pretty(), bytes);
+    assert_eq!(SaveFile::parse(bytes.as_bytes()).unwrap(), writer);
+}
+
+#[test]
 fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
     use model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};
     use model::state::quick_reset::{Pose, QuickReset};

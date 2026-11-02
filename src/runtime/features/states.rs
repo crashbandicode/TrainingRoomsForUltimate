@@ -273,6 +273,7 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
     // The writer thread keeps its own copy (boot, before any hook): Saves reach it through `hand_to_writer`.
     *WRITER_FILE.lock() = Some(file.clone());
+    let file = file.into_game_records();
     *STATE.lock() = Some(State {
         machine: Machine::new(file),
         settings,
@@ -1064,8 +1065,14 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         saved_stage: Some(natives::stage_id()),
         mii: None,
     };
-    // The writer thread gets its own copy of the record (no heap: a captured state carries no Mii value), so it never takes `STATE`.
-    hand_to_writer(role, slot, state.clone());
+    // Capture only the settled, exact value belonging to this loaded role.
+    // JSON conversion belongs to the writer, never to this hook. A not-yet-ready
+    // Mii remains explicitly absent (Setup Save refuses it until saved again).
+    let mii = (crate::runtime::roster::running() && crate::model::state::setup::MII_KINDS.contains(&raw.kind))
+        .then(|| crate::runtime::roster::character_roster::current_mii_configuration(role.index()))
+        .flatten()
+        .filter(|value| value.canonical().class as i32 == raw.kind);
+    hand_to_writer(role, slot, state.clone(), mii);
     let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
     // The save flash.
     let attributes = with(|s| {
@@ -1476,7 +1483,14 @@ const SLOT_EMPTY: u8 = 0;
 const SLOT_WRITING: u8 = 1;
 const SLOT_FULL: u8 = 2;
 const SLOT_READING: u8 = 3;
-type Captured = Option<(u64, Role, usize, SavedState)>;
+struct CapturedRecord {
+    sequence: u64,
+    role: Role,
+    slot: usize,
+    state: SavedState,
+    mii: Option<crate::engine::mii::lifetime::Configuration>,
+}
+type Captured = Option<CapturedRecord>;
 struct HandoffSlot(std::cell::UnsafeCell<Captured>);
 // SAFETY: a slot's cell is touched only by the one thread that moved its state to SLOT_WRITING or SLOT_READING.
 unsafe impl Sync for HandoffSlot {}
@@ -1488,12 +1502,12 @@ static HANDOFF_SEQ: AtomicU64 = AtomicU64::new(0);
 static HANDOFF_DROPPED: AtomicU32 = AtomicU32::new(0);
 
 /// A Save captured `state` for `role` in `slot` (game thread): the writer's copy follows. Never waits, no heap.
-fn hand_to_writer(role: Role, slot: usize, state: SavedState) {
+fn hand_to_writer(role: Role, slot: usize, state: SavedState, mii: Option<crate::engine::mii::lifetime::Configuration>) {
     let seq = HANDOFF_SEQ.fetch_add(1, Ordering::AcqRel);
     for (i, cell) in HANDOFF_STATE.iter().enumerate() {
         if cell.compare_exchange(SLOT_EMPTY, SLOT_WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
             // SAFETY: the slot is ours between SLOT_WRITING and SLOT_FULL.
-            unsafe { *HANDOFF[i].0.get() = Some((seq, role, slot, state)) };
+            unsafe { *HANDOFF[i].0.get() = Some(CapturedRecord { sequence: seq, role, slot, state, mii }) };
             cell.store(SLOT_FULL, Ordering::Release);
             return;
         }
@@ -1511,9 +1525,12 @@ fn take_captured(file: &mut SaveFile) {
             cell.store(SLOT_EMPTY, Ordering::Release);
         }
     }
-    taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |(seq, ..)| *seq));
-    for (_, role, slot, mut state) in taken.into_iter().flatten() {
+    taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
+    for CapturedRecord { role, slot, mut state, mii, .. } in taken.into_iter().flatten() {
         state.marker = Marker::NoAction;
+        // Configuration serializes only validated integer/byte values. Its
+        // allocation-bearing JSON representation stays on this writer thread.
+        state.attach_mii(mii).expect("validated Mii configuration serialization");
         let records = match role {
             Role::Player => &mut file.player,
             Role::Cpu => &mut file.cpu,

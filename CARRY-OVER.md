@@ -313,3 +313,16 @@ Nothing carried from the fork or from any frozen stage. Everything under `src/mo
 ## stream/sync (2026-11-02)
 
 Nothing new carried. Recorded edits to carried files (manifest + regenerated ledger): `src/runtime/mii/native_keyboard.rs` (pkg6: `use parking_lot::Mutex` -> `use hos_lock::Mutex`). `crates/hos-lock` is new code of this repository (MIT), not carried. `parking_lot` and `parking_lot_core` left the build (`tests/no_spin_locks.rs`).
+
+## Lead exact-Mii state capture, 2026-11-02
+Clean-room runtime/features/states.rs now passes a Copy Configuration from the
+existing settled role accessor to the writer, which serializes it off-hook.
+model/state/record.rs gains writer-only attach_mii with failure atomicity;
+model/state/file.rs projects imported records to a JSON-free game copy while
+the writer retains the complete opaque identity. No additional fork source
+was copied. The existing Mii Configuration serialization contract was read in
+the carried model; current_configuration still requires the separate native
+first-lock root. Source contract: manifest-verified ours-new m5i
+docs/setup-library.md d178081ae95cf30726273c2c0178df99d542ffd9d977ce75042ce9fe796be17c
+and src/training/setup_library.rs 4362b966d43d4725f330228b2b50ce64966ab117bf88ee0b0660efc0252cf9fb.
+This is not native acceptance or permission to relax exact identity checks.

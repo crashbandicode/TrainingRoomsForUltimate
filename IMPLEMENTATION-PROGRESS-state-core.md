@@ -81,3 +81,23 @@ retirement/address reuse. These temporary poses are intentionally not serialized
 fresh-process restore evidence is inapplicable to this cache and gameplay remains
 unverified. New candidate gates pending, primary independent review requested;
 no integration acceptance or preview/setup closure.
+## Lead exact-Mii capture candidate 22:00Z
+Lead tr-lead-astra-4 /01a19e0c-415a owns this continuation. Five source/test
+files on f700a92 frozen as270f8c3d42fc0673742b459e8f6154cdadd9046492761c3a0a6dbe655cc1a797,
+archive artifacts/trainingrooms-state-core/mii-capture-r0 under parent.
+Boot writer retains full JSON; game records omit it; capture transfers typed
+settled identity and writer encodes it. Native identity lock and StateWriter
+stack proofs remain OPEN, as do Setup bind/UI and preview.
+Targeted host143+3+150 PASS (not audited full-suite count), including positive
+allocation control, actual JSON-free repeated capture, fault-atomic encoding,
+and saver-process exit before fresh-restorer continuation. Log SHA
+b4959c68cfe9ff22f6aebd25c6188e003aa1596ac22b3e3d0ef76a655c7c0696.
+All-target clippy -Dwarnings PASS0/zero warnings33.72s; log SHA
+056b8b63dcb6bcdd099e1cafa2b187c7308f339eabccebf27f230ec51090a9ca.
+Both gates1111before/after inventories equal. Required no-default still queued
+behind UI diag, not claimed/pass. Claims released; no lead Eden/profile changes.
+Own first runner release prose was malformed by text replacement; corrected
+canonical21:44 release retained, wrapper repaired. No foreign release.
+Next: queued no-default via /tmp/tr-lead4-state-mii-claimed.ps1; exact native
+composition with pkg6 lock root, then source/ELF/runtime proof. Preview model
+work is a separate uncommitted slice, not covered by these frozen gate receipts.
