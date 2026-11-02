@@ -41,6 +41,9 @@ pub struct FrameFacts {
     /// The transition term `CONT_CLIFF_ATTACK` is enabled (a ledge action can be taken).
     pub cont_cliff_attack: bool,
     pub tech: TechFacts,
+    /// Gravity speed y is negative, and the fast-fall flag `RESERVE_DIVE` is already set (SPEC-cpu-06).
+    pub falling: bool,
+    pub reserve_dive: bool,
 }
 
 impl Default for FrameFacts {
@@ -56,6 +59,8 @@ impl Default for FrameFacts {
             catch_cliff: false,
             cont_cliff_attack: false,
             tech: TechFacts::default(),
+            falling: false,
+            reserve_dive: false,
         }
     }
 }
@@ -84,4 +89,6 @@ pub struct FrameOut {
     pub force_status: Option<i32>,
     /// The hidden tech animation (primary body only).
     pub hide: HideOut,
+    /// Set `RESERVE_DIVE` and show the fast-fall flash (SPEC-cpu-06).
+    pub fast_fall: bool,
 }

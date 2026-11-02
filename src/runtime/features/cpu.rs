@@ -21,6 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize
 use parking_lot::Mutex;
 
 use crate::model::cpu::defence::SdiAnswer;
+use crate::model::cpu::command::CmdFacts;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
 use crate::model::cpu::shield::{ButtonAnswer, OosFacts};
 use crate::model::cpu::tech::{is_tech_situation, TechChange, TechRequest};
@@ -39,6 +40,7 @@ use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::reset_hub;
 use crate::runtime::game::{self, natives};
+use crate::runtime::published;
 
 /// The CPU behaviours' state; `None` until `init`.
 static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
@@ -65,6 +67,26 @@ static TERM_PASSIVE_CEIL: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_CONT_ESCAPE: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of `just_shield_off`, the parry animation.
 static PARRY_MOTION: AtomicU64 = AtomicU64::new(0);
+static CAT1: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static CAT2: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static BUTTON_JUMP: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static BUTTON_FLICK_JUMP: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CONT_DASH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CATCH_DASH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_ATTACK_AIR: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_THROW_HI: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_INVALID_CATCH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_RESERVE_DIVE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static KINETIC_GRAVITY: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static EFFECT_CONCLUDE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// `phx::Hash40` of `dash`, `just_shield_off` (already above) and `sys_smash_flash_s`.
+static DASH_MOTION: AtomicU64 = AtomicU64::new(0);
+static FLASH_EFFECT: AtomicU64 = AtomicU64::new(0);
+/// The mash hooks and natives were installed.
+static TERM_ESCAPE_AIR: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_GUARD_ON: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_DOWN_STAND: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static MASH_ON: AtomicBool = AtomicBool::new(false);
 static BUTTON_GUARD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static BUTTON_GUARD_HOLD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of `common`, `shield_dec1` and `shield_recovery1` (the parameter hook compares them).
@@ -75,6 +97,10 @@ static TECH_ON: AtomicBool = AtomicBool::new(false);
 static TECH_EFFECTS: [AtomicU64; 5] = [const { AtomicU64::new(0) }; 5];
 /// The player entry's last seen x (an `f32`'s bits), for the In / Out rule.
 static PLAYER_X: AtomicU32 = AtomicU32::new(0);
+static PLAYER_Y: AtomicU32 = AtomicU32::new(0);
+static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
+/// The player entry has been seen this session (its position is valid for the distance triggers).
+static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
 
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
 static LOBBY: AtomicBool = AtomicBool::new(false);
@@ -97,7 +123,10 @@ mod counts {
     pub const TRANSITION_TERM: usize = 5;
     pub const MOTION_CHANGE: usize = 6;
     pub const QUAKE_POS: usize = 7;
-    static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+    pub const COMMAND_FLAG: usize = 8;
+    pub const AIR_KIND: usize = 9;
+    pub const STICK_DIR: usize = 10;
+    static COUNTS: [AtomicU32; 11] = [const { AtomicU32::new(0) }; 11];
     /// One line per this many primary-body frames.
     const REPORT_EVERY: u32 = 600;
 
@@ -112,7 +141,7 @@ mod counts {
         }
         let take = |i: usize| COUNTS[i].swap(0, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={} heap_allocations={}",
+            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={} command_flag={} air_kind={} stick_dir={} heap_allocations={}",
             take(FRAME),
             take(SDI),
             take(STICK_X),
@@ -121,6 +150,9 @@ mod counts {
             take(TRANSITION_TERM),
             take(MOTION_CHANGE),
             take(QUAKE_POS),
+            take(COMMAND_FLAG),
+            take(AIR_KIND),
+            take(STICK_DIR),
             crate::runtime::alloc::hook_allocations()
         ));
     }
@@ -135,6 +167,9 @@ mod counts_index {
     pub const TRANSITION_TERM: usize = 5;
     pub const MOTION_CHANGE: usize = 6;
     pub const QUAKE_POS: usize = 7;
+    pub const COMMAND_FLAG: usize = 8;
+    pub const AIR_KIND: usize = 9;
+    pub const STICK_DIR: usize = 10;
 }
 
 #[cfg(feature = "diag")]
@@ -171,6 +206,18 @@ pub fn set_lobby(on: bool) {
 /// One step of the Training reset hub (`reset_hub::run`), for every body.
 pub fn hub_step(step: HubStep) {
     with(|cpu| cpu.hub_step(step));
+}
+
+fn player_pos() -> (f32, f32, f32) {
+    (
+        f32::from_bits(PLAYER_X.load(Ordering::Relaxed)),
+        f32::from_bits(PLAYER_Y.load(Ordering::Relaxed)),
+        f32::from_bits(PLAYER_Z.load(Ordering::Relaxed)),
+    )
+}
+
+fn player_pos_valid() -> bool {
+    PLAYER_VALID.load(Ordering::Relaxed)
 }
 
 fn player_x() -> f32 {
@@ -210,6 +257,23 @@ fn ensure_consts() -> bool {
     TERM_PASSIVE_CEIL.store(table.get(C::TermPassiveCeil), Ordering::Release);
     TERM_CONT_ESCAPE.store(table.get(C::TermContEscape), Ordering::Release);
     PARRY_MOTION.store(hash40("just_shield_off"), Ordering::Release);
+    TERM_ESCAPE_AIR.store(table.get(C::TermContEscapeAir), Ordering::Release);
+    TERM_GUARD_ON.store(table.get(C::TermContGuardOn), Ordering::Release);
+    TERM_DOWN_STAND.store(table.get(C::TermDownStand), Ordering::Release);
+    CAT1.store(table.get(C::CatCommand1), Ordering::Release);
+    CAT2.store(table.get(C::CatCommand2), Ordering::Release);
+    BUTTON_JUMP.store(table.get(C::ButtonJump), Ordering::Release);
+    BUTTON_FLICK_JUMP.store(table.get(C::ButtonFlickJump), Ordering::Release);
+    TERM_CONT_DASH.store(table.get(C::TermContDash), Ordering::Release);
+    TERM_CATCH_DASH.store(table.get(C::TermContCatchDash), Ordering::Release);
+    TERM_ATTACK_AIR.store(table.get(C::TermContAttackAir), Ordering::Release);
+    TERM_THROW_HI.store(table.get(C::TermContThrowHi), Ordering::Release);
+    WORK_INVALID_CATCH.store(table.get(C::WorkIntInvalidCatchFrame), Ordering::Release);
+    WORK_RESERVE_DIVE.store(table.get(C::WorkFlagReserveDive), Ordering::Release);
+    KINETIC_GRAVITY.store(table.get(C::KineticGravity), Ordering::Release);
+    EFFECT_CONCLUDE.store(table.get(C::EffectConcludeStatus), Ordering::Release);
+    DASH_MOTION.store(hash40("dash"), Ordering::Release);
+    FLASH_EFFECT.store(hash40("sys_smash_flash_s"), Ordering::Release);
     BUTTON_GUARD.store(table.get(C::ButtonGuard), Ordering::Release);
     BUTTON_GUARD_HOLD.store(table.get(C::ButtonGuardHold), Ordering::Release);
     for (slot, name) in PARAM_HASHES.iter().zip(["common", "shield_dec1", "shield_recovery1"]) {
@@ -284,7 +348,15 @@ unsafe fn fighter_frame(fighter: usize) {
     if entry == 0 {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
+            if MASH_ON.load(Ordering::Acquire) {
+                frame_advantage(accessor);
+            }
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
+            if MASH_ON.load(Ordering::Acquire) {
+                PLAYER_Y.store(natives::pos_y(accessor).to_bits(), Ordering::Relaxed);
+                PLAYER_Z.store(natives::pos_z(accessor).to_bits(), Ordering::Relaxed);
+                PLAYER_VALID.store(true, Ordering::Relaxed);
+            }
         }
         return;
     }
@@ -325,6 +397,16 @@ unsafe fn fighter_frame(fighter: usize) {
         (false, false)
     };
 
+    let (falling, reserve_dive) = if MASH_ON.load(Ordering::Acquire) {
+        let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
+        let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
+        (
+            gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
+            dive != UNRESOLVED && natives::is_flag(accessor, dive),
+        )
+    } else {
+        (false, false)
+    };
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = if TECH_ON.load(Ordering::Acquire) { tech_facts(accessor, status, primary) } else { TechFacts::default() };
 
@@ -340,8 +422,11 @@ unsafe fn fighter_frame(fighter: usize) {
             catch_cliff,
             cont_cliff_attack,
             tech,
+            falling,
+            reserve_dive,
         };
         cpu.roles.set(accessor, key);
+        cpu.fighters[key.index()].kind = kind;
         if primary {
             cpu.tick_clock();
             #[cfg(feature = "diag")]
@@ -394,6 +479,17 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
     if let Some(status) = out.request_status {
         natives::change_status_request(accessor, status);
     }
+    if out.fast_fall {
+        let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
+        if dive != UNRESOLVED {
+            natives::set_flag(accessor, true, dive);
+        }
+        let attribute = EFFECT_CONCLUDE.load(Ordering::Acquire);
+        if attribute != UNRESOLVED {
+            let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
+            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
+        }
+    }
     if let Some(status) = out.force_status {
         natives::change_status_force(accessor, status);
     }
@@ -409,10 +505,9 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
     }
-    // `out.playback` waits for the input-recording package: there is no recorder to ask yet.
-    #[cfg(feature = "diag")]
+    // A playback request goes to the input-recording package's inbox (`published`).
     if let Some(start) = out.playback {
-        diagnostic(format_args!("[TrainingRooms] cpu playback request slot={} ledge={}", start.slot, start.ledge));
+        published::CPU_PLAYBACK_REQUEST.store(1 + u32::from(start.slot) | (u32::from(start.ledge) << 8), Ordering::Release);
     }
 }
 
@@ -471,7 +566,11 @@ pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_Y);
     let original = call_original!(accessor);
-    air_dodge_stick(accessor).map_or(original, |(_, y)| y)
+    if let Some((_, y)) = air_dodge_stick(accessor) {
+        return y;
+    }
+    // Crouch answers when the air-dodge direction does not (SPEC-cpu-06 section 4).
+    role_of(accessor).and_then(|key| with(|cpu| cpu.crouch_stick(key)).flatten()).unwrap_or(original)
 }
 
 /// `ControlModule::start_clatter(accessor, initial, auto, manual, a, b, c, d)`: remember the manual
@@ -556,14 +655,24 @@ fn is_guard_button(button: i32) -> bool {
     button != UNRESOLVED && (button == BUTTON_GUARD.load(Ordering::Acquire) || button == BUTTON_GUARD_HOLD.load(Ordering::Acquire))
 }
 
+fn is_jump_button(button: i32) -> bool {
+    button != UNRESOLVED && (button == BUTTON_JUMP.load(Ordering::Acquire) || button == BUTTON_FLICK_JUMP.load(Ordering::Acquire))
+}
+
+/// The shield's answer for the guard buttons, else the full hop's for the jump buttons.
 fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<bool> {
-    if !is_guard_button(button) {
+    let guard = is_guard_button(button);
+    if !guard && !is_jump_button(button) {
         return None;
     }
     let key = role_of(accessor)?;
-    match with(|cpu| cpu.guard_button(key, on_query))? {
-        ButtonAnswer::Held(value) => Some(value),
-        ButtonAnswer::Original => None,
+    if guard {
+        match with(|cpu| cpu.guard_button(key, on_query))? {
+            ButtonAnswer::Held(value) => Some(value),
+            ButtonAnswer::Original => None,
+        }
+    } else {
+        with(|cpu| cpu.full_hop_button(key, on_query)).flatten()
     }
 }
 
@@ -695,4 +804,121 @@ pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
         cpu.out_of_shield(key, &facts).escape_status
     })
     .flatten()
+}
+
+// ---- SPEC-cpu-01 and SPEC-cpu-06 hooks ------------------------------------------------------------------
+
+/// Whether the mash hooks and natives are installed.
+pub fn set_mash_on(on: bool) {
+    MASH_ON.store(on, Ordering::Release);
+}
+
+unsafe fn term_on(accessor: usize, id: &AtomicI32) -> bool {
+    let id = id.load(Ordering::Acquire);
+    id != UNRESOLVED && natives::is_enable_transition_term(accessor, id)
+}
+
+/// Everything a command query reads from the game, with no lock held.
+unsafe fn command_facts(accessor: usize, key: FighterKey) -> CmdFacts {
+    let (px, py, pz) = (player_pos().0, player_pos().1, player_pos().2);
+    let (cx, cy, cz) = (natives::pos_x(accessor), natives::pos_y(accessor), natives::pos_z(accessor));
+    let distance = if player_pos_valid() { ((cx - px).powi(2) + (cy - py).powi(2) + (cz - pz).powi(2)).sqrt() } else { f32::INFINITY };
+    let invalid = WORK_INVALID_CATCH.load(Ordering::Acquire);
+    let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
+    let motion = natives::motion_kind(accessor);
+    let situation = natives::situation_kind(accessor);
+    let status = natives::status_kind(accessor);
+    let mut facts = CmdFacts {
+        status,
+        situation: crate::model::cpu::status::Situation::Other,
+        motion_frame: natives::motion_frame(accessor) as i32,
+        motion_is_dash: motion == DASH_MOTION.load(Ordering::Acquire),
+        in_parry: motion == PARRY_MOTION.load(Ordering::Acquire),
+        invalid_catch_frame: if invalid != UNRESOLVED { natives::get_int(accessor, invalid) } else { 0 },
+        cont_dash: term_on(accessor, &TERM_CONT_DASH),
+        cont_catch_dash: term_on(accessor, &TERM_CATCH_DASH),
+        cont_attack_air: term_on(accessor, &TERM_ATTACK_AIR),
+        cont_throw_hi: term_on(accessor, &TERM_THROW_HI),
+        kind: UNRESOLVED,
+        falling: gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
+        distance,
+        prev_status: natives::prev_status_kind(accessor, 0),
+    };
+    // The situation and the fighter kind are classified under the lock (they need the table).
+    with(|cpu| {
+        facts.situation = crate::model::cpu::status::Situation::of(&cpu.ids, situation);
+        facts.kind = cpu.fighters[key.index()].kind;
+    });
+    facts
+}
+
+/// `ControlModule::get_command_flag_cat(accessor, category)`: the mash's bits (category 1) or the throw
+/// bits (category 2) of a CPU body are ORed into the game's answer.
+#[skyline::hook(offset = sites_pkg2::COMMAND_FLAG_HOOK_OFFSET)]
+pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::COMMAND_FLAG);
+    let original = call_original!(accessor, category);
+    let cat2 = category == CAT2.load(Ordering::Acquire);
+    if category == UNRESOLVED || (!cat2 && category != CAT1.load(Ordering::Acquire)) {
+        return original;
+    }
+    let Some(key) = role_of(accessor) else { return original };
+    if !with(|cpu| cpu.wants_commands(key, cat2)).unwrap_or(false) {
+        return original;
+    }
+    let facts = command_facts(accessor, key);
+    let Some(out) = with(|cpu| cpu.command_flags(key, cat2, &facts)) else { return original };
+    if let Some(status) = out.request_status {
+        natives::change_status_request(accessor, status);
+    }
+    if out.stop_playback {
+        published::CPU_STOP_PLAYBACK.store(true, Ordering::Release);
+    }
+    original | out.bits
+}
+
+/// `ControlModule::get_attack_air_kind(accessor)`: the queued aerial's kind for a CPU body.
+#[skyline::hook(offset = sites_pkg2::ATTACK_AIR_KIND_HOOK_OFFSET)]
+pub unsafe fn cpu_attack_air_kind_hook(accessor: usize) -> i32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::AIR_KIND);
+    let original = call_original!(accessor);
+    role_of(accessor).and_then(|key| with(|cpu| cpu.attack_air_kind(key)).flatten()).unwrap_or(original)
+}
+
+/// `ControlModule::get_stick_dir(accessor)`: the attack angle of a CPU body.
+#[skyline::hook(offset = sites_pkg2::STICK_DIR_HOOK_OFFSET)]
+pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::STICK_DIR);
+    let original = call_original!(accessor);
+    role_of(accessor).and_then(|key| with(|cpu| cpu.attack_angle(key)).flatten()).unwrap_or(original)
+}
+
+/// Whether a fighter can act now: any of the five transition terms or a cancel (SPEC-cpu-07 §3).
+unsafe fn actionable(accessor: usize) -> bool {
+    term_on(accessor, &TERM_ESCAPE_AIR)
+        || term_on(accessor, &TERM_ATTACK_AIR)
+        || term_on(accessor, &TERM_GUARD_ON)
+        || term_on(accessor, &TERM_CONT_ESCAPE)
+        || term_on(accessor, &TERM_DOWN_STAND)
+        || natives::is_enable_cancel(accessor)
+}
+
+/// Frame advantage, on the player entry's frame: reads both fighters only while the row is On.
+unsafe fn frame_advantage(player: usize) {
+    let lobby = LOBBY.load(Ordering::Acquire);
+    let primary = FighterKey::new(i32::from(primary_entry(lobby)), false);
+    let Some(cpu_accessor) = primary.and_then(|key| CPU.lock().as_ref().and_then(|c| c.roles.accessor_of(key))) else { return };
+    if !with(|cpu| cpu.settings.frame_advantage && cpu.settings.mash_state.is_empty()).unwrap_or(false) {
+        // Off, or a mashing CPU: the state clears and nothing is read.
+        with(|cpu| cpu.frame_advantage(false, false));
+        return;
+    }
+    let (p, c) = (actionable(player), actionable(cpu_accessor));
+    if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
+        published::FRAME_ADVANTAGE_VALUE.store(value, Ordering::Release);
+        published::FRAME_ADVANTAGE_SEQ.fetch_add(1, Ordering::AcqRel);
+    }
 }

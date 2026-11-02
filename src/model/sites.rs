@@ -40,6 +40,8 @@ pub enum Feature {
     CpuShield,
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
     /// that module loads through the `libnro_hook` provider.
+    /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
+    CpuMash,
     CpuCommon,
 }
 
@@ -56,6 +58,7 @@ impl Feature {
             Feature::CpuLedge => "cpu_ledge",
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
+            Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
         }
     }
@@ -343,7 +346,7 @@ pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
 /// must come out usable.
 pub fn feature_usable(feature: Feature, usable: impl Fn(&Site) -> bool) -> bool {
     // The CPU features read their facts through the core's natives, so they need its sites too.
-    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuCommon).then_some(Feature::CpuCore);
+    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon).then_some(Feature::CpuCore);
     sites_of(feature).chain(sites_of(Feature::Training)).chain(core.into_iter().flat_map(sites_of)).all(usable)
 }
 

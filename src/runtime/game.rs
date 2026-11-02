@@ -121,6 +121,34 @@ pub mod natives {
         at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET)(accessor)
     }
 
+    pub unsafe fn is_enable_cancel(accessor: usize) -> bool {
+        at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET)(accessor)
+    }
+
+    pub unsafe fn pos_y(accessor: usize) -> f32 {
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET)(accessor)
+    }
+
+    pub unsafe fn pos_z(accessor: usize) -> f32 {
+        at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Z_OFFSET)(accessor)
+    }
+
+    pub unsafe fn get_int(accessor: usize, id: i32) -> i32 {
+        at::<extern "C" fn(usize, i32) -> i32>(sites_pkg2::WORK_GET_INT_OFFSET)(accessor, id)
+    }
+
+    /// `KineticModule::get_sum_speed_y(accessor, energy id)`.
+    pub unsafe fn sum_speed_y(accessor: usize, energy: i32) -> f32 {
+        at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET)(accessor, energy)
+    }
+
+    /// `EffectModule::req(accessor, effect, pos, rot, scale, 0, 0, true, attribute)`.
+    pub unsafe fn effect_req(accessor: usize, effect: u64, pos: &[f32; 3], scale: f32, attribute: i32) {
+        type Req = extern "C" fn(usize, u64, *const [f32; 3], *const [f32; 3], f32, u32, i32, bool, i32) -> u64;
+        let zero = [0.0f32; 3];
+        at::<Req>(sites_pkg2::EFFECT_REQ_OFFSET)(accessor, effect, pos, &zero, scale, 0, 0, true, attribute);
+    }
+
     pub unsafe fn pos_x(accessor: usize) -> f32 {
         at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_X_OFFSET)(accessor)
     }

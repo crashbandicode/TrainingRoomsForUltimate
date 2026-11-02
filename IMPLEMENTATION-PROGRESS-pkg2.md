@@ -78,3 +78,14 @@ The logic entry points are in `features/cpu.rs` (`di_before`, `tech_request`, `o
   `stage_place_id` of each selectable stage (Battlefield 0, Small Battlefield 347, Big Battlefield 2, Final Destination 3, ...), joined to the game's form table at
   `main+0x454a7e8` (stride 72) for the Omega and Battlefield forms. The camera rule needs the Omega and Battlefield form ids of every stage, which come from that
   form table; the mapping is not built yet.
+
+## P2-6, P2-7, P2-8 (2026-11-02)
+Model: `command.rs` (SPEC-cpu-01's per-frame mash run: trigger priority, once-per-situation roll, the action table, the dash-attack
+sequence, the character-specific completion table), `throw.rs` (SPEC-cpu-06: throws and pummels, fast fall, attack angle, crouch, full hop),
+`advantage.rs` (SPEC-cpu-07's frame advantage). Runtime: hooks `get_command_flag_cat` (0x2001630, category 1 mash bits and category 2 throw bits),
+`get_attack_air_kind` (0x2001710), `get_stick_dir` (0x2001030); crouch is in the stick-y hook and the full hop in the check_button hooks; the fall facts and
+fast-fall flash in the frame wrapper; frame advantage on the player entry's frame. 9 new site rows (feature `CpuMash`, `cancel_is_enable` among them).
+The playback requests (`FrameOut::playback`, Playback Mash Interrupt) and the advantage value go to `runtime::published` atomics for packages 4 and the UI.
+Deviation noted: none from the specs; the 3-D distance uses the three `PostureModule::pos_*` natives.
+Gates: `cargo test` (23 binaries), clippy `-D warnings`, `--no-default-features`, Switch release `9af591d832923ab90b8da6b56b4c9635a7f4f33313d96897a9b90e82e999099c`
+(270,336 B resident) and diag `e1b3ae62e42e2d3d319531b283dc8a6ab6a34884f6587931ff9a22959e5fa88d` (368,640 B resident), 0 warnings. No Eden run yet.

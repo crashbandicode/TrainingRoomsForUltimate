@@ -14,7 +14,7 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 33] = [
+const SYMBOLS: [(&str, &str); 42] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("prev_status_kind", "_ZN3app8lua_bind35StatusModule__prev_status_kind_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -42,6 +42,15 @@ const SYMBOLS: [(&str, &str); 33] = [
     ("work_get_param_float", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("motion_change_hook", "_ZN3app8lua_bind32MotionModule__change_motion_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40Effbfbb"),
     ("quake_pos_hook", "_ZN3app8lua_bind32CameraModule__req_quake_pos_implEPNS_26BattleObjectModuleAccessorEiRKN3phx8Vector3fE"),
+    ("command_flag_hook", "_ZN3app8lua_bind40ControlModule__get_command_flag_cat_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("attack_air_kind_hook", "_ZN3app8lua_bind39ControlModule__get_attack_air_kind_implEPNS_26BattleObjectModuleAccessorE"),
+    ("stick_dir_hook", "_ZN3app8lua_bind33ControlModule__get_stick_dir_implEPNS_26BattleObjectModuleAccessorE"),
+    ("work_get_int", "_ZN3app8lua_bind24WorkModule__get_int_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("kinetic_sum_speed_y", "_ZN3app8lua_bind35KineticModule__get_sum_speed_y_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("pos_y", "_ZN3app8lua_bind25PostureModule__pos_y_implEPNS_26BattleObjectModuleAccessorE"),
+    ("pos_z", "_ZN3app8lua_bind25PostureModule__pos_z_implEPNS_26BattleObjectModuleAccessorE"),
+    ("effect_req", "_ZN3app8lua_bind22EffectModule__req_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ERKNS3_8Vector3fES7_fjibi"),
+    ("cancel_is_enable", "_ZN3app8lua_bind35CancelModule__is_enable_cancel_implEPNS_26BattleObjectModuleAccessorE"),
     ("motion_kind", "_ZN3app8lua_bind30MotionModule__motion_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("shield_param_hook", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("check_button_on_hook", "_ZN3app8lua_bind35ControlModule__check_button_on_implEPNS_26BattleObjectModuleAccessorEi"),
@@ -59,7 +68,7 @@ const PILOT_SITES: [usize; 23] = [
 ];
 
 fn cpu_sites() -> impl Iterator<Item = &'static Site> {
-    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuCommon))
+    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon))
 }
 
 #[test]
@@ -100,6 +109,15 @@ fn cpu_sites_are_the_symbols_they_name() {
         ("work_get_param_float", sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET),
         ("motion_change_hook", sites_pkg2::MOTION_CHANGE_HOOK_OFFSET),
         ("quake_pos_hook", sites_pkg2::QUAKE_POS_HOOK_OFFSET),
+        ("command_flag_hook", sites_pkg2::COMMAND_FLAG_HOOK_OFFSET),
+        ("attack_air_kind_hook", sites_pkg2::ATTACK_AIR_KIND_HOOK_OFFSET),
+        ("stick_dir_hook", sites_pkg2::STICK_DIR_HOOK_OFFSET),
+        ("work_get_int", sites_pkg2::WORK_GET_INT_OFFSET),
+        ("kinetic_sum_speed_y", sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET),
+        ("pos_y", sites_pkg2::POS_Y_OFFSET),
+        ("pos_z", sites_pkg2::POS_Z_OFFSET),
+        ("effect_req", sites_pkg2::EFFECT_REQ_OFFSET),
+        ("cancel_is_enable", sites_pkg2::CANCEL_IS_ENABLE_OFFSET),
         ("motion_kind", sites_pkg2::MOTION_KIND_OFFSET),
         ("shield_param_hook", sites_pkg2::SHIELD_PARAM_HOOK_OFFSET),
         ("check_button_on_hook", sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET),
@@ -134,7 +152,7 @@ fn cpu_sites_every_replace_hook_is_a_thunk_that_fits_the_far_jump() {
     let hooks: Vec<_> = cpu_sites()
         .filter(|s| matches!(s.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }))
         .collect();
-    assert_eq!(hooks.len(), 12, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp");
+    assert_eq!(hooks.len(), 15, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp, command flag, attack air kind, stick dir");
     for site in hooks {
         assert!(!site.note.is_empty(), "{}: an entry hook needs its justification", site.name);
         // A 16-aligned entry: Skyline's far jump is 16 bytes there (20 only at an address 4 past an
@@ -192,7 +210,7 @@ fn cpu_sites_overlapping_windows_are_all_our_own() {
     let mut pairs = 0;
     for (a, b) in sites::overlapping_pairs() {
         let (a, b) = (&sites::SITES[a], &sites::SITES[b]);
-        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuCommon);
+        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon);
         if cpu(a) || cpu(b) {
             pairs += 1;
             assert!(cpu(a) && cpu(b), "{} overlaps {} (a site of another feature)", a.name, b.name);

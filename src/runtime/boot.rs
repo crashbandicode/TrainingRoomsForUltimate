@@ -125,6 +125,7 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason) = install_cpu(&usable, &mut mark);
+    let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
 
     // 6. The install line.
     let reports: [SiteReport; SITE_COUNT] =
@@ -139,6 +140,7 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on, reason: None },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on, reason: None },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on, reason: None },
+        FeatureReport { feature: Feature::CpuMash.name(), installed: cpu_mash_on, reason: None },
         FeatureReport { feature: Feature::CpuCommon.name(), installed: false, reason: cpu_common_reason },
     ];
     let line = InstallLine {
@@ -214,6 +216,22 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
         Some("site_guard_failed")
     };
     (true, defence, ledge, tech, shield, common)
+}
+
+/// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper
+/// reads the fall facts only once `set_mash_on` is set, before any of these hooks can fire.
+fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
+    if !sites::feature_usable(Feature::CpuMash, usable) {
+        return false;
+    }
+    cpu::set_mash_on(true);
+    skyline::install_hook!(cpu::cpu_command_flag_hook);
+    skyline::install_hook!(cpu::cpu_attack_air_kind_hook);
+    skyline::install_hook!(cpu::cpu_stick_dir_hook);
+    for name in ["command_flag_hook", "attack_air_kind_hook", "stick_dir_hook"] {
+        mark(name, Written::Far);
+    }
+    true
 }
 
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.
