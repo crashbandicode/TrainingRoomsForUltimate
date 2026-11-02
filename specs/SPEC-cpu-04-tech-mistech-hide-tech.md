@@ -127,7 +127,7 @@ The reset bundle resets all in-game counters (the lay-down counter). Held roll d
 - **Jab locks**: a locked fighter re-enters `DOWN`; the mistech rule fires again from `DOWN_WAIT` (upstream's changelog lists this as fixed behaviour).
 - **Lobby practice**: both hooks run for entry 4; the fixed-camera hooks only matter in native Training (the waiting room has no Training camera); the quake hook applies in both.
 - **Hot swap**: entry destruction forgets the hidden record (fork interface); session clear resets counters.
-- **Input playback**: tech decisions still apply during playback (upstream); open question 6.
+- **Input playback** (**decided 2026-11-01, B5 / N4**): by default a playing recording wins: tech and mistech decisions yield to playback like the other CPU behaviours, and apply again when the playback ends. The advanced row *Settings override playback* (SPEC-input-01 §2.1, default Off) restores upstream's rule when On: tech decisions then override the CPU during playback. Open question 6.
 - **Menu open**: paused.
 
 ## 7. Persistence
@@ -156,14 +156,15 @@ Nothing is written. Settings live in the menu JSON.
 | Camera centre per stage; default restored when Off; reapplied after reset | `cpu04_camera_table` | `cpu-04-fixed-camera-bf`, `cpu-04-fixed-camera-smashville` | `evidence/cpu-04/camera.md` |
 | Primary body only; Nana visible; swap forgets record | `cpu04_primary_body_only` | `cpu-04-ice-climbers-hide` | `evidence/cpu-04/ic.md` |
 | Common-module hook guard; both camera needles resolve at the documented sites | `cpu04_guards` | `cpu-04-install-line` | `evidence/cpu-04/install.md` |
+| **N4 / B5** Recording wins by default: tech and mistech rewrites are skipped while playback possesses the CPU; with *Settings override playback* On they apply again | `cpu04_playback_wins_default`, `cpu04_playback_override_on` | `cpu-04-tech-during-playback-off`, `cpu-04-tech-during-playback-on` | `evidence/cpu-04/playback.md` |
 
 ## 10. Open questions
 
-1. **Mistech gated on Tech Options.** Upstream runs the mistech logic only when `tech_state` is non-empty, so clearing Tech Options silently disables Mistech Options too. Recommendation: gate mistech on `miss_tech_state` alone.
+1. **Mistech gated on Tech Options.** Upstream runs the mistech logic only when `tech_state` is non-empty, so clearing Tech Options silently disables Mistech Options too. Recommendation: gate mistech on `miss_tech_state` alone. **Decided 2026-11-01 (B8 batch): accepted.**
 2. **RNG on every status change.** Upstream picks a tech option on every script status change of the CPU, even when no tech decision is pending. This spec requires picking only when a tech situation applies. Confirm (pure cost change, no behaviour change).
 3. **Ceiling and wall roll options.** A Roll Backwards pick on a wall does not tech, and any non-No-Tech pick on a ceiling techs in place. Confirm these mappings are wanted or whether Roll Backwards should also wall-jump.
-4. **Per-fighter state.** Held roll directions are global upstream (shared by Popo and Nana). This spec asks for per-fighter state; confirm.
+4. **Per-fighter state.** Held roll directions are global upstream (shared by Popo and Nana). This spec asks for per-fighter state; confirm. **Decided 2026-11-01 (B6): as recommended;** one state per fighter.
 5. **Camera centre timing.** The fixed-camera centre changes only when the camera mode changes or the fixed values are reset; toggling Hide Tech Animations while already in the fixed camera has no visible effect until then. Recommendation: also apply the centre on the toggle change (one write).
-6. **Playback.** Tech and mistech decisions override the CPU during input playback (a recorded tech cannot be replayed). Recommendation: yield to playback like the other CPU behaviours; decide together with SPEC-cpu-02 question 7.
+6. **Playback.** Tech and mistech decisions override the CPU during input playback (a recorded tech cannot be replayed). Recommendation: yield to playback like the other CPU behaviours; decide together with SPEC-cpu-02 question 7. **Decided 2026-11-01 (B5, N4): the recording wins by default,** with the advanced row *Settings override playback* (default Off) restoring the upstream rule (§6).
 7. **Hidden effects on restore.** Upstream re-shows the model but never re-enables the five effect kinds; the game appears to reset effect visibility per status. If an Eden row shows a lingering hidden effect, add the five `set_visible_kind(.., true)` calls to restore.
 8. **Camera manager addressing.** The manager pointer (`main+0x52b6f00`) and the centre offset (`+0xbd0`) come from upstream comments for 13.0.5 and are not covered by a needle; they need a guard of their own (compare the value read at the fixed-values hook against the struct the game passes) before the first write.

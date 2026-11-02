@@ -26,12 +26,16 @@ The player records up to 600 frames of their own controller inputs into one of f
 | Save State Playback | `save_state_playback` | multi choice, weighted | Slot 1 … Slot 5 | none |
 | Playback Mash Interrupt | `playback_mash` | On/Off | | On |
 | Playback Loop | `playback_loop` | On/Off | | Off |
+| **Settings override playback** (draft 9, N4; advanced) | `settings_override_playback` | On/Off | | Off |
+| **Replay capture** (draft 9, menu question 7; Named macros group) | `replay_capture` (writes `replay_capture.ini` `enabled=on/off`; the Deluxe Plugins page row stays in sync) | On/Off | | On |
 
 Help texts (one line each, shown under the item): "Choose which slot to record into"; "Whether to begin recording via button combination or upon loading a Save State"; "How long an input recording should last in frames"; "Remove neutral input frames at the end of your recording"; "Choose which slots to playback input recording upon pressing button combination"; "When to begin playing back inputs when a hitstun mash trigger occurs"; "Choose which slots to playback input recording upon loading a save state"; "End input playback when a mash trigger occurs"; "Repeat triggered input playbacks indefinitely".
 
 Although Recording Trigger is a single choice, the behaviour is defined by membership: recording by chord is available when the selection contains Button Combination; recording on save-state load happens when it contains Save State Load.
 
 Settings owned by other specs that feed this one: the **Input Record** and **Input Playback** chords (SPEC-input-04; defaults ZR + D-pad Down and ZR + D-pad Up); the mash actions **Playback Slot 1–5** in Mash Toggles, Followup Toggles and every override (mash spec); the ledge options **Playback Slot 1–5** and Ledge Delay (defensive spec); save-state load (save-state spec).
+
+**Settings override playback (N4, decided 2026-11-01).** Off (default): a playing recording wins over the CPU settings that would otherwise act on the possessed CPU, namely DI, SDI, air-dodge direction (SPEC-cpu-02), tech and mistech (SPEC-cpu-04) and throws (SPEC-cpu-06); they apply again when the playback ends. On: those settings override the recording, as upstream does (§5.6 lists what the recorder already defers). The row is *advanced*: collapsed by default on the console. It is read live; changing it mid-playback takes effect on the next frame. **Replay capture** is a menu toggle that writes the fork's `replay_capture.ini` (one small INI write when the row changes) so the menu, the INI and the Deluxe page always agree (the INI file is imported, SPEC-core-08 §4).
 
 Carried over from the fork, same tab, not re-specified here (interface in §9): Macro Source (`macro_source`: Numbered Slots / Named Library, default Numbered Slots), Fighter Prompt (`fighter_prompt`, On), and the action rows Named Library, Save Slot to Library, Edit Placement, Replay Window.
 
@@ -155,6 +159,8 @@ When playback starts this way the queued slot is used; at the end the mash head 
 
 ### 5.6 Other features that defer while the recorder owns the CPU (contract for their specs)
 
+**Draft 9 (N4):** the deferral list below is the default (*Settings override playback* Off). The CPU-setting overrides that upstream applied during playback (DI, SDI, air-dodge stick, tech, mistech, throws) join it: while `is_playback()` they return the game's original value, unless *Settings override playback* is On, in which case they act as upstream did. Their owning specs (SPEC-cpu-02, -04, -06) state the same rule.
+
 `is_playback()` is true in states Record **and** Playback; `is_recording()` is true only in Record; `is_standby()` is true in Lockout or Standby. While `is_playback()`: mash aerial-kind override, attack-angle stick override, ledge option forcing, shield automation (also while standby), full-hop and fast-fall automation all return the game's original value. The ledge feature additionally disables the CPU's cliff-climb transition while its chosen option is a Playback slot that has not started.
 
 ## 6. Edge cases and interactions
@@ -176,7 +182,7 @@ When playback starts this way the queued slot is used; at the end the mash head 
 
 - Numbered slots: not persisted; cleared at lockout; lost when the game exits. (Open question 14 asks whether to persist them as the fork's named format.)
 - Menu settings: in the menu file (menu spec).
-- Fork named library (carried over as-is; shape stated for the contract): one `<id>.json` per recording under `sd:/ultimate/TrainingModpack/macros/` (TrainingRooms root to be decided, open question 15), `selected.txt` holding the selected id; compact JSON of `{schema_version: 1 | 2, name (≤ 48 chars, no control characters), game_version (≤ 32 bytes), start: {fighter_kind: i32, costume: u32, facing: f32 (±1.0), situation: i32, status: i32, speed_x: f32, speed_y: f32}, mii?: exact Mii configuration (schema 2 only), placement: {delta_x: f32, delta_y: f32, momentum: "preserve_recorded" | "at_rest"}, frames: [{buttons: u32, lstick_x, lstick_y, rstick_x, rstick_y: i8}]}`, 1–36,000 frames, file ≤ 8 MiB, written atomically via `<id>.json.tmp` and `<id>.json.bak`. A missing or malformed file is skipped with its reason listed; it is never rewritten.
+- Fork named library (carried over as-is; shape stated for the contract): one `<id>.json` per recording under `sd:/ultimate/TrainingModpack/macros/` in the fork; in the clean room `sd:/ultimate/TrainingRooms/macros/` (decided, SPEC-core-08; open question 15), `selected.txt` holding the selected id; compact JSON of `{schema_version: 1 | 2, name (≤ 48 chars, no control characters), game_version (≤ 32 bytes), start: {fighter_kind: i32, costume: u32, facing: f32 (±1.0), situation: i32, status: i32, speed_x: f32, speed_y: f32}, mii?: exact Mii configuration (schema 2 only), placement: {delta_x: f32, delta_y: f32, momentum: "preserve_recorded" | "at_rest"}, frames: [{buttons: u32, lstick_x, lstick_y, rstick_x, rstick_y: i8}]}`, 1–36,000 frames, file ≤ 8 MiB, written atomically via `<id>.json.tmp` and `<id>.json.bak`. A missing or malformed file is skipped with its reason listed; it is never rewritten.
 
 ## 8. Resource budget
 
@@ -227,23 +233,27 @@ The fork's `training_mod_macros` crate, `src/training/named_macros.rs`, `src/rep
 | Tint applied per phase; notification texts and colours | `input::phase_notifications` | IN01-E02 screenshots | |
 | Named-layer contract functions exist and behave (§9) | `input::named_contract_export_import_refusals` | IN01-E16 (named library round trip) | |
 | Zero heap allocations in the two hooks | `input::hooks_allocate_nothing` (counting allocator) | — | install line |
+| **N4** Row `settings_override_playback`: default Off; Off → DI, SDI, air-dodge, tech, mistech and throw overrides return the original while `is_playback()`; On → they act as upstream; read live | `input::override_playback_default_off`, `input::override_playback_defers_when_off`, `input::override_playback_acts_when_on` | IN01-E17 (a recorded air-dodge direction plays unchanged with the row Off, is overridden with it On) | `evidence/input/IN01-E17.md` |
+| **N4** The row is advanced (collapsed by default), persisted as `settings_override_playback`, and loads as Off from a file without it | `input::override_playback_row_metadata` (with `core04_draft9_fields_default`) | IN01-E17 screenshot (`menu-mockup/03-recording.png`) | |
+| **Q7** (decided) Replay capture row writes `replay_capture.ini` once per change and stays in sync with the Deluxe page row | `input::replay_capture_row_writes_ini` | IN01-E18 | |
+| **B4** (decided) While an AI drives P1, Record is refused with a notice and the CPU settings do not touch P1 | `input::record_refused_when_p1_ai` | IN01-E19 (pilot or fallback driving P1: record chord shows the notice, nothing recorded) | |
 
 ## 11. Open questions
 
-1. **End-of-range off-by-one.** Upstream stores L−1 of L frames and plays n−1 of n. Recommendation: store and play the full range [0, L) (as the fork does for named macros); accept the one-frame timing difference from upstream and document it in the release notes. Needs the lead's decision because it changes parity.
+1. **End-of-range off-by-one.** Upstream stores L−1 of L frames and plays n−1 of n. Recommendation: store and play the full range [0, L) (as the fork does for named macros); accept the one-frame timing difference from upstream and document it in the release notes. Needs the lead's decision because it changes parity. **Decided 2026-11-01 (B8 batch): accepted.**
 2. **Stick scale.** Upstream injects `stick_x/y` as value/127 but computes the clamped fields with 1/120; the fork uses 1/120 for named macros after a 120-frame writer-versus-getter comparison matched exactly, and keeps /127 for numbered slots "historically". Recommendation: one scale, 1/120, verified once in Eden against the game's stick getters.
 3. **Half-open status ranges and the placeholder term.** `ESCAPE_AIR_SLIDE` and `ESCAPE_B` are excluded by the half-open ranges, and "other" starting statuses use the side-special term. Recommendation: inclusive ranges; for "other", use a neutral actionable check (e.g. not in hitstun/hitstop and the generic attack term enabled) — needs a design decision from the lead.
 4. **Recording Slot re-read every frame.** Recommendation: latch the slot at lockout.
 5. **Pokémon Trainer switch mid-run.** Recommendation: continue (current behaviour) but re-read facing on the new body; verify in Eden.
 6. **Save-state trigger runs once per fighter callback.** Recommendation: trigger once when both fighters have finished restoring (the fork's named path already does this).
-7. **CPU-as-P1 recording.** Recommendation: when P1 is AI-driven, record the AI's final controls for P1 (the P1 entry's controller at +0x4178) instead of the idle human controller, or refuse recording with a notification. Operator decision.
+7. **CPU-as-P1 recording.** Recommendation: when P1 is AI-driven, record the AI's final controls for P1 (the P1 entry's controller at +0x4178) instead of the idle human controller, or refuse recording with a notification. Operator decision. **Decided 2026-11-01 (B4): the second alternative;** Record is refused with a notification while an AI drives P1, and the CPU settings apply to the CPU role only (SPEC-cpu-01 question 7). Recording the AI's line (reading P1's controller slot) is not built.
 8. **Lockout length 30.** Upstream suspects it is too long for ledge recordings. Recommendation: keep 30 for parity; make it a diag-tunable to test 15.
 9. **Menu open during recording.** Recommendation: pause the record clock while a menu captures input (do not store neutral frames).
 10. **Tint clearing.** Upstream never clears the colour blend; verify in Eden whether the game resets it each frame; if not, clear it when the phase ends.
-11. **Unrecorded slot plays 60 neutral frames.** Recommendation: track "recorded" per slot and refuse with a notification.
+11. **Unrecorded slot plays 60 neutral frames.** Recommendation: track "recorded" per slot and refuse with a notification. **Decided 2026-11-01 (B8 batch): accepted.**
 12. **Random slot pick draws the game's RNG** (`sv_math::rand("fighter")`). In Training this is harmless; the online read-only rules forbid drawing checked RNG. Recommendation: use a plugin-owned PRNG for all weighted picks (also for lobby practice).
-13. **L+R+A reset does not stop the recorder.** Recommendation: stop on reset.
+13. **L+R+A reset does not stop the recorder.** Recommendation: stop on reset. **Decided 2026-11-01 (B8 batch): accepted.**
 14. **Persist numbered slots?** Not upstream. Recommendation: no, keep the named library as the persistent form.
-15. **Storage root.** Carried-over code uses `sd:/ultimate/TrainingModpack/…`; the template says `sd:/ultimate/TrainingRooms/…`. Lead decides the migration (and whether to read the old path once).
+15. **Storage root.** Carried-over code uses `sd:/ultimate/TrainingModpack/…`; the template says `sd:/ultimate/TrainingRooms/…`. Lead decides the migration (and whether to read the old path once). **Decided earlier (2026-11-01) by SPEC-core-08:** the root is `sd:/ultimate/TrainingRooms/`, with a one-time copy of the fork's data.
 16. **Multiple input polls per game frame.** The fork's capture work observed repeated callbacks of the input-mapping function. If true, the recorder's store is idempotent (last write wins) but input delay is not (SPEC-input-03 open question 1). Needs a diag measurement.
-17. **Playback started while Recording** abandons the recording silently. Recommendation: refuse playback while Recording, mirror of the lockout refusal.
+17. **Playback started while Recording** abandons the recording silently. Recommendation: refuse playback while Recording, mirror of the lockout refusal. **Decided 2026-11-01 (B8 batch): accepted.**

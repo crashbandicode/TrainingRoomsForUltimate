@@ -1567,5 +1567,65 @@
     ]
    }
   ]
+ },
+ "sdi_stretch": {
+  "file": "renders/sdi-up-4x-layer-stretch.png",
+  "sha256": "11d9e2d29004c918fe7dc266216140d7087b3993a0dc1e19fe48f6967dbb4d61",
+  "size": [
+   432,
+   432
+  ],
+  "factor": 2.0,
+  "how": "scale",
+  "same_pixels_as": "renders/variants/sdi-up-4x-layer-x2.0.png",
+  "variants": [
+   {
+    "file": "renders/variants/sdi-up-4x-layer-x1.17.png",
+    "sha256": "03afeaacc00f7071b161c37cd855ceb899955f108385c8b3b058c042148d8cdb",
+    "size": [
+     432,
+     432
+    ],
+    "factor": 1.17,
+    "source": "emitter key table at life 0.5 (y key 1.356 -> 1.584)"
+   },
+   {
+    "file": "renders/variants/sdi-up-4x-layer-x1.4.png",
+    "sha256": "09a8a003dfbabbba3ac5a297c7c1f51f7d379c8ef3c400bd693e0874ebde01a2",
+    "size": [
+     432,
+     432
+    ],
+    "factor": 1.4,
+    "source": "life-0.3 S.y x 1.4 (calibrated)"
+   },
+   {
+    "file": "renders/variants/sdi-up-4x-layer-x1.7.png",
+    "sha256": "2d63be098dc73c7cefe96c016946c39814129f8bdddb779231d610868dd9e5cb",
+    "size": [
+     432,
+     432
+    ],
+    "factor": 1.7,
+    "source": "life-0.3 S.y x 1.7 (calibrated)"
+   },
+   {
+    "file": "renders/variants/sdi-up-4x-layer-x2.0.png",
+    "sha256": "11d9e2d29004c918fe7dc266216140d7087b3993a0dc1e19fe48f6967dbb4d61",
+    "size": [
+     432,
+     432
+    ],
+    "factor": 2.0,
+    "source": "life-0.3 S.y x 2.0 (calibrated)"
+   }
+  ],
+  "tool": "tools/render_sdi_stretch.py (imports W9 tools/render_chips.py)",
+  "tool_sha256": "b123bc3baa7ba3c47d963327f756d6fc086433df2f9003303544558e73e7b0bb",
+  "eff_sha256": "8ff5bad0681cc922dfc4988acfb0212def0514d717bb62b4df17b916d04e0023",
+  "base_render_sha256": "9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254",
+  "base_life": 0.3,
+  "key_life": 0.5,
+  "self_check": "factor 1 reproduces W9 pixel for pixel"
  }
 }

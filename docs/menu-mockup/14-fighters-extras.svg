@@ -19,7 +19,7 @@
 <rect x="48.0" y="138.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
 <text x="62.0" y="160.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Extras  (5)</text>
 <text x="62.0" y="200.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Stages  (4)</text>
-<text x="62.0" y="240.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Loading  (7)</text>
+<text x="62.0" y="240.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Loading  (6)</text>
 <text x="62.0" y="259.2" font-size="14" fill="rgb(210,170,80)" text-anchor="start">advanced - collapsed by default</text>
 <polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>

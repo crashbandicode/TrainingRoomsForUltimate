@@ -66,7 +66,7 @@ Performed when:
 1. the CPU-operated fighter is (re)initialised in native Training (Training entry and L+R+A reset) and no hot swap is in progress (fork gate), detected on the fighter "on init" event for a CPU-operated fighter; and
 2. a save-state load places a fighter (right after position and facing are written; also the fork's lobby quick reset, which goes through the same load path).
 
-The bundle: full reset of the mash queue (SPEC-cpu-01); re-roll the SDI direction (SPEC-cpu-02); reset all InGame counters; reset frame advantage (below); reset the ledge delay (SPEC-cpu-03); reset the throw delay (SPEC-cpu-06); re-read the shield tilt (SPEC-cpu-05). A menu save additionally re-rolls the SDI direction and shield tilt (fork: settings-changed event) and applies the mash-disable rule (SPEC-cpu-01).
+The bundle: full reset of the mash queue (SPEC-cpu-01); re-roll the SDI direction (SPEC-cpu-02); reset all InGame counters; reset frame advantage (below); reset the ledge delay (SPEC-cpu-03); reset the throw delay (SPEC-cpu-06); re-read the shield tilt (SPEC-cpu-05). A menu save additionally re-rolls the SDI direction and shield tilt (fork: settings-changed event) and applies the mash-disable rule (SPEC-cpu-01). **Decided 2026-11-01 (menu question 18 A, the fork's M5o rule):** this re-roll happens in normal Training too, at the next CPU frame after the SDI Direction or Shield Tilt row changes, and the roll then holds until the next reset or the next change of that row (SPEC-cpu-02 §5, SPEC-cpu-05 §5).
 
 Upstream HEAD `077a8e43` wraps the init-time reset in a condition that only holds outside training; that inversion is not adopted (rule 1 above is the 97cbe9b9 and fork behaviour).
 

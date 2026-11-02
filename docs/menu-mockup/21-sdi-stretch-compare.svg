@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="DejaVu Sans Mono, monospace">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(18,22,30)"/><stop offset="1" stop-color="rgb(40,46,58)"/></linearGradient></defs>
+<rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0.0" y="560.0" width="1280.0" height="40.0" fill="rgb(52,58,72)"/>
+<rect x="28.0" y="24.0" width="1224.0" height="672.0" fill="rgb(10,12,16)" fill-opacity="0.89" stroke="rgb(70,76,90)" stroke-width="1"/>
+<rect x="48.0" y="40.0" width="94.2" height="36.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="64.6" font-size="22" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Chips</text>
+<text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
+<polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Pick the stretch whose chip-size look is closest to the captured spark (right column).</text>
+<text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
+<text x="48.0" y="116.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Chips  &gt;  SDI spark: stretch along the SDI vector</text>
+<text x="40.0" y="233.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">60 px</text>
+<text x="40.0" y="341.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">30 px</text>
+<text x="166.7" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">v9  x1.0</text>
+<rect x="90.7" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="91" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(0.0 121 240)"/>
+<ellipse cx="120.7" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="105.7" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="106" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 121 322)"/>
+<ellipse cx="120.7" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="120.7" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="120.7" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="182.7" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="183" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(270.0 213 240)"/>
+<ellipse cx="212.7" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="197.7" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/sdi-up-4x-layer.png" x="198" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 213 322)"/>
+<ellipse cx="212.7" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="212.7" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="212.7" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="364.0" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">x1.17</text>
+<rect x="288.0" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.17.png" x="288" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(0.0 318 240)"/>
+<ellipse cx="318.0" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="303.0" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.17.png" x="303" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 318 322)"/>
+<ellipse cx="318.0" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="318.0" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="318.0" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="380.0" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.17.png" x="380" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(270.0 410 240)"/>
+<ellipse cx="410.0" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="395.0" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.17.png" x="395" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 410 322)"/>
+<ellipse cx="410.0" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="410.0" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="410.0" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="561.3" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">x1.4</text>
+<rect x="485.3" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.4.png" x="485" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(0.0 515 240)"/>
+<ellipse cx="515.3" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="500.3" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.4.png" x="500" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 515 322)"/>
+<ellipse cx="515.3" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="515.3" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="515.3" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="577.3" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.4.png" x="577" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(270.0 607 240)"/>
+<ellipse cx="607.3" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="592.3" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.4.png" x="592" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 607 322)"/>
+<ellipse cx="607.3" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="607.3" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="607.3" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="758.7" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">x1.7</text>
+<rect x="682.7" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.7.png" x="683" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(0.0 713 240)"/>
+<ellipse cx="712.7" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="697.7" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.7.png" x="698" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 713 322)"/>
+<ellipse cx="712.7" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="712.7" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="712.7" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="774.7" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.7.png" x="775" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(270.0 805 240)"/>
+<ellipse cx="804.7" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="789.7" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x1.7.png" x="790" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 805 322)"/>
+<ellipse cx="804.7" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="804.7" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="804.7" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<rect x="864.0" y="140.0" width="184.0" height="232.0" rx="8" fill="none" stroke="rgb(111,195,154)" stroke-width="2"/>
+<text x="956.0" y="365.2" font-size="14" fill="rgb(111,195,154)" text-anchor="middle">drawn on 01, 16, 17</text>
+<text x="956.0" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">x2.0</text>
+<rect x="880.0" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x2.0.png" x="880" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(0.0 910 240)"/>
+<ellipse cx="910.0" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="895.0" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x2.0.png" x="895" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 910 322)"/>
+<ellipse cx="910.0" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="910.0" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="910.0" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="972.0" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x2.0.png" x="972" y="210" width="60" height="60" preserveAspectRatio="none" transform="rotate(270.0 1002 240)"/>
+<ellipse cx="1002.0" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="987.0" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/renders/variants/sdi-up-4x-layer-x2.0.png" x="987" y="307" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 1002 322)"/>
+<ellipse cx="1002.0" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="1002.0" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="1002.0" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="1153.3" y="166.0" font-size="20" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">captured</text>
+<rect x="1077.3" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/sdi/sdi-spark.png" x="1096" y="230" width="35" height="21" preserveAspectRatio="none" transform="rotate(-90.0 1107 240)"/>
+<ellipse cx="1107.3" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="1092.3" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/sdi/sdi-spark.png" x="1102" y="317" width="17" height="10" preserveAspectRatio="none" transform="rotate(-90.0 1107 322)"/>
+<ellipse cx="1107.3" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="1107.3" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<text x="1107.3" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">Up</text>
+<rect x="1169.3" y="210.0" width="60.0" height="60.0" rx="8.4" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/sdi/sdi-spark-in-check.png" x="1177" y="222" width="46" height="37" preserveAspectRatio="none" transform="rotate(180.0 1199 240)"/>
+<ellipse cx="1199.3" cy="240.0" rx="3.0" ry="3.0" fill="rgb(236,236,232)"/>
+<rect x="1184.3" y="307.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
+<image href="captures/sdi/sdi-spark-in-check.png" x="1188" y="313" width="23" height="18" preserveAspectRatio="none" transform="rotate(180.0 1199 322)"/>
+<ellipse cx="1199.3" cy="322.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
+<text x="1199.3" y="284.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="1199.3" y="350.0" font-size="10" fill="rgb(150,156,170)" text-anchor="middle">In</text>
+<text x="48.0" y="421.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">How: the burst is stretched along the SDI vector, its width unchanged. x1.17 is the emitter's own scale-key table at life 0.5;</text>
+<text x="48.0" y="443.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">x1.4, x1.7 and x2.0 multiply the life-0.3 scale (calibrated against the captures; the file's keys end at x1.42 with the burst faded).</text>
+<text x="48.0" y="465.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Captured: crops of real frames, SDI Up (sdiup f+12) and SDI In (sdiin f+12), drawn at the same chip size; same chip scale in every column.</text>
+<text x="48.0" y="487.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">Burst tip from head, share of chip: captured Up 0.36, captured In 0.31 (its detached streaks go past 0.4); render 0.19 x factor.</text>
+</svg>

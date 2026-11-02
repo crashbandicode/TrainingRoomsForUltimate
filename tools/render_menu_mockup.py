@@ -20,7 +20,11 @@ docs/menu-mockup/captures/di/), rotated per direction as the game rotates that e
 SDI Direction chips from game-derived renders of the two effects (c1162 W9: the effect file's own textures,
 meshes and colours; docs/menu-mockup/captures/renders/), one still per effect turned per direction; adds the
 SDI Direction grid (screen 17); and puts crops of the real captures (the DI streak, the SDI spark Up and In,
-docs/menu-mockup/captures/di/ and sdi/) beside the renders on the chip sheet as the visual check.
+docs/menu-mockup/captures/di/ and sdi/) beside the renders on the chip sheet as the visual check. v10 lengthens the
+SDI burst x2.0 along the SDI vector (tools/render_sdi_stretch.py, the burst emitter's scale-Y; x1.17, x1.4, x1.7 compared on
+sheet 21) and adds the screens for the
+decided items (DECISIONS N1-N7): 02, 03 and 05 updated, 11 as one docked page, 18 handheld item grid, 19 Aerial Delay popup,
+20 Developer page.
 
 Every screen is drawn once through `Canvas`, which records the primitives and writes both the PNG
 (Pillow) and a text SVG (images referenced by relative path), so the two never drift.
@@ -30,6 +34,7 @@ modpack-style monospace text.
 """
 import json
 import math
+import textwrap
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -262,9 +267,15 @@ def sdi_spark(which="sdi_spark"):
 
 def w9_render(visual):
     """The game-derived chip render (c1162 W9, copied by tools/crop_menu_captures.py): file, its centre (the
-    effect origin, which sits on the chip centre) and its size; drawn pointing Up, reach 0.46 x chip size."""
-    rec = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))["w9_renders"]
-    f = next(r for r in rec["files"] if r["file"].endswith(f"/{visual}-up-4x-layer.png"))
+effect origin, which sits on the chip centre) and its size; drawn pointing Up, reach 0.46 x chip size. Since v10
+    the SDI chip draws the taller-burst still (tools/render_sdi_stretch.py); the DI chip draws W9's file unchanged."""
+    crops = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))
+    if visual.startswith("sdi@"):  # a compared variant (chip sheet 21): "sdi@<factor>"
+        f = next(v for v in crops["sdi_stretch"]["variants"] if v["factor"] == float(visual[4:]))
+    elif visual == "sdi":
+        f = crops["sdi_stretch"]
+    else:  # "di", or "sdi-v9": W9's own file, unchanged
+        f = next(r for r in crops["w9_renders"]["files"] if r["file"].endswith(f"/{visual.replace('-v9', '')}-up-4x-layer.png"))
     return f"captures/{f['file']}", (f["size"][0] / 2, f["size"][1] / 2), f["size"][0]
 
 
@@ -280,7 +291,7 @@ def chip_direction(c, cx, cy, s, name, selected=False, weight=0, absolute=False,
            outline=SEL if cursor else (FG if selected else LINE), width=3 if cursor else 2, radius=s * 0.14)
     dx, dy = DIRS[name]
     col = FG if selected else MUTED
-    if visual in ("di", "sdi") and (dx, dy) != (0, 0):
+    if (visual in ("di", "sdi", "sdi-v9") or visual.startswith("sdi@")) and (dx, dy) != (0, 0):
         rel, anchor, size = w9_render(visual)
         c.image_rotated(rel, cx, cy, s / size, math.degrees(math.atan2(dy, dx)) + 90, anchor, 1.0 if selected else 0.5)
         c.circle(cx, cy, max(2, s * 0.05), fill=col)
@@ -416,13 +427,13 @@ PAGES = [
             ("Randomize Slots", "multi", "0 of 5 selected", "up"),
             ("Mirroring", "drop", "None", "up"),
             ("Auto-load on death", "toggle", "OFF", "up"),
+            ("Respawn invincibility", "toggle", "OFF", "ours"),   # N2; greyed while Auto-load on death is On
             ("Player damage on load", "drop", "Default", "up"),
             ("Player damage range", "slider", "0 - 150 %", "up"),
             ("CPU damage on load", "drop", "Default", "up"),
             ("CPU damage range", "slider", "0 - 150 %", "up"),
             ("Buffs on load", "multi", "0 of 12 selected", "up"),
-            ("Item on load (older saves)", "drop", "None", "up"),
-        ]),
+        ]),   # "Item on load (older saves)" is gone (N6): the first-boot import converts older saves once
         ("Setup library", False, [
             ("Save setup to library...", "editor", "name entry", "ours"),
             ("Setup library", "list", "saved setups", "ours"),
@@ -441,6 +452,7 @@ PAGES = [
             ("Save-state slots", "multi", "0 of 5 selected", "up"),
             ("Mash interrupts playback", "toggle", "ON", "up"),
             ("Loop", "toggle", "OFF", "up"),
+            ("Settings override playback", "toggle", "OFF", "ours"),   # N4, advanced row
         ]),
         ("Named macros", False, [
             ("Source", "drop", "Numbered Slots", "ours"),
@@ -480,8 +492,7 @@ PAGES = [
             ("Ready Fighter Bodies", "drop", "3", "ours"),
             ("Group Swap", "toggle", "ON", "ours"),
             ("Swap groups", "multi", "7 of 7 selected", "ours"),
-            ("Preload Samples", "toggle", "OFF", "ours"),
-        ]),
+        ]),   # Preload Samples moved to the Developer page (Q8 / N1)
     ]),
     ("Display & Controls", [
         ("On screen", False, [
@@ -495,12 +506,28 @@ PAGES = [
         ("Controls", False, [
             ("Button chords", "editor", "6 chords", "mixed"),
             ("L+R+A Reset", "toggle", "ON", "up"),
-            ("Menu shortcut 1", "info", "Minus  (button_config.ini)", "ours"),
-            ("Menu shortcut 2", "info", "disabled  (button_config.ini)", "ours"),
+            ("Menu shortcut 1", "editor", "Minus", "ours"),        # N7: opens the chord editor
+            ("Menu shortcut 2", "editor", "disabled", "ours"),
             ("Permanent shortcut", "info", "B + D-pad Up", "ours"),
         ]),
     ]),
 ]
+
+# The sixth page (N1, SPEC-core-01 §2 and §6): hidden unless developer.ini has developer_page=on. Rows are the three
+# the specs describe, all toggles, default Off; the raygun printer has no row because the specs do not describe it.
+DEV_PAGE = ("Developer", [
+    ("Developer", False, [
+        ("Preload Samples", "toggle", "OFF", "ours"),
+        ("Reload developer config", "toggle", "OFF", "ours"),
+        ("Debug hooks", "toggle", "OFF", "ours"),
+    ]),
+])
+DEV_NOTES = [  # what each row does, from SPEC-core-01 §2 (drawn under the rows, muted)
+    ("Preload Samples", "sparse timing and memory samples of the cycle preload go to the diagnostics file."),
+    ("Reload developer config", "while On and P1 holds L+R+A, the developer config file is re-read every frame."),
+    ("Debug hooks", "a debug-only watch on a game float write (Kirby backshield); installed at boot only when this page is on."),
+]
+ADV_ROWS = {"Settings override playback"}  # a single advanced row (the group is not): tagged next to its label
 
 HELP = {
     "Mash": "Actions the CPU mashes out of hitstun, shieldstun, tumble and landing. Random among the selected.",
@@ -513,6 +540,11 @@ HELP = {
     "Kirby Hats": "Hat order per role on the portrait grid (ZR switches role). Kirby takes the next hat on each hat cycle.",
     "Lobby Practice": "Practise in the waiting room; the stage rows below decide where.",
     "HUD": "Show the Training HUD overlay (damage, state, frame data).",
+    "Respawn invincibility": "On: the game's respawn invincibility and, where possible, the respawn platform. Greyed while Auto-load on death is On.",
+    "Settings override playback": "Off: a playing recording wins over DI, SDI, air-dodge, tech and throw settings. On: those settings override it.",
+    "Menu shortcut 1": "Opens the chord editor. A change applies at once and is written to button_config.ini.",
+    "Menu shortcut 2": "Opens the chord editor. A change applies at once and is written to button_config.ini.",
+    "Preload Samples": "Timing and memory samples of the cycle preload, written to the diagnostics file. Inert unless the page is enabled.",
 }
 
 SUBSCREENS = [
@@ -705,13 +737,22 @@ def frame(c, tabs, active, footer_help, crumb=None):
         c.text(48, 100, crumb, "h", FG)
 
 
-def render_page(pi, selected_group=0):
-    name, groups = PAGES[pi]
+def render_page(pi, selected_group=0, focus=0, dev=False):
+    """One page, one group selected, row `focus` of that group highlighted (its help text in the footer). `dev`: the
+    sixth, hidden Developer page (pi is then ignored): six tabs, a header note, and one line per row under the rows."""
+    pages = PAGES + [DEV_PAGE] if dev else PAGES
+    name, groups = pages[len(PAGES) if dev else pi]
     c = Canvas()
     gname, adv, items = groups[selected_group]
-    first = items[0]
-    frame(c, [p[0] for p in PAGES], pi, HELP.get(first[0], f"{first[0]}: {first[2]}"))
-    y = 104
+    first = items[focus]
+    frame(c, [p[0] for p in pages], len(PAGES) if dev else pi, HELP.get(first[0], f"{first[0]}: {first[2]}"))
+    top = 104
+    if dev:  # the note sits between the tab strip and the panes, so the panes start lower
+        c.rect(48, 98, W - 48, 128, fill=HILITE, outline=ADV, radius=6)
+        c.text(62, 105, "Hidden page: shown only when developer.ini has developer_page=on (read once at boot); rows do nothing otherwise.",
+               "xs", ADV)
+        top = 148
+    y = top
     for gi, (g, a, its) in enumerate(groups):
         if gi == selected_group:
             c.rect(48, y - 6, 372, y + 26, fill=HILITE)
@@ -721,18 +762,29 @@ def render_page(pi, selected_group=0):
             c.text(62, y + 24, "advanced - collapsed by default", "xs", ADV)
             y += 20
         y += 40
-    c.line([(388, 96), (388, H - 100)], LINE)
-    y = 104
+    c.line([(388, top - 8), (388, H - 100)], LINE)
+    y = top
     for ii, (label, kind, value, _origin) in enumerate(items):  # _origin: internal only, never drawn (v6)
-        if ii == 0:
+        if ii == focus:
             c.rect(404, y - 6, W - 48, y + 26, fill=HILITE)
             c.rect(404, y - 6, 408, y + 26, fill=SEL)
         c.text(418, y, label, "t", FG)
+        if label in ADV_ROWS:
+            c.text(418 + c.textlength(label, "t") + 14, y + 4, "advanced", "xxs", ADV)
         draw_control(c, kind, value, y, W - 60)
         y += 38
         if y > H - 120:
             c.text(418, y, "...", "t", MUTED)
             break
+    if dev:
+        y += 14
+        for label, text in DEV_NOTES:
+            c.text(418, y, label, "s", FG)
+            lines = textwrap.wrap(text, 92)
+            for k, line in enumerate(lines):
+                c.text(418, y + 20 + 18 * k, line, "xs", MUTED)
+            y += 30 + 18 * len(lines)
+        c.text(418, y + 6, "No row for the raygun printer: the specs do not describe it yet.", "xs", ADV)
     return c
 
 
@@ -840,19 +892,103 @@ def render_roster_grid(hats=False):
     return c
 
 
-def render_item_grid():
+def tile_item_full(c, x, y, w, h, index, name, cursor=False):
+    """Handheld tile: the fork's 64 px icon and the full name on two lines (owner, then item)."""
+    c.rect(x, y, x + w, y + h, fill=TILE_HI if cursor else TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
+    c.image(f"captures/items/icon-{index:02}.png", x + 8, y + (h - 64) / 2, x + 72, y + (h + 64) / 2)
+    who, what = name.split(": ", 1)
+    c.text(x + 82, y + h / 2 - 20, who + ":", "xs", MUTED)
+    c.text(x + 82, y + h / 2 + 2, what, "s", FG)
+
+
+def render_item_grid(handheld=False):
+    """Give item grid (N5). Docked: one page, 5 x 8 tiles (38 used), short names. Handheld: three pages of 4 x 4
+    (16, 16, 6), full names; this is page 1."""
     c = Canvas()
-    frame(c, ["Fighters & Stages"], 0, "A gives Player 1 the item now (one at a time). L/R pages.",
+    frame(c, ["Fighters & Stages"], 0,
+          "A gives Player 1 the item now (one at a time)." + (" L/R pages." if handheld else ""),
           "Fighters & Stages  >  Extras  >  Give item")
     chip_placeholder(c, 620, 112, 40, "ITEMS")
-    c.text(W - 60, 100, "page 1 / 2   (38 items)", "s", MUTED, "r")
-    tw, th, px, py = 280, 48, 292, 54
-    x0, y0 = 48 + (W - 96 - 4 * px + 12) / 2, 136
-    for i, name in enumerate(ITEMS[:32]):
-        col, row = i % 4, i // 4
+    label = "page 1 of 3   (38 items)" if handheld else "page 1 of 1   (38 items)"
+    c.text(W - 60, 100, label, "s", MUTED, "r")
+    if handheld:
+        tx = W - 60 - c.textlength(label, "s") - 90
+        c.rect(tx, 98, tx + 78, 120, fill=HILITE, outline=ADV, radius=5)
+        c.text(tx + 39, 101, "handheld", "xs", ADV, "m")
+        tw, th, px, py = 280, 100, 292, 110
+        x0, y0 = 48 + (W - 96 - 4 * px + 12) / 2, 136
+        for i, name in enumerate(ITEMS[:16]):
+            col, row = i % 4, i // 4
+            tile_item_full(c, x0 + col * px, y0 + row * py, tw, th, i, name, cursor=(i == 8))
+        c.text(x0, y0 + 4 * py + 2, "Handheld mode: 4 x 4 tiles with full names, three pages (16, 16, 6). Docked: one page, 5 x 8 (screen 11).",
+               "xs", MUTED)
+        return c
+    tw, th, px, py = 228, 48, 236, 54
+    x0, y0 = 48 + (W - 96 - 5 * px + 8) / 2, 136
+    for i, name in enumerate(ITEMS):
+        col, row = i % 5, i // 5
         tile_item(c, x0 + col * px, y0 + row * py, tw, th, i, name, cursor=(i == 8))
-    c.text(x0, y0 + 8 * py + 2, "Icons: the fork's 38 item pictures (scripts/item-icons), made from the game's own item files.",
-           "xs", MUTED)
+    c.text(x0, y0 + 8 * py + 2, "Docked: one page, 5 x 8 tiles (38 used), short names. Icons: the fork's item pictures, "
+           "made from the game's own item files.", "xs", MUTED)
+    return c
+
+
+def delay_popup(c, x0, y0, w, active, ticked=(), rng=(0, 10)):
+    """The Aerial Delay popup (N3) in one of its two states: active = "list" (the checklist holds ticks, the range is
+    greyed) or "range" (a min-max range is set, the checklist is greyed). 31 values, 0-30 frames."""
+    on_list = active == "list"
+    c.rect(x0, y0, x0 + w, y0 + 410, fill=TILE, outline=LINE, radius=8)
+    c.text(x0 + 16, y0 + 12, "Aerial Delay", "h", FG)
+    c.text(x0 + w - 16, y0 + 15, "frames 0 - 30", "xs", MUTED, "r")
+    # checklist
+    ink = FG if on_list else MUTED
+    c.text(x0 + 16, y0 + 50, "Checklist", "t", ink)
+    c.text(x0 + w - 16, y0 + 53, f"{len(ticked)} ticked" if on_list else "none", "xs", ink, "r")
+    cw = (w - 32) / 8
+    for v in range(31):
+        cx, cy = x0 + 16 + (v % 8) * cw, y0 + 84 + (v // 8) * 32
+        c.rect(cx, cy, cx + 18, cy + 18, outline=ink if on_list else LINE, width=2)
+        if v in ticked:
+            c.rect(cx + 4, cy + 4, cx + 14, cy + 14, fill=SEL)
+        c.text(cx + 26, cy, str(v), "s", ink)
+    if not on_list:
+        c.text(x0 + 16, y0 + 218, "clear the range to use the list", "xs", ADV)
+    c.line([(x0 + 16, y0 + 246), (x0 + w - 16, y0 + 246)], LINE)
+    # range
+    ink = FG if not on_list else MUTED
+    c.text(x0 + 16, y0 + 262, "Range (min - max)", "t", ink)
+    c.text(x0 + w - 16, y0 + 265, f"{rng[0]} - {rng[1]} frames" if not on_list else "not set", "xs", ink, "r")
+    sx0, sx1, sy = x0 + 40, x0 + w - 40, y0 + 330
+
+    def at(v):
+        return sx0 + (sx1 - sx0) * v / 30
+
+    c.rect(sx0, sy - 3, sx1, sy + 3, fill=HILITE if on_list else (60, 66, 80), radius=3)
+    if not on_list:
+        c.rect(at(rng[0]), sy - 3, at(rng[1]), sy + 3, fill=SEL, radius=3)
+        for v, tag in ((rng[0], "min"), (rng[1], "max")):
+            c.circle(at(v), sy, 10, fill=FG, outline=SEL, width=2)
+            c.text(at(v), sy - 34, f"{tag} {v}", "xs", FG, "m")
+    else:
+        for v, tag in ((0, "min"), (30, "max")):
+            c.circle(at(v), sy, 10, fill=TILE, outline=LINE, width=2)
+            c.text(at(v), sy - 34, tag, "xs", MUTED, "m")
+        c.text(x0 + 16, y0 + 354, "clear the list to use a range", "xs", ADV)
+    if not on_list:
+        c.text(x0 + 16, y0 + 354, "any value from min to max, picked uniformly", "xs", MUTED)
+    c.text(x0 + 16, y0 + 384, "A tick / move handle    Y clears the active one", "xxs", MUTED)
+
+
+def render_delay_popup():
+    c = Canvas()
+    frame(c, ["CPU"], 0, "Tick values for a random set, or set a min-max range; Y clears the active one so the other can be used.",
+          "CPU  >  Attacks & Movement  >  Aerial Delay")
+    w = 570
+    xa, xb = 48, W - 48 - w
+    c.text(xa, 132, "(a) checklist active: 0, 5 and 10 ticked", "t", FG)
+    c.text(xb, 132, "(b) range active: 0 - 10", "t", FG)
+    delay_popup(c, xa, 164, w, "list", ticked=(0, 5, 10))
+    delay_popup(c, xb, 164, w, "range", rng=(0, 10))
     return c
 
 
@@ -919,6 +1055,39 @@ def render_chip_sheet():
     return c
 
 
+def render_sdi_stretch_compare():
+    """Review sheet (proposal v10): the SDI Up and In chips at the two real chip sizes (60 and 30 px) for the v9 render and
+    four stretches along the SDI vector, beside the captured Up and In spark crops at the same sizes."""
+    c = Canvas()
+    frame(c, ["Chips"], 0, "Pick the stretch whose chip-size look is closest to the captured spark (right column).",
+          "Chips  >  SDI spark: stretch along the SDI vector")
+    cols = [("v9  x1.0", "sdi-v9", "sdi-v9"), ("x1.17", "sdi@1.17", "sdi@1.17"), ("x1.4", "sdi@1.4", "sdi@1.4"),
+            ("x1.7", "sdi@1.7", "sdi@1.7"), ("x2.0", "sdi@2.0", "sdi@2.0"), ("captured", "sdi-capture", "sdi-check")]
+    pitch = (W - 96) / len(cols)
+    chosen = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))["sdi_stretch"]["factor"]
+    c.text(40, 222, "60 px", "xs", MUTED)
+    c.text(40, 330, "30 px", "xs", MUTED)
+    for i, (label, up_v, in_v) in enumerate(cols):
+        cx = 48 + pitch * (i + 0.5) + 20
+        if label == f"x{chosen}":  # the stretch the SDI chips draw
+            c.rect(cx - 92, 140, cx + 92, 372, outline=OURS, width=2, radius=8)
+            c.text(cx, 354, "drawn on 01, 16, 17", "xs", OURS, "m")
+        c.text(cx, 150, label, "h", FG, "m")
+        for row, (name, vis) in enumerate((("Up", up_v), ("In", in_v))):
+            x = cx - 46 + row * 92
+            chip_direction(c, x, 240, 60, name, selected=True, visual=vis)
+            chip_direction(c, x, 322, 30, name, selected=True, visual=vis)
+            c.text(x, 276, name, "tiny", MUTED, "m")
+            c.text(x, 342, name, "tiny", MUTED, "m")
+    notes = ["How: the burst is stretched along the SDI vector, its width unchanged. x1.17 is the emitter's own scale-key table at life 0.5;",
+             "x1.4, x1.7 and x2.0 multiply the life-0.3 scale (calibrated against the captures; the file's keys end at x1.42 with the burst faded).",
+             "Captured: crops of real frames, SDI Up (sdiup f+12) and SDI In (sdiin f+12), drawn at the same chip size; same chip scale in every column.",
+             "Burst tip from head, share of chip: captured Up 0.36, captured In 0.31 (its detached streaks go past 0.4); render 0.19 x factor."]
+    for k, t in enumerate(notes):
+        c.text(48, 410 + 22 * k, t, "xs", MUTED)
+    return c
+
+
 def image_sources():
     """index.md section: every source capture (path, sha256) and every crop box, from captures/crops.json."""
     m = json.loads((CAPS / "crops.json").read_text(encoding="utf-8"))
@@ -962,6 +1131,39 @@ def image_sources():
     for f in r9["files"]:
         out.append(f"| {'DI' if '/di-' in f['file'] else 'SDI'} Up ({f['size'][0]}x{f['size'][1]}) | `captures/{f['file']}` | "
                    f"`{f['source']}` | `{f['sha256']}` |")
+    st = m["sdi_stretch"]
+    st = m["sdi_stretch"]
+    out += ["", "SDI burst, longer (proposal v10): the SDI chips (01, 16, 17 and the decision pictures 17 and 18) draw `captures/" + st["file"] + "`"
+            f" (the burst stretched x{st['factor']} along the SDI vector), not W9's own `sdi-up-4x-layer.png` (kept above, unused). "
+            "Measured on the SDI Up captures (`c1162/captures-ally-sdi/sdi-up`, frames +10 to +15; the largest connected pixels with "
+            "min(R,G,B) >= 240, bounding box): height / width 1.76, 1.47, 1.78, 1.84, 1.65, 1.57, median 1.71 (frames +16 and +17 are "
+            "merged with the fighters and left out). W9's render, the solid burst (alpha >= 230, crown and legs, the thin line excluded): "
+            "58 x 86 px, height / width 1.48. The first try (x1.17, height / width 1.72, the captured median) was not visible at chip "
+            "size, because the capture's burst is bolder and reaches much farther from the head in chip terms: measured against the "
+            "captured crops at the chip scale of sheet 16 (reach 0.40 of the chip), the captured Up burst tip is 0.36 of the chip from "
+            "the head and the captured In burst tip 0.31 with detached streaks going on past 0.40, while W9's burst tip is 0.19. Sheet 21 "
+            "shows the Up and In chips at 60 and 30 px for x1.0 (v9), x1.17, x1.4, x1.7 and x2.0 beside the captured crops; x2.0 (tip 0.39) "
+            "is the closest in reach and in weight, x1.7 (tip 0.32) falls short of the Up capture and of the In streaks, so x2.0 is drawn. "
+            "Remaining difference: the render's burst keeps its width (about 13 % of the chip against about 29 % in the capture), so it "
+            "is a taller, thinner flame than the captured arch. The thin line (`spark1`, W9's calibrated quad) is unchanged. "
+            "Method, the root route as far as the file goes: W9's own renderer (`di-sdi-extract/tools/render_chips.py`, imported "
+            "read-only) is run by `tools/render_sdi_stretch.py`, which changes only the burst emitter `impactring1`'s scale-Y. x1.17 reads "
+            "its own scale-key table at particle life 0.5 instead of 0.3 (y key 1.356 -> 1.584, alpha still 1.0). That table ends at "
+            "y = 1.93 (x1.42) at life 1.0, where the burst has faded to alpha 0.14, so x1.4, x1.7 and x2.0 are not in the file: they "
+            "multiply the life-0.3 scale-Y by the factor, CALIBRATED against the captures, like W9's `spark1` quad. The scale-X, the "
+            "origin, the colours, the gain, the framing and the other emitter are unchanged. The tool self-checks that factor 1 "
+            "reproduces W9's file pixel for pixel. It needs numpy, so it runs under the ssbu-recomp venv Python "
+            "(`tools/crop_menu_captures.py` calls it); the inputs are pinned by sha256 below. No `.eff`, texture, mesh or parameter "
+            "file is in the repository.", "",
+            "| field | value |", "| --- | --- |",
+            f"| file drawn | `captures/{st['file']}` ({st['size'][0]}x{st['size'][1]}, RGBA light layer), factor {st['factor']} ({st['how']}); same pixels as `captures/{st['same_pixels_as']}` |",
+            f"| sha256 | `{st['sha256']}` |",
+            f"| tool | `{st['tool']}`; W9 `tools/render_chips.py` sha256 `{st['tool_sha256']}` |",
+            f"| inputs | stock 13.0.5 `ef_common.eff` sha256 `{st['eff_sha256']}`; W9 `sdi-up-4x-layer.png` sha256 `{st['base_render_sha256']}` |"]
+    out += ["", "Compared stretches (sheet 21, review material; the file drawn is the x" + str(st["factor"]) + " one):", "",
+            "| factor | file | source | sha256 |", "| --- | --- | --- | --- |"]
+    for v in st["variants"]:
+        out.append(f"| x{v['factor']} | `captures/{v['file']}` | {v['source']} | `{v['sha256']}` |")
     out += ["", "DI streak (proposal v8; the visual check since v9): the game's own DI visual (system effect `sys_vector`), cut "
             "from one frame of a real capture. v8 drew the DI chips from this crop; since v9 the chip sheet (16) shows it once, as "
             "captured, beside the rendered DI chips. The game draws one effect and turns it about Z to the DI-corrected launch "
@@ -1015,7 +1217,7 @@ def main():
         old.unlink()
     for old in OUT.glob("*.svg"):
         old.unlink()
-    index = ["# Menu mockup screens (proposal v9, in-game look, 1280x720)", "",
+    index = ["# Menu mockup screens (proposal v10, in-game look, 1280x720)", "",
              "Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; "
              "the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the "
              "fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows "
@@ -1028,21 +1230,26 @@ def main():
              "check. The Airdodge Direction and Shield Tilt "
              "arrows are the clean room's own vector art. The screens carry no origin tags "
              "(upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table "
-             "in `docs/MENU-PROPOSAL.md`.", ""]
+             "in `docs/MENU-PROPOSAL.md`.", "",
+             "Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along the SDI vector (screens 01, 16, 17; the stretches are compared on 21; method "
+             "and measurements below, `DECISIONS.md` N10); the decided items are drawn (`DECISIONS.md` N1-N7): 02 Respawn "
+             "invincibility added and Item on load gone, 03 the advanced row Settings override playback, 05 editable menu shortcuts, "
+             "11 and 18 the item grid docked (5x8, one page) and handheld (4x4, three pages), 19 the delay popup with checklist and "
+             "range, 20 the hidden Developer page. Preload Samples left the Loading group (04, 14 and 15 now count 6 rows there).", ""]
     screens = [
         ("01-cpu", lambda: render_page(0, 1), "page CPU (Defence group: direction grids; the DI and SDI rows preview their "
          "selected chips)"),
-        ("02-saves", lambda: render_page(1), "page Saves"),
-        ("03-recording", lambda: render_page(2), "page Recording"),
+        ("02-saves", lambda: render_page(1, 0, 5), "page Saves (Save states group; Respawn invincibility focused, Item on load gone)"),
+        ("03-recording", lambda: render_page(2, 1, 5), "page Recording (Playback group; the advanced row Settings override playback focused)"),
         ("04-fighters-stages", lambda: render_page(3), "page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)"),
-        ("05-display-controls", lambda: render_page(4), "page Display & Controls"),
+        ("05-display-controls", lambda: render_page(4, 1, 2), "page Display & Controls (Controls group; Menu shortcut 1 / 2 are editor rows, Permanent shortcut stays info)"),
         ("06-situation-overrides", lambda: render_subscreen(0), "sub-screen Situation overrides (CPU > Reactions)"),
         ("07-button-chords", lambda: render_subscreen(1), "sub-screen Button chords (Display & Controls > Controls)"),
         ("08-swap-groups", lambda: render_subscreen(2), "sub-screen Swap groups (Fighters & Stages > Loading)"),
         ("09-direction-grid", render_direction_grid, "sub-screen DI Direction: the 3x3 direction grid of DI streak chips with "
          "absolute Left/Right and weights"),
         ("10-character-grid", lambda: render_roster_grid(False), "sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges"),
-        ("11-item-grid", render_item_grid, "sub-screen Give item: 4x8 item grid with the fork's own item icons, page 1 of 2"),
+        ("11-item-grid", render_item_grid, "sub-screen Give item, docked: one page of 5x8 tiles (38 used) with short names and the fork's own item icons, page 1 of 1"),
         ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time "
          "each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures"),
         ("13-kirby-hats-grid", lambda: render_roster_grid(True), "sub-screen Kirby Hats: the same portrait grid as a two-role hat order"),
@@ -1052,6 +1259,14 @@ def main():
          "SDI chips with crops of the captures beside them as the check, and the Airdodge / Shield Tilt arrows"),
         ("17-sdi-direction-grid", lambda: render_direction_grid("sdi"), "sub-screen SDI Direction: the 3x3 direction grid of SDI "
          "spark chips with absolute Left/Right and weights (same layout as 09)"),
+        ("18-item-grid-handheld", lambda: render_item_grid(True), "sub-screen Give item, handheld: 4x4 tiles with full names, page 1 of 3, "
+         "with a small handheld tag"),
+        ("19-delay-popup", render_delay_popup, "popup Aerial Delay with both controls, two states: (a) checklist active (0, 5, 10 ticked), "
+         "range greyed; (b) range 0 - 10 active, checklist greyed; Y clears the active one"),
+        ("20-developer", lambda: render_page(0, dev=True), "sixth page Developer, hidden unless developer.ini has developer_page=on: "
+         "Preload Samples (moved from Loading), Reload developer config, Debug hooks"),
+        ("21-sdi-stretch-compare", render_sdi_stretch_compare, "review sheet: SDI Up and In chips at 60 and 30 px for the v9 render "
+         "and four stretches along the SDI vector (x1.17, x1.4, x1.7, x2.0), beside the captured Up and In crops at the same size"),
     ]
     for name, fn, what in screens:
         fn().save(name)

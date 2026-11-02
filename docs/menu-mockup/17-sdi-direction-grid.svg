@@ -14,21 +14,21 @@
 <text x="150.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">In (toward the opponent)</text>
 <text x="414.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out (away)</text>
 <rect x="96.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(-45.0 150 206)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="96" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(-45.0 150 206)" opacity="0.50"/>
 <ellipse cx="150.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="150.0" y="276.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Up In</text>
 <rect x="228.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="228" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(0.0 282 206)"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="228" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(0.0 282 206)"/>
 <ellipse cx="282.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
 <ellipse cx="320.9" cy="167.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
 <text x="320.9" y="170.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
 <text x="282.0" y="276.2" font-size="14" fill="rgb(236,236,232)" text-anchor="middle">Up</text>
 <rect x="360.0" y="152.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(45.0 414 206)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="360" y="152" width="108" height="108" preserveAspectRatio="none" transform="rotate(45.0 414 206)" opacity="0.50"/>
 <ellipse cx="414.0" cy="206.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="414.0" y="276.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Up Out</text>
 <rect x="96.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(46,52,66)" stroke="rgb(176,52,42)" stroke-width="3"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 150 338)"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="96" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 150 338)"/>
 <ellipse cx="150.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(236,236,232)"/>
 <ellipse cx="188.9" cy="299.1" rx="11.9" ry="11.9" fill="rgb(176,52,42)"/>
 <text x="188.9" y="302.5" font-size="13" fill="rgb(236,236,232)" text-anchor="middle" font-weight="bold">1</text>
@@ -38,29 +38,29 @@
 <ellipse cx="282.0" cy="338.0" rx="7.6" ry="7.6" fill="rgb(150,156,170)"/>
 <text x="282.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Neutral</text>
 <rect x="360.0" y="284.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 414 338)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="360" y="284" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 414 338)" opacity="0.50"/>
 <ellipse cx="414.0" cy="338.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="414.0" y="408.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Out</text>
 <rect x="96.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="96" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(225.0 150 470)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="96" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(225.0 150 470)" opacity="0.50"/>
 <ellipse cx="150.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="150.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down In</text>
 <rect x="228.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="228" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(180.0 282 470)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="228" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(180.0 282 470)" opacity="0.50"/>
 <ellipse cx="282.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="282.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down</text>
 <rect x="360.0" y="416.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="360" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(135.0 414 470)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="360" y="416" width="108" height="108" preserveAspectRatio="none" transform="rotate(135.0 414 470)" opacity="0.50"/>
 <ellipse cx="414.0" cy="470.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="414.0" y="540.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Down Out</text>
 <text x="626.0" y="139.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">absolute</text>
 <rect x="572.0" y="212.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="572" y="212" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 626 266)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="572" y="212" width="108" height="108" preserveAspectRatio="none" transform="rotate(270.0 626 266)" opacity="0.50"/>
 <ellipse cx="626.0" cy="266.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="626.0" y="300.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
 <text x="626.0" y="336.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Left</text>
 <rect x="572.0" y="356.0" width="108.0" height="108.0" rx="15.120000000000001" fill="rgb(28,32,42)" stroke="rgb(70,76,90)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="572" y="356" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 626 410)" opacity="0.50"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="572" y="356" width="108" height="108" preserveAspectRatio="none" transform="rotate(90.0 626 410)" opacity="0.50"/>
 <ellipse cx="626.0" cy="410.0" rx="5.4" ry="5.4" fill="rgb(150,156,170)"/>
 <text x="626.0" y="444.4" font-size="12" fill="rgb(150,156,170)" text-anchor="middle">abs</text>
 <text x="626.0" y="480.2" font-size="14" fill="rgb(150,156,170)" text-anchor="middle">Right</text>

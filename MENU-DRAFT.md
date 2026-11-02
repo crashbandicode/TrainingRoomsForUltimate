@@ -1,6 +1,6 @@
 # MENU-DRAFT — the clean-room menu, for the operator's green light
 
-Draft 8, 2026-11-01, project lead (drafts 2 to 7 the same day; draft 3 is the
+Draft 9, 2026-11-01, project lead (drafts 2 to 8 the same day; draft 3 is the
 operator's redraft: the fork's grid, item and stage visuals where they fit, a
 direction grid for DI / SDI / Airdodge / Shield Tilt; draft 4 follows the
 operator's review of v3: the Kirby Hats, Solo Popo and character-items chips
@@ -13,8 +13,28 @@ each thumbnail from the stage's own game UI texture at run time, so a stage
 mod's picture shows — see *Grid pictures* below). Supersedes `docs/menu-redesign.md`
 (draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
 here is built; the menu is implemented only after the operator approves this
-page. Rendered screens: `docs/MENU-PROPOSAL.md` (v9; the screens carry no
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (v10; the screens carry no
 origin tags, the Origin column in the tables below is the internal record).
+
+**Draft 9 (the operator's answers, 2026-11-01; the full list is
+`docs/DECISIONS.md`).** The operator approved the proposal and answered its
+questions; implementation may begin. What changes in the tables: *Item on load
+(older saves)* is dropped (the first-boot import converts older saves once);
+*Respawn invincibility* (toggle, Off) is added after *Auto-load on death*; an
+advanced toggle *Settings override playback* (Off) is added under Recording ›
+Playback; the seven delay rows (Aerial Delay, Fast Fall Delay, Throw Delay,
+Pummel Delay, Ledge Delay, OoS Offset, Reaction Time) become **multi-select +
+range** (a checklist and a min–max range in one popup, never both at once);
+*Menu shortcut 1 / 2* become `editor` rows (the menu writes `button_config.ini`);
+*Preload Samples* moves, with the developer-only rows, to a sixth page,
+**Developer**, which is hidden unless `developer.ini` has `developer_page=on`;
+the item grid is one 5 × 8 page when docked and three 4 × 4 pages in handheld
+mode. Decisions that change behaviour only (SDI not set = no SDI; recordings win
+over the CPU settings by default; settings changes apply at the next CPU frame;
+longer SDI streaks on the chips) are in §4 and in the specs. Still open: question
+5 (first page on open; working default the last page used), B11 (ledge options
+changed while the CPU is already hanging; `specs/SPEC-cpu-03`), and the two
+confirmations (the delay popup's slot sets, the stage grid's 4 × 4 paging).
 
 **Draft 6 (the operator's review of v6):** the DI and SDI direction chips show
 the game's own DI / SDI direction visual, read from the game at run time like
@@ -62,12 +82,13 @@ Control vocabulary used in both tables:
 | `dropdown` | **new**: one value from a list; ◂/▸ cycles in place, A opens the popup list |
 | `number` | **new**: one numeric value with ◂/▸ step and a popup for direct pick |
 | `multi-select` | **new**: a set, edited in a popup checklist (A toggles, ZL all/none) |
+| `multi-select + range` | **new (draft 9, question 3)**: one popup with two controls over the same values, a checklist and a min–max range. A ticked checklist greys the range; a set range (the CPU picks any step value from min to max, uniform) greys the checklist; Y clears the active one. A saved file with no range loads as a checklist. Used by the seven delay rows; the slot sets (Randomize Slots, Button slots, Save-state slots) stay `multi-select` (to confirm) |
 | `editor` | **new name** for `action`: opens a sub-screen (grid, list, chord editor, override editor) |
 | `info` | read-only row |
 | `direction grid` | **new** (draft 3): a sub-screen of 3×3 chips — In · Neutral · Out across, Up · – · Down down, relative to the opponent — plus two absolute chips Left / Right; each chip draws its direction (DI and SDI: the game's own DI / SDI visual, read at run time, draft 6; Airdodge and Shield Tilt: the clean room's own arrow; *Direction chips* below); A adds one weight (the random pick is weighted, as today's counts), Y clears, ZL all / none; `(single)` = exactly one chip (Shield Tilt). The page row previews the lit chips as nine dots (DI: the selected chips themselves, draft 7; SDI: the same, draft 8) |
-| `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the stock fighter icons (whether they follow the stage rule below is question 16), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
-| `item grid` | the fork's paged 4×8 item grid (`training_mod_consts/src/character_items.rs`, 38 items) with **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, 64×64, made from the game's own item files; draft 5) |
-| `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below) |
+| `portrait grid` | the fork's 13×7 roster grid (`training_mod_tui/src/roster_grid.rs`): the fighter icons (draft 9, question 16: read at run time like the stage thumbnails; the review screens still show the stock icons), red P1 / blue CPU order badges, ZR role switch, S marks, X form preview, the All cell |
+| `item grid` | the 38 items of `training_mod_consts/src/character_items.rs` with **the fork's own 38 item icons** (`scripts/item-icons/assets/icon-00..37.png`, 64×64, made from the game's own item files; draft 5). **Draft 9 (question 14, B):** docked, one page of 5 × 8 tiles (38 used) with short names; handheld (the console's operation mode when the grid opens), three pages of 4 × 4 (16, 16, 6) with full names; L / R page. The fork's two pages of 4 × 8 are replaced |
+| `stage grid` | the fork's paged 4×4 stage tiles, All first, rotation badges, Y form tag (`training_mod_tui/src/stage_menu.rs`); **each thumbnail is the stage's own game UI texture, read at run time** (draft 5; *Grid pictures* below). Draft 9: unchanged, 4 × 4 (question 14's denser option was about the items; to confirm) |
 | `chip` | an icon at the row's right edge (Kirby Hats, Solo Popo, character items); **draft 4: a neutral placeholder** (dashed rounded square, short label); the final icons are open and will be designed once the functionality is settled |
 
 **Grid pictures (draft 5; answers question 13 for stages and items).**
@@ -93,8 +114,11 @@ Control vocabulary used in both tables:
   stock sizes, and the game's own stage select shows its picture; the fork's
   grid shows the same baked tile with and without the mod.
 - **Item grid:** the fork's own 38 item icons, as the fork ships them.
-- **Portrait grid:** unchanged for now; whether fighter portraits follow the
-  stage rule is question 16.
+- **Portrait grid (draft 9, question 16 decided):** each fighter's own UI
+  portrait is read from the game at run time, like the stage thumbnails, with a
+  text tile as the fallback; nothing is baked or committed, and character and
+  costume mods show. It needs one more development probe (the same unknowns as
+  the stage thumbnails, plus choosing the right costume).
 
 **Direction chips (draft 6; draft 7 adds the identified visuals).**
 
@@ -125,6 +149,9 @@ Control vocabulary used in both tables:
   chips do the same with one render per effect made from the game's effect
   file (draft 8); crops of the captured streak and spark sit beside them on
   the chip sheet as the check.
+- **Streaks (draft 9, question 17 decided as proposed).** Only the DI and SDI
+  chips show the game's visual. The SDI chips draw the spark's white streaks
+  longer, closer to a capture (`specs/SPEC-core-07` §4.6).
 - **Fallback:** if the asset cannot be read, the chip shows the clean room's
   own arrow, never a baked copy of the game's picture.
 
@@ -256,10 +283,16 @@ outside the menu.
 
 ## 2. Proposed layout: five pages, grouped, dropdowns for single choices
 
-Page order and L/R tab titles: **CPU · Saves · Recording · Fighters & Stages · Display & Controls**.
+Page order and L/R tab titles: **CPU · Saves · Recording · Fighters & Stages · Display & Controls**,
+and, after them, **Developer** (draft 9, question 8 / B9): a sixth page that is
+hidden, with every row inert, unless `sd:/ultimate/TrainingRooms/developer.ini`
+has `developer_page=on` (read once at boot; a missing file, a missing key or
+any other value = hidden). It ships in the normal build. The operator's card and
+the Eden test profiles carry `developer_page=on`.
 Rows are listed in the order they appear; a `group` is a section header on the
 page (collapsed by default when marked *(advanced)*). Setting ids do not
-change, so existing `training_modpack.json` files load as they are.
+change, so existing settings files load as they are (the retired
+`character_item` key is accepted and ignored after the import converted it).
 
 | page | group | item | control | options/range | default | origin | note |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -269,42 +302,42 @@ change, so existing `training_modpack.json` files load as they are.
 | CPU | Reactions | Situation overrides | editor | sub-screen: dropdown of 13 situations + multi-select of 13 actions; row shows "n of 13 set" | none | upstream | replaces the 13-row Override tab |
 | CPU | Defence | Airdodge Direction | direction grid | 9 relative chips + Left / Right, weighted | none | upstream | draft 3: chips instead of an 11-row checklist |
 | CPU | Defence | DI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own DI visual, read at run time (draft 7: `sys_vector`) |
-| CPU | Defence | SDI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own SDI visual, read at run time (draft 7: `sys_hitstop_spark`; draft 8: captured, screen 17); when a change applies: question 18 |
+| CPU | Defence | SDI Direction | direction grid | same | none | upstream | draft 3; draft 6: chips show the game's own SDI visual, read at run time (draft 7: `sys_hitstop_spark`; draft 8: captured, screen 17); when a change applies: question 18 (decided: the next CPU frame) |
 | CPU | Defence | SDI Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Clatter Strength | dropdown | None, Normal, Medium, High | None | upstream | was single |
 | CPU | Defence | Dodge Staling | toggle | On, Off | On | upstream | |
 | CPU | Ledge & Tech | Ledge Options | multi-select | Neutral Getup, Roll, Jump, Attack, Wait, Playback Slot 1–5 | upstream default set | upstream | |
-| CPU | Ledge & Tech | Ledge Delay | multi-select | 0–300 by 10 | none | upstream | see open question 3 |
+| CPU | Ledge & Tech | Ledge Delay | multi-select + range | 0–300 by 10 | none | upstream | question 3 (decided): checklist or range, one at a time |
 | CPU | Ledge & Tech | Tech Options | multi-select | 4 | all | upstream | |
 | CPU | Ledge & Tech | Mistech Options | multi-select | 4 | all | upstream | |
 | CPU | Ledge & Tech | Hide Tech Animations | toggle | On, Off | Off | upstream | |
 | CPU | Shield | Shield | dropdown | None, Infinite, Hold, Constant | None | upstream | was "Shield Toggles", single |
 | CPU | Shield | Shield Tilt | direction grid (single) | one of the 11 chips | Neutral | upstream | was single; draft 2 had a dropdown |
-| CPU | Shield | OoS Offset | multi-select | 0–30 hits | none | upstream | |
-| CPU | Shield | Reaction Time | multi-select | 0–30 frames | none | upstream | |
+| CPU | Shield | OoS Offset | multi-select + range | 0–30 hits | none | upstream | checklist or range |
+| CPU | Shield | Reaction Time | multi-select + range | 0–30 frames | none | upstream | checklist or range |
 | CPU | Attacks & Movement | Attack Angle | multi-select | Neutral, Up, Down | none | upstream | |
 | CPU | Attacks & Movement | Throw | multi-select | None, Forward, Back, Up, Down | none | upstream | |
-| CPU | Attacks & Movement | Throw Delay | multi-select | 0–150 by 5 | none | upstream | |
-| CPU | Attacks & Movement | Pummel Delay | multi-select | 0–150 by 5 | none | upstream | |
+| CPU | Attacks & Movement | Throw Delay | multi-select + range | 0–150 by 5 | none | upstream | checklist or range |
+| CPU | Attacks & Movement | Pummel Delay | multi-select + range | 0–150 by 5 | none | upstream | checklist or range; a set range counts as "pummel" (an empty row = no pummelling) |
 | CPU | Attacks & Movement | Falling Aerials | dropdown | Yes, No, Random | No | upstream | was a Yes/No multi; Random = both selected |
-| CPU | Attacks & Movement | Aerial Delay | multi-select | 0–30 | none | upstream | |
+| CPU | Attacks & Movement | Aerial Delay | multi-select + range | 0–30 | none | upstream | checklist or range |
 | CPU | Attacks & Movement | Full Hop | dropdown | Yes, No, Random | Yes | upstream | same mapping |
 | CPU | Attacks & Movement | Fast Fall | dropdown | Yes, No, Random | No | upstream | same mapping |
-| CPU | Attacks & Movement | Fast Fall Delay | multi-select | 0–30 | none | upstream | |
+| CPU | Attacks & Movement | Fast Fall Delay | multi-select + range | 0–30 | none | upstream | checklist or range |
 | CPU | Attacks & Movement | Crouch | toggle | On, Off | Off | upstream | |
-| CPU | *(fallback; shown only when the standalone CPU pilot plugin is absent)* | P1 CPU Control | toggle | On, Off | Off | ours | operator 2026-11-01: the standalone pilot owns P1 and has its own menu page; the clean room keeps only the handoff (install line `standalone_pilot_present`, pilot owns P1). Proposal: hide this group when the pilot is present and show one `info` row "P1 control: CPU pilot plugin (its own menu)" instead; see open question 11 |
+| CPU | *(fallback; shown only when the standalone CPU pilot plugin is absent)* | P1 CPU Control | toggle | On, Off | Off | ours | operator 2026-11-01: the standalone pilot owns P1 and has its own menu page; the clean room keeps only the handoff (install line `standalone_pilot_present`, pilot owns P1). Proposal: hide this group when the pilot is present and show one `info` row "P1 control: CPU pilot plugin (its own menu)" instead; question 11 (decided as proposed) |
 | CPU | *(fallback)* | P1 CPU Level | dropdown | 1–9 | 3 | ours | same visibility rule; setting ids unchanged so existing files stay compatible |
 | Saves | Save states | Save States | toggle | On, Off | On | upstream | was "Enable Save States" |
 | Saves | Save states | Slot | dropdown | 1–5 | 1 | upstream | was single |
 | Saves | Save states | Randomize Slots | multi-select | 1–5 | none | upstream | |
 | Saves | Save states | Mirroring | dropdown | None, Alternate, Random | None | upstream | was single |
 | Saves | Save states | Auto-load on death | toggle | On, Off | Off | upstream | was "Auto Save States" |
+| Saves | Save states | Respawn invincibility | toggle | On, Off | Off | ours (new) | draft 9 (B8 / N2). Off = the fork: instant respawn, no invincibility. On: after a natural death in Training the fighter (P1 or CPU) respawns with the game's own respawn invincibility and, where the game's own respawn path can be used, on the respawn platform as in a match. Greyed while *Auto-load on death* is On (a save state is loaded instead). If the platform cannot be had through the game's own path, that limit goes to the operator before it ships (`specs/SPEC-state-01`) |
 | Saves | Save states | Player damage on load | dropdown | Default, Save State, Random | Default | upstream | was single |
 | Saves | Save states | Player damage range | slider | 0–150 % | 0–150 | upstream | greyed unless Random |
 | Saves | Save states | CPU damage on load | dropdown | Default, Save State, Random | Default | upstream | |
 | Saves | Save states | CPU damage range | slider | 0–150 % | 0–150 | upstream | greyed unless Random |
 | Saves | Save states | Buffs on load | multi-select | 12 buffs | none | upstream | |
-| Saves | Save states | Item on load (older saves) | dropdown | None, Player 1st–8th Var., CPU 1st–8th Var. | None | upstream | was single; see open question 6 |
 | Saves | Setup library | Save setup to library… | editor | name entry for the selected slot | — | ours | |
 | Saves | Setup library | Setup library | editor (list) | saved setups; A binds+restores, Y binds | — | ours | |
 | Recording | Recording | Record Slot | dropdown | 1–5 | 1 | upstream | was single |
@@ -316,20 +349,21 @@ change, so existing `training_modpack.json` files load as they are.
 | Recording | Playback | Save-state slots | multi-select | 1–5 | none | upstream | |
 | Recording | Playback | Mash interrupts playback | toggle | On, Off | On | upstream | |
 | Recording | Playback | Loop | toggle | On, Off | Off | upstream | |
+| Recording | Playback | Settings override playback | toggle *(advanced)* | On, Off | Off | ours (new) | draft 9 (B5 / N4). Off: a playing recording wins over the CPU's DI, SDI, air-dodge, tech and throw settings (they apply again when the playback ends). On: those settings override the recording, as upstream does |
 | Recording | Named macros | Source | dropdown | Numbered Slots, Named Library | Numbered Slots | ours | was single |
 | Recording | Named macros | Ask before switching fighter | toggle | On, Off | On | ours | was "Fighter Prompt" |
 | Recording | Named macros | Named library | editor (list) | | — | ours | |
 | Recording | Named macros | Save slot to library… | editor | | — | ours | |
 | Recording | Named macros | Edit placement | editor | | — | ours | |
 | Recording | Named macros | Replay window | editor | | — | ours | |
-| Recording | Named macros | Replay capture | toggle | On, Off | On | ours | **new in menu**: writes `replay_capture.ini`; Deluxe page toggle stays in sync; see open question 7 |
+| Recording | Named macros | Replay capture | toggle | On, Off | On | ours | **new in menu**: writes `replay_capture.ini`; Deluxe page toggle stays in sync; question 7 (decided) |
 | Fighters & Stages | Player 1 and CPU | Player Swapping | toggle | On, Off | Off | ours | |
 | Fighters & Stages | Player 1 and CPU | Player Character | editor (portrait grid) | all fighters | Mr. Game & Watch | ours | row shows the chosen portrait |
 | Fighters & Stages | Player 1 and CPU | CPU Character | editor (portrait grid) | all fighters | Pikachu | ours | row shows the chosen portrait |
 | Fighters & Stages | Player 1 and CPU | Character Cycles | editor (portrait grid, two roles) | ordered P1 (red) and CPU (blue) picks | as today | ours | row previews both orders with badges; hidden CPU order and Solo Popo marks edited here |
 | Fighters & Stages | Player 1 and CPU | Solo Popo (original Ice Climbers) | toggle + chip | On, Off | Off | ours | chip: placeholder (final icon open) |
 | Fighters & Stages | Extras | Kirby Hats | editor (portrait grid, two roles) + chip | hat order per role | as today | ours | chip: placeholder (final icon open) |
-| Fighters & Stages | Extras | Give item | editor (item grid) + chip | 38 items, 4×8 per page | none | ours | tiles: the fork's own item icons; chip: placeholder (final icon open) |
+| Fighters & Stages | Extras | Give item | editor (item grid) + chip | 38 items; docked: one page of 5×8 (short names); handheld: three pages of 4×4 (full names) | none | ours | tiles: the fork's own item icons; chip: placeholder (final icon open); draft 9 (question 14 B / N5): the layout follows the console's operation mode when the grid opens |
 | Fighters & Stages | Extras | Mii Brawler | dropdown (list) | saved Miis, replay Miis, Add New… | role's saved pick | ours | ZR switches role inside the list |
 | Fighters & Stages | Extras | Mii Swordfighter | dropdown (list) | same | same | ours | |
 | Fighters & Stages | Extras | Mii Gunner | dropdown (list) | same | same | ours | |
@@ -343,7 +377,6 @@ change, so existing `training_modpack.json` files load as they are.
 | Fighters & Stages | Loading *(advanced)* | Ready Fighter Bodies | dropdown | Off, 2, 3 | native max (3) | ours | was single |
 | Fighters & Stages | Loading *(advanced)* | Group Swap | toggle | On, Off | On | ours | master switch |
 | Fighters & Stages | Loading *(advanced)* | Swap groups | multi-select | Ice Climbers pair bank, Original fighter bank, Solo Popo groups, Ice Climbers pair groups, PT/Aegis groups, Ice Climbers pair group, Mii groups | all on | ours | replaces 7 toggle rows; entries grey with the reason when a dependency is off |
-| Fighters & Stages | Loading *(advanced)* | Preload Samples | toggle | On, Off | Off | ours | diagnostics; see open question 8 |
 | Display & Controls | On screen | HUD | toggle | On, Off | On | upstream | from Misc |
 | Display & Controls | On screen | Hitbox Visualization | toggle | On, Off | Off | upstream | from Misc |
 | Display & Controls | On screen | Frame Advantage | toggle | On, Off | Off | upstream | from Misc |
@@ -352,16 +385,37 @@ change, so existing `training_modpack.json` files load as they are.
 | Display & Controls | On screen | Input Delay | number | 0–30 frames | 0 | upstream | was single |
 | Display & Controls | Controls | Button chords | editor | sub-screen with 6 chord rows: Save State Save, Save State Load, Input Record, Input Playback, Cycle Player, Cycle CPU | as today | upstream (4) / ours (2) | replaces the Button Config tab |
 | Display & Controls | Controls | L+R+A Reset | toggle | On, Off | On | upstream | from Misc; grouped with the controls (mockup v1's placement, adopted) |
-| Display & Controls | Controls | Menu shortcut 1 | info | from `button_config.ini` | Minus | ours | read-only; INI stays the editor |
-| Display & Controls | Controls | Menu shortcut 2 | info | from `button_config.ini` | disabled | ours | |
-| Display & Controls | Controls | Permanent shortcut | info | B + D-pad Up | — | ours | |
+| Display & Controls | Controls | Menu shortcut 1 | editor (chord) | chord of the 16 buttons, or disabled; stored in `button_config.ini` | Minus | ours | draft 9 (question 9 B / N7): opens the chord editor; a change applies at once and the menu writes `button_config.ini`, which stays the file of record |
+| Display & Controls | Controls | Menu shortcut 2 | editor (chord) | same | disabled | ours | same |
+| Display & Controls | Controls | Permanent shortcut | info | B + D-pad Up | — | ours | fixed; cannot be edited |
+| Developer *(hidden unless `developer.ini` has `developer_page=on`)* | Developer | Preload Samples | toggle | On, Off | Off | ours | moved here from *Loading (advanced)* (draft 9, question 8): sparse timing and memory samples to the diagnostics file |
+| Developer | Developer | Reload developer config | toggle | On, Off | Off | upstream (rebuilt) | rebuilt from `SPEC-core-01` §6 *Developer config*: while on, holding L+R+A on P1 re-reads the developer config file every frame (a file read per frame, development only) |
+| Developer | Developer | Debug hooks | toggle | On, Off | Off | upstream (rebuilt) | rebuilt from `SPEC-core-01` §6 *Debug hooks*: the debug-only watch on a work-float write (Kirby backshield) that upstream built only under `debug_assertions`; every installed site keeps its 64-byte guard (`specs/SPEC-core-01`) |
 
-Counts: pages 9 → 5; visible rows 103 → 76 with the standalone pilot installed
-(13 override rows → 1 editor, 6 chord rows → 1 editor, 7 group toggles → 1
-multi-select, 2 P1 CPU rows → 1 info row, +1 Replay capture, +3 info rows), 77
-when the pilot is absent and the two fallback rows show; dropdowns 0 → 22 (23
-with the fallback; Shield Tilt is a direction grid in draft 3, not a dropdown);
-direction grids 4; sub-screens 11 → 18 (14 editors + 4 direction grids).
+Counts (draft 9, recounted from the tables; the draft-8 figures 103 → 76 did
+not match the tables, which have 111 visible rows in §1 and 92 in §2):
+
+- **Pages:** 9 → 5, plus the hidden *Developer* page = 6 when `developer.ini`
+  enables it.
+- **Visible rows (the five normal pages):** §1 has 111 visible rows (118 table
+  rows minus 4 hidden and 3 outside the menu). 111 − 12 (13 override rows → 1
+  editor) − 5 (6 chord rows → 1 editor) − 6 (7 group toggles → 1 multi-select)
+  − 1 (2 P1 CPU rows → 1 info row, pilot present) + 1 (Replay capture) − 1 (Item
+  on load dropped) + 1 (Respawn invincibility) + 1 (Settings override playback)
+  − 1 (Preload Samples moved to Developer) + 3 (Menu shortcut 1, 2 and the
+  permanent shortcut) = **91** with the pilot installed. Without the pilot the
+  two fallback rows replace the one info row: **92**, which is the number of
+  rows of the §2 table (31 CPU + 13 Saves + 17 Recording + 20 Fighters & Stages
+  + 11 Display & Controls). The §2 table also holds the 3 Developer rows,
+  hidden unless enabled (Preload Samples, Reload developer config, Debug hooks).
+- **Controls (§2 table):** direction grids 4 (3 + the single-chip Shield Tilt);
+  dropdowns 19 plain + 3 Mii lists (the fallback P1 CPU Level is a 20th plain
+  one; Item on load, a dropdown in draft 8, is gone); `multi-select + range` 7
+  (the delay rows); `multi-select` 13; toggles 24 (new: Respawn invincibility,
+  Settings override playback; the 3 Developer toggles are counted separately).
+- **Sub-screens:** 11 → 18 (14 editor sub-screens + 4 direction grids), unchanged:
+  *Menu shortcut 1 / 2* are two more `editor` rows but open the same chord
+  editor as *Button chords*, and the delay popup is a popup, not a sub-screen.
 
 ## 3. Rationale per page, and what is dropped or merged
 
@@ -372,6 +426,7 @@ direction grids 4; sub-screens 11 → 18 (14 editors + 4 direction grids).
 | Recording | Inputs the CPU plays back: numbered recordings, playback rules, and the fork's named-macro and replay tools that feed the same slots. |
 | Fighters & Stages | Who is on screen and where: swaps, cycles, hats, items, Miis, the stage rows (lobby practice, stage list, rotation, hazards), and (collapsed) the loading machinery that makes swaps fast. |
 | Display & Controls | What is drawn and which buttons do what (chords, the L+R+A reset chord, the menu shortcuts); nothing here changes what the CPU does. |
+| Developer *(hidden)* | Measurement and development aids that no player needs: Preload Samples and the rebuilt developer-only rows of the upstream code. Shown only when `developer.ini` has `developer_page=on`; the operator's card and the Eden test profiles enable it. |
 
 Dropped or merged:
 
@@ -383,7 +438,10 @@ Dropped or merged:
 | Falling Aerials, Full Hop, Fast Fall (Yes/No multi) | *Yes / No / Random* dropdowns | the only set semantics a Yes/No multi can express is "random", so name it |
 | Menu Open Start Press (retired field) | dropped from the menu; the field stays in the JSON for old files | the INI replaced it in the fork |
 | Auto-Update (upstream) | dropped (already gone in the fork) | no network code in the clean room |
-| "Character Item" under Save States | kept but renamed *Item on load (older saves)*; proposed to drop once the fork's item snapshot is the only path (open question 6) | duplicates *Give item* for new saves |
+| "Character Item" under Save States (*Item on load (older saves)* in drafts 2–8) | **dropped** (draft 9, question 6 decided); the row and its setting are gone, and the first-boot import writes the item snapshot of each older save that has none, from the old setting, once (`specs/SPEC-core-08`, `SPEC-state-04`) | duplicated *Give item* for new saves; new saves never used it |
+| Preload Samples (Character Extras / *Loading (advanced)*) | **moved** to the hidden *Developer* page (draft 9, question 8 decided) | a diagnostics row players never need; it ships so capture and test runs need no diag build |
+| Menu shortcut 1 / 2 (read-only `info` rows in draft 8) | **`editor` rows** (draft 9, question 9 decided: editable); the permanent B + D-pad Up stays an `info` row | the INI stays the file of record, the menu writes it |
+| Upstream developer-only code (`dev_config`, debug hooks) | **rebuilt as rows on the Developer page**, not dropped (draft 9, B9); `training_mod_sync` is not kept, `parking_lot` is used directly | `docs/DECISIONS.md` B9 |
 | Misc Settings tab | dissolved into Saves (reset, hazards), Fighters & Stages (lobby, stages), Display & Controls (HUD, hitboxes, frame advantage, input display, input delay), CPU (P1 control) | the grab-bag page was the main source of "where is it" |
 | Characters + Character Extras tabs | merged into *Fighters & Stages* with the loading rows collapsed | extras are either per-fighter cosmetics or advanced loading knobs |
 | Stale help text ("Shield+Down Taunt") | replaced by the configured chord, read live | wrong today |
@@ -397,26 +455,48 @@ carries this page): the MIT copyright holder is the handle
 with a one-time first-boot import of the fork's settings, save states, Mii
 presets and macro library, originals untouched (`specs/SPEC-core-08`). The
 persistence behind every row above therefore lives under the new root.
-Question 13 is answered (draft 5); questions 1–12 and 14–18 remain open.
+**Draft 9: the operator answered the menu questions on 2026-11-01
+(`docs/DECISIONS.md`, whose *Decision* column is authoritative).** Questions 1–4,
+6–18 are decided, each marked "Decided 2026-11-01" below (question 13 was already
+answered in draft 5); **question 5 is open** (working default: the last page
+used). Two confirmations are also still to ask: the slot sets in question 3, and
+the stage grid's paging in question 14. The question text is kept as asked.
 
 1. **Five pages as laid out**, or the variants in `docs/menu-redesign.md` (four pages by merging *Display & Controls* into *Saves*; six by splitting *Stages & Lobby* out of *Fighters & Stages*)?
+   **Decided 2026-11-01: five pages, as recommended**, plus the hidden *Developer* page of question 8.
 2. **Dropdown input**: ◂/▸ cycles the value in place without opening the list (fast, but easier to change by accident). Keep, or require A to open?
+   **Decided 2026-11-01: as recommended** (◂/▸ cycle in place; A opens the list).
 3. **Random-among-a-set delays** (Aerial/Fast Fall/Throw/Pummel/Ledge Delay, OoS Offset, Reaction Time, Randomize Slots, Playback slots): keep as multi-select checklists (exactly today's semantics), or change the delays to a *min–max range* slider ("random in range") which is simpler to read but changes the semantics?
+   **Decided 2026-11-01: both.** The seven delay rows offer the checklist and a min–max range in one popup (`multi-select + range`); using one greys the other, and Y clears the active one. The slot sets keep the checklist only (a range of slots is a run of ticks): to confirm with the operator.
 4. **Sub-screens**: *Situation overrides*, *Button chords* and *Swap groups* as sub-screens/popups (as drawn), or as rows on the page?
+   **Decided 2026-11-01: as recommended** (one editor row each).
 5. **First page on open**: the last page used (today's behaviour) or always *CPU*?
+   **Open (not answered 2026-11-01).** Working default: the last page used.
 6. **Item on load (older saves)**: keep for compatibility with saves made before the fork's item snapshot, or drop it and migrate those saves (the fork's JSON import could set the snapshot from this field once)?
+   **Decided 2026-11-01: drop the row.** The first-boot import converts older saves once (`specs/SPEC-core-08`, `SPEC-state-04`).
 7. **Replay capture in the menu**: add the toggle (it writes `replay_capture.ini` and mirrors the Deluxe Plugins page row), or keep it INI/Deluxe-only as today?
+   **Decided 2026-11-01: as recommended** (add the toggle).
 8. **Preload Samples** (writes sparse timing/memory samples to the diagnostics file): keep as a shipped setting under *Loading (advanced)*, or move it to the `diag` build only?
+   **Decided 2026-11-01: neither; a hidden Developer page.** Preload Samples moves to the sixth page *Developer*, together with the developer-only rows of B9. It ships in the normal build and is hidden, with inert rows, unless `developer.ini` has `developer_page=on`; the operator's own card and the Eden test profiles enable it.
 9. **Menu shortcuts**: shown read-only from the INI (as drawn), or editable in the menu with the INI as the file of record?
+   **Decided 2026-11-01: editable (option B).** The two shortcut rows open the chord editor; the menu writes `button_config.ini`, the file of record; the new chord applies at once. The permanent B + D-pad Up stays fixed. This also answers `PROVENANCE.md` open question 5.
 10. **Help text position and length**: one line at the bottom as today, or a two-line panel so the longer fork help texts (group rows) do not need shortening?
+   **Decided 2026-11-01: as recommended** (two-line panel).
 11. **P1 CPU fallback** (the standalone pilot now owns P1): when the pilot is absent, show the two fallback rows on the CPU page (as proposed), keep the fallback INI-only, or drop the TM-side control altogether and require the pilot?
+   **Decided 2026-11-01: as recommended** (the fallback rows, shown only when the pilot is absent).
 12. **Direction grid weights** (draft 3): show the weight digit on a selected chip (upstream's counts, today's semantics, as drawn) or plain on/off chips with a uniform random pick?
+   **Decided 2026-11-01: as recommended** (weights).
 13. **Grid picture source** — *answered 2026-11-01 (draft 5).* Background (draft 4): the fork commits its grid pictures — `scripts/roster-grid/assets/` 89 stock icons (`sources.json`: SmashWiki copies), `scripts/stage-grid/assets/` 115 thumbnails decoded from the game's `stage_1` textures, `scripts/item-icons/assets/` 38 icons rendered from the game's item files — and builds them into its patched `layout.arc`. **Answer:** stage thumbnails are not carried over or baked at all; the stage grid reads each stage's own game UI texture at run time, through the mod-aware file view, so stage mods show (*Grid pictures* in the vocabulary section; `specs/SPEC-core-07` §4.5). The item grid uses the fork's own 38 item icons. Fighter portraits: question 16. The review crops and copies in `docs/menu-mockup/captures/` stay mockup-only.
 14. **Grid paging** (draft 3): items 4×8 per page (two pages of 38) and stages 4×4 (eight pages of All + 117) as the fork does, or denser pages so the items fit on one screen?
+   **Decided 2026-11-01: denser (option B), with a handheld rule.** Docked: all 38 items on one page (5 × 8 tiles, short names). Handheld: three pages of 4 × 4 (16, 16, 6) with full names. The stage grid keeps 4 × 4: the operator's choice was about the items, to confirm.
 15. **Mii rows** (draft 3): lists as drawn, with the fork's exact bust thumbnail beside each saved Mii where one exists, or text only? (Saved Miis have no stock portrait, so a portrait grid does not apply.)
+   **Decided 2026-11-01: as recommended** (busts where they exist).
 16. **Fighter portraits and mods** (draft 5, open): should the portrait grid follow the stage rule — read each fighter's own UI portrait texture from the game at run time, so character and costume mods show — or keep a fixed set of stock icons, as the fork does with its 89 committed icons? Not decided.
+   **Decided 2026-11-01: as recommended** (read at run time, falling back to a text tile; one more development probe is needed, `specs/SPEC-core-07`).
 17. **DI / SDI visual** (draft 6, open): (a) confirm that only the DI and SDI chips show the game's own visual and that Airdodge Direction and Shield Tilt keep the clean room's arrows (as proposed; unchanged in draft 7); (b) *status, draft 7:* the visuals are identified (DI `sys_vector`, SDI `sys_hitstop_spark`, two different effects) and the DI streak is captured; an SDI capture is still to be scheduled (`specs/SPEC-core-07` §4.6). *Status, draft 8:* the SDI spark is captured (Up and In) and the DI turn with the launch is confirmed; the screens draw renders made from the game's effect file, the captures are the check. (a) is still open.
+   **Decided 2026-11-01: as recommended** (DI and SDI only), with one change: the SDI chips draw the spark's white streaks longer, closer to a match (screens 01, 16, 17).
 18. **When a CPU setting change takes effect** (draft 8, open): in the fork, a CPU SDI Direction changed in the menu takes effect only at the next Training reset (`sdi::roll_direction()` ← `reset::on_reset()`), and the menu does not say so; other per-reset rolls (shield tilt) may do the same. Recommendation: apply the change immediately (re-roll when the row changes), or at least show "applies on next reset" on the row. Not decided (`specs/SPEC-cpu-02` question 9).
+   **Decided 2026-11-01: follow the fork (option A).** The fork's stage M5o rule: a changed SDI Direction or Shield Tilt applies at the next CPU frame with a new weighted roll that holds until the next reset or the next change of that row (not a new roll every hitlag episode); DI was already read live at each hit. No "applies on next reset" label is needed.
 
 ## 5. Reconciliation with the coordinator's mockup v1
 
@@ -431,7 +511,7 @@ fallback described in §3.
 
 ### 5.1 Agreed and adopted from v1
 
-- Five pages; dropdowns for single choices; chip sets for sets; sliders for the
+- Five pages (draft 9: plus the hidden *Developer* page); dropdowns for single choices; chip sets for sets; sliders for the
   damage ranges; *Situation overrides* as one situation dropdown plus an action
   chip set; the swap-group switches as one chip set.
 - Stage Hazards grouped with the stage rows and L+R+A Reset grouped with the
@@ -452,7 +532,7 @@ fallback described in §3.
 Mii Brawler / Mii Swordfighter / Mii Gunner (saved-Mii lists with *Add New…*),
 *Give item* (the Character Extras item grid), *Lobby Stages* (ordered stage grid
 with the *All* entry and the Y form cycle), *Replay capture* (today INI/Deluxe
-page; proposed as a menu toggle, open question 7), the second menu shortcut and
+page; added as a menu toggle, question 7 decided), the second menu shortcut (an `editor` row since draft 9) and
 the permanent B + D-pad Up, *Preload* value *Hats*, the *Ice Climbers Pair Group*
 switch (distinct from *Ice Climbers Pair Groups*, see below).
 
@@ -493,8 +573,8 @@ Shipped values are from `training_mod_consts/src/options.rs`,
 | Ready fighter bodies | 2, 3 | Off, 2, 3 |
 | Group kinds | 4 chips (PT/Aegis, Ice Climbers pair, Solo Popo, Mii) + 2 toggles | 7 switches: Ice Climbers Pair Bank, Original Fighter Bank, Solo Popo Groups, Ice Climbers Pair Groups (a pair window may own groups), PT/Aegis Groups, Ice Climbers Pair Group (the pair is itself a group), Mii Groups; this draft puts all 7 in one chip set |
 | Shortcuts (6 chords) | dropdowns of preset chords ("Grab + D-pad Down", "ZR + D-pad Left") | 16-button chord editors (hold one, press the others); defaults ZL + D-pad Down, ZL + D-pad Up, ZR + D-pad Down, ZR + D-pad Up, ZL + D-pad Left, ZL + D-pad Right |
-| Menu shortcut | Minus / Plus / Disabled | two INI slots, each any `+` chord of the 16 names (`disabled` allowed), plus the permanent B + D-pad Up; this draft shows them read-only (open question 9) |
-| Row count | "112 submenus" | 103 visible rows + 4 hidden submenus in the shipped feature set (§1); the difference is rows behind cargo features not in the C116.1 build |
+| Menu shortcut | Minus / Plus / Disabled | two INI slots, each any `+` chord of the 16 names (`disabled` allowed), plus the permanent B + D-pad Up; draft 9: the two slots are editable in the menu (`editor` rows) and written to the INI, the permanent chord stays an `info` row (question 9, decided) |
+| Row count | "112 submenus" | 111 visible rows + 4 hidden submenus in the shipped feature set (§1, recounted in draft 9; draft 8 said 103); the difference is rows behind cargo features not in the C116.1 build |
 
 ### 5.5 Resource cost per upstream item (for the mockup's info panel)
 

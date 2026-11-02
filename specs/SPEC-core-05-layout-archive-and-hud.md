@@ -110,13 +110,14 @@ None (the `hud` setting is part of the menu file, SPEC-core-04). The development
 | Tick order and name gating (`info_training` work only in native Training) | `core05_tick_dispatch_order` | `core05-E7` | — |
 | Combo-display observers: value copied, defaults enabled, no retained pointer; notifications cleared when off | `core05_combo_display_observer` | `core05-E8` turn combo display off in the game's menu | — |
 | Missing plugin panes → no draw, no panic | `core05_missing_pane_skip` | `core05-E9` stock archive forced | — |
+| **B3** (decided) A non-stock `info_training` layout from another mod is overridden anyway; the install line names the foreign layout; no skip | `core05_foreign_layout_injects_and_notes` | `core05-E11` profile with a layout mod | `docs/EDEN-RESULTS.md` |
 | Resident memory before/after release | — | `core05-E10` heap meter diag lines | `docs/resource-costs.md` |
 
 ## 10. Open questions
 
 1. **Behaviour when injection fails.** Skip all drawing and refuse to open the menu (silent), or show a notification through the stock HUD? Recommendation: log and refuse; the install line already says `layout_arc=skipped`.
-2. **Coexistence with layout mods.** Another mod's `info_training` layout is overridden. Recommendation: document as unsupported; optionally detect a non-stock archive by size/fingerprint and skip injection (menu unavailable) — operator decision.
+2. **Coexistence with layout mods.** Another mod's `info_training` layout is overridden. Recommendation: document as unsupported; optionally detect a non-stock archive by size/fingerprint and skip injection (menu unavailable) — operator decision. **Decided 2026-11-01 (B3): inject anyway and document it;** the install line notes the other layout, and the other mod's training HUD does not show while this plugin is installed. The optional detect-and-skip is not adopted.
 3. **Layout name handling.** Compare the name bytes against ASCII constants instead of converting to a string (no allocation, no panic on invalid UTF-8). Recommendation: do that.
 4. **Draw entry choice.** The fork's two anchors are the only non-virtual positions that see every holder at the right moment; the upstream vtable-entry replace hook is simpler but collides with any plugin that replaces the same vtable entry and runs after animate only by accident of install order. Recommendation: anchors (fork design), with the playbook's sharing rules.
 5. **Archive grace period.** 5 s is generous; the copy completes inside the hooked call sequence. Recommendation: keep 5 s (cheap) unless memory pressure requires less; never free synchronously inside the hook.
-6. **`info_playercursor_item`** is hidden with the HUD although it carries the item cursor the player uses to pick items in Training's item menu. Confirm this is intended (upstream behaviour) or exclude it when the game's item menu is open.
+6. **`info_playercursor_item`** is hidden with the HUD although it carries the item cursor the player uses to pick items in Training's item menu. Confirm this is intended (upstream behaviour) or exclude it when the game's item menu is open. **Decided 2026-11-01 (B8 batch, kept line "HUD Off: item cursor hidden too"): kept as the fork does it.**

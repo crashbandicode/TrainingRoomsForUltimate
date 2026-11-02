@@ -12,15 +12,13 @@
 <text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
 <polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Save and load positions and damage with the chord set under Display &amp; Controls.</text>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">On: the game's respawn invincibility and, where possible, the respawn platform. Greyed while Auto-load on death is On.</text>
 <text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
 <rect x="48.0" y="98.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
 <rect x="48.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
 <text x="62.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Save states  (11)</text>
 <text x="62.0" y="160.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Setup library  (2)</text>
 <polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
-<rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
 <text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Save States</text>
 <text x="1220.0" y="120.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">[ON]</text>
 <text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Slot</text>
@@ -31,16 +29,18 @@
 <text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  None  &gt;</text>
 <text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Auto-load on death</text>
 <text x="1220.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
-<text x="418.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Player damage on load</text>
-<text x="1220.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Default  &gt;</text>
-<text x="418.0" y="348.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Player damage range</text>
-<text x="1220.0" y="348.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">|=========---|  0 - 150 %</text>
-<text x="418.0" y="386.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">CPU damage on load</text>
-<text x="1220.0" y="386.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Default  &gt;</text>
-<text x="418.0" y="424.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">CPU damage range</text>
-<text x="1220.0" y="424.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">|=========---|  0 - 150 %</text>
-<text x="418.0" y="462.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Buffs on load</text>
-<text x="1220.0" y="462.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">0 of 12 selected  &gt;</text>
-<text x="418.0" y="500.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Item on load (older saves)</text>
-<text x="1220.0" y="500.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  None  &gt;</text>
+<rect x="404.0" y="288.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="404.0" y="288.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="418.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Respawn invincibility</text>
+<text x="1220.0" y="310.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
+<text x="418.0" y="348.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Player damage on load</text>
+<text x="1220.0" y="348.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Default  &gt;</text>
+<text x="418.0" y="386.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Player damage range</text>
+<text x="1220.0" y="386.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">|=========---|  0 - 150 %</text>
+<text x="418.0" y="424.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">CPU damage on load</text>
+<text x="1220.0" y="424.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Default  &gt;</text>
+<text x="418.0" y="462.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">CPU damage range</text>
+<text x="1220.0" y="462.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">|=========---|  0 - 150 %</text>
+<text x="418.0" y="500.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Buffs on load</text>
+<text x="1220.0" y="500.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">0 of 12 selected  &gt;</text>
 </svg>

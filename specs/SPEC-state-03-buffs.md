@@ -105,7 +105,7 @@ The delay counter is shared by all buffs and is reset by the training reset (SPE
 
 ## 7. Persistence
 
-None beyond the menu setting (`buff_state` in `training_modpack.json`, carried over).
+None beyond the menu setting (`buff_state` in the settings file, `settings.json` in the clean room; carried over).
 
 ## 8. Resource budget
 

@@ -45,6 +45,16 @@ The settings menu is drawn by the game's own 2D layout engine: the plugin adds p
 - The game's pause menu is detected from its own layout: the help footer pane `L_staying_help` of `info_training` rests at `pos_y = -80` and animates to 0 over 10 frames when the pause menu opens (`info_training_in_menu` animation); `pos_y != -80` means "pause menu active". While it is active the plugin's panel is hidden even if the model says open, and all plugin chords are refused.
 - Upstream, with `Menu Open Start Press` on: pressing Plus while the pause menu is open closes it (the plugin passes the press through) and never opens the plugin menu.
 
+### 2.5 Draft 9 rendering and input rules (`MENU-DRAFT.md` draft 9, decided 2026-11-01)
+
+- **Dropdown input (Q2).** On a `dropdown` row Left / Right cycle the value in place (wrapping) and A opens the full list popup. Every cycle step is a model event like a toggle press, so it commits on close like any change.
+- **Help panel (Q10).** The footer is a two-line panel for the focused row; the longer fork help texts fit without being cut. The item list shows one row fewer than a one-line footer would allow.
+- **Delay popup (N3).** A delay row opens one popup with two controls over the same values: the weighted checklist and a min–max range (two handles, the slider rules of SPEC-core-02 §2.4 at the row's step). The greyed control is drawn dimmed and ignores A; Y clears the active one (SPEC-core-02 §2.8). Mockup: `docs/menu-mockup/19-delay-popup.png`.
+- **Item grid paging (N5, menu question 14 B).** The *Give item* grid draws all 38 items. **Docked** (the console's operation mode when the grid opens): one page of 5 × 8 tiles (38 used, two empty cells), short item names. **Handheld:** three pages of 4 × 4 tiles (16, 16 and 6 items) with the full names; L / R page and the page footer follows the fork's paging footer (SPEC-core-02 §6 item 2). The layout is chosen when the grid opens from the game's operation mode (candidate read: `nn::oe::GetOperationMode`, unverified on 13.0.5: one of the two behaviours must be proven on Eden before it ships); a dock or undock while the grid is open takes effect at the next opening (working default; not decided). The stage grid keeps 4 × 4 pages (8 pages; the denser choice was about the items: to confirm with the operator). Mockups: `docs/menu-mockup/11-item-grid.png` (docked), `18-item-grid-handheld.png`.
+- **Menu shortcut rows (N7).** *Menu shortcut 1 / 2* are `editor` rows that open the chord editor of SPEC-input-04 (hold one, press the others), and show the chord's text (`Minus`, `disabled`, `ZL + D-pad Up`, …); the permanent B + D-pad Up is an `info` row.
+- **Portrait grid (Q16).** Fighter portraits are read from the game at run time with a text tile as the fallback (SPEC-core-07 §4.5 rule applied to portraits); the portrait grid's layout and badges are unchanged.
+- **Developer page.** Drawn like any page, in the tab strip only while it exists (SPEC-core-02 §2.8). Mockup: `docs/menu-mockup/20-developer.png`.
+
 ## 3. Inputs
 
 - The game's per-player final input mapping function (`main+0x1750dd0`, SPEC-core-01 §4.2): arguments `(controller mappings*, player index, out mapped inputs*, controller holder*, flag)`. The plugin runs the original first, then reads/mutates Player 1 (`player index == 0`) only. The controller holder contains a pointer to the game's controller record at `+0x10`.
@@ -133,7 +143,7 @@ Menu hints: tab left/right = ZL/ZR (GameCube L/R); save defaults = X; reset = R 
 - **Second player**: only Player 1 is read and blocked; other controllers keep working (a CPU-controlling second controller still moves the CPU while the menu is open). Q4.
 - **Another plugin owning the input-mapping entry**: HOOK-SHARING chain; the Deluxe family does not hook it (fork survey); the fork's hook order inside the function is internal.
 - **Icon stacking**: upstream hid stacked icons by walking every submenu id of every tab for every button (cloning the whole model per render); the fork hides every child of `Icon` by walking the pane's child list. Fold in the child-list walk (no per-render clone).
-- **Fork's INI shortcuts (carry over, fork's own):** `sd:/…/button_config.ini`, section `[menu]`, keys `shortcut_1` (default `Minus`) and `shortcut_2` (default `disabled`); names case-insensitive, chords joined by `+` (A, B, X, Y, L, R, ZL, ZR, DPad_Up/Down/Left/Right, Plus, Minus, LStick, RStick and the display labels); `disabled`/`none` disable a slot; malformed or duplicate keys fall back per slot; file ≤ 8 KiB; created with the defaults when absent; read once at boot. A shortcut passes when every button of the chord is held and at least one was pressed this frame (edge-triggered, no repeat while held). An explicit `Plus` chord consumes the pause press. The permanent B + D-pad Up chord always works.
+- **Fork's INI shortcuts (carry over, fork's own):** `sd:/…/button_config.ini`, section `[menu]`, keys `shortcut_1` (default `Minus`) and `shortcut_2` (default `disabled`); names case-insensitive, chords joined by `+` (A, B, X, Y, L, R, ZL, ZR, DPad_Up/Down/Left/Right, Plus, Minus, LStick, RStick and the display labels); `disabled`/`none` disable a slot; malformed or duplicate keys fall back per slot; file ≤ 8 KiB; created with the defaults when absent; read once at boot (draft 9, N7: the menu also rewrites it when the player confirms a change in *Menu shortcut 1 / 2*, and the new chord applies at once; SPEC-input-04 §7). A shortcut passes when every button of the chord is held and at least one was pressed this frame (edge-triggered, no repeat while held). An explicit `Plus` chord consumes the pause press. The permanent B + D-pad Up chord always works.
 - **Fork extras in the renderer (carry over):** roster grid and stage grid overlays, item-icon flash animation (24 draw callbacks, one tile, colour blend), named-macro panel rendering, Mii catalogue view with greyed rows, GameCube L/R paging on the stage page.
 
 ## 7. Persistence
@@ -165,12 +175,25 @@ None here; the commit on close is SPEC-core-04; the shortcuts INI is described a
 | Redraw only on input; visibility every tick | `core03_redraw_flag` | `core03-E9` diag counter steady with menu open | — |
 | Sub-handler order inside the input hook | `core03_input_hook_order` (sequence model) | `core03-E10` | — |
 | Upstream start-press variant or fork INI variant (Q1) | `core03_start_press_state_machine` / fork tests | `core03-E11` | — |
+| **N5** Item grid layout by operation mode: docked = one 5 × 8 page (38 used), short names; handheld = three 4 × 4 pages (16, 16, 6), full names; layout fixed at open | `core03_item_grid_layout_docked`, `core03_item_grid_layout_handheld`, `core03_item_grid_layout_fixed_at_open` | `core03-E12` the same grid docked and handheld (`11-item-grid.png`, `18-item-grid-handheld.png`); L / R pages the handheld pages | `docs/EDEN-RESULTS.md` |
+| **N5** Stage grid unchanged: 4 × 4, 8 pages, in both operation modes | `core03_stage_grid_unchanged` | `core03-E12` | — |
+| **N5** Item grid page contents: every item exactly once, in the fork's order, in both layouts | `core03_item_grid_pages_cover_38_items_once` | — | — |
+| **N7** *Menu shortcut 1 / 2* rows open the chord editor and show the chord text; the permanent chord row is read-only | `core03_shortcut_rows_open_editor`, `core03_permanent_shortcut_row_info` | `core03-E13` | `docs/EDEN-RESULTS.md` |
+| **N3** The delay popup draws both controls and greys the inactive one; A on a greyed control is ignored | `core03_delay_popup_render_plan` | `core03-E14` (`19-delay-popup.png`) | `docs/EDEN-RESULTS.md` |
 
 ## 10. Open questions
 
 1. **Open-chord contract.** Upstream: B + D-pad Up always; optional Minus press and 10-frame Plus hold with Plus re-injection. Fork: B + D-pad Up always, INI shortcuts (default Minus), Plus never implicit. Recommendation: ship the fork contract (fewer input side effects, host-tested parser) and do not implement the Plus-hold state machine.
 2. **Start to close the menu.** Defined in the model but never dispatched upstream. Recommendation: do not wire it (Plus must keep meaning "pause" for the game).
-3. **Pause menu versus our menu.** Hide (upstream) or refuse the pause menu while ours is open. Recommendation: refuse Plus while our menu is open (suppress the bit as the fork does for modal panels), so the two menus never overlap.
+3. **Pause menu versus our menu.** Hide (upstream) or refuse the pause menu while ours is open. Recommendation: refuse Plus while our menu is open (suppress the bit as the fork does for modal panels), so the two menus never overlap. **Decided 2026-11-01 (B8 batch): accepted** (Plus is ignored while our menu is open).
 4. **Second controller while the menu is open.** Upstream blocks only Player 1. Lobby practice and CPU control make a second controller meaningful. Recommendation: keep upstream behaviour; document it.
 5. **Pane lookups by name per rebuild.** Upstream searches the pane tree by string for every write. Recommendation: resolve the pane set once per layout registration (the registration anchor tells us when the layout is new) and store raw pointers until the next registration or scene change; measure first.
 6. **Name limit.** Pane names are 24 characters; the icon for `save_damage_limits_player` was truncated. The clean-room archive should use short icon pane names (e.g. `ic_<nn>`) mapped from submenu ids in code.
+7. **Menu-draft questions that land in this spec (answered 2026-11-01, `docs/DECISIONS.md`; menu question numbers).**
+   - **Dropdown input (Q2).** **Decided 2026-11-01:** as recommended (§2.5).
+   - **Help text (Q10).** **Decided 2026-11-01:** as recommended; a two-line panel (§2.5).
+   - **Grid paging (Q14).** **Decided 2026-11-01:** denser items, with the handheld rule (§2.5, N5); the stage grid's 4 × 4 paging is to confirm.
+   - **Mii rows (Q15).** **Decided 2026-11-01:** as recommended; lists with the fork's bust thumbnail beside each saved Mii where one exists.
+   - **Fighter portraits (Q16).** **Decided 2026-11-01:** as recommended; read at run time (SPEC-core-07 §4.5).
+   - **Menu shortcuts (Q9).** **Decided 2026-11-01:** editable; the chord editor is SPEC-input-04; open question 1's "fork INI contract" stands with the INI as the file of record.
+   - **Open: where the dock / undock switch is read from, and what happens when the mode changes while the grid is open** (§2.5): unverified; Eden proves it.

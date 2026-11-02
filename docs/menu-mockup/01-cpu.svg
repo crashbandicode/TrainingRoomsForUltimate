@@ -50,10 +50,10 @@
 <text x="1108.0" y="158.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">3 selected  &gt;</text>
 <text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">SDI Direction</text>
 <rect x="1186.0" y="176.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="1186" y="176" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 1201 191)"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="1186" y="176" width="30" height="30" preserveAspectRatio="none" transform="rotate(270.0 1201 191)"/>
 <ellipse cx="1201.0" cy="191.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
 <rect x="1152.0" y="176.0" width="30.0" height="30.0" rx="4.2" fill="rgb(46,52,66)" stroke="rgb(236,236,232)" stroke-width="2"/>
-<image href="captures/renders/sdi-up-4x-layer.png" x="1152" y="176" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 1167 191)"/>
+<image href="captures/renders/sdi-up-4x-layer-stretch.png" x="1152" y="176" width="30" height="30" preserveAspectRatio="none" transform="rotate(0.0 1167 191)"/>
 <ellipse cx="1167.0" cy="191.0" rx="2.0" ry="2.0" fill="rgb(236,236,232)"/>
 <text x="1142.0" y="196.8" font-size="16" fill="rgb(236,236,232)" text-anchor="end">2 selected  &gt;</text>
 <text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">SDI Strength</text>

@@ -1,43 +1,47 @@
-# Decisions open for the operator
+# Decisions for the operator
 
-2026-11-01. This page lists every decision that is still waiting for the operator, one illustration per
-decision. In each picture the recommended option has a **green outline**. The images are in
-[`decisions/`](decisions/) and are drawn by `tools/render_decisions.py` in the menu mockup's style. Sources:
-`MENU-DRAFT.md` §4 (the menu questions keep their numbers), the specs' *Open questions* sections,
-`PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10. Nothing here is built.
+2026-11-01. This page lists every operator decision of the menu proposal, one illustration per decision. In each
+picture the recommended option has a **green outline**. The images are in [`decisions/`](decisions/) and are drawn
+by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep
+their numbers), the specs' *Open questions* sections, `PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10.
 
-| # | Decision | Recommendation |
-| --- | --- | --- |
-| Q1 | Number of pages | five, as drawn |
-| Q2 | Dropdown input | Left / Right cycle in place; A opens the list |
-| Q3 | Random-among-a-set delays | keep the checklists |
-| Q4 | Overrides, chords, swap groups | one editor row each |
-| Q5 | First page on open | the last page used |
-| Q6 | Item on load (older saves) | keep the row for now |
-| Q7 | Replay capture in the menu | add the toggle |
-| Q8 | Preload Samples | diag build only |
-| Q9 | Menu shortcuts | read-only; the INI is the editor |
-| Q10 | Help text | two-line panel |
-| Q11 | P1 CPU fallback without the pilot | fallback rows, as drawn |
-| Q12 | Direction grid weights | weight digit on the chip |
-| Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) |
-| Q15 | Mii rows | list with the bust where one exists |
-| Q16 | Fighter portraits and mods | read at run time, like stages |
-| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only |
-| Q18 | When a CPU setting change takes effect | follow the fork: apply at the next CPU frame |
-| S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed |
-| S2 | Corrupt settings file | keep a copy, load field by field |
-| B1 | Plugin name | `training_rooms` |
-| B2 | Panic policy | log it, no pop-up |
-| B3 | Another mod's training HUD layout | inject anyway, document it |
-| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused |
-| B5 | Input playback and the CPU settings | the recording wins |
-| B6 | Ice Climbers state | one state per fighter |
-| B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere |
-| B8 | Behaviour changes from the fork | accept the batch |
-| B9 | Upstream developer-only code | drop it from the shipped build |
-| B10 | README media | reuse the GIFs that show no menu |
-| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI |
+**Answered 2026-11-01 (late evening ET):** the operator approved the proposal with the answers in the *Decision*
+column below, and implementation may begin. Items marked **open** were not answered; their recommendation is the
+working default until they are. The new requirements the answers add are collected in
+[*New requirements from the answers*](#new-requirements-from-the-answers) at the end, with their mockups.
+
+| # | Decision | Recommendation | Decision (2026-11-01) |
+| --- | --- | --- | --- |
+| Q1 | Number of pages | five, as drawn | **as recommended** (plus the hidden Developer page, Q8) |
+| Q2 | Dropdown input | Left / Right cycle in place; A opens the list | **as recommended** |
+| Q3 | Random-among-a-set delays | keep the checklists | **both:** checklist and min–max range; using one disables the other |
+| Q4 | Overrides, chords, swap groups | one editor row each | **as recommended** |
+| Q5 | First page on open | the last page used | **open** (working default: the last page used) |
+| Q6 | Item on load (older saves) | keep the row for now | **drop the row;** the import converts older saves once |
+| Q7 | Replay capture in the menu | add the toggle | **as recommended** |
+| Q8 | Preload Samples | diag build only | **Developer page:** hidden unless an INI enables it (the operator's own INI enables it) |
+| Q9 | Menu shortcuts | read-only; the INI is the editor | **B: editable in the menu;** the menu writes `button_config.ini` |
+| Q10 | Help text | two-line panel | **as recommended** |
+| Q11 | P1 CPU fallback without the pilot | fallback rows, as drawn | **as recommended** |
+| Q12 | Direction grid weights | weight digit on the chip | **as recommended** |
+| Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) | **B: denser, all items on one page; in handheld mode three pages** |
+| Q15 | Mii rows | list with the bust where one exists | **as recommended** |
+| Q16 | Fighter portraits and mods | read at run time, like stages | **as recommended** |
+| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only | **as recommended;** the SDI spark's white streaks drawn longer, closer to a match |
+| Q18 | When a CPU setting change takes effect | follow the fork: apply at the next CPU frame | **as recommended (A)** |
+| S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed | **as recommended, except item 3:** `replay_captures/` is imported in full (it is the Replay Window's crop source) |
+| S2 | Corrupt settings file | keep a copy, load field by field | **as recommended** |
+| B1 | Plugin name | `training_rooms` | **as recommended** |
+| B2 | Panic policy | log it, no pop-up | **as recommended** |
+| B3 | Another mod's training HUD layout | inject anyway, document it | **as recommended** |
+| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused | **as recommended** |
+| B5 | Input playback and the CPU settings | the recording wins | **the recording wins by default;** an advanced row lets the settings override it (default Off) |
+| B6 | Ice Climbers state | one state per fighter | **as recommended** |
+| B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere | **as recommended** |
+| B8 | Behaviour changes from the fork | accept the batch | **as recommended, except:** SDI not set means no SDI (the fork's rule stays); the respawn line becomes a toggle |
+| B9 | Upstream developer-only code | drop it from the shipped build | **Developer page** (with Q8): shipped, hidden unless the INI enables it |
+| B10 | README media | reuse the GIFs that show no menu | **as recommended** |
+| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI | **open** (working default: the recommendation) |
 
 ## Menu
 
@@ -66,6 +70,8 @@ cannot express a set like {0, 5, 10}. Cost: a checklist is a longer popup than a
 
 ![Q3 delays](decisions/03-delays.png)
 
+**Decided 2026-11-01: both.** Each delay row offers the checklist and a min–max range; while one holds a value the other is greyed, and Y clears the active one. See *New requirements* N3.
+
 ### Q4 · Situation overrides, Button chords, Swap groups
 
 Should these three be sub-screens (one row each), or should all their rows sit on the page?
@@ -91,6 +97,8 @@ has been tested on real cards. Cost: one rarely used row on Saves.
 
 ![Q6 item on load](decisions/06-item-on-load.png)
 
+**Decided 2026-11-01: drop the row.** The first-boot import sets an older save's item snapshot from this setting once (N6).
+
 ### Q7 · Replay capture in the menu
 
 Should there be a menu toggle that writes `replay_capture.ini` and matches the Deluxe Plugins row, or should
@@ -108,6 +116,8 @@ exactly this. Cost: measuring on a card then needs the diag build.
 
 ![Q8 preload samples](decisions/08-preload-samples.png)
 
+**Decided 2026-11-01: a Developer page** (with B9), hidden unless an INI flag enables it; the operator's own INI enables it, so capture and test rows need no diag build (N1).
+
 ### Q9 · Menu shortcuts
 
 Show the INI shortcuts read-only in the menu, or make them editable there with the INI as the file of
@@ -116,6 +126,8 @@ record? (This also answers `PROVENANCE.md` open question 5.)
 (restart to apply). Cost: changing a shortcut means editing `button_config.ini`.
 
 ![Q9 menu shortcuts](decisions/09-menu-shortcuts.png)
+
+**Decided 2026-11-01: B, editable in the menu.** The two shortcut rows open the chord editor; the menu writes `button_config.ini` and the new chord applies at once (N7).
 
 ### Q10 · Help text
 
@@ -150,6 +162,8 @@ pages?
 Cost: L / R to reach items 33–38.
 
 ![Q14 paging](decisions/14-grid-paging.png)
+
+**Decided 2026-11-01: B, denser, with a handheld rule.** Docked: all 38 items on one page. Handheld: three pages. The stage grid keeps 4 × 4 (Q14's B was about the items; to confirm) (N5).
 
 ### Q15 · Mii rows
 
@@ -221,6 +235,8 @@ Cost: item 2 adds two small files to the copy list. The others cost nothing.
 
 ![S1 import details](decisions/S1-import-details.png)
 
+**Decided 2026-11-01: as recommended, except item 3.** `replay_captures/` holds the companions the Replay Window crops macros from (`docs/reference/named-macros.md` in the fork), so it is imported in full, with no size cap (N8).
+
 ### S2 · Corrupt settings file (`SPEC-core-04` question 2)
 
 Delete the file and start from defaults (upstream), or keep a renamed copy and load it field by field?
@@ -276,6 +292,8 @@ the settings apply again when playback ends.
 
 ![B5 playback](decisions/B5-playback-vs-settings.png)
 
+**Decided 2026-11-01: the recording wins by default,** and an advanced row *Settings override playback* (default Off) restores the upstream rule when switched On (N4).
+
 ### B6 · Ice Climbers state (cross-cutting; `SPEC-cpu-02` … `-06` question 4 or 5)
 
 Should Popo and Nana share one set of CPU counters and cases (upstream), or have one each?
@@ -304,6 +322,8 @@ list them.
 
 ![B8 behaviour changes](decisions/B8-behaviour-changes.png)
 
+**Decided 2026-11-01: the batch is accepted with two changes.** *SDI not set* keeps the fork's rule: with no SDI Direction selected the CPU does not SDI (the "native CPU SDI" line is withdrawn). *Natural deaths in Training* becomes the toggle *Respawn invincibility* (N2). The other twelve changes and five kept lines stand.
+
 ### B9 · Upstream developer-only code (`PROVENANCE.md` questions 3 and 4)
 
 Drop `dev_config`, the debug hooks and `raygun_printer` from the shipped build, or keep them as diag-only
@@ -313,6 +333,8 @@ behaviour? Should `training_mod_sync` (36 lines of lock helpers) be kept, or sho
 Cost: none for players.
 
 ![B9 dev code](decisions/B9-dev-only-code.png)
+
+**Decided 2026-11-01: the Developer page** (N1) holds the developer-only rows with Preload Samples; they ship hidden. `parking_lot` is used directly (the helper crate is not kept).
 
 ### B10 · README media (`PROVENANCE.md` question 2)
 
@@ -361,3 +383,25 @@ moment the row changes; the fork keeps (b) until it gets the same change. Source
 The remaining *Open questions* in `specs/` are technical: site guards, hook placement, measurements, RNG
 source, cost-only changes and Eden rows to run. Each has a written recommendation that stands unless the
 operator objects; they are not repeated here. The operator-facing ones are pulled into Q18 and S1–B11 above.
+
+## New requirements from the answers
+
+Added 2026-11-01 by the lead from the operator's answers. Each one is folded into `MENU-DRAFT.md` (draft 9), the
+affected spec (its *Open questions* answer and §9 test-provenance rows) and the mockups named here
+(`docs/menu-mockup/`, the renderer's style).
+
+| # | Requirement | Where | Mockup |
+| --- | --- | --- | --- |
+| N1 | **Developer page.** A sixth page, *Developer*, after Display & Controls. It is hidden, and its rows do nothing, unless `sd:/ultimate/TrainingRooms/developer.ini` has `developer_page=on` (read at boot; missing file or any other value = hidden). It holds Preload Samples (Q8, moved from *Loading*) and the developer-only rows of B9, rebuilt from `SPEC-core-01`'s description of them. They ship in the normal build, so capturing or testing them needs no diag build; the playbook's `diag` feature keeps only the Eden stand-ins. The operator's card and the Eden test profiles carry `developer_page=on`. | `SPEC-core-01`, `SPEC-core-02`, `SPEC-core-08` | `20-developer.png` |
+| N2 | **Respawn invincibility** (toggle, default Off = the fork: instant respawn, no invincibility). On: after a natural death in Training the fighter (P1 or CPU) respawns with the game's own respawn invincibility and, where the game's own respawn path can be used, on the respawn platform as in a match. Greyed while *Auto-load on death* is On (a save state is loaded instead). If the platform cannot be had through the game's own path, that limit goes to the operator before it ships. | Saves › Save states, after *Auto-load on death*; `SPEC-state-01` | `02-saves.png` |
+| N3 | **Delay rows: checklist and range** (Q3). Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset and Reaction Time open one popup with both controls. A ticked checklist greys the range; a set range (any step value from min to max, uniform) greys the checklist; Y clears the active one. Saved files without a range load as checklists. The three slot sets keep the checklist only (a range of slots is a run of ticks; to confirm). | `SPEC-core-02`, `SPEC-cpu-01`/`-03`/`-05`/`-06` | `19-delay-popup.png` |
+| N4 | **Settings override playback** (toggle, *advanced*, default Off). Off: a playing recording wins over DI, SDI, air-dodge, tech and throw settings (B5). On: those settings override the recording, as upstream does. | Recording › Playback; `SPEC-cpu-02`/`-04`/`-06`, `SPEC-input-01` | `03-recording.png` |
+| N5 | **Item grid paging** (Q14). Docked: one page, 5 × 8 tiles (38 used), short names. Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 (16, 16, 6) with full names. Stages unchanged (4 × 4). | `SPEC-core-03`; item grid (carried over) | `11-item-grid.png`, `18-item-grid-handheld.png` |
+| N6 | **Item on load dropped** (Q6). The first-boot import writes the item snapshot of each save that has none, from the old setting, once; the row and its setting are gone. | `SPEC-core-08`, `SPEC-state-04` | `02-saves.png` |
+| N7 | **Editable menu shortcuts** (Q9 B). *Menu shortcut 1 / 2* open the chord editor; a change applies at once and is written to `button_config.ini`, the file of record. The permanent `B + D-pad Up` stays fixed. | Display & Controls › Controls; `SPEC-input-04` | `05-display-controls.png` |
+| N8 | **Import all replay captures** (S1 item 3). `replay_captures/` is copied in full to the new root on first boot, without blocking the boot; the originals stay. | `SPEC-core-08` | `S1-import-details.png` (as drawn, item 3 changed) |
+| N9 | **SDI not set = no SDI** (B8). With no SDI Direction chip selected, the CPU does not SDI, as in the fork. | `SPEC-cpu-02` | – |
+| N10 | **SDI chip streaks longer** (Q17). The SDI chips draw the spark's white streaks longer, closer to a match. | `SPEC-core-07` §4.6 | screens `01`, `16`, `17` |
+
+Still to confirm with the operator (each with a picture in the status for the primary): Q5 and B11 (not answered),
+N3's slot sets, N5's stage grid.

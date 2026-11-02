@@ -12,22 +12,27 @@
 <text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
 <polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Slot the next recording is written to.</text>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Off: a playing recording wins over DI, SDI, air-dodge, tech and throw settings. On: those settings override it.</text>
 <text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
-<rect x="48.0" y="98.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
-<rect x="48.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
-<text x="62.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Recording  (4)</text>
-<text x="62.0" y="160.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Playback  (5)</text>
+<text x="62.0" y="120.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Recording  (4)</text>
+<rect x="48.0" y="138.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="48.0" y="138.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="160.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Playback  (6)</text>
 <text x="62.0" y="200.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Named macros  (7)</text>
 <polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
-<rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
-<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Record Slot</text>
-<text x="1220.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  1  &gt;</text>
-<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Trigger</text>
-<text x="1220.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Button Combination  &gt;</text>
-<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Duration</text>
-<text x="1220.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  150 frames  &gt;</text>
-<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Crop trailing neutral</text>
+<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Button slots</text>
+<text x="1220.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">1 of 5 selected  &gt;</text>
+<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Hitstun timing</text>
+<text x="1220.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  As Hitstun Ends  &gt;</text>
+<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Save-state slots</text>
+<text x="1220.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">0 of 5 selected  &gt;</text>
+<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Mash interrupts playback</text>
 <text x="1220.0" y="234.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">[ON]</text>
+<text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Loop</text>
+<text x="1220.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
+<rect x="404.0" y="288.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="404.0" y="288.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="418.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Settings override playback</text>
+<text x="745.2" y="307.6" font-size="12" fill="rgb(210,170,80)" text-anchor="start">advanced</text>
+<text x="1220.0" y="310.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
 </svg>

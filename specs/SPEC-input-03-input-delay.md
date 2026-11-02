@@ -105,6 +105,6 @@ None beyond the menu setting (menu spec).
 ## 10. Open questions
 
 1. **Poll multiplicity.** If the mapping function runs more than once per game frame, advance the queue only when the in-game frame stamp changed (the input display already de-duplicates this way). Needs the diag measurement of SPEC-input-01 open question 16 first.
-2. **Clear on save-state load and L+R+A reset?** Not upstream. Recommendation: clear on both (a load repositions the fighters; stale presses are never what the player meant).
+2. **Clear on save-state load and L+R+A reset?** Not upstream. Recommendation: clear on both (a load repositions the fighters; stale presses are never what the player meant). **Decided 2026-11-01 (B8 batch): accepted** (the queue is cleared on a save-state load and on a reset).
 3. **Polls during the vanilla pause.** Recommendation: treat the vanilla menu as an input owner (clear and output neutral while it is open), consistent with §5.1.
 4. **Range.** 0–30 matches upstream. The menu redesign may prefer a slider; the behaviour does not change.

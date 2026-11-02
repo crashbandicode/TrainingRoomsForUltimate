@@ -2,6 +2,55 @@
 
 Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07bfb85c`, Fable 5.1 xhigh, under primary session `63392ddd-6c77-4f46-9cc3-d9fcd0d16793`).
 
+## Operator's answers recorded; phase 3 started — 2026-11-02 ~00:2xZ (lead `0caa72b8`)
+
+- Lead: Claude session `0caa72b8-b70b-4e6c-b4f4-ccb596f8a6e3` under primary `b81ec740`, `claude-opus-5-5` / high
+  (transcript check; the operator chose Opus 5.5 high + Sonnet 5.5 high). Watcher `/tmp/trlead-0caa72b8-watch.py`
+  PID 2795950 (status `/tmp/trlead-0caa72b8-watch-status.json`), not a repo artifact. Playbook `53fd1f24`.
+- `docs/DECISIONS.md`: Decision column + *Decided* lines; new section N1–N10. Open: Q5, B11; to confirm: N3 slot
+  sets, N5 stage grid.
+- Workers (native Sonnet 5.5 high): renderer (SDI streaks, new screens 18–20, updates 02/03/05/11), docs (draft 9,
+  v10, specs), package-1 implementer on `work/implementation` (worktree
+  `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work`, base `9fabada`, target
+  `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-work`; carry-over source stage `m5o`).
+- Status for the primary: `/home/intpa/smash-training-lobby/TRAININGROOMS-STATUS.md`.
+- Docs worker (Sonnet 5.5 high): `MENU-DRAFT.md` draft 9 (Counts recounted from its own tables: §1 has 111
+  visible rows, not 103; new layout 91 with the pilot, 92 without, + 3 hidden Developer rows), proposal v10,
+  19 specs + 4 indexes with *Decided* lines and 53 new §9 rows; `SPEC-cpu-02` §5 (no per-hitlag re-roll, Q18 A)
+  and `SPEC-cpu-05` (Shield Tilt In/Out opponent-relative, B7) changed to match the answers. Open details it left
+  in the specs: dock/undock while the item grid is open, INI rewrite rules for shortcuts (`SPEC-input-04` Q6),
+  the item-on-load conversion map (`SPEC-state-04` Q5/Q6), proposed ids `replay_capture`, `respawn_invincibility`.
+- Renderer worker (Sonnet 5.5 high): new screens 18 (item grid, handheld), 19 (delay popup), 20 (Developer page,
+  three rows from `SPEC-core-01`; no raygun row, the spec does not describe one), 21 (SDI stretch comparison);
+  updated 02, 03, 04, 05, 11, 14, 15. SDI chips: `tools/render_sdi_stretch.py` re-runs W9's renderer with the burst
+  emitter's scale-Y × 2.0 along the SDI vector (×1.17 from the emitter's own key table was invisible at chip size;
+  burst tip at 0.39 of the chip vs 0.36 captured Up); chips on 01, 16, 17 and decisions 17, 18. Remaining gap: the
+  render's burst is narrower than the captured arch.
+- Next: merge `review/menu-proposal` into `work/implementation`; Switch build of package 1 (campaign toolchain on
+  this Surface, `/home/intpa/smash-training-lobby/toolchain/`, when no Eden runs here, or the Yoga / Ally).
+
+### Addendum 2026-11-02 (operator order via the primary): card swap and fixes in both trees
+
+- **Done** = a release candidate with the full gate, batched Eden rows, the playbook's online rows, compliance and an
+  illustrated install summary; then the primary swaps the fork for the clean room on the card. Plan and data
+  migration: `docs/CARD-SWAP-PLAN.md` (also lists what the clean room needs from the card).
+- **Carry-over rule:** a carried file is taken from the newest fork stage that has every ledger fix to it; each
+  carried file records its stage and sha256 in `CARRY-OVER.md` on `work/implementation` (package 1 uses `m5o`,
+  which is C116.2 as shipped). Before each package closes, its carried files are diffed against the newest stage.
+
+### Two-way fix ledger (fork ⇄ clean room)
+
+| # | Found in | Defect | Fork fix (stage / commit) | Carried file(s) | Clean room | Offered back to the fork |
+| --- | --- | --- | --- | --- | --- | --- |
+| F1 | fork, C116.2 console (W19 triage, `c1162/c1162-console-triage/`) | Kirby hats notice stuck at "Paused 2/3" | pending (triage running; no `TRIAGE.md` yet) | `src/cycle_preload*.rs`, `training_mod_consts/src/{body_bank,notice_queue}.rs`, `src/native_body_bank.rs` (package 6) | not yet carried; take the fixed stage | n/a |
+| F2 | fork, C116.2 console | hat cycle falls back to the 3 s canonical Reload | pending (the primary's first read: designed `KirbyPark` fallback for a hat-holding Kirby, operator decision 2026-11-01) | Kirby hat / swap files (package 6) | not yet carried | n/a |
+| F3 | fork, C116.2 console | multi-second freezes (candidates: group prefetch holding INSTALL 3.88 s, a group build 1.01 s) | pending | swap engine, cycle preload (package 6) | not yet carried | n/a |
+| C1 | clean room (decisions) | the first-boot import must ignore a pre-installed `developer.ini` (only `migration.json` marks it done) | n/a (fork has no import) | – | `SPEC-core-08` requirement + host test | n/a |
+
+Rule: every fork fix to a carried file gets a row and lands in the clean room when that file is carried (or at
+once if it is already carried); every clean-room fix to a carried file gets a row and is offered to the fork
+through the primary.
+
 ## Decisions page refresh (Q18, new B11) — 2026-11-01
 
 - Worker: Claude session `c0296db6-c2d5-4ad1-adec-70d4f39242d8` under primary `b81ec740`. Model gate
