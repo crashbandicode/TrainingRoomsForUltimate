@@ -86,7 +86,7 @@ Status at commit `64d439f` + this file. M = mandatory, C = conditional. "open" =
 | Root-cause fixes only; workarounds approved | M | pass | effect-pool exhaustion → persistent spheres (lead ruling on Q3, 2026-11-02); install line cut → heap String at boot (to be replaced by `27d84f4`) |
 | Version guard | M | pass | inherited boot (`result=unsupported_version` path unchanged) |
 | 64-byte guard on every hooked / called / relied site | M | pass | 17 rows in `sites_hitbox.rs`, generated from the ELF (`tools/gen_hitbox_sites.py`), `core06_rows_match_the_owned_elf`; Eden hb-01 install line: all `stock` |
-| Card scan before choosing sites | M | pass | `scan-offsets.py` over the 2026-11-01 10:19 MTP preflight copy (16 plugins): only `libtraining_modpack.nro` (the fork) references the hook sites; `docs/test-provenance/core-06.md` § Card scan. Re-run for `2017840 2017a20 203db10 469af0 468490`: open |
+| Card scan before choosing sites | M | pass | `scan-offsets.py` over the 2026-11-01 10:19 MTP preflight copy (16 plugins): only `libtraining_modpack.nro` (the fork) references the hook sites; `docs/test-provenance/core-06.md` § Card scan. Re-run 2026-11-02 ~11:50Z for the new rows `2017840 2017a20 203db10 469af0 468490`: only `libtraining_modpack.nro: const32/const64:0x468490@0x4120f0` (the fork, never installed with this plugin; our row there is relied-on, a hook by anyone would fail its guard and leave the feature off); nothing else |
 | Hook sharing (another plugin hooks the site) | C | N/A | the scan shows nobody but the fork (never installed with this plugin) at `2284b20 22ac290 2027bb0`; Called rows tolerate others' hooks |
 | Hook after prologue / call instead of hook / most specific | M | pass with note | the three hooks are replace hooks at the entry as the spec names them (`hitbox_visualizer.*` rows); everything else is called |
 | No diag code in the shipped NRO | M | open | compliance.py on the release NRO |
@@ -104,7 +104,7 @@ Status at commit `64d439f` + this file. M = mandatory, C = conditional. "open" =
 | console.log searched (panic / abort / crash / Unmapped) | M | pass (hb-01) | `tr_eden_hb.py scan hb-01`: 5690 lines, 0 matching |
 | Every local command under memory/time guard | M | pass | cargo via `systemd-run ... MemoryMax=6G timeout 1800`; Eden via `eden-run.py` bounds |
 | Each run's outputs under its label | M | pass | `eden/runs/hb-01/` (shots, logs, run.json, memory.peak) |
-| README with GIF | M | N/A for this stream | repository-level release item (lead, package 7) |
+| README with GIF | M | → pkg7 | project-level item, package 7 (lead 2026-11-02) |
 | Dated evidence doc | M | open | `eden/EDEN-HITBOX.md` after hb-02/hb-03 |
 | Numbers from a committed script | C | open | the cost and pool numbers come from `[Hitbox] stats` lines; a parser in `eden/` with a host test is open |
 | No operator quotes, no claims beyond tests | M | pass | |
@@ -124,3 +124,15 @@ Status at commit `64d439f` + this file. M = mandatory, C = conditional. "open" =
 | `tools/gen_hitbox_sites.py`, `tools/re_hitbox_layout.py` | kept: reverse-engineering evidence (64-byte rows, vtable from relocations); the playbook has no such tool |
 | `/tmp` helpers (`hb-ledger.py`, `hb-cargo.ps1`, `hb-switch.ps1`, `yoga-build.ps1`) | not in the repo; `hb-ledger.py` = `eden/ally/ledger.py` with this stream's owner; the build helpers wrap the documented commands of `docs/BUILD.md` |
 | playbook tools used as is | `tools/build/nro_size.py`, `tools/build/scan-offsets.py`, `tools/check/compliance.py` (before READY) |
+
+### Harness diffs (for the lead's parameterised playbook tool)
+
+- `eden/tr_eden_hb.py` vs `eden/tr_eden_r2.py` (`diff -u`): constants only. `ROOT=/home/intpa/trainingrooms-eden-hb`, `PROFILE=ROOT/profiles/hb`,
+  `OWNER="Claude 0caa72b8/hitbox-eden"`, `DISPLAY=":96"`, label regex `hb-\d{2}`, systemd unit / Wayland socket prefix `trhb-`, set-aside folder
+  `plugins-set-aside-trainingrooms-hitbox`, and the CLAIMED / RELEASED ledger text. Against the playbook's `tools/eden-solo/gv.py` the file is a
+  different program (676 diff lines): the playbook pair `gv.py` + `solo.ps1` is pinned to gsp-visualizer's profile `y`, display :68 and its own claim
+  text; the TrainingRooms harness adds `settings.json` / `diag.txt` / extra files into the copy, the CLI mute before boot, the fork-NRO refusal, the
+  Yoga GPU lock unit names, `restore`, `scan` and `macro` sub-commands. Parameters a playbook tool would need: work root, source profile, profile name,
+  owner, display, label pattern, unit prefix, set-aside name, files to place (`--settings`, `--diag-txt`, `--extra`), claim text.
+- `eden/route_hb.py` vs `eden/route_r2.py`: the work root, the profile path, the harness name, and the install-line gate needle
+  (`plugin=training_rooms/` instead of `result=installed`, because the 8 KiB install-line buffer cut the line in hb-01, see above).
