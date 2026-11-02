@@ -34,6 +34,17 @@ const NOP_FAR: [u32; 5] = [NOP, LDR_X17_LITERAL_8, BR_X17, 0x8100_0000, 0x0000_0
 const FAR_TARGET: u64 = 0x8100_0000;
 
 #[test]
+fn f6_control_task_guards_cover_the_final_instruction_word() {
+    for label in ["group_swap.control_callback", "group_swap.control_functor"] {
+        let (_, site) = find_site(label).expect("F6 task call must have a seam");
+        assert_eq!(guard_outcome(&site.guard, &site.guard, site.kind), GuardOutcome::Stock);
+        let changed = with_words(site.guard, WORDS - 1, &[0xd280_0000]);
+        assert_eq!(guard_outcome(&site.guard, &changed, site.kind),
+                   GuardOutcome::Foreign { first_diff: 60 });
+    }
+}
+
+#[test]
 fn identical_bytes_are_stock_for_every_kind() {
     for kind in [HOOK, INLINE, SeamKind::Called, SeamKind::Relied] {
         assert_eq!(guard_outcome(&stock(), &stock(), kind), GuardOutcome::Stock);

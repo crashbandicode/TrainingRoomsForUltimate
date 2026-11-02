@@ -213,7 +213,14 @@
    "dest": "src/model/seams/native_seams/rows_a1.rs",
    "crate": "consts",
    "src_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d",
-   "dest_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d"
+   "dest_sha256": "a335a18cf10652abe0a2ed935f5d7ceaa1c5722ed4951e45ff3ae8bc683679ee",
+   "edits": [
+    {
+     "old": "pub const ROWS: &[Seam] = &[\n",
+     "new": "pub const ROWS: &[Seam] = &[\n    Seam { label: \"group_swap.control_callback\", group: \"native_body_bank\", offset: 0x655f30,\n           kind: SeamKind::Called,\n           guard: [0x08, 0xc0, 0x41, 0x39, 0x48, 0x00, 0x00, 0x34, 0xc0, 0x03, 0x5f, 0xd6, 0x00, 0x30, 0x40, 0xf9, 0x80, 0x00, 0x00, 0xb4, 0x08, 0x00, 0x40, 0xf9, 0x01, 0x19, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6, 0xfd, 0x7b, 0xbf, 0xa9, 0xfd, 0x03, 0x00, 0x91, 0xbe, 0xb1, 0xcd, 0x94, 0x00, 0x00, 0x00, 0x00, 0xff, 0x83, 0x02, 0xd1, 0xe9, 0x23, 0x05, 0x6d, 0xf8, 0x5f, 0x06, 0xa9, 0xf6, 0x57, 0x07, 0xa9],\n           feature: \"native-body-bank-alpha\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"F6: native state-8 scheduler callback for the control-initialization task\" },\n    Seam { label: \"group_swap.control_functor\", group: \"native_body_bank\", offset: 0x6574e0,\n           kind: SeamKind::Called,\n           guard: [0x08, 0x04, 0x40, 0xf9, 0x00, 0x01, 0x40, 0xf9, 0xce, 0xe0, 0xff, 0x17, 0x00, 0x00, 0x00, 0x00, 0xff, 0x83, 0x06, 0xd1, 0xe8, 0x9b, 0x00, 0xfd, 0xfc, 0x6f, 0x14, 0xa9, 0xfa, 0x67, 0x15, 0xa9, 0xf8, 0x5f, 0x16, 0xa9, 0xf6, 0x57, 0x17, 0xa9, 0xf4, 0x4f, 0x18, 0xa9, 0xfd, 0x7b, 0x19, 0xa9, 0xfd, 0x43, 0x06, 0x91, 0x09, 0x27, 0x8b, 0x52, 0x17, 0x00, 0x09, 0x8b, 0xe9, 0x02, 0x40, 0x39],\n           feature: \"native-body-bank-alpha\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"F6: native control-initialization functor reached through relocated vtable 0x4f81510 + 0x30; slot checked live\" },\n",
+     "reason": "F6: add the two new native task calls to the authoritative 64-byte guard table, from owned 13.0.5 ELF 0789f0a4; prior legacy fingerprints covered only 32 and 12 bytes."
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a2.rs",
@@ -276,7 +283,7 @@
    "dest": "src/model/seams/native_seams/tests.rs",
    "crate": "consts",
    "src_sha256": "fd7c889851be63354f4db71a22b2cfe61024eec5268f2e4dcc455b92ffc5c163",
-   "dest_sha256": "9c5de7f2764aba03bcb33592b3ff1d0d90189b972200cef6f4045760e2ec51f6",
+   "dest_sha256": "d1fed35f89a09e3a93f7167e1a4d0da9c20f2b9b58de862229e146575b2714a1",
    "edits": [
     {
      "old": "Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"..\");",
@@ -297,6 +304,11 @@
      "old": "    assert!(attrs.len() >= 150, \"found only {} hook attributes\", attrs.len());\n",
      "new": "    // The fork counted 150+ hooks over its whole src/. Here only the carried runtime areas are scanned and they\n    // land in steps C7-C10 (docs/PACKAGE-6-PLAN.md); the ratchet is active as soon as one carried hook exists.\n    if attrs.is_empty() {\n        return;\n    }\n",
      "reason": "the whole-tree hook count of the fork does not apply to the carried subset"
+    },
+    {
+     "old": "#[test]\nfn identical_bytes_are_stock_for_every_kind() {",
+     "new": "#[test]\nfn f6_control_task_guards_cover_the_final_instruction_word() {\n    for label in [\"group_swap.control_callback\", \"group_swap.control_functor\"] {\n        let (_, site) = find_site(label).expect(\"F6 task call must have a seam\");\n        assert_eq!(guard_outcome(&site.guard, &site.guard, site.kind), GuardOutcome::Stock);\n        let changed = with_words(site.guard, WORDS - 1, &[0xd280_0000]);\n        assert_eq!(guard_outcome(&site.guard, &changed, site.kind),\n                   GuardOutcome::Foreign { first_diff: 60 });\n    }\n}\n\n#[test]\nfn identical_bytes_are_stock_for_every_kind() {",
+     "reason": "F6 regression: altered final instruction beyond the former short fingerprints must refuse both new task callees."
     }
    ]
   },
@@ -1573,7 +1585,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "0461c28894fafabe9a77685247953ddebdd4b0f984fa53996b7da51a5640d0b3",
+   "dest_sha256": "3377466c5f45dfa92d86cd83c8d883bd777d3c9e021e6005411b618aaa81b4d6",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -1759,6 +1771,11 @@
      "old": "    trace!(\"[GroupSwap] async build {} functor_slot={:#x} expected={:#x}\",\n        if async_ok { \"enabled\" } else { \"disabled by fingerprint; synchronous build\" }, functor_slot, base + CONSTRUCT_FUNCTOR);\n",
      "new": "    trace!(\"[GroupSwap] async build {} functor_slot={:#x} expected={:#x} control_slot={:#x} expected={:#x}\",\n        if async_ok { \"enabled\" } else { \"disabled by fingerprint; synchronous build\" }, functor_slot, base + CONSTRUCT_FUNCTOR,\n        control_slot, base + CONTROL_FUNCTOR);\n",
      "reason": "F6 fix (ledger F6, stream f6 2026-11-02): the enable line names the control-init slot too"
+    },
+    {
+     "old": "\"group_swap.construct_functor\", \"capacity.load_655320\"];",
+     "new": "\"group_swap.construct_functor\", \"group_swap.control_callback\", \"group_swap.control_functor\", \"capacity.load_655320\"];",
+     "reason": "F6: require the control task callback and functor 64-byte seam outcomes before enabling asynchronous construction; relocated functor slot remains checked live."
     }
    ]
   },
