@@ -185,8 +185,10 @@ pub fn survey(mut line: impl FnMut(core::fmt::Arguments<'_>)) {
         }
         let data = Live.u64(base + facts::ENTRY_DATA).unwrap_or(0);
         let magic = Live.ptr(base + facts::ENTRY_DATA).and_then(|d| Live.bytes(d, 4)).map(|b| [b[0], b[1], b[2], b[3]]);
+        let effn = Live.ptr(base + facts::ENTRY_DATA);
+        let sets = effn.map(|d| (facts::effect_set(&Live, d, Visual::Di.effect_name()), facts::effect_set(&Live, d, Visual::Sdi.effect_name())));
         line(format_args!(
-            "survey entry={i} key={key:#x} resource={:?} hash40={:#x} data={data:#x} magic={magic:?} refs={:?}",
+            "survey entry={i} key={key:#x} resource={:?} hash40={:#x} data={data:#x} magic={magic:?} refs={:?} di_sdi_sets={sets:?}",
             Live.i32(base + facts::ENTRY_RESOURCE),
             hash & facts::HASH_MASK,
             Live.i32(base + 0x98)

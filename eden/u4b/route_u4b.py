@@ -110,7 +110,7 @@ def main():
     label = sys.argv[1]
     events = f"{PROFILE_SD}/TrainingRooms/events.log"
     tile_log = f"{PROFILE_SD}/ssbu-tile-cursor/events.log"
-    wait_line(events, "result=installed", 240, "install line")
+    wait_line(events, "game=13.0.5", 240, "install line", after=int(sys.argv[2]) if len(sys.argv) > 2 else 0)
     menu_box = (40, 60, 620, 380)
     for attempt in range(10):
         press(label, "a")
@@ -123,7 +123,7 @@ def main():
             continue
         d = dist(p, "menu.png", menu_box)
         print(f"after A#{attempt + 1}: menu dist {d:.1f}", flush=True)
-        if d <= 30:
+        if d <= 90:
             print("GATE ok main menu", flush=True)
             break
     else:

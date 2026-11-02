@@ -1,7 +1,7 @@
 //! The pure half of the resident effect-texture helper (`runtime/ui/effect_texture.rs`, stream u4b; SPEC-core-07 section 4.6,
 //! question 17): where the game keeps the textures of its own DI and SDI effects, and what the plugin reads of them.
 //!
-//! The game loads `effect/system/common/ef_common.eff` (arc hash40 `0x222d35b012`) through its `lib::EffectManager`, keeps the file's
+//! The game loads `effect/system/common/ef_common.eff` (arc hash40 `0x222d35b012`; its manager entry is named by the folder hash) through its `lib::EffectManager`, keeps the file's
 //! bytes resident and hands the `VFXB` block to its particle system (`nn::vfx` resource), which builds every texture of the file's
 //! `BNTX` in place (memory pool, texture, texture view) and registers each view in the same descriptor pool the UI draws from
 //! (`0x9ab70` called with `0x35b9360`, the function the UI texture builder also registers its views with). The plugin therefore
@@ -12,8 +12,10 @@
 //! use them); the `EMTR` field offsets (colour, alpha, scale, sampler) are stream W9's inferred layout, checked against the game's
 //! own reads at `+0x9f0`, `+0xa10`, `+0xa30` (the three sampler ids the resource's slot resolver reads).
 
-/// The file's arc hash40 (`effect/system/common/ef_common.eff`), low 40 bits: how the manager's entry names it.
-pub const EF_COMMON_HASH40: u64 = 0x22_2d35_b012;
+/// How the manager's entry names the file: the hash40 of its folder, `effect/system/common` (the manager loads a folder's effect file; Eden
+/// u4b-01 survey: entry hash `0x1482d0fc5a`, which is that string's CRC-32 `0x82d0fc5a` with length 0x14; the file inside is
+/// `ef_common.eff`, arc hash40 `0x222d35b012`). The file is confirmed by its `EFFN` names, not by this hash alone.
+pub const EF_COMMON_HASH40: u64 = 0x14_82d0_fc5a;
 pub const HASH_MASK: u64 = 0xff_ffff_ffff;
 
 /// `main`-relative slot that holds the address of `lib::Singleton<lib::EffectManager>::instance_` (the instance pointer is read
@@ -28,7 +30,7 @@ pub const ENTRY_COUNT: usize = 30;
 pub const ENTRY_KEY: usize = 0x00;
 /// `i32`: the index of the particle-system resource that was made from this entry's file.
 pub const ENTRY_RESOURCE: usize = 0x04;
-/// `u64`: the file's hash40 (low 40 bits).
+/// `u64`: the hash40 of the file's folder (low 40 bits).
 pub const ENTRY_HASH: usize = 0x08;
 /// `u64`: the loaded file's bytes (the `EFFN` header).
 pub const ENTRY_DATA: usize = 0x10;
