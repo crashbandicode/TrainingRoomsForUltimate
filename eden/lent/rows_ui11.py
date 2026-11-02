@@ -19,7 +19,13 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("phase")
 parser.add_argument("--menu-static-bytes", type=int, required=True,
                     help="tr-menu static bytes from the retained exact candidate ELF stack_depth report")
+parser.add_argument("--archive-base", choices=("stock", "vanilla"),
+                    help="required base for Training hand-outs (vanilla for the modified-archive B3 row)")
+parser.add_argument("--archive-loads", type=int, default=1,
+                    help="minimum Training hand-outs; use at least 2 for a retained reload batch")
 args = parser.parse_args()
+if args.archive_loads <= 0:
+    parser.error("--archive-loads must be positive")
 if args.menu_static_bytes <= 0:
     parser.error("--menu-static-bytes must be positive")
 PHASE = args.phase
@@ -138,9 +144,10 @@ def main():
     ok, reasons = hook_stats.gate(stats, ["ui_archive", "menu_draw"])
     r6.row("hook allocations: every delta and final total zero, archive/draw covered", ok,
            "; ".join(reasons) if reasons else f"{len(hook_stats.parse(stats))} complete samples")
-    ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"])
+    ok, reasons = hook_stats.gate_layout_archives(stats, ["info_training"],
+                                                   required_base=args.archive_base, minimum_handouts=args.archive_loads)
     r6.row("archive hand-outs allocate zero and retire after at least five seconds", ok,
-           "; ".join(reasons) if reasons else "all hand-outs matched by layout/size; grace >=5000ms")
+           "; ".join(reasons) if reasons else f"base={args.archive_base or 'any'} minimum={args.archive_loads}; all hand-outs matched by layout/size; grace >=5000ms")
     requests = [int(n) for n in re.findall(r"\[Thumbs\] page .* requested=(\d+)", stats)]
     bound = [int(n) for n in re.findall(r"\[Thumbs\] bound=(\d+)", stats)]
     r6.row("roster requests and binds runtime portrait textures",

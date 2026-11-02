@@ -53,15 +53,19 @@ def gate(text, required):
     return not reasons, reasons
 
 
-def gate_layout_archives(text, required):
+def gate_layout_archives(text, required, *, required_base=None, minimum_handouts=1):
     """Require allocation-free hand-outs and a matching release after >=5 s.
 
     Per-load accounting is separate from steady-state hook_stats. Retain the
     full diagnostic log through the final retirement before applying this gate.
+    B3/reload rows can require a base and repeated hand-outs for each layout.
     """
+    if required_base not in (None, "stock", "vanilla") or minimum_handouts < 1:
+        raise ValueError("archive evidence needs a known base and positive hand-out count")
+    required = set(required)
     handed = re.compile(r"\[LayoutArchive\] handed out (\w+) bytes=(\d+) stock=\d+ base=(\w+) load_allocations=(\d+)")
     released = re.compile(r"\[LayoutArchive\] released (\w+) bytes=(\d+) after=(\d+)ms")
-    pending, seen, reasons = {}, set(), []
+    pending, seen, reasons = {}, {}, []
     for number, line in enumerate(text.splitlines(), 1):
         if "[LayoutArchive]" not in line:
             continue
@@ -69,8 +73,10 @@ def gate_layout_archives(text, required):
             reasons.append(f"line {number}: archive injection skipped")
         match = handed.search(line)
         if match:
-            name, size, _, allocations = match.groups()
-            seen.add(name)
+            name, size, base, allocations = match.groups()
+            seen[name] = seen.get(name, 0) + 1
+            if name in required and required_base is not None and base != required_base:
+                reasons.append(f"line {number}: {name} base {base}, expected {required_base}")
             key = (name, int(size))
             pending[key] = pending.get(key, 0) + 1
             if int(allocations):
@@ -92,8 +98,8 @@ def gate_layout_archives(text, required):
     if not seen:
         reasons.append("no archive hand-out in the log (coverage is zero)")
     for name in required:
-        if name not in seen:
-            reasons.append(f"no {name} hand-out (coverage is zero)")
+        if seen.get(name, 0) < minimum_handouts:
+            reasons.append(f"{name}: {seen.get(name, 0)} hand-outs, need {minimum_handouts} (insufficient coverage)")
     for (name, size), count in pending.items():
         if count:
             reasons.append(f"{name} bytes={size}: {count} hand-outs not retired")
