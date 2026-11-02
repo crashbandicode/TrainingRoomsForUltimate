@@ -20,9 +20,12 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
+use crate::model::sites_pkg4;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
-use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards, states};
+use crate::runtime::features::{
+    chords, cpu, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
+};
 use crate::runtime::{clock, game, import, install, published, state_boot};
 
 const SITE_COUNT: usize = SITES.len();
@@ -87,6 +90,9 @@ pub fn run() {
     states::start_writer();
     #[cfg(feature = "diag")]
     states::start_diag_triggers();
+    // Package 4: the shortcuts file (fail-closed, created when absent) and the recorder's generator.
+    chords::load_ini();
+    recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
@@ -98,6 +104,10 @@ pub fn run() {
         } else {
             site.slot_outcome(game::read_slot_target(site.offset))
         };
+    }
+    let mut found4 = [GuardOutcome::Stock; sites_pkg4::SITES.len()];
+    for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
     }
     let usable = |site: &sites::Site| {
         SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
@@ -145,13 +155,20 @@ pub fn run() {
     let mut state_written = [Written::Skipped; state_boot::N];
     let state_on = state_boot::install(&state_found, cpu_core_on, &mut state_written);
     let state_reports = state_boot::reports(&state_found, &state_written);
+    // Package 4: the recorder, the chords' poll and the notices.
+    let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
+    let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
 
-    // 6. The install line.
-    let reports: [SiteReport; SITE_COUNT + state_boot::N] = std::array::from_fn(|i| {
+    // 6. The install line: the base sites, then package 3's, then package 4's.
+    const STATE_END: usize = SITE_COUNT + state_boot::N;
+    let reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
         if i < SITE_COUNT {
             SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
-        } else {
+        } else if i < STATE_END {
             state_reports[i - SITE_COUNT]
+        } else {
+            let j = i - STATE_END;
+            SiteReport { site: sites_pkg4::SITES[j].name, found: found4[j], written: written4[j] }
         }
     });
     let features = [
@@ -165,6 +182,9 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
         FeatureReport { feature: Feature::StateCore.name(), installed: state_on },
+        FeatureReport { feature: "chords", installed: input_delay_on },
+        FeatureReport { feature: Feature::Recording.name(), installed: recording_on },
+        FeatureReport { feature: Feature::Notices.name(), installed: notices_on },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -243,6 +263,45 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     (true, defence, ledge, tech, shield)
 }
 
+/// Package 4: the recorder's hook at the AI control function's epilogue (it also needs the poll hooks
+/// that carry the chords and the P1 stage, and the CPU core's per-frame facts), and the notice
+/// observers. Every row of a feature must have passed its guard. Returns whether the recorder and the
+/// notice hooks were installed.
+fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
+    let usable4 = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
+    for (slot, site) in written4.iter_mut().zip(sites_pkg4::SITES.iter()) {
+        if usable4(site.name) {
+            *slot = Written::Checked;
+        }
+    }
+    let mut mark = |name: &str, how: Written| {
+        if let Some(i) = sites_pkg4::SITES.iter().position(|s| s.name == name) {
+            written4[i] = how;
+        }
+    };
+    let recording = poll_ok && cpu_core_on && sites_pkg4::sites_of(Feature::Recording).all(|s| usable4(s.name));
+    if recording {
+        skyline::install_hook!(recorder::ai_epilogue);
+        mark("ai_epilogue", Written::Near);
+    }
+    // Each observer is its own site and its own pin: a mismatch leaves notices visible (SPEC-input-05 §4).
+    let combo_a = usable4("combo_display_a_pin") && usable4("combo_display_a");
+    let combo_b = usable4("combo_display_b_pin") && usable4("combo_display_b");
+    let stale = usable4("stale_moves_toggle");
+    if combo_a {
+        skyline::install_hook!(notices::combo_display_a);
+        mark("combo_display_a", Written::Near);
+    }
+    if combo_b {
+        skyline::install_hook!(notices::combo_display_b);
+        mark("combo_display_b", Written::Near);
+    }
+    if stale {
+        skyline::install_hook!(notices::stale_moves_toggle);
+        mark("stale_moves_toggle", Written::Near);
+    }
+    (recording, combo_a && combo_b && stale)
+}
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.
 fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
     let sites_ok = sites::feature_usable(Feature::StageHazards, usable);

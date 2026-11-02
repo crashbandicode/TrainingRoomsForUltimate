@@ -48,6 +48,11 @@ pub enum Feature {
     StateItems,
     /// Package 3: Steve, Olimar, Sora and the fighter-specific restores (SPEC-state-05).
     StateRestore,
+    /// Package 4: the input recorder (SPEC-input-01): the natives it reads and writes through and the
+    /// hook at the AI control function's epilogue.
+    Recording,
+    /// Package 4: HUD notices (SPEC-input-05): the Combo Display observers and the stale-moves toggle.
+    Notices,
 }
 
 impl Feature {
@@ -68,6 +73,8 @@ impl Feature {
             Feature::StateBuff => "state_buff",
             Feature::StateItems => "state_items",
             Feature::StateRestore => "state_restore",
+            Feature::Recording => "recording",
+            Feature::Notices => "notices",
         }
     }
 }

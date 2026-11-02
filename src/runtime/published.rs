@@ -19,6 +19,9 @@ static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     crate::runtime::features::cpu::publish(snapshot, rerolls);
     crate::runtime::features::states::publish(crate::model::state::settings::StateSettings::from_snapshot(snapshot));
+    crate::runtime::features::recorder::publish(snapshot);
+    crate::runtime::features::chords::publish(snapshot);
+    crate::runtime::features::input_display::publish(snapshot);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);

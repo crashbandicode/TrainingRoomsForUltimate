@@ -24,6 +24,7 @@ use crate::model::cpu::defence::SdiAnswer;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
 use crate::model::cpu::shield::ButtonAnswer;
 use crate::model::cpu::hash::hash40;
+use crate::model::cpu::playback::PlaybackState;
 use crate::model::cpu::ids::{self, Table, C, UNRESOLVED};
 use crate::model::cpu::role::{is_cpu_role, FighterKey, Scene, LOBBY_CPU_ENTRY};
 use crate::model::cpu::settings::CpuSettings;
@@ -35,7 +36,7 @@ use crate::model::sites;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::reset_hub;
+use crate::runtime::features::{recorder, reset_hub};
 use crate::runtime::game::{self, natives};
 
 /// The CPU behaviours' state; `None` until `init`.
@@ -166,6 +167,41 @@ fn player_x() -> f32 {
     f32::from_bits(PLAYER_X.load(Ordering::Relaxed))
 }
 
+/// The constant table once the game's table has answered (package 4's recorder reads its own ids).
+pub fn ids() -> Option<Table> {
+    if !CONSTS_READY.load(Ordering::Acquire) {
+        return None;
+    }
+    CPU.lock().as_ref().map(|cpu| cpu.ids.clone())
+}
+
+/// The entry of the primary CPU body for the current scene.
+pub fn primary_entry_now() -> u8 {
+    primary_entry(LOBBY.load(Ordering::Acquire))
+}
+
+/// The playback slot (0..=4) at the head of body key's mash queue, when the head is a Playback Slot.
+pub fn mash_head(key: FighterKey) -> Option<u8> {
+    with(|cpu| cpu.fighters[key.index()].mash.queue.current().and_then(|a| a.playback_slot())).flatten()
+}
+
+/// The recorder is done with the head (the playback it asked for ended or was refused).
+pub fn mash_pop(key: FighterKey) {
+    with(|cpu| {
+        cpu.fighters[key.index()].mash.queue.complete();
+    });
+}
+
+/// The recorder's state, for the CPU specs that yield to a playback (decisions B5 / N4).
+pub fn set_playback(state: PlaybackState) {
+    with(|cpu| cpu.playback = state);
+}
+
+/// A save state is loading (package 3 sets it).
+pub fn save_loading() -> bool {
+    with(|cpu| cpu.save_loading).unwrap_or(false)
+}
+
 /// The module accessor's body, if it is a registered CPU role.
 fn role_of(accessor: usize) -> Option<FighterKey> {
     CPU.lock().as_ref().and_then(|cpu| cpu.roles.find(accessor))
@@ -273,11 +309,17 @@ unsafe fn fighter_frame(fighter: usize) {
         return;
     }
     if !training {
-        with(|cpu| {
-            if cpu.roles.any() {
+        let cleared = with(|cpu| {
+            let any = cpu.roles.any();
+            if any {
                 cpu.clear_session();
             }
+            any
         });
+        // Package 4's session state (recorder, chords, notices) goes with it; outside the CPU lock.
+        if cleared == Some(true) {
+            recorder::session_clear();
+        }
         return;
     }
     let lobby = LOBBY.load(Ordering::Acquire);
@@ -393,10 +435,8 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
     }
-    // `out.playback` waits for the input-recording package: there is no recorder to ask yet.
-    #[cfg(feature = "diag")]
     if let Some(start) = out.playback {
-        diagnostic(format_args!("[TrainingRooms] cpu playback request slot={} ledge={}", start.slot, start.ledge));
+        recorder::request_playback(start);
     }
 }
 
