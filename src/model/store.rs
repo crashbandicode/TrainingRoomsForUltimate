@@ -354,13 +354,13 @@ fn decode<R: Record>(data: &[u8]) -> Result<R, R::Error> {
     }
 }
 
-fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     file.write_all(bytes)?;
     file.sync_all()
 }
 
-fn replace_file(tmp: &Path, dest: &Path) -> io::Result<()> {
+pub fn replace_file(tmp: &Path, dest: &Path) -> io::Result<()> {
     let first = match fs::rename(tmp, dest) {
         Ok(()) => return Ok(()),
         Err(err) => err,

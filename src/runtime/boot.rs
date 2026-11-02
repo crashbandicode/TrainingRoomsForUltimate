@@ -6,6 +6,7 @@
 //! the provider plugins, the menu, the notifications.
 
 use std::fs;
+use std::path::Path;
 
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
@@ -13,6 +14,7 @@ use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
+use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
@@ -241,14 +243,14 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
     }
 }
 
+
 /// Read `settings.json` (or the fork's file name, once) on a thread with a 128 KiB stack, joined here
-/// (SPEC-core-04 §5). A file that does not read cleanly is kept under `settings.invalid-<n>.json`
-/// (decision S2) and what parses is used.
+/// (SPEC-core-04 §5). All of the file logic, including the recovery of a file that does not read
+/// cleanly (the original kept as `settings.invalid-<n>.json`, the sanitized settings written to the
+/// active path before the original is retired), is `model::settings_file::load`; this only runs it and
+/// logs its notes.
 fn load_settings() -> Settings {
-    let spawned = std::thread::Builder::new()
-        .name("tr-settings-load".into())
-        .stack_size(settings::LOADER_STACK_BYTES)
-        .spawn(load_settings_inner);
+    let spawned = std::thread::Builder::new().name("tr-settings-load".into()).stack_size(settings::LOADER_STACK_BYTES).spawn(load_settings_inner);
     match spawned {
         Ok(handle) => handle.join().unwrap_or_else(|_| Settings::factory()),
         Err(_) => load_settings_inner(),
@@ -256,47 +258,9 @@ fn load_settings() -> Settings {
 }
 
 fn load_settings_inner() -> Settings {
-    let exists = |name: &str| FixedPath::<128>::in_root(name).is_some_and(|p| fs::metadata(p.as_str()).is_ok());
-    let name = match storage::pick_settings_source(
-        exists(storage::file::SETTINGS),
-        exists(storage::file::LEGACY_SETTINGS),
-    ) {
-        storage::SettingsSource::Current => storage::file::SETTINGS,
-        storage::SettingsSource::LegacyName => storage::file::LEGACY_SETTINGS,
-        storage::SettingsSource::Missing => return Settings::factory(),
-    };
-    let Some(path) = FixedPath::<128>::in_root(name) else {
-        return Settings::factory();
-    };
-    let bytes = match fs::read(path.as_str()) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            diagnostic(format_args!("[TrainingRooms] settings unreadable: {error}; factory settings"));
-            return Settings::factory();
-        }
-    };
-    let loaded = settings::parse_bytes(&bytes);
-    for issue in &loaded.issues {
-        diagnostic(format_args!("[TrainingRooms] settings issue at={} reason={}", issue.at, issue.reason));
+    let boot = settings_file::load(Path::new(storage::ROOT));
+    for note in &boot.notes {
+        diagnostic(format_args!("{note}"));
     }
-    if loaded.corrupt() {
-        keep_copy(path.as_str());
-    }
-    loaded.settings
-}
-
-/// Rename the file that did not read cleanly to the first free `settings.invalid-<n>.json`.
-fn keep_copy(path: &str) {
-    let exists = |name: &str| FixedPath::<128>::in_root(name).is_some_and(|p| fs::metadata(p.as_str()).is_ok());
-    let Some(n) = storage::first_free_invalid_copy(exists) else {
-        diagnostic(format_args!("[TrainingRooms] no free settings.invalid-<n>.json; the file stays where it is"));
-        return;
-    };
-    let Some(target) = storage::invalid_copy_name(n).and_then(|name| FixedPath::<128>::in_root(name.as_str())) else {
-        return;
-    };
-    match fs::rename(path, target.as_str()) {
-        Ok(()) => diagnostic(format_args!("[TrainingRooms] settings kept as {}", target.as_str())),
-        Err(error) => diagnostic(format_args!("[TrainingRooms] could not keep a copy: {error}")),
-    }
+    boot.settings
 }

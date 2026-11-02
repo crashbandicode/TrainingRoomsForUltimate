@@ -27,6 +27,8 @@ pub mod menu;
 pub mod migration;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/settings_file.rs"]
+pub mod settings_file;
 #[path = "model/sites.rs"]
 pub mod sites;
 #[path = "model/stage_hazards.rs"]
