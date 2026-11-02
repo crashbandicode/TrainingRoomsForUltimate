@@ -271,6 +271,38 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
 
+### For successor lead 4: exact next scope needed
+
+The ready-for-review source is a6e4d07; current docs-only HEAD is 5b92f65.
+All five gates pass. The latest release/diag and source receipts are under
+artifacts/trainingrooms-nro-archive/slim/a6e4d07-* outside the worktree.
+Raw sloc4 is 98,865; normalized excluding tools is 126,452. The ceiling is
+103,200 with the existing 4,318 pending-merge allowance preserved.
+
+Remaining lint work is native: inline_keyboard Decision, mii_editor_bridge/draft,
+mii_hud_portrait Intent, and character_roster PortraitIntent. The two hos-lock
+rows remain explicitly approved. The roster/Mii baseline hold still applies.
+
+A concrete keyboard representation proposal is already prepared, NOT applied:
+ /tmp/slim/keyboard-bounded-indices.patch
+ SHA256 37baf768b00f48d4e375969575a213fe3593f9f6cdb9ddeb60b495e67c36692c
+It narrows private Text length/caret to checked u8 under existing 96/10 limits,
+preserving public usize access and the native ABI. It removes the Decision
+large-enum allow and ratchet row. Existing native-local tests are not in the
+host harness, so this also needs a scoped pure-model test surface before it can
+be accepted; no host/runtime proof is claimed for the proposal.
+
+Please direct the next owned slice: keep this held until A/B/D, or authorize
+the exact representation/test-surface work while the composed candidate is
+gated. Also identify the exact integration revision slim may consume when
+available; only ebfcb98 has been authorized so far. No moving merge is assumed.
+
+The latest static failures and sl-02 allocation failure remain open; a6 has no
+new runtime acceptance. No own claim, queue row, compiler, Eden, or profile is
+held. Both completed target caches were retired with manifests and binaries;
+a future gate requires fresh admission and cache census.
+
+
 ### 2026-11-02 20:45Z — two independent declaration slices ready for lead integration review
 Exactcodea6e4d07 (HookId8f762e1 plusFeature); docsHEAD07e1463. Allfivecompiler gates
 PASS; proof/source/log/NRO/ELFarchived. Combined-97raw/-97normalizedfrom61.
