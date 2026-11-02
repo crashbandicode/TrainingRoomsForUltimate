@@ -222,4 +222,10 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
 - Then the wiring: the worker service in worker_tick (drain the LayerEvent mailbox, keyboard, character service, deferred effects, publish
   MacroQueries, fill PlayBuffers on load); hooks read MacroQueries / PlayBuffers / CaptureBuffer only; the clip editor's P1 controls to a
   Mailbox<ClipPress,16>; remaining hook-side calls under HookId::MacroPanel; s4-09 proves R5 0 in this layer and no keyboard stall.
-- Next yoga turn: requeue at the end when the wiring builds.
+- Next yoga turn: requeue at the end when the wiring builds.- Added to design C (lead, from deluxe dx-03): with no Deluxe host and replay_capture.ini off, live_replay::init returns before installing the
+  adapter (`if !seed && !registered { return; }`), so turning Replay capture On in the menu only takes effect at the next boot. Fix: keep the
+  guarded adapter resident whenever the layer installs (drop that early return; guards/seams/writer still decide), gated at run time by the
+  published toggle (`toggle().is_armed()` already gates before_frame/after_frame; check the record-start/save hooks gate on it too, and that the
+  worker's Q7 path (`ui/worker.rs:254`, `writer::request_replay_capture`) reaches `replay_store::toggle()`). Host test (toggle off at boot,
+  adapter ready, On arms it live) + s4-09 row: toggle On without a reboot, a match is captured.
+- Resume trigger: integrator-3's work sha with ui-screens 71ba1f7 and pkg6's entry_active_body landed.
