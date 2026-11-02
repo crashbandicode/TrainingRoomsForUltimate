@@ -18,6 +18,7 @@ static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 /// B11); the first publish at boot has none.
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     crate::runtime::features::cpu::publish(snapshot, rerolls);
+    crate::runtime::features::states::publish(crate::model::state::settings::StateSettings::from_snapshot(snapshot));
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);

@@ -27,6 +27,10 @@ pub mod file {
     pub const DEVELOPER_INI: &str = "developer.ini";
     /// The import's marker and receipt (SPEC-core-08 §2).
     pub const MIGRATION: &str = "migration.json";
+    /// The save-state slots (SPEC-state-01 §7): five per role, the fork's file name.
+    pub const SAVE_STATES: &str = "save_states.json";
+    /// The folder of the portable setup library (`<id>.json` per setup).
+    pub const SETUPS_DIR: &str = "setups";
 }
 
 /// Full paths the diagnostics file uses (also built by `FixedPath::in_root`; a test keeps them equal).

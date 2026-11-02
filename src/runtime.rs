@@ -11,9 +11,12 @@ mod diag_log;
 mod features;
 mod game;
 mod hub;
+mod import;
 mod install;
 mod published;
 mod scene;
+mod state_boot;
+mod state_natives;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {

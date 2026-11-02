@@ -20,8 +20,10 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
-use crate::runtime::{clock, game, install, published};
+use crate::model::state::file::SaveFile;
+use crate::model::state::settings::StateSettings;
+use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards, states};
+use crate::runtime::{clock, game, import, install, published, state_boot};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -63,6 +65,9 @@ pub fn run() {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
     published::set_developer_page(read_developer_ini().developer_page);
+    // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
+    // background).
+    let migration = import::start();
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
@@ -72,9 +77,20 @@ pub fn run() {
     );
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);
+    // Package 3: the save-state slots (read once, here, on a thread with an explicit stack; the writer
+    // thread keeps the file current).
+    states::init(
+        StateSettings::from_snapshot(&loaded.menu),
+        load_save_states(),
+        Rng::seed_from(clock::uptime_ms().rotate_left(7), ((run as fn() as usize) as u64) ^ 0x5a7e_57a7),
+    );
+    states::start_writer();
+    #[cfg(feature = "diag")]
+    states::start_diag_triggers();
     published::publish(&loaded.menu, 0);
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
+    let state_found = state_boot::check();
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
         *slot = if site.compared() {
@@ -125,10 +141,19 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
+    let mut state_written = [Written::Skipped; state_boot::N];
+    let state_on = state_boot::install(&state_found, cpu_core_on, &mut state_written);
+    let state_reports = state_boot::reports(&state_found, &state_written);
 
     // 6. The install line.
-    let reports: [SiteReport; SITE_COUNT] =
-        std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
+    let reports: [SiteReport; SITE_COUNT + state_boot::N] = std::array::from_fn(|i| {
+        if i < SITE_COUNT {
+            SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
+        } else {
+            state_reports[i - SITE_COUNT]
+        }
+    });
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
@@ -139,6 +164,7 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
+        FeatureReport { feature: Feature::StateCore.name(), installed: state_on },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -153,11 +179,20 @@ pub fn run() {
             lra_reset: loaded.menu.lra_reset(),
             stage_hazards: loaded.menu.stage_hazards(),
         }),
-        migration: None,
+        migration: Some(migration.as_str()),
         heap_allocations: Some(hook_allocations()),
     };
     install::write(&line);
     diag_log::flush();
+}
+
+/// Read `save_states.json` on a thread with a 128 KiB stack, joined here (the settings reader's rule).
+fn load_save_states() -> SaveFile {
+    let spawned = std::thread::Builder::new().name("tr-state-load".into()).stack_size(128 * 1024).spawn(states::load_file);
+    match spawned {
+        Ok(handle) => handle.join().unwrap_or_default(),
+        Err(_) => states::load_file(),
+    }
 }
 
 /// The CPU behaviours (package 2): the per-frame wrapper first (the facts every other piece reads),

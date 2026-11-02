@@ -38,6 +38,16 @@ pub enum Feature {
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
     CpuShield,
+    /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
+    StateCore,
+    /// Package 3: the charge writes and visuals (SPEC-state-02).
+    StateCharge,
+    /// Package 3: the buffs and their five hooks (SPEC-state-03).
+    StateBuff,
+    /// Package 3: the held-item restore and its sixteen turnip hooks (SPEC-state-04).
+    StateItems,
+    /// Package 3: Steve, Olimar, Sora and the fighter-specific restores (SPEC-state-05).
+    StateRestore,
 }
 
 impl Feature {
@@ -53,6 +63,11 @@ impl Feature {
             Feature::CpuLedge => "cpu_ledge",
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
+            Feature::StateCore => "state_core",
+            Feature::StateCharge => "state_charge",
+            Feature::StateBuff => "state_buff",
+            Feature::StateItems => "state_items",
+            Feature::StateRestore => "state_restore",
         }
     }
 }
