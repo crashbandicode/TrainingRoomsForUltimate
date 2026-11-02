@@ -36,6 +36,7 @@ pub mod preview;
 pub mod settings;
 #[path = "setup.rs"]
 pub mod setup;
+pub mod setup_transaction;
 #[path = "steve.rs"]
 pub mod steve;
 

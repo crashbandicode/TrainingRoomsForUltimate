@@ -35,6 +35,7 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/states.rs", "STATE"),
     ("features/states/quick_reset.rs", "QUICK"),
     ("features/states/preview.rs", "CHECKPOINT"),
+    ("features/states/setups.rs", "FACTS"),
     ("features/recorder.rs", "REC"),
     ("features/recorder.rs", "RNG"),
     ("features/input_display.rs", "LOG"),
@@ -82,6 +83,7 @@ fn plugin_thread_entries() -> Vec<String> {
 }
 /// `(function key, lock)` reached from a plugin thread on purpose, with the reason it is not a hook waiting on real work.
 const ALLOWED: &[(&str, &str, &str)] = &[
+    ("setups::facts", "FACTS", "copies only the published value; no native call, allocation or STATE access under this lock"),
     // Macro Source = Named Library reserves the layer's buffers on the publishing thread: the allocation runs before `MOTION` is
     // taken, and the write lock only swaps the reserved buffers in (pkg4 manifest edit, stream/sync).
     ("named_macros::prepare_buffers", "MOTION", "write lock held for a buffer swap only; the allocation is outside"),

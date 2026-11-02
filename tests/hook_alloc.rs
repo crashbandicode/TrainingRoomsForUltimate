@@ -55,6 +55,43 @@ fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
 }
 
 #[test]
+fn setup_game_transfer_validation_and_atomic_pair_commit_allocate_nothing() {
+    use model::state::{machine::{Machine, SituationIds}, record::SavedState,
+        settings::StateSettings, setup_transaction::{self, Exchange, Facts, Prepared, Target}};
+    use model::cpu::rng::Rng;
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let exchange = Exchange::new();
+    let pair = std::array::from_fn(|i| SavedState { fighter_kind: i as i32, lr: 1.0,
+        saved_stage: Some(17), situation_kind: 0, ..SavedState::never_saved() });
+    let record = setup_transaction::export("Setup", &pair).unwrap();
+    let target = Target { session: 9, slot: 3, enabled: true };
+    let facts = Facts { session: 9, owned: true, busy: false, enabled: true, stage: 17, kinds: [0, 1],
+        miis: [None::<u64>; 2], situations: SituationIds { ground: 0, air: 2, cliff: 5 } };
+    let mut machine = Machine::default();
+    let settings = StateSettings::default();
+    let mut rng = Rng::new(19);
+    let before = hook_allocations();
+    for iteration in 0..20 {
+        // Allocation and final destruction are worker work, outside HookScope.
+        let ticket = exchange.submit(Box::new(Prepared::new(&record, [None::<u64>; 2]).unwrap()))
+            .unwrap_or_else(|_| panic!("idle exchange"));
+        {
+            let _scope = HookScope::enter_hook(HookId::StateFrame);
+            let (id, prepared) = exchange.take_game().unwrap();
+            assert_eq!(id, ticket);
+            prepared.validate(target, &facts, true).unwrap();
+            assert!(machine.bind_setup(target.slot, prepared.pair(), iteration % 2 == 0, &settings, &mut rng));
+            exchange.finish_game(id, prepared, true);
+            machine.cancel_all();
+        }
+        let (id, prepared) = exchange.take_writer().unwrap();
+        exchange.finish_writer(id, prepared);
+        drop(exchange.poll(ticket).unwrap());
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
+#[test]
 fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
     use model::state::file::SaveFile;
     use model::state::machine::{Machine, Role};

@@ -369,12 +369,40 @@ impl Machine {
             }
             None => usize::from(settings.slot).min(SLOTS - 1),
         };
+        self.start_load(slot, settings, rng);
+        true
+    }
+
+    fn start_load(&mut self, slot: usize, settings: &StateSettings, rng: &mut Rng) {
         self.active = Some(slot);
         for role in [Role::Player, Role::Cpu] {
             self.set_marker(role, slot, Marker::KillPlayer);
         }
         self.mirror_sign = place::next_mirror_sign(settings.mirroring, self.mirror_sign, rng);
         self.restore_pending = true;
+    }
+
+    /// A setup transaction never replaces half a pair or redirects a pending
+    /// save/load. Checked again at commit, under the same game-owner lock.
+    pub fn setup_busy(&self) -> bool {
+        self.temporary.is_some() || self.file.player.iter().chain(self.file.cpu.iter())
+            .any(|r| r.marker != Marker::NoAction)
+    }
+
+    /// Commit an already validated JSON-free setup to the frozen slot. A restore
+    /// uses the normal death/rebirth machine, with this explicit slot rather
+    /// than drawing from Randomize Slots or changing the selected setting.
+    pub fn bind_setup(&mut self, slot: usize, mut pair: [SavedState; 2], restore: bool,
+        settings: &StateSettings, rng: &mut Rng) -> bool
+    {
+        if slot >= SLOTS || self.setup_busy() || pair.iter().any(|r| r.mii.is_some()) {
+            return false;
+        }
+        for record in &mut pair { record.marker = Marker::NoAction; }
+        let [player, cpu] = pair;
+        self.file.player[slot] = player;
+        self.file.cpu[slot] = cpu;
+        if restore { self.start_load(slot, settings, rng); }
         true
     }
 

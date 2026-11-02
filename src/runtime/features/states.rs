@@ -48,6 +48,7 @@ use crate::runtime::scene;
 
 mod quick_reset;
 mod preview;
+pub(crate) mod setups;
 pub(crate) use quick_reset::on_input as on_quick_reset_input;
 pub(crate) use quick_reset::request as request_quick_reset;
 pub(crate) use preview::{request as request_preview_restore, finish as finish_preview_restore, end as end_preview_restore};
@@ -55,6 +56,7 @@ pub(crate) use preview::{request as request_preview_restore, finish as finish_pr
 /// Everything the per-frame step owns, behind one lock.
 struct State {
     machine: Machine,
+    saved_miis: [[Option<crate::engine::mii::lifetime::Configuration>; 5]; 2],
     settings: StateSettings,
     rng: Rng,
     ids: Table,
@@ -275,9 +277,11 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
     // The writer thread keeps its own copy (boot, before any hook): Saves reach it through `hand_to_writer`.
     *WRITER_FILE.lock() = Some(file.clone());
+    let saved_miis = setups::saved_identities(&file);
     let file = file.into_game_records();
     *STATE.lock() = Some(State {
         machine: Machine::new(file),
+        saved_miis,
         settings,
         rng: Rng::new(seed),
         ids: Table::unresolved(),
@@ -377,11 +381,18 @@ pub fn cancel_pending() {
 }
 
 pub(crate) fn clear_session() {
+    with(|_| setups::clear_facts());
     cancel_pending();
     quick_reset::clear();
     preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
+}
+
+/// The roster's existing waiting-room lifetime decision, rather than a practice
+/// active edge, retires Setup drafts. Serialize this epoch with game commits.
+pub(crate) fn retire_setup_session() {
+    with(|_| setups::retire_session());
 }
 
 fn role_of_entry(entry: i32) -> Option<Role> {
@@ -521,6 +532,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         fighter,
     };
     quick_reset::observe(&raw, nana);
+    if role == Role::Player && !nana { setups::service(); }
     if !ENABLE.load(Ordering::Acquire) && !TEMPORARY.load(Ordering::Acquire) {
         return;
     }
@@ -1083,7 +1095,10 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         .flatten()
         .filter(|value| value.canonical().class as i32 == raw.kind);
     hand_to_writer(role, slot, state.clone(), mii);
-    let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
+    let write = with(|s| {
+        s.saved_miis[role.index()][slot.min(4)] = mii;
+        s.machine.capture(role, slot, state)
+    }).unwrap_or(false);
     // The save flash.
     let attributes = with(|s| {
         [C::EffectNoJointScale, C::EffectFollow, C::EffectConcludeStatus]
@@ -1527,6 +1542,7 @@ fn hand_to_writer(role: Role, slot: usize, state: SavedState, mii: Option<crate:
 
 /// The writer applies the captured records to its copy, oldest first (as `Machine::capture` stores them).
 fn take_captured(file: &mut SaveFile) {
+    let mut binding = setups::take_writer_bind();
     let mut taken: [Captured; HANDOFF_SLOTS] = [const { None }; HANDOFF_SLOTS];
     for (i, cell) in HANDOFF_STATE.iter().enumerate() {
         if cell.compare_exchange(SLOT_FULL, SLOT_READING, Ordering::Acquire, Ordering::Relaxed).is_ok() {
@@ -1536,7 +1552,10 @@ fn take_captured(file: &mut SaveFile) {
         }
     }
     taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
-    for CapturedRecord { role, slot, mut state, mii, .. } in taken.into_iter().flatten() {
+    for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
+        if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
+            setups::apply_writer_bind(file, binding.take().unwrap());
+        }
         state.marker = Marker::NoAction;
         // Configuration serializes only validated integer/byte values. Its
         // allocation-bearing JSON representation stays on this writer thread.
@@ -1547,6 +1566,7 @@ fn take_captured(file: &mut SaveFile) {
         };
         records[slot.min(records.len() - 1)] = state;
     }
+    if let Some(binding) = binding { setups::apply_writer_bind(file, binding); }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
     if dropped != 0 {
         diagnostic(format_args!("[TrainingRooms] save-state records dropped before the writer took them: {dropped}"));
