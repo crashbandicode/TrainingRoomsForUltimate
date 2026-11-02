@@ -646,6 +646,21 @@ impl HandleSet {
         if keep_grabs {
             for k in 0..self.pending_len {
                 let p = self.pending[k];
+                // The command sets a grab box again under the same id (a tether moving out): the old sphere of that key is
+                // replaced, or kept when it is the same sphere and still exists.
+                if let Some(j) = self.held[..self.len].iter().position(|h| h.once && h.sphere.key == p.key) {
+                    let h = self.held[j];
+                    let alive = fx.sphere_alive(h.handle);
+                    if alive && h.sphere == p {
+                        c.kept += 1;
+                        continue;
+                    }
+                    if alive {
+                        fx.sphere_kill_own(h.handle);
+                        c.killed += 1;
+                    }
+                    self.remove(j);
+                }
                 self.add(&p, true, fx, &mut c);
             }
         }

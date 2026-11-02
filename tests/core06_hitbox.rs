@@ -707,10 +707,17 @@ fn core06_persistent_spheres() {
     fx.end(grab);
     let c = set.reconcile(&[], true, &mut fx);
     assert_eq!((c.ended, c.spawned, c.kept), (1, 0, 1), "a grab sphere the game ended is not requested again");
+    // The command sets the same grab box again (Steve's tether in Eden hb-03 re-issued id 0 every few frames): one sphere per
+    // key, the old one replaced, never piling up.
+    for x in [4.0, 5.0, 5.0] {
+        assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), x)));
+        set.reconcile(&[], true, &mut fx);
+    }
+    assert_eq!(set.len(), 2, "the surviving grab sphere and the one of key (grab 0, sphere 0)");
     // Off / shield / rebound / not practice: every held sphere is killed by its handle, the queue is dropped.
     assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 1, 0), 3.0)));
     let c = set.clear(&mut fx);
-    assert_eq!((c.killed, c.spawned), (1, 0));
+    assert_eq!((c.killed, c.spawned), (2, 0));
     assert!(set.is_empty() && fx.live.is_empty());
     // A full pool: the refused requests are counted and asked again next pass; what fits stays.
     let mut small = FakeFx::new(2);
