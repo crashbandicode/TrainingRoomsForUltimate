@@ -37,6 +37,20 @@ evidence `R/stages/m5q/eden/{A,S}/RESULT.md`, `R/c1162/group-build-offthread/{RE
 | `tools/f6_split_table.py` (+ `test_f6_split_table.py`, `tests/f6_split.rs`) | none (WORKFLOW §6 asks for it) | The committed, host-tested script that turns the `[BuildSplit]` lines into the evidence table. |
 | `/tmp/f6-watch/{gate,yf6,yhost}.ps1`, `claims.py`, `claim.py`, `free.py` | `solo.ps1` claim logic | Host-local claim + one cargo call + release (also on failure) for compile claims, not in the repo. |
 
+### `eden/f6_eden.py` against the playbook's `tools/eden-solo/gv.py` + `solo.ps1` (for the lead's parameterised version)
+Hard-wired values changed (gv.py / solo.ps1 value → f6 value):
+- `ROOT` `/home/intpa/gsp-visualizer-work` → `/home/intpa/trainingrooms-eden-f6`; profile `profiles/y` → `profiles/f6`.
+- `SOURCE` Yoga profile `b` → on the Surface `ssbu-desync-1029/profiles/g` (Yoga: `b`).
+- `OWNER` `Claude 88c0f449… gsp-visualizer` → `Claude 0caa72b8/f6-eden`; display `:68` → `:97`; label pattern `e\d{2,}` → `f6-\d{2}`.
+- `OUTPUT` `ultimate/gsp-visualizer` (+ quiet-elite, elite-rematch) → `ultimate/TrainingRooms` (+ tile cursor, cpu pilot).
+- `FORCED` `lan_online=true, lan_online_tls=true, airplane_mode=false` → `pauseWhenInBackground=false, volume=0, volume\default=false`, and on the Surface `lan_online=false, airplane_mode=true`.
+- Game path: Yoga `~/Games/Roms/Switch/…xci` → Surface `~/eden-assets/games/01006A800016E000/base/…xci`.
+- Ledger: local `Add-Content` on the Yoga file → from the Surface, the line is shipped to the Yoga over `scp`/`ssh` (the one ledger lives there).
+- Claim check: `(CLAIMED|RELEASED): (\S+ \S+)` per owner → the same plus a 12-hour staleness cut, the host named by `on <host>`, and `HH:MM` or `HH:MM:SS` stamps.
+- GPU lock (`flock /tmp/opencode/yoga-gpu-reservation.lock`): kept on the Yoga, skipped on the Surface (no lock there). Launch runtime `5400` → `3600` s.
+- Display unit/socket names `gv-<label>-…` → `trf6-<label>-…`.
+Added steps (not in the playbook tools): `settings.json` copied into the profile copy before boot; `core.volume=0` set, saved and read back through the control API before `game.load` (AGENTS.md); `collect`, `scan`, `restore`, `reload` subcommands.
+
 ## Checklist (docs/CHECKLIST.md at `ae87443`)
 | Requirement | Tag | Result | Evidence |
 | --- | --- | --- | --- |
