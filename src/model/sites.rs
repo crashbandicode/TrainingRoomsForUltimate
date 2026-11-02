@@ -53,6 +53,8 @@ pub enum Feature {
     Recording,
     /// Package 4: HUD notices (SPEC-input-05): the Combo Display observers and the stale-moves toggle.
     Notices,
+    /// Package 5: the layout archive hook, the UI anchors and the manager global (`sites_ui.rs`).
+    Ui,
 }
 
 impl Feature {
@@ -75,6 +77,7 @@ impl Feature {
             Feature::StateRestore => "state_restore",
             Feature::Recording => "recording",
             Feature::Notices => "notices",
+            Feature::Ui => "ui",
         }
     }
 }

@@ -14,6 +14,8 @@ mod hub;
 mod import;
 mod install;
 mod published;
+mod ui;
+
 mod scene;
 mod state_boot;
 mod state_natives;

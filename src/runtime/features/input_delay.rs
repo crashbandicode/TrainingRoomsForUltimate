@@ -14,21 +14,22 @@ use crate::model::input_delay::{self, Clear, DelayQueue, MappedInputs};
 use crate::model::sites;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::features::{chords, input_display, recorder};
-use crate::runtime::{game, published};
+use crate::runtime::{game, published, ui};
 
 static QUEUE: Mutex<DelayQueue> = Mutex::new(DelayQueue::new());
 
 thread_local! {
     /// The out record and slot of the mapping call in progress on this thread, noted before the call
     /// and taken after it. Const-initialised, no destructor: no allocation.
-    static IN_PROGRESS: Cell<(usize, i64)> = const { Cell::new((0, 0)) };
+    static IN_PROGRESS: Cell<(usize, i64, usize)> = const { Cell::new((0, 0, 0)) };
     /// The game's Controller of the mapping call in progress (package 4's chords and display read it).
     static CONTROLLER: Cell<usize> = const { Cell::new(0) };
 }
 
-/// state is the fourth argument of the call: a struct whose field at +0x10 is the player's Controller.
+/// `state` is the fourth argument of the call (x3): the controller holder, a struct whose field at +0x10 is
+/// the player's Controller. Package 5's menu keeps the holder itself, package 4 reads the Controller from it.
 fn note(out: usize, slot: i64, state: usize) {
-    let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot)));
+    let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot, state)));
     let controller = if state == 0 { 0 } else { unsafe { ((state + 0x10) as *const usize).read() } };
     let _ = CONTROLLER.try_with(|cell| cell.set(controller));
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
@@ -53,10 +54,13 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 
 fn apply() {
     // A pass that made no call has no note.
-    let (out, slot) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0))).unwrap_or((0, 0));
+    let (out, slot, holder) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0, 0))).unwrap_or((0, 0, 0));
     if out == 0 || !input_delay::applies(slot as i32, game::is_training_mode()) {
         return;
     }
+    // The menu reads P1 before the delay (SPEC-core-03 §4.1 sub-handler order); it sets the MENU owner,
+    // which makes the poll below output neutral.
+    ui::input::on_p1_poll(holder);
     let out = out as *mut MappedInputs;
     let mut queue = QUEUE.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.

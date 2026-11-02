@@ -26,7 +26,7 @@ use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
     chords, cpu, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
 };
-use crate::runtime::{clock, game, import, install, published, state_boot};
+use crate::runtime::{clock, game, import, install, published, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -159,9 +159,12 @@ pub fn run() {
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
     let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
 
-    // 6. The install line: the base sites, then package 3's, then package 4's.
+    // Package 5: the menu's layout archive hook, UI anchors and input callers.
+    let ui_install = ui::install(&loaded, input_delay_on);
+
+    // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
-    let reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
+    let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
         if i < SITE_COUNT {
             SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
         } else if i < STATE_END {
@@ -171,6 +174,8 @@ pub fn run() {
             SiteReport { site: sites_pkg4::SITES[j].name, found: found4[j], written: written4[j] }
         }
     });
+    let mut reports: Vec<SiteReport> = base_reports.to_vec();
+    reports.extend(ui::reports(&ui_install));
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
@@ -185,6 +190,7 @@ pub fn run() {
         FeatureReport { feature: "chords", installed: input_delay_on },
         FeatureReport { feature: Feature::Recording.name(), installed: recording_on },
         FeatureReport { feature: Feature::Notices.name(), installed: notices_on },
+        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),

@@ -1,0 +1,21 @@
+[package]
+name = "layout-builder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+description = "Host tool: builds the TrainingRooms layout archive recipe from the player's own stock info_training archive"
+
+# Not part of the plugin's crate (the plugin is a cdylib for the Switch); built on the host only.
+[workspace]
+
+[dependencies]
+# The operator's own MIT crate (https://github.com/crashbandicode/Toolbox-Cli, formerly Toolbox-Cli): BFLYT,
+# BNTX and SARC reading and writing. Library use only. A checkout is expected at ../../../pkg5-scratch/Toolbox-Cli
+# beside the worktrees (see README.md in this folder).
+nx-layout-toolbox = { path = "../../../pkg5-scratch/Toolbox-Cli", default-features = false }
+serde_json = "1"
+
+[[bin]]
+name = "layout-builder"
+path = "src/main.rs"

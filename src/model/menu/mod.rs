@@ -1222,11 +1222,11 @@ impl Menu {
 }
 
 /// Where the focus starts in a direction grid: the Neutral chip.
-const DIRECTION_START: usize = 8;
+pub const DIRECTION_START: usize = 8;
 
 /// Position (column, row) of each chip, by array index: In · Neutral · Out across and Up · - · Down
 /// down as 3 x 3 (In on the left), then the two absolute chips in a column of their own.
-const CHIP_POS: [(u8, u8); 11] = [
+pub const CHIP_POS: [(u8, u8); 11] = [
     (2, 1), // Out
     (2, 0), // Up Out
     (1, 0), // Up
