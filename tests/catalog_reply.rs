@@ -77,3 +77,39 @@ fn helper_snapshot_publish_reader_retirement_and_reuse_allocate_nothing() {
         assert!(storage.available());
     }
 }
+#[path = "../src/model/replay_jobs.rs"]
+mod replay_jobs;
+
+#[test]
+fn replay_request_retirement_completion_and_poll_reuse_allocate_nothing() {
+    use replay_jobs::{Identity, Poll, Queue};
+    let mut queue = Queue::new(3);
+    for revision in 0..64 {
+        let id = Identity { epoch: 7, revision };
+        native(|| queue.retire(id));
+        let old = native(|| queue.submit([revision; 128], Some(id)).unwrap());
+        let work = native(|| queue.take_next().unwrap());
+        assert_eq!(work.request[127], revision);
+        assert_eq!(native(|| queue.poll(old)), Poll::Pending);
+        assert!(native(|| queue.complete(old, Ok::<_, ()>(revision))));
+        assert_eq!(native(|| queue.poll(old)), Poll::Ready(Ok(revision)));
+        assert_eq!(native(|| queue.poll(old)), Poll::Retired);
+    }
+}
+
+#[test]
+fn boot_reserved_import_box_and_endpoint_survive_full_retry_and_completion() {
+    let mut replies = catalog_reply::Replies::new();
+    let mut payload = Some(Box::new([0u64; 256]));
+    let address = payload.as_ref().unwrap().as_ptr();
+    for n in 0..32 {
+        let (value, job) = native(|| (payload.take().unwrap(), catalog_reply::Job::new(replies.begin().unwrap())));
+        native(|| { payload = Some(value); replies.rejected(job.rejected()); });
+        let (mut value, job) = native(|| (payload.take().unwrap(), catalog_reply::Job::new(replies.begin().unwrap())));
+        value[255] = n; // existing file worker owns the payload while processing
+        job.complete(value);
+        payload = Some(native(|| replies.poll().unwrap().unwrap()));
+        assert_eq!(payload.as_ref().unwrap().as_ptr(), address);
+        assert_eq!(payload.as_ref().unwrap()[255], n);
+    }
+}

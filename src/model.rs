@@ -129,3 +129,7 @@ pub mod catalog_reply;
 /// Boot-allocated storage for immutable native transaction snapshots.
 #[path = "model/reusable_snapshot.rs"]
 pub mod reusable_snapshot;
+
+/// Boot-reserved replay request identities and completion lifecycle.
+#[path = "model/replay_jobs.rs"]
+pub mod replay_jobs;
