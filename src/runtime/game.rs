@@ -357,6 +357,25 @@ pub mod natives {
         ((entry_ptr + ENTRY_BODY_FIELD) as *const usize).read()
     }
 
+    /// F11: the entry's running body (the fighter object), or 0: the window cell the game marks active (`+0x5918`, counted by
+    /// `+0x4150`; `model::entry_cells::active_cell`), which a body-bank group swap or a native Pokemon Trainer switch changes, so it
+    /// is the body the fighter actually is. Without the guarded layout (`sites_pkg6::entry_active_cell`, checked at boot) it is the
+    /// first body, as `entry_body`. Game thread only: it reads the live entry; worker and menu threads read published facts.
+    pub(crate) unsafe fn entry_active_body(entry_ptr: usize) -> usize {
+        if entry_ptr == 0 {
+            return 0;
+        }
+        let cell = if ACTIVE_CELL_GUARDED.load(Ordering::Acquire) {
+            crate::model::entry_cells::active_cell(((entry_ptr + 0x5918) as *const u8).read(), ((entry_ptr + 0x4150) as *const u64).read())
+        } else {
+            0
+        };
+        ((entry_ptr + ENTRY_BODY_FIELD + 8 * cell) as *const usize).read()
+    }
+
+    /// F11: the layout `entry_active_body` relies on passed its guard (set once at boot).
+    pub(crate) static ACTIVE_CELL_GUARDED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
     /// The fighter object's `BattleObjectModuleAccessor`, or 0.
     pub unsafe fn fighter_accessor(fighter: usize) -> usize {
         if fighter == 0 {
@@ -365,10 +384,10 @@ pub mod natives {
         ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read()
     }
 
-    /// The module accessor of the first body of a fighter entry (`None` when the entry or its body does
-    /// not exist).
+    /// The module accessor of the running body of a fighter entry (`None` when the entry or its body does not exist): the game's
+    /// active cell (F11, `entry_active_body`), so a body-bank group swap or a Pokemon Trainer switch is followed.
     pub unsafe fn module_accessor(entry: i32) -> Option<usize> {
-        let accessor = fighter_accessor(entry_body(fighter_entry(entry)));
+        let accessor = fighter_accessor(entry_active_body(fighter_entry(entry)));
         (accessor != 0).then_some(accessor)
     }
 

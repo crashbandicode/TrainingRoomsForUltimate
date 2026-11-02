@@ -290,6 +290,9 @@ fn run_inner() {
     // menu writer are the 13.0.5 instructions (the rows name it in the install line otherwise; then Training admits no source: the
     // shipped preload-off path).
     roster::set_cpu_quantity_guarded(roster::CPU_QUANTITY_ROWS.iter().all(|name| own_row_usable(name)));
+    // F11: the running body of an entry (natives::entry_active_body) follows the game's active-cell index only when its read is the
+    // 13.0.5 one; otherwise every reader gets the first body, as before.
+    crate::runtime::game::natives::ACTIVE_CELL_GUARDED.store(own_row_usable("entry_active_cell"), std::sync::atomic::Ordering::Release);
     if roster_on {
         init_roster_cycle();
     } else {

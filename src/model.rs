@@ -116,3 +116,6 @@ pub mod thread_stacks;
 /// F9: Training's parked CPU entries and the roster cycle's helper sources (the give-back decision).
 #[path = "model/parked_entries.rs"]
 pub mod parked_entries;
+/// F11: the running cell of a fighter entry's window (the game's active-cell index).
+#[path = "model/entry_cells.rs"]
+pub mod entry_cells;
