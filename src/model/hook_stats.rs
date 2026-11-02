@@ -20,156 +20,81 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-/// Every hook of the plugin that runs inside a `HookScope`, in the order the report prints them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(usize)]
-pub enum HookId {
-    InputCallerANote,
-    InputCallerAApply,
-    InputCallerBNote,
-    InputCallerBApply,
-    ResetCheck,
-    HazardRule,
-    ResetHub,
-    CpuFrame,
-    CpuSdi,
-    CpuStickX,
-    CpuStickY,
-    CpuClatterStart,
-    CpuTransitionTerm,
-    CpuMotionChange,
-    CpuQuakePos,
-    CpuCheckButtonOn,
-    CpuCheckButtonOff,
-    CpuStickXNoClamp,
-    CpuStickYNoClamp,
-    CpuShieldParam,
+// Keep the enum, index order and report labels in one declaration.
+macro_rules! hook_ids {
+    ($( $(#[$meta:meta])* $variant:ident => $name:literal, )+) => {
+        /// Every hook of the plugin that runs inside a HookScope, in report order.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        #[repr(usize)]
+        pub enum HookId { $( $(#[$meta])* $variant, )+ }
+
+        /// Number of HookId values.
+        pub const HOOK_COUNT: usize = HookId::Other as usize + 1;
+
+        impl HookId {
+            pub const ALL: [HookId; HOOK_COUNT] = [$(HookId::$variant),+];
+
+            /// The name the report line uses (the Eden scripts match these).
+            pub const fn name(self) -> &'static str {
+                match self { $(Self::$variant => $name),+ }
+            }
+        }
+    };
+}
+
+hook_ids! {
+    InputCallerANote => "input_caller_a_note",
+    InputCallerAApply => "input_caller_a_apply",
+    InputCallerBNote => "input_caller_b_note",
+    InputCallerBApply => "input_caller_b_apply",
+    ResetCheck => "reset_check",
+    HazardRule => "hazard_rule",
+    ResetHub => "reset_hub",
+    CpuFrame => "cpu_frame",
+    CpuSdi => "cpu_sdi",
+    CpuStickX => "cpu_stick_x",
+    CpuStickY => "cpu_stick_y",
+    CpuClatterStart => "cpu_clatter_start",
+    CpuTransitionTerm => "cpu_transition_term",
+    CpuMotionChange => "cpu_motion_change",
+    CpuQuakePos => "cpu_quake_pos",
+    CpuCheckButtonOn => "cpu_check_button_on",
+    CpuCheckButtonOff => "cpu_check_button_off",
+    CpuStickXNoClamp => "cpu_stick_x_no_clamp",
+    CpuStickYNoClamp => "cpu_stick_y_no_clamp",
+    CpuShieldParam => "cpu_shield_param",
     /// Package 5: the layout archive hook and the two UI anchors (R2-7).
-    UiArchive,
-    UiPassCalculate,
-    UiRegisterCalculate,
+    UiArchive => "ui_archive",
+    UiPassCalculate => "ui_pass_calculate",
+    UiRegisterCalculate => "ui_register_calculate",
     /// Package 4 S4-4: the live replay capture's hooks (the game's native replay recorder, the save actor, the fighter frame pair).
-    LiveReplay,
+    LiveReplay => "live_replay",
     /// Package 6, nested inside the hooks above so an allocation is charged to the step that made it: the roster cycle's input
     /// step (P1 and the CPU operator), its per-frame steps (sources, Kirby hats, items, preload, the practice lease) and package
     /// 3's per-fighter state frame.
-    RosterInput,
-    RosterSources,
-    RosterKirby,
-    RosterItems,
-    RosterPreload,
-    PracticeLease,
-    StateFrame,
+    RosterInput => "roster_input",
+    RosterSources => "roster_sources",
+    RosterKirby => "roster_kirby",
+    RosterItems => "roster_items",
+    RosterPreload => "roster_preload",
+    PracticeLease => "practice_lease",
+    StateFrame => "state_frame",
     /// Package 4 S4-4, nested the same way: the recorder's AI epilogue and P1 poll stages, the named layer's once-per-frame services
     /// (keyboard, character request, panel hold, clip reload) and its save-state restore follow-up.
-    RecorderAi,
-    RecorderPoll,
-    NamedService,
-    NamedRestore,
+    RecorderAi => "recorder_ai",
+    RecorderPoll => "recorder_poll",
+    NamedService => "named_service",
+    NamedRestore => "named_restore",
     /// ui-screens, nested in the UI and input hooks so the menu's own allocations are charged to the step that made them (the lead's
     /// menu-open attribution, 2026-11-02): the menu's input adapter (open, close, presses), the tick's menu draw (panes, text), the stage
     /// grid's thumbnails, and any call a hook still makes into package 4's named-macro panel model (design C: none should remain).
-    MenuInput,
-    MenuDraw,
-    MenuThumbs,
-    MacroPanel,
+    MenuInput => "menu_input",
+    MenuDraw => "menu_draw",
+    MenuThumbs => "menu_thumbs",
+    MacroPanel => "macro_panel",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
-    Other,
-}
-
-/// Number of `HookId` values.
-pub const HOOK_COUNT: usize = HookId::Other as usize + 1;
-
-impl HookId {
-    pub const ALL: [HookId; HOOK_COUNT] = [
-        HookId::InputCallerANote,
-        HookId::InputCallerAApply,
-        HookId::InputCallerBNote,
-        HookId::InputCallerBApply,
-        HookId::ResetCheck,
-        HookId::HazardRule,
-        HookId::ResetHub,
-        HookId::CpuFrame,
-        HookId::CpuSdi,
-        HookId::CpuStickX,
-        HookId::CpuStickY,
-        HookId::CpuClatterStart,
-        HookId::CpuTransitionTerm,
-        HookId::CpuMotionChange,
-        HookId::CpuQuakePos,
-        HookId::CpuCheckButtonOn,
-        HookId::CpuCheckButtonOff,
-        HookId::CpuStickXNoClamp,
-        HookId::CpuStickYNoClamp,
-        HookId::CpuShieldParam,
-        HookId::UiArchive,
-        HookId::UiPassCalculate,
-        HookId::UiRegisterCalculate,
-        HookId::LiveReplay,
-        HookId::RosterInput,
-        HookId::RosterSources,
-        HookId::RosterKirby,
-        HookId::RosterItems,
-        HookId::RosterPreload,
-        HookId::PracticeLease,
-        HookId::StateFrame,
-        HookId::RecorderAi,
-        HookId::RecorderPoll,
-        HookId::NamedService,
-        HookId::NamedRestore,
-        HookId::MenuInput,
-        HookId::MenuDraw,
-        HookId::MenuThumbs,
-        HookId::MacroPanel,
-        HookId::Other,
-    ];
-
-    /// The name the report line uses (the Eden scripts match these).
-    pub const fn name(self) -> &'static str {
-        match self {
-            HookId::InputCallerANote => "input_caller_a_note",
-            HookId::InputCallerAApply => "input_caller_a_apply",
-            HookId::InputCallerBNote => "input_caller_b_note",
-            HookId::InputCallerBApply => "input_caller_b_apply",
-            HookId::ResetCheck => "reset_check",
-            HookId::HazardRule => "hazard_rule",
-            HookId::ResetHub => "reset_hub",
-            HookId::CpuFrame => "cpu_frame",
-            HookId::CpuSdi => "cpu_sdi",
-            HookId::CpuStickX => "cpu_stick_x",
-            HookId::CpuStickY => "cpu_stick_y",
-            HookId::CpuClatterStart => "cpu_clatter_start",
-            HookId::CpuTransitionTerm => "cpu_transition_term",
-            HookId::CpuMotionChange => "cpu_motion_change",
-            HookId::CpuQuakePos => "cpu_quake_pos",
-            HookId::CpuCheckButtonOn => "cpu_check_button_on",
-            HookId::CpuCheckButtonOff => "cpu_check_button_off",
-            HookId::CpuStickXNoClamp => "cpu_stick_x_no_clamp",
-            HookId::CpuStickYNoClamp => "cpu_stick_y_no_clamp",
-            HookId::CpuShieldParam => "cpu_shield_param",
-            HookId::UiArchive => "ui_archive",
-            HookId::UiPassCalculate => "ui_pass_calculate",
-            HookId::UiRegisterCalculate => "ui_register_calculate",
-            HookId::LiveReplay => "live_replay",
-            HookId::RosterInput => "roster_input",
-            HookId::RosterSources => "roster_sources",
-            HookId::RosterKirby => "roster_kirby",
-            HookId::RosterItems => "roster_items",
-            HookId::RosterPreload => "roster_preload",
-            HookId::PracticeLease => "practice_lease",
-            HookId::StateFrame => "state_frame",
-            HookId::RecorderAi => "recorder_ai",
-            HookId::RecorderPoll => "recorder_poll",
-            HookId::NamedService => "named_service",
-            HookId::NamedRestore => "named_restore",
-            HookId::MenuInput => "menu_input",
-            HookId::MenuDraw => "menu_draw",
-            HookId::MenuThumbs => "menu_thumbs",
-            HookId::MacroPanel => "macro_panel",
-            HookId::Other => "other",
-        }
-    }
+    Other => "other",
 }
 
 thread_local! {

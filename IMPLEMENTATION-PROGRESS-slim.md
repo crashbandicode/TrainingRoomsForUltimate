@@ -265,6 +265,8 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
 
+- 20:18Z independent planned reduction notice: src/model/hook_stats.rs, enum/ALL/name declaration only (SIZE-PLAN section2 core row). Blob98e0ef37 and actual sourceSHA846d9faa match lead, pkg4 and UI worktrees. Replace three copies of the same40 hook entries with one local declarative table, preserving ordinals, report names, variant metadata and public API. No TLS, allocator, HookScope, attribution, counter or formatter behavior edit; no native Mii/roster overlap. This is within slim's already planned safe table reductions. Gates and exact before/after mapping proof will follow.
+
 ### Milestone report and decisions needed — 2026-11-02 19:57Z
 - Code: 61b0aab; evidence commit 5644502; branch stream/slim.
 - All five compile gates pass with 1,110 unchanged source hashes. Full pkg4 carry verification passes.
@@ -776,3 +778,17 @@ resume tr-lead-astra-3 to resolve the existing top QUESTIONS. This is not a gran
 of authorization and not a READY/operator-blocker declaration. The goal remains
 active, with no owned claims/compiler/Eden/profile/queue. NativeText proposal is
 still scratch-only. Do not re-run old-source Eden to fill this wait.
+
+### 2026-11-02 20:19Z — independent HookId table slice, uncompiled
+After re-reading SIZE-PLAN core row, consolidated enum/ALL/name into one local
+hook_ids declaration in src/model/hook_stats.rs. All40 old enum ordinals, ALL
+entries and name arms compared exactly before edit; variant comments retained.
+Allocator/TLS/HookScope/counter/formatter tail from thread_local onward byte
+identical. Actual hook_stats source matched lead/pkg4/UI before edit; pre-edit
+ownership notice posted. No carry transform: this is clean-room package1 model.
+Source mapping proof /tmp/slim/hook-id-table-proof.json records both SHA values
+and every ordinal/variant/label. Existing uniqueness/index/observer/allocator
+tests are the relevant runtime contract; no duplicate implementation test added.
+Rawsloc4=98,885 (-77), sizegatePASS103,300, diffcheckPASS. Normalized andallfive
+compiler gates pending; prior61b0aab receipts remain valid only for that source.
+No own claim/job/queue/profile currently. Native Text remains unapplied.

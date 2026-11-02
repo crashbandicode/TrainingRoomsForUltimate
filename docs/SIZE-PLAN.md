@@ -280,3 +280,14 @@ Normalizedf07bda2 via operator sloc-fmt.ps1:126710incltools167 =126543excltools;
 Helper feature-scope follow-up: raw98,962 (+6 versusf07bda2; ceiling103,300 unchanged), removing the last pending module-wide dead_code allow with actual feature/test scopes. Normalized count and compiler gates pending; no claim of further line reduction for this lint root. Five large-enum ratchet rows remain pending alongside the two approved hos-lock allows.
 
 Normalized10a8232=126725includingtools167 (126558excludingtools), +15 versusf07bda2, -9511 versusauthorizedbase136069; rustfmt1.9.0-stable48a229cea,0failures. This is the explicit feature-scope cost of retiring a broad dead-code allowance; budget not raised.
+
+## Hook identifier declaration (2026-11-02)
+
+The 40 HookId variants, ALL ordering and report labels now come from one local
+declarative table in model/hook_stats.rs. This removes three maintained copies
+of the same mapping, rather than compressing its formatting. Before/after source
+comparison proves every ordinal, label and variant comment is retained, and all
+allocator, scope, counter and formatter code is unchanged. Raw sloc4 is98,885
+(-77 from61b0aab); the103,300 ceiling remains unchanged. Normalized count and
+compiler gates are pending for this slice. This does not resolve any runtime
+allocation failure.
