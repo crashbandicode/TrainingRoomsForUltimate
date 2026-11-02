@@ -1,7 +1,8 @@
 //! The outer Quickplay context survives the match/results/character-select
 //! cycle. Practice's IngameCall owner does not define this lifetime.
 use super::{native::{aligned, read}, BASE};
-use std::sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use hos_lock::Mutex;
 
 #[derive(Clone, Copy)]
 struct Owner { scene: usize, context: usize, generation: u64, current: i32 }
@@ -50,7 +51,7 @@ pub(super) unsafe fn generation_for(sequence: usize) -> Option<u64> {
     let scene = parent.checked_sub(0x50)?;
     let context = context(scene)?;
     if read::<i32>(context, 0x150) != 8 { return None; }
-    OWNER.lock().unwrap().filter(|owner|
+    OWNER.lock().filter(|owner|
         owner.scene == scene && owner.context == context)
         .map(|owner| owner.generation)
 }
@@ -58,11 +59,11 @@ pub(super) unsafe fn generation_for(sequence: usize) -> Option<u64> {
 #[skyline::hook(offset = 0x236af60)]
 unsafe fn initialized(scene: usize) {
     original!()(scene);
-    let previous = OWNER.lock().unwrap().take();
+    let previous = OWNER.lock().take();
     if let Some(previous) = previous { retire(previous.generation, "resume_owner_replaced"); }
     let Some(context) = context(scene) else { return; };
     let Some(generation) = next_generation() else { return; };
-    *OWNER.lock().unwrap() = Some(Owner { scene, context, generation, current: -1 });
+    *OWNER.lock() = Some(Owner { scene, context, generation, current: -1 });
     note("quickplay_owner_initialized", [scene as u64, context as u64, generation, 0]);
 }
 
@@ -70,7 +71,7 @@ unsafe fn initialized(scene: usize) {
 unsafe fn released(scene: usize) {
     let current = context(scene);
     let previous = {
-        let mut owner = OWNER.lock().unwrap();
+        let mut owner = OWNER.lock();
         if owner.as_ref().is_some_and(|owner| owner.scene == scene && current == Some(owner.context)) {
             owner.take()
         } else { None }
@@ -96,7 +97,7 @@ unsafe fn frame(scene: usize, arg: usize) {
     let previous: i32 = read(context, 0x158);
     if !(0..13).contains(&current) { return; }
     let observation = {
-        let mut owner = OWNER.lock().unwrap();
+        let mut owner = OWNER.lock();
         owner.as_mut().filter(|owner| owner.scene == scene && owner.context == context).map(|owner| {
             let changed = owner.current != current;
             owner.current = current;

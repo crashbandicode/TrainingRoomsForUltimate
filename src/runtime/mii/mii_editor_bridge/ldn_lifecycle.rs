@@ -4,7 +4,8 @@
 //! Generations share Quickplay's counter so one number cannot name both rooms.
 use super::{connected_native::local_wireless_parent_waiting, lifecycle::next_generation,
     native::{aligned, read}, BASE};
-use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use hos_lock::Mutex;
 
 #[derive(Clone, Copy)]
 struct Owner { scene: usize, context: usize, generation: u64, current: i32 }
@@ -49,7 +50,7 @@ pub(super) unsafe fn generation_for(sequence: usize) -> Option<u64> {
     let top: i32 = read(context, 0xd0 + level as usize * 4);
     let state: i32 = read(context, 0x120);
     if !local_wireless_parent_waiting(level, state, top) { return None; }
-    OWNER.lock().unwrap().filter(|owner|
+    OWNER.lock().filter(|owner|
         owner.scene == scene && owner.context == context)
         .map(|owner| owner.generation)
 }
@@ -57,11 +58,11 @@ pub(super) unsafe fn generation_for(sequence: usize) -> Option<u64> {
 #[skyline::hook(offset = 0x2336c90)]
 unsafe fn ldn_parent_initialized(scene: usize) {
     original!()(scene);
-    let previous = OWNER.lock().unwrap().take();
+    let previous = OWNER.lock().take();
     if let Some(previous) = previous { retire(previous.generation, "local_wireless_owner_replaced"); }
     let Some(context) = context(scene) else { return; };
     let Some(generation) = next_generation() else { return; };
-    *OWNER.lock().unwrap() = Some(Owner { scene, context, generation, current: -1 });
+    *OWNER.lock() = Some(Owner { scene, context, generation, current: -1 });
     note("local_wireless_owner_initialized", [scene as u64, context as u64, generation, 0]);
 }
 
@@ -69,7 +70,7 @@ unsafe fn ldn_parent_initialized(scene: usize) {
 unsafe fn ldn_parent_released(scene: usize) {
     let current = context(scene);
     let previous = {
-        let mut owner = OWNER.lock().unwrap();
+        let mut owner = OWNER.lock();
         if owner.as_ref().is_some_and(|owner| owner.scene == scene && current == Some(owner.context)) {
             owner.take()
         } else { None }
@@ -97,7 +98,7 @@ unsafe fn ldn_parent_frame(scene: usize, arg: usize) {
     let previous: i32 = read(context, 0x128);
     if !(0..10).contains(&current) { return; }
     let observation = {
-        let mut owner = OWNER.lock().unwrap();
+        let mut owner = OWNER.lock();
         owner.as_mut().filter(|owner| owner.scene == scene && owner.context == context).map(|owner| {
             let changed = owner.current != current;
             owner.current = current;

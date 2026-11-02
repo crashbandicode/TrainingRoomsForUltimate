@@ -1304,3 +1304,67 @@ slim'sexistinghelperaccepts [x,y,w,h]. Adaptedonecalltoarray [0.0,0.0,64.0,64.0]
 allvalues/color/visibilityunchanged. No layout/newbehavior orlintallow.
 Claimreleased22:47, nojob/Eden/profile. NewsourcewillgetNEWemptytarget;
 failed820targetretirewithmanifest first. Existinglogandfrozencopyretained.
+
+## Composed keyboard native evidence — 2026-11-02 22:53Z
+Source839eafa fixes only incoming item-icon rect argument shape after exact8ee merge.
+Fresh diag passed56.786s; all1184 hashes unchanged; raw SHA256
+873ef2d1315478f63eb92ebe8544978fad19904ebc18315fbd8e64198e76038f.
+NRO6fe1b126922a7bdd562e978c540a55c7143efa983cab13591b5fe33a9f9f9a8d;
+ELF35442479b4d124e749b11c9e09faaa88764fe03cd8e3d11b2237e0c1250a37ed.
+All own claims released22:51. Host queued behindpkg6; no own compiler/Eden/profile.
+
+The old5b source had no mii_editor_bridge::request consumer. Its name_frame
+at169f54 only forwarded to original. Exact8ee introduces menu_handoff::service
+at the native roster callback, consuming the worker's close intent and calling
+mii_editor_bridge::request. The merged native ELF retains Keyboard::open52da4,
+constructor/Initialize and all6 callback registration imports. No forced retention,
+keyboard ABI change, or relaxed guard was needed. Source evidence and old raw
+name_frame are in8201cd4-preflight; new symbols and full native functions are in
+839eafa-diag/stack. All five keyboard-related source files are byte-identical to5b.
+
+Actual registration in open: changed52eb4→f4c94, moved52ec4→f4be4,
+entered52ed4→f4d44, cancelled52ee4→f4f60, initialized52ef4→f4b48,
+finished52f04→f4ec4. Callback direct static depths: changed544, moved544,
+entered768, cancel/init/finished0. These are additional explicit SDK callback
+roots; the generic bare-name hook scanner does NOT count these mangled functions.
+The generic134 registered hooks have0 over budget. Thread table passes, and a
+private corrected MiiCatalog symbol also passes5856/24576. Menu32384/57344.
+No allocated stack size changed. SDK internals/indirect calls and runtime remain open.
+
+Newly reachable open still contains the original Box<Work>: count_allocation
+at52e70, allocation1688 bytes at52e7c, beforeSDKconstruct52e90. Therefore
+do NOT promote pure callback zero-allocation evidence to whole keyboard opening.
+The earlier authorized Signals lock fix remains allocation-free in the retained
+open/poll/callback/close lock paths; SDK work storage is a separate remaining root.
+
+Lead22:43 assigned independent Mii cold-lock audit. Personally read lifecycle,
+ldn_lifecycle, ui_resume, name_keyboard, filesystem and trace_slot in full, plus
+registration/initialization paths and remaining mutex callsite inventory.
+TRACE cold-first-hook inference is disconfirmed: boot init_roster_cycle7627c
+locks the same trace buffer mutex5e4dc and allocates its two required buffers
+before installing the Mii hooks. This is existing required preparation, not a
+new warmup. No trace lock change proposed.
+Quickplay OWNER and LDN OWNER are true cold candidates: init functions only
+register hooks, and the first initialization callback locks OWNER immediately
+after original (183eb4→5e354;1843ac→5e0ec), before context qualification.
+Both zero mutex words branch to OnceBox1e861c, count_allocation1e862c,
+40-byte allocation1e8638. Their private statics are only accessed by these
+lifecycle paths; no boot resource preparation acquires them.
+Remaining STATE/continuation/reconstruction/cosmetic/settings/name candidates
+are still being audited; no broad parent Mutex substitution is authorized.
+
+## QUESTIONS
+For the lead: approve the exact UNAPPLIED two-lifecycle OWNER patch
+/tmp/slim/mii-lifecycle-owner-locks.patch,
+SHA25632aba4b78347acdbc112396d44c0970f6a53b9adc3a0264e3337aefc47deea42.
+Only imports and OWNER lock guard unwrapping change to existing hos_lock;
+all original calls, qualification, generations, guard extents and retirement
+ordering stay identical. Parent STATE and all other owners remain unchanged.
+Also request direction on the now-proven Keyboard::open Box<Work> root:
+proposed one statically reserved, aligned1688-byte work region owned by the
+existing exclusive Lease, cleared before SDK Initialize and released only
+after Finalize. Wrong-thread/orphan drop retains the lease as today. No second
+keyboard/capacity reduction, no workaround. No work-buffer patch applied yet.
+
+## Slim scratch and approved owner fix23:02Z
+Adopted ext4 TMPDIR=/home/intpa/smash-training-lobby/tmp-slim. Four owned inactive archives/binaries hash-verified then relocated; freed 46952448B, manifest tmp-slim/retired-scratch/move-manifest.json. Live helpers/watchers untouched. Applying only approved two lifecycle OWNER patch32aba4b7; parentSTATE unchanged. StaticWork remains HELD; prepared UNAPPLIED patch /tmp/slim/keyboard-static-work.patch SHA57f66fe9ab95db90843a3b932f1964dfef3d8dac28f1275cf3deea956c3488be preserved for review, not an implementation request until off-hook contract is established. Superseding queued839 host after new owner source freeze; no compileclaim/Eden/profile.

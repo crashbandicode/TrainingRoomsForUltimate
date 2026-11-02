@@ -1823,17 +1823,17 @@
      "reason": "`InstallFields`: the seam outcome as fields of package 1's one install line (`seams=<n> seams_stock=<n> seams_skipped=[..] ...`, the rows that fail, counts for the rest); rows checked or changed after the line stay in the tagged late line (`[TrainingSeams] late ...`)"
     },
     {
-     "delete_from": "/// Non-`main` rows as `[label:code,…]`, for the install line (`images=`).",
+     "delete_from": "/// Non-`main` rows as `[label:code,\u2026]`, for the install line (`images=`).",
      "delete_to": "/// Rows whose recorded bits satisfy `keep`",
      "reason": "removed (no caller in the clean room): `ImageLabels` was a field of the fork's own install line; the clean room has one install line (package 1's, `InstallFields` shortened to counts and failing rows)"
     },
     {
-     "delete_from": "/// `[group,…]`, for the install line",
+     "delete_from": "/// `[group,\u2026]`, for the install line",
      "delete_to": "struct Missing;",
      "reason": "removed (no caller in the clean room): `Groups` was a field of the fork's own install line (`authoritative=`), see `ImageLabels`"
     },
     {
-     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` → `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
+     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
      "new": "",
      "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
     },
@@ -3041,7 +3041,7 @@
    "dest_sha256": "71bb09a5363de91d2388f471a03e28ddbf0527e3fb8037b0c09686e98e09e879",
    "edits": [
     {
-     "old": "/// Start archive retirement in every build, with optional diagnostic heartbeat output.\npub fn start() {\n    let started = if TRACE_ENABLED { now_ms() } else { 0 };\n    let spawned = std::thread::Builder::new()\n        .name(\"practice-heartbeat\".into())\n        .stack_size(0x10000)\n        .spawn(move || {\n            crate::engine::compat::logging::writer_started();\n            let drains_per_beat = (HEARTBEAT_INTERVAL.as_millis() / DRAIN_INTERVAL.as_millis()) as u64;\n            let mut beat = 0u64;\n            let mut drains = 0u64;\n            loop {\n                std::thread::sleep(DRAIN_INTERVAL);\n                // R-A0b: seam outcomes resolved after the install line (runtime-only rows, late NROs).\n                crate::runtime::seams::seam_install::report_late();\n                // Diagnostic build: the hook-sharing drill's stand-in run counts, when they change.\n                #[cfg(feature = \"diag\")]\n                crate::swap_native::seam_drill::report_counts(now_ms());\n                crate::engine::compat::logging::drain();\n                drains += 1;\n                if !drains.is_multiple_of(drains_per_beat) {\n                    continue;\n                }\n                let now = now_ms();\n                // Revision 33: housekeeping off the game threads — release inflated layout archives\n                // the game finished copying (training::ui).\n                crate::runtime::lobby::training::ui::release_stale_archives(now);\n                if TRACE_ENABLED {\n                    beat += 1;\n                    let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();\n                    crate::engine::compat::logging::diagnostic(format_args!(\n                        \"[Heartbeat] n={} up={}s mode={:?} {} {}\",\n                        beat,\n                        now.saturating_sub(started) / 1000,\n                        crate::runtime::lobby::game_mode::current(),\n                        probes.join(\" \"),\n                        crate::engine::compat::logging::ring_stats()\n                    ));\n                }\n            }\n        });\n    match spawned {\n        Ok(_) => {\n            if TRACE_ENABLED {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[Heartbeat] thread started interval={}s probes={}\",\n                    HEARTBEAT_INTERVAL.as_secs(),\n                    PROBES.len()\n                ));\n            }\n        }\n        Err(error) => {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[Heartbeat] thread unavailable: {error}\"));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[PracticeDiagnostics] writer=caller heartbeat_thread=unavailable\"\n            ));\n        }\n    }\n}\n",
+     "old": "/// Start archive retirement in every build, with optional diagnostic heartbeat output.\npub fn start() {\n    let started = if TRACE_ENABLED { now_ms() } else { 0 };\n    let spawned = std::thread::Builder::new()\n        .name(\"practice-heartbeat\".into())\n        .stack_size(0x10000)\n        .spawn(move || {\n            crate::engine::compat::logging::writer_started();\n            let drains_per_beat = (HEARTBEAT_INTERVAL.as_millis() / DRAIN_INTERVAL.as_millis()) as u64;\n            let mut beat = 0u64;\n            let mut drains = 0u64;\n            loop {\n                std::thread::sleep(DRAIN_INTERVAL);\n                // R-A0b: seam outcomes resolved after the install line (runtime-only rows, late NROs).\n                crate::runtime::seams::seam_install::report_late();\n                // Diagnostic build: the hook-sharing drill's stand-in run counts, when they change.\n                #[cfg(feature = \"diag\")]\n                crate::swap_native::seam_drill::report_counts(now_ms());\n                crate::engine::compat::logging::drain();\n                drains += 1;\n                if !drains.is_multiple_of(drains_per_beat) {\n                    continue;\n                }\n                let now = now_ms();\n                // Revision 33: housekeeping off the game threads \u2014 release inflated layout archives\n                // the game finished copying (training::ui).\n                crate::runtime::lobby::training::ui::release_stale_archives(now);\n                if TRACE_ENABLED {\n                    beat += 1;\n                    let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();\n                    crate::engine::compat::logging::diagnostic(format_args!(\n                        \"[Heartbeat] n={} up={}s mode={:?} {} {}\",\n                        beat,\n                        now.saturating_sub(started) / 1000,\n                        crate::runtime::lobby::game_mode::current(),\n                        probes.join(\" \"),\n                        crate::engine::compat::logging::ring_stats()\n                    ));\n                }\n            }\n        });\n    match spawned {\n        Ok(_) => {\n            if TRACE_ENABLED {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[Heartbeat] thread started interval={}s probes={}\",\n                    HEARTBEAT_INTERVAL.as_secs(),\n                    PROBES.len()\n                ));\n            }\n        }\n        Err(error) => {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[Heartbeat] thread unavailable: {error}\"));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[PracticeDiagnostics] writer=caller heartbeat_thread=unavailable\"\n            ));\n        }\n    }\n}\n",
      "new": "",
      "reason": "the fork's `practice-heartbeat` thread (`start`) is removed: the diagnostics drain thread is package 1's `diag_log::start_drain_thread` (it now also runs `seam_install::report_late`, the late seam report), layout archive retirement is package 5's own retire thread (`ui::archive`), and the diag hook-count summary is package 1's `hook_stats` line (review R5). The probes (`ROSTER_SERVICE.hit()` ...) stay as carried"
     }
@@ -3380,7 +3380,7 @@
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
     },
     {
-     "old": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"😀\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"😀\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
+     "old": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"\ud83d\ude00\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"\ud83d\ude00\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
      "new": "",
      "count": 1,
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
@@ -4073,7 +4073,21 @@
    "dest": "src/runtime/mii/mii_editor_bridge/lifecycle.rs",
    "crate": "root",
    "src_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1",
-   "dest_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1"
+   "dest_sha256": "1a138dab42b878b285042592ed9104fa1d59dc62e79155aba92ee436841a7173",
+   "edits": [
+    {
+     "old": "use std::sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Mutex};",
+     "new": "use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};\nuse hos_lock::Mutex;",
+     "count": 1,
+     "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    },
+    {
+     "old": "OWNER.lock().unwrap()",
+     "new": "OWNER.lock()",
+     "count": 5,
+     "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/cosmetic_resume.rs",
@@ -4087,7 +4101,21 @@
    "dest": "src/runtime/mii/mii_editor_bridge/ldn_lifecycle.rs",
    "crate": "root",
    "src_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e",
-   "dest_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e"
+   "dest_sha256": "b7d8db80596173f1de5f88acbe2111c38f9b9926ad95feb395bc4eb817b51141",
+   "edits": [
+    {
+     "old": "use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};",
+     "new": "use std::sync::atomic::{AtomicBool, Ordering};\nuse hos_lock::Mutex;",
+     "count": 1,
+     "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    },
+    {
+     "old": "OWNER.lock().unwrap()",
+     "new": "OWNER.lock()",
+     "count": 5,
+     "reason": "Lead23:00 approved proven first-hook OWNER cold-allocation root: const hos-lock storage preserves lifecycle owner guard scope and native original/retirement ordering; parent STATE unchanged."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/native.rs",
@@ -4792,7 +4820,7 @@
     },
     {
      "old": "            let disabled = visible.map(|(_, row)| row.greyed).collect();",
-     "new": "            let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();\n            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {\n                labels.push(\"Add New…\".into());\n                disabled.push(!cfg!(feature = \"mii-editor-alpha\") || !self.snapshot.is_complete());\n            }",
+     "new": "            let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();\n            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {\n                labels.push(\"Add New\u2026\".into());\n                disabled.push(!cfg!(feature = \"mii-editor-alpha\") || !self.snapshot.is_complete());\n            }",
      "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
     }
    ]
