@@ -69,6 +69,18 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
   `cargo-targets/trainingrooms-<name>`, Yoga folder `/home/intpa/trainingrooms-build-<name>`, Eden labels `s<N>-NN`.
   The lead merges into `work/implementation` at each gate (integration worktree `TrainingRoomsForUltimate-work`,
   lead only) and deletes stream branches at the end.
+### 2026-11-02 ~09:xxZ — integration checkpoint (lead)
+
+- origin `work/implementation` = `7735000` (packages 1–5 + r1fix + wire + pkg5 R2-2/R2-7); local integration head
+  `a3ec141` adds package 6 `1497af6`+`5175312` and u4 (`8911679`: run-time UI textures via the game's own loader).
+- Streams: pkg4 `6e7ea3f` (macros/replay runtime; +596 KiB, size pass pending), pkg6 `41d046b` (roster cycle +
+  lobby/Mii declared; ~390 dead-code warnings until consumers are wired; push held), pkg5 (texture integration,
+  hitbox visualizer, screens), r2fix (R2-1 capabilities, R2-8; merging `a3ec141`), integrator-2 (pkg4 + pkg6 merge).
+- Done and merged: pkg3 (complete), r1fix (R1–R5), wire (R2-3…R2-6), u4. Astra R2 fixes ledger:
+  `artifacts/trainingrooms-reviews/R2-astra-pkg2-5/FIXES.md`. Open cross-stream items:
+  `/home/intpa/smash-training-lobby/TRAININGROOMS-INTEGRATION-OPEN.md`. Eden queue / stream rules / status files in
+  `/home/intpa/smash-training-lobby/`. Lead slip: u4's raw Eden screenshots deleted with its worktree (re-proof
+  assigned to pkg5's batch).
 ### 2026-11-02 ~06:xxZ — stream heads (checkpoint)
 
 - `work/implementation` (integration, local, not pushed past `473da26`): `fa8b77d` pkg2 core → `4895ea3` shared Store
