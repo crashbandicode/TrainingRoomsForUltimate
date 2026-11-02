@@ -118,3 +118,39 @@ Added steps (not in the playbook tools): `settings.json` copied into the profile
 | nothing pushed / tagged / written without order | M | pass | |
 | model/effort gate and watcher | M | pass | see header |
 | spawned workers read the playbook | M | N/A: no workers spawned |
+
+## Handover (2026-11-02 ~14:1xZ, operator order: the lead role moves to the Codex Astra lead)
+- Branch `stream/f6`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-f6`, head = the commit `WIP: handover to Astra
+  lead` (after `c426fe0`); it contains the merge of work/implementation 97648b8 (`8c8e7e9`). **Uncompiled since the merge.**
+- Targets: Surface `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-f6` 302 MB (no incremental dirs); Yoga
+  `/home/intpa/trainingrooms-build-f6` 1.5 GB (5.1 GB incremental deleted; manifest `cargo-targets/f6-nro/DELETED-incremental-20261102T1302.txt`).
+  Evidence NROs in `/home/intpa/smash-training-lobby/cargo-targets/f6-nro/`: `f6-split-diag-cfe67ff9.nro` (split meter, pre-merge),
+  `f6-fix-diag-3c9ff2d5.nro` (fix, pre-merge), `f6-release-74bfad23.nro` (pre-fix release, no meter strings).
+- **Proven:** the first-boot hitch is `0x64f820` (control init) run on the game thread. In f6-03, the first build of the boot spent 127,566 of
+  130,551 µs `setup_us` there (`eden/EDEN-F6.md`, `eden/runs/f6-03/`,
+  `python3 -I tools/f6_split_table.py eden/runs/f6-03/TrainingRooms/practice-diagnostics*.log`). Native runs it on the task worker (state 8
+  task, functor `0x4f81510`, slot `0x6574e0: b 0x64f820`, callback `0x655f30`). The fix's new live guard passes
+  (f6-04: `control_slot=0x8149a4e0 expected=0x8149a4e0`). Host gates of the pre-merge tree passed on the Yoga (8,055 tests, clippy 0,
+  no-default-features).
+- **Not proven yet:** the fix on Eden. Done criterion: first switch of a boot with `setup_us` <= the plain-lap tick gap, the Kirby-first group
+  `[6, b, 1f]` too, R5 delta 0, no Unmapped. Also not done: the native-Reload baseline of the Kirby gap (174.7 ms after a poll tick
+  mid-construction in f6-03; the lead wants the game's own Kirby build measured the same way), and the host and Switch gates of the merged tree.
+- **NEXT:**
+  1. Surface compile (queued): `pwsh -File /tmp/f6-watch/gate.ps1 -What 'Switch diag build' -Kind switch -CargoArgs 'build --release
+     --features diag' -Log /tmp/f6-watch/sw-diag-merged.log`, with `CARGO_INCREMENTAL=0`. The helpers in `/tmp/f6-watch` are `gate.ps1`,
+     `sw.ps1`, `cg.ps1`, `claims.py`, `claim.py`, `yf6.ps1` and `yhost.ps1`, and all claims go through `eden/f6_eden.py`. Copy the NRO to
+     `cargo-targets/f6-nro/f6-fix-diag-<sha8>.nro`.
+  2. One Eden claim (queued; check the imgui-nvn-sol / tm-f8-terra / tm-f8-sol interleave first):
+     `cd eden; python3 -u -I f6_boot.py f6-05 --nro <nro> --then f6-06 --nro2 <nro> --settings2 settings/f6-native.json --then-always --p1 14 --cpu 4`.
+     f6-05 is the proof; f6-06 is the game's own Kirby Reload with preload, bank and groups off. Read `[BuildSplit] setup/queue/settle/gaps/stall`.
+     If f6-04's black-title stall recurs on the merged tree, stop and report it as a P1 boot hang (lead ruling).
+  3. Gates with `CARGO_INCREMENTAL=0`: test, clippy `-D warnings`, no-default-features, Switch release + diag, `nro_size.py`,
+     `compliance.py --nro <release>`.
+  4. EDEN-F6.md rows, this checklist, the lead report.
+- **Blockers / defects outside f6 (reported):**
+  - `carry_pkg6 verify` fails on work/implementation: `seam_install.rs` was edited by 73831b8 without a manifest edit (integrator-3).
+  - The install line is cut at about 8,142 characters (integrator-3).
+  - In-hook allocations rise about 220 per 10 s with no swaps (pkg6 R5).
+  - f6-04's boot stall on the pre-sync tree.
+- Open claims: none (last `RELEASED` 12:12Z, queue line deleted). Watcher stopped. Eden profile `/home/intpa/trainingrooms-eden-f6/profiles/f6`
+  restored to source g's plugin set.
