@@ -51,7 +51,7 @@ unsafe fn note_pending(s: &mut Session) {
 
 pub(super) unsafe fn before_parent() {
     let queued = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         if let Some(s) = state.as_mut().filter(|s| s.thread == current_thread()
             && matches!(s.phase, Phase::Queued | Phase::Editing)) {
             note_pending(s);
@@ -63,7 +63,7 @@ pub(super) unsafe fn before_parent() {
 
 pub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> bool {
     let (abort, completed) = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing
             && s.thread == current_thread()) else { return false; };
         note_pending(s);
@@ -76,7 +76,7 @@ pub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> 
     // entry reveals state 9 and Test entry reveals state 10. Capture and leaf
     // completion follow on that page.
     if let Some(revealed) = contract::release_preview_wait(context) {
-        if let Some(s) = STATE.lock().unwrap().as_mut() {
+        if let Some(s) = STATE.lock().as_mut() {
             let underneath = native::read::<i32>(context, 0xf8 + revealed as usize * 4);
             s.event("interrupted_preview_wait_released", [
                 native::read::<i32>(context, 0x148) as u64,
@@ -94,7 +94,7 @@ pub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> 
         // Pending screen values have been captured separately from DRAFT.
         // Native leaf completion releases the layouts without confirming them.
         {
-            let mut state = STATE.lock().unwrap();
+            let mut state = STATE.lock();
             let s = state.as_mut().unwrap();
             s.submenu_completed = true;
             s.event("interrupted_submenu_completed", [submenu.state as u64, 0, 0, 0]);
@@ -107,11 +107,11 @@ pub(super) unsafe fn before_edit(scene: usize, frame: usize, context: usize) -> 
     }
     if let Some(event) = contract::interrupt_editor(base, context, || {
         // Do not replace the checkpoint with teardown's confirmed DRAFT.
-        if let Some(s) = STATE.lock().unwrap().as_mut() {
+        if let Some(s) = STATE.lock().as_mut() {
             s.event("interrupted_editor_ready_to_cancel", [0; 4]);
         }
     }) {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         if let Some(s) = state.as_mut() { s.event(event, [native::read::<i32>(context, 0x148) as u64,
             native::read::<u32>(context, 0x14c) as u64, native::read::<i32>(context, 0x144) as u64, 0]); }
     }
@@ -159,7 +159,7 @@ unsafe fn drive_waiting(
     context: usize, base: usize,
 ) -> Drive {
     let phase = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| s.origin == origin) else {
             return Drive::Original;
         };
@@ -187,12 +187,12 @@ unsafe fn drive_waiting(
             // Practice may have received the match before its quit completed.
             // Its actual result takes precedence; never manufacture result3.
             if owner.result() != 0 {
-                let mut state = STATE.lock().unwrap();
+                let mut state = STATE.lock();
                 relinquish(state.as_mut().unwrap(), "practice_completed_before_editor");
                 return Drive::Original;
             }
             if !contract::practice_resources_released(base) {
-                let mut state = STATE.lock().unwrap();
+                let mut state = STATE.lock();
                 relinquish(state.as_mut().unwrap(), "practice_resources_not_released");
                 return Drive::Original;
             }
@@ -204,7 +204,7 @@ unsafe fn drive_waiting(
             EDIT_OWNER.store(owner.sequence(), Ordering::Release);
             EDIT_OWNED.store(true, Ordering::Release);
             let queued = native::enqueue_sequence(base, owner.sequence(), b"CharaMakeSequenceScene");
-            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();
+            let mut state = STATE.lock(); let s = state.as_mut().unwrap();
             s.inputs = inputs;
             #[cfg(feature = "diag")]
             { s.input_baseline = Some(input_baseline); }
@@ -228,7 +228,7 @@ unsafe fn drive_waiting(
         Phase::Exiting if owner.drained() => {
             if !super::save_ready_for_return(base) { return Drive::Value(0); }
             let (mode, inputs, interrupted, seed) = {
-                let state = STATE.lock().unwrap(); let s = state.as_ref().unwrap();
+                let state = STATE.lock(); let s = state.as_ref().unwrap();
                 (s.mode, s.inputs, s.interrupted, s.seed)
             };
             native::register_editor_sequence(base, owner.sequence(), false);
@@ -244,7 +244,7 @@ unsafe fn drive_waiting(
             let resources_released = contract::practice_resources_released(base);
             let catalog_clean = native::catalog_clean(base);
             let reentered = released && idle && resources_released && catalog_clean && owner.reenter();
-            let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();
+            let mut state = STATE.lock(); let s = state.as_mut().unwrap();
             s.phase = if reentered { Phase::Returning } else { Phase::Refused };
             s.observe_inputs("after_editor_release");
             s.event("connected_reentry_barrier", [u64::from(resources_released),
@@ -269,7 +269,7 @@ unsafe fn drive_waiting(
 unsafe fn waiting_owner(context: usize, args: usize) -> usize {
     if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }
     let base = BASE.load(Ordering::Acquire);
-    let origin = STATE.lock().unwrap().as_ref().map(|session| session.origin);
+    let origin = STATE.lock().as_ref().map(|session| session.origin);
     let driven = match origin {
         Some(Origin::Quickplay) => {
             let Some(owner) = contract::Owner::bind(base, context) else {
@@ -300,7 +300,7 @@ unsafe fn practice_frame(scene: usize, frame: usize) -> usize {
     }
     let base = BASE.load(Ordering::Acquire);
     let begin = {
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)
             && s.thread == current_thread()) else { return result; };
         let Some(practice) = contract::Practice::bind(base, scene, frame, s.owner) else { return result; };
@@ -319,11 +319,11 @@ unsafe fn practice_frame(scene: usize, frame: usize) -> usize {
         } else { false }
     };
     if begin {
-        let owner = { STATE.lock().unwrap().as_ref().unwrap().owner };
+        let owner = { STATE.lock().as_ref().unwrap().owner };
         if let Some(practice) = contract::Practice::bind(base, scene, frame, owner) {
             if practice.request_quit(base) {
                 RETAINED.store(owner, Ordering::Release);
-                let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();
+                let mut state = STATE.lock(); let s = state.as_mut().unwrap();
                 s.phase = Phase::Quitting; s.wait_frames = 0;
                 s.event("connected_practice_quit_requested", [scene as u64, owner as u64, 0, 0]);
                 if s.origin == Origin::LocalWireless {
@@ -348,7 +348,7 @@ unsafe fn scene_network_ready(scene: usize) -> bool {
     // session is safe: no native state has been changed yet. This base-scene
     // callback survives the practice scene and may run several times per frame.
     if ACTIVE.load(Ordering::Acquire) {
-        if let Ok(mut state) = STATE.try_lock() {
+        if let Some(mut state) = STATE.try_lock() {
             if let Some(s) = state.as_mut().filter(|s| matches!(s.origin, Origin::Quickplay | Origin::LocalWireless)
                 && s.phase == Phase::Requested) {
                 let available = match s.origin {

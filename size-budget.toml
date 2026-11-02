@@ -1,0 +1,75 @@
+# Code-size ratchet of the clean room. Operator 2026-11-02: RC ratchets only; next version >=15% below fork after rustfmt normalization.
+# Counted by tools/sloc.py (the primary's sloc4.py rules since 2026-11-02: Rust lines without blanks, comments and tests,
+# test-gated module files and host-only simulator code apart; third_party/ excluded). Entries before the sloc4 entry
+# were counted with sloc3's rules. Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
+# Append entries, never edit old ones. The last entry of a scope is its ceiling. The first ceiling of a scope and
+# every raise need approved_by (the lead); a cut needs only a reason. Plan and history: docs/SIZE-PLAN.md.
+
+[[budget]]
+scope = "total"
+ceiling = 114100
+date = "2026-11-02"
+reason = "start: 106,983 measured at 7bb86fd plus 7,061 pending in unmerged stream branches and worktrees (pkg6 +2,416, hitbox +1,272, u4b +990, ui-screens +721, stack +640, sync +495, f6 +481, deluxe +83 without its vendored SDK, pkg4 -37; tools/sloc.py tree count minus merge base, 2026-11-02 ~12:10Z), rounded up to the next hundred"
+approved_by = "lead 0caa72b8 (slim stream brief, 2026-11-02: start at measured plus pending)"
+
+[[budget]]
+scope = "total"
+ceiling = 114000
+date = "2026-11-02"
+reason = "cut: the slim stream's first wins (lint-allow roots in model/cpu and panes, one crc32/hash40, one game-constant table, Store::write_atomic = write_replace) remove 129 lines: 107,341 at stream/slim on 566780a (107,470) plus the 6,566 still pending, rounded up"
+
+[[budget]]
+scope = "total"
+ceiling = 113400
+date = "2026-11-02"
+reason = "cut: three never-compiled carried files deleted (e79019b, 556 lines): 106,785 at stream/slim plus the 6,566 still pending, rounded up"
+
+[[budget]]
+scope = "total"
+ceiling = 103500
+date = "2026-11-02"
+reason = "counter corrected to sloc4, primary 2026-11-02 (tools/sloc.py is now sloc4's rules: test-gated module files and cfg(all(test, ...)) items are tests, host-only simulator code is reported apart): stream/slim at eb8e034 counts 103,497 (8b73694: 106,099), rounded up"
+
+# Pending merges (lead 2026-11-02 ~14:0xZ: ceiling = head + known pending; integrator-3 lowers it to the actual count after
+# each merge). Each line item is that branch's sloc4 delta from its merge base with stream/slim (tools/sloc.py), or an
+# estimate where the code is not written yet:
+#   deluxe     e4432ad  +83     (owner: deluxe stream)
+#   hitbox     eca0f81  +1,285  (owner: hitbox stream)
+#   ui-screens 237b857  +1,062  measured, plus ~+1,500 estimated for the screens not written yet (roster grid, Mii
+#                               lists, waiting room, B3: about four screens of the size of the measured ones)
+#                               (owner: ui-screens stream)
+#   pkg4       2d25cdf  +219    measured (design C, expected net about 0) (owner: pkg4 stream)
+#   pkg6       d517dab  +169    (owner: pkg6 stream)
+#   total pending about +4,318
+[[budget]]
+scope = "total"
+ceiling = 107900
+date = "2026-11-02"
+reason = "head 103,497 (stream/slim 2aa887a, sloc4) plus the pending merges listed above (+4,318), rounded up to the next hundred; integrator-3 lowers it to the actual count after each merge"
+approved_by = "lead 0caa72b8 (2026-11-02 ~14:0xZ: ceiling at head plus the known pending merges)"
+
+[[budget]]
+scope = "total"
+ceiling = 105600
+date = "2026-11-02"
+reason = "cut: approved capacity/lifecycle probe and empty alias retirement; raw sloc4 101224 plus retained pending merge allowance4318 =105542, rounded up. Prior measured104350, slice reduction3126; no counting semantics or normalized-unit conversion."
+[[budget]]
+scope = "total"
+ceiling = 103300
+date = "2026-11-02"
+reason = "cut: approved Mii probe retirement and helper scope roots; raw sloc4 98956 plus retained pending merge allowance4318 =103274, rounded up. Previous101224, slice reduction2268; no count/layout change."
+
+[[budget]]
+scope = "total"
+ceiling = 103200
+date = "2026-11-02"
+reason = "cut: HookId and Feature declaration tables remove maintained duplicate mappings; raw sloc4 98865 plus unchanged pending merge allowance4318 =103183, rounded up. No counting/layout or behavior change."
+
+# Entries above are historical raw units (implicit basis=raw-sloc4), not comparable to this section.
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136069
+date = "2026-11-02"
+reason = "Operator unit migration: rustfmt 1.9.0-stable (48a229ceae), edition2021, sloc4 counting rules after formatting, excluding scripts/tools and vendored code. Historical clean-room ebfcb98 normalized136069 is the initial RC regression ceiling; fork M5q131081 is the comparator. The >=15% reduction target (about111400) is next-version work, not an RC blocker. No raw103200 or raw4318 allowance is compared or converted into normalized units. Ratchet after coherent pending Setup/UI/F9 composition; no invented normalized allowance."
+approved_by = "Operator decisions2026-11-02 via primary b81ec740; lead23:11 explicit normalized baseline136069 authorization"

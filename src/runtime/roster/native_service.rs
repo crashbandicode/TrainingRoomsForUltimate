@@ -19,7 +19,7 @@ impl ServiceEntryContext {
         // Capture the actual callback stack; TLS alone cannot identify a fiber stack.
         self as *const Self as usize + std::mem::size_of::<Self>()
     }
-    #[cfg(any(feature = "source-capacity-probe", feature = "managed-third-source-alpha"))]
+    #[cfg(feature = "managed-third-source-alpha")]
     pub(super) fn dispatcher_tuple(&self) -> [usize; 4] {
         self.words
     }

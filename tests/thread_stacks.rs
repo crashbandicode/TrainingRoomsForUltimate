@@ -23,7 +23,7 @@ fn rows_are_in_id_order_with_unique_names() {
     for (i, row) in THREADS.iter().enumerate() {
         assert_eq!(row.id as usize, i, "{} is out of order", row.name);
         assert!(!row.name.is_empty() && row.name.len() <= 31, "{}", row.name);
-        assert!(!row.symbol.is_empty() && !row.runs.is_empty(), "{}", row.name);
+        assert!(!row.symbol.is_empty(), "{}", row.name);
     }
     let mut names: Vec<_> = THREADS.iter().map(|r| r.name).collect();
     names.sort_unstable();

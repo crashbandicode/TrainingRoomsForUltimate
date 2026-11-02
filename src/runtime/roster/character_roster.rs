@@ -49,10 +49,7 @@ use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 
 #[path = "native_source.rs"]
 mod native_source;
-#[cfg(any(
-    feature = "source-capacity-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;
 #[path = "character_sources.rs"]
@@ -60,18 +57,6 @@ pub mod sources;
 /// GS-PANIC: the process-memory admission every fighter load the mod starts goes through.
 #[path = "process_memory.rs"]
 pub(crate) mod process_memory;
-
-#[cfg(feature = "source-lifecycle-probe")]
-#[path = "source_lifecycle_probe.rs"]
-pub mod source_lifecycle_probe;
-
-#[cfg(feature = "source-capacity-probe")]
-#[path = "source_capacity_probe.rs"]
-pub mod source_capacity_probe;
-
-#[cfg(feature = "source-ldn-capacity-probe")]
-#[path = "source_ldn_capacity_probe.rs"]
-mod source_ldn_capacity_probe;
 
 #[cfg(feature = "source-owner-probe")]
 #[path = "source_owner_probe.rs"]
@@ -446,11 +431,6 @@ pub fn waiting_drafts_ready() -> bool {
 
 fn finish_install(token: InstallToken, reason: &str) -> bool {
     let finished = INSTALL.finish(token);
-    #[cfg(feature = "source-ldn-capacity-link-probe")]
-    if reason == "capacity Link native destruction" {
-        trace!("[NativeInstall] capacity Link destructor token={:?} finished={} gate_active_after={}",
-            token, finished, INSTALL.active());
-    }
     #[cfg(feature = "managed-third-source-alpha")]
     if reason == "managed source destroyed" {
         trace!(
@@ -856,22 +836,14 @@ pub fn scene_changed(mode: game_mode::Mode) {
     mii_origin_observer::scene_changed();
     #[cfg(feature = "mii-pool-observer")]
     mii_pool_observer::scene_changed();
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::scene_changed();
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::scene_changed();
-    #[cfg(feature = "source-capacity-probe")]
-    source_capacity_probe::scene_changed();
     sources::scene_changed();
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::scene_changed();
     #[cfg(feature = "source-owner-probe")]
     source_owner_probe::scene_changed();
     crate::runtime::roster::character_items::scene_changed();
-    #[cfg(feature = "mii-identity-probe")]
-    crate::runtime::mii::mii_identity_probe::forget(std::ptr::null());
-    #[cfg(feature = "mii-identical-reload-probe")]
-    mii_reload_probe::scene_changed();
     let same_lobby = WAITING_MEMORY
         .lock()
         .scene_changed(mode.initialized, mode.melee, mode.mode);
@@ -996,7 +968,6 @@ unsafe fn ready_forms(entry: *const u8, owner: u32) -> Option<(Forms, u32)> {
 
 /// `ready_forms` without the roster catalog admission: single-kind Mii entries only.
 #[cfg(any(
-    feature = "mii-identical-reload-probe",
     feature = "mii-pool-observer",
     feature = "mii-origin-observer",
     feature = "mii-saved-alpha"
@@ -1051,12 +1022,7 @@ unsafe fn ready_single_mii(entry: *const u8, owner: u32) -> Option<u32> {
 }
 
 /// Existing readiness readers only; no native calls or Rust mutexes (also used under G lock).
-#[cfg(feature = "mii-cpu-adapter-probe")]
-pub(crate) unsafe fn mii_cpu_probe_visible_ready(entry: *const u8, owner: u32) -> bool {
-    mii_saved_cpu_visible_ready(entry, owner, 0x49)
-}
-
-#[cfg(any(feature = "mii-cpu-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
     if !(0x48..=0x4a).contains(&kind) { return false; }
     match owner {
@@ -1067,7 +1033,7 @@ pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, k
 }
 
 /// Called before G lock; the current probe may already own INSTALL, never a roster replacement.
-#[cfg(any(feature = "mii-cpu-adapter-probe",feature="mii-saved-alpha"))]
+#[cfg(feature="mii-saved-alpha")]
 pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
     native_source::training_cpu_quantity() == Some(1)
         && STATES.iter().all(|state| {
@@ -1093,16 +1059,8 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
     mii_pool_observer::service(entry, owner);
     #[cfg(feature = "mii-origin-observer")]
     mii_origin_observer::service(entry, owner);
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::service(ctx, entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::service(entry, owner);
-    #[cfg(feature = "source-lifecycle-probe")]
-    source_lifecycle_probe::service(entry, owner);
-    #[cfg(feature = "source-capacity-probe")]
-    if source_capacity_probe::service(ctx, entry, owner) {
-        return;
-    }
     sources::service(ctx, entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::service(entry, owner);
@@ -1138,14 +1096,6 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     if mii_ordinary_cpu::service(entry,owner){return;}
     #[cfg(feature="mii-saved-alpha")]
     if mii_saved_alpha::service(entry,owner){return;}
-    #[cfg(feature = "mii-identity-probe")]
-    crate::runtime::mii::mii_identity_probe::observe_entry(entry, owner);
-    #[cfg(feature = "mii-saved-file-probe")]
-    crate::runtime::mii::mii_saved_file_probe::on_service(entry, owner);
-    #[cfg(feature = "mii-identical-reload-probe")]
-    if mii_reload_probe::service(entry, owner, role, _caller_lr) {
-        return;
-    }
     let active = state_for(role).lock().active;
     if let Some(mut active) = active {
         if active.entry != entry as usize || active.scope.owner != owner {
@@ -1513,14 +1463,8 @@ pub unsafe fn on_destroy(entry: *const u8) {
     mii_pool_observer::on_destroy(owner);
     #[cfg(feature = "mii-origin-observer")]
     mii_origin_observer::on_destroy(owner);
-    #[cfg(feature = "source-ldn-capacity-probe")]
-    source_ldn_capacity_probe::on_destroy(entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::on_destroy(entry, owner);
-    #[cfg(feature = "source-capacity-probe")]
-    source_capacity_probe::on_destroy(entry, owner);
-    #[cfg(feature = "source-lifecycle-probe")]
-    source_lifecycle_probe::destroy(entry, owner);
     sources::on_destroy(entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::on_destroy(entry, owner);
@@ -1533,10 +1477,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
         return;
     }
     let role = if owner == 0 { Role::Player } else { Role::Cpu };
-    #[cfg(feature = "mii-identity-probe")]
-    crate::runtime::mii::mii_identity_probe::forget(entry);
-    #[cfg(feature = "mii-identical-reload-probe")]
-    mii_reload_probe::on_destroy(entry);
     let mut state = state_for(role).lock();
     let practice_departure = role == Role::Player
         && (state
@@ -1606,8 +1546,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
     if practice_departure {
         // Native Training -> CSS -> Training retains the same mode tuple. The
         // actual P1 entry destructor is also a scene boundary for plugin intent.
-        #[cfg(feature = "source-capacity-probe")]
-        source_capacity_probe::scene_changed();
         sources::scene_changed();
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::scene_changed();
@@ -2425,15 +2363,8 @@ pub fn init() {
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.
         #[cfg(feature="mii-ordinary-player-alpha")]
         if !mii_ordinary_player::init(base) {return;}
-        #[cfg(feature = "source-lifecycle-probe")]
-        source_lifecycle_probe::install(base);
-        #[cfg(any(
-            feature = "source-capacity-probe",
-            feature = "managed-third-source-alpha"
-        ))]
+        #[cfg(feature = "managed-third-source-alpha")]
         native_source_capacity::init(base);
-        #[cfg(feature = "source-capacity-probe")]
-        source_capacity_probe::install(base);
         #[cfg(feature="mii-ldn-qualification-probe")]
         mii_ldn_qualification::init(base);
         #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -2451,415 +2382,5 @@ pub fn init() {
             skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
         }
         trace!("[CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping", cfg!(feature = "waiting-roster-reload"));
-    }
-}
-
-/// Development-only one-shot identical-descriptor reload of P1's native Mii in Training.
-/// It observes whether a same-kind state-3 cycle re-creates the body and re-runs the native
-/// Mii resource rebuild. No descriptor byte, record, saved entry or information block is
-/// written, except that `mii-special-change-probe` writes the neutral special of the bound saved
-/// row and information block, and `mii-fullconfig-probe` writes the full alternate configuration
-/// (`crate::runtime::mii::mii_fullconfig_probe`, shot 1) and restores it (shot 2) on the same live entry.
-/// The install token is held until native completion or entry destruction.
-#[cfg(feature = "mii-identical-reload-probe")]
-pub(crate) mod mii_reload_probe {
-    use super::*;
-    #[cfg(feature = "mii-cpu-adapter-probe")]
-    use crate::runtime::mii::mii_fullconfig_probe::{ack, ack_phase};
-
-    const ARM_FILE: &str = "sd:/ultimate/TrainingRooms/mii_probe.arm";
-    /// Second arm file required by the special-change variant; both must exist.
-    const CHANGE_ARM_FILE: &str = "sd:/ultimate/TrainingRooms/mii_special_probe.arm";
-    const CHANGE: bool = cfg!(feature = "mii-special-change-probe");
-    /// Full-configuration variant: both shots go through `crate::runtime::mii::mii_fullconfig_probe::step`.
-    const FULL: bool = cfg!(feature = "mii-fullconfig-probe");
-    const TARGET_OWNER: u32 = if cfg!(feature = "mii-cpu-adapter-probe") { 1 } else { 0 };
-    /// Identical reload: one shot. Special change: shot 1 changes, shot 2 restores.
-    const MAX_SHOTS: usize = if CHANGE || FULL { 2 } else { 1 };
-
-    #[derive(Clone, Copy, Debug)]
-    struct Track {
-        token: InstallToken,
-        entry: usize,
-        kind: u32,
-        ticks: usize,
-        phase: u32,
-        saw_reload: bool,
-        departed: bool,
-    }
-
-    static ARMED: AtomicBool = AtomicBool::new(false);
-    static FIRED: AtomicBool = AtomicBool::new(false);
-    static SHOTS: AtomicUsize = AtomicUsize::new(0);
-
-    /// Shot-1 record. `fe` is the live entry's identity only: it is compared with callback
-    /// arguments and never dereferenced. `original` held equal `E+0x1b2..` and `D+0x390..` values.
-    #[derive(Clone, Copy, Debug)]
-    struct ChangeState {
-        fe: usize,
-        id: u32,
-        e: usize,
-        original: [u8; 4],
-        written: u8,
-        changed: bool,
-    }
-
-    impl ChangeState {
-        /// Saved-row specials expected while shot 1 is in effect.
-        fn changed_tuple(&self) -> [u8; 4] {
-            [self.written, self.original[1], self.original[2], self.original[3]]
-        }
-    }
-    static ORIGINAL: Mutex<Option<ChangeState>> = Mutex::new(None);
-    static REQUESTED: AtomicBool = AtomicBool::new(false);
-    static HELD: AtomicBool = AtomicBool::new(false);
-    static TRACK: Mutex<Option<Track>> = Mutex::new(None);
-
-    pub fn init() {
-        let armed = std::path::Path::new(ARM_FILE).exists()
-            && (!CHANGE || std::path::Path::new(CHANGE_ARM_FILE).exists());
-        // Third arm file and the fingerprint-gated hook installation of the full-configuration probe.
-        #[cfg(feature = "mii-fullconfig-probe")]
-        let armed = armed && crate::runtime::mii::mii_fullconfig_probe::armed();
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        let armed = armed && ack::init();
-        ARMED.store(armed, Ordering::Relaxed);
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        trace!("[MiiCpuAdapter] armed={} target_owner=1 native_training_only=true ordinary_observation_once=true old_p1_mutation_disabled=true", armed);
-        trace!("[MiiReloadProbe] armed={} arm_file={} change={} change_arm_file={} full={} max_shots={}",
-            armed, ARM_FILE, CHANGE, CHANGE_ARM_FILE, FULL, MAX_SHOTS);
-    }
-
-    unsafe fn permitted() -> bool {
-        crate::runtime::compat::common::is_native_training_mode()
-            && crate::runtime::compat::common::is_ready_go()
-            && !menu::captures_input()
-            && !INSTALL.active()
-            && !training::save_states::is_loading()
-            && !training::recording_or_playback()
-            && !crate::runtime::compat::replay_preview::occupied()
-    }
-
-    /// L3+X edge while permitted requests the one shot; the chord is consumed like the
-    /// item-state probe does. Both features cannot be enabled together (lib.rs guard).
-    pub unsafe fn handle_input(out: &mut MappedInputs, click: bool, x: bool) {
-        let held = click && x;
-        let was_held = HELD.swap(held, Ordering::Relaxed);
-        if !held || !permitted() {
-            return;
-        }
-        *out = MappedInputs::empty();
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        if !ack::inputs_enabled() { return; }
-        if held && !was_held && ARMED.load(Ordering::Relaxed) && !FIRED.load(Ordering::Relaxed)
-            && SHOTS.load(Ordering::Relaxed) < MAX_SHOTS
-        {
-            REQUESTED.store(true, Ordering::Relaxed);
-            trace!("[MiiReloadProbe] requested; waiting for a ready native Mii entry for owner {}", TARGET_OWNER);
-        }
-    }
-
-    unsafe fn info_block(entry: *const u8) -> (u16, u8, u16) {
-        let d = read::<*const u8>(entry, 0xf8);
-        if aligned(d) {
-            (read::<u16>(d, 0x72), read::<u8>(d, 0x94), read::<u16>(entry, 0x46))
-        } else {
-            (u16::MAX, u8::MAX, read::<u16>(entry, 0x46))
-        }
-    }
-
-    /// Runs inside the native service callback with the live entry. Returns true while this
-    /// probe owns the entry's reload so the roster path leaves that tick alone.
-    pub(super) unsafe fn service(entry: *mut u8, owner: u32, role: Role, _service_entry_lr: usize) -> bool {
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        if owner == 0 && ARMED.load(Ordering::Relaxed)
-            && crate::runtime::mii::mii_fullconfig_probe::cpu_ordinary_pending() && permitted()
-        {
-            crate::runtime::mii::mii_fullconfig_probe::observe_cpu_ordinary(entry);
-        }
-        let tracked = *TRACK.lock().unwrap();
-        if let Some(mut track) = tracked {
-            if track.entry != entry as usize {
-                return false;
-            }
-            track.ticks += 1;
-            let phase = u32::from(read::<u8>(entry, 0x5920))
-                | (u32::from(read::<u8>(entry, 0x591c)) << 8)
-                | (u32::from(read::<u8>(entry, 0x5935)) << 16);
-            if phase & 255 == 3 {
-                track.saw_reload = true;
-            }
-            if phase != track.phase {
-                track.phase = phase;
-                trace!(
-                    "[MiiReloadProbe] phase owner={} outer={} loader={} guard={} tick={}",
-                    owner, phase & 255, (phase >> 8) & 255, phase >> 16, track.ticks
-                );
-            }
-            if track.saw_reload
-                && ready_single_mii(entry, owner) == Some(track.kind)
-                && read::<u8>(entry, 0x5918) == 0
-            {
-                let body = read::<*const u8>(entry, 0x4160);
-                let body_id = read::<u32>(body, 8);
-                let (d72, d94, fe46) = info_block(entry);
-                trace!(
-                    "[MiiReloadProbe] complete owner={} kind=0x{:x} ticks={} body_id=0x{:x} fe46=0x{:x} d72=0x{:x} d94={}",
-                    owner, track.kind, track.ticks, body_id, fe46, d72, d94
-                );
-                #[cfg(feature = "mii-fullconfig-probe")]
-                crate::runtime::mii::mii_fullconfig_probe::on_complete(entry, _service_entry_lr);
-                #[cfg(not(feature = "mii-cpu-adapter-probe"))]
-                finish_install(track.token, "identical reload probe complete");
-                #[cfg(feature = "mii-cpu-adapter-probe")]
-                let finished = finish_install(track.token, "identical reload probe complete");
-                *TRACK.lock().unwrap() = None;
-                #[cfg(feature = "mii-cpu-adapter-probe")]
-                ack::complete(ack_phase(), serde_json::json!({"owner":owner,"kind":track.kind,
-                    "entry":ack::hex(entry as usize),"ticks":track.ticks,"saw_reload":track.saw_reload,
-                    "departed":track.departed,"body_id":body_id,
-                    "fe46":fe46,"d72":d72,"d94":d94}), finished, INSTALL.active());
-                return true;
-            }
-            if track.ticks == 600 {
-                #[cfg(feature = "mii-cpu-adapter-probe")]
-                ack::terminal(ack::STALLED, ack_phase(), "native_reload_stalled",
-                    serde_json::json!({"entry":ack::hex(entry as usize),"ticks":track.ticks,
-                        "native_phase":phase,"departed":track.departed,"install_active":INSTALL.active()}));
-                trace!(
-                    "[MiiReloadProbe] stalled owner={} phase=0x{:x} departed={}; token retained until native completion or destruction",
-                    owner, phase, track.departed
-                );
-            }
-            // Preserve a departure recorded by the scene callback while this
-            // service tick observed the native loader.
-            if let Some(current) = TRACK.lock().unwrap().as_mut() {
-                if current.entry == track.entry && current.token == track.token {
-                    current.ticks = track.ticks;
-                    current.phase = track.phase;
-                    current.saw_reload = track.saw_reload;
-                }
-            }
-            return true;
-        }
-        let target_role = if TARGET_OWNER == 0 { Role::Player } else { Role::Cpu };
-        if !REQUESTED.load(Ordering::Relaxed) || owner != TARGET_OWNER || role != target_role {
-            return false;
-        }
-        // Native Training only; the waiting room and LDN scopes are out of this probe's scope.
-        if scope(role).is_none_or(|s| s.waiting()) || !permitted() {
-            return false;
-        }
-        let Some(kind) = ready_single_mii(entry, owner) else {
-            return false;
-        };
-        {
-            let state = state_for(role).lock();
-            if state.active.is_some() || state.pending.is_some() {
-                return false;
-            }
-        }
-        let Some(token) = INSTALL.try_begin(true) else {
-            return false;
-        };
-        REQUESTED.store(false, Ordering::Relaxed);
-        if CHANGE {
-            // Writes exactly u8 E+0x1b2 and u32 D+0x390 (shot 1: (n+1)%3; shot 2: originals) after the
-            // table-based binding verified the row. Nothing else is written. Failure releases the
-            // token immediately because no install was issued.
-            if !change_step(entry) {
-                finish_install(token, "special change probe refused (binding or shot state)");
-                return false;
-            }
-        }
-        // Full configuration: shot 0 applies the alternate saved configuration, shot 1 restores the
-        // captured one. Both run before the descriptor copy below so the copy carries the written
-        // tokens. A refusal writes nothing and releases the token (no install was issued).
-        #[cfg(feature = "mii-fullconfig-probe")]
-        if !crate::runtime::mii::mii_fullconfig_probe::step(entry, SHOTS.load(Ordering::Relaxed), _service_entry_lr) {
-            #[cfg(not(feature = "mii-cpu-adapter-probe"))]
-            finish_install(token, "full configuration probe refused (see [MiiFullProbe] lines)");
-            #[cfg(feature = "mii-cpu-adapter-probe")]
-            {
-                let finished = finish_install(token, "full configuration probe refused (see [MiiFullProbe] lines)");
-                ack::terminal(ack::REFUSED, (SHOTS.load(Ordering::Relaxed) + 1) as u8, "step_refused", serde_json::json!({
-                    "reason":ack::take_refusal(),"entry":ack::hex(entry as usize),"writes_committed":false,
-                    "committed_phase":ack_phase(),
-                    "install_finished":finished,"install_active_after":INSTALL.active()}));
-            }
-            return false;
-        }
-        let shots = SHOTS.fetch_add(1, Ordering::Relaxed) + 1;
-        if shots >= MAX_SHOTS {
-            FIRED.store(true, Ordering::Relaxed);
-        }
-        // Identical descriptor: the live 0x70-byte descriptor is copied without any change.
-        let mut descriptor = [0u64; 14];
-        std::ptr::copy_nonoverlapping(entry as *const u8, descriptor.as_mut_ptr().cast::<u8>(), 0x70);
-        let (d72, d94, fe46) = info_block(entry);
-        trace!(
-            "[MiiReloadProbe] install owner={} entry=0x{:x} kind=0x{:x} count={} fe46=0x{:x} d72=0x{:x} d94={} body_id=0x{:x}",
-            owner, entry as usize, kind, read::<u32>(entry, 0x14), fe46, d72, d94,
-            read::<u32>(read::<*const u8>(entry, 0x4160), 8)
-        );
-        *TRACK.lock().unwrap() = Some(Track {
-            token,
-            entry: entry as usize,
-            kind,
-            ticks: 0,
-            phase: u32::MAX,
-            saw_reload: false,
-            departed: false,
-        });
-        training::clear_session_state();
-        let install: unsafe extern "C" fn(*mut u8, *const u64, *const u8) =
-            std::mem::transmute(BASE.load(Ordering::Acquire) + 0x653240);
-        install(entry, descriptor.as_ptr(), [1u8, 0, 0].as_ptr());
-        true
-    }
-
-    unsafe fn row_specials(e: usize) -> [u8; 4] {
-        let e = e as *const u8;
-        [read(e, 0x1b2), read(e, 0x1b3), read(e, 0x1b4), read(e, 0x1b5)]
-    }
-
-    /// Shot 1 writes the neutral special (`E+0x1b2`, `D+0x390`) to `(n+1)%3` when all four bound
-    /// specials are within 0..=2. Shot 2 restores both on the same live entry, only while the row
-    /// still holds the shot-1 tuple. Both shots require a fresh table binding of the live callback
-    /// argument; any mismatch writes nothing.
-    unsafe fn change_step(entry: *mut u8) -> bool {
-        let Some(bound) = crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) else {
-            trace!("[MiiSpecialProbe] refused: live entry could not be bound to a consistent saved row");
-            return false;
-        };
-        let d = read::<*const u8>(entry, 0xf8);
-        if !aligned(d) {
-            return false;
-        }
-        let d = d as usize;
-        let fe = entry as usize;
-        // The binding guarantees `D+0x390..` equals these values.
-        let current = row_specials(bound.e);
-        let mut original = ORIGINAL.lock().unwrap();
-        match (SHOTS.load(Ordering::Relaxed), *original) {
-            (0, None) if current.iter().all(|&n| n <= 2) => {
-                let written = (current[0] + 1) % 3;
-                std::ptr::write_volatile((bound.e + 0x1b2) as *mut u8, written);
-                std::ptr::write_volatile((d + 0x390) as *mut u32, u32::from(written));
-                *original = Some(ChangeState { fe, id: bound.id, e: bound.e, original: current, written, changed: true });
-                trace!("[MiiSpecialProbe] shot1 id={} fe=0x{:x} e=0x{:x} kind=0x{:x} neutral {} -> {} (E+0x1b2, D+0x390 written; identical reload follows)",
-                    bound.id, fe, bound.e, bound.kind, current[0], written);
-                true
-            }
-            (1, Some(o)) if o.changed && o.fe == fe && o.id == bound.id && o.e == bound.e
-                && current == o.changed_tuple() =>
-            {
-                std::ptr::write_volatile((bound.e + 0x1b2) as *mut u8, o.original[0]);
-                std::ptr::write_volatile((d + 0x390) as *mut u32, u32::from(o.original[0]));
-                *original = Some(ChangeState { changed: false, ..o });
-                trace!("[MiiSpecialProbe] shot2 id={} fe=0x{:x} restored neutral {} (E+0x1b2, D+0x390; identical reload follows)",
-                    bound.id, fe, o.original[0]);
-                true
-            }
-            (shot, state) => {
-                trace!("[MiiSpecialProbe] refused: shot={} state={:?} bound=({}, 0x{:x}) fe=0x{:x} current={:?}",
-                    shot, state, bound.id, bound.e, fe, current);
-                false
-            }
-        }
-    }
-
-    /// The exact shot-1 entry is being destroyed: end the experiment and consume its record. A row
-    /// still holding the shot-1 tuple is restored only through a fresh table binding of this live
-    /// argument; otherwise nothing is written. `D` belongs to the dying entry and is never written.
-    unsafe fn end_change_on_destroy(entry: *const u8) {
-        let Some(o) = ORIGINAL.lock().unwrap().take_if(|o| o.fe == entry as usize) else {
-            return;
-        };
-        FIRED.store(true, Ordering::Relaxed);
-        if !o.changed {
-            trace!("[MiiSpecialProbe] ended on entry destruction id={} fe=0x{:x}; row already restored", o.id, o.fe);
-            return;
-        }
-        match crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) {
-            Some(b) if b.id == o.id && b.e == o.e && row_specials(b.e) == o.changed_tuple() => {
-                std::ptr::write_volatile((o.e + 0x1b2) as *mut u8, o.original[0]);
-                trace!("[MiiSpecialProbe] restored E+0x1b2={} on entry destruction id={} fe=0x{:x}",
-                    o.original[0], o.id, o.fe);
-            }
-            bound => trace!(
-                "[MiiSpecialProbe] restore refused on entry destruction id={} fe=0x{:x} bound={:?}: saved-row ownership not re-established; E+0x1b2 not written (expected {})",
-                o.id, o.fe, bound.map(|b| (b.id, b.e)), o.written
-            ),
-        }
-    }
-
-    /// Native destruction ends the install like the roster path: the token is finished here,
-    /// never on a tick count.
-    pub unsafe fn on_destroy(entry: *const u8) {
-        if CHANGE {
-            end_change_on_destroy(entry);
-        }
-        #[cfg(feature = "mii-fullconfig-probe")]
-        crate::runtime::mii::mii_fullconfig_probe::on_destroy(entry);
-        #[cfg(not(feature = "mii-cpu-adapter-probe"))]
-        {
-        let mut track = TRACK.lock().unwrap();
-        if track.is_some_and(|t| t.entry == entry as usize) {
-            let t = track.take().unwrap();
-            finish_install(t.token, "identical reload probe entry destroyed");
-            trace!(
-                "[MiiReloadProbe] entry destroyed entry=0x{:x} ticks={} departed={} saw_reload={}",
-                entry as usize, t.ticks, t.departed, t.saw_reload
-            );
-        }
-        }
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        {
-            let taken = {
-                let mut track = TRACK.lock().unwrap();
-                track.take_if(|t| t.entry == entry as usize)
-            };
-            if let Some(t) = taken {
-                let finished = finish_install(t.token, "identical reload probe entry destroyed");
-                trace!("[MiiReloadProbe] entry destroyed entry=0x{:x} ticks={} departed={} saw_reload={}",
-                    entry as usize, t.ticks, t.departed, t.saw_reload);
-                ack::terminal(ack::DESTROYED, ack_phase(), "entry_destroyed",
-                    serde_json::json!({"entry":ack::hex(entry as usize),"ticks":t.ticks,
-                        "departed":t.departed,"saw_reload":t.saw_reload,"install_finished":finished,
-                        "install_active_after":INSTALL.active(),"track_cleared":true}));
-            } else if ack::observed_entry() == entry as usize {
-                ack::terminal(ack::DESTROYED, ack_phase(), "entry_destroyed_no_pending_install",
-                    serde_json::json!({"entry":ack::hex(entry as usize),"install_active":INSTALL.active(),
-                        "cleanup_writes":false}));
-            }
-        }
-    }
-
-    pub fn scene_changed() {
-        REQUESTED.store(false, Ordering::Relaxed);
-        // No live entry here: end the experiment, but never write the static row from this callback.
-        if CHANGE {
-            if let Some(o) = *ORIGINAL.lock().unwrap() {
-                FIRED.store(true, Ordering::Relaxed);
-                trace!("[MiiSpecialProbe] ended on scene departure id={} changed={}; restoration left to entry 0x{:x} destruction",
-                    o.id, o.changed, o.fe);
-            }
-        }
-        #[cfg(feature = "mii-fullconfig-probe")]
-        crate::runtime::mii::mii_fullconfig_probe::scene_changed();
-        if let Some(t) = TRACK.lock().unwrap().as_mut() {
-            t.departed = true;
-            trace!("[MiiReloadProbe] scene departure during reload; native teardown owns cancellation");
-        }
-        #[cfg(feature = "mii-cpu-adapter-probe")]
-        if ack::observed_entry() != 0 {
-            let tracked = *TRACK.lock().unwrap();
-            ack::terminal(ack::DEPARTED, ack_phase(), "scene_departure", serde_json::json!({
-                "observed_entry":ack::hex(ack::observed_entry()),
-                "pending_entry":tracked.map(|t| ack::hex(t.entry)),
-                "install_active":INSTALL.active(),"cleanup_writes":false,
-                "entry_destroyed":false}));
-        }
     }
 }

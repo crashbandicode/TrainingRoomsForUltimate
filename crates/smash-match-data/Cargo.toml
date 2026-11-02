@@ -16,3 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 # what keeps native stick/position values bit-exact across a JSON round trip.
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 sha2 = "0.10"
+
+# The test oracle (reference producer, clip resolution, whole-capture helpers); test code only.
+[dev-dependencies]
+smash-match-data-oracle = { path = "tests/oracle" }

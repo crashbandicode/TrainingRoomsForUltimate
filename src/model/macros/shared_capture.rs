@@ -479,7 +479,8 @@ impl Projector {
 mod tests {
     use super::*;
     use crate::engine::macros::live_frame::LiveTrack;
-    use smash_match_data::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, Recorder, RecorderOptions};
+    use smash_match_data_oracle::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, validate_capture, CaptureExt, Recorder,
+        RecorderOptions};
     use std::io::{Seek, SeekFrom, Write};
 
     struct Fixture(PathBuf);
@@ -569,7 +570,7 @@ mod tests {
     fn canonical_floats_are_bit_exact_and_projection_matches_training() {
         let f = Fixture::new(); let s = session(); let dir = f.publish(&s);
         let capture = Capture::load(&dir).unwrap();
-        assert!(validate::validate_capture(&capture).iter().all(|i| !i.is_error()));
+        assert!(validate_capture(&capture).iter().all(|i| !i.is_error()));
         assert_eq!(capture.completeness, Completeness::Complete);
         assert!(capture.events.iter().all(|e| e.clocks == Clocks::NONE));
         let mut input_index = 0; let mut state_index = 0;
@@ -642,7 +643,7 @@ mod tests {
         s.tracks.insert(0, LiveTrack { entry: 7, frames: vec![frame([0.0;4])] });
         let dir = f.publish(&s); let capture = Capture::load(&dir).unwrap();
         assert!(matches!(capture.completeness, Completeness::DeclaredTruncated { .. }));
-        assert!(validate::validate_capture(&capture).iter().all(|i| !i.is_error()));
+        assert!(validate_capture(&capture).iter().all(|i| !i.is_error()));
         assert_eq!(capture.manifest.actors.len(),3);
         assert_eq!(capture.manifest.actors.iter().map(|a| a.form_changes).sum::<u32>(),1);
         assert!(capture.events.iter().all(|e| !matches!(e.body, EventBody::Boundary(BoundaryKind::MatchEnd))));
@@ -829,5 +830,37 @@ mod tests {
                 assert!(track.export(&window, "boundary", "13.0.5", &[expected.start.status + 1]).is_err());
             }
         }
+    }
+
+    /// The bytes the plugin publishes for `session()` are pinned (`tests/fixtures/smd-golden`), and a plain JSON reader
+    /// that knows only `docs/FORMAT.md` reads them, as an outside consumer (Export, AI) would. `SMD_GOLDEN_BLESS=1`
+    /// rewrites the files after an intended format change (slim stream, 2026-11-02).
+    #[test]
+    fn the_published_capture_matches_the_golden_files_and_a_plain_reader() {
+        let golden = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/smd-golden");
+        let f = Fixture::new();
+        let dir = f.publish(&session());
+        for file in [MANIFEST_FILE, TIMELINE_FILE] {
+            let bytes = fs::read(dir.join(file)).unwrap();
+            if std::env::var_os("SMD_GOLDEN_BLESS").is_some() {
+                fs::create_dir_all(&golden).unwrap();
+                fs::write(golden.join(file), &bytes).unwrap();
+            }
+            assert_eq!(bytes, fs::read(golden.join(file)).unwrap(), "{file} differs from tests/fixtures/smd-golden");
+        }
+        let manifest: serde_json::Value = serde_json::from_slice(&fs::read(golden.join(MANIFEST_FILE)).unwrap()).unwrap();
+        assert_eq!(manifest["format"], "smash-match-data");
+        assert_eq!(manifest["timeline_file"], TIMELINE_FILE);
+        assert_eq!(manifest["completion"]["state"], "complete");
+        let text = fs::read_to_string(golden.join(TIMELINE_FILE)).unwrap();
+        let events: Vec<serde_json::Value> = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        for (i, event) in events.iter().enumerate() {
+            assert_eq!(event["seq"].as_u64(), Some(i as u64), "seq strictly increasing from 0");
+            assert!(event["clocks"].is_object());
+            assert_eq!(event["body"].as_object().map(|b| b.len()), Some(1), "one kind per body");
+        }
+        let end = &events.last().unwrap()["body"]["end"];
+        assert_eq!(end["events"].as_u64(), Some(events.len() as u64 - 1), "the end line counts the lines before it");
+        assert_eq!(manifest["completion"]["last_seq"].as_u64(), Some(events.len() as u64 - 1));
     }
 }

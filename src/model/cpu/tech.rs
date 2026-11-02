@@ -5,6 +5,7 @@
 //! Decisions B5 / N4 (the recording wins by default) and B8 (Mistech Options no longer depend on Tech
 //! Options) apply.
 
+use super::facts::FrameFacts;
 use super::hash::hash40;
 use super::ids::{Table, C, UNRESOLVED};
 use super::rng::Rng;
@@ -259,18 +260,10 @@ pub fn laydown_lockout(base: f32, max: f32, damage_max: f32, damage: f32) -> u16
 }
 
 /// The hide-tech frame rule for the primary body (SPEC-cpu-04 §5 "Hide tech"). `hidden` is the record
-/// of the body hidden last frame. Returns what to apply and the new record.
-#[allow(clippy::too_many_arguments)]
-pub fn hide_frame(
-    t: &Table,
-    hide_on: bool,
-    entry: u8,
-    status: i32,
-    motion_frame: i32,
-    end_frame: i32,
-    cursor_offset: f32,
-    hidden: Option<Hidden>,
-) -> (HideOut, Option<Hidden>) {
+/// of the body hidden last frame; `f` gives the status, the motion frame, the end frame and the cursor
+/// offset. Returns what to apply and the new record.
+pub fn hide_frame(t: &Table, hide_on: bool, entry: u8, f: &FrameFacts, hidden: Option<Hidden>) -> (HideOut, Option<Hidden>) {
+    let (status, motion_frame, end_frame, cursor_offset) = (f.status, f.motion_frame, f.tech.end_frame, f.tech.cursor_offset);
     let in_status = t.is(C::StatusDown, status) || t.is(C::StatusPassive, status) || t.is(C::StatusPassiveFb, status);
     let mut out = HideOut::default();
     if hide_on && in_status {

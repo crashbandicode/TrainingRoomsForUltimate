@@ -135,7 +135,6 @@ pub struct Listing<S> {
 }
 
 // Not derived: a derive would demand `S: Default`, which summaries do not have.
-#[allow(clippy::derivable_impls)]
 impl<S> Default for Listing<S> {
     fn default() -> Self {
         Self {
@@ -286,13 +285,7 @@ impl<R: Record> Store<R> {
     }
 
     fn write_atomic(&self, id: &str, bytes: &[u8]) -> Result<(), StoreError> {
-        let tmp = self.file(id, "json.tmp");
-        let result =
-            write_synced(&tmp, bytes).and_then(|()| replace_file(&tmp, &self.file(id, "json")));
-        if result.is_err() {
-            let _ = fs::remove_file(&tmp);
-        }
-        Ok(result?)
+        Ok(write_replace(&self.file(id, "json"), bytes)?)
     }
 
     /// A `.json.bak` without its `.json` means a crash inside the fallback swap;

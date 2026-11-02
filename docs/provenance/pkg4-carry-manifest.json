@@ -124,7 +124,29 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "f5a43c2d99d21a44f7da738475195ea27a58bac90e52acf009b60f08f56fbd7b"
+   "dest_sha256": "2522d200491e6b1f41e00f2021d0e6e4cec778f7cf6d4f6917c223ade086b69b",
+   "edits": [
+    {
+     "old": "            }\n        }\n    }\n}\n",
+     "new": "            }\n        }\n    }\n\n    /// The bytes the plugin publishes for `session()` are pinned (`tests/fixtures/smd-golden`), and a plain JSON reader\n    /// that knows only `docs/FORMAT.md` reads them, as an outside consumer (Export, AI) would. `SMD_GOLDEN_BLESS=1`\n    /// rewrites the files after an intended format change (slim stream, 2026-11-02).\n    #[test]\n    fn the_published_capture_matches_the_golden_files_and_a_plain_reader() {\n        let golden = PathBuf::from(env!(\"CARGO_MANIFEST_DIR\")).join(\"tests/fixtures/smd-golden\");\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        for file in [MANIFEST_FILE, TIMELINE_FILE] {\n            let bytes = fs::read(dir.join(file)).unwrap();\n            if std::env::var_os(\"SMD_GOLDEN_BLESS\").is_some() {\n                fs::create_dir_all(&golden).unwrap();\n                fs::write(golden.join(file), &bytes).unwrap();\n            }\n            assert_eq!(bytes, fs::read(golden.join(file)).unwrap(), \"{file} differs from tests/fixtures/smd-golden\");\n        }\n        let manifest: serde_json::Value = serde_json::from_slice(&fs::read(golden.join(MANIFEST_FILE)).unwrap()).unwrap();\n        assert_eq!(manifest[\"format\"], \"smash-match-data\");\n        assert_eq!(manifest[\"timeline_file\"], TIMELINE_FILE);\n        assert_eq!(manifest[\"completion\"][\"state\"], \"complete\");\n        let text = fs::read_to_string(golden.join(TIMELINE_FILE)).unwrap();\n        let events: Vec<serde_json::Value> = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();\n        for (i, event) in events.iter().enumerate() {\n            assert_eq!(event[\"seq\"].as_u64(), Some(i as u64), \"seq strictly increasing from 0\");\n            assert!(event[\"clocks\"].is_object());\n            assert_eq!(event[\"body\"].as_object().map(|b| b.len()), Some(1), \"one kind per body\");\n        }\n        let end = &events.last().unwrap()[\"body\"][\"end\"];\n        assert_eq!(end[\"events\"].as_u64(), Some(events.len() as u64 - 1), \"the end line counts the lines before it\");\n        assert_eq!(manifest[\"completion\"][\"last_seq\"].as_u64(), Some(events.len() as u64 - 1));\n    }\n}\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        s.tracks.insert(0, LiveTrack { entry: 7, frames: vec![frame([0.0;4])] });\n        let dir = f.publish(&s); let capture = Capture::load(&dir).unwrap();\n        assert!(matches!(capture.completeness, Completeness::DeclaredTruncated { .. }));\n        assert!(validate::validate_capture(&capture).iter().all(|i| !i.is_error()));\n        assert_eq!(capture.manifest.actors.len(),3);\n        assert_eq!(capture.manifest.actors.iter().map(|a| a.form_changes).sum::<u32>(),1);\n        assert!(capture.events.iter().all(|e| !matches!(e.body, EventBody::Boundary(BoundaryKind::MatchEnd))));\n",
+     "new": "        s.tracks.insert(0, LiveTrack { entry: 7, frames: vec![frame([0.0;4])] });\n        let dir = f.publish(&s); let capture = Capture::load(&dir).unwrap();\n        assert!(matches!(capture.completeness, Completeness::DeclaredTruncated { .. }));\n        assert!(validate_capture(&capture).iter().all(|i| !i.is_error()));\n        assert_eq!(capture.manifest.actors.len(),3);\n        assert_eq!(capture.manifest.actors.iter().map(|a| a.form_changes).sum::<u32>(),1);\n        assert!(capture.events.iter().all(|e| !matches!(e.body, EventBody::Boundary(BoundaryKind::MatchEnd))));\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    fn canonical_floats_are_bit_exact_and_projection_matches_training() {\n        let f = Fixture::new(); let s = session(); let dir = f.publish(&s);\n        let capture = Capture::load(&dir).unwrap();\n        assert!(validate::validate_capture(&capture).iter().all(|i| !i.is_error()));\n        assert_eq!(capture.completeness, Completeness::Complete);\n        assert!(capture.events.iter().all(|e| e.clocks == Clocks::NONE));\n        let mut input_index = 0; let mut state_index = 0;\n",
+     "new": "    fn canonical_floats_are_bit_exact_and_projection_matches_training() {\n        let f = Fixture::new(); let s = session(); let dir = f.publish(&s);\n        let capture = Capture::load(&dir).unwrap();\n        assert!(validate_capture(&capture).iter().all(|i| !i.is_error()));\n        assert_eq!(capture.completeness, Completeness::Complete);\n        assert!(capture.events.iter().all(|e| e.clocks == Clocks::NONE));\n        let mut input_index = 0; let mut state_index = 0;\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "mod tests {\n    use super::*;\n    use crate::engine::macros::live_frame::LiveTrack;\n    use smash_match_data::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, Recorder, RecorderOptions};\n    use std::io::{Seek, SeekFrom, Write};\n\n    struct Fixture(PathBuf);\n",
+     "new": "mod tests {\n    use super::*;\n    use crate::engine::macros::live_frame::LiveTrack;\n    use smash_match_data_oracle::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, validate_capture, CaptureExt, Recorder,\n        RecorderOptions};\n    use std::io::{Seek, SeekFrom, Write};\n\n    struct Fixture(PathBuf);\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/ui_anchor.rs",
@@ -329,12 +351,87 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "f25302dd66b9d091091f63272a3f5f86bba0cccf008f645a860bc54f9c685fe6",
+   "dest_sha256": "f5175b9b09f40631de9c2d2f6270e9258968ddb7bdbc4df208f7503cd0109876",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
      "new": "    /// `copy_playback` into a caller-owned buffer (cleared, then filled; no allocation when its capacity suffices).\n    pub fn copy_playback_into(&self, out: &mut Vec<InputFrame>) -> Option<(f32, i32)> {\n        if !self.playback_allowed() {\n            return None;\n        }\n        let recording = &self.loaded.as_ref()?.recording;\n        if recording.frames.is_empty() {\n            return None;\n        }\n        out.clear();\n        out.extend_from_slice(&recording.frames);\n        Some((recording.start.facing, recording.start.status))\n    }\n\n    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
      "reason": "playback start without a clone (hot-path allocation contract); the original function stays"
+    },
+    {
+     "old": "            self.screen = Screen::Closed;\n            return Effect::None;\n        };\n        if let NameBody::Macro { placement: saved, .. } = &mut held.body {\n            *saved = placement;\n        }\n        self.screen = Screen::Save(held);\n        Effect::None\n",
+     "new": "            self.screen = Screen::Closed;\n            return Effect::None;\n        };\n        if let NameBody::Macro(body) = &mut held.body {\n            body.placement = placement;\n        }\n        self.screen = Screen::Save(held);\n        Effect::None\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "            native_cursor: source.recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro {\n                frames: source.recording.frames.clone(),\n                start: source.recording.start,\n                placement,\n                version: source.recording.game_version.clone(),\n                mii: source.recording.mii,\n            },\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        };\n        self.held_save = None;\n        self.screen = Screen::Save(Box::new(draft));\n        Effect::None\n    }\n\n",
+     "new": "            native_cursor: source.recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: source.recording.frames.clone(),\n                start: source.recording.start,\n                placement,\n                version: source.recording.game_version.clone(),\n                mii: source.recording.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        };\n        self.held_save = None;\n        self.screen = Screen::Save(draft);\n        Effect::None\n    }\n\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        }\n        let (name, version, start, frames, placement, mii) = match &self.screen {\n            Screen::Save(draft) => match &draft.body {\n                NameBody::Macro { frames, start, placement, version, mii } => (\n                    draft.name.clone(),\n                    version.clone(),\n                    *start,\n                    frames.clone(),\n                    *placement,\n                    *mii,\n                ),\n                NameBody::External { .. } => return Effect::None,\n            },\n",
+     "new": "        }\n        let (name, version, start, frames, placement, mii) = match &self.screen {\n            Screen::Save(draft) => match &draft.body {\n                NameBody::Macro(body) => (\n                    draft.name.clone(),\n                    body.version.clone(),\n                    body.start,\n                    body.frames.clone(),\n                    body.placement,\n                    body.mii,\n                ),\n                NameBody::External { .. } => return Effect::None,\n            },\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        let external = match &self.screen {\n            Screen::Save(draft) => match draft.body {\n                NameBody::External { token, title, .. } => Some((token, title, draft.name.clone())),\n                NameBody::Macro { .. } => None,\n            },\n            _ => return Effect::None,\n        };\n",
+     "new": "        let external = match &self.screen {\n            Screen::Save(draft) => match draft.body {\n                NameBody::External { token, title, .. } => Some((token, title, draft.name.clone())),\n                NameBody::Macro(_) => None,\n            },\n            _ => return Effect::None,\n        };\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "            self.screen = screen;\n            return Effect::None;\n        };\n        let NameBody::Macro { placement, .. } = &draft.body else {\n            self.screen = Screen::Save(draft);\n            return Effect::None;\n        };\n        let working = *placement;\n        self.held_save = Some(draft);\n        self.screen = Screen::Place(Box::new(PlaceDraft {\n            working,\n",
+     "new": "            self.screen = screen;\n            return Effect::None;\n        };\n        let NameBody::Macro(body) = &draft.body else {\n            self.screen = Screen::Save(draft);\n            return Effect::None;\n        };\n        let working = body.placement;\n        self.held_save = Some(draft);\n        self.screen = Screen::Place(Box::new(PlaceDraft {\n            working,\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "\n    fn toggle_draft_momentum(&mut self) {\n        if let Screen::Save(draft) = &mut self.screen {\n            if let NameBody::Macro { placement, .. } = &mut draft.body {\n                placement.momentum = flip(placement.momentum);\n            }\n        }\n    }\n",
+     "new": "\n    fn toggle_draft_momentum(&mut self) {\n        if let Screen::Save(draft) = &mut self.screen {\n            if let NameBody::Macro(body) = &mut draft.body {\n                body.placement.momentum = flip(body.placement.momentum);\n            }\n        }\n    }\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "\n    /// Put an unsaved recording back on screen after the disk write failed.\n    pub fn restore_draft(&mut self, recording: MacroRecording) {\n        self.screen = Screen::Save(Box::new(NameDraft {\n            name: recording.name.clone(),\n            native_cursor: recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro {\n                frames: recording.frames.clone(),\n                start: recording.start,\n                placement: recording.placement,\n                version: recording.game_version.clone(),\n                mii: recording.mii,\n            },\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }));\n        self.playback_on = false;\n    }\n\n",
+     "new": "\n    /// Put an unsaved recording back on screen after the disk write failed.\n    pub fn restore_draft(&mut self, recording: MacroRecording) {\n        self.screen = Screen::Save(NameDraft {\n            name: recording.name.clone(),\n            native_cursor: recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: recording.frames.clone(),\n                start: recording.start,\n                placement: recording.placement,\n                version: recording.game_version.clone(),\n                mii: recording.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        });\n        self.playback_on = false;\n    }\n\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    fn open_name(&mut self, draft: NameDraft) {\n        self.playback_on = false;\n        self.held_save = None;\n        self.screen = Screen::Save(Box::new(draft));\n    }\n\n    pub fn open_library(&mut self, rows: Vec<LibraryRow>, skipped: usize) {\n",
+     "new": "    fn open_name(&mut self, draft: NameDraft) {\n        self.playback_on = false;\n        self.held_save = None;\n        self.screen = Screen::Save(draft);\n    }\n\n    pub fn open_library(&mut self, rows: Vec<LibraryRow>, skipped: usize) {\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "            native_cursor: \"Recording\".encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro {\n                frames,\n                start,\n                placement: Placement::default(),\n                version: clip_version(version),\n                mii,\n            },\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        });\n        Effect::None\n",
+     "new": "            native_cursor: \"Recording\".encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames,\n                start,\n                placement: Placement::default(),\n                version: clip_version(version),\n                mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        });\n        Effect::None\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro { frames, start, .. } => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "new": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro(body) => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro { frames, .. } => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "new": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro(body) => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        match &self.screen {\n            Screen::Save(draft) => match draft.body {\n                NameBody::External { token, .. } => Some(token),\n                NameBody::Macro { .. } => None,\n            },\n            _ => None,\n        }\n",
+     "new": "        match &self.screen {\n            Screen::Save(draft) => match draft.body {\n                NameBody::External { token, .. } => Some(token),\n                NameBody::Macro(_) => None,\n            },\n            _ => None,\n        }\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    /// runtime has remembered it.\n    prompt_commit: Option<(String, String)>,\n    /// Name dialog parked while its placement page is open.\n    held_save: Option<Box<NameDraft>>,\n    /// CPU position from the latest save-state restore, before the offset.\n    anchor: Option<(f32, f32)>,\n    anchor_generation: Option<u64>,\n",
+     "new": "    /// runtime has remembered it.\n    prompt_commit: Option<(String, String)>,\n    /// Name dialog parked while its placement page is open.\n    held_save: Option<NameDraft>,\n    /// CPU position from the latest save-state restore, before the offset.\n    anchor: Option<(f32, f32)>,\n    anchor_generation: Option<u64>,\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "\nenum Screen {\n    Closed,\n    Save(Box<NameDraft>),\n    Place(Box<PlaceDraft>),\n    Library(Box<LibraryPage>),\n    Fighter(Box<FighterScreen>),\n",
+     "new": "\nenum Screen {\n    Closed,\n    Save(NameDraft),\n    Place(Box<PlaceDraft>),\n    Library(Box<LibraryPage>),\n    Fighter(Box<FighterScreen>),\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    prior: Option<Box<LibraryPage>>,\n}\n\n// NameDraft is already boxed and only one draft is active. Keep the exact Mii\n// value inline rather than adding a second allocation to every macro name edit.\n#[allow(clippy::large_enum_variant)]\nenum NameBody {\n    Macro {\n        frames: Vec<InputFrame>,\n        start: StartState,\n        placement: Placement,\n        version: String,\n        mii: Option<crate::engine::mii::lifetime::Configuration>,\n    },\n    /// Name and caret only. The setup or other draft stays with the caller.\n    External { token: u64, summary: String, title: &'static str },\n}\n",
+     "new": "    prior: Option<Box<LibraryPage>>,\n}\n\n// One allocation owns the large macro payload; the small name/caret state stays\n// inline, including while parked. External naming needs no payload allocation.\nstruct MacroNameBody {\n    frames: Vec<InputFrame>,\n    start: StartState,\n    placement: Placement,\n    version: String,\n    mii: Option<crate::engine::mii::lifetime::Configuration>,\n}\n\nenum NameBody {\n    Macro(Box<MacroNameBody>),\n    /// Name and caret only. The setup or other draft stays with the caller.\n    External { token: u64, summary: String, title: &'static str },\n}\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     }
    ]
   },
@@ -351,7 +448,7 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "3499ed6485324a0a0dac609fa7c9c16f5502c57c98b2de797de722f9cbf78119",
-   "dest_sha256": "c21465eb04a85ae879fbbb3953bda7b70074eb62bead5b1be957bbeb52c61971",
+   "dest_sha256": "0fd110f7d144bd7311be48e0539795b625edcda7acb833dd67ce8ef497b5e438",
    "edits": [
     {
      "old": "//! * `replay`: saved-replay import behind the `replay` feature.\n",
@@ -362,6 +459,16 @@
      "old": "#[cfg(feature = \"replay\")]\npub mod replay;\n",
      "new": "",
      "reason": "the replay module is not vendored (see Cargo.toml)"
+    },
+    {
+     "old": "#![forbid(unsafe_code)]\n\npub mod archive;\npub mod capture;\npub mod clip;\npub mod model;\npub mod validate;\n\npub use archive::{ArchiveError, TimelineReader, WriteOptions};\npub use capture::{CaptureError, Finished, Recorder, RecorderOptions};\npub use clip::{\n    clip_context, clip_context_for, clip_events, clip_events_for, selection_end, selection_end_for,\n    ClipContext, Resolved, SelectAt,\n};\npub use model::*;\npub use validate::{validate_capture, Conformance, Issue, IssueCode};\n",
+     "new": "#![forbid(unsafe_code)]\n\npub mod archive;\npub mod model;\npub mod validate;\n\npub use archive::{ArchiveError, TimelineReader, WriteOptions};\npub use model::*;\npub use validate::{Conformance, Issue, IssueCode};\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "//! Shared match recording format and library for Training, Export and AI.\n//!\n//! * [`model`]: the data contract (see `docs/FORMAT.md`).\n//! * [`capture`]: producer-side [`Recorder`] that validates as it records and\n//!   writes a streaming manifest + JSONL capture, or keeps events in memory.\n//! * [`archive`]: manifest/JSONL reading and writing with explicit\n//!   [`Completeness`] instead of silently accepted truncation.\n//! * [`clip`]: selected-frame and clip-start state resolution.\n//! * [`validate`]: rule checks shared by the recorder and offline validation.\n//!\n//!\n//! Consumer-specific conversion and behavior belong in the respective Training,\n//! Export and AI projects, outside this shared library.\n",
+     "new": "//! Shared match recording format and library for Training, Export and AI.\n//!\n//! * [`model`]: the data contract (see `docs/FORMAT.md`).\n//! * [`archive`]: manifest/JSONL reading and writing with explicit\n//!   [`Completeness`] instead of silently accepted truncation.\n//! * [`validate`]: rule checks shared by the writer and offline validation.\n//!\n//! This copy carries what the TrainingRooms plugin uses. The reference producer (`Recorder`), the clip\n//! resolution and the whole-capture helpers are the test oracle crate `tests/oracle`.\n//!\n//! Consumer-specific conversion and behavior belong in the respective Training,\n//! Export and AI projects, outside this shared library.\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     }
    ]
   },
@@ -371,30 +478,19 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "b05ab94a60ad8350bb8f5a4b6815f06d6d7473361228bb4ddccb368b8a8058c1",
-   "dest_sha256": "52da75eb9204cd93c1e73efccf5bdab46c4a9af33eaf657c58040e9b999a7d98",
+   "dest_sha256": "58a7031c094d23d587814852c0e4f019e1a1b68cbbdadcb4e8d76ff77e808ca5",
    "edits": [
     {
      "old": "serde_json::from_str(text)",
      "new": "serde_json::from_slice(text.as_bytes())",
      "reason": "size: the manifest is read with from_slice; reading the timeline lines through the same reader type shares one monomorphised deserializer per format type instead of a second copy for the string reader (the line was already valid UTF-8, a String); results are identical"
+    },
+    {
+     "old": "    }\n}\n\n// ---------------------------------------------------------------------------\n// Whole-capture convenience\n// ---------------------------------------------------------------------------\n\nimpl Capture {\n    /// Load a capture directory fully into memory.\n    pub fn load(dir: impl AsRef<Path>) -> Result<Capture, ArchiveError> {\n        let dir = dir.as_ref();\n        let manifest = read_manifest(dir)?;\n        let mut reader = open_timeline(dir, &manifest)?;\n        let mut events = Vec::new();\n        while let Some(event) = reader.next_event()? {\n            events.push(event);\n        }\n        let completeness = reader\n            .completeness()\n            .cloned()\n            .unwrap_or(Completeness::Incomplete {\n                problems: vec![TruncationProblem::MissingEnd],\n            });\n        Ok(Capture {\n            manifest,\n            events,\n            completeness,\n        })\n    }\n\n    /// Write this capture to `dir`. Any existing `end` event is replaced by a\n    /// fresh one so the output is self-consistent. An `incomplete` source is\n    /// saved as `truncated` with the original problems in the reason.\n    pub fn save(\n        &self,\n        dir: impl AsRef<Path>,\n        options: &WriteOptions,\n    ) -> Result<Manifest, ArchiveError> {\n        let mut manifest = self.manifest.clone();\n        let mut writer = ArchiveWriter::create(dir, manifest.clone(), options)?;\n        let mut last_clocks = Clocks::NONE;\n        let mut count = 0u64;\n        for event in &self.events {\n            if matches!(event.body, EventBody::End { .. }) {\n                continue;\n            }\n            writer.write_event(event)?;\n            last_clocks = event.clocks;\n            count += 1;\n        }\n        let end_seq = writer.last_seq().map_or(0, |seq| seq + 1);\n        writer.write_event(&Event {\n            seq: end_seq,\n            clocks: last_clocks,\n            body: EventBody::End { events: count },\n        })?;\n        manifest.completion = match &self.completeness {\n            Completeness::Complete => Completion::complete(),\n            Completeness::DeclaredTruncated { reason } => Completion {\n                state: CompletionState::Truncated,\n                reason: reason.clone(),\n                events: None,\n                last_seq: None,\n            },\n            other @ Completeness::Incomplete { .. } => {\n                Completion::truncated(format!(\"re-saved {other}\"))\n            }\n        };\n        writer.finish(manifest)\n    }\n}\n",
+     "new": "    }\n}\n\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     }
    ]
-  },
-  {
-   "src": "src/capture.rs",
-   "dest": "crates/smash-match-data/src/capture.rs",
-   "crate": "smd",
-   "root": "smd",
-   "src_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
-   "dest_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc"
-  },
-  {
-   "src": "src/clip.rs",
-   "dest": "crates/smash-match-data/src/clip.rs",
-   "crate": "smd",
-   "root": "smd",
-   "src_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc",
-   "dest_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc"
   },
   {
    "src": "src/model.rs",
@@ -410,7 +506,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524",
-   "dest_sha256": "64a2905d63bf25f5c37a538dd075b5cb111f34ab1fb877d75aa136feb40a4524"
+   "dest_sha256": "c02db8a0e1343ed0fba5231f7f73aa823c72f3fdda9183fbac52933b136c16fb",
+   "edits": [
+    {
+     "old": "    }\n}\n\n// ---------------------------------------------------------------------------\n// Whole capture\n// ---------------------------------------------------------------------------\n\npub fn validate_capture(capture: &Capture) -> Vec<Issue> {\n    let manifest = &capture.manifest;\n    let mut issues = Vec::new();\n    if manifest.format != FORMAT_NAME {\n        issues.push(Issue::error(\n            IssueCode::Format,\n            None,\n            format!(\"format is {:?}, expected {FORMAT_NAME:?}\", manifest.format),\n        ));\n    }\n    if !FORMAT_VERSION.can_read(manifest.format_version) {\n        issues.push(Issue::error(\n            IssueCode::Format,\n            None,\n            format!(\n                \"format version {} is not readable by {FORMAT_VERSION}\",\n                manifest.format_version\n            ),\n        ));\n    }\n    issues.extend(validate_header(&manifest.capture));\n\n    let mut checker = StreamChecker::new(&manifest.capture);\n    for event in &capture.events {\n        issues.extend(checker.check(event));\n    }\n\n    match &capture.completeness {\n        Completeness::Complete => {\n            if !checker.ended() {\n                issues.push(Issue::error(\n                    IssueCode::MissingEnd,\n                    None,\n                    \"capture claims complete but the timeline has no end event\",\n                ));\n            }\n        }\n        other @ Completeness::DeclaredTruncated { .. } => {\n            issues.push(Issue::info(\n                IssueCode::Completeness,\n                None,\n                other.to_string(),\n            ));\n        }\n        other @ Completeness::Incomplete { .. } => {\n            issues.push(Issue::warning(\n                IssueCode::Completeness,\n                None,\n                other.to_string(),\n            ));\n        }\n    }\n\n    if manifest.completion.state != CompletionState::Open {\n        if manifest.actors != checker.actor_summaries() {\n            issues.push(Issue::warning(\n                IssueCode::ManifestMismatch,\n                None,\n                \"manifest actor summary differs from the timeline\",\n            ));\n        }\n        if manifest.boundaries != checker.boundaries() {\n            issues.push(Issue::warning(\n                IssueCode::ManifestMismatch,\n                None,\n                \"manifest boundaries differ from the timeline\",\n            ));\n        }\n        if let Some(declared) = manifest.completion.events {\n            if declared != capture.events.len() as u64 {\n                issues.push(Issue::warning(\n                    IssueCode::ManifestMismatch,\n                    None,\n                    format!(\n                        \"manifest declares {declared} events but the capture holds {}\",\n                        capture.events.len()\n                    ),\n                ));\n            }\n        }\n    }\n\n    if manifest.capture.rules.target == RulesetTarget::Competitive {\n        match competitive_conformance(&manifest.capture.rules.actual) {\n            Conformance::Conforms => {}\n            Conformance::Deviates { reasons } => issues.push(Issue::warning(\n                IssueCode::RulesTarget,\n                None,\n                format!(\n                    \"actual rules deviate from the competitive target: {}\",\n                    reasons.join(\", \")\n                ),\n            )),\n            Conformance::Undetermined { unknown } => issues.push(Issue::info(\n                IssueCode::RulesTarget,\n                None,\n                format!(\n                    \"competitive conformance undetermined; unknown: {}\",\n                    unknown.join(\", \")\n                ),\n            )),\n        }\n    }\n    issues\n}\n\nimpl Capture {\n    pub fn validate(&self) -> Vec<Issue> {\n        validate_capture(self)\n    }\n}\n",
+     "new": "    }\n}\n\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    }
+   ]
   },
   {
    "src": "Cargo.toml",
@@ -418,7 +521,7 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "f0b6dba3d83cfed9e3761f1fd4a403b3340792d646dde7402689d8bd0315ab5d",
-   "dest_sha256": "c3041ae2837944d9eb41148aef6d65842b7b996b6b72f5a95a40160cd420642d",
+   "dest_sha256": "c7c956cb30f741a81f40ed84b6b885cb555e151b38ad15337e0d152942f2d6da",
    "edits": [
     {
      "delete_from": "[features]",
@@ -429,6 +532,11 @@
      "old": "smash-replay-core = { git = \"https://git.syntaxbyexample.com/intpa/smash-replay-export.git\", rev = \"bf84744fd7feeecc81ff3ed7495ffc63c8ae80fa\", optional = true }\n",
      "new": "",
      "reason": "the optional smash-replay-core git dependency is dropped with its feature"
+    },
+    {
+     "old": "# what keeps native stick/position values bit-exact across a JSON round trip.\nserde_json = { version = \"1.0\", features = [\"float_roundtrip\"] }\nsha2 = \"0.10\"\n",
+     "new": "# what keeps native stick/position values bit-exact across a JSON round trip.\nserde_json = { version = \"1.0\", features = [\"float_roundtrip\"] }\nsha2 = \"0.10\"\n\n# The test oracle (reference producer, clip resolution, whole-capture helpers); test code only.\n[dev-dependencies]\nsmash-match-data-oracle = { path = \"tests/oracle\" }\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     }
    ]
   },
@@ -446,7 +554,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032",
-   "dest_sha256": "fc2c6cc7b22d20b05f81b3157ab4e7f404291b09c89d1e4954d8ee5799231032"
+   "dest_sha256": "ec639a3422f41b46601086b5cffffa20fde62f48231afbce05a665dc3ca27abd",
+   "edits": [
+    {
+     "old": "use std::fs;\nuse std::path::PathBuf;\n\nuse smash_match_data::archive::{open_timeline, read_manifest};\nuse smash_match_data::clip::{ActorStatus, MissingReason};\nuse smash_match_data::validate::{competitive_conformance, Conformance};\nuse smash_match_data::*;\n\n// ---------------------------------------------------------------------------\n// Helpers\n",
+     "new": "use std::fs;\nuse std::path::PathBuf;\n\nuse smash_match_data_oracle::archive::{open_timeline, read_manifest};\nuse smash_match_data_oracle::clip::{ActorStatus, MissingReason};\nuse smash_match_data_oracle::validate::{competitive_conformance, Conformance};\nuse smash_match_data_oracle::*;\n\n// ---------------------------------------------------------------------------\n// Helpers\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    }
+   ]
   },
   {
    "src": "tests/review_archive.rs",
@@ -462,7 +577,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb",
-   "dest_sha256": "a41ec6c0f09f90e8d986496898102c1e89c5031dc94c422be5fb43a5b04800cb"
+   "dest_sha256": "1a9fdf870e2c1681ef33610c0705c740873d17bf542aae2db185e6f22fa1a4e4",
+   "edits": [
+    {
+     "old": "//! Shared selection regression from the operator's data-correctness review.\n//! Every fixture goes through Recorder and validates without even warnings.\nuse smash_match_data::*;\n\nfn clock(n: u64) -> Clocks {\n    Clocks::tick(n).with_record(n)\n",
+     "new": "//! Shared selection regression from the operator's data-correctness review.\n//! Every fixture goes through Recorder and validates without even warnings.\nuse smash_match_data_oracle::*;\n\nfn clock(n: u64) -> Clocks {\n    Clocks::tick(n).with_record(n)\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    }
+   ]
   },
   {
    "src": "tests/review_precision.rs",
@@ -478,7 +600,14 @@
    "crate": "smd",
    "root": "smd",
    "src_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db",
-   "dest_sha256": "f7b3cc06f2be605dd7a50b9d6b8556c0363b4802581b5a5f910396ac790e82db"
+   "dest_sha256": "1a690ee235ce045ee71a017366201f9631e092d0ac8d82ef8cb07163129c94c7",
+   "edits": [
+    {
+     "old": "//! Review of selection boundaries and the operator's explicit competitive target.\nuse smash_match_data::clip::{clip_events, SelectAt};\nuse smash_match_data::model::*;\nuse smash_match_data::validate::{competitive_conformance, Conformance};\n\n#[test]\nfn reversed_clip_is_invalid_while_equal_endpoints_are_empty() {\n",
+     "new": "//! Review of selection boundaries and the operator's explicit competitive target.\nuse smash_match_data_oracle::clip::{clip_events, SelectAt};\nuse smash_match_data_oracle::model::*;\nuse smash_match_data_oracle::validate::{competitive_conformance, Conformance};\n\n#[test]\nfn reversed_clip_is_invalid_while_equal_endpoints_are_empty() {\n",
+     "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    }
+   ]
   },
   {
    "src": "src/training/named_macros.rs",
@@ -1761,6 +1890,30 @@
      "old": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::macros::capture_plugin::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
      "new": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::deluxe_row::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
      "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    }
+   ]
+  },
+  {
+   "src": "src/capture.rs",
+   "dest": "crates/smash-match-data/tests/oracle/src/capture.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
+   "dest_sha256": "7e4b3cbb5f142a6077f46d9f7183745c6ebe3dd81f4a767b0ca25bc1be6244dc",
+   "edits": []
+  },
+  {
+   "src": "src/clip.rs",
+   "dest": "crates/smash-match-data/tests/oracle/src/clip.rs",
+   "crate": "smd",
+   "root": "smd",
+   "src_sha256": "a4d85a1b4fcaaec32864cd78dee58f1885c0d6bb2ad6aee3a9c676ed163e6dbc",
+   "dest_sha256": "750720745f3b6ef0a90d5253ce227c553ce8f987c3b7f83b504bc6c5321bca0b",
+   "edits": [
+    {
+     "old": "impl Capture {\n    pub fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {\n        clip_context(&self.events, at)\n    }\n\n    pub fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {\n        clip_context_for(&self.events, at, actor)\n    }\n\n    pub fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {\n        clip_events(&self.events, start, end)\n    }\n\n    pub fn clip_events_for(\n        &self,\n        start: SelectAt,\n        end: SelectAt,\n        actor: ActorId,\n    ) -> Option<&[Event]> {\n        clip_events_for(&self.events, start, end, actor)\n    }\n}\n",
+     "new": "/// The clip methods of a whole `Capture` (inherent methods in the library before the slim stream moved this module).\npub trait CaptureClip {\n    fn clip_context(&self, at: SelectAt) -> Option<ClipContext>;\n    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext>;\n    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]>;\n    fn clip_events_for(&self, start: SelectAt, end: SelectAt, actor: ActorId) -> Option<&[Event]>;\n}\n\nimpl CaptureClip for Capture {\n    fn clip_context(&self, at: SelectAt) -> Option<ClipContext> {\n        clip_context(&self.events, at)\n    }\n\n    fn clip_context_for(&self, at: SelectAt, actor: ActorId) -> Option<ClipContext> {\n        clip_context_for(&self.events, at, actor)\n    }\n\n    fn clip_events(&self, start: SelectAt, end: SelectAt) -> Option<&[Event]> {\n        clip_events(&self.events, start, end)\n    }\n\n    fn clip_events_for(\n        &self,\n        start: SelectAt,\n        end: SelectAt,\n        actor: ActorId,\n    ) -> Option<&[Event]> {\n        clip_events_for(&self.events, start, end, actor)\n    }\n}\n",
+     "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): clip.rs is the test oracle (tests/oracle); a trait carries the clip methods of the foreign `Capture`"
     }
    ]
   }

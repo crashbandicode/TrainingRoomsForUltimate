@@ -17,11 +17,6 @@ pub(crate) struct Snapshot {
 }
 
 /// Manager lookup and all Rust synchronization occur before taking the native G mutex.
-#[cfg(feature = "mii-cpu-adapter-probe")]
-pub(crate) unsafe fn resolve(target: *const u8) -> Result<Live, &'static str> {
-    resolve_for_kind(target, 0x49)
-}
-
 pub(crate) unsafe fn resolve_for_kind(target: *const u8, kind: u32) -> Result<Live, &'static str> {
     if !(0x48..=0x4a).contains(&kind) { return Err("CPU adapter: saved class required"); }
     if !crate::runtime::compat::common::is_native_training_mode() {
@@ -64,11 +59,6 @@ pub(crate) unsafe fn resolve_for_kind(target: *const u8, kind: u32) -> Result<Li
 
 /// Exact native inactive single-form body shape, as in native_source::parked_ready, without
 /// its selectable-source catalog admission (native saved Miis are intentionally not in it).
-#[cfg(feature = "mii-cpu-adapter-probe")]
-pub(crate) unsafe fn helper_ready(base: usize, fe: usize, id: u32) -> bool {
-    helper_ready_for_kind(base, fe, id, 0x49)
-}
-
 pub(crate) unsafe fn helper_ready_for_kind(base: usize, fe: usize, id: u32, kind: u32) -> bool {
     if rd::<u32>(fe, 0x14) != 1
         || rd::<[u32; 3]>(fe, 0x18) != [kind, u32::MAX, u32::MAX]
@@ -206,38 +196,4 @@ pub(crate) unsafe fn locked_snapshot(
         owners,
         helpers: helpers.map(Option::unwrap),
     })
-}
-
-#[cfg(feature = "mii-cpu-adapter-probe")]
-pub(crate) unsafe fn snapshot(
-    entry: *const u8,
-    current: Context,
-) -> Result<Snapshot, &'static str> {
-    let live = resolve(entry)?;
-    let base = getRegionAddress(Region::Text) as usize;
-    let guard = PoolLock::acquire(base, current.binding.manager);
-    let fresh = context(
-        base,
-        entry as usize,
-        current.binding.row,
-        Some(guard.g),
-        current.thread,
-        current.binding.owner,
-        current.binding.epoch,
-    );
-    let result = match fresh {
-        Ok(fresh) if fresh == current => locked_snapshot(base, live, fresh),
-        _ => Err("CPU adapter: locked context changed"),
-    };
-    drop(guard);
-    result
-}
-
-#[cfg(feature = "mii-cpu-adapter-probe")]
-pub(crate) fn unchanged(expected: &Snapshot, current: &Snapshot) -> Result<(), &'static str> {
-    if expected.owners != current.owners {
-        return Err("CPU adapter: current owner associations changed");
-    }
-    values::preserved_cpu_helpers(&expected.helpers, &current.helpers)
-        .map_err(|_| "CPU adapter: native helper configuration/resource identity changed")
 }

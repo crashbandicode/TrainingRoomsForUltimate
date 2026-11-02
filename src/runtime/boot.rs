@@ -149,8 +149,10 @@ fn run_inner() {
     crate::runtime::diag_reload::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
-    #[allow(unused_mut)]
-    let mut state_found = state_boot::check();
+    let state_found = state_boot::check();
+    // Only the diag build changes it (`apply_diag_poison` below).
+    #[cfg(feature = "diag")]
+    let mut state_found = state_found;
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
         *slot = if site.compared() {

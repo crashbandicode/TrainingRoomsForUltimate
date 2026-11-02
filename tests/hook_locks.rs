@@ -68,14 +68,16 @@ const FEATURE_ONLY_ENTRIES: &[(&str, &str)] = &[("practice_trace::writer", "cons
 const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept"];
 
 /// `module::function` of every plugin thread's entry, derived from `model::thread_stacks::THREADS` (each row's `symbol`, its closure
-/// suffix dropped), so a new or renamed thread cannot be missed; the diag-only threads (`runs` starts with `diag:`) live in modules the
+/// suffix dropped), so a new or renamed thread cannot be missed; the diag-only threads are identified by their stable IDs and live in modules the
 /// scan does not read. Plus the publishing path.
 fn plugin_thread_entries() -> Vec<String> {
     let diag_only = diag_only_modules(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"));
     let mut out: Vec<String> = PUBLISHING_ENTRIES.iter().map(|s| (*s).to_owned()).collect();
     for row in thread_stacks::THREADS.iter() {
         let path = row.symbol.split("::{").next().unwrap_or(row.symbol);
-        if row.runs.starts_with("diag:") || path.split("::").any(|m| diag_only.contains(m)) {
+        if matches!(row.id, thread_stacks::ThreadId::StateDiag | thread_stacks::ThreadId::DiagReload | thread_stacks::ThreadId::MacroDiag)
+            || path.split("::").any(|m| diag_only.contains(m))
+        {
             continue;
         }
         let path = row.symbol.split("::{").next().unwrap_or(row.symbol);

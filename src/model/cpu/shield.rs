@@ -5,10 +5,10 @@
 //! (decision B6); the tilt's In / Out are opponent-relative on both sides (decision B7) and a changed
 //! Shield Tilt applies at the next CPU frame (decision Q18 A).
 
-use super::counter::{CounterId, Counters};
+use super::counter::CounterId;
 use super::defence::stick_vector;
-use super::ids::{Table, C, UNRESOLVED};
-use super::mash::{Action, BufferContext, Mash};
+use super::ids::{C, UNRESOLVED};
+use super::mash::{Action, Step};
 use super::rng::Rng;
 use super::settings::{situation, trigger, CpuSettings, ShieldMode};
 
@@ -160,17 +160,8 @@ impl Shield {
     /// The script continuation, after the original, for a body that just left shieldstun
     /// (SPEC-cpu-05 §5 "Out of shield"). The Hold flag, the offset and reaction gates, the parry stop,
     /// the shieldstun mash and the current action's effect on the shield all happen here.
-    #[allow(clippy::too_many_arguments)]
-    pub fn out_of_shield(
-        &mut self,
-        t: &Table,
-        s: &CpuSettings,
-        rng: &mut Rng,
-        counters: &mut Counters,
-        mash: &mut Mash,
-        ctx: BufferContext,
-        f: &OosFacts,
-    ) -> OosOut {
+    pub fn out_of_shield(&mut self, step: Step, f: &OosFacts) -> OosOut {
+        let Step { t, s, rng, counters, mash, ctx } = step;
         let mut out = OosOut::default();
         if !f.left_shieldstun {
             return out;

@@ -343,12 +343,12 @@ pub const TEXT_DIM: [u8; 4] = [150, 156, 168, 255];
 pub const TEXT_ON: [u8; 4] = [110, 210, 160, 255];
 pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
 
-const fn rect(name: Name, x: f32, y: f32, w: f32, h: f32, color: [u8; 4], visible: bool) -> Spec {
+/// `[x, y, w, h]`: a pane's place and size, the order `Spec` keeps them in.
+const fn rect(name: Name, [x, y, w, h]: [f32; 4], color: [u8; 4], visible: bool) -> Spec {
     Spec { name, parent: ROOT, kind: Kind::Rect { color }, x, y, w, h, visible }
 }
 
-#[allow(clippy::too_many_arguments)]
-const fn text(name: Name, x: f32, y: f32, w: f32, h: f32, align: Align, font: (f32, f32), chars: u16, color: [u8; 4]) -> Spec {
+const fn text(name: Name, [x, y, w, h]: [f32; 4], align: Align, font: (f32, f32), chars: u16, color: [u8; 4]) -> Spec {
     Spec { name, parent: ROOT, kind: Kind::Text { align, font, chars, color }, x, y, w, h, visible: true }
 }
 
@@ -363,66 +363,66 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
-        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, 0.0, 0.0, 64.0, 64.0, [255; 4], false),
+        i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
-        IDX_NOTICE_BASE => under(rect(name, 0.0, 405.0, 1000.0, 150.0, [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
-        IDX_NOTICE_HEADER => under(text(name, 0.0, 445.0, 960.0, 50.0, Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
-        IDX_NOTICE_TEXT => under(text(name, 0.0, 390.0, 960.0, 70.0, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
-        IDX_BG => rect(name, 0.0, 0.0, PANEL_W, PANEL_H, PANEL, true),
+        IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT => under(text(name, [0.0, 390.0, 960.0, 70.0], Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
+        IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
         IDX_LOG => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: -700.0, y: 380.0, w: 520.0, h: 800.0, visible: false },
         i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => {
             Spec { name, parent: name_of(IDX_LOG), kind: Kind::Null, x: 0.0, y: -52.5 * (i - IDX_LOG_ROW) as f32, w: 520.0, h: 50.0, visible: true }
         }
         i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_GLYPH;
-            under(Spec { visible: false, ..text(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0, Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(Spec { visible: false, ..text(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0], Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_SHAFT;
-            under(rect(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(rect(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0], TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_HEAD;
-            under(rect(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, LOG_HEAD_OFFSET, 18.0, 18.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(rect(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, LOG_HEAD_OFFSET, 18.0, 18.0], TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => {
-            under(text(name, 130.0, 0.0, 70.0, 48.0, Align::Right, FONT_SMALL, 4, TEXT), name_of(IDX_LOG_ROW + (i - IDX_LOG_FRAME)))
+            under(text(name, [130.0, 0.0, 70.0, 48.0], Align::Right, FONT_SMALL, 4, TEXT), name_of(IDX_LOG_ROW + (i - IDX_LOG_FRAME)))
         }
         i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => {
-            under(text(name, 330.0, 0.0, 200.0, 48.0, Align::Left, FONT_SMALL, 48, TEXT_DIM), name_of(IDX_LOG_ROW + (i - IDX_LOG_STATUS)))
+            under(text(name, [330.0, 0.0, 200.0, 48.0], Align::Left, FONT_SMALL, 48, TEXT_DIM), name_of(IDX_LOG_ROW + (i - IDX_LOG_STATUS)))
         }
-        IDX_CHIP_HI => rect(name, 0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0, ACCENT, false),
-        IDX_TILE_HI => rect(name, 0.0, 0.0, 100.0, 60.0, ACCENT, false),
-        i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, 0.0, 0.0, CHIP_SIZE, CHIP_SIZE, HIGHLIGHT, false),
-        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => rect(name, 0.0, 0.0, 10.0, 84.0, TEXT, false),
-        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Spec { visible: false, ..text(name, 0.0, 0.0, CHIP_SIZE, 44.0, Align::Center, FONT_SMALL, 16, TEXT) },
-        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, 0.0, 0.0, 60.0, 44.0, Align::Center, FONT, 4, TEXT) },
-        i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, 0.0, 0.0, 100.0, 60.0, HIGHLIGHT, false),
-        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, 0.0, 0.0, 100.0, 40.0, Align::Center, FONT_SMALL, 28, TEXT) },
-        IDX_TAB_HI => rect(name, -740.0, TAB_Y, 200.0, TAB_H, ACCENT, true),
-        IDX_TITLE => text(name, 600.0, TAB_Y, 560.0, TAB_H, Align::Right, FONT_SMALL, 40, TEXT_DIM),
-        IDX_SEP => rect(name, 0.0, TAB_Y - 52.0, 1760.0, 3.0, RULE, true),
-        IDX_CRUMB => text(name, 0.0, CRUMB_Y, 1760.0, 56.0, Align::Left, FONT, 120, TEXT),
-        IDX_DIVIDER => rect(name, DIVIDER_X, 20.0, 3.0, 650.0, RULE, true),
-        IDX_GROUP_HI => rect(name, GROUP_X, group_y(0), GROUP_W, GROUP_ROW_H, HIGHLIGHT, true),
-        IDX_ROW_HI => rect(name, (ROW_LEFT + ROW_RIGHT) / 2.0, row_y(0), ROW_RIGHT - ROW_LEFT + 30.0, ROW_H, HIGHLIGHT, true),
-        IDX_SEP_HELP => rect(name, 0.0, HELP_Y[0] + 48.0, 1760.0, 3.0, RULE, true),
-        IDX_HINT => text(name, HELP_X, HINT_Y, HELP_W, 44.0, Align::Left, FONT_SMALL, 160, TEXT_DIM),
-        i if i == IDX_HELP => text(name, HELP_X, HELP_Y[0], HELP_W, 48.0, Align::Left, FONT_SMALL, 160, TEXT),
-        i if i == IDX_HELP + 1 => text(name, HELP_X, HELP_Y[1], HELP_W, 48.0, Align::Left, FONT_SMALL, 160, TEXT),
+        IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
+        IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
+        i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),
+        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => rect(name, [0.0, 0.0, 10.0, 84.0], TEXT, false),
+        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, CHIP_SIZE, 44.0], Align::Center, FONT_SMALL, 16, TEXT) },
+        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT) },
+        i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
+        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, 40.0], Align::Center, FONT_SMALL, 28, TEXT) },
+        IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
+        IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
+        IDX_SEP => rect(name, [0.0, TAB_Y - 52.0, 1760.0, 3.0], RULE, true),
+        IDX_CRUMB => text(name, [0.0, CRUMB_Y, 1760.0, 56.0], Align::Left, FONT, 120, TEXT),
+        IDX_DIVIDER => rect(name, [DIVIDER_X, 20.0, 3.0, 650.0], RULE, true),
+        IDX_GROUP_HI => rect(name, [GROUP_X, group_y(0), GROUP_W, GROUP_ROW_H], HIGHLIGHT, true),
+        IDX_ROW_HI => rect(name, [(ROW_LEFT + ROW_RIGHT) / 2.0, row_y(0), ROW_RIGHT - ROW_LEFT + 30.0, ROW_H], HIGHLIGHT, true),
+        IDX_SEP_HELP => rect(name, [0.0, HELP_Y[0] + 48.0, 1760.0, 3.0], RULE, true),
+        IDX_HINT => text(name, [HELP_X, HINT_Y, HELP_W, 44.0], Align::Left, FONT_SMALL, 160, TEXT_DIM),
+        i if i == IDX_HELP => text(name, [HELP_X, HELP_Y[0], HELP_W, 48.0], Align::Left, FONT_SMALL, 160, TEXT),
+        i if i == IDX_HELP + 1 => text(name, [HELP_X, HELP_Y[1], HELP_W, 48.0], Align::Left, FONT_SMALL, 160, TEXT),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => {
-            text(name, -840.0 + TAB_BOX_W / 2.0, TAB_Y, TAB_BOX_W, TAB_H, Align::Left, FONT, 40, TEXT_DIM)
+            text(name, [-840.0 + TAB_BOX_W / 2.0, TAB_Y, TAB_BOX_W, TAB_H], Align::Left, FONT, 40, TEXT_DIM)
         }
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => {
-            text(name, GROUP_X, group_y(i - IDX_GROUP), GROUP_W, GROUP_ROW_H, Align::Left, FONT, 48, TEXT_DIM)
+            text(name, [GROUP_X, group_y(i - IDX_GROUP), GROUP_W, GROUP_ROW_H], Align::Left, FONT, 48, TEXT_DIM)
         }
         i => {
             let row = (i - IDX_ROW) / 2;
             if (i - IDX_ROW).is_multiple_of(2) {
-                text(name, ROW_LEFT + ROW_LABEL_W / 2.0, row_y(row), ROW_LABEL_W, ROW_H, Align::Left, FONT, 80, TEXT)
+                text(name, [ROW_LEFT + ROW_LABEL_W / 2.0, row_y(row), ROW_LABEL_W, ROW_H], Align::Left, FONT, 80, TEXT)
             } else {
-                text(name, ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(row), ROW_VALUE_W, ROW_H, Align::Right, FONT, 72, TEXT)
+                text(name, [ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(row), ROW_VALUE_W, ROW_H], Align::Right, FONT, 72, TEXT)
             }
         }
     }

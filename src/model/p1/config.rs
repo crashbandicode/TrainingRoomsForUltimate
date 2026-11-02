@@ -65,6 +65,7 @@ impl TryFrom<JsonConfig> for Config {
     }
 }
 
+#[cfg(test)]
 pub fn from_json(input: &str) -> Result<Config, String> {
     let json: JsonConfig = serde_json::from_str(input).map_err(|error| error.to_string())?;
     Config::try_from(json).map_err(str::to_string)

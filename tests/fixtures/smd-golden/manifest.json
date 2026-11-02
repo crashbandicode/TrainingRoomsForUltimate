@@ -1,0 +1,122 @@
+{
+  "format": "smash-match-data",
+  "format_version": {
+    "major": 1,
+    "minor": 0
+  },
+  "capture": {
+    "capture_id": "6e61746976652d6964",
+    "recorder": {
+      "name": "Training",
+      "version": "shared-capture-1"
+    },
+    "game": {
+      "title": "Super Smash Bros. Ultimate",
+      "version": "13.0.5"
+    },
+    "source": {
+      "kind": "live_match",
+      "description": "Native title"
+    },
+    "rules": {
+      "target": "competitive",
+      "actual": {}
+    },
+    "stage": {},
+    "controllers": [],
+    "entries": [
+      {
+        "entry": 1,
+        "control": "unknown"
+      }
+    ],
+    "input_layouts": [
+      {
+        "id": "training_native_f32",
+        "description": "Native ControlModule observations",
+        "buttons": {
+          "width_bits": 32,
+          "names": {}
+        },
+        "left_stick": {
+          "encoding": "f32"
+        },
+        "right_stick": {
+          "encoding": "f32"
+        }
+      }
+    ],
+    "channels": {
+      "kinematics": {
+        "level": "partial",
+        "note": "State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification."
+      },
+      "situation": {
+        "level": "partial",
+        "note": "State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification."
+      },
+      "animation": {
+        "level": "unsupported"
+      },
+      "vitals": {
+        "level": "unsupported"
+      },
+      "inputs": {
+        "level": "partial",
+        "note": "State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification."
+      },
+      "lifecycle": {
+        "level": "partial",
+        "note": "First observation, native object replacement and form changes only; no observed death/respawn."
+      },
+      "objects": {
+        "level": "unsupported"
+      },
+      "random": {
+        "level": "unsupported"
+      }
+    },
+    "clocks": {
+      "supplied": [],
+      "relations": []
+    },
+    "notes": [
+      "State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification.",
+      "Serializer counter is opaque raw provenance, not a tick/input_seq/record clock. All samples explicit; actual rules, stage and controllers unknown."
+    ]
+  },
+  "timeline_file": "timeline.jsonl",
+  "completion": {
+    "state": "complete",
+    "events": 10,
+    "last_seq": 9
+  },
+  "boundaries": [
+    {
+      "boundary": "recording_start",
+      "seq": 0,
+      "clocks": {}
+    },
+    {
+      "boundary": "recording_end",
+      "seq": 8,
+      "clocks": {}
+    }
+  ],
+  "actors": [
+    {
+      "actor": 0,
+      "identity": {
+        "fighter_kind": 18,
+        "costume": 2,
+        "entry": 1,
+        "control": "unknown",
+        "native_object_id": 91
+      },
+      "spawn_seq": 2,
+      "deaths": 0,
+      "respawns": 0,
+      "form_changes": 0
+    }
+  ]
+}

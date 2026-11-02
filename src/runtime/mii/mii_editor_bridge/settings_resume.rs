@@ -2,7 +2,8 @@
 //! The pane coordinate mirrored into the editor context is not a button id.
 use super::{current_thread, lua_vm::{Error, Value, Vm}, native, Origin, Phase, BASE,
     EDIT_CONTEXT, EDIT_OWNED, STATE};
-use std::sync::{atomic::Ordering, Mutex};
+use std::sync::atomic::Ordering;
+use hos_lock::Mutex;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Snapshot {
@@ -41,17 +42,17 @@ struct Job {
 
 static JOB: Mutex<Option<Job>> = Mutex::new(None);
 
-pub(super) fn clear() { *JOB.lock().unwrap() = None; }
+pub(super) fn clear() { *JOB.lock() = None; }
 
 /// Editor release: the next owned Settings component is a new entry.
 pub(super) fn release() {
     clear();
-    *POLICY.lock().unwrap() = None;
-    *WRAP.lock().unwrap() = None;
+    *POLICY.lock() = None;
+    *WRAP.lock() = None;
 }
 
 pub(super) fn capture(context: usize) -> Option<Result<Option<Snapshot>, Error>> {
-    let mut stored = JOB.lock().unwrap();
+    let mut stored = JOB.lock();
     if stored.as_ref().is_none_or(|job| job.context != context
         || !matches!(job.operation, Operation::Capture)) {
         *stored = Some(Job { context, operation: Operation::Capture, frames: 0, result: None });
@@ -66,12 +67,12 @@ pub(super) fn capture(context: usize) -> Option<Result<Option<Snapshot>, Error>>
 }
 
 pub(super) fn begin_restore(context: usize, wanted: Snapshot) {
-    *JOB.lock().unwrap() = Some(Job { context,
+    *JOB.lock() = Some(Job { context,
         operation: Operation::Restore { wanted, applied: false }, frames: 0, result: None });
 }
 
 pub(super) fn restore_result(context: usize) -> Option<Result<Option<Snapshot>, Error>> {
-    let mut stored = JOB.lock().unwrap();
+    let mut stored = JOB.lock();
     let result = stored.as_mut().filter(|job| job.context == context
         && matches!(job.operation, Operation::Restore { .. })).and_then(|job| job.result.take());
     if result.is_some() { *stored = None; }
@@ -183,14 +184,14 @@ unsafe fn install(component: usize) -> Result<i32, Error> {
 
 unsafe fn apply_policy(context: usize, component: usize) {
     let age: u32 = native::read(component, 0xe4);
-    if !Policy::due(&mut POLICY.lock().unwrap(), context, component, age) { return; }
+    if !Policy::due(&mut POLICY.lock(), context, component, age) { return; }
     // Protected Lua runs without a Rust mutex held.
     let result = install(component);
-    let event = POLICY.lock().unwrap().as_mut()
+    let event = POLICY.lock().as_mut()
         .filter(|policy| policy.context == context && policy.component == component)
         .and_then(|policy| policy.record(&result));
     if let Some((name, values)) = event {
-        if let Some(session) = STATE.lock().unwrap().as_mut() { session.event(name, values); }
+        if let Some(session) = STATE.lock().as_mut() { session.event(name, values); }
         if name == "waiting_cosmetics_policy_failed" {
             // Fail open: the native rows stay as they are. Quickplay resume reads
             // the child page itself, so a helper failure must not invent a cursor.
@@ -259,13 +260,13 @@ unsafe fn install_random_wrapper(component: usize) -> Result<i32, Error> {
 
 unsafe fn ensure_random_wrapper(context: usize, component: usize) {
     let age: u32 = native::read(component, 0xe4);
-    if !WrapLatch::due(&mut WRAP.lock().unwrap(), context, component, age) { return; }
+    if !WrapLatch::due(&mut WRAP.lock(), context, component, age) { return; }
     let result = install_random_wrapper(component);
-    let event = WRAP.lock().unwrap().as_mut()
+    let event = WRAP.lock().as_mut()
         .filter(|entry| entry.context == context && entry.component == component)
         .and_then(|entry| entry.record(&result));
     if let Some((name, values)) = event {
-        if let Some(session) = STATE.lock().unwrap().as_mut() { session.event(name, values); }
+        if let Some(session) = STATE.lock().as_mut() { session.event(name, values); }
         if name == "settings_random_wrapper_failed" {
             crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] random wrapper failed: {result:?}"));
         }
@@ -277,10 +278,10 @@ unsafe fn settings_frame(component: usize) {
     let context = EDIT_CONTEXT.load(Ordering::Acquire);
     // An unowned editor never reaches the session lock. An owned Settings page
     // installs the Random wrapper once, before main enables input.
-    let pending = JOB.lock().unwrap().as_ref().is_some_and(|job|
+    let pending = JOB.lock().as_ref().is_some_and(|job|
         job.context == context && job.result.is_none());
     let origin = if EDIT_OWNED.load(Ordering::Acquire) && context != 0 {
-        STATE.lock().unwrap().as_ref()
+        STATE.lock().as_ref()
             .filter(|session| session.phase == Phase::Editing && session.thread == current_thread())
             .map(|session| session.origin)
     } else { None };
@@ -294,19 +295,19 @@ unsafe fn settings_frame(component: usize) {
     // Age 1 is the first main resume, and this hook runs before it. The
     // method table already holds update_random. Local Wireless must finish
     // its replacement first.
-    let policy_settled = POLICY.lock().unwrap().as_ref().is_some_and(|entry|
+    let policy_settled = POLICY.lock().as_ref().is_some_and(|entry|
         entry.settled && entry.context == context && entry.component == component);
     if bound && wrapper_after_policy(suppress, policy_settled) {
         ensure_random_wrapper(context, component);
     }
     // Age 0 starts the coroutine; wait until its default selection has run.
     if bound && pending && native::read::<u32>(component, 0xe4) > 1 {
-        let mut job = JOB.lock().unwrap().take().unwrap();
+        let mut job = JOB.lock().take().unwrap();
         let capture = matches!(job.operation, Operation::Capture);
         let result = job.step(component);
         let completed = matches!(result, Ok(None));
         if capture || !completed { job.result = Some(result); }
-        *JOB.lock().unwrap() = Some(job);
+        *JOB.lock() = Some(job);
         // Freeze a captured interaction for this tick. A completed native
         // action must propagate normally; never convert Cancel into Save.
         if capture && !completed { return; }

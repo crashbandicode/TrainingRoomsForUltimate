@@ -42,7 +42,7 @@ pub(super) struct Entry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Layout {
     Training,
-    #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+    #[cfg(feature = "managed-ldn-third-source-alpha")]
     LdnWaiting,
     #[cfg(feature = "lobby-preload-extended")]
     QuickplayWaiting,
@@ -52,7 +52,7 @@ impl Layout {
     pub(super) fn backend(self) -> Backend {
         match self {
             Self::Training => Backend::Training,
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+            #[cfg(feature = "managed-ldn-third-source-alpha")]
             Self::LdnWaiting => Backend::Ldn,
             #[cfg(feature = "lobby-preload-extended")]
             Self::QuickplayWaiting => Backend::Quickplay,
@@ -61,26 +61,6 @@ impl Layout {
     pub(super) fn waiting(self) -> bool { self.backend().waiting() }
     pub(super) fn owners(self) -> [u32; 4] { self.backend().owners().map(|slot| slot as u32) }
     pub(super) fn extra_slots(self) -> &'static [usize; EXTRA_SLOTS.len()] { extra_slots(self.backend()) }
-    #[cfg(feature = "source-capacity-probe")]
-    pub(super) fn callback(self, owner: u32) -> u8 {
-        match self {
-            Self::Training => u8::from(owner == 0),
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
-            Self::LdnWaiting => match owner { 5 => 1, 6 => 2, _ => 0 },
-            #[cfg(feature = "lobby-preload-extended")]
-            Self::QuickplayWaiting => match owner { 5 => 1, 6 => 2, _ => 0 },
-        }
-    }
-    #[cfg(feature = "source-capacity-probe")]
-    pub(super) fn callbacks_complete(self, seen: u8) -> bool {
-        match self {
-            Self::Training => seen == 1,
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
-            Self::LdnWaiting => seen == 3,
-            #[cfg(feature = "lobby-preload-extended")]
-            Self::QuickplayWaiting => seen == 3,
-        }
-    }
 }
 
 /// Waiting-room additions to the scene a created-entry load must leave unchanged (scene bits 17-20), with what the
@@ -93,7 +73,7 @@ impl Layout {
 /// - `input`: the legacy entry-7 view (`inputs()`), whatever entry is loading; the entry-7 probes read it as that.
 ///   Its rows and shared fields are relevant and proven by the load's input contract; entry 7's own
 ///   mapping/controller/flag/CSS role are relevant to loads on entry 7 only (`canonical::comparison_view`).
-#[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct LdnFields {
     pub(super) selection: [(u8, u8, u8); 8],
@@ -119,7 +99,7 @@ pub(super) struct Snapshot {
     pub(super) listeners: u64,
     pub(super) count: u32,
     pub(super) quantity: Option<u32>,
-    #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+    #[cfg(feature = "managed-ldn-third-source-alpha")]
     pub(super) ldn: Option<LdnFields>,
     pub(super) rules: [u8; 2],
     pub(super) ratio_bits: u32,
@@ -204,7 +184,7 @@ pub(super) unsafe fn entry_observation(entry: *const u8, owner: u32) -> Option<E
 
 /// Reacquire every pointer from current native roots, only at a verified service
 /// callback. No pointer in a previously saved Snapshot is dereferenced here.
-#[cfg(any(feature = "source-capacity-link-probe", feature = "managed-third-source-alpha"))]
+#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn snapshot(ctx: &ServiceEntryContext, entry: *const u8, owner: u32) -> Option<Snapshot> {
     snapshot_for(Layout::Training, ctx, entry, owner)
 }
@@ -250,12 +230,12 @@ pub(super) unsafe fn snapshot_for(
         count: read(internal, 0xa0),
         quantity: match layout {
             Layout::Training => Some(native_source::training_cpu_quantity()?),
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+            #[cfg(feature = "managed-ldn-third-source-alpha")]
             Layout::LdnWaiting => None,
             #[cfg(feature = "lobby-preload-extended")]
             Layout::QuickplayWaiting => None,
         },
-        #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+        #[cfg(feature = "managed-ldn-third-source-alpha")]
         ldn: None,
         // Preserve observed rule bytes and ratio bits without reinterpreting them.
         rules: [read(internal, 0xea), read(internal, 0xeb)],
@@ -267,7 +247,7 @@ pub(super) unsafe fn snapshot_for(
         selection: std::array::from_fn(|i| read((base + 0x52c5730 + i * 0x260) as *const u8, 0xa)),
         original,
     };
-    #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+    #[cfg(feature = "managed-ldn-third-source-alpha")]
     if layout.waiting() {
         // A failed supplemental read remains visible. It must not discard the
         // current native owner needed to bind its eventual retirement.
@@ -284,12 +264,6 @@ pub(super) unsafe fn snapshot_for(
         });
     }
     Some(current)
-}
-
-/// Legacy entry7 wrapper; its remaining callers are the capacity probes.
-#[cfg(feature = "source-capacity-probe")]
-pub(super) fn creation_delta(before: Snapshot, after: Snapshot) -> bool {
-    creation_delta_at(before, after, SLOT)
 }
 
 /// Exactly one new entry at `slot`: its three roots, count+1 and listeners+1.
@@ -313,10 +287,7 @@ pub(super) fn creation_delta_at(before: Snapshot, after: Snapshot, slot: usize) 
         && !before.aliases.contains(&after.resources[slot])
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct InputSlot {
     pub(super) pointer: usize,
@@ -326,10 +297,7 @@ pub(super) struct InputSlot {
     pub(super) alias: i32,
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Inputs {
     /// Created entry these records/mapping belong to: records `slot` and `slot + 8`.
@@ -348,10 +316,7 @@ pub(super) struct Inputs {
     pub(super) slots: [InputSlot; 16],
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 impl Inputs {
     // Native313e90 supplies the occupancy/alias predicates. Also reject an
     // active control bound to either record through its owner at+160, and
@@ -376,23 +341,13 @@ impl Inputs {
 }
 
 /// Legacy entry7 view for the probes and the LDN snapshot.
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
-#[cfg(any(
-    feature = "source-lifecycle-probe",
-    feature = "source-ldn-capacity-empty-probe",
-    feature = "managed-ldn-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 pub(super) unsafe fn inputs() -> Result<Inputs, (&'static str, usize, usize)> {
     inputs_for(SLOT)
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn inputs_for(slot: usize) -> Result<Inputs, (&'static str, usize, usize)> {
     if slot >= 8 {
         return Err(("input slot outside the eight native entries", slot, 0));
@@ -500,10 +455,7 @@ pub(super) unsafe fn inputs_for(slot: usize) -> Result<Inputs, (&'static str, us
     })
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn original_resources(current: Snapshot) -> Option<[(u32, u32); 4]> {
     let mut fields = [(0, 0); 4];
     for (index, field) in fields.iter_mut().enumerate() {
@@ -516,25 +468,8 @@ pub(super) unsafe fn original_resources(current: Snapshot) -> Option<[(u32, u32)
     Some(fields)
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
-#[cfg(all(not(feature = "source-capacity-group-probe"), any(
-    feature = "source-capacity-link-probe", not(feature = "managed-grouped-source-alpha")
-)))]
-#[cfg(feature = "source-capacity-link-probe")]
-pub(super) unsafe fn ordinary_actor(entry: *const u8, kind: u32) -> Option<(usize, usize)> {
-    ordinary_actor_at(entry, SLOT, kind)
-}
-
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
-#[cfg(all(not(feature = "source-capacity-group-probe"), any(
-    feature = "source-capacity-link-probe", not(feature = "managed-grouped-source-alpha")
-)))]
+#[cfg(feature = "managed-third-source-alpha")]
+#[cfg(not(feature = "managed-grouped-source-alpha"))]
 pub(super) unsafe fn ordinary_actor_at(entry: *const u8, slot: usize, kind: u32) -> Option<(usize, usize)> {
     let actor = read::<*const u8>(entry, 0x4178);
     if !aligned(actor)
@@ -593,8 +528,6 @@ unsafe fn verify_creation(base: usize) -> Result<(), usize> {
 
 #[derive(Clone, Copy)]
 pub(super) enum Claimant {
-    #[cfg(feature = "source-capacity-probe")]
-    Probe = 1,
     #[cfg(feature = "managed-third-source-alpha")]
     Managed = 2,
 }
@@ -603,25 +536,16 @@ pub(super) enum Claimant {
 static CLAIM: [AtomicU8; ALL_EXTRA_SLOTS.len()] = [const { AtomicU8::new(0) }; ALL_EXTRA_SLOTS.len()];
 static CLAIM_OWNER: [AtomicUsize; ALL_EXTRA_SLOTS.len()] = [const { AtomicUsize::new(0) }; ALL_EXTRA_SLOTS.len()];
 static CREATION_VERIFIED: AtomicBool = AtomicBool::new(false);
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 static LOAD_VERIFIED: AtomicBool = AtomicBool::new(false);
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 pub(super) fn load_supported() -> bool {
     LOAD_VERIFIED.load(Ordering::Acquire)
 }
 
 /// All clients verify the pristine ranges before either shared hook is installed.
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 unsafe fn verify_load(base: usize) -> bool {
     for (offset, len, expected) in [
         (0x653240, 592, 0xee56df013a817f73u64),
@@ -637,11 +561,11 @@ unsafe fn verify_load(base: usize) -> bool {
         (0x15095cc, 36, 0x40be917c207acaf7),
         #[cfg(feature = "managed-third-source-alpha")]
         (0x65bd80, 132, 0x505c394d7cdcaa02),
-        #[cfg(any(feature = "source-capacity-aegis-probe", feature = "source-capacity-trainer-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         (0x453c158, 24, 0x74162f9ac96d0337),
-        #[cfg(any(feature = "source-capacity-group-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         (0x651660, 260, 0x871c1dd21365e5e3),
-        #[cfg(any(feature = "source-capacity-group-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         (0x6b7aa0, 52, 0x7009ea488edbd02a),
     ] {
         let mut hash = 0xcbf29ce484222325u64;
@@ -655,7 +579,7 @@ unsafe fn verify_load(base: usize) -> bool {
             return false;
         }
     }
-    #[cfg(any(feature = "source-capacity-group-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     if read::<usize>((base + 0x4f85d30) as *const u8, 0) != base + 0x6b7920
         || read::<usize>((base + 0x4f85d30) as *const u8, 8) != base + 0x6b7aa0
     {
@@ -669,38 +593,20 @@ unsafe fn verify_load(base: usize) -> bool {
 #[skyline::hook(offset = 0x652214, inline)]
 unsafe fn listener_removed(ctx: &InlineCtx) {
     crate::runtime::threads::headroom("listener_removed");
-    #[cfg(feature = "source-capacity-probe")]
-    super::source_capacity_probe::listener_removed(ctx);
     #[cfg(feature = "managed-third-source-alpha")]
     super::sources::capacity_listener_removed(ctx);
 }
 
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 #[skyline::hook(offset = 0x6b79a0, inline)]
 unsafe fn actor_cleanup(ctx: &InlineCtx) {
     crate::runtime::threads::headroom("actor_cleanup");
-    #[cfg(feature = "source-capacity-link-probe")]
-    super::source_capacity_probe::actor_cleanup(ctx);
     #[cfg(feature = "managed-third-source-alpha")]
     super::sources::capacity_actor_cleanup(ctx);
 }
 
-#[cfg(feature = "source-capacity-probe")]
-pub(super) fn creation_supported() -> bool {
-    CREATION_VERIFIED.load(Ordering::Acquire)
-}
-
 /// The caller also owns INSTALL. Retain this claim until actual owner cleanup;
 /// failed post-call qualification deliberately cannot rearm another creator.
-/// Legacy entry7 wrapper; its remaining caller is the capacity probe.
-#[cfg(feature = "source-capacity-probe")]
-pub(super) unsafe fn create(claimant: Claimant) -> bool {
-    create_at(claimant, SLOT)
-}
-
 /// The same single native call with `slot` as its index argument, under that
 /// slot's own claim. Slots 6/5 also require the extended feature; the managed
 /// preflight additionally requires Training and the earlier slots' registrations.
@@ -729,11 +635,6 @@ pub(super) fn claimed_at(slot: usize) -> bool {
     claim_index(slot).is_none_or(|index| CLAIM[index].load(Ordering::Acquire) != 0)
 }
 
-#[cfg(feature = "source-capacity-probe")]
-pub(super) fn bind_owner(claimant: Claimant, owner: usize) {
-    bind_owner_at(claimant, SLOT, owner);
-}
-
 pub(super) fn bind_owner_at(claimant: Claimant, slot: usize, owner: usize) {
     let Some(index) = claim_index(slot) else {
         return;
@@ -751,8 +652,6 @@ fn claim_state(index: usize) -> (u8, usize) {
 
 #[skyline::hook(offset = 0x17e44c4, inline)]
 unsafe fn owner_cleanup_complete(ctx: &InlineCtx) {
-    #[cfg(feature = "source-capacity-probe")]
-    super::source_capacity_probe::owner_cleanup_complete(ctx);
     let owner = ctx.registers[19].x() as usize;
     #[cfg(feature = "managed-third-source-alpha")]
     let managed_owner = super::sources::capacity_owner_retired(owner);
@@ -772,11 +671,6 @@ unsafe fn owner_cleanup_complete(ctx: &InlineCtx) {
         managed::unregister(index);
         CLAIM[index].store(0, Ordering::Release);
     }
-    #[cfg(feature = "source-ldn-capacity-empty-probe")]
-    super::source_capacity_probe::claim_retired(
-        owner, released_index.is_some(),
-        CLAIM[0].load(Ordering::Acquire), CLAIM_OWNER[0].load(Ordering::Acquire),
-    );
     #[cfg(feature = "managed-third-source-alpha")]
     if managed_owner {
         crate::engine::compat::logging::diagnostic(format_args!(
@@ -804,10 +698,7 @@ const CREATION_SEAMS: &[&str] = &["capacity.entry_summon", "capacity.creation_4e
     "capacity.owner_cleanup_complete", "capacity.creation_17eb000"];
 /// The load contract's rows (same cfg as `verify_load`'s ranges) and the actor-cleanup hook. The rodata
 /// descriptor tables (0x453c158) are outside the code-seam table and stay an FNV contract only.
-#[cfg(any(
-    feature = "source-capacity-link-probe",
-    feature = "managed-third-source-alpha"
-))]
+#[cfg(feature = "managed-third-source-alpha")]
 const LOAD_SEAMS: &[&str] = &[
     "lifecycle.reload_entry", "body_bank.prepare_models", "capacity.load_655320", "capacity.load_6b6f10",
     "capacity.load_6b7920", "capacity.load_313e90", "capacity.owner_load", "capacity.actor_cleanup",
@@ -817,12 +708,12 @@ const LOAD_SEAMS: &[&str] = &[
     "capacity.load_15095cc",
     #[cfg(feature = "managed-third-source-alpha")]
     "capacity.load_65bd80",
-    #[cfg(any(feature = "source-capacity-group-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     "capacity.group_651660",
-    #[cfg(any(feature = "source-capacity-group-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     "capacity.group_6b7aa0",
     // Rows 27/36: the 24-B `.rodata` contract at 0x453c158 (main row, read once WP-A core r6 adds the region).
-    #[cfg(any(feature = "source-capacity-aegis-probe", feature = "source-capacity-trainer-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     "capacity.actor_tables",
 ];
 
@@ -846,20 +737,14 @@ pub(super) unsafe fn init(base: usize) {
     if creation.is_err() {
         return;
     }
-    #[cfg(any(
-        feature = "source-capacity-link-probe",
-        feature = "managed-third-source-alpha"
-    ))]
+    #[cfg(feature = "managed-third-source-alpha")]
     let load_verified = {
         let contract = verify_load(base);
         gate("native_source_capacity", LOAD_SEAMS, contract) && contract
     };
     // Both original ranges have now been checked, before any overlapping patch.
     skyline::install_hooks!(owner_cleanup_complete, listener_removed);
-    #[cfg(any(
-        feature = "source-capacity-link-probe",
-        feature = "managed-third-source-alpha"
-    ))]
+    #[cfg(feature = "managed-third-source-alpha")]
     if load_verified {
         skyline::install_hooks!(actor_cleanup);
         LOAD_VERIFIED.store(true, Ordering::Release);
@@ -922,8 +807,8 @@ pub(super) mod managed {
     /// Registered creations as the one value Mii owner checks may accept. An
     /// inconsistent registry (order or claim/owner) yields no extras, so any live
     /// created entry stays unknown and every Mii shape check refuses it.
-    #[cfg_attr(not(all(feature = "mii-saved-alpha",
-        any(feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha"))), allow(dead_code))]
+    #[cfg(all(feature = "mii-saved-alpha",
+        any(feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha")))]
     pub(crate) fn owned_extras() -> crate::engine::preload::cycle_preload_capacity::Extras {
         use crate::engine::mii::capacity::{Extras, Roots};
         let created = created();
@@ -982,7 +867,7 @@ pub(super) mod managed {
         visible: [Option<canonical::VisibleBank>; 2],
         #[cfg(feature = "managed-visible-grouped-source-alpha")]
         initial_visible: [Option<canonical::CreationVisible>; 2],
-        #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         parked_groups: [Option<ParkedGroup>; 2],
         /// lobby-preload A: each visible owner's proven exact Mii (index 0 Player, 1 CPU), or None.
         /// Part of the stability equality and of `create_reserved`'s pre-call recheck.
@@ -992,7 +877,7 @@ pub(super) mod managed {
 
     // Temporary experiment evidence, captured only by pending creation/load work.
     // Actor pointers are compared as numbers, never decoded as ordinary actors.
-    #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct ParkedGroup {
         descriptor: [u32; 28],
@@ -1001,7 +886,7 @@ pub(super) mod managed {
         actors: [usize; 5],
     }
 
-    #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+    #[cfg(feature = "managed-grouped-source-alpha")]
     unsafe fn parked_groups(scene: Snapshot) -> Option<[Option<ParkedGroup>; 2]> {
         let mut groups = [None; 2];
         if !cfg!(feature = "managed-grouped-source-alpha") && matches!(scene.layout, Layout::Training) {
@@ -1212,7 +1097,7 @@ pub(super) mod managed {
     unsafe fn layout_permitted(layout: Layout) -> bool {
         match layout {
             Layout::Training => training(),
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+            #[cfg(feature = "managed-ldn-third-source-alpha")]
             Layout::LdnWaiting => cfg!(feature = "managed-ldn-third-source-alpha")
                 && enabled() && crate::runtime::roster::character_lifecycle::native_hooks_ready()
                 && matches!(common::game_mode::current(), Some(mode)
@@ -1245,7 +1130,7 @@ pub(super) mod managed {
 
     /// The witnessed solo waiting rows, extended only by exact registered owners.
     /// Active consumers are allowed; their source leases prevent replacement.
-    #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+    #[cfg(feature = "managed-ldn-third-source-alpha")]
     unsafe fn waiting_creation_shape(scene: Snapshot, created: CreatedSlots) -> bool {
         if scene.quantity.is_some() { return false; }
         let Some(fields) = scene.ldn else { return false; };
@@ -1315,7 +1200,7 @@ pub(super) mod managed {
 
     /// The admission shapes compiled into this build, for the value rule in consts.
     const COMPILED: creation::Compiled = creation::Compiled {
-        grouped_helper: cfg!(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha")),
+        grouped_helper: cfg!(feature = "managed-grouped-source-alpha"),
         managed_grouped: cfg!(feature = "managed-grouped-source-alpha"),
         visible_grouped: cfg!(feature = "managed-visible-grouped-source-alpha"),
     };
@@ -1511,7 +1396,7 @@ pub(super) mod managed {
                     Some(record) => roots(&scene, owner) == created_roots(record),
                     None => scene.primary[owner] == 0,
                 }),
-            #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+            #[cfg(feature = "managed-ldn-third-source-alpha")]
             Layout::LdnWaiting => waiting_creation_shape(scene,created),
             #[cfg(feature = "lobby-preload-extended")]
             Layout::QuickplayWaiting => waiting_creation_shape(scene,created),
@@ -1593,7 +1478,7 @@ pub(super) mod managed {
             #[cfg(feature = "managed-visible-grouped-source-alpha")]
             initial_visible: canonical::creation_visible_checked(scene, input)
                 .map_err(|(index, check)| Refusal::Visible { index, check })?,
-            #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+            #[cfg(feature = "managed-grouped-source-alpha")]
             parked_groups: parked_groups(scene).ok_or(Refusal::ParkedGroups)?,
             #[cfg(feature = "mii-ordinary-cpu-alpha")]
             visible_mii,
@@ -1633,7 +1518,7 @@ pub(super) mod managed {
         {
             return None;
         }
-        #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         {
             let current_groups = parked_groups(after);
             let preserved = current_groups == Some(before.parked_groups);
@@ -1754,7 +1639,7 @@ pub(super) mod managed {
                 return Err(("original/owned roots, aliases or selection", owner));
             }
         }
-        #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+        #[cfg(feature = "managed-ldn-third-source-alpha")]
         if reservation.scene.layout.waiting() {
             let Some(fields) = reservation.scene.ldn else { return Err(("LDN snapshot unavailable", target)); };
             for owner in 0..8 {
@@ -1803,7 +1688,7 @@ pub(super) mod managed {
         #[cfg(feature = "managed-grouped-source-alpha")]
         InputRole,
         OriginalResources,
-        #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         ParkedGroups,
     }
 
@@ -1811,31 +1696,6 @@ pub(super) mod managed {
         ctx: &ServiceEntryContext, entry: *const u8, reservation: Reservation, previous: Option<u32>,
     ) -> Option<Preflight> {
         load_preflight_checked(ctx, entry, reservation, previous).ok()
-    }
-
-    /// Event-only supplementary reads from this live callback, never saved pointers.
-    #[cfg(feature = "source-capacity-probe")]
-    pub(in crate::runtime::roster::character_roster) type AdmissionDetail = (
-        bool, bool, Option<(&'static str, usize)>, Option<[u32; 28]>, Option<bool>, Option<bool>,
-        Result<Inputs, (&'static str, usize, usize)>,
-    );
-
-    #[cfg(feature = "source-capacity-probe")]
-    pub(in crate::runtime::roster::character_roster) unsafe fn admission_detail(
-        ctx: &ServiceEntryContext, entry: *const u8, previous: u32, reservation: Option<Reservation>,
-    ) -> AdmissionDetail {
-        let slot = reservation.map_or(SLOT as u32, |owner| owner.slot);
-        let current_entry = native_source::entry(slot) == Some(entry);
-        let dispatch = current_entry && dispatch_identity(ctx, entry).is_some();
-        let parked = dispatch.then(|| native_source::parked_ready(entry, slot, previous));
-        #[cfg(feature = "managed-grouped-source-alpha")]
-        let canonical = (parked == Some(true))
-            .then(|| canonical::ready(entry, slot as usize, previous).is_some());
-        #[cfg(not(feature = "managed-grouped-source-alpha"))]
-        let canonical = None;
-        let owned_error = reservation.and_then(|owner| owned_checked(owner, entry).err());
-        (current_entry, dispatch, owned_error, dispatch.then(|| descriptor(entry)),
-            parked, canonical, inputs_for(slot as usize))
     }
 
     pub(crate) unsafe fn load_preflight_checked(
@@ -1910,7 +1770,7 @@ pub(super) mod managed {
             visible,
             #[cfg(feature = "managed-visible-grouped-source-alpha")]
             initial_visible: [None; 2], // Creation-only authority; never freezes later native switches.
-            #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+            #[cfg(feature = "managed-grouped-source-alpha")]
             parked_groups: parked_groups(scene).ok_or(LoadDecline::ParkedGroups)?,
             #[cfg(feature = "mii-ordinary-cpu-alpha")]
             visible_mii: [None; 2], // Creation-only, like `initial_visible`.
@@ -1930,7 +1790,7 @@ pub(super) mod managed {
         let Some(current) = current_snapshot(reservation.scene.layout, ctx, entry, reservation.slot) else {
             return false;
         };
-        #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+        #[cfg(feature = "managed-grouped-source-alpha")]
         if parked_groups(current) != Some(before.parked_groups) {
             return false;
         }
@@ -1951,70 +1811,6 @@ pub(super) mod managed {
         { canonical::loaded_visible_input(before.scene, before.input, before.previous, kind, before.visible, input) }
         #[cfg(not(feature = "managed-grouped-source-alpha"))]
         { let _ = kind; (input == before.input).then_some(before.input) }
-    }
-
-    // Diagnostic-only copies of the existing load contract. Neither result
-    // participates in admission, completion or native ownership release.
-    #[cfg(feature = "source-capacity-probe")]
-    pub(crate) unsafe fn observe_install_inputs(
-        source: crate::engine::swap::source_lifetime::SourceToken,
-        previous: Option<(crate::engine::swap::source_lifetime::SourceToken, u32)>,
-        kind: u32,
-        before: Option<Preflight>,
-    ) {
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[SourceOverlap] install_commit source={:?} previous(source,kind)={:?} kind=0x{:x} captured_preflight_input={:x?}",
-            source, previous, kind, before.map(|before| before.input)));
-        #[cfg(feature = "managed-grouped-source-alpha")]
-        if let Some(before) = before {
-            canonical::observe_visible(source, before.scene, inputs_for(before.input.slot).ok(),
-                before.visible, "commit");
-        }
-    }
-
-    #[cfg(feature = "source-capacity-probe")]
-    pub(crate) unsafe fn observe_load_inputs(
-        source: crate::engine::swap::source_lifetime::SourceToken,
-        kind: u32,
-        event: &str,
-        before: Option<Preflight>,
-    ) {
-        let Some(before) = before else {
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[SourceOverlap] load_event source={:?} kind=0x{:x} event={} preflight_unavailable=true",
-                source, kind, event));
-            return;
-        };
-        #[cfg(feature = "managed-grouped-source-alpha")]
-        let strict_expected = canonical::loaded_input(before.input, before.previous, kind);
-        #[cfg(not(feature = "managed-grouped-source-alpha"))]
-        let strict_expected = Some(before.input);
-        // One bounded read at this terminal event, after the caller released
-        // STATE. This is not the earlier read that decided completion.
-        let observed = inputs_for(before.input.slot);
-        let current = observed.as_ref().ok().copied();
-        let qualified = current.and_then(|input| load_expected_input(before, kind, input));
-        let expected = qualified.or(strict_expected);
-        let mask = |left: Inputs, right: Inputs| {
-            left.slots.iter().zip(right.slots).enumerate().fold(0u16, |mask, (index, (a, b))| {
-                mask | if *a != b { 1u16 << index } else { 0 }
-            })
-        };
-        let changed_from_preflight = current.map(|current| mask(before.input, current));
-        let authorized_visible_mask = strict_expected.zip(qualified).map(|(strict, qualified)| mask(strict, qualified));
-        let unexpected_slots = expected.zip(current).map(|(expected, current)| mask(expected, current));
-        let non_slot_fields_equal = expected.zip(current).map(|(expected, mut current)| {
-            current.slots = expected.slots;
-            current == expected
-        });
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[SourceOverlap] load_event source={:?} kind=0x{:x} event={} event_only_resample=true changed_from_preflight_mask={:x?} unexpected_slots_mask={:x?} non_slot_fields_equal={:?} expected_available={} authorized_visible_mask={:x?} current={:x?}",
-            source, kind, event, changed_from_preflight, unexpected_slots, non_slot_fields_equal,
-            expected.is_some(), authorized_visible_mask, observed));
-        #[cfg(feature = "managed-grouped-source-alpha")]
-        if event == "stalled; native ownership retained" {
-            canonical::observe_visible(source, before.scene, current, before.visible, "stalled");
-        }
     }
 
     // Fixed field bits documented by the diagnostic contract. This observes the
@@ -2045,7 +1841,7 @@ pub(super) mod managed {
         let mask = fields.iter().enumerate().fold(0u32, |mask, (index, differs)| {
             mask | if *differs { 1 << index } else { 0 }
         });
-        #[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+        #[cfg(feature = "managed-ldn-third-source-alpha")]
         let mask = mask
             | (u32::from(expected.ldn.is_some() != current.ldn.is_some()) << 17)
             | (u32::from(expected.ldn.map(|f| f.selection) != current.ldn.map(|f| f.selection)) << 18)
@@ -2159,12 +1955,8 @@ pub(super) mod managed {
             expected.listeners = current.listeners;
             checks.scene = Some(expected == current);
             checks.scene_diff = Some(snapshot_difference(expected, current));
-            #[cfg(feature = "source-capacity-probe")]
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[SourceOverlap] stalled_scene entry={:p} kind=0x{:x} normalized_scene_diff_mask=0x{:x} input_qualified={} listeners_normalized=true",
-                entry, kind, snapshot_difference(expected, current), expected_input.is_some()));
             checks.original_resources = Some(original_resources(current) == Some(before.resources));
-            #[cfg(any(feature = "source-ldn-grouped-helper-capacity-probe", feature = "managed-grouped-source-alpha"))]
+            #[cfg(feature = "managed-grouped-source-alpha")]
             if before.parked_groups.iter().any(Option::is_some) {
                 let groups = parked_groups(current);
                 crate::engine::compat::logging::diagnostic(format_args!(

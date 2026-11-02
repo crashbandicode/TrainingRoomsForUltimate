@@ -8,8 +8,8 @@ use super::counter::{CounterId, Counters};
 use super::defence::{Defence, SdiAnswer};
 use super::facts::{FrameFacts, FrameOut};
 use super::ids::Table;
-use super::ledge::Ledge;
-use super::mash::{BufferContext, Mash};
+use super::ledge::{Ledge, TermQuery};
+use super::mash::{BufferContext, Mash, Step};
 use super::playback::{covered_setting_applies, PlaybackState};
 use super::rng::Rng;
 use super::role::{FighterKey, RoleTable, Scene};
@@ -256,7 +256,6 @@ impl Cpu {
     pub fn frame(&mut self, key: FighterKey, f: &FrameFacts) -> FrameOut {
         let ctx = self.context();
         let covered = self.covered_applies();
-        let self_playback_running = self.playback.running;
         let primary = !key.partner && key.entry == self.primary_entry();
         let Self { ids, settings, rng, fighters, hidden, .. } = self;
         let fighter = &mut fighters[key.index()];
@@ -268,16 +267,7 @@ impl Cpu {
         }
         out.stale_flag = fighter.defence.stale_write(settings);
         if primary {
-            let (hide, record) = tech::hide_frame(
-                ids,
-                settings.tech_hide,
-                key.entry,
-                f.status,
-                f.motion_frame,
-                f.tech.end_frame,
-                f.tech.cursor_offset,
-                *hidden,
-            );
+            let (hide, record) = tech::hide_frame(ids, settings.tech_hide, key.entry, f, *hidden);
             out.hide = hide;
             *hidden = record;
         }
@@ -301,7 +291,8 @@ impl Cpu {
         if status::in_clatter(ids, f.status) {
             out.clatter = fighter.defence.clatter_frame(settings);
         }
-        let ledge = fighter.ledge.frame(ids, settings, rng, &mut fighter.counters, &mut fighter.mash, ctx, f);
+        let step = Step { t: ids, s: settings, rng: &mut *rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
+        let ledge = fighter.ledge.frame(step, f);
         out.request_status = ledge.request_status;
         out.playback = ledge.playback;
         if fighter.pending & reroll::SHIELD_TILT != 0 {
@@ -315,18 +306,8 @@ impl Cpu {
             status::in_shieldstun(ids, f.status, f.prev_status),
             ids.is(super::ids::C::StatusGuard, f.status),
         );
-        out.fast_fall = throw::fast_fall_frame(
-            ids,
-            settings,
-            rng,
-            &mut fighter.counters,
-            &mut fighter.mash,
-            f.situation == Situation::Air,
-            f.falling,
-            f.status,
-            f.reserve_dive,
-            self_playback_running,
-        );
+        out.fast_fall =
+            throw::fast_fall_frame(Step { t: ids, s: settings, rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx }, f);
         fighter.defence.di_frame(status::in_hitstun(ids, f.status));
         out
     }
@@ -379,7 +360,8 @@ impl Cpu {
     /// The transition-term hook for the body `key`: the answer the hook returns.
     pub fn ledge_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool) -> bool {
         let fighter = &self.fighters[key.index()];
-        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, self.playback.running, status, term, original)
+        let q = TermQuery { status, term, original };
+        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, self.playback.running, q)
     }
 }
 
@@ -458,7 +440,7 @@ impl Cpu {
         let ctx = self.context();
         let Self { ids, settings, rng, fighters, .. } = self;
         let fighter = &mut fighters[key.index()];
-        fighter.shield.out_of_shield(ids, settings, rng, &mut fighter.counters, &mut fighter.mash, ctx, facts)
+        fighter.shield.out_of_shield(Step { t: ids, s: settings, rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx }, facts)
     }
 
     /// The multiplier to write this frame (SPEC-cpu-05 §4): the first call caches what the game has.
@@ -520,7 +502,8 @@ impl Cpu {
             if !applies {
                 return CmdOut::default();
             }
-            return fighter.throw.step(ids, settings, rng, &mut fighter.counters, &mut fighter.mash, ctx, true, f);
+            let step = Step { t: ids, s: settings, rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
+            return fighter.throw.step(step, true, f);
         }
         let mut out = fighter.mash.check_buffer(ids, settings, rng, ctx, f, save_loading);
         let done = fighter.mash.perform(ids, settings, &mut fighter.counters, f);

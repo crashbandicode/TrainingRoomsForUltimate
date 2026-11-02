@@ -300,6 +300,13 @@ estimate (1 + 2..5 + 6) is about 4 MB, under the fork's 4.88 MB. Over-budget mea
   `training.handle_effect`: the CPU-as-P1 rows and the hook-sharing drill sites), so dropping the file is not clean; the 82 extra
   rows are checked against the owned ELF like all the others (`compared_rows_match_the_owned_elf` passes for the whole
   table). Resident cost to be measured when the runtime consumes the table (it is `cfg(test)`-only until then).
+  **Overridden in part (lead, 2026-11-02, slim stream):** 82 rows that no code installs, checks, names or reports beyond the
+  census count are not carried: 10 `training.*` rows, 37 image rows (`console_load_probe` 28, `console_map_probe` 6,
+  `training` 3), `console_map_probe` 1 in `rows_a5`, `mii_quit_observer` 14, `mii_preview_observer` 11,
+  `automation_helper_native` 11 (their only reader was the never-compiled `automation_helper/native.rs`),
+  `kirby_resource_probe` 1. Proof: `python3 -I tools/seam_census.py .` in every stream work tree (docs/SIZE-PLAN.md "Seam
+  rows"); `needle.set_cpu_controls`, `training.handle_effect`, the hitbox rows and every probe row stream/pkg6 brings back stay.
+  The table is consumed at run time now (`seam_install`), so the deleted rows also leave the shipped `.rodata`.
 - **D7 accepted:** `cycle_preload.ini` stays the boot cache (regenerated, never imported).
 - **D8 accepted:** `.md` only; no GIFs.
 - **D9 accepted narrowly:** an `allow` stays only on carried code that is byte-identical to the fork's approved code; each is

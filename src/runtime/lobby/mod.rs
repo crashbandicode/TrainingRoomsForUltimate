@@ -6,9 +6,9 @@
 
 pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
-pub(crate) mod lobby_stage_probe;
+pub(crate) mod lobby_stage;
 #[cfg(feature = "practice-stage")]
-pub(crate) mod practice_stage_observer;
+pub(crate) mod practice_stage;
 pub(crate) mod practice_stage_request;
 pub(crate) mod training;
 pub(crate) mod training_stage_rotation;
@@ -23,9 +23,9 @@ use crate::runtime::game;
 /// after the roster cycle's own `init` and before the install line.
 pub(crate) fn init() {
     training::lobby::init();
-    lobby_stage_probe::init();
+    lobby_stage::init();
     #[cfg(feature = "practice-stage")]
-    practice_stage_observer::init();
+    practice_stage::init();
 }
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).

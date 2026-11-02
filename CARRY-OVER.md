@@ -103,7 +103,7 @@ Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/
 
 | Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
 | --- | --- | --- | --- | --- |
-| `src/model/store.rs` (shared: package 4's named macros reuse it, do not carry `library.rs` again) | `training_mod_macros/src/library.rs` (ours-new) | `f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275` | whole file except the macro-specific parts | (1) the fork's `MacroError` became `StoreError` (only the variants the store itself raises: version, size, id, not found, no free id, parse, I/O); (2) `Library`, `MacroEntry` and `Record for MacroRecording` removed (package 4 adds its own `Record` impl); (3) `Listing<S>` lost its `MacroEntry` default; (4) the `Header` serde derive in `decode` is a hand read of `schema_version` (this crate has no serde derive: resident size); (5) the id slug fallback is `entry`, not `macro`; (6) the fork's `library/tests.rs` is not carried (macro recordings); new host tests with a toy record cover ids, atomic overwrite, version/size/corruption listing, orphaned backup, sort order. |
+| `src/model/store.rs` (shared: package 4's named macros reuse it, do not carry `library.rs` again) | `training_mod_macros/src/library.rs` (ours-new) | `f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275` | whole file except the macro-specific parts | (1) the fork's `MacroError` became `StoreError` (only the variants the store itself raises: version, size, id, not found, no free id, parse, I/O); (2) `Library`, `MacroEntry` and `Record for MacroRecording` removed (package 4 adds its own `Record` impl); (3) `Listing<S>` lost its `MacroEntry` default; (4) the `Header` serde derive in `decode` is a hand read of `schema_version` (this crate has no serde derive: resident size); (5) the id slug fallback is `entry`, not `macro`; (6) the fork's `library/tests.rs` is not carried (macro recordings); new host tests with a toy record cover ids, atomic overwrite, version/size/corruption listing, orphaned backup, sort order; (7) 2026-11-02, slim stream: the `#[allow(clippy::derivable_impls)]` on `impl<S> Default for Listing<S>` removed (a lint allow is a workaround; the hand impl stays because a derive would add `S: Default`; clippy `-D warnings` passes without it); (8) 2026-11-02, slim stream: `Store::write_atomic` calls `write_replace` (the same temporary file `<id>.json.tmp`, sync and replace, written out a second time before). |
 ## pkg6 (carry-over of the fork's engines), S6-0 plan phase, 2026-11-02
 
 Nothing is carried yet. This section records what S6-0 read, so the lead can audit the boundary.
@@ -336,6 +336,111 @@ Nothing carried from the fork or from any frozen stage. Everything under `src/mo
 
 Nothing new carried. Recorded edits to carried files (manifest + regenerated ledger): `src/runtime/mii/native_keyboard.rs` (pkg6: `use parking_lot::Mutex` -> `use hos_lock::Mutex`). `crates/hos-lock` is new code of this repository (MIT), not carried. `parking_lot` and `parking_lot_core` left the build (`tests/no_spin_locks.rs`).
 
+## slim (code size), 2026-11-02
+
+Not carried: no module reaches it (no `mod` line or `#[path]` declared these files, so they were never compiled; lead ruling
+2026-11-02). Deleted from `src/` and moved from the pkg6 manifest's `files` to its `not_carried` list (the ledger rows removed
+with them); stream/pkg6 confirmed its WIP does not reach them.
+
+| Was here | Fork path (stage m5o) | src sha256 | Lines (`tools/sloc.py`) |
+| --- | --- | --- | --- |
+| `src/runtime/lobby/automation_helper/native.rs` | `src/automation_helper/native.rs` | `62851fc8c4e245ae` | 425 |
+| `src/runtime/lobby/automation_helper/plugin.rs` | `src/automation_helper/plugin.rs` | `cf5371be7299d337` | 58 |
+| `src/runtime/roster/effect_hook_chain.rs` | `src/effect_hook_chain.rs` | `100929d53a938c4e` | 73 |
+
+`mii_native_adapter.rs`, `mii_cpu_adapter.rs` and `mii_closed_ack.rs` stay: stream/pkg6's `mii_fullconfig_probe` reaches them
+through `#[path]`. `runtime/macros/capture_plugin.rs` is stream/deluxe's (deleted there with its carry record). The comment at
+`src/runtime/roster.rs:13` still names `effect_hook_chain` as carried and not declared; it changes after stream/f6's mod lines
+next to it are merged.
+
+### Seam table: rows not carried (lead override of D6, 2026-11-02)
+
+Not carried: no consumer (lead override of D6, 2026-11-02). 82 rows that no code installs, checks, names or reports beyond
+the census count, deleted by recorded edits of the pkg6 manifest (one `delete_from`/`delete_to` per row, from the row's own
+generator comment to the next row's), so `carry_pkg6.py verify` still re-derives every file from stage m5q: `images.rs` 37
+(`console_load_probe` 28, `console_map_probe` 6, `training` 3), `rows_a2.rs` 25 (`mii_quit_observer` 14,
+`mii_preview_observer` 11), `rows_a4.rs` 11 (`automation_helper_native`), `rows_a3.rs` 7 (`training`), `rows_a1.rs` 1
+(`kirby_resource_probe`), `rows_a5.rs` 1 (`console_map_probe`). Proof: `python3 -I tools/seam_census.py <tree>` in the slim,
+work, pkg6, pkg4, ui-screens, hitbox, deluxe and f6 trees (2026-11-02): each deleted row has no consumer in any of them
+(label literal, offset literal, `SITE_<NAME>` constant, or another row naming it), apart from the 11
+`automation_helper_native` rows, whose only reader was the never-compiled `automation_helper/native.rs`.
+
+Also recorded: `src/model/seams/native_seams/mod.rs` re-exports `model::guard`'s rule set instead of its copy (five edits).
+`tools/carry_pkg6.py ledger` lists a reason shared by many edits of one file once.
+
+### smash-match-data keeps what the plugin uses (lead ruling 2026-11-02)
+
+Recorded pkg4-manifest edits (`tools/carry_pkg4.py verify` re-derives every file from its source): `capture.rs` (the
+reference `Recorder`) and `clip.rs` (clip resolution; its inherent `impl Capture` becomes the trait `CaptureClip`) move to
+the test-only oracle crate `crates/smash-match-data/tests/oracle` (`smash-match-data-oracle`, a dev-dependency of the crate
+and of the plugin); `archive.rs` loses `Capture::load`/`save` and `validate.rs` loses `validate_capture`, both now
+`tests/oracle/src/whole.rs` (written here from those removed lines; `CaptureExt` keeps the method syntax); `lib.rs` and the
+crate's `Cargo.toml` follow; the crate tests `core.rs`, `review_correctness.rs`, `review_selection.rs` and the plugin's
+`shared_capture.rs` tests reach the moved parts through the oracle. New in `shared_capture.rs`'s tests: golden files
+(`tests/fixtures/smd-golden`) pin the published capture bytes, read by a plain JSON reader.
+
+## Slim probe retirement (2026-11-02)
+
+Not carried: probe served (pkg6 confirmation, 2026-11-02). The source-capacity experiments and lifecycle attribution have no shipped/test consumer. Their inline sites are exact manifest edits; shared admission, native guards, creation/load calls, source-book release and ownership cleanup remain. Historical seam provenance is retained.
+
+| Retired destination | Authorized stage path | Stage SHA256 |
+| --- | --- | --- |
+| src/runtime/roster/source_capacity_probe.rs | src/source_capacity_probe.rs | a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e |
+| src/runtime/roster/source_ldn_capacity_probe.rs | src/source_ldn_capacity_probe.rs | e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c |
+| src/runtime/roster/source_lifecycle_probe.rs | src/source_lifecycle_probe.rs | 3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2 |
+
+Cargo also retires eight empty diagnostic aliases: console-map-probe, archive-poison-probe, kirby-resource-probe, lobby-stage-probe, practice-stage-observer, stage-asset-probe, mii-preview-observer and mii-quit-observer. The ten source-capacity features and source-lifecycle-probe are removed with their experiments. Product lobby-stage/practice-stage features remain. The matrix drops only the two exclusions belonging to deleted experiments. Texture-probe remains pending UI proof, as do all unresolved diagnostic tools.
+
+### Slim served Mii experiments and helper scopes (2026-11-02)
+
+Removed seven diagnostic features: `mii-identity-probe`, `mii-saved-file-probe`, `mii-fullconfig-probe`, `mii-native-adapter-probe`, `mii-cpu-adapter-probe`, `mii-identical-reload-probe`, `mii-special-change-probe`. Shared native access, saved/ordinary behavior and the existing exact write-set regression remain. Every carried change is a manifest transform; native helper predicates follow the real feature consumers, with test-only APIs retained under test. No lint suppression added.
+
+| Retired source | Source SHA256 | Former destination | Reason |
+| --- | --- | --- | --- |
+| src/mii_identity_probe.rs | 239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c | src/runtime/mii/mii_identity_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_saved_file_probe.rs | f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126 | src/runtime/mii/mii_saved_file_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_fullconfig_probe.rs | 3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e | src/runtime/mii/mii_fullconfig_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_native_adapter.rs | a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9 | src/runtime/mii/mii_native_adapter.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_cpu_adapter.rs | 6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2 | src/runtime/mii/mii_cpu_adapter.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_closed_ack.rs | eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b | src/runtime/mii/mii_closed_ack.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+
+The shipped stage services are renamed lobby_stage_probe.rs -> lobby_stage.rs and practice_stage_observer.rs -> practice_stage.rs through destination/module-map transforms. Historical seam group strings, guards and behavior stay unchanged; lobby declarations and the notice-header test use the new paths.
+
+### Slim helper feature scope (2026-11-02)
+The broad dead_code allowance on mii_ordinary_native::helpers is removed through pkg6 manifest edits. Helper::Ready, its token/key imports, accepts arm and parked argument compile with mii-managed-source-coexist-alpha or tests, exactly where Ready constructors exist. Native helper_kind uses the same predicate for the managed/parked calculation and argument. Enabled product and test decision bodies are preserved; disabled coexistence no longer compiles an unconstructible variant. This changes no native ownership or transaction rule.
+
+### Slim macro name payload ownership (2026-11-02)
+
+The pkg4 macro panel now boxes the large macro-only payload instead of the whole
+name draft. Name, caret and grid state remain inline, including when parked for
+placement; the exact Mii configuration remains owned by the macro payload.
+A macro draft still has one payload allocation, while external naming no longer
+allocates an outer draft. No validation, confirmation, placement or retry behavior
+is removed. The large-enum suppression and its KNOWN row are removed; all 18
+transforms are recorded in the pkg4 manifest and the ledger is regenerated.
+
+## Slim keyboard value boundary (lead scoped authorization21:18Z)
+
+The actual Text/Decision/callback-value state moves from the carried native
+inline_keyboard adapter into src/model/mii/inline_keyboard.rs, consumed by that
+adapter and host probes. Both destinations derive from the same authorized
+ours-new m5q source via exact manifest edits. The pure entry precedes the native
+entry, so the tool's source-to-destination module mapping still resolves the
+native keyboard child to its SDK adapter. The carried mii module adds one
+declaration. No upstream or mixed source was opened.
+
+Native Changed/Moved/Entered/Object/Work/InputText/Appear layouts and SDK
+declarations remain unchanged. Only value validation/decision handling moves;
+lease, locking, UI-thread ownership and Finalize ordering remain in the adapter.
+The initial extraction intentionally retains usize metadata and allocating
+macro validation to reproduce the original defect with the actual shared code.
+It is a regression baseline, not a completed fix or runtime acceptance.
+
+Keyboard root follow-up: pure value carry transforms now use checked u8 metadata and allocation-free UTF-16 encoding/validation. The ten-unit raw Mii contract, 48-scalar Macro contract and cursor boundaries are preserved by original exported-code probes. Only the superseded keyboard large-enum lint row is removed.
+
+Editor-only matrix correction: mii_ordinary_cpu_native original-kind match now applies the same existing coexistence/test cfg as Helper::Ready. This repairs a missing arm condition from the earlier slim feature-scope cleanup; full-feature behavior is unchanged. Actual failed E0599 and corrected carry253 verification retained.
+
+Lead21:59 authorized exact native keyboard Signals mutex replacement with hos_lock const storage; native cold OnceBox allocation proved in78f440d ELF. Only import and guard unwrap transformations; SDK/lease/guard extents unchanged.
 ## ui-screens — owned Mii list adapter (2026-11-02)
 
 The existing `src/model/mii_root/mii_menu.rs` (ours-new carried from frozen m5q; source sha256 `94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c`) now supports the approved direct class list with an Add New row and ZR role switching. The original selection, eligibility, exact identity and menu-close action policy remains its owner. Changes are exact-text transforms in `docs/provenance/pkg6-carry-manifest.json`, applied with `tools/carry_pkg6.py carry`; the generated ledger was refreshed and `verify` passed all 264 files against m5q. No fork or stage file was edited.

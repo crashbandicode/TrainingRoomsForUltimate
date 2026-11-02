@@ -11,7 +11,8 @@
 //! into the hat, outfit, or colour field when that field still holds the preview.
 use super::{lua_vm::{Error, Value, Vm}, native, BASE};
 use std::convert::TryFrom;
-use std::sync::{atomic::Ordering, Mutex};
+use std::sync::atomic::Ordering;
+use hos_lock::Mutex;
 
 /// Editor state 11 is the shared preview wait. Test pushes 10 then 11. Voice
 /// pushes 9 then 11. Any other occupant keeps the previous Test treatment.
@@ -228,17 +229,17 @@ static COLOR: Mutex<Option<ColorRestore>> = Mutex::new(None);
 
 pub(super) fn clear() {
     clear_wait();
-    *VOICE.lock().unwrap() = None;
-    *GEAR.lock().unwrap() = None;
-    *COLOR.lock().unwrap() = None;
+    *VOICE.lock() = None;
+    *GEAR.lock() = None;
+    *COLOR.lock() = None;
 }
 
 // Capture also serves restore polling. A successful observation must not retire
 // a setter already issued while its native preview catches up on the next frame.
-fn clear_wait() { *WAIT.lock().unwrap() = None; }
+fn clear_wait() { *WAIT.lock() = None; }
 
 fn attempts(context: usize, state: i32) -> u16 {
-    let mut slot = WAIT.lock().unwrap();
+    let mut slot = WAIT.lock();
     if slot.as_ref().is_none_or(|wait| wait.context != context || wait.state != state) {
         *slot = Some(Wait { context, state, frames: 0 });
     }
@@ -386,7 +387,7 @@ pub(super) unsafe fn prepare(context: usize, screen: &super::ui_resume::Screen) 
 
 unsafe fn apply_gear(context: usize, holder: usize, wanted: GearSelection) {
     let failed = {
-        let mut job = GEAR.lock().unwrap();
+        let mut job = GEAR.lock();
         if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {
             *job = Some(GearRestore { context, wanted, wrote: false, failed: None });
         }
@@ -405,7 +406,7 @@ unsafe fn apply_gear(context: usize, holder: usize, wanted: GearSelection) {
         ])?;
         Ok(())
     })();
-    if let Some(job) = GEAR.lock().unwrap().as_mut() {
+    if let Some(job) = GEAR.lock().as_mut() {
         match result {
             Ok(()) => job.wrote = true,
             Err(Error::Binding) => {}
@@ -426,7 +427,7 @@ unsafe fn color_source(component: usize) -> Option<usize> {
 
 unsafe fn apply_color(context: usize, wanted: ColorSelection) {
     let called = {
-        let mut job = COLOR.lock().unwrap();
+        let mut job = COLOR.lock();
         if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {
             *job = Some(ColorRestore { context, wanted, called: false });
         }
@@ -443,7 +444,7 @@ unsafe fn apply_color(context: usize, wanted: ColorSelection) {
     let published = native::read::<u32>(source, COLOR_SOURCE_HIGHLIGHT) == wanted.cursor
         && native::read::<u32>(source, COLOR_SOURCE_DECIDED) == u32::MAX;
     if !published { return; }
-    if let Some(job) = COLOR.lock().unwrap().as_mut() {
+    if let Some(job) = COLOR.lock().as_mut() {
         if job.context == context && job.wanted == wanted { job.called = true; }
     }
 }
@@ -453,7 +454,7 @@ unsafe fn prepare_voice(context: usize, wanted: VoiceSelection) {
     let on_page = state == 9 || (state == 11 && previous_state(context) == Some(9));
     if !on_page { return; }
     let failed = {
-        let mut job = VOICE.lock().unwrap();
+        let mut job = VOICE.lock();
         if job.as_ref().is_none_or(|job| job.context != context || job.wanted != wanted) {
             *job = Some(VoiceRestore { context, wanted, wrote: false, failed: None });
         }
@@ -473,7 +474,7 @@ unsafe fn prepare_voice(context: usize, wanted: VoiceSelection) {
         ])?;
         Ok(())
     })();
-    if let Some(job) = VOICE.lock().unwrap().as_mut() {
+    if let Some(job) = VOICE.lock().as_mut() {
         match result {
             Ok(()) => job.wrote = true,
             Err(Error::Binding) => {}
@@ -486,7 +487,7 @@ pub(super) enum Poll { Pending, Ready, Failed(u64) }
 
 pub(super) unsafe fn poll_gear(context: usize, state: i32, wanted: GearSelection) -> Poll {
     if native::read::<i32>(context, 0x148) != state { return Poll::Pending; }
-    let (failed, wrote) = GEAR.lock().unwrap().as_ref()
+    let (failed, wrote) = GEAR.lock().as_ref()
         .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));
     if let Some(detail) = failed { return Poll::Failed(detail); }
     if !wrote { return Poll::Pending; }
@@ -499,7 +500,7 @@ pub(super) unsafe fn poll_gear(context: usize, state: i32, wanted: GearSelection
 
 pub(super) unsafe fn poll_color(context: usize, wanted: ColorSelection) -> Poll {
     if native::read::<i32>(context, 0x148) != 7 { return Poll::Pending; }
-    if COLOR.lock().unwrap().as_ref().is_none_or(|job|
+    if COLOR.lock().as_ref().is_none_or(|job|
         job.context != context || job.wanted != wanted || !job.called) { return Poll::Pending; }
     match capture_color(context, 7) {
         Shot::Found(seen) if seen == wanted => Poll::Ready,
@@ -509,7 +510,7 @@ pub(super) unsafe fn poll_color(context: usize, wanted: ColorSelection) -> Poll 
 }
 
 pub(super) unsafe fn poll_voice(context: usize, wanted: VoiceSelection) -> Poll {
-    let (failed, wrote) = VOICE.lock().unwrap().as_ref()
+    let (failed, wrote) = VOICE.lock().as_ref()
         .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));
     if let Some(detail) = failed { return Poll::Failed(detail); }
     // voice_focus reconciles pitch button 1 before wrote is set. Matching

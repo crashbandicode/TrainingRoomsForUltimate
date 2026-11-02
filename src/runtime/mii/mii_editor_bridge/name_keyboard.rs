@@ -2,7 +2,8 @@
 //! Only an explicit Enter passes an owned string through the original commit.
 use super::{current_thread, inline_keyboard::{Decision, Keyboard, Text}, native,
     Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE};
-use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use hos_lock::Mutex;
 
 struct Owner {
     context: usize,
@@ -22,7 +23,7 @@ static PREPARED: Mutex<Option<(usize, Text)>> = Mutex::new(None);
 static SUSPENDED: AtomicUsize = AtomicUsize::new(0);
 
 fn note(name: &'static str, values: [u64; 4]) {
-    if let Some(s) = STATE.lock().unwrap().as_mut() { s.event(name, values); }
+    if let Some(s) = STATE.lock().as_mut() { s.event(name, values); }
 }
 
 fn ours(context: usize) -> bool {
@@ -31,7 +32,7 @@ fn ours(context: usize) -> bool {
 }
 
 fn on_editor_thread() -> bool {
-    STATE.lock().unwrap().as_ref().is_some_and(|s|
+    STATE.lock().as_ref().is_some_and(|s|
         s.phase == Phase::Editing && s.thread == current_thread())
 }
 
@@ -93,8 +94,8 @@ impl Binding {
 
 /// Called with the fresh editor context before native entry into state 4.
 pub(super) fn prepare_resume(context: usize, text: Text) -> bool {
-    if !ours(context) || !on_editor_thread() || OWNER.lock().unwrap().is_some() { return false; }
-    let mut pending = PREPARED.lock().unwrap();
+    if !ours(context) || !on_editor_thread() || OWNER.lock().is_some() { return false; }
+    let mut pending = PREPARED.lock();
     if pending.is_some() { return false; }
     *pending = Some((context, text));
     SUSPENDED.store(0, Ordering::Release);
@@ -102,7 +103,7 @@ pub(super) fn prepare_resume(context: usize, text: Text) -> bool {
 }
 
 pub(super) fn restored(context: usize) -> bool {
-    OWNER.lock().unwrap().as_ref().is_some_and(|owner| owner.context == context
+    OWNER.lock().as_ref().is_some_and(|owner| owner.context == context
         && owner.resumed && owner.shown && !owner.failed)
 }
 
@@ -111,7 +112,7 @@ pub(super) fn restored(context: usize) -> bool {
 pub(super) unsafe fn suspend(context: usize) -> Result<Text, &'static str> {
     if !ours(context) || !on_editor_thread() { return Err("keyboard_owner_mismatch"); }
     let mut owner = {
-        let mut state = OWNER.lock().unwrap();
+        let mut state = OWNER.lock();
         if state.as_ref().is_none_or(|owner|
             owner.context != context || owner.thread != current_thread()) {
             return Err("keyboard_not_owned");
@@ -128,7 +129,7 @@ pub(super) unsafe fn suspend(context: usize) -> Result<Text, &'static str> {
         }
         if !keyboard.close() { owner.failed = true; }
     }
-    *PREPARED.lock().unwrap() = None;
+    *PREPARED.lock() = None;
     if owner.failed { Err("keyboard_capture_failed") } else { Ok(owner.text) }
 }
 
@@ -136,7 +137,7 @@ pub(super) unsafe fn suspend(context: usize) -> Result<Text, &'static str> {
 /// This must run before native editor destruction, never afterward.
 pub(super) unsafe fn before_release(context: usize) {
     let mut owner = {
-        let mut stored = OWNER.lock().unwrap();
+        let mut stored = OWNER.lock();
         if stored.as_ref().is_some_and(|owner|
             owner.context != context || owner.thread != current_thread()) { return; }
         stored.take()
@@ -144,7 +145,7 @@ pub(super) unsafe fn before_release(context: usize) {
     if let Some(owner) = owner.as_mut() {
         if let Some(keyboard) = owner.keyboard.as_mut() { keyboard.close(); }
     }
-    *PREPARED.lock().unwrap() = None;
+    *PREPARED.lock() = None;
     SUSPENDED.store(0, Ordering::Release);
 }
 
@@ -155,10 +156,10 @@ unsafe fn name_frame(context: usize) -> usize {
     let Some(binding) = Binding::bind(context) else { return 0; };
     // Never take ownership of the synchronous global manager or clear its flags.
     if !binding.manager_idle() { return 0; }
-    let mut owner = OWNER.lock().unwrap().take();
+    let mut owner = OWNER.lock().take();
     if owner.is_none() {
         let pending = {
-            let mut prepared = PREPARED.lock().unwrap();
+            let mut prepared = PREPARED.lock();
             if prepared.as_ref().is_some_and(|(target, _)| *target == context) {
                 prepared.take().map(|(_, text)| text)
             } else { None }
@@ -175,7 +176,7 @@ unsafe fn name_frame(context: usize) -> usize {
     }
     let mut owner = owner.unwrap();
     if owner.context != context || owner.thread != current_thread() {
-        *OWNER.lock().unwrap() = Some(owner);
+        *OWNER.lock() = Some(owner);
         return 0;
     }
     if let Some(keyboard) = owner.keyboard.as_mut() {
@@ -197,7 +198,7 @@ unsafe fn name_frame(context: usize) -> usize {
         if let Some(decision) = owner.decision {
             if let Some(keyboard) = owner.keyboard.as_mut() {
                 if !keyboard.close() {
-                    *OWNER.lock().unwrap() = Some(owner);
+                    *OWNER.lock() = Some(owner);
                     return 0;
                 }
             }
@@ -209,7 +210,7 @@ unsafe fn name_frame(context: usize) -> usize {
             return result;
         }
     }
-    *OWNER.lock().unwrap() = Some(owner);
+    *OWNER.lock() = Some(owner);
     0
 }
 

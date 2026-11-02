@@ -133,11 +133,13 @@ pub struct MoveObserver {
 }
 
 impl MoveObserver {
+    #[cfg(test)]
     pub fn active_family(&self) -> Option<Family> {
         self.active
     }
 
     /// Reset on a new bound match/fighter identity; does not invent a completion.
+    #[cfg(test)]
     pub fn reset(&mut self) {
         *self = Self::default();
     }

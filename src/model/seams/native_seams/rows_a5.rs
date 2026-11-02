@@ -643,13 +643,6 @@ pub const ROWS: &[Seam] = &[
            feature: "console-practice-trace", scopes: Scopes::ALL, read_only: false, per_frame: false,
            sharing: Sharing::None,
            note: "Diag only (console-practice-trace). Placement heuristic says entry because the previous word is an unconditional b; it is a branch target inside the list callback loop (mid-function)." },
-    // console_map:hook/raw_inline:exact=20
-    Seam { label: "console_map.free_pages_result", group: "console_map_probe", offset: 0x37cae24,
-           kind: SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid },
-           guard: [0x40, 0x06, 0x00, 0x35, 0x88, 0x0b, 0x01, 0xf0, 0x08, 0x41, 0x11, 0x91, 0x09, 0xfd, 0x5f, 0xc8, 0x29, 0x01, 0x15, 0xcb, 0x09, 0xfd, 0x0a, 0xc8, 0xaa, 0xff, 0xff, 0x35, 0x80, 0x0b, 0x01, 0xf0, 0x00, 0x40, 0x10, 0x91, 0x7f, 0x02, 0x00, 0xb9, 0xe1, 0xda, 0x07, 0x94, 0xfd, 0x7b, 0x46, 0xa9, 0xf4, 0x4f, 0x45, 0xa9, 0xf6, 0x57, 0x44, 0xa9, 0xf8, 0x5f, 0x43, 0xa9, 0xff, 0xc3, 0x01, 0x91],
-           feature: "console-map-probe", scopes: Scopes::ALL, read_only: false, per_frame: false,
-           sharing: Sharing::None,
-           note: "diag" },
     // turnip:relied/code:exact=64
     Seam { label: "turnip.lua_module_public", group: "turnip_identity", offset: 0x2056ab0,
            kind: SeamKind::Relied,

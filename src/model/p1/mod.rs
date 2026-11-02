@@ -249,29 +249,5 @@ impl Pilot {
     }
 }
 
-/// Original draft encoder retained, unverified against native input at runtime.
-pub fn encode(buttons: u32, stick_x: f32, stick_y: f32) -> u64 {
-    let axis = |value: f32| -> u8 {
-        let units = if value.is_finite() {
-            (value * 120.0).round().clamp(-120.0, 120.0)
-        } else {
-            0.0
-        };
-        (units as i8) as u8
-    };
-    u64::from(buttons) | (u64::from(axis(stick_x)) << 32) | (u64::from(axis(stick_y)) << 40)
-}
-
-/// Existing walk-off proposal: nearer edge, then down/out in air. Native
-/// ledge/drop-through behavior remains root-owned and runtime-unverified.
-pub fn walk_off(p1_x: f32, left_edge: f32, right_edge: f32, grounded: bool) -> u64 {
-    let out = if (right_edge - p1_x) <= (p1_x - left_edge) {
-        1.0
-    } else {
-        -1.0
-    };
-    encode(0, out, if grounded { 0.0 } else { -1.0 })
-}
-
 #[cfg(test)]
 mod tests;

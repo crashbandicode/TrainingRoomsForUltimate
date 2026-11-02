@@ -6,9 +6,10 @@
 //! the install line can say which feature lost it. Each package that needs more names adds them here;
 //! the order of the list is the order of `C`, nothing else depends on it.
 
-use super::hash::lua_bind_hash;
-
-macro_rules! constants {
+/// A list of game constants by name and the table of their resolved values: the enum `C`, `NAMES`, `COUNT`,
+/// `UNRESOLVED` and `Table` with its lookups. One implementation for every such list (`model::state::ids` too); a
+/// module adds its own predicates in a second `impl Table`.
+macro_rules! game_constants {
     ($($variant:ident = $name:literal,)*) => {
         /// One game constant.
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,10 +18,79 @@ macro_rules! constants {
 
         /// The identifiers, in `C` order.
         pub const NAMES: &[&str] = &[$($name),*];
+
+        /// Number of constants.
+        pub const COUNT: usize = NAMES.len();
+
+        /// The value of a constant the game did not answer for. No status, term or work id is this value.
+        pub const UNRESOLVED: i32 = i32::MIN;
+
+        /// The resolved values.
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub struct Table {
+            values: [i32; COUNT],
+        }
+
+        impl Default for Table {
+            fn default() -> Self {
+                Self::unresolved()
+            }
+        }
+
+        impl Table {
+            /// Every constant unresolved.
+            pub const fn unresolved() -> Self {
+                Self { values: [UNRESOLVED; COUNT] }
+            }
+
+            /// Ask `lookup` for every name (by its key, `cpu::hash::lua_bind_hash`). Returns how many names it did
+            /// not answer; those stay `UNRESOLVED`.
+            pub fn resolve(&mut self, mut lookup: impl FnMut(u64) -> Option<i32>) -> usize {
+                let mut missing = 0;
+                for (slot, name) in self.values.iter_mut().zip(NAMES.iter()) {
+                    match lookup(crate::model::cpu::hash::lua_bind_hash(name)) {
+                        Some(value) => *slot = value,
+                        None => {
+                            *slot = UNRESOLVED;
+                            missing += 1;
+                        }
+                    }
+                }
+                missing
+            }
+
+            /// A table with explicit values (tests, and a runtime that resolved elsewhere).
+            pub fn with(values: &[(C, i32)]) -> Self {
+                let mut table = Self::unresolved();
+                for (c, value) in values {
+                    table.values[*c as usize] = *value;
+                }
+                table
+            }
+
+            pub fn get(&self, c: C) -> i32 {
+                self.values[c as usize]
+            }
+
+            pub fn resolved(&self, c: C) -> bool {
+                self.get(c) != UNRESOLVED
+            }
+
+            /// `value == c` and `c` resolved.
+            pub fn is(&self, c: C, value: i32) -> bool {
+                self.resolved(c) && self.get(c) == value
+            }
+
+            /// The names that stayed unresolved, in list order.
+            pub fn missing(&self) -> impl Iterator<Item = &'static str> + '_ {
+                self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v == UNRESOLVED).map(|(_, n)| *n)
+            }
+        }
     };
 }
+pub(crate) use game_constants;
 
-constants! {
+game_constants! {
     // Situation kinds.
     SituationGround = "SITUATION_KIND_GROUND",
     SituationAir = "SITUATION_KIND_AIR",
@@ -246,12 +316,6 @@ constants! {
     ModelColorBlend = "MODEL_COLOR_TYPE_COLOR_BLEND",
 }
 
-/// Number of constants.
-pub const COUNT: usize = NAMES.len();
-
-/// The value of a constant the game did not answer for. No status, term or work id is this value.
-pub const UNRESOLVED: i32 = i32::MIN;
-
 /// The statuses of the clatter list, in the spec's order.
 pub const CLATTER_STATUSES: [C; 43] = [
     C::ClatterCapturePulled,
@@ -299,62 +363,7 @@ pub const CLATTER_STATUSES: [C; 43] = [
     C::ClatterCaptureWaitOctopus,
 ];
 
-/// The resolved values.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Table {
-    values: [i32; COUNT],
-}
-
-impl Default for Table {
-    fn default() -> Self {
-        Self::unresolved()
-    }
-}
-
 impl Table {
-    /// Every constant unresolved.
-    pub const fn unresolved() -> Self {
-        Self { values: [UNRESOLVED; COUNT] }
-    }
-
-    /// Ask `lookup` for every name (by its key). Returns how many names it did not answer; those stay
-    /// `UNRESOLVED`.
-    pub fn resolve(&mut self, mut lookup: impl FnMut(u64) -> Option<i32>) -> usize {
-        let mut missing = 0;
-        for (slot, name) in self.values.iter_mut().zip(NAMES.iter()) {
-            match lookup(lua_bind_hash(name)) {
-                Some(value) => *slot = value,
-                None => {
-                    *slot = UNRESOLVED;
-                    missing += 1;
-                }
-            }
-        }
-        missing
-    }
-
-    /// A table with explicit values (tests, and a runtime that resolved elsewhere).
-    pub fn with(values: &[(C, i32)]) -> Self {
-        let mut table = Self::unresolved();
-        for (c, value) in values {
-            table.values[*c as usize] = *value;
-        }
-        table
-    }
-
-    pub fn get(&self, c: C) -> i32 {
-        self.values[c as usize]
-    }
-
-    pub fn resolved(&self, c: C) -> bool {
-        self.get(c) != UNRESOLVED
-    }
-
-    /// `value == c` and `c` resolved.
-    pub fn is(&self, c: C, value: i32) -> bool {
-        self.resolved(c) && self.get(c) == value
-    }
-
     /// `first <= value <= last` (both ends resolved).
     pub fn within(&self, first: C, last: C, value: i32) -> bool {
         self.resolved(first) && self.resolved(last) && self.get(first) <= value && value <= self.get(last)
@@ -369,10 +378,5 @@ impl Table {
     /// read by name).
     pub fn resolved_entries(&self) -> impl Iterator<Item = (&'static str, i32)> + '_ {
         self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v != UNRESOLVED).map(|(v, n)| (*n, *v))
-    }
-
-    /// The names that stayed unresolved, in list order.
-    pub fn missing(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.values.iter().zip(NAMES.iter()).filter(|(v, _)| **v == UNRESOLVED).map(|(_, n)| *n)
     }
 }

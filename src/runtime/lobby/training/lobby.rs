@@ -134,7 +134,7 @@ pub unsafe fn observe_fighter(accessor: &mut smash::app::BattleObjectModuleAcces
     let bit = 1 << entry;
     if SEEN_ENTRIES.fetch_or(bit, Ordering::Relaxed) & bit == 0 {
         #[cfg(feature = "lobby-stage")]
-        crate::runtime::lobby::lobby_stage_probe::observe_loaded();
+        crate::runtime::lobby::lobby_stage::observe_loaded();
         trace!(
             "[LobbyPractice] fighter entry={} cpu={} ready_go={}",
             entry,

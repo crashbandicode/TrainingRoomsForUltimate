@@ -628,57 +628,6 @@ pub(crate) unsafe fn loaded_visible_input(
     (observed == expected && inputs_for(observed.slot) == Ok(observed)).then_some(expected)
 }
 
-// Event-only attribution, including raw current control addresses when the
-// qualification reader refuses their semantics/alignment. Never follow a saved
-// actor or an unvalidated control; actor_record remains the dereference gate.
-#[cfg(feature = "source-capacity-probe")]
-unsafe fn visible_event_members(
-    scene: Snapshot, index: usize,
-) -> Option<(u32, Actors, [Option<usize>; 3])> {
-    let owner = scene.layout.owners()[index];
-    let entry = native_source::entry(owner)?;
-    if entry as usize != scene.primary[owner as usize]
-        || super::entry_observation(entry, owner) != Some(scene.original[index])
-    { return None; }
-    let (forms, active_kind) = super::super::ready_forms(entry, owner)?;
-    let plan = visible_plan(entry, owner, forms)?;
-    if plan.first != 2 { return None; }
-    let pointers: [usize; 5] =
-        [0x4178, 0x4180, 0x4188, 0x4190, 0x4198].map(|offset| read(entry, offset));
-    let mut controls = [None; 3];
-    let actors = std::array::from_fn(|index| {
-        if index >= plan.count { return None; }
-        let actor = pointers[plan.first + index] as *const u8;
-        if aligned(actor) && read::<usize>(actor, 0) == BASE.load(Ordering::Acquire) + 0x4f85d30 {
-            controls[index] = Some(read(actor, 0x58));
-        }
-        actor_record(actor)
-    });
-    if native_source::entry(owner) != Some(entry)
-        || super::entry_observation(entry, owner) != Some(scene.original[index])
-        || super::super::ready_forms(entry, owner) != Some((forms, active_kind))
-        || [0x4178, 0x4180, 0x4188, 0x4190, 0x4198].map(|offset| read::<usize>(entry, offset)) != pointers
-    { return None; }
-    Some((active_kind, Actors { pointers, actors }, controls))
-}
-
-#[cfg(feature = "source-capacity-probe")]
-pub(crate) unsafe fn observe_visible(
-    source: crate::engine::swap::source_lifetime::SourceToken,
-    scene: Snapshot, input: Option<Inputs>, captured: [Option<VisibleBank>; 2], event: &str,
-) {
-    for (index, bank) in captured.iter().copied().enumerate() {
-        let owner = scene.layout.owners()[index];
-        let applicable = matches!(scene.original[index].kinds[0], 0x24..=0x26 | 0x5a | 0x5b);
-        let current = if applicable { input.and_then(|input| visible_bank(scene, input, index)) } else { None };
-        let members = if applicable { visible_event_members(scene, index) } else { None };
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[SourceOverlap] visible_event source={:?} event={} owner={} applicable={} captured_qualified={} event_qualified={} event_only_resample=true input_row={:x?} captured_bank={:x?} event_bank={:x?} event_members(active_kind,actors,raw_controls)={:x?}",
-            source, event, owner, applicable, bank.is_some(), current.is_some(),
-            input.map(|input| input.slots[owner as usize]), bank, current, members));
-    }
-}
-
 pub(crate) fn preflight_input(before: Inputs, previous: Option<u32>) -> bool {
     if previous.is_some_and(|kind| !supported(kind)) {
         return false;
@@ -719,10 +668,7 @@ pub(crate) fn comparison_view(
     before: Inputs,
     expected: Option<Inputs>,
 ) -> Snapshot {
-    #[cfg(any(
-        feature = "source-ldn-capacity-empty-probe",
-        feature = "managed-ldn-third-source-alpha"
-    ))]
+    #[cfg(feature = "managed-ldn-third-source-alpha")]
     {
         let mut current = current;
         let prior_member = prior.ldn.and_then(|fields| fields.input);
@@ -737,25 +683,22 @@ pub(crate) fn comparison_view(
         }
         current
     }
-    #[cfg(not(any(
-        feature = "source-ldn-capacity-empty-probe",
-        feature = "managed-ldn-third-source-alpha"
-    )))]
+    #[cfg(not(feature = "managed-ldn-third-source-alpha"))]
     {
         let _ = (prior, before, expected);
         current
     }
 }
 
-#[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewRow = (usize, u8, i32, i32, i32);
-#[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewShared = (usize, usize, usize, usize, u8);
-#[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewOwn = (i32, usize, usize, u8, u8);
 
 /// One entry's input view as the scene proof's model sees it: rows, shared fields, the entry's own fields.
-#[cfg(any(feature = "source-ldn-capacity-empty-probe", feature = "managed-ldn-third-source-alpha"))]
+#[cfg(feature = "managed-ldn-third-source-alpha")]
 fn input_view(input: Inputs) -> crate::engine::swap::source_load::InputView<ViewRow, ViewShared, ViewOwn> {
     crate::engine::swap::source_load::InputView {
         slot: input.slot,
