@@ -5,6 +5,7 @@ use crate::model::cpu::hash::hash40;
 use crate::model::state::buff::{Art, BuffKind, BuffOut, Spell, Waft};
 use crate::model::state::charge::{self, Joint, Op, Plan, Step};
 use crate::model::state::ids::{Table, C};
+use crate::runtime::features::state_restore;
 use crate::runtime::game::natives;
 use crate::runtime::state_natives as n;
 
@@ -26,7 +27,7 @@ unsafe fn follow(accessor: usize, ids: &Table, effect: &str, joint: u64, pos: [f
 ///
 /// # Safety
 /// The charge sites passed their guards; `accessor` is a live fighter's module accessor.
-pub unsafe fn run_charge(accessor: usize, ids: &Table, plan: &Plan) {
+pub unsafe fn run_charge(accessor: usize, fighter: usize, ids: &Table, plan: &Plan) {
     for step in plan.iter() {
         match step {
             Step::SetInt(c, value) => {
@@ -64,6 +65,8 @@ pub unsafe fn run_charge(accessor: usize, ids: &Table, plan: &Plan) {
                     n::article_set_visibility(accessor, article, hash40("set_main"), hash40(charge::sheik_group(count)));
                 }
             }
+            Step::OlimarLine(line) => state_restore::olimar_respawn(accessor, ids, &line),
+            Step::SoraSpell(saved) => state_restore::sora_spell(accessor, fighter, ids, saved),
             Step::RevengeAura(joint) => {
                 follow(accessor, ids, "gaogaen_revenge_aura", joint, [0.0; 3], [0.0; 3], 32768, -1, None);
             }

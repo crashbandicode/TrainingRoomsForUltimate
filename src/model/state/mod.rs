@@ -16,6 +16,8 @@ pub mod held_item;
 pub mod hooks;
 #[path = "ids.rs"]
 pub mod ids;
+#[path = "items.rs"]
+pub mod items;
 #[path = "json.rs"]
 pub mod json;
 #[path = "machine.rs"]
@@ -30,6 +32,8 @@ pub mod record;
 pub mod settings;
 #[path = "setup.rs"]
 pub mod setup;
+#[path = "steve.rs"]
+pub mod steve;
 
 /// The ItemManager singleton's pointer slot (`_ZN3lib9SingletonIN3app11ItemManagerEE9instance_E`, in
 /// `.bss`), checked in `tests/state_sites.rs` against the guarded `adrp` / `ldr` pair of the

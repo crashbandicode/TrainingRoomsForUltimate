@@ -89,6 +89,29 @@ OFFSETS_M2 = [
     ("StateBuff", "state_fighter_play_se", 0x4CF6C0, "REPLACE", "The fighter sound module's play_se: every sound is se_silent while a record is buffing."),
 ]
 
+# Milestone 3: character items (SPEC-state-04) and the fighter-specific restores (SPEC-state-05).
+CALLED_M3 = [
+    ("StateItems", "state_is_have_item", "_ZN3app8lua_bind29ItemModule__is_have_item_implEPNS_26BattleObjectModuleAccessorEi", "ItemModule::is_have_item: whether the player holds an item."),
+    ("StateItems", "state_get_have_item_id", "_ZN3app8lua_bind33ItemModule__get_have_item_id_implEPNS_26BattleObjectModuleAccessorEi", "ItemModule::get_have_item_id: the held item's object id."),
+    ("StateItems", "state_remove_item", "_ZN3app8lua_bind28ItemModule__remove_item_implEPNS_26BattleObjectModuleAccessorEi", "ItemModule::remove_item: the restore replaces the held item."),
+    ("StateItems", "state_set_have_item_action", "_ZN3app8lua_bind37ItemModule__set_have_item_action_implEPNS_26BattleObjectModuleAccessorEifi", "ItemModule::set_have_item_action: a turnip's special-init action with its power."),
+    ("StateItems", "state_object_category", "_ZN3app7utility12get_categoryEj", "utility::get_category: the held object is an item."),
+    ("StateItems", "state_object_kind", "_ZN3app7utility8get_kindEPKNS_26BattleObjectModuleAccessorE", "utility::get_kind: the held item's kind."),
+    ("StateItems", "state_have_item", "_ZN3app8lua_bind26ItemModule__have_item_implEPNS_26BattleObjectModuleAccessorENS_8ItemKindEiibb", "ItemModule::have_item: path A of an item grant."),
+    ("StateItems", "state_article_generate", "_ZN3app8lua_bind36ArticleModule__generate_article_implEPNS_26BattleObjectModuleAccessorEibi", "ArticleModule::generate_article: a turnip, and an Olimar Pikmin."),
+    ("StateRestore", "state_sub_material_num", "_ZN3app25FighterSpecializer_Pickel16sub_material_numERNS_26BattleObjectModuleAccessorEii", "FighterSpecializer_Pickel::sub_material_num: subtracting zero refreshes Steve's HUD bar."),
+    ("StateRestore", "state_work_get_int64", "_ZN3app8lua_bind26WorkModule__get_int64_implEPNS_26BattleObjectModuleAccessorEi", "WorkModule::get_int64: Steve's tool buffer and Olimar's troops manager."),
+    ("StateRestore", "state_article_remove_exist", "_ZN3app8lua_bind32ArticleModule__remove_exist_implEPNS_26BattleObjectModuleAccessorEiNS_22ArticleOperationTargetE", "ArticleModule::remove_exist: Olimar's Pikmin before the line is rebuilt."),
+    ("StateRestore", "state_article_active_num", "_ZN3app8lua_bind34ArticleModule__get_active_num_implEPNS_26BattleObjectModuleAccessorEi", "ArticleModule::get_active_num: gates the three Pikmin spawns."),
+    ("StateRestore", "state_object_module_accessor", "_ZN3app16sv_battle_object15module_accessorEj", "sv_battle_object::module_accessor: a Pikmin's accessor from its battle object id."),
+    ("StateRestore", "state_object_is_active", "_ZN3app16sv_battle_object9is_activeEj", "sv_battle_object::is_active: only active Pikmin contribute a colour."),
+    ("StateRestore", "state_sora_change_magic", "_ZN3app24FighterSpecializer_Trail12change_magicERNS_7FighterE", "FighterSpecializer_Trail::change_magic: advances Sora's spell one step."),
+]
+REPLACE_M3 = [
+    ("StateRestore", "state_pikmin_autonomy", 0x34B6CD0, "The Pikmin 'activate autonomy' routine (weapon, work module): called only for thrown or attacking Pikmin, so idle Pikmin keep their order."),
+]
+TURNIP_PROBES = [("daisy", 0x165BE40), ("peach", 0x1668C90)]
+
 # The ItemManager singleton pointer is read through this guarded instruction pair (adrp + ldr of the
 # singleton's slot, 0x52c4070).
 RELIED = [
@@ -143,6 +166,16 @@ def main():
     replace = "SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }"
     for feature, name, offset, kind, note in OFFSETS_M2:
         emit(name, feature, replace if kind == "REPLACE" else kind, offset, note)
+    for feature, name, symbol, note in CALLED_M3:
+        emit(name, feature, "SeamKind::Called", table[symbol], note)
+    for feature, name, offset, note in REPLACE_M3:
+        emit(name, feature, replace, offset, note)
+    for who, first in TURNIP_PROBES:
+        for n in range(1, 9):
+            emit(f"state_{who}_prob_{n}", "StateItems", replace, first + 0x20 * (n - 1), f"{who.capitalize()}'s turnip face {n} probability getter: certain for the chosen face while a grant is generating (SPEC-state-04 §5.3).")
+    for who, first in (("daisy", 0x165BF40), ("peach", 0x1668D90)):
+        for n in range(1, 9):
+            emit(f"state_{who}_power_{n}", "StateItems", "SeamKind::Called", first + 0x20 * (n - 1), f"{who.capitalize()}'s turnip face {n} power getter: the power a restored turnip is thrown with.")
     for name, offset, note in RELIED:
         emit(name, "StateCore", "SeamKind::Relied", offset, note)
     body = out[body_start:]

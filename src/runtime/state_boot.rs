@@ -5,7 +5,7 @@
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::sites_pkg3::STATE_SITES;
-use crate::runtime::features::states;
+use crate::runtime::features::{state_restore, states};
 use crate::runtime::game;
 
 /// Number of rows.
@@ -23,11 +23,14 @@ pub fn check() -> [GuardOutcome; N] {
 /// Install the hooks when every row is usable and `frame_wrapper` (the CPU core's per-frame hook) is in.
 /// Returns whether the feature is installed; marks the rows in `written`.
 pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Written; N]) -> bool {
+    states::set_active(false);
     for (slot, outcome) in written.iter_mut().zip(found) {
         if outcome.usable() {
             *slot = Written::Checked;
         }
     }
+    // The rows are installed together: they share the frame step and the constant table, and the
+    // frame step calls the natives unguarded once it runs.
     if !frame_wrapper || !found.iter().all(|f| f.usable()) {
         return false;
     }
@@ -43,6 +46,13 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
     skyline::install_hook!(states::state_wiifit_heal_hook);
     skyline::install_hook!(states::state_req_screen_hook);
     skyline::install_hook!(states::state_fighter_play_se_hook);
+    state_restore::install_probability_hooks();
+    skyline::install_hook!(state_restore::state_pikmin_autonomy_hook);
+    for site in STATE_SITES.iter().filter(|s| s.name.contains("_prob_")) {
+        if let Some(i) = STATE_SITES.iter().position(|t| t.name == site.name) {
+            written[i] = Written::Far;
+        }
+    }
     for name in [
         "state_get_param_int",
         "state_set_dead_rumble",
@@ -56,11 +66,13 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
         "state_wiifit_heal",
         "state_req_screen",
         "state_fighter_play_se",
+        "state_pikmin_autonomy",
     ] {
         if let Some(i) = STATE_SITES.iter().position(|s| s.name == name) {
             written[i] = Written::Far;
         }
     }
+    states::set_active(true);
     true
 }
 

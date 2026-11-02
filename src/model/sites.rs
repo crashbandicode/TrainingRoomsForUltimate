@@ -44,6 +44,10 @@ pub enum Feature {
     StateCharge,
     /// Package 3: the buffs and their five hooks (SPEC-state-03).
     StateBuff,
+    /// Package 3: the held-item restore and its sixteen turnip hooks (SPEC-state-04).
+    StateItems,
+    /// Package 3: Steve, Olimar, Sora and the fighter-specific restores (SPEC-state-05).
+    StateRestore,
 }
 
 impl Feature {
@@ -62,6 +66,8 @@ impl Feature {
             Feature::StateCore => "state_core",
             Feature::StateCharge => "state_charge",
             Feature::StateBuff => "state_buff",
+            Feature::StateItems => "state_items",
+            Feature::StateRestore => "state_restore",
         }
     }
 }

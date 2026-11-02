@@ -251,3 +251,75 @@ pub unsafe fn status_force(accessor: usize, status: i32, block: bool) {
 pub unsafe fn get_param_int(accessor: usize, kind: u64, name: u64) -> i32 {
     at::<extern "C" fn(usize, u64, u64) -> i32>(s::STATE_GET_PARAM_INT_OFFSET)(accessor, kind, name)
 }
+
+// ---- milestone 3: items and the fighter-specific restores ------------------------------------------
+
+/// `ItemModule::have_item(accessor, kind, variation, 0, false, false)`.
+pub unsafe fn have_item(accessor: usize, kind: i32, variation: i32) {
+    at::<extern "C" fn(usize, i32, i32, i32, bool, bool)>(s::STATE_HAVE_ITEM_OFFSET)(accessor, kind, variation, 0, false, false)
+}
+
+pub unsafe fn article_generate(accessor: usize, article: i32, arg: i32) {
+    at::<extern "C" fn(usize, i32, bool, i32)>(s::STATE_ARTICLE_GENERATE_OFFSET)(accessor, article, false, arg)
+}
+
+pub unsafe fn article_remove_exist(accessor: usize, article: i32, target: i32) {
+    at::<extern "C" fn(usize, i32, i32)>(s::STATE_ARTICLE_REMOVE_EXIST_OFFSET)(accessor, article, target)
+}
+
+pub unsafe fn article_active_num(accessor: usize, article: i32) -> i32 {
+    at::<extern "C" fn(usize, i32) -> i32>(s::STATE_ARTICLE_ACTIVE_NUM_OFFSET)(accessor, article)
+}
+
+pub unsafe fn work_get_int64(accessor: usize, id: i32) -> i64 {
+    at::<extern "C" fn(usize, i32) -> i64>(s::STATE_WORK_GET_INT64_OFFSET)(accessor, id)
+}
+
+pub unsafe fn sub_material_num(accessor: usize, material: i32) {
+    at::<extern "C" fn(usize, i32, i32)>(s::STATE_SUB_MATERIAL_NUM_OFFSET)(accessor, material, 0)
+}
+
+/// `sv_battle_object::module_accessor(object id)`.
+pub unsafe fn object_accessor(object_id: u32) -> usize {
+    at::<extern "C" fn(u32) -> usize>(s::STATE_OBJECT_MODULE_ACCESSOR_OFFSET)(object_id)
+}
+
+pub unsafe fn object_is_active(object_id: u32) -> bool {
+    at::<extern "C" fn(u32) -> bool>(s::STATE_OBJECT_IS_ACTIVE_OFFSET)(object_id)
+}
+
+pub unsafe fn sora_change_magic(fighter: usize) {
+    at::<extern "C" fn(usize)>(s::STATE_SORA_CHANGE_MAGIC_OFFSET)(fighter)
+}
+
+pub unsafe fn is_have_item(accessor: usize) -> bool {
+    at::<extern "C" fn(usize, i32) -> bool>(s::STATE_IS_HAVE_ITEM_OFFSET)(accessor, 0)
+}
+
+pub unsafe fn get_have_item_id(accessor: usize) -> i32 {
+    at::<extern "C" fn(usize, i32) -> i32>(s::STATE_GET_HAVE_ITEM_ID_OFFSET)(accessor, 0)
+}
+
+pub unsafe fn remove_item(accessor: usize) {
+    at::<extern "C" fn(usize, i32)>(s::STATE_REMOVE_ITEM_OFFSET)(accessor, 0)
+}
+
+pub unsafe fn set_have_item_action(accessor: usize, action: i32, power: f32) {
+    at::<extern "C" fn(usize, i32, f32, i32)>(s::STATE_SET_HAVE_ITEM_ACTION_OFFSET)(accessor, action, power, 0)
+}
+
+/// `utility::get_category(object id)`.
+pub unsafe fn object_category(object_id: u32) -> i32 {
+    at::<extern "C" fn(u32) -> i32>(s::STATE_OBJECT_CATEGORY_OFFSET)(object_id)
+}
+
+/// `utility::get_kind(accessor)`: the kind of the fighter or item behind an accessor.
+pub unsafe fn object_kind(accessor: usize) -> i32 {
+    at::<extern "C" fn(usize) -> i32>(s::STATE_OBJECT_KIND_OFFSET)(accessor)
+}
+
+/// A turnip's power getter: `peach` or `daisy`, face `n` in 1..=8.
+pub unsafe fn turnip_power(peach: bool, n: u8) -> f32 {
+    let first = if peach { 0x1668D90 } else { 0x165BF40 };
+    at::<extern "C" fn() -> f32>(first + 0x20 * (usize::from(n) - 1))()
+}

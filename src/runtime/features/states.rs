@@ -38,7 +38,7 @@ use crate::model::state::settings::StateSettings;
 use crate::model::storage::{self, FixedPath};
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{reset_hub, state_effects, state_recorder};
+use crate::runtime::features::{reset_hub, state_effects, state_recorder, state_restore};
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives as n;
 use crate::runtime::hub;
@@ -49,6 +49,9 @@ struct State {
     settings: StateSettings,
     rng: Rng,
     ids: Table,
+    /// The two roles' fighter kinds as last seen (an item that needs a fighter's data is granted only
+    /// when one of them is that fighter).
+    last_kinds: [i32; 2],
     /// One buff bookkeeping per record (SPEC-state-03 OQ 5): player, CPU.
     buff: [BuffState; 2],
 }
@@ -67,6 +70,14 @@ static SAVE_REQUEST: AtomicBool = AtomicBool::new(false);
 static LOAD_REQUEST: AtomicBool = AtomicBool::new(false);
 /// The slot file needs writing (the writer thread takes it).
 static DIRTY: AtomicBool = AtomicBool::new(false);
+
+/// Set by boot once every site of the save states passed its guard and the hooks are installed; the
+/// frame step does nothing before that (it calls the natives unguarded).
+static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_active(on: bool) {
+    ACTIVE.store(on, Ordering::Release);
+}
 
 static CONSTS_READY: AtomicBool = AtomicBool::new(false);
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
@@ -179,7 +190,7 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
 /// generator seed.
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
-    *STATE.lock() = Some(State { machine: Machine::new(file), settings, rng: Rng::new(seed), ids: Table::unresolved(), buff: [BuffState::new(); 2] });
+    *STATE.lock() = Some(State { machine: Machine::new(file), settings, rng: Rng::new(seed), ids: Table::unresolved(), last_kinds: [-1, -1], buff: [BuffState::new(); 2] });
     set_flags(&settings);
     for (slot, name) in HASHES.iter().zip([
         "common",
@@ -288,6 +299,7 @@ fn ensure_consts() -> bool {
     JOSTLE_ID.store(table.get(C::WorkIntJostle), Ordering::Release);
     SHULK_FLASH_ID.store(table.get(C::WorkIntShulkFlash), Ordering::Release);
     JOKER_SUMMON.store(table.get(C::JokerStatusSummon), Ordering::Release);
+    state_restore::set_pikmin_statuses(table.get(C::PikminStatusAttackAir), table.get(C::PikminStatusAttackHi4Landing));
     if missing > 0 {
         let mut names = FixedPath::<400>::new();
         for name in table.missing().take(8) {
@@ -358,6 +370,9 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let stage_id = n::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
+        if raw.entry <= 1 && !nana {
+            state.last_kinds[raw.entry as usize] = raw.kind;
+        }
         if ids.is(C::KindLittleMac, raw.kind) {
             MAC_PRESENT.store(true, Ordering::Release);
         }
@@ -539,7 +554,22 @@ unsafe fn finish(raw: &Raw, done: &Done) {
     if let Some(saved) = &done.charge {
         if let Some(ids) = with(|s| s.ids.clone()) {
             let plan = charge::plan_write(&ids, raw.kind, saved);
-            state_effects::run_charge(accessor, &ids, &plan);
+            state_effects::run_charge(accessor, raw.fighter, &ids, &plan);
+        }
+    }
+    // Steve's materials and tools (SPEC-state-05 §5.4), only for Steve.
+    if let Some(steve) = &done.steve {
+        if let Some(ids) = with(|s| s.ids.clone()) {
+            if ids.is(C::KindSteve, raw.kind) {
+                state_restore::steve_write(accessor, &ids, steve);
+            }
+        }
+    }
+    // The player's held-item snapshot (SPEC-state-04 §5.1): the player record only, never Nana.
+    if let Some(item) = &done.item {
+        if let Some(ids) = with(|s| s.ids.clone()) {
+            let other = with(|s| s.last_kinds).unwrap_or([-1, -1]);
+            state_restore::restore_item(accessor, &ids, item, other);
         }
     }
     state_diag!(
@@ -553,9 +583,13 @@ unsafe fn finish(raw: &Raw, done: &Done) {
 }
 
 /// `WorkModule` reads for the charge table.
-struct Fields(usize);
+struct Fields<'a>(usize, &'a Table);
 
-impl charge::Work for Fields {
+impl charge::Work for Fields<'_> {
+    fn olimar_colours(&self) -> [Option<i32>; 3] {
+        // SAFETY: only used from the frame step with a live fighter's accessor.
+        unsafe { state_restore::olimar_line(self.0, self.1) }
+    }
     fn get_int(&self, id: i32) -> i32 {
         // SAFETY: only used from the frame step with a live fighter's accessor.
         unsafe { n::work_get_int(self.0, id) }
@@ -622,6 +656,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
     }
     let Some(role) = Role::of_entry(raw.entry) else { return };
     let accessor = raw.accessor;
+    let ids = with(|s| s.ids.clone());
     let state = SavedState {
         x: natives::pos_x(accessor),
         y: n::pos_y(accessor),
@@ -630,9 +665,10 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
-        charge: with(|s| s.ids.clone()).map(|ids| charge::read(&ids, raw.kind, &Fields(accessor))).unwrap_or_default(),
-        steve: None,
-        held_item: None,
+        charge: ids.as_ref().map(|ids| charge::read(ids, raw.kind, &Fields(accessor, ids))).unwrap_or_default(),
+        steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
+        // The player's held item (the CPU stores none).
+        held_item: ids.as_ref().filter(|_| role == Role::Player).map(|ids| state_restore::item_snapshot(accessor, ids)),
         saved_stage: Some(n::stage_id()),
         mii: None,
     };
@@ -653,7 +689,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
 
 /// The per-frame wrapper's one call (`cpu::on_frame`): constants first, then the fighter.
 pub fn frame(fighter: usize) {
-    if !ensure_consts() {
+    if !ACTIVE.load(Ordering::Acquire) || !ensure_consts() {
         return;
     }
     // SAFETY: `fighter` is the object the game passed to its on-frame function.

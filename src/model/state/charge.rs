@@ -10,6 +10,11 @@ use super::record::{Charge, Robin};
 
 /// Reading and writing a fighter's work fields (the runtime's `WorkModule` calls; tests use a map).
 pub trait Work {
+    /// Olimar: the colours of the Pikmin in line order, held first (SPEC-state-02 §5.1); the runtime
+    /// reads the troops manager. Any other implementation has none.
+    fn olimar_colours(&self) -> [Option<i32>; 3] {
+        [None; 3]
+    }
     fn get_int(&self, id: i32) -> i32;
     fn get_float(&self, id: i32) -> f32;
     fn get_flag(&self, id: i32) -> bool;
@@ -103,6 +108,10 @@ pub enum Special {
     Incineroar,
     /// Hero: the max effect is cleared before the hold frame is written.
     Hero,
+    /// Olimar: the Pikmin line (three colours in `int_x`, `int_y`, `int_z`).
+    Olimar,
+    /// Sora: the current spell (`int_x`), rotated back by the spell-change routine.
+    Sora,
 }
 
 struct Entry {
@@ -123,7 +132,7 @@ const fn follow(effect: &'static str, joint: &'static str, pos: [f32; 3], rot: [
 /// The effect attribute 32768 the spec gives for Incineroar's aura and Piranha Plant's smoke.
 const ATTR_32768: u32 = 32768;
 
-static ENTRIES: [Entry; 19] = [
+static ENTRIES: [Entry; 21] = [
     Entry {
         kinds: &[C::KindMario],
         fields: &[int(Slot::IntX, C::MarioFluddCharge)],
@@ -244,6 +253,8 @@ static ENTRIES: [Entry; 19] = [
     },
     Entry { kinds: &[C::KindHero], fields: &[int(Slot::IntX, C::HeroHoldFrame)], rules: &[], special: Special::Hero },
     Entry { kinds: &[C::KindBanjo], fields: &[int(Slot::IntX, C::BanjoFeathers)], rules: &[], special: Special::None },
+    Entry { kinds: &[C::KindOlimar], fields: &[], rules: &[], special: Special::Olimar },
+    Entry { kinds: &[C::KindSora], fields: &[int(Slot::IntX, C::SoraMagicKind)], rules: &[], special: Special::Sora },
     Entry {
         kinds: &[C::KindMiiGunner],
         fields: &[int(Slot::IntX, C::GunnerCharge)],
@@ -290,6 +301,12 @@ pub fn read(ids: &Table, kind: i32, work: &dyn Work) -> Charge {
             _ => {}
         }
     }
+    if entry.special == Special::Olimar {
+        let [first, second, third] = work.olimar_colours();
+        charge.int_x = first;
+        charge.int_y = second;
+        charge.int_z = third;
+    }
     if entry.special == Special::Robin {
         let g = |c: C| ids.get(c);
         if [
@@ -332,6 +349,11 @@ pub enum Step {
     SheikNeedles(i32),
     /// Incineroar's aura on one joint.
     RevengeAura(u64),
+    /// Olimar: respawn the Pikmin in this colour order (each present colour spawns in turn).
+    OlimarLine([Option<i32>; 3]),
+    /// Sora: make this the current spell (writes `(saved + 1) mod 3`, raises the change flag, calls the
+    /// game's spell-change routine, which advances one spell and lands on the saved one).
+    SoraSpell(i32),
 }
 
 /// A plan: at most `CAPACITY` steps, no allocation.
@@ -458,6 +480,16 @@ pub fn plan_write(ids: &Table, kind: i32, charge: &Charge) -> Plan {
                 }
             }
         }
+        Special::Olimar => {
+            if charge.int_x.is_some() || charge.int_y.is_some() || charge.int_z.is_some() {
+                plan.push(Step::OlimarLine([charge.int_x, charge.int_y, charge.int_z]));
+            }
+        }
+        Special::Sora => {
+            if let Some(saved) = charge.int_x {
+                plan.push(Step::SoraSpell(saved));
+            }
+        }
         Special::Hero | Special::None => {}
     }
     for rule in entry.rules {
@@ -482,4 +514,36 @@ pub fn sheik_group(count: i32) -> &'static str {
         1 => "group_main_1",
         _ => "group_main_0",
     }
+}
+
+/// Sora's `MAGIC_KIND` to write so that the game's change routine, which advances one spell, lands on
+/// `saved` (SPEC-state-02 §4): `(saved + 1) mod 3`.
+pub fn sora_written_kind(saved: i32) -> i32 {
+    (saved + 1).rem_euclid(3)
+}
+
+/// The previous Pikmin colour the game chooses the next one from: `v - 1`, and 4 before 0
+/// (SPEC-state-02 §5.1).
+pub fn prev_colour(v: i32) -> i32 {
+    if v > 0 {
+        v - 1
+    } else {
+        4
+    }
+}
+
+/// The three colours in line order: held Pikmin first, then the following ones, at most three; absent
+/// when fewer exist.
+pub fn line_order(held: &[Option<i32>], following: &[Option<i32>]) -> [Option<i32>; 3] {
+    let mut out = [None; 3];
+    for (slot, colour) in out.iter_mut().zip(held.iter().chain(following.iter()).flatten()) {
+        *slot = Some(*colour);
+    }
+    out
+}
+
+/// What the Pikmin respawn does for a line: for the active count 0, 1, 2 in turn, the colour to spawn
+/// (its two previous colours are written first). A colour that is absent leaves that position empty.
+pub fn spawn_colour(active: i32, line: &[Option<i32>; 3]) -> Option<i32> {
+    usize::try_from(active).ok().and_then(|i| line.get(i).copied().flatten())
 }
