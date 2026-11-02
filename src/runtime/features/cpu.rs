@@ -733,7 +733,7 @@ unsafe fn apply_mash(accessor: usize, out: &FrameOut) {
         let attribute = EFFECT_CONCLUDE.load(Ordering::Acquire);
         if attribute != UNRESOLVED {
             let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
-            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
+            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, &[0.0; 3], 2.0, (0, 0, true, attribute));
         }
     }
 }
@@ -745,7 +745,7 @@ unsafe fn apply_tech(accessor: usize, out: &FrameOut) {
     }
     if let Some(status) = out.force_status {
         cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
-        natives::change_status_force(accessor, status);
+        natives::change_status_force(accessor, status, true);
     }
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if let (Some(value), true) = (out.hide.cursor, cursor != UNRESOLVED) {

@@ -480,8 +480,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             raw.entry,
             raw.kind,
             natives::pos_x(accessor),
-            n::pos_y(accessor),
-            n::lr(accessor),
+            natives::pos_y(accessor),
+            natives::lr(accessor),
             natives::damage(accessor, 0),
             raw.status,
             raw.situation
@@ -512,7 +512,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                     raw.entry,
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopy)),
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopyOnStart)),
-                    n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)),
+                    natives::get_int(accessor, ids.get(C::KirbyIntCopyChara)),
                     module_kind
                 ));
             }
@@ -577,7 +577,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
-    let stage_id = n::stage_id();
+    let stage_id = natives::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
         if raw.entry <= 1 && !nana {
@@ -667,7 +667,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         state_restore::pt_predeath(accessor, &pt_ids());
     }
     if out.force_dead {
-        natives::change_status_force(accessor, with(|s| s.ids.get(C::StatusDead)).unwrap_or(UNRESOLVED));
+        natives::change_status_force(accessor, with(|s| s.ids.get(C::StatusDead)).unwrap_or(UNRESOLVED), true);
         state_diag!("[TrainingRooms] state kill entry={}", raw.entry);
     }
     if out.cleanup {
@@ -841,7 +841,7 @@ impl charge::Work for Fields<'_> {
     }
     fn get_int(&self, id: i32) -> i32 {
         // SAFETY: only used from the frame step with a live fighter's accessor.
-        unsafe { n::work_get_int(self.0, id) }
+        unsafe { natives::get_int(self.0, id) }
     }
     fn get_float(&self, id: i32) -> f32 {
         unsafe { natives::get_float(self.0, id) }
@@ -994,7 +994,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
                 // §5.2 step 1: the copy flag and the copied fighter's kind, then its charge values; the
                 // copied fighter's own flag goes to `copy_charge`.
                 let has_copy = natives::is_flag(accessor, ids.get(C::KirbyFlagCopy));
-                charge::read_kirby(ids, has_copy, n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
+                charge::read_kirby(ids, has_copy, natives::get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
             } else {
                 (charge::read(ids, raw.kind, &fields), None)
             }
@@ -1002,9 +1002,9 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         .unwrap_or_default();
     let state = SavedState {
         x: natives::pos_x(accessor),
-        y: n::pos_y(accessor),
+        y: natives::pos_y(accessor),
         percent: natives::damage(accessor, 0),
-        lr: n::lr(accessor),
+        lr: natives::lr(accessor),
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
@@ -1013,7 +1013,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
         held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
-        saved_stage: Some(n::stage_id()),
+        saved_stage: Some(natives::stage_id()),
         mii: None,
     };
     let write = with(|s| s.machine.capture(role, slot, state)).unwrap_or(false);
@@ -1071,12 +1071,12 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
             if param == DeathParam::DeadRebirthWaitFrame {
                 // The jostle and Shulk cleanups that ride on this override (SPEC-state-01 §4).
                 let jostle = JOSTLE_ID.load(Ordering::Acquire);
-                if jostle != UNRESOLVED && n::work_get_int(accessor, jostle) > 1 {
-                    n::work_set_int(accessor, 1, jostle);
+                if jostle != UNRESOLVED && natives::get_int(accessor, jostle) > 1 {
+                    natives::set_int(accessor, 1, jostle);
                 }
                 let flash = SHULK_FLASH_ID.load(Ordering::Acquire);
                 if flash != UNRESOLVED {
-                    n::work_set_int(accessor, 0, flash);
+                    natives::set_int(accessor, 0, flash);
                     n::effect_remove_common(accessor, hash40("monad_arts_damage_buster"));
                     n::effect_remove_common(accessor, hash40("monad_arts_damage_smash"));
                 }

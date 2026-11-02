@@ -353,7 +353,7 @@ unsafe fn on_ai_frame(ai: usize) {
             && game::natives::status_kind(body.accessor) == STATUS_CLIFF_WAIT.load(Ordering::Acquire)
             && natives::get_int(body.accessor, rest) < crate::model::recording::CLIFF_REST_TIMER_LOW
         {
-            natives::set_int(body.accessor, rest, crate::model::recording::CLIFF_REST_TIMER);
+            natives::set_int(body.accessor, crate::model::recording::CLIFF_REST_TIMER, rest);
         }
     }
 
