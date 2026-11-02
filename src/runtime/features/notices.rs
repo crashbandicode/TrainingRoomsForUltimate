@@ -97,6 +97,13 @@ pub fn session_clear() {
 pub fn hud_tick() -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);
     let out = QUEUE.lock().tick(combo_display(), menu_open);
+    #[cfg(feature = "diag")]
+    {
+        static LAST_VISIBLE: AtomicU8 = AtomicU8::new(2);
+        if LAST_VISIBLE.swap(u8::from(out.visible), Ordering::AcqRel) != u8::from(out.visible) {
+            crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] notice_visible={} menu_open={menu_open}", out.visible));
+        }
+    }
     if let Some(draw) = out.draw {
         write_panes(&draw);
     }

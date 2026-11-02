@@ -55,7 +55,21 @@ pub unsafe fn on_poll(controller: usize) {
         state.style = style;
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
-        detector.poll(set, sample, block);
+        let passed = detector.poll(set, sample, block);
+        #[cfg(feature = "diag")]
+        {
+            if passed != 0 {
+                diagnostic(format_args!("[TrainingRooms] chords_passed bits={passed:#x}"));
+            }
+            // Eden stand-in for package 5's menu (diag build only): a menu-open shortcut toggles the
+            // MENU owner bit, also while it is set, so the owner paths can be exercised.
+            if set.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0) {
+                let now = published::INPUT_OWNERS.fetch_xor(Owners::MENU.bits(), std::sync::atomic::Ordering::AcqRel) ^ Owners::MENU.bits();
+                diagnostic(format_args!("[TrainingRooms] standin menu_owner open={}", now & Owners::MENU.bits() != 0));
+            }
+        }
+        #[cfg(not(feature = "diag"))]
+        let _ = passed;
         !block && chords::plus_shortcut_accepted(set, sample)
     };
     if chords::clear_plus_bits(modal, accepted) {

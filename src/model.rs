@@ -7,6 +7,8 @@
 
 #[path = "model/cpu/mod.rs"]
 pub mod cpu;
+#[path = "model/capture_settings.rs"]
+pub mod capture_settings;
 #[path = "model/chords.rs"]
 pub mod chords;
 #[path = "model/damage_display.rs"]

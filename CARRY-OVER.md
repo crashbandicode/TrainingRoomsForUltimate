@@ -85,3 +85,27 @@ Source: stage **m5o**, `/home/intpa/smash-training-lobby/artifacts/enhancements/
 | Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
 | --- | --- | --- | --- | --- |
 | `src/model/store.rs` (shared: package 4's named macros reuse it, do not carry `library.rs` again) | `training_mod_macros/src/library.rs` (ours-new) | `f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275` | whole file except the macro-specific parts | (1) the fork's `MacroError` became `StoreError` (only the variants the store itself raises: version, size, id, not found, no free id, parse, I/O); (2) `Library`, `MacroEntry` and `Record for MacroRecording` removed (package 4 adds its own `Record` impl); (3) `Listing<S>` lost its `MacroEntry` default; (4) the `Header` serde derive in `decode` is a hand read of `schema_version` (this crate has no serde derive: resident size); (5) the id slug fallback is `entry`, not `macro`; (6) the fork's `library/tests.rs` is not carried (macro recordings); new host tests with a toy record cover ids, atomic overwrite, version/size/corruption listing, orphaned backup, sort order. |
+
+## pkg4 (package 4: recording, input display, chords, notifications; stream `stream/pkg4`)
+
+Source: stage **m5o** (`.../parked-reuse175/refactor/stages/m5o/stage`, called `<stage>`). Only files whose `origin` is
+`ours-new` in `docs/provenance/provenance-files.json` were opened (`training_mod_consts/src/menu_shortcuts.rs`,
+`training_mod_macros/src/capture_settings.rs`, `training_mod_macros/src/test_util.rs` for its `TempDir`, the heads of
+`training_mod_macros/src/lib.rs` and `src/capture_plugin.rs`, and the import / dependency lines of the other
+`training_mod_macros` files to size the carry). The mixed files (`input_record.rs`, `button_config.rs`, `input_log.rs`,
+`ui/display.rs`) and everything under `upstream-ref/` were not opened; the fork's benchmark fixtures
+(`scripts/input-display-bench/fixtures/*`, upstream copies) were not opened.
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/menu_shortcuts.rs` | `training_mod_consts/src/menu_shortcuts.rs` (ours-new) | `b19b20ac365178ff7ddba0b4801698872048de0081e8955ed4df9e87ea2e6d0d` | whole file (parse, passes, tests) | The fork's `ButtonConfig` byteflags struct is this plugin's `Chord` (`u16`, bit order of the chord rows); button-name tables (`FIELDS`, `LABELS`) replace `ButtonConfig::ALL_FIELDS/ALL_NAMES`; `DEFAULT_INI` doc line no longer says "restart" (N7, a change applies at once); `passes` also needs a non-empty chord; added `to_ini_text` (N7 writer: keeps comments and unknown lines, one line per slot), `with_slot`, `slots`, `ini_name`, `FILE_NAME`, `MAX_BYTES`; tests moved to `Chord` plus round-trip tests. |
+| `src/model/capture_settings.rs` | `training_mod_macros/src/capture_settings.rs` (ours-new) | `5357f35edcdee093075cd7e27e6c206c8a408b8a05ad46b583493213b6dc6af3` | whole file | none to the carried text except the test `TempDir` (the fork's `test_util::TempDir`, reduced, defined in the test module). Added at the end: `FILE_NAME`, `MAX_BYTES`, `to_ini_text` (the menu's Replay capture toggle, Q7: replaces the recognised line in place), `from_bytes` (fail-closed read) and their tests. |
+
+Not carried yet (S4-4, waiting on the lead's sequencing: pkg6's `training_mod_mii` first): `training_mod_macros/src/{recording,library,window,replay,live_frame,move_start,live_capture,capture_archive,capture_toggle,shared_capture,ui_anchor}.rs`,
+`src/training/named_macros.rs`, `src/replay_*.rs`, `src/live_replay.rs`, `src/capture_plugin.rs`, `src/training/ui/clip_editor.rs`,
+`training_mod_tui/src/{clip_*,macro_panel*,replay_panel,resume}.rs`. Dependencies they need (lead rulings 2026-11-02): `training_mod_mii`
+(pkg6), `smash-match-data` (vendored under `crates/`), `deluxe_plugin_sdk` (feature `deluxe-sdk`), `serde` with derive.
+`library.rs`'s generic `Store` is pkg3's `model::store`; the macro `Record` impl follows `recording.rs`.
+
+New code in this stream with no fork origin: everything else under `src/model/{recording,chords,ini_files,notify,damage_display,input_display,sites_pkg4}.rs`
+and `src/runtime/features/{recorder,chords,notices,input_display}.rs`, written from SPEC-input-01/02/04/05 and the owned 13.0.5 ELF.

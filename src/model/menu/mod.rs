@@ -47,7 +47,9 @@ impl Default for Env {
             pilot_present: false,
             console: ConsoleMode::Docked,
             shortcuts: [Chord::DEFAULT_SHORTCUT_1, Chord::NONE],
-            replay_capture: true,
+            // The file of record is the INI, which defaults to off when absent (lead ruling 2026-11-02);
+        // the runtime sets this from it at boot.
+        replay_capture: false,
         }
     }
 }
