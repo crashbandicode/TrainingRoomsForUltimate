@@ -6,7 +6,9 @@
 #[allow(dead_code)]
 mod model;
 
-use model::hook_stats::{hook_allocations, snapshot, CountingAllocator, HookId, HookScope, Observer, HOOK_COUNT};
+use model::hook_stats::{
+    hook_allocations, snapshot, CountingAllocator, HookId, HookScope, Observer, HOOK_COUNT,
+};
 
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
@@ -33,6 +35,68 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
+fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
+    use model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};
+    use model::state::quick_reset::{Pose, QuickReset};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut quick = QuickReset::new();
+    let mut machine = Machine::default();
+    let mut rng = model::cpu::rng::Rng::new(8);
+    let settings = model::state::settings::StateSettings::default();
+    let pose = Pose {
+        x: 3.0,
+        y: 4.0,
+        lr: 1.0,
+        percent: 23.0,
+        kind: 7,
+        situation: 0,
+        stage: 8,
+    };
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        for _ in 0..20 {
+            quick.clear();
+            quick.observe([8, 16], 0, true, pose);
+            quick.observe([8, 16], 1, true, pose);
+            let pair = quick.pair([8, 16]).unwrap();
+            assert!(machine.begin_temporary(pair.map(Pose::record)));
+            for _ in 0..2 {
+                for entry in [0, 1] {
+                    std::hint::black_box(machine.frame(
+                        &FrameIn {
+                            entry,
+                            nana: false,
+                            popo: false,
+                            kind: 7,
+                            dead: false,
+                            status: StatusNow::Wait,
+                            prev_rebirth: false,
+                            standby: false,
+                            stage_id: 8,
+                            situation: SituationIds {
+                                ground: 0,
+                                air: 2,
+                                cliff: 1,
+                            },
+                            save_chord: false,
+                            load_chord: false,
+                            kirby: false,
+                            pokemon: false,
+                            buffable: false,
+                        },
+                        &settings,
+                        &mut rng,
+                    ));
+                }
+            }
+            assert!(!machine.is_loading());
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
+#[test]
 fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
     let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
     let mut observer = Observer::new();
@@ -46,20 +110,38 @@ fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
         sink ^= well_behaved_hook(HookId::ResetCheck, n);
     }
     std::hint::black_box(sink);
-    let clean = observer.observe(snapshot()).expect("hooks ran, so a line is due");
-    assert_eq!(clean.delta, 0, "a stack-only hook must not move the allocation counter: {clean}");
+    let clean = observer
+        .observe(snapshot())
+        .expect("hooks ran, so a line is due");
+    assert_eq!(
+        clean.delta, 0,
+        "a stack-only hook must not move the allocation counter: {clean}"
+    );
     assert!(clean.covered(HookId::InputCallerAApply) && clean.covered(HookId::ResetCheck));
-    assert!(!clean.covered(HookId::HazardRule), "a hook that never ran is not covered");
+    assert!(
+        !clean.covered(HookId::HazardRule),
+        "a hook that never ran is not covered"
+    );
     assert_eq!(clean.hook_calls, 100);
-    assert!(clean.to_string().contains("delta=0") && clean.to_string().contains("input_caller_a_apply:50"));
+    assert!(
+        clean.to_string().contains("delta=0")
+            && clean.to_string().contains("input_caller_a_apply:50")
+    );
 
     // The intentionally allocating stub: the same detector reports a nonzero delta.
     let before = hook_allocations();
     assert_eq!(allocating_hook(HookId::HazardRule, 4096), 4096);
-    assert!(hook_allocations() > before, "the stub's allocation is counted");
-    let dirty = observer.observe(snapshot()).expect("an allocation is reported even with one hook call");
+    assert!(
+        hook_allocations() > before,
+        "the stub's allocation is counted"
+    );
+    let dirty = observer
+        .observe(snapshot())
+        .expect("an allocation is reported even with one hook call");
     assert!(dirty.delta >= 1, "{dirty}");
-    assert!(dirty.to_string().contains(&format!("delta={}", dirty.delta)));
+    assert!(dirty
+        .to_string()
+        .contains(&format!("delta={}", dirty.delta)));
     assert!(dirty.covered(HookId::HazardRule));
 
     // Allocation outside any hook is not counted (the boot thread allocates freely).
@@ -90,12 +172,21 @@ fn the_byte_meter_counts_what_the_one_global_allocator_serves() {
         return;
     }
     let output = std::process::Command::new(std::env::current_exe().expect("the test binary"))
-        .args(["--exact", "the_byte_meter_counts_what_the_one_global_allocator_serves", "--test-threads=1", "--nocapture"])
+        .args([
+            "--exact",
+            "the_byte_meter_counts_what_the_one_global_allocator_serves",
+            "--test-threads=1",
+            "--nocapture",
+        ])
         .env(CHILD, "1")
         .output()
         .expect("the child test process starts");
-    let text = String::from_utf8_lossy(&output.stdout).into_owned() + &String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success() && text.contains("heap_meter exact"), "{text}");
+    let text = String::from_utf8_lossy(&output.stdout).into_owned()
+        + &String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && text.contains("heap_meter exact"),
+        "{text}"
+    );
 }
 
 /// The child's measurement: the only thread allocating is this one.
@@ -110,18 +201,32 @@ fn measure_the_byte_meter_alone() {
         let held = model::hook_stats::heap_bytes();
         assert_eq!(held.live, before.live + (1 << 20), "live holds the block");
         assert!(held.peak >= held.live);
-        assert_eq!((held.total, held.calls), (before.total + (1 << 20), before.calls + 1));
+        assert_eq!(
+            (held.total, held.calls),
+            (before.total + (1 << 20), before.calls + 1)
+        );
         assert!(held.largest >= 1 << 20);
         let moved = ALLOCATOR.realloc(pointer, first, 1 << 10);
         assert!(!moved.is_null());
         let shrunk = model::hook_stats::heap_bytes();
-        assert_eq!(shrunk.live, before.live + (1 << 10), "the old block left `live` at the realloc, the new size is live");
-        assert_eq!(shrunk.total, held.total + (1 << 10), "the new size counts as requested");
+        assert_eq!(
+            shrunk.live,
+            before.live + (1 << 10),
+            "the old block left `live` at the realloc, the new size is live"
+        );
+        assert_eq!(
+            shrunk.total,
+            held.total + (1 << 10),
+            "the new size counts as requested"
+        );
         assert_eq!(shrunk.peak, held.peak, "peak never falls");
         ALLOCATOR.dealloc(moved, Layout::from_size_align(1 << 10, 8).unwrap());
     }
     let after = model::hook_stats::heap_bytes();
-    assert_eq!(after.live, before.live, "the freed block is not live any more");
+    assert_eq!(
+        after.live, before.live,
+        "the freed block is not live any more"
+    );
     println!("heap_meter exact");
 }
 
@@ -141,12 +246,25 @@ fn an_allocation_is_charged_to_the_innermost_scope() {
     }
     let after = snapshot();
     let charged = |id: HookId| after.allocs[id as usize] - before.allocs[id as usize];
-    assert!(charged(HookId::RosterKirby) >= 1, "the inner scope made one");
-    assert!(charged(HookId::CpuFrame) >= 1, "the outer scope is current again after the inner drops");
-    assert_eq!(after.allocs.iter().sum::<u64>(), after.allocations, "per-scope counts sum to the total");
+    assert!(
+        charged(HookId::RosterKirby) >= 1,
+        "the inner scope made one"
+    );
+    assert!(
+        charged(HookId::CpuFrame) >= 1,
+        "the outer scope is current again after the inner drops"
+    );
+    assert_eq!(
+        after.allocs.iter().sum::<u64>(),
+        after.allocations,
+        "per-scope counts sum to the total"
+    );
     let mut observer = Observer::new();
     let line = observer.observe(after).expect("activity").to_string();
-    assert!(line.contains(" allocs=") && line.contains("roster_kirby:"), "{line}");
+    assert!(
+        line.contains(" allocs=") && line.contains("roster_kirby:"),
+        "{line}"
+    );
 }
 
 /// Nesting: a hook that calls another hook's code stays inside a scope until the outer one drops.
@@ -162,7 +280,10 @@ fn nested_scopes_count_until_the_outermost_ends() {
         let v = vec![0u8; 64];
         std::hint::black_box(&v);
     }
-    assert!(hook_allocations() > before, "the allocation after the inner scope ended is still inside the outer");
+    assert!(
+        hook_allocations() > before,
+        "the allocation after the inner scope ended is still inside the outer"
+    );
     let after = hook_allocations();
     let v = vec![0u8; 64];
     std::hint::black_box(&v);

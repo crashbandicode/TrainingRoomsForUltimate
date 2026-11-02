@@ -30,6 +30,7 @@ pub mod pokemon;
 pub mod place;
 #[path = "record.rs"]
 pub mod record;
+pub mod quick_reset;
 #[path = "settings.rs"]
 pub mod settings;
 #[path = "setup.rs"]

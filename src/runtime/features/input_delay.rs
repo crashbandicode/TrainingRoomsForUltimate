@@ -81,6 +81,10 @@ fn apply() {
     if slot == 0 {
         let controller = CONTROLLER.try_with(|cell| cell.get()).unwrap_or(0);
         // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
+        if unsafe { crate::runtime::features::states::on_quick_reset_input(controller, out as *mut MappedInputs) } {
+            let _ = CONTROLLER.try_with(|cell| cell.set(0));
+            return;
+        }
         unsafe { crate::runtime::roster::handle_p1_input(out as *mut MappedInputs, controller) };
     }
     let out = out as *mut MappedInputs;
