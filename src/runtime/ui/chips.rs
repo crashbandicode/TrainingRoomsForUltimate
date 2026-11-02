@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::effect_chips::{self as m, Candidate, Held, Step};
 use crate::model::effect_texture::Visual;
