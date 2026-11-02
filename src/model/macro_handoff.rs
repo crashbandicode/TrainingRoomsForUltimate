@@ -53,7 +53,16 @@ pub struct MacroQueries {
     pub marker: Option<(f32, f32)>,
 }
 
+/// What one physical P1 mapping may do with the published editor snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClipInputRoute { Pass, Consume, Forward }
+
 impl MacroQueries {
+    pub fn clip_input_route(&self, close_owned: bool) -> ClipInputRoute {
+        if close_owned { ClipInputRoute::Consume }
+        else if self.clip_foreground || self.replay_loading { ClipInputRoute::Forward }
+        else { ClipInputRoute::Pass }
+    }
     /// Nothing loaded, nothing visible: what the hooks see before the worker's first publish.
     pub const IDLE: MacroQueries = MacroQueries {
         session: 0,
@@ -733,4 +742,33 @@ mod tests {
         assert_eq!(capture.finish(), None);
         assert!(capture.begin(), "a cancelled capture returns the buffer ready");
     }
+    #[test]
+    fn parked_clip_keeps_cancel_route_and_closing_b_never_reaches_a_later_editor() {
+        use crate::engine::macro_ui::clip_panel::CloseInputGuard;
+        use ClipInputRoute::{Consume, Forward, Pass};
+        let mut queries = MacroQueries::IDLE;
+        let mut guard = CloseInputGuard::new();
+        assert_eq!(queries.clip_input_route(guard.poll(true, false)), Pass);
+        queries.clip_foreground = true;
+        assert_eq!(queries.clip_input_route(guard.poll(true, false)), Forward);
+        // A pending Mii read parks EDITOR, but its physical B still has to reach
+        // the existing worker cancellation handler through the same mailbox.
+        queries.clip_foreground = false;
+        queries.replay_loading = true;
+        assert_eq!(queries.clip_input_route(guard.poll(true, true)), Forward);
+        // Cancel closes the opening draft. Its held press cannot leak after the
+        // short grace, nor be forwarded to a new editor published meanwhile.
+        queries = MacroQueries::IDLE;
+        guard.arm(15);
+        for poll in 0..90 {
+            if poll == 30 { queries.clip_foreground = true; }
+            assert_eq!(queries.clip_input_route(guard.poll(true, true)), Consume);
+        }
+        assert_eq!(queries.clip_input_route(guard.poll(true, false)), Forward);
+        queries = MacroQueries::IDLE;
+        assert_eq!(queries.clip_input_route(guard.poll(true, true)), Pass);
+        guard.arm(15);
+        assert_eq!(queries.clip_input_route(guard.poll(false, true)), Pass);
+    }
+
 }

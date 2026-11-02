@@ -15,7 +15,7 @@ use smash::phx::{Hash40, Vector2f, Vector3f};
 use {crate::engine::macros::InputFrame, crate::engine::macros::Library, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 use crate::runtime::macros::port::sync::*;
 use crate::engine::macro_ui::macro_panel::{
-    Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi, MiiIdentity,
+    Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi,
     NameContext, Pad, View, MACRO_KEYBOARD_TITLE, SETUP_KEYBOARD_TITLE,
 };
 
@@ -594,9 +594,8 @@ pub fn service_keyboard() {
     crate::runtime::diag_log::diagnostic(format_args!("[NativeKeyboard] applied id={}", id));
 }
 
-pub fn capture_active() -> bool { CAPTURE.capturing() }
+#[cfg(feature = "named-input-trace")]
 pub fn playback_active() -> bool { PLAYING.load(Ordering::Acquire) != 0 }
-pub fn using_frames() -> bool { capture_active() || playback_active() }
 
 pub fn init() {
     // R5: the panel-hold list is reserved at boot so hold_panel_fighter (a hook) never grows it (sync-01: +1 at the first library open).
@@ -653,6 +652,10 @@ pub fn on_pad(pad: Pad) {
             _ => {}
         }
         assign(&menu::MENU_RECEIVED_INPUT, true);
+        return;
+    }
+    if crate::runtime::macros::replay_capture::loading() {
+        if pad == Pad::Back { crate::runtime::macros::replay_capture::cancel_reload(); }
         return;
     }
     if crate::runtime::macros::replay_capture::browser_visible() {
@@ -752,24 +755,6 @@ pub fn open_external_library(
     assign(&menu::MENU_RECEIVED_INPUT, true);
 }
 
-/// CPU role index shared with save states. The read is the live configuration at record start.
-const CPU_ROLE: usize = 1;
-
-/// Exact CPU identity at recording start. Saved, original, and discovered Miis all come
-/// from `current_mii_configuration`. A Mii with no exact configuration stays [`MiiIdentity::Unknown`].
-pub fn mii_at_lockout(
-    kind: i32,
-) -> (MiiIdentity, Option<crate::engine::mii::lifetime::Configuration>) {
-    let observed = crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE);
-    let observed_kind = observed.as_ref().map(|configuration| configuration.canonical().class.kind());
-    let identity = crate::engine::macro_ui::macro_panel::mii_identity(kind, observed_kind);
-    let mii = match identity {
-        MiiIdentity::Exact => observed,
-        MiiIdentity::Ordinary | MiiIdentity::Unknown => None,
-    };
-    (identity, mii)
-}
-
 pub fn open_editor() {
     if !practice_ready() {
         return;
@@ -826,10 +811,6 @@ pub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) ->
     start
 }
 
-pub fn has_captured_frame(index: usize) -> bool {
-    CAPTURE.has_frame(index)
-}
-
 pub fn store_frame(index: usize, input: &MappedInputs) {
     if index >= crate::engine::macros::MAX_FRAMES {
         return;
@@ -842,10 +823,6 @@ pub fn store_frame(index: usize, input: &MappedInputs) {
         rstick_y: input.rstick_y,
     };
     let _ = CAPTURE.store(index, frame);
-}
-
-pub fn frame_at(index: usize) -> MappedInputs {
-    frame_for(index).unwrap_or_default()
 }
 
 pub fn finish_capture(crop: bool) {
@@ -952,6 +929,8 @@ pub fn cancel_motion() {
 /// Close the panel and stop playback. The loaded recording stays, because a
 /// character install calls session cleanup as part of the swap this macro asked for.
 pub fn clear_session() {
+    // Game-owned input guard must not survive scene cleanup.
+    crate::runtime::macros::replay_capture::owns_close_input(false, false);
     GENERATION.fetch_add(1, Ordering::Relaxed);
     SESSION_GENERATION.fetch_add(1, Ordering::Relaxed);
     crate::runtime::macros::replay_preview::clear_session();

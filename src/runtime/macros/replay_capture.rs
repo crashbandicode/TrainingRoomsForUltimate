@@ -911,6 +911,10 @@ fn apply_action(action: ClipAction) {
 /// reloads the other fighter and the crop never moves.
 pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     use crate::runtime::macros::port::input::ControllerStyle;
+    if loading() {
+        if controller.just_down.b() { cancel_reload(); }
+        return;
+    }
     let p = controller.just_down;
     let b = controller.current_buttons;
     let gcc = controller.style == ControllerStyle::GCController;

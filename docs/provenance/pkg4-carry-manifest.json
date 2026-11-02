@@ -614,7 +614,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "bc9387009a1e264d19f789a71ae189a841a941ab385d3f3460ba5c8598954766",
+   "dest_sha256": "25694e81258638ac5eb46156f16c884b3af77f77c039a377ab85b8cd039c44b9",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1079,6 +1079,41 @@
      "old": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n",
      "new": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n        crate::runtime::features::states::retire_setup_session();\n",
      "reason": "Lead23:07 exact da1 Setup provider: actual new-lobby game callback retires frozen Setup epoch before worker lifecycle handoff; same-lobby interruption preserves target. Preserve Design C worker-only UI retirement and existing preview close intent."
+    },
+    {
+     "old": "pub fn capture_active() -> bool { CAPTURE.capturing() }\npub fn playback_active() -> bool { PLAYING.load(Ordering::Acquire) != 0 }\npub fn using_frames() -> bool { capture_active() || playback_active() }\n",
+     "new": "#[cfg(feature = \"named-input-trace\")]\npub fn playback_active() -> bool { PLAYING.load(Ordering::Acquire) != 0 }\n",
+     "reason": "RC native zero-warning root: remove unused pre-Design-C facade wrappers after exact consumer inventory; retain indexed frame_for and published game identity. The only playback_active caller is named-input-trace, so declaration matches that feature instead of suppressing dead_code."
+    },
+    {
+     "old": "/// CPU role index shared with save states. The read is the live configuration at record start.\nconst CPU_ROLE: usize = 1;\n\n/// Exact CPU identity at recording start. Saved, original, and discovered Miis all come\n/// from `current_mii_configuration`. A Mii with no exact configuration stays [`MiiIdentity::Unknown`].\npub fn mii_at_lockout(\n    kind: i32,\n) -> (MiiIdentity, Option<crate::engine::mii::lifetime::Configuration>) {\n    let observed = crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE);\n    let observed_kind = observed.as_ref().map(|configuration| configuration.canonical().class.kind());\n    let identity = crate::engine::macro_ui::macro_panel::mii_identity(kind, observed_kind);\n    let mii = match identity {\n        MiiIdentity::Exact => observed,\n        MiiIdentity::Ordinary | MiiIdentity::Unknown => None,\n    };\n    (identity, mii)\n}\n\n",
+     "new": "",
+     "reason": "RC native zero-warning root: remove unused pre-Design-C facade wrappers after exact consumer inventory; retain indexed frame_for and published game identity. The only playback_active caller is named-input-trace, so declaration matches that feature instead of suppressing dead_code."
+    },
+    {
+     "old": "pub fn has_captured_frame(index: usize) -> bool {\n    CAPTURE.has_frame(index)\n}\n\n",
+     "new": "",
+     "reason": "RC native zero-warning root: remove unused pre-Design-C facade wrappers after exact consumer inventory; retain indexed frame_for and published game identity. The only playback_active caller is named-input-trace, so declaration matches that feature instead of suppressing dead_code."
+    },
+    {
+     "old": "pub fn frame_at(index: usize) -> MappedInputs {\n    frame_for(index).unwrap_or_default()\n}\n\n",
+     "new": "",
+     "reason": "RC native zero-warning root: remove unused pre-Design-C facade wrappers after exact consumer inventory; retain indexed frame_for and published game identity. The only playback_active caller is named-input-trace, so declaration matches that feature instead of suppressing dead_code."
+    },
+    {
+     "old": "    if crate::runtime::macros::replay_capture::browser_visible() {\n        crate::runtime::macros::replay_capture::browser_input(pad);",
+     "new": "    if crate::runtime::macros::replay_capture::loading() {\n        if pad == Pad::Back { crate::runtime::macros::replay_capture::cancel_reload(); }\n        return;\n    }\n    if crate::runtime::macros::replay_capture::browser_visible() {\n        crate::runtime::macros::replay_capture::browser_input(pad);",
+     "reason": "RC F8 loading cancellation root: pending RELOAD parks EDITOR, so foreground-only routing lost B while the loading footer advertised cancel. Restore B-only handling on the existing worker paths, preserving cancel_reload selection/crop semantics; hooks read the published loading bit and post copied controls, never worker state."
+    },
+    {
+     "old": "Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi, MiiIdentity,",
+     "new": "Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi,",
+     "reason": "RC warning root: remove the import used only by the retired pre-Design-C mii_at_lockout wrapper; current identity publication remains in the existing game provider."
+    },
+    {
+     "old": "pub fn clear_session() {\n    GENERATION.fetch_add(1, Ordering::Relaxed);",
+     "new": "pub fn clear_session() {\n    // Game-owned input guard must not survive scene cleanup.\n    crate::runtime::macros::replay_capture::owns_close_input(false, false);\n    GENERATION.fetch_add(1, Ordering::Relaxed);",
+     "reason": "RC F8 close input root: restore the existing game-only CloseInputGuard consumer/reset; workers only arm its atomic mailbox, so no game-to-worker lock or waits on UI work are introduced."
     }
    ]
   },
@@ -1181,7 +1216,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "b14e71b7e773d2c8e7c98f9e53c2f9ab2f202634091a0598fbfa04a885a35588",
+   "dest_sha256": "c349610d0299eaee8f4443eff3a265a532efa5def32e5ef051f3396ad7f3dca9",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1463,6 +1498,11 @@
      "old": "    crate::runtime::macros::replay_preview::request_stop();\n    PENDING.lock().unwrap().take();",
      "new": "    if RELOAD.lock().unwrap().is_some() {\n        crate::runtime::macros::replay_preview::request_stop();\n    } else {\n        crate::runtime::macros::replay_preview::request_close();\n    }\n    PENDING.lock().unwrap().take();",
      "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n",
+     "new": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n    if loading() {\n        if controller.just_down.b() { cancel_reload(); }\n        return;\n    }\n",
+     "reason": "RC F8 loading cancellation root: pending RELOAD parks EDITOR, so foreground-only routing lost B while the loading footer advertised cancel. Restore B-only handling on the existing worker paths, preserving cancel_reload selection/crop semantics; hooks read the published loading bit and post copied controls, never worker state."
     }
    ]
   },
@@ -1471,7 +1511,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "cc5c18d4169f71c1b278b439cba445210c1bd62619ec615acb1b55653f2a311f",
+   "dest_sha256": "a909bcdb9f28fee656d4b298e8607a32445e4ca499a338364f94260b1339676f",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -1672,6 +1712,11 @@
      "old": "        Some(Request::Stop) => STATUS.store(0, Ordering::Relaxed),",
      "new": "        Some(Request::Stop) => {\n            save_states::finish_preview_restore(RETIREMENT.finish());\n            STATUS.store(0, Ordering::Relaxed);\n        },",
      "reason": "Close can supersede a queued Play before a native session starts. Consume the explicit close intent in the idle Stop branch after draining requests, preserving ordinary Stop anchor retention."
+    },
+    {
+     "old": "pub fn status() -> &'static str {\n    match STATUS.load(Ordering::Relaxed) {\n        1 => \"Preparing the temporary preview setup...\",\n        2 => \"Native input preview: attacks and effects run normally\",\n        3 => \"Inputs complete; native effects finish normally. Y: restart\",\n        4 => \"Restoring the temporary preview setup...\",\n        // The editor keeps the actual failure in its full-width help strip.\n        5 => \"Preview stopped. Fix the issue above, then press X.\",\n        _ => \"\",\n    }\n}\n\n",
+     "new": "",
+     "reason": "RC zero-warning root: remove the unconsumed static-text preview facade. The canonical ClipView already publishes playing state and the exact worker-delivered failure text through clip_help; retain STATUS for actual preview state/recovery qualification."
     }
    ]
   },

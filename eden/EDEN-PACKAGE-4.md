@@ -111,3 +111,8 @@ recording duration 60), seed seed-s4-03. memory.peak 6522310656 bytes; console s
   and in this layer live_replay 1 (match load), recorder_poll 10 (finish_named_capture -> named_macros::finish_capture: to_vec, version String, offer_save,
   on the stop chord), named_service 2 (match start) + 81 (the keyboard applet service). The ones in this layer are the hook-side model calls design C
   moves to the worker; input_caller_a_note 27 / input_caller_a_apply 1 / cpu_frame 192 are at the match load (other packages).
+## Loading cancellation / held-close regression (pending integrated runtime)
+
+On the final composed candidate, retain a crop and request a track whose exact Mii metadata is still loading. Press physical B while EDITOR is parked in RELOAD: the pending selection must cancel and the previous crop must return unchanged. Repeat cancellation during opening/fighter reload: the editor closes. Other physical controls during loading do not mutate the crop or start preview. Retain the loading view/receipt and resulting editor/crop, not only a no-crash observation.
+
+Close with physical B held past 15 mapping polls, then release and press again. The held closing press must never reach gameplay or a newly opened editor; the later fresh press may. Repeat after scene departure to show close ownership reset. A failed native preview cleanup remains stopped, but after closing its panel the native pause/exit route must be available. All final hook allocation/dropped-event/Unmapped gates still apply. These rows are OPEN; source routing and host policy tests do not establish native acceptance.
