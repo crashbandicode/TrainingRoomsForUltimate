@@ -162,7 +162,7 @@ fn next_cycle_with_ice_climbers(
         Identity::Fighter(_) => PlayerOrigin::NotMii,
         Identity::Saved(canonical) => PlayerOrigin::Mii(Origin(canonical)),
     };
-    let mut choices = Vec::with_capacity(ordered.len());
+    let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);
     for fighter in ordered {
         let kind = fighter.kind();
         if let Some(class) = MiiClass::from_kind(kind) {

@@ -960,7 +960,14 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "33f39ba2db1c4616cf6cbd25a941e080efe73ce6736c61378e8bf34299053822"
+   "dest_sha256": "9c0def1eaf158115c4ea0d3af249daaf9924b38662d910faa1b6c788d4861285",
+   "edits": [
+    {
+     "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
+     "new": "    let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);\n",
+     "reason": "R5 / fix ledger F10: the preload planner's Player lane (the ordinary Mii owner's `mixed_targets`) built a Vec per planning step inside the fighter-frame hook scope (Eden s6-07 bisection: ~22 allocations a second with fighters preloaded, none with hats only and none with preload off); the lists are allocation-free and the Mii preferences are read in place"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/cycle_preload_capacity.rs",
@@ -1546,7 +1553,14 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "777ff33e518a3196dd68fa30d33d4007bdb77dfbdf1eae12592a88b279f26da0"
+   "dest_sha256": "d84d9f1989485a726c1820d1d93e34df7ec507567a7b02b6b3b58b5474314d7d",
+   "edits": [
+    {
+     "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
+     "new": "    let roster = if role == 0 {\n        menu.player_roster.fighters_excluding_fixed(None)\n    } else {\n        menu.cpu_roster.fighters_excluding_fixed(None)\n    };\n    let preferences = crate::runtime::compat::menu::mii_preferences_view();\n",
+     "reason": "R5 / fix ledger F10: the preload planner's Player lane (the ordinary Mii owner's `mixed_targets`) built a Vec per planning step inside the fighter-frame hook scope (Eden s6-07 bisection: ~22 allocations a second with fighters preloaded, none with hats only and none with preload off); the lists are allocation-free and the Mii preferences are read in place"
+    }
+   ]
   },
   {
    "src": "src/cycle_preload_config.rs",
@@ -1603,7 +1617,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "b78df911d5282e3418b6ccee694799c42062fef89624089ba471e62ca4ffb668",
+   "dest_sha256": "ef6111c7990dd71487cc9de4f77e735d50ea0e9df267fdd304cf3a686d199195",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -1619,26 +1633,6 @@
      "old": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    let is_capacity=is_capacity_entry(entry,slot);\n",
      "new": "pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {\n    // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an\n    // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).\n    #[cfg(feature = \"diag\")]\n    {\n        static SEEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);\n        let quantity = native_source::training_cpu_quantity().unwrap_or(u32::MAX - 1);\n        if SEEN.swap(quantity, Ordering::Relaxed) != quantity {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[CharacterSources] cpu_quantity={quantity} seen_by_service slot={slot}\"));\n        }\n    }\n    let is_capacity=is_capacity_entry(entry,slot);\n",
      "reason": "diag only (F9 research, lead ruling 2026-11-02): proves whether the native loader callback runs while the pause menu is open, i.e. whether the give-back can run there before the game activates a parked CPU entry"
-    },
-    {
-     "old": "\n/// Only called with the current native loader callback's argument.\n",
-     "new": "\n/// F9: the native fighter each parked Training entry held before the first helper went in (captured at admission), and a give-back\n/// in progress (its install token and the native kind being reinstalled). Indexed by native entry.\nstatic NATIVE_KIND: [std::sync::atomic::AtomicU32; 8] = [const { std::sync::atomic::AtomicU32::new(u32::MAX) }; 8];\nstatic GIVE_BACK: Mutex<[Option<(InstallToken, u32)>; 8]> = Mutex::new([None; 8]);\n\nfn native_kind(slot: u32) -> Option<u32> {\n    let kind = NATIVE_KIND.get(slot as usize)?.load(Ordering::Acquire);\n    // A Mii (needs its own configuration) or a kind the roster catalog does not know cannot be reinstalled by kind alone: unknown.\n    (kind != u32::MAX && !(0x48..=0x4a).contains(&kind) && crate::engine::swap::trio::TrioFighter::from_kind(kind).is_some()).then_some(kind)\n}\n\n/// F9: the give-back step of a parked Training entry's loader callback. `true` when the callback is taken (a give-back started, is\n/// in progress or waits for a lease), so the ordinary service does not run for this entry.\nunsafe fn give_back(entry: *mut u8, slot: u32) -> bool {\n    use crate::model::parked_entries::{action, EntryAction};\n    let index = slot as usize;\n    if index >= 8 { return false; }\n    let pending = GIVE_BACK.lock().unwrap()[index];\n    if let Some((install, kind)) = pending {\n        if native_source::parked_ready(entry, slot, kind) {\n            GIVE_BACK.lock().unwrap()[index] = None;\n            NATIVE_KIND[index].store(u32::MAX, Ordering::Release);\n            finish_install(install, \"parked entry given back to its native fighter\");\n            crate::engine::compat::logging::diagnostic(format_args!(\"[CharacterSources] give_back done slot={slot} kind=0x{kind:x}\"));\n        }\n        return true;\n    }\n    let training = crate::runtime::compat::common::is_native_training_mode();\n    let quantity = native_source::training_cpu_quantity();\n    let (owned, leased, kind) = {\n        let state = STATE.lock().unwrap();\n        let source = state.sources[index];\n        let leased = source.is_some_and(|source| state.leases.iter().flatten().any(|live| live.source == source.token));\n        (source.is_some_and(|source| source.install.is_none()), leased, source.map(|source| source.kind))\n    };\n    match action(training, quantity, slot, owned, leased, native_kind(slot)) {\n        EntryAction::Keep => false,\n        EntryAction::Wait => true,\n        EntryAction::GiveBack => {\n            let Some(native) = native_kind(slot) else { return true; };\n            let Some(install) = INSTALL.try_begin(false) else { return true; };\n            STATE.lock().unwrap().sources[index] = None;\n            GIVE_BACK.lock().unwrap()[index] = Some((install, native));\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[CharacterSources] give_back slot={slot} cpu_quantity={quantity:?} helper=0x{:x} native=0x{native:x}\", kind.unwrap_or(0)));\n            native_source::install(entry, native);\n            true\n        }\n    }\n}\n\n/// Only called with the current native loader callback's argument.\n",
-     "reason": "F9 give-back (lead ruling 2026-11-02, fix ledger F9; the fork has the defect too): a helper admitted into a parked Training entry while No. of CPUs was 1 stayed there when the count rose, and the game activated the entry with the helper's body (Eden s6-04). The entry's native fighter is captured at admission; on the entry's own loader callback, once the count makes it live, an unleased helper is replaced by that native fighter (a parked native install under the shared install gate) before the game shows it; a leased one waits for its release. The decision is `model::parked_entries::action` (host-tested)"
-    },
-    {
-     "old": "    let is_capacity=is_capacity_entry(entry,slot);\n    if !cfg!(feature = \"managed-sources\") || !callback_slot(slot) {\n        return;\n    }\n",
-     "new": "    let is_capacity=is_capacity_entry(entry,slot);\n    if !cfg!(feature = \"managed-sources\") || !callback_slot(slot) {\n        return;\n    }\n    if give_back(entry, slot) {\n        return;\n    }\n",
-     "reason": "F9 give-back (lead ruling 2026-11-02, fix ledger F9; the fork has the defect too): a helper admitted into a parked Training entry while No. of CPUs was 1 stayed there when the count rose, and the game activated the entry with the helper's body (Eden s6-04). The entry's native fighter is captured at admission; on the entry's own loader callback, once the count makes it live, an unleased helper is replaced by that native fighter (a parked native install under the shared install gate) before the game shows it; a leased one waits for its release. The decision is `model::parked_entries::action` (host-tested)"
-    },
-    {
-     "old": "    native_source::install(entry, wanted.kind);\n}\n",
-     "new": "    // F9: remember the native fighter of a parked Training entry before its first helper (a later helper replaces a helper).\n    if crate::runtime::compat::common::is_native_training_mode() && crate::model::parked_entries::PARKED.contains(&slot)\n        && native_kind(slot).is_none() {\n        NATIVE_KIND[slot as usize].store(read::<u32>(entry, 0x18), Ordering::Release);\n    }\n    native_source::install(entry, wanted.kind);\n}\n",
-     "reason": "F9 give-back (lead ruling 2026-11-02, fix ledger F9; the fork has the defect too): a helper admitted into a parked Training entry while No. of CPUs was 1 stayed there when the count rose, and the game activated the entry with the helper's body (Eden s6-04). The entry's native fighter is captured at admission; on the entry's own loader callback, once the count makes it live, an unleased helper is replaced by that native fighter (a parked native install under the shared install gate) before the game shows it; a leased one waits for its release. The decision is `model::parked_entries::action` (host-tested) (capture at admission)"
-    },
-    {
-     "old": "pub fn scene_changed() {\n",
-     "new": "pub fn scene_changed() {\n    // F9: a new scene has new parked entries: forget the captured native fighters and end a give-back still in progress.\n    for kind in &NATIVE_KIND { kind.store(u32::MAX, Ordering::Release); }\n    for pending in GIVE_BACK.lock().unwrap().iter_mut() {\n        if let Some((install, _)) = pending.take() { finish_install(install, \"give-back ended by the scene change\"); }\n    }\n",
-     "reason": "F9 give-back (lead ruling 2026-11-02, fix ledger F9; the fork has the defect too): a helper admitted into a parked Training entry while No. of CPUs was 1 stayed there when the count rose, and the game activated the entry with the helper's body (Eden s6-04). The entry's native fighter is captured at admission; on the entry's own loader callback, once the count makes it live, an unleased helper is replaced by that native fighter (a parked native install under the shared install gate) before the game shows it; a leased one waits for its release. The decision is `model::parked_entries::action` (host-tested) (scene change)"
     }
    ]
   },

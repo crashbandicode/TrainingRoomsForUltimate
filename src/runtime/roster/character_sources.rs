@@ -1198,11 +1198,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 }
 
 pub fn scene_changed() {
-    // F9: a new scene has new parked entries: forget the captured native fighters and end a give-back still in progress.
-    for kind in &NATIVE_KIND { kind.store(u32::MAX, Ordering::Release); }
-    for pending in GIVE_BACK.lock().unwrap().iter_mut() {
-        if let Some((install, _)) = pending.take() { finish_install(install, "give-back ended by the scene change"); }
-    }
     #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::depart();
     // LOG-REFUSED: refusal lines are bounded per scene.
@@ -1884,57 +1879,6 @@ unsafe fn admission_declined(
         phase, replaceable, requested, seen.reservation, detail));
 }
 
-/// F9: the native fighter each parked Training entry held before the first helper went in (captured at admission), and a give-back
-/// in progress (its install token and the native kind being reinstalled). Indexed by native entry.
-static NATIVE_KIND: [std::sync::atomic::AtomicU32; 8] = [const { std::sync::atomic::AtomicU32::new(u32::MAX) }; 8];
-static GIVE_BACK: Mutex<[Option<(InstallToken, u32)>; 8]> = Mutex::new([None; 8]);
-
-fn native_kind(slot: u32) -> Option<u32> {
-    let kind = NATIVE_KIND.get(slot as usize)?.load(Ordering::Acquire);
-    // A Mii (needs its own configuration) or a kind the roster catalog does not know cannot be reinstalled by kind alone: unknown.
-    (kind != u32::MAX && !(0x48..=0x4a).contains(&kind) && crate::engine::swap::trio::TrioFighter::from_kind(kind).is_some()).then_some(kind)
-}
-
-/// F9: the give-back step of a parked Training entry's loader callback. `true` when the callback is taken (a give-back started, is
-/// in progress or waits for a lease), so the ordinary service does not run for this entry.
-unsafe fn give_back(entry: *mut u8, slot: u32) -> bool {
-    use crate::model::parked_entries::{action, EntryAction};
-    let index = slot as usize;
-    if index >= 8 { return false; }
-    let pending = GIVE_BACK.lock().unwrap()[index];
-    if let Some((install, kind)) = pending {
-        if native_source::parked_ready(entry, slot, kind) {
-            GIVE_BACK.lock().unwrap()[index] = None;
-            NATIVE_KIND[index].store(u32::MAX, Ordering::Release);
-            finish_install(install, "parked entry given back to its native fighter");
-            crate::engine::compat::logging::diagnostic(format_args!("[CharacterSources] give_back done slot={slot} kind=0x{kind:x}"));
-        }
-        return true;
-    }
-    let training = crate::runtime::compat::common::is_native_training_mode();
-    let quantity = native_source::training_cpu_quantity();
-    let (owned, leased, kind) = {
-        let state = STATE.lock().unwrap();
-        let source = state.sources[index];
-        let leased = source.is_some_and(|source| state.leases.iter().flatten().any(|live| live.source == source.token));
-        (source.is_some_and(|source| source.install.is_none()), leased, source.map(|source| source.kind))
-    };
-    match action(training, quantity, slot, owned, leased, native_kind(slot)) {
-        EntryAction::Keep => false,
-        EntryAction::Wait => true,
-        EntryAction::GiveBack => {
-            let Some(native) = native_kind(slot) else { return true; };
-            let Some(install) = INSTALL.try_begin(false) else { return true; };
-            STATE.lock().unwrap().sources[index] = None;
-            GIVE_BACK.lock().unwrap()[index] = Some((install, native));
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[CharacterSources] give_back slot={slot} cpu_quantity={quantity:?} helper=0x{:x} native=0x{native:x}", kind.unwrap_or(0)));
-            native_source::install(entry, native);
-            true
-        }
-    }
-}
-
 /// Only called with the current native loader callback's argument.
 /// Already-owned loads run before any scene, mode or ownership gate.
 pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
@@ -1950,9 +1894,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     }
     let is_capacity=is_capacity_entry(entry,slot);
     if !cfg!(feature = "managed-sources") || !callback_slot(slot) {
-        return;
-    }
-    if give_back(entry, slot) {
         return;
     }
     let index = slot as usize;
@@ -2345,11 +2286,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
             crate::engine::compat::logging::diagnostic(format_args!("[MiiHelper] native submit refused; INSTALL retained source={:?}",load.source()));
         }
         return;
-    }
-    // F9: remember the native fighter of a parked Training entry before its first helper (a later helper replaces a helper).
-    if crate::runtime::compat::common::is_native_training_mode() && crate::model::parked_entries::PARKED.contains(&slot)
-        && native_kind(slot).is_none() {
-        NATIVE_KIND[slot as usize].store(read::<u32>(entry, 0x18), Ordering::Release);
     }
     native_source::install(entry, wanted.kind);
 }
