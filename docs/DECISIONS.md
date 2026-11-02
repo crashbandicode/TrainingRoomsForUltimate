@@ -411,3 +411,38 @@ affected spec (its *Open questions* answer and §9 test-provenance rows) and the
 
 **Answered 2026-11-02 (~02:4xZ):** Q5 and B11 as recommended; the SDI ×2.0 stretch, the Developer page (N1) and the
 delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage grid. Nothing in this list is open.
+
+## CPU ownership and hot-slot decisions — 2026-11-02
+
+### F9: promote the helper on CPU-count increases
+
+The 20:5xZ decision supersedes delayed count changes and native setter replay.
+When the CPU count rises, the helper already occupying newly active entry 2 or
+3 becomes that CPU. Retain its body, remove it from the helper pool, and publish
+matching identity, descriptor, HUD, portrait and name through the existing swap
+identity path. Exact-Mii identity and Training-reset persistence are required.
+Entry 2 uses the CPU rotation's next member; entry 3 uses the following member.
+In slow mode, helper seats do not occupy live entries while the CPU count is
+greater than one; re-adopt them when the count drops.
+
+Acceptance remains open: count 1→2→3→2→1, a helper still loading, exact-Mii
+promotion, L+R+A and save/load with two or three CPUs, and zero total Unmapped
+messages in the retained Eden console. This records the behavior decision,
+not implementation or runtime acceptance.
+
+### Hot fighters and Kirby hats: measure before setting defaults
+
+The 21:1xZ preference is ten total hot fighters across both roles, including
+the two active fighters, plus a separate budget of five hot Kirby hats. Hat
+sources are not charged against the fighter budget; a hat whose fighter kind
+is already hot shares that body. A maximum of fifteen is conditional on fit.
+Keep the existing fighter-pool and free-memory guard, with ordinary slow
+loading beyond available capacity.
+
+Before fixing the defaults, run one low-priority Eden measurement at ten
+fighters plus five hats. Record fighter-pool capacity, reserve, peak guest
+memory and zero total Unmapped messages. If the pool or memory cannot hold
+that configuration, present the measurements for a decision rather than
+silently lowering it. The measurement must follow resolution of the existing
+helper-path fault hold. This follow-up is not an RC blocker unless it changes
+approved behavior; no default has been changed by this documentation.
