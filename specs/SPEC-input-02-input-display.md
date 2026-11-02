@@ -30,6 +30,14 @@ Help texts: "Log inputs in a queue on the left of the screen"; "Group input logs
 - The whole column is hidden while the mod menu is open, while the vanilla pause menu is open (SPEC-input-04 §3.3 for the detection), or when Input Display is None.
 - Colours (RGB, applied as the icon picture material's "black" colour): GREEN (22, 156, 0), RED (153, 10, 10), CYAN (0, 255, 255), BLUE (0, 40, 108), PURPLE (100, 66, 202), YELLOW (230, 180, 14), WHITE (255, 255, 255).
 
+**Icons — lead decision 2026-11-02 (packages 4 and 5).** The specs name no source for the input-log icon art, and
+upstream's icon pictures are unlicensed. Each row's five icon slots are therefore **text boxes that show the game's own
+controller glyphs** from its font (code points in SPEC-core-03 §4.3: A E0E0, X E0E2, Y E0E3, L E0E4, R E0E5, ZL E0E6,
+ZR E0E7, D-pad E079–E07C, Plus E0EF, Minus E0F0, stick presses E104/E105, the rest per that section), coloured with
+this spec's per-icon colours as the text colour; stick directions and their strong tiers use the clean room's own
+arrow glyph built from rectangles (the font has no arrows). No new texture, 15 rows × 5 text slots instead of
+2,775 picture panes. `Frame` and `Status` stay text boxes. Pane names are package 5's single pane table
+(`panes::name_of`). An Eden screenshot of the log goes into the release summary for the operator.
 ## 3. Inputs
 
 - The two menu settings.
