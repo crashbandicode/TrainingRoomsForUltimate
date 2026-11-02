@@ -82,7 +82,15 @@ def main():
     cpu_on = after_cpu == [1, 0]
     w.open()
     w.focus("Character Cycles")
-    w.keys("a w15 down right right right zr y w8")
+    w.keys("a w15 down right right right")
+    # Role changes synchronously request a fresh portrait page. Wait for its
+    # observed ready state before sending the short Y press; a fixed 0.3 s
+    # gap was shorter than ui-14's 429 ms portrait load and the press was lost.
+    ready = r"\[Thumbs\] bound=86 loading=0"
+    before_ready = u.count(PHASE, r6.DIAG, ready)
+    w.keys("zr")
+    u.wait_count(PHASE, r6.DIAG, ready, before_ready + 1, 15, "CPU roster portraits ready before Solo input")
+    w.keys("y w8")
     r6.shot("solo-cpu-toggled")
     w.keys("zr w8")
     r6.shot("solo-player-preserved")
