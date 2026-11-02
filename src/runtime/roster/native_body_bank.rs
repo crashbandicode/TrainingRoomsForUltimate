@@ -2611,7 +2611,9 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             return;
         }
         let mut saved_x = save_window(entry as usize);
-        let x_members = std::mem::replace(&mut bank.members, Box::new(*bank.groups[swap.group].members));
+        // Both tables already own stable storage. Exchange their owners instead
+        // of allocating a duplicate target table inside this native callback.
+        std::mem::swap(&mut bank.members, &mut bank.groups[swap.group].members);
         let target_members = *bank.members;
         // The Mii identity follows the window: `R` holds the window group's identity
         // (MII-GROUPS-DESIGN §3.3). When a Mii moves in or out, save the words the
@@ -2630,7 +2632,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
-                group.members = x_members; group.bodies = x_bodies; group.saved = Some(saved_x);
+                group.bodies = x_bodies; group.saved = Some(saved_x);
                 trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
                     &group.members.kinds()[..group.members.count()], x_bodies);
                 restore_window(entry as usize, &y);
@@ -2654,7 +2656,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             }
             (GroupState::Prefetched, None) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, [Body::default(); NATIVE_MEMBERS]);
-                group.members = x_members; group.bodies = x_bodies; group.saved = Some(saved_x); group.state = GroupState::Built;
+                group.bodies = x_bodies; group.saved = Some(saved_x); group.state = GroupState::Built;
                 trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
                     &group.members.kinds()[..group.members.count()], x_bodies);
                 clear_window(entry as usize);
@@ -2711,7 +2713,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             (found, saved) => {
                 // Inconsistent record: put the table back and refuse this swap. A permanent
                 // failure: a Prefetched record returns its keys first (U20, `swap_model::fallback`).
-                bank.members = x_members;
+                std::mem::swap(&mut bank.members, &mut group.members);
                 group.saved = saved;
                 group.identity = target_identity;
                 bank.identity = x_identity;
@@ -3017,11 +3019,10 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     let (failed, restored) = {
         let mut state = BANKS[role].lock().unwrap();
         let Some(bank) = state.as_mut() else { return; };
-        let target = std::mem::replace(&mut bank.members, Box::new(Members::new(&[0, 1]).unwrap()));
         let target_identity = bank.identity;
         let record = &mut bank.groups[group];
         let Some(x) = record.saved.take() else { return; };
-        bank.members = std::mem::replace(&mut record.members, target);
+        std::mem::swap(&mut bank.members, &mut record.members);
         let failed = *record.members;
         bank.bodies = std::mem::replace(&mut record.bodies, [Body::default(); NATIVE_MEMBERS]);
         record.state = GroupState::Failed;

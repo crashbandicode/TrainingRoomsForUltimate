@@ -36,14 +36,16 @@ def request(method, params=None):
     return reply["result"]
 
 
-# Loader:Debug in this isolated profile supplies this boot's real mapping.
+# A current guest instruction capture, matched against 64 bytes of owned main,
+# supplies the mapping even when the launcher overrides Loader:Debug.
 console = (run / "console.log").read_bytes()
-matches = re.findall(rb"loaded module main @ (0x[0-9a-fA-F]+)", console)
-assert len(matches) == 1, "Require current-run Loader:Debug main mapping before trigger"
-base = int(matches[0], 16)
+mapping = json.loads((out / "main-mapping-verified.json").read_text())
+assert mapping["guard_bytes"] == 64
+base = int(mapping["main_base"], 16)
 (out / "console-before-trigger.log").write_bytes(console)
 manifest = json.loads((run / "run.json").read_text())
 pid = int(manifest["verified_limits"]["MainPID"])
+assert pid == mapping["eden_pid"]
 command = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ")
 assert b"eden" in command.lower(), command
 address = base + 0x653350
@@ -53,6 +55,7 @@ armed = request("tracepoint.arm", {
     "memory_register": "x24", "memory_size": 32, "timeout_ms": 20000,
 })
 assert armed["state"] == "armed", "Unexpected pre-trigger hit; do not reload"
+assert armed["process_id"] == mapping["process_id"]
 
 # Exact r_r5_soak settings transition, without its one-second wait before capture.
 live = json.loads((rows.SD / "settings.json").read_text()).get("menu", {})
