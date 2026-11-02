@@ -2,6 +2,7 @@
 //! INSTALL submission and phase-time publication are distinct commits.
 use super::*;
 use std::sync::Arc;
+use hos_lock::Mutex as OwnerMutex;
 use std::convert::TryInto;
 use crate::engine::mii::{
     inventory::{MiiClass,Snapshot as Catalog}, lifetime::Configuration,
@@ -16,7 +17,9 @@ use crate::engine::swap::mii_cycle::{self,Identity,Live};
 #[path="mii_ordinary_gate.rs"] mod hook;
 
 static ENABLED:AtomicBool=AtomicBool::new(false);
-static STATE:Mutex<State>=Mutex::new(State {
+// Const kernel lock: the first native callback must not allocate a pthread
+// mutex. Keep exclusion for all callers; no game-thread-only assumption.
+static STATE:OwnerMutex<State>=OwnerMutex::new(State {
     owner:None,track:None,catalog:None,capture:false,capture_at:(0,0),menu_valid:false,request:None,next:1,
     generic:None,restore:None,
     #[cfg(feature="native-body-bank-alpha")]
@@ -111,11 +114,11 @@ pub(super) unsafe fn visible_exact(current:*const u8,kind:u32)->Result<native::V
 fn note(reason:impl std::fmt::Display) { trace!("[MiiOrdinaryPlayer] {reason}"); }
 
 pub(super) fn preload_pending()->bool {
-    let s=STATE.lock().unwrap(); s.capture || s.request.is_some() || s.busy()
+    let s=STATE.lock(); s.capture || s.request.is_some() || s.busy()
 }
 pub(super) fn preload_targets(menu:&TrainingModpackMenu)->Option<[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS]> {
     let (original,live,catalog,saved)={
-        let s=STATE.lock().unwrap();
+        let s=STATE.lock();
         if !s.menu_valid || s.capture || s.busy() || s.request.is_some() {return None;}
         let o=s.owner.as_ref()?;
         if o.origin.binding.epoch!=epoch() {return None;}
@@ -145,7 +148,7 @@ pub(super) unsafe fn init(base:usize)->bool {
 }
 pub(super) fn catalog_ready(catalog:Arc<Catalog>,generation:u64,opening:u64)->bool {
     if !ENABLED.load(Ordering::Acquire) {return false;}
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     if epoch()!=generation || mii_saved_alpha::menu_epoch()!=opening {return false;}
     let complete=catalog.is_complete();
     s.catalog=Some(catalog);s.menu_valid=false;s.capture=complete && !s.busy();
@@ -154,24 +157,24 @@ pub(super) fn catalog_ready(catalog:Arc<Catalog>,generation:u64,opening:u64)->bo
 }
 #[cfg(feature="mii-ordinary-cpu-alpha")]
 pub(super) fn library_catalog() -> Result<Option<Arc<Catalog>>, ()> {
-    let s = STATE.try_lock().map_err(|_| ())?;
+    let s = STATE.try_lock().ok_or(())?;
     Ok(s.catalog.as_ref().map(Arc::clone))
 }
 #[cfg(feature="mii-ordinary-cpu-alpha")]
 pub(super) fn publish_library(expected: &Arc<Catalog>, prepared: &Arc<Catalog>) -> Result<bool, ()> {
-    let mut s = STATE.try_lock().map_err(|_| ())?;
+    let mut s = STATE.try_lock().ok_or(())?;
     if !s.catalog.as_ref().is_some_and(|catalog| Arc::ptr_eq(catalog, expected)) { return Ok(false); }
     s.catalog = Some(Arc::clone(prepared));
     Ok(true)
 }
 pub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {
-    let s=STATE.lock().unwrap();
+    let s=STATE.lock();
     s.capture && (s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize)
         || original_kind(Role::Player)==Some(read::<u32>(entry,0x18)))
 }
 #[cfg(feature="mii-managed-helper-alpha")]
 pub(super) fn helper_origin_captured()->bool {
-    let s=STATE.lock().unwrap();
+    let s=STATE.lock();
     !s.capture && !s.busy() && s.owner.as_ref().is_some_and(|o|o.origin.binding.epoch==epoch())
 }
 /// Settled loaded configuration for this Player entry. Original, saved and
@@ -179,7 +182,7 @@ pub(super) fn helper_origin_captured()->bool {
 /// A transaction, a non-Mii, or a configuration whose class is not the loaded
 /// descriptor kind returns None.
 pub(super) fn current_configuration()->Option<Configuration> {
-    let s=STATE.lock().unwrap();
+    let s=STATE.lock();
     if !s.menu_valid || s.capture || s.busy() || s.request.is_some() {return None;}
     let owner=s.owner.as_ref().filter(|o|
         o.origin.binding.epoch==epoch() && o.origin.layout.logical(o.origin.binding.owner)==Some(0))?;
@@ -188,7 +191,7 @@ pub(super) fn current_configuration()->Option<Configuration> {
         .then_some(configuration)
 }
 pub(super) fn player_context()->Option<(PlayerOrigin,PlayerLive)> {
-    let s=STATE.lock().unwrap();
+    let s=STATE.lock();
     if !s.menu_valid || s.capture || s.busy() || s.request.is_some() {return None;}
     s.owner.as_ref().filter(|o|o.origin.binding.epoch==epoch()).map(|o| {
         let original=o.origin_saved.map_or(PlayerOrigin::NotMii,
@@ -203,7 +206,7 @@ pub(super) fn player_context()->Option<(PlayerOrigin,PlayerLive)> {
 /// Consume ordinary Player actions even when refused, so they cannot fall through to SavedRole.
 pub(super) fn menu_close(context:MenuContext,action:Action)->bool {
     if !matches!(action,Action::ReloadPlayer(_)) {return false;}
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
         return enabled();
     };
@@ -240,7 +243,7 @@ fn stage_saved(origin:&native::Snapshot,target:Configuration)->[u8;0x70] {
     descriptor
 }
 fn clear_request(request:Request) {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let restore_refused=s.request==Some(request) && s.restore.is_some();
     if s.request==Some(request) {s.request=None;s.restore=None;}
     drop(s);
@@ -251,10 +254,10 @@ fn clear_request(request:Request) {
 }
 pub(super) fn enabled()->bool {ENABLED.load(Ordering::Acquire)}
 pub(super) fn owns(entry:usize)->bool {
-    STATE.lock().unwrap().owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry)
+    STATE.lock().owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry)
 }
 pub(super) fn request_restore(value:WaitingValue)->bool {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     if !mii_backend::current().is_some_and(|l|l.waiting()) || !enabled() {return false;}
     // Qualification precedes continuation, ordinary values included: the remembered
     // choice replaces the CSS-origin body, the only body capture can qualify.
@@ -276,7 +279,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
 }
 pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {
     if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
         #[cfg(feature="mii-ordinary-cpu-alpha")]
         // A manual ordinary swap can replace the same origin needed by capture.
@@ -438,14 +441,14 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     if owner!=0 || !ENABLED.load(Ordering::Acquire) {return false;}
     #[cfg(feature="native-body-bank-alpha")]
     {
-        let bank=STATE.lock().unwrap().bank;
+        let bank=STATE.lock().bank;
         if let Some(b)=bank {
             if b.ticket.entry!=entry as usize {return false;}
             bank_service(entry,b);
             return true;
         }
     }
-    let tracked=STATE.lock().unwrap().track.clone();
+    let tracked=STATE.lock().track.clone();
     if let Some(t)=tracked {
         if t.ticket.entry!=entry as usize {return false;}
         if matches!(t.gate.phase(),Phase::Refused|Phase::Departed) {
@@ -468,11 +471,11 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
         }
         return true;
     }
-    let needs_capture=STATE.lock().unwrap().capture;
+    let needs_capture=STATE.lock().capture;
     if needs_capture {capture(entry);}
     #[cfg(feature="native-body-bank-alpha")]
     mii_group_record_publication(entry);
-    if STATE.lock().unwrap().request.is_none() {return false;}
+    if STATE.lock().request.is_none() {return false;}
     begin(entry)
 }
 
@@ -503,7 +506,7 @@ unsafe fn complete(entry:*const u8,t:&Track) {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080004);
             let result=native::completed(t);
-            let mut s=STATE.lock().unwrap();
+            let mut s=STATE.lock();
             if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}
             match result {
                 Ok(now) if epoch()==t.ticket.epoch => {
@@ -563,7 +566,7 @@ unsafe fn complete(entry:*const u8,t:&Track) {
 /// A bank build is a cache load with native already settled. Never adopt the new
 /// physical receipt: drop authority (no native writes) and release INSTALL.
 fn bank_build_refused(t:&Track,reason:&'static str) {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}
     s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;
     drop(s);
@@ -577,7 +580,7 @@ unsafe fn capture(entry:*mut u8) {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080002);
     let kind=read::<u32>(entry,0x18);
-    let captured=STATE.lock().unwrap().owner.as_ref().map(|o|o.origin.original_kind);
+    let captured=STATE.lock().owner.as_ref().map(|o|o.origin.original_kind);
     let Some(original)=captured.or_else(||original_kind(Role::Player)) else {return;};
     // An owned bank can display any member while +0x18 remains member zero.
     // Prove native readiness here; capture_origin below compares the physical
@@ -588,7 +591,7 @@ unsafe fn capture(entry:*mut u8) {
     };
     if (captured.is_none() && original!=kind) || !ready_now
         || INSTALL.active() || !mii_backend::ready() {return;}
-    let (catalog,at)={let s=STATE.lock().unwrap();(s.catalog.as_ref().map(Arc::clone),s.capture_at)};
+    let (catalog,at)={let s=STATE.lock();(s.catalog.as_ref().map(Arc::clone),s.capture_at)};
     let Some(catalog)=catalog else {return;};
     // Keep the arm's generation/opening through native capture; never adopt a later lifetime.
     let result=if at==(epoch(),mii_saved_alpha::menu_epoch()) {
@@ -598,7 +601,7 @@ unsafe fn capture(entry:*mut u8) {
         Ok(())=>note("catalog owner qualified; immutable origin retained"),
         Err(native::helpers::CaptureError::Busy)=>{},
         Err(native::helpers::CaptureError::Refused(reason))=>{
-            let mut s=STATE.lock().unwrap();
+            let mut s=STATE.lock();
             if s.capture_at==at {s.capture=false;}
             drop(s);note(reason);
         }
@@ -611,7 +614,7 @@ unsafe fn begin(entry:*mut u8)->bool {
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080003);
     if !permitted() {return false;}
     let pending={
-        let s=STATE.lock().unwrap();
+        let s=STATE.lock();
         s.owner.as_ref().zip(s.request).map(|(o,request)|
              (o.origin,o.origin_saved,o.expected,o.active,o.cursor,s.catalog.as_ref().map(Arc::clone),request,s.restore))
     };
@@ -744,7 +747,7 @@ unsafe fn begin(entry:*mut u8)->bool {
     if (bank_same || (descriptor==current.descriptor && ready(entry,descriptor_kind(&descriptor))))
         && crate::engine::mii::role_owner::payload_already_active(active,publish,
             restore.is_some() || destination.target==mii_cycle::Target::Original) {
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         if !s.busy() && s.request==Some(request)
             && request.current(mii_saved_alpha::menu_epoch(),active.map(|c|c.canonical())) {
             if let Some(o)=s.owner.as_mut().filter(|o|
@@ -840,7 +843,7 @@ unsafe fn begin(entry:*mut u8)->bool {
         refused_before_submit(token,"Player preflight changed before INSTALL ownership");return false;
     }
     let track={
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         if s.busy() || s.request!=Some(request) || epoch()!=current.binding.epoch
             || !request.current(mii_saved_alpha::menu_epoch(),
                 s.owner.as_ref().and_then(|o|o.active.map(|c|c.canonical())))
@@ -893,7 +896,7 @@ unsafe fn begin(entry:*mut u8)->bool {
     if !submitted {
         // The bank refused before any native write: no Reload was issued.
         let owned={
-            let mut s=STATE.lock().unwrap();
+            let mut s=STATE.lock();
             let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);
             if owned {s.track=None;}
             owned
@@ -902,7 +905,7 @@ unsafe fn begin(entry:*mut u8)->bool {
         note("bank build refused before native Reload; request cleared");
         return false;
     }
-    if let Some(current)=STATE.lock().unwrap().track.as_mut().filter(|t|t.ticket==track.ticket) {
+    if let Some(current)=STATE.lock().track.as_mut().filter(|t|t.ticket==track.ticket) {
         current.installing=false;
     }
     true
@@ -913,7 +916,7 @@ unsafe fn begin(entry:*mut u8)->bool {
 #[cfg(feature="native-body-bank-alpha")]
 unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
     pose:super::native_reload_pose::ReloadPose)->bool {
-    let bank=STATE.lock().unwrap().bank;
+    let bank=STATE.lock().bank;
     let Some(b)=bank.filter(|b|b.ticket.entry==entry as usize) else {return false;};
     // A Mii group switch publishes the exact record before the native request
     // (MII-GROUPS-DESIGN §5.2), with the group's own identity as the hat proof. The
@@ -1028,7 +1031,7 @@ unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
 #[cfg(feature="native-body-bank-alpha")]
 unsafe fn bank_refused(b:BankTrack,reason:&'static str,diverged:bool) {
     let effects=crate::engine::mii::ordinary_player::bank_refusal_effects(diverged);
-    let (published,departed)=match STATE.lock().unwrap().bank {
+    let (published,departed)=match STATE.lock().bank {
         Some(now) if now.ticket==b.ticket && now.token==b.token=>(now.published,now.departed),
         _=>return,
     };
@@ -1038,7 +1041,7 @@ unsafe fn bank_refused(b:BankTrack,reason:&'static str,diverged:bool) {
         trace!("[MiiOrdinaryPlayer] bank publication restore deferred ticket={:?} why=busy reason={}",b.ticket,reason);
         return;
     }
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}
     if effects.drop_bank {s.bank=None;}
     if effects.drop_request {s.request=None;s.restore=None;}
@@ -1125,7 +1128,7 @@ fn trace_recovering(note:Option<RecoveringNote>) {
 
 /// Wrapper ownership is separate from the observer/service callback's Rust early return.
 pub(super) unsafe fn enter_native(entry:*mut u8)->bool {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let Some(t)=s.track.as_mut().filter(|t|t.ticket.entry==entry as usize) else{return true;};
     if t.installing {return false;} // Suppress a same-entry callback nested inside INSTALL.
     if !native::span(entry as usize,0x5a88,false) || epoch()!=t.ticket.epoch {
@@ -1135,7 +1138,7 @@ pub(super) unsafe fn enter_native(entry:*mut u8)->bool {
 }
 pub(super) unsafe fn leave_native(entry:*mut u8) {
     let event={
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         s.track.as_mut().filter(|t|t.ticket.entry==entry as usize).and_then(|t| {
             let loader=read::<u8>(entry,0x591c);
             t.gate.leave(t.ticket,loader);
@@ -1157,12 +1160,12 @@ pub(super) unsafe fn leave_native(entry:*mut u8) {
     }
 }
 pub(super) fn tracked(entry:usize)->bool {
-    STATE.lock().unwrap().track.as_ref().is_some_and(|t|t.ticket.entry==entry)
+    STATE.lock().track.as_ref().is_some_and(|t|t.ticket.entry==entry)
 }
 /// The tracked request's staged descriptor when it carries a Mii payload, and whether it is the
 /// same-class retained-O arm (U5: the gate's configure-skip writer reads it; cloned under STATE).
 pub(super) fn mii_payload_descriptor(entry:usize)->Option<([u8;0x70],bool)> {
-    STATE.lock().unwrap().track.as_ref().filter(|t|t.ticket.entry==entry && t.publish.is_some())
+    STATE.lock().track.as_ref().filter(|t|t.ticket.entry==entry && t.publish.is_some())
         .map(|t|(t.descriptor,t.same_class.is_some()))
 }
 /// WORKAROUND-DECISIONS row 7 (operator-approved root fix), the Player side of D-PTA1b: a prequeue
@@ -1172,7 +1175,7 @@ pub(super) fn mii_payload_descriptor(entry:usize)->Option<([u8;0x70],bool)> {
 /// rows, its publication skipped); the track stays `Refused`, is never published, and `service`
 /// releases it as `NativeSettledUnowned` when native settles (loader 14). Eden E2 validates it.
 pub(super) fn continue_natively(entry:usize)->bool {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let event=s.track.as_mut().filter(|t|t.ticket.entry==entry).and_then(|t| {
         t.gate.continue_natively()
             .then_some((t.ticket,t.reload_target().kind,t.bank,t.publish.is_some() || t.same_class.is_some()))
@@ -1188,7 +1191,7 @@ pub(super) fn continue_natively(entry:usize)->bool {
 }
 pub(super) unsafe fn prequeue(entry:usize,selected:usize)->bool {
     let track={
-        let s=STATE.lock().unwrap();
+        let s=STATE.lock();
         let Some(t)=s.track.as_ref().filter(|t|t.ticket.entry==entry) else{return true;};
         if !t.gate.may_publish(t.ticket,6) {drop(s);refuse(entry,"duplicate/reentrant gate");return false;}
         t.clone()
@@ -1215,7 +1218,7 @@ pub(super) unsafe fn prequeue(entry:usize,selected:usize)->bool {
     }
 }
 fn refuse(entry:usize,reason:&str) {
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     let event=s.track.as_mut().filter(|t|t.ticket.entry==entry).map(|t| {
         t.gate.refuse();(t.ticket,t.gate.phase(),t.gate.published())
     });
@@ -1233,7 +1236,7 @@ pub(super) unsafe fn begin_generic(entry:*mut u8,token:InstallToken,descriptor:&
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080005);
     if !enabled() {return;}
     let pending={
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         s.generic=None;
         let busy=s.busy() || s.request.is_some();
         s.owner.as_ref().filter(|o|o.origin.binding.entry==entry as usize).map(|o|(
@@ -1249,7 +1252,7 @@ pub(super) unsafe fn begin_generic(entry:*mut u8,token:InstallToken,descriptor:&
         Ok(_)=>{note("generic Player0 began from an unqualified owner state");return;}
         Err(reason)=>{note(reason);return;}
     };
-    let mut s=STATE.lock().unwrap();
+    let mut s=STATE.lock();
     if s.busy() || s.request.is_some() || epoch()!=before.binding.epoch
         || !s.owner.as_ref().is_some_and(|o|o.expected==expected && o.origin_saved.is_none()
             && o.active.is_none() && o.cursor.is_none()) {
@@ -1263,7 +1266,7 @@ pub(super) unsafe fn complete_generic(entry:*mut u8,token:InstallToken,kind:u32)
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080006);
     if !enabled() {return;}
     let generic={
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         if s.generic.as_ref().is_some_and(|g|g.token==token && g.before.binding.entry==entry as usize) {
             s.generic.take()
         } else {None}
@@ -1276,7 +1279,7 @@ pub(super) unsafe fn complete_generic(entry:*mut u8,token:InstallToken,kind:u32)
     }
 }
 pub(super) fn scene_changed() {
-    let mut s=STATE.lock().unwrap();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;
+    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;
     s.generic=None;s.restore=None;
     #[cfg(feature="native-body-bank-alpha")]
     if let Some(b)=s.bank.as_mut() {b.departed=true;}
@@ -1288,7 +1291,7 @@ pub(super) fn scene_changed() {
 }
 pub(super) fn on_destroy(entry:*const u8) {
     let token={
-        let mut s=STATE.lock().unwrap();
+        let mut s=STATE.lock();
         if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}
         if s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize) {
             s.owner=None;s.request=None;s.restore=None;s.capture=false;s.menu_valid=false;

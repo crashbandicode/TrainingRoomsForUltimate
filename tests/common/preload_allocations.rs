@@ -32,6 +32,30 @@ static ALLOCATOR: CountAlloc = CountAlloc;
 mod observed_map;
 
 #[test]
+fn const_owner_lock_first_use_and_refusal_do_not_allocate() {
+    // Exercise the exact public primitive selected by the native owner states.
+    // Host futex contention has a different wait backend; native SVC proof is
+    // separate. No setup lock or warm-up before the measured first acquisition.
+    static OWNER: hos_lock::Mutex<Option<[u64; 4]>> = hos_lock::Mutex::new(None);
+    std::thread::spawn(|| {
+        COUNT.with(|count| count.set(0));
+        TRACK.with(|track| track.set(true));
+        let mut owner = OWNER.lock();
+        let first = *owner;
+        *owner = Some([17, 23, 42, 99]);
+        let refused = OWNER.try_lock().is_none();
+        drop(owner);
+        let settled = *OWNER.try_lock().unwrap();
+        for _ in 0..128 { assert_eq!(*OWNER.lock(), settled); }
+        TRACK.with(|track| track.set(false));
+        assert_eq!(COUNT.with(Cell::get), 0);
+        assert_eq!(first, None);
+        assert_eq!(settled, Some([17, 23, 42, 99]));
+        assert!(refused);
+    }).join().unwrap();
+}
+
+#[test]
 fn native_release_recipes_use_key_mask_bound_without_allocations() {
     use crate::engine::swap::swap_model::ledger::*;
     for kind in (0..128).chain(std::iter::once(NO_KIND)) {
