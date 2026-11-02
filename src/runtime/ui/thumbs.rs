@@ -104,9 +104,9 @@ pub unsafe fn run(panes: &Panes) -> bool {
         if !s.active || s.sig != s.requested {
             changed |= release_all(&mut s, Some(panes));
             if s.active && texture::usable() {
-                request(&mut s);
+                let keyed = request(&mut s);
                 let loading = s.slots.iter().take(s.count).filter(|slot| matches!(slot, Slot::Loading { .. })).count();
-                log(format_args!("[Thumbs] page sig={:#x} tiles={} requested={loading}", s.sig, s.count));
+                log(format_args!("[Thumbs] page sig={:#x} tiles={} requested={loading} keyed={keyed}", s.sig, s.count));
             }
         }
         for i in 0..s.count {
@@ -146,8 +146,9 @@ pub unsafe fn run(panes: &Panes) -> bool {
 }
 
 /// Ask for the textures of the page's tiles.
-unsafe fn request(s: &mut State) {
+unsafe fn request(s: &mut State) -> usize {
     s.requested = s.sig;
+    let mut keyed = 0;
     for i in 0..s.count {
         let mut buffer = [0u8; 96];
         let hash = if s.roster {
@@ -158,12 +159,14 @@ unsafe fn request(s: &mut State) {
                 .and_then(|len| core::str::from_utf8(&buffer[..len]).ok())
                 .map(texture::path_hash)
         };
+        keyed += usize::from(hash.is_some());
         let slot = hash.and_then(|hash| texture::load(hash));
         s.slots[i] = match slot {
             Some(texture) => Slot::Loading { texture, frames: 0 },
             None => Slot::Failed,
         };
     }
+    keyed
 }
 
 /// Unbind what is bound (when the panes still exist) and retire every texture the slots hold. True when a picture was on screen.

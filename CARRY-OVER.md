@@ -320,3 +320,5 @@ The existing `src/model/mii_root/mii_menu.rs` (ours-new carried from frozen m5q;
 
 `src/editors/mii.rs` is new clean-room presentation/worker adapter code. Its tests create synthetic owned saved-Mii records and exercise the real carried policy. Runtime native lifecycle/actions and bust binding are still being wired and are not accepted yet.
 The ui-screens portrait transform also extracts the existing native key-builder call in character_roster.rs into one shared helper (waiting-icon preload and roster UI); its manifest/ledger records the edit. Uses owned game assembly and existing seam guards, not a new pathname provider. Runtime evidence pending.
+
+UI portrait admission correction after ui-13: the existing enforcing character_roster seam gate checks roster.kind_hash and roster.icon_hash before publishing BASE. The menu helper now uses that readiness; core game::Granted has neither carried seam and previously refused every portrait. Exact manifest transform, regenerated ledger, full264-file verification; no guard bypass or fork/stage edit. Runtime portrait acceptance pending.

@@ -1467,7 +1467,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "87c4e3831f1c83ac1873bca049d351ff8114da1aa74f62f0b7957ea675167120",
+   "dest_sha256": "9c65b85356c48d625bec6014385b8be850fb386f880ab10962c0479fb1191519",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1509,6 +1509,11 @@
      "old": "// Both icon paths use this roster module's published, verified text base.",
      "new": "/// Native UI key builder shared by waiting-icon preloads and menu portraits.\nunsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u32) -> u64 {\n    let key: unsafe extern \"C\" fn(u64, u32, u32) -> u64 = std::mem::transmute(base + 0x3238a70);\n    key(fighter_kind_hash(base, kind), costume, picture)\n}\n\n/// The active role's costume portrait, queried on the UI job thread. The native\n/// builder supplies patch paths, names and regional costume remapping.\npub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 || !crate::runtime::game::granted(0x3238a70)\n        || !crate::runtime::game::granted(0x138c9b0) { return None; }\n    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };\n    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));\n    let hash = fighter_picture_hash(base, kind, costume, 1);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}\n\n// Both icon paths use this roster module's published, verified text base.",
      "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "    if base == 0 || !crate::runtime::game::granted(0x3238a70)\n        || !crate::runtime::game::granted(0x138c9b0) { return None; }",
+     "new": "    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }",
+     "reason": "ui-13 portrait root fix: use the roster BASE published only after its authoritative native_seams gate; unrelated core Granted excludes both functions and permanently refused every portrait. Preserve both existing64-byte guards and pre-init refusal."
     }
    ]
   },

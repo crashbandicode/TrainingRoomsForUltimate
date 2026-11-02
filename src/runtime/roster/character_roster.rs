@@ -2284,8 +2284,10 @@ unsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u3
 /// builder supplies patch paths, names and regional costume remapping.
 pub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {
     let base = BASE.load(Ordering::Acquire);
-    if base == 0 || !crate::runtime::game::granted(0x3238a70)
-        || !crate::runtime::game::granted(0x138c9b0) { return None; }
+    // init publishes BASE only after the enforcing character_roster seam gate
+    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).
+    // These carried seams are not members of game::Granted's core Site tables.
+    if base == 0 { return None; }
     let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };
     let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));
     let hash = fighter_picture_hash(base, kind, costume, 1);
