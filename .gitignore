@@ -3,3 +3,4 @@
 *.nro
 /eden/runs/
 /eden/refs/
+__pycache__/

@@ -318,12 +318,16 @@ def down(args, failed=False):
     print("down", json.dumps({"label": label, "failed_up": failed, **note, "left": left}))
 
 
+def scan_lines(text):
+    """(line number, line) of every panic/abort/crash/Unmapped line (case-insensitive)."""
+    return [(i + 1, l) for i, l in enumerate(text) if re.search(r"panic|abort|crash|Unmapped", l, re.I)]
+
+
 def scan(args):
     """Search console.log for panic/abort/crash and Unmapped lines (EDEN.md "Read the results")."""
     log = run_dir(args.label) / "console.log"
     text = log.read_text(encoding="utf-8", errors="replace").splitlines()
-    hits = [(i + 1, l) for i, l in enumerate(text)
-            if re.search(r"panic|abort|crash|Unmapped", l, re.I)]
+    hits = scan_lines(text)
     for n, l in hits[:200]:
         print(f"{n}: {l[:300]}")
     print(f"-- {len(text)} lines, {len(hits)} matching")

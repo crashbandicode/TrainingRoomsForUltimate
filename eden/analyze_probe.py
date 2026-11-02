@@ -5,6 +5,9 @@ For every trial: mean absolute grey difference over Steve's region (x 100-420, y
 render shot) between the paused frame and (a) the baseline shot taken before the macro started and
 (b) the first trial's paused frame (macro frame == the first target). The onset is the first macro frame
 whose difference to the baseline exceeds the threshold, provided every later frame stays above it.
+
+Host test (synthetic shots, a planted 5-frame shift and a no-shift case):
+    /usr/bin/python3 -I tests/eden/test_analyze.py        (also run by `cargo test`, tests/eden_scripts.rs)
 """
 import json
 import sys
@@ -15,36 +18,49 @@ from PIL import Image, ImageChops, ImageStat
 BOX = (100, 120, 420, 480)
 
 
-def grey(path):
-    return Image.open(path).convert("L").crop(BOX)
+def grey(path, box=BOX):
+    return Image.open(path).convert("L").crop(box)
 
 
 def diff(a, b):
     return ImageStat.Stat(ImageChops.difference(a, b)).mean[0]
 
 
+def table_for(d, name, box=BOX):
+    """[(macro frame, difference to the baseline shot, difference to the first trial)] per trial."""
+    d = Path(d)
+    rows = json.loads((d / f"{name}.json").read_text())
+    folder = d / name
+    ref = grey(folder / rows[0]["shot"], box)
+    return [
+        (r["frame_paused"], diff(grey(folder / r["shot"], box), grey(folder / r["base"], box)),
+         diff(grey(folder / r["shot"], box), ref))
+        for r in rows
+    ]
+
+
+def find_onset(table, threshold):
+    """First macro frame above the threshold whose every later frame stays above it, or None."""
+    for i, (frame, db, _) in enumerate(table):
+        if db > threshold and all(x[1] > threshold for x in table[i:]):
+            return frame
+    return None
+
+
+def max_noise(table, onset):
+    return max(db for frame, db, _ in table if onset is None or frame < onset)
+
+
 def main():
     d = Path(sys.argv[1])
     name = sys.argv[2]
     threshold = float(sys.argv[3]) if len(sys.argv) > 3 else 6.5
-    rows = json.loads((d / f"{name}.json").read_text())
-    folder = d / name
-    ref = grey(folder / rows[0]["shot"])
-    table = []
-    for r in rows:
-        f = grey(folder / r["shot"])
-        b = grey(folder / r["base"])
-        table.append((r["frame_paused"], diff(f, b), diff(f, ref)))
+    table = table_for(d, name)
     print("macro_frame d_to_baseline d_to_first")
     for frame, db, dr in table:
         print(f"{frame:4d} {db:6.2f} {dr:6.2f}")
-    onset = None
-    for i, (frame, db, _) in enumerate(table):
-        if db > threshold and all(x[1] > threshold for x in table[i:]):
-            onset = frame
-            break
-    quiet = [db for frame, db, _ in table if onset is None or frame < onset]
-    print(f"threshold={threshold} onset_frame={onset} max_noise_before_onset={max(quiet):.2f}")
+    onset = find_onset(table, threshold)
+    print(f"threshold={threshold} onset_frame={onset} max_noise_before_onset={max_noise(table, onset):.2f}")
 
 
 if __name__ == "__main__":

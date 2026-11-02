@@ -121,7 +121,7 @@ Game fps 59.9-60.0 in Training.
 `mkmacros.py` + `macros/` (probe macros and the route segment with sha256 of the original), `settings/` (the four settings files), `refs/` (reference screenshots for the gates), `runs/tr101..tr104/` (events.log, settings.json, console.log, run.json, memory.peak, receipts, shots, probes).
 **`eden/runs/` is about 690 MB (screenshots of four runs) and is not in `.gitignore`; add `/eden/runs/` before committing.**
 
-Reproduce a number: `python3 -I eden/analyze_probe.py eden/runs/tr101/probes jump-scan 6.5` (prints `onset_frame=74`), same for tr103 (74) and tr104 (69).
+Reproduce a number: `python3 -I eden/analyze_probe.py eden/runs/tr101/probes jump-scan 6.5` (prints `onset_frame=74`), same for tr103 (74) and tr104 (69); frame-stepped numbers: `python3 -I eden/analyze_step.py eden/runs/tr102/probes step-jump 6.5` (prints `onset_frame=64`); console.log counts and matches: `python3 -I eden/tr_eden.py scan <label>`. The scripts have host tests on synthetic data (a planted 5-frame shift is measured as 5, no shift as 0, a flicker is not an onset, planted panic/Unmapped lines are found): `python3 -I tests/eden/test_analyze.py`, also run by `cargo test` (`tests/eden_scripts.rs`).
 
 ## Re-run after the D1-D4 fixes (2026-11-02, labels tr105 and tr106)
 
