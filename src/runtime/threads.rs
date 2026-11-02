@@ -88,15 +88,18 @@ mod imp {
         busy: &'static AtomicBool,
     }
 
-    /// One static slot per thread (the boot loaders share one), each the size of its table row; diag-only and
-    /// feature-only threads have their stacks only in those builds.
+    /// One static slot per thread (the boot stack is shared), each the size of its table row; diag-only and feature-only
+    /// threads have their stacks only in those builds. Each arm takes its thread's name as an inline const, so only the
+    /// names of threads this build has reach the binary (the table itself is not read at run time).
     macro_rules! slots {
-        ($( $(#[$attr:meta])* $name:ident = [$($id:ident),+]; )*) => {
-            $( $(#[$attr])* static $name: Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }> = Slot::new(); )*
-            fn parts(id: ThreadId) -> Option<Parts> {
+        (shared $sname:ident = [$($sid:ident),+]; $( $(#[$attr:meta])* $name:ident = [$id:ident]; )*) => {
+            static $sname: Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$sid),+]) }> = Slot::new();
+            $( $(#[$attr])* static $name: Slot<{ thread_stacks::of(ThreadId::$id).bytes }> = Slot::new(); )*
+            fn parts(id: ThreadId) -> Option<(Parts, &'static core::ffi::CStr)> {
                 #[allow(unreachable_patterns)]
                 match id {
-                    $( $(#[$attr])* $(ThreadId::$id)|+ => Some($name.parts()), )*
+                    $( ThreadId::$sid => Some(($sname.parts(), const { thread_stacks::of(ThreadId::$sid).c_name })), )+
+                    $( $(#[$attr])* ThreadId::$id => Some(($name.parts(), const { thread_stacks::of(ThreadId::$id).c_name })), )*
                     _ => None,
                 }
             }
@@ -104,8 +107,8 @@ mod imp {
     }
 
     slots! {
+        shared BOOT_STACK = [Import, SettingsLoad, StateLoad, ImportCaptures];
         HEARTBEAT = [Heartbeat];
-        BOOT_STACK = [Import, SettingsLoad, StateLoad, ImportCaptures];
         STATE_WRITER = [StateWriter];
         #[cfg(feature = "diag")] STATE_DIAG = [StateDiag];
         INI_WRITER = [IniWriter];
@@ -122,7 +125,7 @@ mod imp {
 
     /// Create `id`'s thread on its static stack, running `entry(argument)`, and name it. `busy` is held on success.
     fn create(id: ThreadId, entry: extern "C" fn(*mut skyline::libc::c_void), argument: *mut u8) -> io::Result<Parts> {
-        let Some(parts) = parts(id) else {
+        let Some((parts, name)) = parts(id) else {
             return Err(io::Error::other("no static stack for this thread in this build"));
         };
         if parts.busy.swap(true, Ordering::AcqRel) {
@@ -139,7 +142,7 @@ mod imp {
             return Err(io::Error::other(format!("nn::os::CreateThread failed: {result:#x}")));
         }
         // SAFETY: the object was just created; the name is a static C string.
-        unsafe { nn::os::SetThreadNamePointer(parts.object, thread_stacks::of(id).c_name.as_ptr().cast()) };
+        unsafe { nn::os::SetThreadNamePointer(parts.object, name.as_ptr().cast()) };
         Ok(parts)
     }
 

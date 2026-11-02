@@ -144,7 +144,16 @@ fn every_thread_has_one_static_stack_from_the_table() {
     for id in thread_stacks::BOOT_LOADERS {
         assert!(thread_stacks::joined(id), "{id:?} shares a stack before the last user, so it must be joined");
     }
-    assert!(text.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>"), "slot sizes come from the table");
+    assert!(text.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$sid),+]) }>"), "the shared slot's size comes from the table");
+    assert!(text.contains("Slot<{ thread_stacks::of(ThreadId::$id).bytes }>"), "each slot's size comes from the table");
+    // Names are inline consts per arm: only the threads a build has put their names into it.
+    assert!(text.contains("const { thread_stacks::of(ThreadId::$id).c_name }"));
+    // The diag-only and feature-only threads have their stacks only in those builds.
+    for (slot, gate) in [("STATE_DIAG", "diag"), ("DIAG_RELOAD", "diag"), ("PROBE", "diag"), ("MACRO_DIAG", "diag"),
+        ("PRACTICE_TRACE", "console-practice-trace")]
+    {
+        assert!(block.contains(&format!("#[cfg(feature = \"{gate}\")] {slot} = [")), "{slot} must be behind `{gate}`");
+    }
     assert_eq!(
         thread_stacks::slot_bytes(&thread_stacks::BOOT_STACK),
         thread_stacks::BOOT_STACK.iter().map(|id| thread_stacks::of(*id).bytes).max().unwrap()
