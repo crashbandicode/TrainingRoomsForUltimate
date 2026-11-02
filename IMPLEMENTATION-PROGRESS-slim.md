@@ -1414,3 +1414,112 @@ Operator normalized gate implemented with unchanged sloc4 measure rules, pinnedf
 separate historical raw budget basis. Lead23:11 approved initial136069 normalizedceiling.
 Nine counter/gate tests PASS; currentworking normalized130570<=136069.
 Independent operator-tool parity at33a9713 running; finalfreshCargo gates pending.
+
+## Slim six bounded cold owners proposal 2026-11-02T23:15:41.983048+00:00
+Completed fullsource audit of ui_resume/name/settings/resume_adapter/cosmetic paths.
+Fresh839 native followup raw: slim/839eafa-diag/stack/mii-cold-owner-followup.txt.
+1) CONTINUATION has no boot initialization: registered practice_frame187364 calls
+try_auto_return f5af0; inactive initial path f5b18 locks5e784 before any ticket,
+menu or context qualification. Also lifecycle observation and invalid-context paths.
+2) settings JOB is locked unconditionally at18949c→5e2ac before EDIT_OWNED;
+POLICY18957c→5e2e4 reached even unowned, WRAP1895dc→5e31c on first bound
+Settings page. init only registers settings_frame; no storage acquisition atboot.
+3) name OWNER184e8c→5e124 and PREPARED184ec4→5e3c0 precede real first
+Keyboard::open184f78; init onlyregisters name_frame. Fresh owned editing or release
+can first-touch them. These privateowners have no worker initializer.
+Each zero native lock word reachesOnceBox1e861c count1e862c/alloc40 at1e8638.
+Request exact UNAPPLIED /home/intpa/smash-training-lobby/tmp-slim/mii-six-owner-locks.patch
+SHA21f21dc81978abc96fda61a8e5c07bef25c8007f153852d9cf113b38b8629ae3: only these SIXprivateowners across3files,
+consthos import+namedowner unwrap removals, parentSTATE and TRACE untouched.
+Guard scopes/valueownership/SDK/Lua/native ordering unchanged. No broad substitution.
+33a native-owner gatedhost componentPASS; b88 batches approved staticWork+normalized
+gate/protocoltest, frozen1185; no b88compiler yet. Newproposal NOTapplied.
+
+## Slim normalized basis parity and native candidate 2026-11-02T23:16:46.610914+00:00
+b88d22e committed: exactapproved static SDK work + actual-adapter SDK-boundary test
++ operatornormalizedcounter/gate. Current130570=src127132+crates3438, headroom5499
+against lead-approved136069. Exact33a comparison: operator sloc-fmt rustfmt0fail
+src127125+crates3438+tools245=130808, excludingtools130563; newcounter130563 EXACT.
+Delta33a→b88 +7normalized; 5b126463→fixed8ee/lifecycle33a130563 +4100normalized
+(compositiondelta, not attributed solely to slim). No rawpendingallowance carried.
+Ninecounter/gatetestsPASS. b88 fresh1185frozenfiles, NEWemptytarget, tar8ce6cfee.
+FreshhostONEclaim Yoga23:15, running; CARGO_INCREMENTAL0/TMPDIRext4/6G1800.
+Archived74executed33atestbinaries tarSHA608ef91b5625bb768e4ea208b3fb382a3798d0e1e146be7001dcfd9662c5ff3b.
+Own839target323980795B and33atarget1574708293B retired onlyafter complete
+SHAmanifests/idle/sourcechecks; receipts in respective final-retirement dirs.
+Conservative freshcache56.665GB (census before33aretirement)+3GBreserve<60GB.
+No Eden/profile. Sixcoldownerproposal21f21dc8 remainsUNAPPLIED awaitingreview.
+
+## QUESTIONS — remaining release-only cold owners 2026-11-02T23:17:51.153296+00:00
+Lead: approve separate exact UNAPPLIED /home/intpa/smash-training-lobby/tmp-slim/mii-release-owner-locks.patch
+SHA5888a2d731d2213ed21f9ba5f319f125411d0f8261eeac0be0eb02e894541a70? Only CAPTURE/RECONSTRUCTION and cosmetic
+WAIT/VOICE/GEAR/COLOR imports+namedlockunwrap removal; parentSTATE untouched.
+Proof fresh839: registered editor_release1835f0 ownedscene/context branch calls
+resume_adapter::before_release f5968 at1836a8 BEFORE nativeoriginal/destruction.
+That function clears CAPTUREf5a4c→5e194 and RECONSTRUCTIONf5a68→5e15c.
+Cosmeticclear f7798 calledf5ad0: WAITf779c→5e274,VOICEf77b4→5e23c,
+GEARf77d0→5e1cc,COLORf77e8→5e204. All exactstdlockzero branches reach
+OnceBoxcount+alloc40. Normal first editor close without entering those leaves
+still clears their constNone slots, so first acquisition can be cleanup itself.
+No bootresourceinitialization for these private statics; resumeinit onlyregisters
+specials_frame/settings_frame. Fullsource personallyread. No arbitrarywarmup.
+Existingcontext/thread qualification, take/drop order, native/Lua calls outside
+guards, selection/state/ticket/identity contracts unchanged. Rawfullfunctions
+slim/839eafa-diag/stack/mii-release-owner-followup.txt. This and21f21dc8
+remainUNAPPLIED while currentb88host runs; request batches further gates.
+TRACE cold claim disproven as previouslyreported. ParentSTATE requires separate
+worker/init-order audit and remainsuntouched, no global substitution requested.
+
+## Host gate failure and formatter root correction 2026-11-02T23:18:43.973368+00:00
+b88 host cargo101,86.143s,1185unchanged,59executedbinaryhashes;
+log85878e71be7af571159a1e909206a62a10b7b957d0630069da7eed841c11db25.
+No wholehostPASS; stopped atsize_budget after other suites. Actual nativeadapter
+protocolcase passed. Exact rawerror:
+```text
+---- the_implementation_is_within_its_size_budget stdout ----
+
+thread 'the_implementation_is_within_its_size_budget' (2141197) panicked at tests/size_budget.rs:21:5:
+size_gate.py failed:
+size_gate: normalization failed: normalization requires rustfmt 1.9.0-stable (48a229ceae 2026-09-01); found rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)
+
+
+```
+Root: floating stable alias points to1.10 onYoga,1.9 onSurface. Both explicit
+rustup run1.98.1 rustfmt --version return exact1.9.0-stable48a229ceae.
+Change invocation to1.98.1, retain exactversionreject and no rawfallback.
+No toolchain replacement/install or baselinechange. Rawfailurearchived.
+Yoga released23:18/controllerreaped, no compiler/Eden/profile.
+
+## QUESTIONS — parent editor STATE first-use audit 2026-11-02T23:20:42.027752+00:00
+ParentSTATE cold candidate now has concrete source/native ownership proof, but
+no patchapplied or blanketreplacementrequested. Fresh839 Quickplayinitialized
+183f8c→lifecycle::notef8a18→STATE.try_lock5df24 atf8a30; LDN184484→
+notef50cc→same trylockf50e4. This occurs after validoutercontext/generation,
+before any editorrequest is required. STATE startsNone, init neveracquiresit.
+Only catalog-worker early-use candidate is catalog_read a25f0→STATE.lock5deec
+ata2610, reached by fallback1a600/replaywriter3ee70 only AFTER receiving a
+catalogjob. Full replay_store audit: startup opensresources then receiver.recv;
+mii_catalog_request::init acquires its DIFFERENT Broker and createsReplies,
+but doesNOTenqueue/catalog_read/initializeeditorSTATE. Neither worker supplies
+a before-hook acquisition guarantee; a fresh lobby's initialization can precede
+any saved-Mii/menu request. STATE.trylock zero-word stillallocatesOnceBox40.
+Raw slim/839eafa-diag/stack/mii-state-owner-followup.txt; full priorlockrawsaved.
+UnlikeTRACE's provenbootprep, this is an independently cold first-hook stateowner.
+Recommend bounded singleSTATE consthos change preserving all existing Result
+busy/refusal branches as Option equivalents, no lockscope/nativecall movement.
+Please authorize preparing/reviewing that exact cross-consumer patch ifdesired;
+I will not substituteparentSTATE under existing privateowner approvals.
+
+## QUESTIONS — concrete parent STATE patch 2026-11-02T23:21:19.956916+00:00
+Prepared reviewable UNAPPLIED single-owner patch /home/intpa/smash-training-lobby/tmp-slim/mii-parent-state-lock.patch
+SHAe9a365b1236016564d303e81fed0e21c802f245851ae4b1c81b81b327ee85545. Eightconsumerfiles, only parentSTATE
+lock unwrap removal, six try-lock Result→Option successmatches and begin_session
+same busy-string ok_or, plus singledeclaringimport. Exactcallsite inventory:
+{'connected.rs': {'blocking': 16, 'try': 1}, 'ldn_lifecycle.rs': {'blocking': 1, 'try': 1}, 'lifecycle.rs': {'blocking': 1, 'try': 1}, 'mod.rs': {'blocking': 17, 'try': 4}, 'name_keyboard.rs': {'blocking': 2, 'try': 0}, 'resume_adapter.rs': {'blocking': 9, 'try': 0}, 'settings_resume.rs': {'blocking': 3, 'try': 0}, 'ui_resume.rs': {'blocking': 1, 'try': 0}}
+Full eightconsumerfiles and worker/init sources read. Existing scopes/nativecalls
+and refusal/return behavior retained; do not infer all existingnativecalls are
+outside STATE (some binding/transition calls alreadyrununderit). No scope redesign.
+Production panic=abort means no recoverable poisonpath; contention still returns
+without mutation at same checks. Prior12privateowner patches are independent,
+all3proposals stillunapplied pendingreview. This is concrete followup to23:20
+first-hook proof, not permission for unrelated/global mutex substitution.

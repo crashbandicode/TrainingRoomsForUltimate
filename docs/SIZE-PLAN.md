@@ -317,7 +317,7 @@ Compiled/native acceptance is tracked separately; no line-budget increase.
 ### Normalized gate migration (operator/lead23:11, 2026-11-02)
 
 tools/sloc.py CLI and tools/size_gate.py now measure rustfmt-normalized sloc4.
-The pinned formatter is rustfmt1.9.0-stable48a229ceae, edition2021, matching the
+The pinned formatter is rustfmt1.9.0-stable48a229ceae from toolchain1.98.1, edition2021, matching the
 operator's sloc-fmt.ps1. Each file is formatted through isolated stdin with
 skip_children=true, so source files and module children are never edited.
 Formatting errors or a different formatter version fail the gate; no raw fallback.

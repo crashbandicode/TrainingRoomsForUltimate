@@ -200,7 +200,7 @@ RUSTFMT_VERSION = "rustfmt 1.9.0-stable (48a229ceae 2026-09-01)"
 
 def normalized_files(files):
     rustup = pathlib.Path.home() / ".cargo/bin/rustup"
-    command = [str(rustup), "run", "stable", "rustfmt"]
+    command = [str(rustup), "run", "1.98.1", "rustfmt"]
     version = subprocess.run(command + ["--version"], capture_output=True, text=True,
                              check=True, timeout=30).stdout.strip()
     if version != RUSTFMT_VERSION:
