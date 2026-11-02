@@ -86,7 +86,7 @@ pub(super) unsafe fn publish_same_class(track:&super::Track,selected:usize,
     let update=proof.prepare_write(observed,&track.descriptor,rows,&now.record)?;
     let at=values::record_address(b,b).map_err(|_|"CPU same-class final record bounds")?;
     let targets=Targets {e:b.row,fe:b.entry,d:observed.owner.information,o:observed.owner.object};
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let fresh=state.track.as_mut().ok_or("CPU same-class ticket retired")?;
     check(fresh.ticket==track.ticket && fresh.same_class==Some(proof)
         && fresh.destination==track.destination && fresh.gate.may_publish(track.ticket,6)
@@ -126,7 +126,7 @@ pub(super) unsafe fn publish(track:&super::Track,selected:usize,evidence:&mut Op
     allowed:crate::engine::mii::identity::ExpectedMutation)->Result<(),&'static str> {
     let publication=shared::publication(target(track),selected,evidence,allowed)?;
     retained_origin(track)?;
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let fresh=state.track.as_mut().ok_or("CPU ticket retired")?;
     check(fresh.ticket==track.ticket && fresh.gate.may_publish(track.ticket,6)
         && fresh.destination==track.destination && super::epoch()==track.ticket.epoch,
@@ -151,7 +151,7 @@ pub(super) unsafe fn completed(track:&super::Track)->Result<Snapshot,&'static st
         let proof=track.same_class.ok_or("CPU same-class completion proof absent")?;
         proof.completed(same_class_values(&now)?,&track.descriptor)?;
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(state.track.as_ref().is_some_and(|t|t.ticket==track.ticket&&t.gate.can_complete(track.ticket))
         && super::epoch()==track.ticket.epoch,"CPU ready ticket/epoch changed before commit")?;
     let owner=state.owner.as_mut().ok_or("CPU ready owner retired")?;
@@ -200,7 +200,7 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
     let publication=shared::publication_in(target,selected,evidence,shared::PublicationPhase::BankSwitch {group_hat},
         crate::engine::mii::identity::ExpectedMutation::None)?;
     retained_origin_bank(bank)?;
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(!state.departed && state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==bank.ticket.epoch,"CPU bank publication ticket/epoch changed")?;
     let track=state.bank.as_mut().ok_or("CPU bank publication track absent")?;
@@ -224,7 +224,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
     ->Result<(),PublishRefusal> {
     shared::target_rows(c).map_err(publish_refusal)?;
     let (expected,original_kind,retained)={
-        let s=super::STATE.lock().unwrap();
+        let s=super::STATE.lock();
         if s.departed || s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
         let o=s.owner.as_ref().ok_or(PublishRefusal::Permanent("CPU Mii group publication without an owner"))?;
         if o.origin.binding.entry!=entry || o.origin.binding.epoch!=super::epoch() {
@@ -302,7 +302,7 @@ unsafe fn prefetch_publish_owned(receipt:PrefetchReceipt,c:Configuration,token:s
     check(rd::<u8>(entry,0x5920)==6 && rd::<u8>(entry,0x591c)==14 && rd::<u8>(entry,0x591a)==0xff
         && rd::<u8>(entry,0x5934)==0 && rd::<u8>(entry,0x5935)==0,
         "CPU Mii group publication needs the native loader idle at 6/14").map_err(PublishRefusal::Race)?;
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     if state.departed || state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}
     if !state.reservation.acquire(super::super::INSTALL.owns(token)) {
         return Err(PublishRefusal::Race("CPU reservation refused before the Mii group publication"));
@@ -356,7 +356,7 @@ pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,publish
         && Scalars::read(b.row,d)==Scalars::saved(c),
         "CPU bank rollback state is not the published state")?;
     // The ticket/epoch/scene proof `bank_publish` made before it wrote (G -> STATE -> COMMITTED).
-    let state=super::STATE.lock().unwrap();
+    let state=super::STATE.lock();
     check(!state.departed && state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==bank.ticket.epoch,"CPU bank rollback ticket/epoch changed or the scene departed")?;
     let registry=final_registry(helpers,Some(bank.token))?;
@@ -460,7 +460,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
         }
         exact=outcome.active(bank.publish);
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let current=!state.departed && state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==before.binding.epoch;
     let owner=match state.owner.as_mut().filter(|o|current && same_owned(&o.expected,before,bank.retained)
@@ -500,7 +500,7 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32,cursor:Option<
     // descriptor publishes its proven live member. Every other receipt keeps +0x18.
     let published=super::bank_live(g.before.binding.entry as *const u8,g.before.binding.owner,&now.descriptor)
         .filter(|live|*live==kind).unwrap_or_else(||super::descriptor_kind(&now.descriptor));
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     let transaction_busy=state.departed || state.busy() || state.request.is_some()
         || super::epoch()!=g.before.binding.epoch;
     let reservation_held=state.reservation.held();
@@ -562,7 +562,7 @@ pub(super) unsafe fn completion_failure(track:&super::Track)->Option<Failure> {
 /// Later tickets retain their full protected owner/record union byte comparisons.
 pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,opening:u64)
     ->Result<(),helpers::CaptureError> {
-    let previous={let state=super::STATE.lock().unwrap();
+    let previous={let state=super::STATE.lock();
         state.owner.as_ref().map(|o|(o.expected,o.live,state.reservation,state.request,state.reservation.held()
             || o.live.target.publish(o.origin_saved).is_some()))};
     if let Some((expected,live,reservation,request,retained))=previous {
@@ -588,7 +588,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
         let comparison=Snapshot {descriptor,..expected};
         check(same_owned(&now,&comparison,retained),"menu current owner changed")?;
         check(current_locked(m,b,kind,None,helpers)?==now,"CPU menu snapshot changed before rank refresh")?;
-        let mut state=super::STATE.lock().unwrap();
+        let mut state=super::STATE.lock();
         check(super::super::mii_saved_alpha::menu_epoch()==opening
             && state.capture_at==(epoch,opening) && state.capture && !state.departed
             && !state.busy() && state.generic.is_none() && state.request==request
@@ -658,7 +658,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
             role_owner::validate_saved(c,id as u16,mirrors(owner),rows,&record.1)?;
         }
     }
-    let mut state=super::STATE.lock().unwrap();
+    let mut state=super::STATE.lock();
     check(super::super::mii_saved_alpha::menu_epoch()==opening
         && state.capture && state.owner.is_none() && !state.busy() && !state.departed
         && super::epoch()==epoch,"CPU origin capture retired")?;
