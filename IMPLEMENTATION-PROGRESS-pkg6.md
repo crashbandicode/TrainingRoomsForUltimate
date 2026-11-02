@@ -260,7 +260,7 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 | Package-6 A/B/C and coordinated D | M (stream) | fail | candidate run matrix pending |
 | compliance.py --nro release with every agent row resolved | M | fail | final release NRO not built |
 
-## QUESTIONS
+## Earlier questions (superseded)
 
 - F11 reader exists but invalid/empty bank and failed guard currently return cell zero. I will make invalid/unverified active-body lookup return no body, with fake-bank read coverage, then provide a gated slice for pkg4 after the required first R5 compile.
 - Slim coordination: this worker has not changed roster/Mii inline probe sites. Please exchange exact committed slices before overlapping manifest changes.
@@ -303,8 +303,10 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 - Full clippy queued at end of Surface queue behind slim/f6 and interleave. No current claim. Model reverified Astra medium; watcher exec6380, bounded no-TTY, no alert. Next gate must name this F11 candidate, not b7b4c6c baseline.
 
 ## QUESTIONS
-- F11: newest review/menu-proposal fix ledger row147 specifies fallback to cell0 for invalid index/guard. This slice preserves it while testing the actual reader. Confirm whether a no-body policy is wanted; predecessor's intent above is superseded until answered.
-- Need exact committed slim inline-deletion slice before editing character_roster/Mii manifest; exact authorized harness slice before adoption. No moving-branch merge is authorized.
+- Lead: identify the exact authorized pkg4 recorder consumer slice for F11 and the UI typed-Mii consumer integration route. Own recorder baseline still calls entry_body; do not infer runtime acceptance from accessor-only gates. UI consumer remains prepared/unapplied.
+- F9: request behavior/native facts for a separate created7/6 exact-Mii destination (descriptor, G record binding, headgear/resource ownership), preserving native selector ownership and waiting layout. Primary received the request through the lead; no mixed implementation may cross this boundary. Operator B delay is approved; cap/removal are not.
+- F9: native setter replay feedback/thread context still needs runtime qualification. Loader callback chain is located, but no native gate/restoration is wired. Original identity restoration must preserve original descriptor/scalars/index and rebind fresh borrowed references +58/+60; kind-only restoration cannot establish exact Mii identity.
+- Resolved: F11 fallback to cell0 explicitly confirmed; harness225d16bd authorized absolute use; slim probe scope exchanged. Do not reopen these as permission questions.
 
 ### Practice-stage single initialization — current successor slice
 - After compaction, exact thread 01a19cb7 model reverified Astra/medium; watcher session6380 remains live, no duplicate watcher.
@@ -412,3 +414,13 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 - Edenfixture root: mk_s6_settings claimedOff butomittedpreload fields, factorydefaultslots5. NowexplicitJSON slotsOff/bankOff/sourcesBoth/P1CPUoff; regenerateds6-a.json. R5soak explicitlyenables2slots+fighters/hats+bank3 andchecksbank_members=3 inliveappliedline; slotvectorsmatchactual6choices (waslegacy10zeros). Added bootcache row BEFORE anyreload requiringloadednativeOff + persistedJSONOff + mirroredINIOff; archivesbothfiles. Driverregressions now6methodsPASS0.006s including4bootdisagreementcases; syntax/diffcheckpass. NoEdenevidenceyet.
 - Rowcorrections: IC/PT completionmustname0x4b/0x24; Kirbyshortcut requiresconfirmed receipt aswellasrequest. Removed invalidhot-swap practice-session retirement expectation (nativeTrainingneednotretire; lobbyDlease staysleadpairedrow). Recorder/PT activecellacceptance stillOPEN, notinferredfromthesechecks.
 - 5c45530diag sizes: file3194880/text2019328/ro598016/data577536/bss671744/resident3866624B. Host5cYogaqueuedbehindpkg4+parallelinterleave; noownclaim. Next batcheds6-08 shouldstart install bootcache r5soak thencompatibleA/B/C rows, finalr5 andindependentfullUnmappedscan.
+
+- Yoga fullhost5c45530 CLAIMED after actualqueuehead, interleavedimgui release, fullfreshledger, processidle, free251GB/rootsupperbound33159005537B. Runningexec64036 via ownhost.ps1; orderedhost-test.log, pinned1.98.1, incremental0,6G/1800s. ExplicitlyunsetSKIP_OWNED_ELF_FACT andRUSTUP_TOOLCHAIN; ownedELFhashverified. Releaseimmediatelyonexit/removequeue/requeueEND. NoEden/profilechanges.
+
+- AppendedSurfaceEND s6-08 batchedEden request ondiag5c45530/6929a0aa driver16bff2e; admissiondependsfullhostpass (currentlyexec64036Yoga) and allprecedingrows/interleave. NoEdenclaim/profileprep yet. Ifhostfails, remove/unreadyEdenlinebeforeitblocksqueue. Plannedfirstrows install bootcache r5soak, thencompatibleA/B/C; doNOTclaimF9orF11recorderclosedfrombaselineconsumer.
+
+### Host5c45530 failure and root corrections
+- Fullhost exited1; YogaRELEASED andcompletedhost+unreadySurfaceEdenlinesremoved. Noownclaim/Eden/profilemutation. Orderedraw artifacts/trainingrooms-nro-archive/pkg6/host-5c45530/host-test.log SHA7794feaed07f9f3fc2fe0631537a1cc36ed40cacc73c7b1e23ba32585e932b77. Parsed68Rustsuiteboundaries withmatchingresults:9933passed,2failed,6ignored,0measured/filtered; counts.jsonretained. Newcatalog_reply6testsPASS includingnativeallocator+reuse; wholejobFAIL.1116filesunchanged before/afterhostinventoryarchived.
+- Exact failures: carry_pkg4 carried_files_match_the_manifest: EDITED  src/runtime/macros/replay_store.rs / 1 problem(s). cpu_common cpu_common_guards_match_the_owned_module: owned 13.0.5 common NRO missing at /home/intpa/trainingrooms-build-pkg6/5c45530/src/../research/game-13.0.5/nro/lua2cpp_common.nro: extract it (IMPLEMENTATION-PROGRESS-pkg2.md), or set SKIP_OWNED_ELF_FACT=1 to skip. NoSKIPused.
+- Rootfix: approved3ade295 replay_store APIhunks lackedpkg4carrytransforms. Readcarry_pkg4.pycompletely, notifiedlead/pkg4, added7exact-contexttransforms fromowned691e655->currentdiff, regeneratedcarry42+ledger; replay_storeRustbytesunchanged. Fullpkg4verify42 andpkg6verify264PASS; nofork/stagewrites, noforeigncodehunks. OwnedcommonNROfixture copiedandhashverified43876f961a80e413370629d32c23af9de6e4cc26b448bab88d5433714a566097; mainELFhashunchanged. Rerunfullhostonnewfrozenmanifestcandidate, notacceptfailedjob.
+- UpdatedQUESTIONS whilepreservingallhistoricalsuccessorread/checklist/gateevidence; firstduplicateheadingrenamedEarlierquestions(superseded).
