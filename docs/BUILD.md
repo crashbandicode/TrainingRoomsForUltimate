@@ -36,3 +36,23 @@ cargo-skyline from `/home/intpa/smash-training-lobby/toolchain/tools/skyline-ins
 `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` — byte-identical to the release NRO built
 earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`), so the build is
 reproducible and the override is not needed. Resident size: `nro_size.py` → 172,032 B.
+
+## Layout archive recipe (package 5, host tool)
+
+2026-11-02. `assets/info_training.tra1` is built, not hand-written: `tools/layout-builder` reads the player's own stock
+`info_training` layout archive (451,604 B on 13.0.5; dumped by the **diag** build into
+`sd:/ultimate/TrainingRooms/stock/`, copied under the gitignored `eden/runs/<label>/` or a scratch folder; game data is
+never committed), adds the plugin's panes (`src/model/ui/panes.rs`, the one pane table the runtime also reads) to its
+`info_training.bflyt` and writes a `TRA1` recipe: copy ranges of the stock archive plus the plugin's own bytes. The
+committed recipe holds no complete game archive; the plugin applies it to the bytes the game just decompressed and refuses
+an archive whose length and FNV-1a fingerprint differ (`model::archive_recipe`).
+
+    cargo build --release --manifest-path tools/layout-builder/Cargo.toml     # own CARGO_TARGET_DIR
+    layout-builder build <stock info_training.arc> <out dir>                  # target.arc (private), info_training.tra1, report.json
+    cp <out dir>/info_training.tra1 assets/info_training.tra1
+
+The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git dependency, host only (it is not linked into the plugin):
+
+- origin `https://github.com/crashbandicode/Toolbox-Cli` (crate `nx-layout-toolbox` 0.1.0, MIT, `LICENSE` in the repository); no Forgejo mirror exists (`git.syntaxbyexample.com/intpa/Toolbox-Cli` is not found)
+- pinned revision `9010ca890b6339346758fa68bb53075d24aa0f95` (2026-06-01, "Document MeshCodec mesh-framing RE"), in `tools/layout-builder/Cargo.toml` and `Cargo.lock`; the Yoga copy `/home/intpa/toolbox-cli-aux/Toolbox-Cli` used for the first builds is this revision (identical `src/` apart from CRLF line endings)
+- reproducible from a clean checkout: 2026-11-02 the recipe built from the git dependency is byte-identical to the committed `assets/info_training.tra1` (sha256 `a1f3ee13...`, target archive fnv `e8a5a9ce3f4ec968`) given the same stock archive.

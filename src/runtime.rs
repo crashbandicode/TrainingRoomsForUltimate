@@ -8,12 +8,19 @@ mod alloc;
 mod boot;
 mod clock;
 pub(crate) mod diag_log;
+#[cfg(feature = "diag")]
+mod diag_reload;
 mod features;
 mod game;
 mod hub;
+mod import;
 mod install;
 mod published;
+mod ui;
+
 mod scene;
+mod state_boot;
+mod state_natives;
 #[cfg(feature = "diag")]
 mod sync_probe;
 

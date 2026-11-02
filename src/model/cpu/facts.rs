@@ -41,6 +41,9 @@ pub struct FrameFacts {
     /// The transition term `CONT_CLIFF_ATTACK` is enabled (a ledge action can be taken).
     pub cont_cliff_attack: bool,
     pub tech: TechFacts,
+    /// Gravity speed y is negative, and the fast-fall flag `RESERVE_DIVE` is already set (SPEC-cpu-06).
+    pub falling: bool,
+    pub reserve_dive: bool,
 }
 
 impl Default for FrameFacts {
@@ -56,6 +59,8 @@ impl Default for FrameFacts {
             catch_cliff: false,
             cont_cliff_attack: false,
             tech: TechFacts::default(),
+            falling: false,
+            reserve_dive: false,
         }
     }
 }
@@ -67,6 +72,26 @@ pub struct PlaybackStart {
     pub slot: u8,
     /// A ledge playback (a 5-frame input buffer, 4 when the body is still in `CLIFF_CATCH`).
     pub ledge: bool,
+}
+
+impl PlaybackStart {
+    /// Bit 8 of the request word marks a ledge playback.
+    pub const LEDGE_BIT: u32 = 1 << 8;
+
+    /// The word the input-recording package's inbox (`published::CPU_PLAYBACK_REQUEST`) carries: `1 + slot`
+    /// in the low byte (0 means no request) and `LEDGE_BIT` for a ledge playback.
+    pub const fn request_word(self) -> u32 {
+        (1 + self.slot as u32) | if self.ledge { Self::LEDGE_BIT } else { 0 }
+    }
+
+    /// The request a word carries, or `None` for 0 (no request) and for a word that is not one.
+    pub const fn from_request_word(word: u32) -> Option<Self> {
+        let low = word & 0xff;
+        if low == 0 || low > 5 || word & !(0xff | Self::LEDGE_BIT) != 0 {
+            return None;
+        }
+        Some(Self { slot: (low - 1) as u8, ledge: word & Self::LEDGE_BIT != 0 })
+    }
 }
 
 /// What the runtime applies after one body's frame. Every field is `None` when nothing is asked.
@@ -84,4 +109,6 @@ pub struct FrameOut {
     pub force_status: Option<i32>,
     /// The hidden tech animation (primary body only).
     pub hide: HideOut,
+    /// Set `RESERVE_DIVE` and show the fast-fall flash (SPEC-cpu-06).
+    pub fast_fall: bool,
 }

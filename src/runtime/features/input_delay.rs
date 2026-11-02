@@ -13,44 +13,68 @@ use skyline::hooks::InlineCtx;
 use crate::model::input_delay::{self, Clear, DelayQueue, MappedInputs};
 use crate::model::sites;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::{game, published};
+use crate::runtime::features::{chords, input_display, recorder};
+use crate::runtime::{game, published, ui};
 
 static QUEUE: Mutex<DelayQueue> = Mutex::new(DelayQueue::new());
 
 thread_local! {
     /// The out record and slot of the mapping call in progress on this thread, noted before the call
     /// and taken after it. Const-initialised, no destructor: no allocation.
-    static IN_PROGRESS: Cell<(usize, i64)> = const { Cell::new((0, 0)) };
+    static IN_PROGRESS: Cell<(usize, i64, usize)> = const { Cell::new((0, 0, 0)) };
+    /// The game's Controller of the mapping call in progress (package 4's chords and display read it).
+    static CONTROLLER: Cell<usize> = const { Cell::new(0) };
 }
 
-fn note(out: usize, slot: i64) {
-    let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot)));
+/// `state` is the fourth argument of the call (x3): the controller holder, a struct whose field at +0x10 is
+/// the player's Controller. Package 5's menu keeps the holder itself, package 4 reads the Controller from it.
+fn note(out: usize, slot: i64, state: usize) {
+    let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot, state)));
+    let controller = if state == 0 { 0 } else { unsafe { ((state + 0x10) as *const usize).read() } };
+    let _ = CONTROLLER.try_with(|cell| cell.set(controller));
+    // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
+    if slot == 0 && controller != 0 && game::is_training_mode() {
+        unsafe { chords::on_poll(controller) };
+    }
 }
 
 /// Caller A, before the call: x20 is the slot, x23 + x22 the slot's out record.
 #[skyline::hook(offset = sites::INPUT_CALLER_A_NOTE_OFFSET, inline)]
 pub unsafe fn caller_a_note(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
-    note(ctx.registers[23].x().wrapping_add(ctx.registers[22].x()) as usize, ctx.registers[20].x() as i64);
+    note(ctx.registers[23].x().wrapping_add(ctx.registers[22].x()) as usize, ctx.registers[20].x() as i64, ctx.registers[3].x() as usize);
 }
 
 /// Caller B, before the call: x8 is the out record, x2 the slot (a 32-bit index).
 #[skyline::hook(offset = sites::INPUT_CALLER_B_NOTE_OFFSET, inline)]
 pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter();
-    note(ctx.registers[8].x() as usize, i64::from(ctx.registers[2].w() as i32));
+    note(ctx.registers[8].x() as usize, i64::from(ctx.registers[2].w() as i32), ctx.registers[3].x() as usize);
 }
 
 fn apply() {
     // A pass that made no call has no note.
-    let (out, slot) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0))).unwrap_or((0, 0));
+    let (out, slot, holder) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0, 0))).unwrap_or((0, 0, 0));
     if out == 0 || !input_delay::applies(slot as i32, game::is_training_mode()) {
         return;
     }
+    // The menu reads P1 before the delay (SPEC-core-03 §4.1 sub-handler order); it sets the MENU owner,
+    // which makes the poll below output neutral.
+    ui::input::on_p1_poll(holder);
     let out = out as *mut MappedInputs;
     let mut queue = QUEUE.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.
     unsafe { *out = queue.poll(published::input_delay(), published::input_owners(), *out) };
+    drop(queue);
+    // After the delay: the input display and the recorder see the delayed record (SPEC-input-03 §5.2).
+    if slot == 0 {
+        let controller = CONTROLLER.try_with(|cell| cell.replace(0)).unwrap_or(0);
+        // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
+        unsafe {
+            input_display::on_p1_poll(controller, out);
+            recorder::on_p1_poll(out);
+        }
+    }
 }
 
 /// Caller A, at the loop increment the call returns to.
