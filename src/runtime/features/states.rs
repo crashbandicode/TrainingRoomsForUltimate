@@ -486,8 +486,13 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if accessor == 0 {
         return;
     }
-    if !scene::is_training() {
-        if entry == 0 && SESSION_ACTIVE.swap(false, Ordering::AcqRel) {
+    let scene_facts = scene::facts();
+    if !crate::model::scene::is_training(scene_facts) {
+        // The shared predicate is also false during a hot swap. A suspended
+        // callback is not an entry-lifetime boundary: practice retirement owns
+        // that boundary, and only actual scene departure clears the cache here.
+        if entry == 0 && !scene_facts.native_training && !scene_facts.lobby_active
+            && SESSION_ACTIVE.swap(false, Ordering::AcqRel) {
             clear_session();
         }
         return;

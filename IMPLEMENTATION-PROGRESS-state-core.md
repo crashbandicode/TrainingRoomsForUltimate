@@ -43,6 +43,14 @@ then Switch release/diag, stack/size and fresh Eden waiting/native regressions.
 
 ## Remaining work
 
+Source review after45ba42f caught a lifetime error in the new adapter: the
+widened Training predicate is false during hot swap as well as departure.
+Clearing the first-WAIT cache on that predicate alone would replace an
+entry-lifetime pose during a suspended callback. The departure path now checks
+the underlying native/lobby scene facts; actual practice retirement still
+clears it. Runtime acceptance must include a same-entry hot swap followed by
+quick reset, and an actual entry retirement. No passing runtime claim yet.
+
 Preview core is still the existing explicit stub: primary behavior-only
 start/stop/retry contract requested in LEAD-INBOX. Setup Library UI has no core
 selected-slot snapshot/bind provider yet. Settings Profiles has no located
