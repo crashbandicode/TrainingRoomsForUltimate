@@ -1,5 +1,5 @@
 #!/bin/bash
-# TrainingRooms package 5 (and any TrainingRooms stream): the gates and both Switch builds on the Ally's WSL (a remote
+# TrainingRooms (any stream; packages 2 and 5 wrote it): the gates and both Switch builds on the Ally's WSL (a remote
 # Linux helper; adapted from worker-d/ally-run.sh and W20's ally-setup-w20.sh). Run it with `wsl -e bash <file> <stream>`
 # from an MSI-pwsh snippet (see eden/ALLY-SETUP.md); never while eden.exe runs on the Ally.
 #
@@ -76,4 +76,5 @@ recipe)
   "$target/release/layout-builder" build "$stock" "$out" > "$out/layout-builder-run.log" 2>&1
   echo "layout-builder run exit=$?"
   sha256sum "$out/info_training.tra1" | tee "$out/tra1.sha256"
-  ;;esac
+  ;;
+esac

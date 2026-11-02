@@ -89,3 +89,54 @@ The playback requests (`FrameOut::playback`, Playback Mash Interrupt) and the ad
 Deviation noted: none from the specs; the 3-D distance uses the three `PostureModule::pos_*` natives.
 Gates: `cargo test` (23 binaries), clippy `-D warnings`, `--no-default-features`, Switch release `9af591d832923ab90b8da6b56b4c9635a7f4f33313d96897a9b90e82e999099c`
 (270,336 B resident) and diag `e1b3ae62e42e2d3d319531b283dc8a6ab6a34884f6587931ff9a22959e5fa88d` (368,640 B resident), 0 warnings. No Eden run yet.
+
+## Successor worker (claude-sonnet-5-5 high, 2026-11-02): playback request, diag lines, the two open items by analysis
+Playbook followed: `ae87443`. Gates run on the Surface worktree (target `cargo-targets/trainingrooms-pkg2`, campaign rustup home for the Switch builds).
+
+* **Playback request (977dd7e).** `FrameOut::playback` already reached `published::CPU_PLAYBACK_REQUEST` from 850da30; the encoding is now the
+  model's (`PlaybackStart::request_word` / `from_request_word`: `1 + slot` in the low byte, bit 8 = ledge) with host tests, the runtime stores that
+  word and the diag build logs `cpu_event playback_request`. Package 4 takes it with
+  `PlaybackStart::from_request_word(CPU_PLAYBACK_REQUEST.swap(0, Ordering::AcqRel))`.
+* **Diag lines (02090b5, 9d95f54).** The diag build prints one `[TrainingRooms] cpu_event <name> ...` line per answer a behaviour gave (`role`, `status`,
+  `sdi_input`/`sdi_none`, `di`, `airdodge_stick`, `clatter`/`clatter_start`, `request_status`, `force_status`, `fast_fall`, `hide`, `tech`/`tech_unchanged`,
+  `motion_substitute`, `quake_suppressed`, `oos_escape`, `guard_button`, `shield_tilt`, `shield_param`, `command_flags`, `attack_air_kind`, `stick_dir`,
+  `crouch`, `full_hop_button`, `climb_denied`, `playback_request`/`playback_stop`, `frame_advantage`, `common_params`, `shield_damage_mul`, `camera_mode`,
+  `camera_setup`; per-frame hooks log only when their answer changes) and the resolved constant table by name (`cpu_ids`, six per line). The shipped
+  build compiles all of it away (release resident size unchanged, 270,336 B). `diag-settings-next.json` (diag only): a one-second poll thread replaces
+  the live settings from that file and publishes with the re-roll bits the menu would set (`menu::rerolls_between`), so the B11 / Q18 A rows run before
+  the menu exists.
+* **Shield damage multiplier: no provider needed (root cause).** Decoded `libparam_hook` (its `add_param_load_hook(callback)` pushes the callback onto a
+  list guarded by a spin lock; `handle_load_prc_file(this, idx)` calls the original, then each callback with a pair of references to `this` and the
+  file's hash40 read from a table; what the fork's `ParamsInfo::get::<CommonParams>` does with `this` is the fork's code and was not decoded): the
+  game's object needs no provider. The 13.0.5 `main` fills the game's `CommonParams` object (allocated 0xc58 bytes by the factory at `main+0x736920`) in one
+  70 KB function, `from_prc(this, params)` at `main+0x736a90`, which reads each field by its 40-bit hash constant and stores it into `this`: `shield_max`
+  at +0x160, `shield_dec1` +0x16c, `shield_recovery1` +0x170, **`shield_damage_mul` +0x174**, `shield_damage_add` +0x178 (field names from
+  `ParamLabels.csv`; found with the read-only ELF scripts in `tools/elf/`: `hashscan.py` (code that builds a hash40 constant), `armdis.py`, `sym.py`, `fields.py` (the loader's stores by field name), `stagetab.py`, `ptrscan.py`, `nrosym.py` (an NRO's exports); they need capstone, e.g. `/home/intpa/ssbu-recomp/deps/venv/bin/python3 -I`). New site row `common_params_fill` (`main+0x736ac0`, the
+  `mov x19, x0`, inline hook, guard 64 bytes, card scan of the 16 plugins: no reference, also none to `0x736a90`/`0x736920`) and feature
+  `cpu_shield_damage`: the hook keeps x0 (the object); once per frame on the player entry (also outside Training) the runtime writes 0.0 while Training is
+  active and the shield is Infinite and the game's first-observed value otherwise (`Cpu::damage_multiplier`, already host-tested). `tests/cpu_sites.rs`
+  `cpu_sites_common_params_fill_stores_shield_damage_mul_at_the_field_offset` locks the offset to the ELF (the hash constant, then `str s0, [x19, #0x174]`).
+  A lost site costs only the multiplier (`cpu_shield` keeps its hooks). This is SPEC-cpu-05 question 6, alternative (a): the lead decides whether the
+  `libparam_hook` dependency is dropped for good; nothing here needs it.
+* **StageID and the fixed camera: resolved from the game's own table.** The game's `StageID` numbers are the indices of the stage table at
+  `main+0x454a7e8` (364 records of 72 bytes): word 0 = the id, word 1 = the form (0 the stage, 1 its Omega form, 2 its Battlefield form), word 2 = the
+  hash40 of the stage's name. `tests/cpu_sites.rs` `cpu_sites_stage_table_records_are_the_stages_the_camera_rule_names` proves the seven ids the spec
+  names by that name hash: `battlefield` 0, `end` 3, `battlefield_s` 347, `animal_city` 257, `poke_stadium2` 107, `animal_village` 95, `trail_castle` 361
+  (they equal the `stage_place_id` of the carried `lobby_stages.rs`, where its `native_forms` rows are exactly the table's form records), so no list of Omega
+  and Battlefield forms is written down: `tech::stage_class(id, form)` takes the form from the record. `sv_information::stage_id()` (`main+0x227ebb0`,
+  symbol checked, a called function) gives the current id. Needle sites checked on the ELF: `change_active_camera` (`main+0x4ee480`: x0 the manager,
+  w1 the mode; inline hook after its prologue at `+0x18`), the fixed-camera setup (`main+0x3158e00`, a 64-byte leaf function: it copies the values struct,
+  centre first, to `manager + 0xbd0`, `+0xbe0`, `+0xbf0`; replace hook at its 16-aligned entry). **Spec correction:** the setup function loads the manager through
+  the slot at `main+0x52b8f00` (`adrp x8, 0x52b8000; ldr x8, [x8, #0xf00]; ldr x8, [x8]`), not `0x52b6f00` as the spec has it (open question 8);
+  `tests/cpu_sites.rs` `cpu_sites_fixed_camera_setup_loads_the_manager_through_the_slot_and_stores_the_centre_at_the_field` decodes it. Hooks: `cpu_camera_mode_hook`
+  and `cpu_camera_setup_hook` (the latter writes after the original, so the caller's struct is never written); feature `cpu_camera` (own sites, the
+  core's natives). Model: `Cpu::camera_setup` / `camera_mode`, `StageClass`, host tests in `tests/cpu04.rs`.
+  Not decided by this analysis: camera mode 4 = fixed (spec, upstream) is confirmed only by the Eden diag line `camera_mode mode=`.
+
+## Eden on the Ally, 2026-11-02 (successor worker)
+Four boots (s2-01 release, s2-02 to s2-04 diag) on the Ally's owned rig: see `eden/EDEN-PACKAGE-2.md` (rows, hashes, lines) and `eden/ALLY-SETUP.md`
+(the rig for every stream). Found and fixed: the install line was cut at 2048 bytes (`2d1df59`). Confirmed: the `common` module's loader name is `common`;
+DI, SDI, air-dodge direction, dodge staling, the shield multiplier (1.19 -> 0.0 -> 1.19 through the game's own `CommonParams` object), the ledge Roll row, the
+mash table (16 of 18 actions) and the fixed-camera setup write. Not run: tech, mistech, hide tech effects, clatter, out of shield, throws, B11 on a ledge, camera
+mode 4, leaving Training. Open items for the lead: none parked; the spec's camera manager slot is `0x52b8f00`; whether `libparam_hook` stays a dependency
+(this package no longer needs it).
