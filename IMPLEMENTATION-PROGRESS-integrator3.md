@@ -218,3 +218,21 @@ owners imgui-nvn-sol, tm-f8-terra*, tm-f8-sol*):
   crates/smash-match-data/Cargo.toml` and `crates/hos-lock/Cargo.toml` (delete the Cargo.lock those runs create in the crate dirs).
 - After the gates: delete `.../trainingrooms-work/debug/incremental`.
 
+
+## Lead 4 development integration: declaration slices (2026-11-02)
+
+Adopted only src/model/hook_stats.rs and src/model/sites.rs from fixed slim a6e4d07
+(the HookId slice8f762e1 and Feature slicea6e4d07). Both pre-change files matched
+integration cb0e3b4 exactly. Independent review/probe confirms all40 HookId
+ordinals/report labels and all28 Feature ordinals/labels are unchanged; all code
+below those declarations is byte-identical, including allocator behavior and site
+guards. Raw review receipt: ../artifacts/trainingrooms-lead-astra4/slim-declarations-review.json.
+
+Audited archived a6 host/clippy/no-default exits0, completed-log hashes and all1110
+before/after source hashes. The two adopted files match those archived hashes.
+No full-suite arithmetic claimed: the supplied host command is test --no-fail-fast,
+not the separately listed all-targets proof required by bounded-validation-evidence.
+This is a development source integration; integrated compiler/stack/size/runtime
+acceptance remains pending with the composed candidate. No new budget, suppression,
+thread allocation exemption or runtime pass. The four OS-TLS cells below the HookId
+table remain an open root explicitly assigned to UI; the table change does not fix them.

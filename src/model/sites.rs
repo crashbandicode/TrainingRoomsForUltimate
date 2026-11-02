@@ -15,105 +15,86 @@
 use super::guard::{outcome_for, GuardOutcome, HookForm, Placement, SeamKind, Sharing, GUARD_BYTES};
 use super::version::Verdict;
 
-/// The feature a site belongs to: a feature is installed only when every one of its sites is usable.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Feature {
+macro_rules! features {
+    ($( $(#[$meta:meta])* $variant:ident => $name:literal, )+) => {
+        /// The feature a site belongs to: installed only when every one of its sites is usable.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum Feature {
+            $( $(#[$meta])* $variant, )+
+        }
+
+        impl Feature {
+            pub const fn name(self) -> &'static str {
+                match self {
+                    $( Self::$variant => $name, )+
+                }
+            }
+        }
+    };
+}
+
+features! {
     /// Shared by every Training feature (the Training-mode predicate).
-    Training,
-    InputDelay,
-    LraReset,
+    Training => "training",
+    InputDelay => "input_delay",
+    LraReset => "lra_reset",
     /// The Training reset hub (SPEC-state-06 §5): the fighter on-init wrapper that runs it.
-    ResetHub,
-    StageHazards,
+    ResetHub => "reset_hub",
+    StageHazards => "stage_hazards",
     /// The CPU behaviours' shared plumbing (package 2): the per-frame dispatch, the game's constant table
     /// and the natives the facts are read through.
-    CpuCore,
+    CpuCore => "cpu_core",
     /// SPEC-cpu-02: SDI, air-dodge direction, clatter (DI needs the `common` module, see `cpu::common`).
-    CpuDefence,
+    CpuDefence => "cpu_defence",
     /// SPEC-cpu-03: the ledge options.
-    CpuLedge,
+    CpuLedge => "cpu_ledge",
     /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the camera and the script status-change
     /// hook need sites this table does not have yet, see `IMPLEMENTATION-PROGRESS.md`).
-    CpuTech,
+    CpuTech => "cpu_tech",
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
-    CpuShield,
+    CpuShield => "cpu_shield",
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
-    StateCore,
+    StateCore => "state_core",
     /// Package 3: the charge writes and visuals (SPEC-state-02).
-    StateCharge,
+    StateCharge => "state_charge",
     /// Package 3: the buffs and their five hooks (SPEC-state-03).
-    StateBuff,
+    StateBuff => "state_buff",
     /// Package 3: the held-item restore and its sixteen turnip hooks (SPEC-state-04).
-    StateItems,
+    StateItems => "state_items",
     /// Package 3: Steve, Olimar, Sora and the fighter-specific restores (SPEC-state-05).
-    StateRestore,
+    StateRestore => "state_restore",
     /// Package 4: the input recorder (SPEC-input-01): the natives it reads and writes through and the
     /// hook at the AI control function's epilogue.
-    Recording,
+    Recording => "recording",
     /// Package 4: HUD notices (SPEC-input-05): the Combo Display observers and the stale-moves toggle.
-    Notices,
+    Notices => "notices",
     /// Package 4, S4-4: the named-macro layer's game calls (control reads, kinetic reads, the panel's hold and the restore pose writes).
-    NamedMacros,
+    NamedMacros => "named_macros",
     /// Package 5: the layout archive hook, the UI anchors and the manager global (`sites_ui.rs`).
-    Ui,
+    Ui => "ui",
     /// The input display's reads in the input-delay hook (the P1 body's status, found through the fighter manager): no
     /// rows of its own, only the natives it calls (R2-1). Input Delay installs on its own rows; the display degrades apart.
-    InputDisplay,
+    InputDisplay => "input_display",
     /// The run-time texture helper's rows (`sites_u4.rs`, `runtime/ui/texture.rs`): a unit of its own (they are the Ui feature's rows in
     /// their table), so the menu does not depend on a helper that is optional (R2-1 merge with u4).
-    UiTexture,
+    UiTexture => "ui_texture",
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
     /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
-    CpuMash,
-    CpuCommon,
+    CpuMash => "cpu_mash",
+    CpuCommon => "cpu_common",
     /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
-    P1Cpu,
+    P1Cpu => "p1_cpu",
     /// Package 6: the roster cycle's game calls that no other package guards (sites_pkg6.rs `roster_*` rows); the cycle's hooks are carried seam rows.
-    Roster,
+    Roster => "roster",
     /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
-    Probes,
+    Probes => "probes",
     /// SPEC-cpu-05's shield damage multiplier: the game's CommonParams object, found at the moment the game fills
     /// it from its parameter file (no provider plugin).
-    CpuShieldDamage,
+    CpuShieldDamage => "cpu_shield_damage",
     /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
-    CpuCamera,
-}
-
-impl Feature {
-    pub const fn name(self) -> &'static str {
-        match self {
-            Feature::Training => "training",
-            Feature::InputDelay => "input_delay",
-            Feature::LraReset => "lra_reset",
-            Feature::ResetHub => "reset_hub",
-            Feature::StageHazards => "stage_hazards",
-            Feature::CpuCore => "cpu_core",
-            Feature::CpuDefence => "cpu_defence",
-            Feature::CpuLedge => "cpu_ledge",
-            Feature::CpuTech => "cpu_tech",
-            Feature::CpuShield => "cpu_shield",
-            Feature::StateCore => "state_core",
-            Feature::StateCharge => "state_charge",
-            Feature::StateBuff => "state_buff",
-            Feature::StateItems => "state_items",
-            Feature::StateRestore => "state_restore",
-            Feature::Recording => "recording",
-            Feature::Notices => "notices",
-            Feature::NamedMacros => "named_macros",
-            Feature::Ui => "ui",
-            Feature::InputDisplay => "input_display",
-            Feature::UiTexture => "ui_texture",
-            Feature::CpuMash => "cpu_mash",
-            Feature::CpuCommon => "cpu_common",
-            Feature::P1Cpu => "p1_cpu",
-            Feature::Roster => "roster",
-            Feature::Probes => "probes",
-            Feature::CpuShieldDamage => "cpu_shield_damage",
-            Feature::CpuCamera => "cpu_camera",
-        }
-    }
+    CpuCamera => "cpu_camera",
 }
 
 /// One guarded site.
