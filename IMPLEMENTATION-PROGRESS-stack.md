@@ -10,38 +10,41 @@ Playbook followed: `ae87443` (pulled 2026-11-02 at the start and again ~12:0xZ; 
 docs/ file, tools/PROVENANCE.md; tools read before use: eden-solo/solo.ps1, eden-solo/gv.py, build/nro_size.py,
 check/compliance.py).
 
-### Checklist (docs/CHECKLIST.md)
+### Checklist (docs/CHECKLIST.md), final 2026-11-02
 
 | Item | Tag | Result | Evidence |
 | --- | --- | --- | --- |
-| crate-type cdylib only | M | pass (unchanged) | Cargo.toml; compliance.py before READY |
-| release profile s/lto/cu1/abort, skyline =0.6.0, toolchain 1.98.1 | M | pass (unchanged) | Cargo.toml, rust-toolchain.toml |
-| pure logic in model with host tests; runtime switch-only | M | pass | `model::thread_stacks` + `tests/thread_stacks.rs`, `BoxedSlot` tests; `runtime::threads` |
-| gates: test, clippy -D warnings, no-default-features, release, diag (one cargo call each) | M | open | Ally WSL run 1 (60e0ad9): host-test failed (runtime_diag_log harness lacked `threads`, fixed ab6ef6c); rerun pending |
-| no heap in hooks (counting allocator, heap_allocations=0) | M | open | BoxedSlot put/take/finish allocation-free (host test); Eden install line pending |
-| fixed buffers, a writer thread on a static stack, paths built on the stack | M | open (core item) | every thread from one host-checked size table, measured in diag; the stacks are still allocated by std at spawn (not static arrays): proposal to the lead pending the st-01 numbers |
-| root-cause fixes / approved workarounds | M | pass so far | trace writer: by-reference boxed slot (no size bump); no workaround shipped |
-| version guard, 64-byte site guards, card scan, hook placement | M | N/A for this stream | no hook site added or moved (the headroom probes are statements inside existing hooks) |
+| crate-type cdylib only | M | pass | compliance.py (aa18732 tree, release 2b1c0095) |
+| release profile s/lto/cu1/abort, skyline =0.6.0, toolchain 1.98.1 | M | pass | compliance.py |
+| pure logic in model with host tests; runtime switch-only | M | pass | `model::thread_stacks`, `BoxedSlot` with host tests (`tests/thread_stacks.rs`, trace_slot unit tests); `runtime::threads` switch-only (host stub only for the diag_log test harness) |
+| gates, one cargo call each | M | pass | Ally WSL 1a14480: cargo test 7966 passed 0 failed, clippy -D warnings 0, no-default-features 0, Switch release `2b1c0095` + diag `03ecd495`, 0 warnings (`/tmp/stack-a2594031/b1a14480/GATES.txt`); aa18732 (boot split) gated in integrator-3's merged-tree build (lead decision b) |
+| no heap in hooks | M | pass | install line `result=installed heap_allocations=0` in st-02..st-11 `events.log`; `BoxedSlot` put/take/finish/flush allocation-free (host test with the counting allocator) |
+| fixed buffers, a writer thread on a static stack, paths built on the stack | M | pass | every plugin thread on a page-aligned static stack + static `ThreadType` through `nn::os::CreateThread/StartThread` (gsp-visualizer's pattern), sized by the measured table (`tests/thread_stacks.rs`); the trace writer's state in boot-made buffers; paths are `FixedPath` |
+| root-cause fixes / approved workarounds | M | pass | the fault's cause (11 KB trace moved by value → 59.7 KB frame) removed, not a bigger stack; no workaround shipped |
+| version guard, 64-byte site guards, card scan, hook placement | M | N/A | no hook site added or moved (probes are statements inside existing hooks); compliance's "guard sizes [0, 64]" row fails on the integration head too (repository-level, not this stream) |
 | hook sharing / chaining stand-ins | C | N/A | no new or changed hook site |
-| no diag code or strings in the shipped NRO | M | open | `headroom` is an inline no-op without `diag`; compliance.py on the release NRO pending |
-| shipped NRO writes only its install line | M | pass (unchanged) | the [ThreadStack]/[HookStack] lines are diag-only |
-| online rules (read-only, replay A/B, two consoles) | C | N/A | no online path changed |
-| Eden: claim/release, one per host, MemAvailable, never profile a / :61 | M | open | st-01 queued on the Yoga |
-| Eden: hard-linked profile copy, copies vs links | M | open | own profile copy for st-NN (gv.py prep pattern) |
-| df >= 40 GB before builds and Eden; one target dir per source copy; products deleted with a manifest at the end | M | partial | df 173 GB (11:3xZ); host target `trainingrooms-stack`, Ally target `c1161-targets/TrainingRoomsForUltimate-stack-ally`; cleanup at the end |
-| waits gated on a log line / screenshot | M | open | st-01 |
-| failed precondition aborted and retried under the next label | M | open | st-01 |
-| shortest ruleset | M | N/A for Training rows (Training mode has no match end) | — |
-| profile restored, console.log scanned (panic/abort/crash/Unmapped), run.json + memory.peak kept | M | open | st-01 |
-| every local command under memory/time guard | M | pass | `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout …` (host.ps1, analysis runs) |
-| outputs per label | M | open | `eden/runs/st-NN/` |
-| README / GIF | M | N/A for this stream | no user-visible change (the lead owns README) |
-| dated evidence doc | M | open | `eden/EDEN-STACK.md` after st-01 |
-| numbers from tested scripts | C | applies | `tools/stack_depth.py` + `tools/test_stack_depth.py` (static numbers); the st-01 high-water table from the logs by a script (to write, with tests) |
-| no operator quotes, no claims beyond tests | M | pass | this file |
-| handoff current | M | pass | this file; the lead's TRAININGROOMS-HANDOFF gets F7 text from me |
-| release/card | C | not authorized | no tag, release, push or card write |
-| model/effort gate and watcher | M | pass | claude-opus-5-5 / high from transcript agent-a2594031d8d5c0534; watcher pid 1204646 (`/tmp/stack-watcher-a2594031`) |
+| no diag code or strings in the shipped NRO | M | pass | compliance.py: no diag markers; the diag threads' names and stacks absent from 2b1c0095 (`llvm-strings`: 0 for tr-probe, tr-practice-trace, tr-state-diag, tr-diag-reload, tr-macro-diag) |
+| shipped NRO writes only its install line | M | pass | `[ThreadStack]`/`[HookStack]` are diag-only |
+| online rules | C | N/A | no online path changed |
+| Eden: claim/release, one per host, MemAvailable, never profile a / :61 | M | pass | ledger CLAIMED/RELEASED per run st-02..st-12 (solo.ps1 copy), display :99, MemAvailable checked by solo.ps1 (23 GB at st-02) |
+| Eden: hard-linked profile copy | M | pass | `gv.py prep` copy of ssbu-desync-1029/profiles/b at `/home/intpa/trainingrooms-eden-st/profiles/y` (read-only content hard-linked) |
+| disk: df, one target per copy, products deleted with a manifest | M | pass | df 173 GB (Surface) / 238 GB (Yoga); targets `trainingrooms-stack` (host), Ally `c1161-targets/TrainingRoomsForUltimate-stack-ally`; cleanup below |
+| waits gated on a log line / screenshot | M | pass | `st_run.py`: install line, `hook_stats` beat, diag request lines, screen matches on the route |
+| failed precondition retried under the next label | M | pass | st-01 → st-02 (driver), st-10 → st-11 (record row), st-11 → st-12 (stopped at the lead's release order) |
+| shortest ruleset | M | N/A | Training mode, no match |
+| profile restored, console.log scanned, run.json + memory.peak kept | M | pass | scan 0 in st-02..st-12 (`eden/runs/st-NN/scan.txt`); run.json and memory.peak kept per run (peaks 4.99–6.23 GB); the profile is this stream's own copy |
+| every local command under memory/time guard | M | pass | systemd-run scopes for every cargo, analysis and Eden driver run |
+| outputs per label | M | pass | `eden/runs/st-NN/` |
+| README / GIF | M | N/A | no user-visible change; compliance's README/GIF rows fail repository-wide (lead) |
+| dated evidence doc | M | pass | `eden/EDEN-STACK.md` |
+| numbers from tested scripts | C | pass | `tools/stack_table.py` (+ `test_stack_table.py`), `tools/stack_depth.py` (+ `test_stack_depth.py`) |
+| no operator quotes, no claims beyond tests | M | pass | this file, EDEN-STACK.md |
+| handoff current | M | pass | this file; F7 text and numbers sent to the lead (ledger row F7) |
+| release/card | C | not authorized | nothing tagged, pushed or written to a card |
+| card handling by the user | M | pass | no card access |
+| model/effort gate and watcher | M | pass | claude-opus-5-5 / high (transcript agent-a2594031d8d5c0534); watcher `/tmp/stack-watcher-a2594031` |
+
+compliance.py (`/tmp/stack-a2594031/compliance.md`, aa18732 + release 2b1c0095): 4 machine rows fail — guard sizes [0, 64], README GIF, docs/media GIF, `HANDOFF.md` — all four fail identically on work/implementation (repository-level, not introduced here); every other machine row passes; agent rows resolved in this table.
 
 ### Scripts written by this stream
 
@@ -115,22 +118,29 @@ First numbers (st-02): the boot thread is Skyline's, **64 KiB** (`spawn name=boo
 `ui_archive` / `ui_pass_calculate` run on a stack inside a 156 MB heap block (a fiber), where svcQueryMemory cannot
 bound the stack: such sites are marked by `kind=` from the next build and are not read as stack room.
 
-## State (2026-11-02 ~12:2xZ)
+## Final report (2026-11-02 ~12:4xZ)
 
-| Step | Result |
-| --- | --- |
-| gates 6541f2d (Ally WSL) | cargo test 7826 passed 0 failed, clippy -D warnings 0, no-default-features 0, Switch release `2c368003` + diag `5d21cf2f`, 0 warnings |
-| carry verify pkg6 / pkg4 | 262 / 42 files verified against m5q (after every carried edit) |
-| Eden st-02..st-12 | 8 cold boots clean; busy rows save/load/state file/ini/settings reload pass (st-10); st-11 stalled after the reload request without a fault (stream/sync's livelock); st-12 stopped by me at the lead's release order; console scans 0 in every run |
-| sizes | dc737c1: every row = max(static, measured) × 1.25 + 16 KiB (`tests/thread_stacks.rs`); spec constants from the table (SPEC-core-04 amended) |
-| hook budget | `tools/stack_depth.py <diag elf> budget`: 134 roots, 0 over (6541f2d) |
-| open for integrator-3's merged-tree boot | recording row, menu open/close, the reload stall (lead 12:1xZ) |
-
-Branch `stream/stack`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-stack`, HEAD dc737c1 (ungated:
-the shrink, boxed boot settings, captures on the boot stack, [HookStack] kind, gate split).
-
-## Next
-
-1. One compile in queue order (Surface or Ally WSL, `/tmp/stack-a2594031/tools/ally-pack.ps1` + `ally-build.sh gates`).
-2. `python3 -I tools/stack_depth.py <diag .so> table` and `… budget`; `nro_size.py` on the release NRO (resident figure).
-3. compliance.py on the release NRO; give integrator-3 (aaf990350073a351c) the gated sha; final report to the lead.
+- **Fault:** `tr-trace-writer` (64 KiB) ran off its stack at every boot where the SDK file path under it went deep (s4-07, u4b-02,
+  ui-09: identical SP/FP offsets). Cause: the 11 KB Mii editor trace moved by value through the slot → a 59,712 B frame.
+  Fix: `BoxedSlot` (two buffers made at init, copy in place, serialise by reference): static depth 61,968 → 2,624 B, measured
+  1,696 B.
+- **Every thread:** one host-checked table (`model::thread_stacks`), static page-aligned stacks through `nn::os` (no heap for
+  stacks or names), diag `[ThreadStack]` spawn/high-water lines (painted stacks, lock-free registry), sizes = max(static,
+  measured) × 1.25 + 16 KiB from Eden st-02..st-12. Boot loaders and the captures share one 40 KiB stack. Diag-only threads
+  exist only in diag builds (names too).
+- **Hooks:** `[HookStack]` entry room per site; main-thread hooks ≥ 1,021,280 B free (native service 1,032,672 B), the
+  `other` sites' 896 KiB thread 523,536 B; fiber-hosted sites marked. Budget gate `tools/stack_depth.py budget`
+  ((523,536 − 16 KiB) / 1.25 per path, 16 KiB on fibers): 134 roots, 0 over. No stack switch needed (lead).
+- **Boot thread** (Skyline's, 64 KiB): measured 38,160 B pre-merge; on the merged tree static 43,776 B → aa18732 keeps boot's
+  sections out of its frame; integrator-3 checks `boot::run` ≤ 39,321 B in the merged-tree build (lead decision b).
+- **Resident (release):** 2b1c0095 at 1a14480: .bss 413,696 B, resident 3,321,856 B (3,244 KiB); 6541f2d with unmeasured static
+  stacks was 4,264 KiB; before static stacks 2,816 KiB plus ~1.15 MB of heap stacks. The merged-tree figure comes from
+  integrator-3's build.
+- **Commits:** stream/stack up to aa18732 (merge of work/implementation 92f5143 at 1a14480); gated 1a14480; aa18732 gated in
+  the merged-tree build.
+- **Open (moved to integrator-3's merged-tree Eden boot by the lead):** recording row, menu open/close, the settings-reload
+  stall seen in st-11 (stream/sync's livelock class, no fault line).
+- **Carried edits:** recorded in the pkg6/pkg4 manifests (verify 261/42) and CARRY-OVER `## stack`.
+- **Cleanup:** after integrator-3's build: delete `cargo-targets/trainingrooms-stack`, the Ally target
+  `/home/intpa/c1161-targets/TrainingRoomsForUltimate-stack-ally` and `C:\Users\intpa\stack-pack`, with a manifest; NROs, logs and
+  receipts stay under `eden/runs/st-NN/` and `/tmp/stack-a2594031/b*/`.
