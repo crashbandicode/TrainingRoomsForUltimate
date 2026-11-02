@@ -2,7 +2,7 @@
 
 ## Current worker checkpoint — 2026-11-02T22:05:20.581438+00:00
 Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
-Branch stream/slim; HEAD/source5b40bac, previoussource78f440d fully5-gated.
+Branch stream/slim; source5b40bac, docsHEAD395b5d7. Prior results retain moved-cache provenance; fresh acceptance gates now running.
 Lead21:18 authorized actual keyboard model/representation+streamingUTF16 root;
 21:59 authorized exact Signals hos_lock constant-mutex root (3684a52f patch).
 Both applied; b4c8b56 also fixes missingReady-armcfg found by extraeditor-only
@@ -11,9 +11,11 @@ matrix. No other native refactor/moving merge. Only merge ebfcb98 via dae0787.
 98879+4318pending=103197. NativeABI9blocks byte-identicaltoa6. Carry253PASS.
 Previous78 hostfull/clippyzero/nodefault/release/diag andnativeCORE9PASS;
 extraeditor-alone FAIL E0599 retained, corrected in5b. SMD24/0/0; hos20/0/0.
-5b frozen1112files onYoga; extraeditor-alone PASS, fullhost80.344sPASS,
-clippy21.055sPASS0warnings, nodefault2.185sPASS. Diag CLAIMED22:13(exec12354);
-release/compiledstack/compliance pending. NoSurfaceclaim/Eden/profile.
+5b frozen1112files onYoga; prior editor/host/clippy/nodefault/diag passed using
+movedcache and are RETAINED not finalacceptance. Entireownedtarget retired
+2112514504B at22:16; fresh emptytarget created for thisimmutablecopy.
+Fresh host-all-targets CLAIMED22:18(exec84475); otherfreshgates pending.
+NoSurfaceclaim/Eden/profile.
 78 release17d0877e resident3440640;diag5ee38f2e3780608 (-4096eachvsa6).
 78 stack3tableFAIL; Menu49392 requires81920>57344; fiber25104>16384.
 78 Keyboarddrop2176→2000/Signalsmutex976→816; constructor/registration/callback
@@ -1179,3 +1181,59 @@ Currentglobalfresh58266022490B, 1GB reserve; receipts5b40bac-preflight/cache1-*.
 Crates27filesidenticalto78: SMD24/0/0 andhos20/0/0 retained; source-delta.json.
 Unapplied next Configuration proposal cb5af6f2 exists only/tmp; no authorization
 yet, do not apply. Independent keyboard review/integratedconsumerroute pending.
+
+## Slim sequencing / cache correction acknowledgement — 2026-11-02T22:16:10.366797+00:00
+Read22:13: Configuration patch remains unapplied; no shared lifetime/consumer
+change or ceilingraise. Finishing5b keyboard and integrated-path obligations.
+5b hostfull/clippy/nodefault/editor-alone/diagPASS; release andcoldlock audit next.
+My cache reuse moved an idle target directory into each new frozen source's
+unique path (f7→78→b4→5b), rather than sharing one live target path. Nevertheless
+your explicit sequential-copy ruling makes reuse of inherited cache content an
+acceptance risk. I will archive current5b binaries/hashmanifest, retire ONLYthis
+owned target, and rerun final5b gates from a fresh directory. Priorreceipts remain
+labeled with moved-cache provenance, not silently promoted. Allclaimsreleased
+22:15; noEden/profile. This is owned correctivework, not an operator blocker.
+
+
+## Fresh-cache acceptance wave — 2026-11-02T22:19:56.024214+00:00
+Retirementmanifest and executedkeyboard/NRO/ELF preserved at
+slim/5b40bac-cache-correction; target2112514504B deleted onlyafterownjob reaped,
+source/targetprocess checksidle. Thennewempty5b/target created. Existing1112
+frozenfiles unchanged. Allpriorreceipt logs remain, no overwrite. Freshjobs use
+*-fresh names and retain actualexecutedbinarySHA256 pluscurrentcgroupmemory.peak.
+CurrentONEYoga host-fresh exec84475; afterreap releasewith yoga-release.py
+host-fresh. Freshsource/cap/queue admission unchanged; claimtemplate stale
+wordreusedtarget corrected by explicitledgerNOTE beforelaunch.
+Latestfreshglobal55929477124B (5b-preflight/cache-fresh-start-*.json),3GBreserve.
+Lead22:13 defers Configuration representation proposal; unapplied/tmp only.
+No READY; finalnative/callbackreachability/stack/runtime/compliance stillopen.
+
+
+## Fresh5b native and host milestone — 2026-11-02T22:35:16.290326+00:00
+Source5b40bac; current docs HEAD395b5d7. Fresh EMPTY target since22:17; prior moved-cache evidence remains separate.
+- host-fresh: cargo0, 78.467s; raw SHA256 12be37ff261fea69560c0cfc171d9fd6e16f42c39d42e74fe692a15714b9c885; 1112 source hashes unchanged; executed binaries 70; peak 3900006400B.
+- clippy-fresh: cargo0, 20.621s; raw SHA256 e85077f4cfbf625b0ed61a907c8d25cef16f99585b969a25ddda2949ca7c2371; 1112 source hashes unchanged; executed binaries 0; peak 2153037824B.
+- no-default-fresh: cargo0, 1.769s; raw SHA256 1135041f535c345d7633eebfe6692a8c4c4a2c95d3b406f5382b74f8a2f48c8f; 1112 source hashes unchanged; executed binaries 0; peak 350461952B.
+- diag-fresh: cargo0, 52.896s; raw SHA256 1b9e530c08ac7b24f8a5bf4608ee41da230d8950a318c8353934d6d2856418e6; 1112 source hashes unchanged; executed binaries 0; peak 1536176128B.
+- release-fresh: cargo0, 42.631s; raw SHA256 89065dd2da2c4fa0b598a76331ead3f91ce8647b496a65493c37c64dc4f01ce5; 1112 source hashes unchanged; executed binaries 0; peak 1177739264B.
+- matrix-no-default-fresh: cargo0, 20.904s; raw SHA256 20adad1faf40424ccd0bf0f248a40331202122452f903eb805abddf40a09f376; 1112 source hashes unchanged; executed binaries 0; peak 1137356800B.
+Release NROce1e216a5ba8ba7402a1a95e58f6b8873d4dd96772203e8a31f415dda732a343,
+ELF0699d1df1830ce1a870c6c7708e51dab147778d5463f4fe2ad1aa9aaaaedf8d1.
+Diag NRO56b028498076e841b97c176dc242ec11cd662b20f1a715289e2fcbce7d607c49,
+ELF8ad76f6e1cf458b3252d69812b8395d41be2fd73c3ce18c02228d0a98a133cf2.
+Resident release3440640/diag3780608B, each4096B belowa6, sameas78.
+Native retained frame_after Signals static2bbe48: acquire7ddf0..7de08 inline
+ldaxr/stxr; contended810ac..810f8 and81158..811a4 use svc34, release svc35.
+No allocator/OnceBox in these lock paths, old std Mutex<Signals>::lock symbol absent.
+Raw fullfunction report5b40bac-diag-fresh/stack/signals-xref-functions.txt.
+The other3 page/offset search candidates were falsepositives; no4-function claim.
+Constructor/open/callbackregistration remains absent in old/new shippedELF;
+this proves Signals storage lock only, not fullSDK/callback first-use acceptance.
+Freshdiag stack has FOUR actual tableFAIL: Heartbeat4720>4272, Menu49392>57344
+allocation once margin applied(required81920), ReplaySave32256>31616,
+MiiCatalog5920>5856. Fiber ui_pass_calculate25104>16384. No budgets altered.
+Current YogaONE matrix-trace-fresh exec67557; poll/reap then release via
+/tmp/slim/yoga-release.py matrix-trace-fresh. Remaining CORE checks andeditor-alone,
+crate rechecks, exactreleasecompliance, independentreview/integratedroute pending.
+Freshcache census22:32 global50824757216B; reserve1GB forchecks.
+NoEden/profile/helperboot. Configuration proposal explicitly deferred/unapplied.
