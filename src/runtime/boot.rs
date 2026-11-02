@@ -23,7 +23,7 @@ use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::runtime::features::{cpu, input_delay, lra_reset, pause_owner, reset_hub, stage_hazards as hazards};
-use crate::runtime::{clock, game, install, published};
+use crate::runtime::{clock, game, install, published, scene};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -76,6 +76,7 @@ pub fn run() {
     );
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);
+    scene::set_lobby_active(false);
     published::publish(&loaded.menu, 0);
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).

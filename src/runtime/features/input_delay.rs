@@ -16,7 +16,7 @@ use crate::model::sites;
 use crate::runtime::alloc::{HookId, HookScope};
 #[cfg(feature = "diag")]
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::{game, published};
+use crate::runtime::{published, scene};
 
 /// The delay queue, the owner-mask rules and the pause trace (`model::input_adapter`): the hooks only
 /// call its methods, so the host tests drive the same code.
@@ -49,7 +49,7 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 fn apply() {
     // A pass that made no call has no note.
     let (out, slot) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0))).unwrap_or((0, 0));
-    if out == 0 || !input_delay::applies(slot as i32, game::is_training_mode()) {
+    if out == 0 || !input_delay::applies(slot as i32, scene::is_training()) {
         return;
     }
     let out = out as *mut MappedInputs;

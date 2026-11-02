@@ -37,6 +37,7 @@ use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::reset_hub;
 use crate::runtime::game::{self, natives};
+use crate::runtime::scene;
 
 /// The CPU behaviours' state; `None` until `init`.
 static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
@@ -262,7 +263,7 @@ unsafe fn fighter_frame(fighter: usize) {
     if accessor == 0 || !lra_reset::entry_id_valid(entry) {
         return;
     }
-    let training = game::is_training_mode();
+    let training = scene::is_native_training();
     if entry == 0 {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {

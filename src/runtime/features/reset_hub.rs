@@ -14,7 +14,8 @@ use crate::model::input_delay::Clear;
 use crate::model::lra_reset;
 use crate::model::sites;
 use crate::runtime::alloc::{HookId, HookScope};
-use crate::runtime::{game, hub, published};
+use crate::model::cpu::role::Scene;
+use crate::runtime::{game, hub, published, scene};
 
 static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
 
@@ -51,7 +52,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     // SAFETY: `a0` is the fighter object the game just initialised.
     let cpu = unsafe { cpu_operated(a0) };
     let hot_swap = published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire);
-    if lra_reset::hub_should_run(cpu, game::is_training_mode(), hot_swap) {
+    if lra_reset::hub_should_run(cpu, scene::current() == Some(Scene::Training), hot_swap) {
         hub::run(Clear::TrainingReset);
     }
     result
