@@ -187,6 +187,7 @@ use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
 use crate::runtime::roster::special_articles as articles;
+use crate::runtime::roster::build_split as split;
 
 macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
@@ -1655,6 +1656,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     bank.phase = Phase::Changing; bank.observed = None; bank.from = from; bank.target = target;
     bank.acknowledged = false; bank.failed = false; bank.swap = swap;
     bank.tick = TickGap::arm(now_us());
+    split::arm(role, now_us());
     fields::write_unchecked(entry as usize, 0x5932, 0u8);
     fields::write_unchecked(entry as usize, 0x591a, target);
     match swap {
@@ -1710,6 +1712,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
     }
     // P3-0: one tick of this entry's pre-service; the meter is armed by a request and read at Ready.
     bank.tick.observe(now_us());
+    split::observe(role, now_us());
     // A former Ready receipt must not survive a callback observing an unfinished
     // native reset/replacement. Publish it again only after today's full proof.
     bank.observed = None;
@@ -1796,6 +1799,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 trace!("[GroupSwap] swap owner={} kind={:#x} request_to_ready_us={} bodies={:?} max_tick_gap_us={} ticks={}",
                     owner, kind, now_us().saturating_sub(requested), now, bank.tick.max_gap_us, bank.tick.ticks);
                 bank.tick.disarm();
+                split::report_gaps(role, owner, kind);
             }
             let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none()
                 && (bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned));
@@ -2035,9 +2039,11 @@ impl RegistryOps for NativeRegistry {
     fn unregister(&mut self, members: Members) {
         unsafe {
             let unprepare: unsafe extern "C" fn(*mut u8, u32, u32, u32) = std::mem::transmute(self.base + UNPREPARE);
+            split::mark(split::Step::Plugin);
             for (sub, kind) in members.kinds().iter().enumerate().take(members.count()) {
                 unprepare(self.g68 as *mut u8, *kind, self.owner, sub as u32);
             }
+            split::mark(split::Step::Unprepare);
         }
     }
 
@@ -2048,7 +2054,9 @@ impl RegistryOps for NativeRegistry {
     fn refresh_roster(&mut self) {
         unsafe {
             let refresh: unsafe extern "C" fn(*mut u8) = std::mem::transmute(self.base + ROSTER_REFRESH);
+            split::mark(split::Step::Plugin);
             refresh(self.r as *mut u8);
+            split::mark(split::Step::Roster);
         }
     }
 
@@ -2058,9 +2066,11 @@ impl RegistryOps for NativeRegistry {
             let header = self.header();
             let costume = copy_registry::registry_costume(header[0], fields::read_unchecked::<u32>(self.r, 0x64),
                 fields::read_unchecked::<u32>(self.base, REGION_WORD));
+            split::mark(split::Step::Plugin);
             for (sub, kind) in header.iter().enumerate().take(members.count()) {
                 prepare(self.g68 as *mut u8, (self.r + 0xb0) as *mut u8, *kind, costume, self.owner, sub as u32);
             }
+            split::mark(split::Step::Prepare);
         }
     }
 }
@@ -2376,9 +2386,13 @@ unsafe fn start_async_construction(base: usize, entry: *mut u8, owner: u32, memb
     let models: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + MODELS_SETUP);
     let contexts: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + COUNT_SETUP);
     let control: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + CONTROL_INIT);
+    split::mark(split::Step::Plugin);
     models(entry);
+    split::mark(split::Step::Models);
     contexts(entry);
+    split::mark(split::Step::Contexts);
     control(entry);
+    split::mark(split::Step::Control);
     let setup_done = now_us();
     let allocate: unsafe extern "C" fn(u8, u32, u32) -> usize = std::mem::transmute(base + BODY_ALLOC);
     let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
@@ -2387,13 +2401,17 @@ unsafe fn start_async_construction(base: usize, entry: *mut u8, owner: u32, memb
     let mut tasks = [0usize; NATIVE_MEMBERS];
     let mut bodies = [0usize; NATIVE_MEMBERS];
     for (i, kind) in members.kinds().iter().copied().enumerate().take(members.count()) {
+        split::mark(split::Step::Plugin);
         let body = allocate(0, kind, owner);
+        split::mark(split::Step::Allocate);
         if body == 0 {
             install_cells(e, &bodies[..i]);
             return Err(i);
         }
         bodies[i] = body;
+        split::mark(split::Step::Plugin);
         let t = heap_alloc(task::ALIGN, task::SIZE);
+        split::mark(split::Step::TaskAlloc);
         if t == 0 {
             install_cells(e, &bodies[..=i]);
             return Err(i + 1);
@@ -2416,7 +2434,9 @@ unsafe fn start_async_construction(base: usize, entry: *mut u8, owner: u32, memb
                 destroy(holder);
             }
         }
+        split::mark(split::Step::Functor);
         schedule(t + task::HANDLE, base + TASK_CALLBACK, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);
+        split::mark(split::Step::Schedule);
         tasks[i] = t;
     }
     Ok((tasks, setup_done))
@@ -2451,16 +2471,20 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
         }
         bank.construction.take().unwrap()
     };
+    split::start_settle(role);
     let mut bodies = [0usize; NATIVE_MEMBERS];
     for (i, task_object) in construction.tasks.iter().enumerate().take(construction.count) {
         bodies[i] = fields::read::<usize>(*task_object, task::BODY).unwrap_or(0);
     }
     install_cells(entry as usize, &bodies[..construction.count]);
+    split::mark(split::Step::Install);
     free_tasks(base, &construction.tasks[..construction.count]);
+    split::mark(split::Step::FreeTasks);
     let mut tail = construction.tail;
     tail.asynchronous = Some(AsyncReport { setup_us: construction.setup_us,
         queued_us: construction.queued_us.saturating_sub(tail.started), settled_us: construction.settled_us, ticks: construction.ticks });
     complete_exchange(base, entry, owner, role, tail);
+    split::report_settle(owner, construction.group);
 }
 
 /// A destroyer (finalize, reload, scene end) while a Phase B′ construction is in flight: wait for
@@ -2725,6 +2749,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         (prepared, before.unwrap(), alias)
     };
     let started = now_us();
+    split::start(role, started);
     // U18: the outgoing window leaves the copy registry and the entry's header and roster become
     // the incoming group's before native runs for it, as a Reload into that group would leave
     // them; a warm attach then registers the group as its inits did (`swap_model::copy_registry`).
@@ -2734,12 +2759,16 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     let registry_ok = match (prepared, NativeRegistry::new(base, alias, owner)) {
         (Prepared::Warm { outgoing, members, .. }, Some(mut registry)) => {
             copy_registry::attach(&mut registry, outgoing, members);
+            split::mark(split::Step::Plugin);
             registry.trace("attach", outgoing, members);
+            split::mark(split::Step::Log);
             true
         }
         (Prepared::Build { outgoing, members, .. }, Some(mut registry)) => {
             copy_registry::build(&mut registry, outgoing, members);
+            split::mark(split::Step::Plugin);
             registry.trace("build", outgoing, members);
+            split::mark(split::Step::Log);
             true
         }
         (_, None) => {
@@ -2757,11 +2786,15 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             Some(crate::runtime::roster::mii_setup::prepare_mii_group(base, entry as usize, owner, alias, identity, c)),
         _ => None,
     };
+    split::mark(split::Step::MiiSetup);
     let setup_ok = registry_ok && !matches!(setup, Some(crate::engine::mii::mii_setup::Outcome::Refused(_)
         | crate::engine::mii::mii_setup::Outcome::Failed(_)));
     // GS-PANIC: the build's own charge (the bodies and their article models, `0x6081f8 → … → 0x392e290`).
+    split::mark(split::Step::Plugin);
     let construct_committed = matches!(prepared, Prepared::Build { .. }).then(|| MemorySample::capture().committed.get()).flatten();
+    split::mark(split::Step::Memory);
     exchange_articles(base, role, entry as usize, owner, prepared, registry_ok);
+    split::mark(split::Step::Articles);
     match prepared {
         Prepared::Warm { .. } if registry_ok => select_control(base, entry),
         Prepared::Warm { .. } => {}
@@ -2781,6 +2814,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
                             trace!("[GroupSwap] build owner={} group={} mode=async queued={} tasks={:x?} setup_us={} us={}; frames run until the tasks settle",
                                 owner, group, members.count(), &tasks[..members.count()], setup_done.saturating_sub(started),
                                 queued_us.saturating_sub(started));
+                            split::report_setup(owner, group, &members.kinds()[..members.count()], setup_done.saturating_sub(started));
                         }
                         None => trace!("[GroupSwap] build owner={} group={} mode=async UNEXPECTED: bank gone after queuing; tasks {:x?} leak (reported)",
                             owner, group, &tasks[..members.count()]),
@@ -2807,6 +2841,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             log_memory(owner, group, kinds, "build", construct_committed, MemorySample::capture(), memory::group_cost(kinds).build);
         }
     }
+    split::mark(split::Step::Memory);
     // U19: the construction is over (each body's tail ran inside `0x658af0`), so the request bit
     // the build set goes back, as the reset would hand it back if the last tail had emptied the
     // map. Other batches' keys keep the map non-empty here; a bit left set would let a later load
@@ -2821,6 +2856,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             trace!("[RequestBit] UNEXPECTED owner={} group={}: R+0x4c changed during the construction ({:#x} -> {:#x}); left as found", owner, group, lease.before, now);
         }
     }
+    split::mark(split::Step::Request);
     let elapsed = now_us().saturating_sub(started);
     // Verify under the lock; roll back on any failure.
     let rollback = {
@@ -2900,6 +2936,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         }
     };
     let (rollback, post_release) = rollback;
+    split::mark(split::Step::Verify);
     // Diag only: who listens to the body event the activation posts for this exchange.
     #[cfg(feature = "diag")]
     if rollback.is_none() { super::trace_event_listeners("[GroupSwap] body-event listeners at acknowledgement", 0x1e); }
@@ -2928,6 +2965,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         // `r_handle::reconcile` supersedes WP2's mirror-based `observe::reconcile`).
         if alias != 0 && resource(base, owner) == Some(alias) { r_handle::reconcile(lrole, "build"); }
     }
+    split::mark(split::Step::Ledger);
     let Some((group, via)) = rollback else { return; };
     // PT-TRAINER-PARK: a failed warm attach rebuilt its pool; it goes before the previous window returns.
     if matches!(prepared, Prepared::Warm { .. }) {

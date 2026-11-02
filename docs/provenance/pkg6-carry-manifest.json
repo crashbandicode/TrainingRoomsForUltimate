@@ -1536,7 +1536,124 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "fdd8959105a2044865a0e4c7214ddc1cc7e3358ea363c0ca72d8a6985d71c916"
+   "dest_sha256": "8b418c49d1fe185dbdd3f0c0eafca06d118389a67b30b0f2676dc3a1877823f9",
+   "edits": [
+    {
+     "old": "use crate::runtime::roster::special_articles as articles;\n",
+     "new": "use crate::runtime::roster::special_articles as articles;\nuse crate::runtime::roster::build_split as split;\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): the module of the build-time marks (`runtime::roster::build_split`, empty without `diag`)"
+    },
+    {
+     "old": "    bank.tick = TickGap::arm(now_us());\n",
+     "new": "    bank.tick = TickGap::arm(now_us());\n    split::arm(role, now_us());\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): arms the per-role tick-gap timeline with the carried P3-0 meter"
+    },
+    {
+     "old": "    bank.tick.observe(now_us());\n",
+     "new": "    bank.tick.observe(now_us());\n    split::observe(role, now_us());\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): one entry tick of the gap timeline, beside the carried P3-0 observation"
+    },
+    {
+     "old": "                bank.tick.disarm();\n",
+     "new": "                bank.tick.disarm();\n                split::report_gaps(role, owner, kind);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): `[BuildSplit] gaps`: the swap's largest tick gaps with the plugin work of the tick before each"
+    },
+    {
+     "old": "            for (sub, kind) in members.kinds().iter().enumerate().take(members.count()) {\n                unprepare(self.g68 as *mut u8, *kind, self.owner, sub as u32);\n            }\n",
+     "new": "            split::mark(split::Step::Plugin);\n            for (sub, kind) in members.kinds().iter().enumerate().take(members.count()) {\n                unprepare(self.g68 as *mut u8, *kind, self.owner, sub as u32);\n            }\n            split::mark(split::Step::Unprepare);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the `0x17f26c0` unprepare calls of the U18 registry move"
+    },
+    {
+     "old": "            refresh(self.r as *mut u8);\n",
+     "new": "            split::mark(split::Step::Plugin);\n            refresh(self.r as *mut u8);\n            split::mark(split::Step::Roster);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the `0x17e4f50` roster refresh of the U18 registry move"
+    },
+    {
+     "old": "            for (sub, kind) in header.iter().enumerate().take(members.count()) {\n                prepare(self.g68 as *mut u8, (self.r + 0xb0) as *mut u8, *kind, costume, self.owner, sub as u32);\n            }\n",
+     "new": "            split::mark(split::Step::Plugin);\n            for (sub, kind) in header.iter().enumerate().take(members.count()) {\n                prepare(self.g68 as *mut u8, (self.r + 0xb0) as *mut u8, *kind, costume, self.owner, sub as u32);\n            }\n            split::mark(split::Step::Prepare);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the `0x17f1a60` prepare_entry calls of a warm attach"
+    },
+    {
+     "old": "    let started = now_us();\n    // U18: the outgoing window leaves the copy registry",
+     "new": "    let started = now_us();\n    split::start(role, started);\n    // U18: the outgoing window leaves the copy registry",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): starts the split at the carried `setup_us` origin"
+    },
+    {
+     "old": "            copy_registry::attach(&mut registry, outgoing, members);\n            registry.trace(\"attach\", outgoing, members);\n",
+     "new": "            copy_registry::attach(&mut registry, outgoing, members);\n            split::mark(split::Step::Plugin);\n            registry.trace(\"attach\", outgoing, members);\n            split::mark(split::Step::Log);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): the `[Registry] attach` line's formatting time"
+    },
+    {
+     "old": "            copy_registry::build(&mut registry, outgoing, members);\n            registry.trace(\"build\", outgoing, members);\n",
+     "new": "            copy_registry::build(&mut registry, outgoing, members);\n            split::mark(split::Step::Plugin);\n            registry.trace(\"build\", outgoing, members);\n            split::mark(split::Step::Log);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): the `[Registry] build` line's formatting time"
+    },
+    {
+     "old": "        _ => None,\n    };\n    let setup_ok = registry_ok",
+     "new": "        _ => None,\n    };\n    split::mark(split::Step::MiiSetup);\n    let setup_ok = registry_ok",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the Mii Phase B setup (Mii groups only)"
+    },
+    {
+     "old": "    let construct_committed = matches!(prepared, Prepared::Build { .. }).then(|| MemorySample::capture().committed.get()).flatten();\n    exchange_articles(base, role, entry as usize, owner, prepared, registry_ok);\n",
+     "new": "    split::mark(split::Step::Plugin);\n    let construct_committed = matches!(prepared, Prepared::Build { .. }).then(|| MemorySample::capture().committed.get()).flatten();\n    split::mark(split::Step::Memory);\n    exchange_articles(base, role, entry as usize, owner, prepared, registry_ok);\n    split::mark(split::Step::Articles);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the build's memory sample (four `svcGetInfo`) and `exchange_articles`"
+    },
+    {
+     "old": "    models(entry);\n    contexts(entry);\n    control(entry);\n    let setup_done = now_us();\n",
+     "new": "    split::mark(split::Step::Plugin);\n    models(entry);\n    split::mark(split::Step::Models);\n    contexts(entry);\n    split::mark(split::Step::Contexts);\n    control(entry);\n    split::mark(split::Step::Control);\n    let setup_done = now_us();\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times `0x654dc0`, `0x655320` and `0x64f820`, the entry-level setup"
+    },
+    {
+     "old": "        let body = allocate(0, kind, owner);\n",
+     "new": "        split::mark(split::Step::Plugin);\n        let body = allocate(0, kind, owner);\n        split::mark(split::Step::Allocate);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times each `0x3ae5f0` pool pop and base constructor"
+    },
+    {
+     "old": "        let t = heap_alloc(task::ALIGN, task::SIZE);\n",
+     "new": "        split::mark(split::Step::Plugin);\n        let t = heap_alloc(task::ALIGN, task::SIZE);\n        split::mark(split::Step::TaskAlloc);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times each task object allocation `0x392e290`"
+    },
+    {
+     "old": "        schedule(t + task::HANDLE, base + TASK_CALLBACK, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);\n",
+     "new": "        split::mark(split::Step::Functor);\n        schedule(t + task::HANDLE, base + TASK_CALLBACK, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);\n        split::mark(split::Step::Schedule);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the functor copy (`0x3cb050` + destructor) and the queueing `0x3549720`"
+    },
+    {
+     "old": "                                queued_us.saturating_sub(started));\n",
+     "new": "                                queued_us.saturating_sub(started));\n                            split::report_setup(owner, group, &members.kinds()[..members.count()], setup_done.saturating_sub(started));\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): `[BuildSplit] setup`: the exchange's split, the build's index since boot and the carried `setup_us`"
+    },
+    {
+     "old": "    let mut bodies = [0usize; NATIVE_MEMBERS];\n    for (i, task_object) in construction.tasks.iter().enumerate().take(construction.count) {\n        bodies[i] = fields::read::<usize>(*task_object, task::BODY).unwrap_or(0);\n    }\n    install_cells(entry as usize, &bodies[..construction.count]);\n    free_tasks(base, &construction.tasks[..construction.count]);\n",
+     "new": "    split::start_settle(role);\n    let mut bodies = [0usize; NATIVE_MEMBERS];\n    for (i, task_object) in construction.tasks.iter().enumerate().take(construction.count) {\n        bodies[i] = fields::read::<usize>(*task_object, task::BODY).unwrap_or(0);\n    }\n    install_cells(entry as usize, &bodies[..construction.count]);\n    split::mark(split::Step::Install);\n    free_tasks(base, &construction.tasks[..construction.count]);\n    split::mark(split::Step::FreeTasks);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): splits the settlement tick (cells, task frees)"
+    },
+    {
+     "old": "    complete_exchange(base, entry, owner, role, tail);\n}\n\n/// A destroyer",
+     "new": "    complete_exchange(base, entry, owner, role, tail);\n    split::report_settle(owner, construction.group);\n}\n\n/// A destroyer",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): `[BuildSplit] settle`: the settlement tick's split"
+    },
+    {
+     "old": "            log_memory(owner, group, kinds, \"build\", construct_committed, MemorySample::capture(), memory::group_cost(kinds).build);\n        }\n    }\n",
+     "new": "            log_memory(owner, group, kinds, \"build\", construct_committed, MemorySample::capture(), memory::group_cost(kinds).build);\n        }\n    }\n    split::mark(split::Step::Memory);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the settlement's memory sample and line"
+    },
+    {
+     "old": "    let elapsed = now_us().saturating_sub(started);\n    // Verify under the lock; roll back on any failure.\n",
+     "new": "    split::mark(split::Step::Request);\n    let elapsed = now_us().saturating_sub(started);\n    // Verify under the lock; roll back on any failure.\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times `r_handle::end_request` and its line"
+    },
+    {
+     "old": "    let (rollback, post_release) = rollback;\n",
+     "new": "    let (rollback, post_release) = rollback;\n    split::mark(split::Step::Verify);\n",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the verification, the `built` line and the acknowledgement"
+    },
+    {
+     "old": "    let Some((group, via)) = rollback else { return; };\n    // PT-TRAINER-PARK: a failed warm attach",
+     "new": "    split::mark(split::Step::Ledger);\n    let Some((group, via)) = rollback else { return; };\n    // PT-TRAINER-PARK: a failed warm attach",
+     "reason": "F6 diag meter (ledger F6, stream f6 2026-11-02): times the post-build release and ledger reconcile"
+    }
+   ]
   },
   {
    "src": "src/native_source_capacity.rs",

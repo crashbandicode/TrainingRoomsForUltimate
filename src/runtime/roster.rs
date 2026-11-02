@@ -8,6 +8,9 @@
 //! fork's (`swap_native/mod.rs`): the native-body-bank files need `native-body-bank-alpha`, the presentation readback
 //! `mii-hud-portrait-alpha`.
 
+/// Diag meter of the group build's game-thread time (stream f6; empty without `diag`).
+#[cfg(feature = "native-body-bank-alpha")]
+pub(crate) mod build_split;
 pub(crate) mod character_items;
 pub(crate) mod character_lifecycle;
 // Carried, not declared (no clean-room consumer, single owner): `effect_hook_chain` (the fork's chaining of the shared EffectModule

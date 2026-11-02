@@ -17,6 +17,8 @@ pub mod archive_name;
 pub mod archive_recipe;
 #[path = "model/archive_retire.rs"]
 pub mod archive_retire;
+#[path = "model/build_split.rs"]
+pub mod build_split;
 #[path = "model/cpu/mod.rs"]
 pub mod cpu;
 #[path = "model/capture_settings.rs"]
