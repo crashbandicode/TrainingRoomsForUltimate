@@ -12,13 +12,15 @@ Releasec6229b70 resident3444736 unchangedvs8f; diag9c167b423784704 unchanged.
 Exacta6stack same5thread-tableFAIL and1fiberFAIL; no budget/tablewaiver.
 Menu49392 required81920>57344; fiber25104>16384. Noa6runtimeacceptance.
 Artifacts slim/a6e4d07-{host,clippy,no-default,diag,release,preflight}.
-Latestallhosttargetcensus20:39total57,128,742,311B (<60GB). Yogaowna6target moved
-from8f idle; Surfaceownreusedtarget. Allprevious8fNRO/ELF/logsarchived.
+Latestallhosttargetcensus20:39total57,128,742,311B (<60GB). Ownfinisheda6targets
+nowRETIRED: Surface322,249,256B andYoga1,634,279,828B (1,956,529,084B freed).
+Manifests+lastbinaries archivedcache-retirement-a6e4d07; noownactivecache remains.
 NativeTextproposalUNAPPLIED pendingbaseline/ownership;4unapprovedenumrows/hos2approved.
 HelperpathEdenheld;sl02allocationFAIL818/delta100on10stillopen. LatestleadSTATUS
 mtime19:38:20at20:42check; asyncprimaryresumeleadquestionpending. NoREADY.
-Nexta6complianceaftercleanprogresscommit, exacthandoff tolead viaQUESTIONS; continue
-independentworkwithinownership andawaitnative/integration/stack decisions.
+a6complianceonclean07e1463 exit1samefourmachinefailures/29agentrows. Handoffb8dda80
+postedunderQUESTIONS; primaryresumeleadrequestreissuedwithgatedcommits. Awaitexact
+native/integration/stack decisions; no nativeTextapplication orhelperbootauthorized.
 Watcher2674699 ownerboundalive/noalert at20:31; exactthreadAstra/mediumconfirmed.
 Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
 
@@ -891,3 +893,19 @@ beforeexecution, retried timeout40seconds spelledtimeout 40. No mutation fromfai
 Exacta6release compliance atclean07e1463 exit1/fourmachinefailures/29agentrows; report
 a6e4d07-release/compliance.md. No-diagmarkersPASS andcleantreePASS. OwnM/C
 compile row refreshedtoa6; remainingopenrows keptunchanged.
+
+## Completed cache retirement while awaiting integration
+UTC2026-11-02T20:51:59.603057+00:00
+RetiredONLYown finishedSurface cargo-targets/trainingrooms-slim322249256B/622files
+andYoga a6e4d07/target1634279828B/1848files; owncompiler/envchecks idle first.
+SurfacecurrentNRO+ELF matcheda6releasearchive beforedeletion. Yoga lastSwitchNRO
+e2946b9d968efb95cdc162a51e378b0d37ff715f511cc0e900aeeb71b3461c49 (61release),
+ELFb9d7451f960372fe07b068748101d811e233db8e318d370af9934da70668fb94
+copiedbeforedelete withfullfile/byte manifest. Receiptsandbinaries fetchedlocal
+slim/cache-retirement-a6e4d07/{surface-manifest.json,yoga/}. Source/logs/research
+unchanged; noforeigncachetouched. Freed1956529084B; old20:39globalminusownretirement
+55172213227B is arithmetic, NOTa newlymeasuredglobalcensus. Noowncompiler/Eden/profile/
+claim/queue. Futurecompile requiresnewadmission/currentcachecheck/newtarget.
+RemainingSIZE-PLANcounterabstractionwouldtouchactiveleadstates/pkg4recorder; boot
+tableconsolidationcrossessharedinstall/runtimeboundaries. Noextraneouseditsmade.
+Exacta6gatedslice isreviewable; requirednative/stack/runtimeintegration remainspending.
