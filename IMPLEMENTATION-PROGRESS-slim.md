@@ -13,7 +13,7 @@ Raw98,962/ceiling103,300; normalized126549 excludingtools (-9vs10a8232);
 four unapproved enum rows remain, hos2 approved. Carrypkg4 full42PASS.
 BothclaimsRELEASED19:51; no owncompiler/Eden/queue/profile. TargetcacheYoga61b0aab
 reused from10a8232; Surface61b0aab new solecargo-targets/trainingrooms-slim.
-Global accepted47GB beforefreshcache, >10GBheadroom; preservepriorcachemanifest.
+Prior47GB global estimate was later invalidated; UI fresh19:54 census53,306,307,619B afterpkg6retirement is the corrected basis. OwnSurfacecache retired20:02 withmanifest; Yoga target retained forcontinuingwork.
 Compiledstack61diag: Menu49392/required81920>57344, fiber25104>16384 FAILunchanged;
 5 tablefailures (Heartbeat4896,Menu49392,Archive2608,ReplaySave32432,MiiCatalog5920).
 OtherthanMenu allocatedsizescoverrequired buttableproofisstale; no waiver.
@@ -174,10 +174,10 @@ Unverified is an explicit pending state; before READY each must have the prescri
 
 | Requirement | Tag | Result | Evidence |
 | --- | --- | --- | --- |
-| `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified;10a8232 release3bf44a35 resident3,440,640B via playbook tools/build/nro_size.py; archivedreleaseNRO. |
-| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml;10a8232 release3bf44a35; archived10a8232-release/compliance.md machine rows pass. |
-| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; fullhost10a8232 exit0,1110trackedsource hashes unchanged; compliance machine row pass. |
-| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for10a8232 | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchivedsource/log receipts; ordinary-player-only Switch also0. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
+| `crate-type = ["cdylib"]` only. An `rlib` alongside makes Cargo skip LTO for the crate without saying so, and its code stays in the resident image the game's heap pays for. Shaderdb-probe went from 1,081,344 to 618,496 bytes resident with the same exports. Evidence: `Cargo.toml` and `tools/build/nro_size.py` on the shipped NRO. | M | pass | Cargo.toml cdylib-only verified;61b0aab releasee2946b9d resident3,440,640B via playbook compliance.py nro_facts; archivedreleaseNRO. |
+| Release profile `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`; `skyline = "=0.6.0"`; toolchain `1.98.1`. | M | pass | Cargo.toml and rust-toolchain.toml;61b0aab releasee2946b9d; archived61b0aab-release/compliance.md machine rows pass. |
+| Pure logic in `model.rs` with host tests; `runtime.rs` only under `#[cfg(target_os = "switch")]`. | M | pass | src/lib.rs target gate; fullhost61b0aab exit0,1110trackedsource hashes unchanged; compliance machine row pass. |
+| Gates pass, one cargo call each: root test, clippy zero, no-default, Switch release and diag. | M | pass for61b0aab | Rootfullhost/clippy-Dwarnings/no-default andSwitchrelease/diag all0 witharchivedsource/log receipts; prior10a8232 ordinary-player-only Switch also0; unchanged feature-scope code. Switchwarnings41/40 remain; no warning-freeSwitchclaim. |
 | No heap in hooks: a counting allocator and `heap_allocations=0` in the install line. | M | FAIL | sl-02 installation heap_allocations=0, but full hook parser FAIL:11rows,7nonzero deltas, final818/delta100; archivedhook-stats-final-verdict.log. sl-01 failure also retained. Finalzero-hookgateOPEN. |
 | Fixed buffers, a writer thread on a static stack, files opened from stack-built paths. **E** gsp-visualizer, ssbu-gnw-judge-log. | M | unverified | Acceptance pending; no pass claimed. |
 | Every fix solves the root cause. Otherwise the workaround (guard, skip, restriction, tolerance, lint `allow`, feature gate, setting off) went to the operator with its root cause, cost and a recommendation, and was approved before it shipped. The report lists each approved workaround with its date ([WORKFLOW](WORKFLOW.md), "Root cause, or the operator's approval"). Defects that share one cause were checked for a single abstraction, and the report says which approach was chosen and why. | M | unverified | Acceptance pending; no pass claimed. |
@@ -186,22 +186,22 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Card scan before the site is chosen: `tools/build/scan-offsets.py` over the card copy, for the site and, for a virtual function, its vtable slot. Evidence: the scan's output and the copy's date. | M | unverified | Acceptance pending; no pass claimed. |
 | (another plugin hooks or may hook the site) Sharing v1 or the chain rules ([HOOK-SHARING](HOOK-SHARING.md)); the owner election runs before the byte guard; both stand-in modes (`foreign=inline`, `foreign=far`) and both load orders tested in Eden. N/A only when the scan showed nobody at the site, with the scan cited. | C | unverified | Acceptance pending; no pass claimed. |
 | Hook after the prologue, or call the game function instead of hooking it; hook the most specific instruction. | M | unverified | Acceptance pending; no pass claimed. |
-| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | 10a8232-release/compliance.md: no diagmarkers inrelease3bf44a35. |
+| No diag code or strings in the shipped NRO (`diag` feature off; no `diag.txt` or `standin` strings). Evidence: `compliance.py`. | M | pass | 61b0aab-release/compliance.md: no diagmarkers inreleasee2946b9d. |
 | The shipped NRO writes its install line and nothing per frame. **C** (a logging plugin whose product is the log) its data files too, but no per-frame diagnostics. | M | unverified | Acceptance pending; no pass claimed. |
 | Read-only rules reviewed in the code, hook by hook: no checked random number drawn, no native code that draws one skipped or reordered, no simulated state written (ssbu-desync-detector `docs/WHAT-IS-CHECKED.md`). Evidence: the review in the evidence doc. | C | unverified | Acceptance pending; no pass claimed. |
 | Replay A/B with the desync detector: the same replay with and without the plugin, identical check values and positions. | C | unverified | Acceptance pending; no pass claimed. |
 | Online-only paths: two consoles, the detector on both, the changed path played to its end so the session after it is checked; `desync_seen=0` at the same `frame=` on both. | C | unverified | Acceptance pending; no pass claimed. |
-| Claim written before `Up` and released after `Down`, also after a failed run. Evidence: the coordination file's lines. | M | pass for sl-01 | Yoga CLAIMED16:57Z before Up16:58:21Z; Down/restore17:06Z then RELEASED17:07Z; shared ledger and sl-01 receipts retained. |
-| One Eden per host, MemAvailable at least 10 GiB, never profile `a`, display `:61` or another agent's runs. | M | pass for sl-01 | Fresh host/process/ledger preflight,21GiB available; private profile sl and display109, no compiler beside Eden. Final run will recheck. |
-| The profile is a copy with the game content hard-linked (`gv.py prep`, or `cp -al`); a full copy per profile fills the filesystem. Only the copy is changed. Byte-identical files are links, and files that differ or that the run writes in place (saves, rewritten INI/config, shader caches, logs) are real copies ([EDEN](EDEN.md), "Link what is identical, copy what is not"). Evidence: `du -sh` against `du -sh --apparent-size` on the copy. | M | unverified | Acceptance pending; no pass claimed. |
+| Claim written before `Up` and released after `Down`, also after a failed run. Evidence: the coordination file's lines. | M | pass for sl-01/sl-02 | sl-02 SurfaceCLAIMED19:23 beforeUp19:23:34; stopped19:25:41, restored/source1244verified thenRELEASED19:26. Bothrunreceipts retained. |
+| One Eden per host, MemAvailable at least 10 GiB, never profile `a`, display `:61` or another agent's runs. | M | pass for sl-01/sl-02 | Freshhost/process/ledgerpreflight >10GiB available; ownprofile sl/display109, no compilerbesideEden. Final61/integratedrunpending. |
+| The profile is a copy with the game content hard-linked (`gv.py prep`, or `cp -al`); a full copy per profile fills the filesystem. Only the copy is changed. Byte-identical files are links, and files that differ or that the run writes in place (saves, rewritten INI/config, shader caches, logs) are real copies ([EDEN](EDEN.md), "Link what is identical, copy what is not"). Evidence: `du -sh` against `du -sh --apparent-size` on the copy. | M | pass for sl-02 | Existinggvprep; readonlycontentinode matches, mutableconfig/MiiDB separateinode, du6.5G perprofile; source1244hashes unchanged. Evidence profile-copy-sl-02.json/source-before/source-after/restoration. |
 | One `CARGO_TARGET_DIR` per source copy, never shared between copies of the same workspace, and the cargo home shared per host and toolchain; sources refreshed with new file times; `df -h /` checked before every build or Eden launch, stopping below 40 GB free; finished work's build products deleted, with a manifest, while NROs, receipts and logs are kept ([WORKFLOW](WORKFLOW.md), "Build caches and disk"). | M | unverified | Acceptance pending; no pass claimed. |
 | Every wait gated on a log line or a screenshot check, between macro segments too ([MACROS](MACROS.md), "Hybrid"); a fixed sleep only where neither exists, and then rounded up. | M | unverified | Acceptance pending; no pass claimed. |
 | A run whose precondition line never comes is aborted and retried under the next label ([EDEN](EDEN.md), "Queue runs"). | M | unverified | Acceptance pending; no pass claimed. |
 | The ruleset is the shortest that covers the path under test: 1 stock, a 1:00 limit, items, hazards and FS meter off ([EDEN](EDEN.md), "Keep matches short"). A longer match only when the test needs it, with the reason in the handoff. Evidence: the ruleset screenshot or the match length in the log. | M | unverified | Acceptance pending; no pass claimed. |
-| Profile restored after the run: set-aside NROs back, saves and replays back, temp files removed, the host released. | M | pass for sl-01 | Original plugin set hashes verified, owned processes stopped, fresh private profile removed back to initial absence; sl-01 restoration evidence archived. |
-| `console.log` searched for `panic`, `abort`, `crash` and `Unmapped`; an `Unmapped Read`/`Unmapped Write` below `0x1000` or inside the plugin's activity window fails the lane, because Eden tolerates the null read the console faults on ([EDEN](EDEN.md), "Read the results"). `run.json` and `memory.peak` kept with the run. | M | pass for sl-01 console scan; runtime lane FAIL | Full final5689-line console:0Unmapped and0panic/abort/crash; run.json/memory.peak retained in slim/sl-01. Hook allocations and route gate failed separately, never accepted as lane pass. |
+| Profile restored after the run: set-aside NROs back, saves and replays back, temp files removed, the host released. | M | pass for sl-01/sl-02 | sl-02 originalpluginhashrestored, ownedEden/displaystopped, source1244hashesunchanged/noextras, privateprofiledeletedbacktoabsence; archivedrestoration.json. |
+| `console.log` searched for `panic`, `abort`, `crash` and `Unmapped`; an `Unmapped Read`/`Unmapped Write` below `0x1000` or inside the plugin's activity window fails the lane, because Eden tolerates the null read the console faults on ([EDEN](EDEN.md), "Read the results"). `run.json` and `memory.peak` kept with the run. | M | pass for sl-02 console scan; runtime lane FAIL | Fullfinal11934lineconsole0Unmapped/0panic-abort-crash; run.json/memory.peak retained in slim/sl-02. Route/installpassed; hookallocationsFAIL818, neveraccepted aslanepass. |
 | Every local command under the memory and time guard; anything with `${var}` in a script file. | M | unverified | Acceptance pending; no pass claimed. |
-| Each run's outputs kept under its label. | M | pass | sl-01 raw logs/receipts/screens/run.json/memory.peak under artifacts/trainingrooms-nro-archive/slim/sl-01; frozen build/test directories remain separate by commit and attempt. |
+| Each run's outputs kept under its label. | M | pass | sl-01/sl-02 rawlogs/receipts/screens/run.json/memory.peak under artifacts/trainingrooms-nro-archive/slim/; frozen build/test directories remain separate by commit and attempt. |
 | README: one paragraph, a full-screen GIF (1280 wide, under 10 s, caption with date and build), the install path, the build commands, a license line and the AI-assistance disclaimer. | M | unverified | Acceptance pending; no pass claimed. |
 | A dated evidence doc: run labels, the build (commit or NRO sha256), what was done, what the log showed. | M | unverified | Acceptance pending; no pass claimed. |
 | (the evidence cites numbers computed from logs) every such number comes from a committed script over the logged files, with host tests, and the command is named next to the numbers. | C | unverified | Acceptance pending; no pass claimed. |
@@ -214,7 +214,8 @@ Unverified is an explicit pending state; before READY each must have the prescri
 | Without the order: nothing pushed, tagged or written to the card, and the report says so. | M | pass | No push/tag/release/card action; only local stream commits and owned host builds. |
 | Forgejo, never GitHub; push only on the operator's order; commit messages from a UTF-8 file. | M | pass | Origin is Forgejo per compliance; local commits use mandated identity and UTF-8 message files; no pushes. |
 | Model/effort gate and owner-bound watcher per routing authority. | M | pass | Exact thread01a19c9f-18c1-7832-9236-a14dcebafa3b, live Astra/medium; hidden watcher11182, checked after compaction. |
-| Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | unverified | Acceptance pending; no pass claimed. |
+| Every spawned worker read this playbook itself (`README.md`, all of `docs/`, `tools/PROVENANCE.md`) before changing code, built its own checklist and ran `tools/check/compliance.py` before READY; the brief that spawned it said so and recorded the playbook commit it followed. | M | pass for this worker | Personallyread playbookae87443 README/all7docs/PROVENANCE beforecode; ownfullchecklist; compliance61release executedexit1 with4mandatorymachinefailures retained. No subdelegation. |
+
 
 ### Restart checkpoint — first compile, 2026-11-02 14:26Z
 
@@ -263,6 +264,20 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+### Milestone report and decisions needed — 2026-11-02 19:57Z
+- Code: 61b0aab; evidence commit 5644502; branch stream/slim.
+- All five compile gates pass with 1,110 unchanged source hashes. Full pkg4 carry verification passes.
+- Release e2946b9d: resident 3,440,640 B, unchanged. Diag b03b3257: 3,784,704 B, +4,096 B.
+- Raw sloc4: 98,962; normalized excluding tools: 126,549. Four unapproved enum rows remain.
+- No owned claims, jobs, queue entries, or profiles. No new Eden run; the helper-path hold is respected.
+- Final runtime allocation and compiled stack gates still fail; no READY or inherited-failure exemption.
+- Heartbeat/archive +176 B static path growth follows std filesystem/C-string allocation/panic paths, not MacroUi; archived shared-paths.json records both exact chains. No unsupported causal attribution.
+- Please provide the exact permitted integration route for gated pkg4/UI/R5 roots and stack table ownership.
+- Please decide the already prepared native keyboard bounded-index representation patch (no ABI or behavior change), or supply the required baseline route. It remains unapplied.
+- README/GIF/HANDOFF and guard-checker issues remain the integration compliance work; no shared playbook or release docs changed here.
+- I continue available stream work and wait for these lead decisions; this is not an operator-blocker declaration.
+
 
 - 19:53Z 61b0aab allfivecompilegatesPASS: fullhost/clippy-Dwarnings/no-default, releasee2946b9d, diagb03b3257. Source1110unchanged; allrawlogs/receipts under slim/61b0aab-*. Compiledstack comparison retained: offer_save frame800->480, restore_draft736->400; on_pad1024->1056/deepest2608->3232. Menu remains49392 andfiber25104, bothFAILunchanged. Heartbeat static4896 andarchive2608 nowexceedrecordedtable4272/2576, butallocatedstacks stillcoverrequired28672. ReplaySave/MiiCatalogstalerowsremain. No budget/tablewaiveroracceptance; requestexactpkg4/UI integration route andstacktableownership. BothclaimsRELEASED19:51, noownjob/queue/profile. NativeTextproposal stillunapplied.
 
@@ -707,3 +722,35 @@ Yoga release40.64s/41warnings rawffb029c971a4620d77309a64ed8812bcad59a446bac510e
 No newwarning suppression; no claimofwarningfreeSwitch. No ordinary-onlyrepeat
 requiredfor this puremodel change; previous10a8232 feature-scopeordinarygate retained.
 Compiledstacktools readfully; newandbaseline reports preserve failures, no tableedit.
+
+### 2026-11-02 19:54Z — compliance repeated
+Clean docsHEAD5644502/code61b0aab, releasee2946b9d: complianceexit1,4mandatorymachinefails unchanged (guardscanner sees repeat-initializer0, READMEbuild/GIFrow, noGIF, exactHANDOFF.mdmissing),29agentrows. Resident3440640B, nodiagmarkers, cleantreepass. Report archived slim/61b0aab-release/compliance.md. CurrentM/C table refreshed withactual61gates andsl02operationalproof; runtime/stack/lintremaininggates stillFAIL/pending, noREADY.
+
+19:57Z stack path audit: baseline/new Heartbeat and Archive shim frames unchanged2432/144. The +176B selected deepestpath enters std::sys::fs::switch::cstr112 + Vec::spec_extend48 + reserve16 beforepanic. Reports retain actualELF identities; no claimthisis caused by macrostate layout. Residentdiag+4096 is observed, cause not independentlyattributed.
+
+### 2026-11-02 19:58Z — keyboard test-surface audit (read only)
+Read the complete native inline adapter. Its existing cfg(test) module contains
+the 10-unit Mii buffer and 48-scalar/96-unit macro/caret tests, but no root host
+target includes that runtime module. Direct inclusion also requires the native
+skyline current-thread call, SDK imports and logging boundary; it is not a
+self-contained existing host test surface. No native-call stubs, blanket allows,
+source-extraction harness or duplicate Text implementation were introduced.
+A proper follow-up would move the pure bounded Text/Decision validation into an
+existing engine-owned model surface, retain the runtime ABI/callback adapter and
+test frozen Enter independently of subsequent Changed events. That is larger than
+the prepared two-file representation patch and needs the lead's scoped ownership
+decision; no source change or test pass is claimed for the unapplied patch.
+
+### 2026-11-02 20:02Z — cache correction and completed Surface retirement
+Read latest lead INBOX: UI's earlier52.06GB/lead47GB estimates omitted deeper
+target-host directories; corrected pre-retirement total was73.16GB. Pkg6 owner
+retired21,901,351,012B, then UI fresh19:54:55 census found53,306,307,619B globally.
+My19:49/19:51 claims cited the then-accepted47GB figure; that global-bound claim is
+invalid in retrospect. Those jobs ended19:51 before I read the newer correction.
+No further compiler claim or cache growth has been made after learning it.
+Deleted ONLY own completed Surface target at20:02:26 after checking compiler
+cwd/environ and verifying every61diag archivedfilehash;622files/322,548,096B.
+Manifest artifacts/trainingrooms-nro-archive/slim/cache-cleanup-61b0aab/
+surface-target-manifest.json saysdeleted. Source, NRO, ELF, rawlogs, receipts and
+stack reports retained. OwnYoga61target remains for continuing source work; a
+future claim requires a fresh global census, not the superseded47GB figure.
