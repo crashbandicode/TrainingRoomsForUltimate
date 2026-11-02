@@ -8,6 +8,8 @@
 use std::fs;
 use std::io::Read;
 
+use crate::model::cpu::rng::Rng;
+use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
@@ -18,7 +20,7 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{input_delay, lra_reset, reset_hub, stage_hazards as hazards};
+use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
 use crate::runtime::{clock, game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
@@ -62,7 +64,15 @@ pub fn run() {
     }
     published::set_developer_page(read_developer_ini().developer_page);
     let loaded = load_settings();
-    published::publish(&loaded.menu);
+    // The CPU behaviours' state exists before the first publish and before any hook is installed. The
+    // generator is the plugin's own (never the game's): seeded from the system tick and an address.
+    cpu::init(
+        CpuSettings::from_snapshot(&loaded.menu),
+        Rng::seed_from(clock::uptime_ms(), (run as fn() as usize) as u64),
+    );
+    // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
+    cpu::set_lobby(false);
+    published::publish(&loaded.menu, 0);
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
@@ -114,6 +124,7 @@ pub fn run() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
+    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
 
     // 6. The install line.
     let reports: [SiteReport; SITE_COUNT] =
@@ -123,6 +134,11 @@ pub fn run() {
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
         FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on },
         FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on },
+        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on },
+        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on },
+        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
+        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
+        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -142,6 +158,54 @@ pub fn run() {
     };
     install::write(&line);
     diag_log::flush();
+}
+
+/// The CPU behaviours (package 2): the per-frame wrapper first (the facts every other piece reads),
+/// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
+/// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
+/// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
+fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool) {
+    if !sites::feature_usable(Feature::CpuCore, usable) {
+        return (false, false, false, false, false);
+    }
+    cpu::install_frame();
+    mark("cpu_on_frame_slot", Written::Far);
+    let defence = sites::feature_usable(Feature::CpuDefence, usable);
+    if defence {
+        skyline::install_hook!(cpu::cpu_sdi_hook);
+        skyline::install_hook!(cpu::cpu_stick_x_hook);
+        skyline::install_hook!(cpu::cpu_stick_y_hook);
+        skyline::install_hook!(cpu::cpu_clatter_start_hook);
+        for name in ["sdi_hook", "stick_x_hook", "stick_y_hook", "clatter_start_hook"] {
+            mark(name, Written::Far);
+        }
+    }
+    let ledge = sites::feature_usable(Feature::CpuLedge, usable);
+    if ledge {
+        skyline::install_hook!(cpu::cpu_transition_term_hook);
+        mark("transition_term_hook", Written::Far);
+    }
+    let tech = sites::feature_usable(Feature::CpuTech, usable);
+    if tech {
+        skyline::install_hook!(cpu::cpu_motion_change_hook);
+        skyline::install_hook!(cpu::cpu_quake_pos_hook);
+        cpu::set_tech_on(true);
+        for name in ["motion_change_hook", "quake_pos_hook"] {
+            mark(name, Written::Far);
+        }
+    }
+    let shield = sites::feature_usable(Feature::CpuShield, usable);
+    if shield {
+        skyline::install_hook!(cpu::cpu_check_button_on_hook);
+        skyline::install_hook!(cpu::cpu_check_button_off_hook);
+        skyline::install_hook!(cpu::cpu_stick_x_no_clamp_hook);
+        skyline::install_hook!(cpu::cpu_stick_y_no_clamp_hook);
+        skyline::install_hook!(cpu::cpu_shield_param_hook);
+        for name in ["check_button_on_hook", "check_button_off_hook", "stick_x_no_clamp_hook", "stick_y_no_clamp_hook", "shield_param_hook"] {
+            mark(name, Written::Far);
+        }
+    }
+    (true, defence, ledge, tech, shield)
 }
 
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.

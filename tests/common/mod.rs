@@ -16,6 +16,8 @@ pub struct Section {
 }
 
 pub struct OwnedMain {
+    /// `(symbol name, main-relative address)` of every function and object in the ELF's symbol table.
+    pub symbols: Vec<(String, usize)>,
     pub bytes: Vec<u8>,
     pub text: Section,
     pub rodata: Section,
@@ -84,5 +86,33 @@ pub fn owned_main(test: &str) -> Option<OwnedMain> {
         all.iter().find(|(n, _)| n == name).map(|(_, s)| *s).unwrap_or_else(|| panic!("no {name} section"))
     };
     let (text, rodata, data) = (find(".text"), find(".rodata"), find(".data"));
-    Some(OwnedMain { bytes, text, rodata, data })
+    let symbols = symbols(&bytes, &all);
+    Some(OwnedMain { symbols, bytes, text, rodata, data })
+}
+
+/// The symbol table (`.symtab` with `.strtab`): `(name, value)` of every named symbol.
+fn symbols(elf: &[u8], sections: &[(String, Section)]) -> Vec<(String, usize)> {
+    let find = |name: &str| sections.iter().find(|(n, _)| n == name).map(|(_, s)| *s);
+    let (Some(symtab), Some(strtab)) = (find(".symtab"), find(".strtab")) else { return Vec::new() };
+    let u32_at = |o: usize| u32::from_le_bytes([elf[o], elf[o + 1], elf[o + 2], elf[o + 3]]) as usize;
+    let u64_at = |o: usize| {
+        let mut word = [0u8; 8];
+        word.copy_from_slice(&elf[o..o + 8]);
+        u64::from_le_bytes(word) as usize
+    };
+    (0..symtab.size / 24)
+        .filter_map(|i| {
+            let at = symtab.offset + i * 24;
+            let name_at = strtab.offset + u32_at(at);
+            let len = elf[name_at..].iter().position(|b| *b == 0)?;
+            (len > 0).then(|| (String::from_utf8_lossy(&elf[name_at..name_at + len]).into_owned(), u64_at(at + 8)))
+        })
+        .collect()
+}
+
+impl OwnedMain {
+    /// The address of the symbol called exactly `name`.
+    pub fn symbol(&self, name: &str) -> Option<usize> {
+        self.symbols.iter().find(|(n, _)| n == name).map(|(_, a)| *a)
+    }
 }

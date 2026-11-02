@@ -21,7 +21,7 @@ static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
 type OnInit = extern "C" fn(usize, usize, usize, usize, usize, usize, usize, usize) -> usize;
 
 /// The fighter is CPU-operated, by the game's own accessors; false for anything unresolvable.
-unsafe fn cpu_operated(fighter: usize) -> bool {
+pub(crate) unsafe fn cpu_operated(fighter: usize) -> bool {
     if fighter == 0 {
         return false;
     }

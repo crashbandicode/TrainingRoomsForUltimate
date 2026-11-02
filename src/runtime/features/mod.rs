@@ -1,5 +1,6 @@
-//! The features of package 1 (hooks only; the rules are in `model`).
+//! The features' hooks (the rules are in `model`): package 1's three, and package 2's CPU behaviours.
 
+pub mod cpu;
 pub mod input_delay;
 pub mod lra_reset;
 pub mod reset_hub;
