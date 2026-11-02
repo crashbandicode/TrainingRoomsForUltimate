@@ -4,7 +4,6 @@
 //! apart; the one kept is the `game::natives` one.
 
 #[path = "common/callgraph.rs"]
-#[allow(dead_code)]
 mod callgraph;
 
 use std::collections::BTreeMap;

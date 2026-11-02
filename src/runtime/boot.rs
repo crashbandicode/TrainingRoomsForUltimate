@@ -344,7 +344,7 @@ pub fn run() {
 fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
     let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return };
     let Ok(text) = fs::read_to_string(path.as_str()) else { return };
-    let mut poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
+    let poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
         match rows.iter().position(|row| row.name == name) {
             Some(i) => {
                 outcomes[i] = GuardOutcome::Foreign { first_diff: 0 };
