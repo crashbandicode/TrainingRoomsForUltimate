@@ -3,5 +3,5 @@
 //! (`InstallFields` is the seam group of it).
 
 pub(crate) mod seam_install;
-#[cfg(feature = "diag")]
+#[cfg(feature = "seam-drill")]
 pub(crate) mod seam_drill;

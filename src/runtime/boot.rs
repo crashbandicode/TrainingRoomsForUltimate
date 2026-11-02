@@ -66,6 +66,10 @@ pub fn run() {
         diag_log::flush();
         return;
     }
+    // The hook-sharing drill (feature `seam-drill`): with `foreign=` in diag.txt it hooks its sites as a plugin that does not share
+    // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::before();
 
     // 2. Panic policy (decision B2): log it, no pop-up. `panic = "abort"` then ends the process.
     std::panic::set_hook(Box::new(|info| {
@@ -315,6 +319,8 @@ pub fn run() {
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),

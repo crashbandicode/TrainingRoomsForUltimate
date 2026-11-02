@@ -133,6 +133,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if !visible {
         thumbs::hide();
     }
+    // The texture helper's Eden proof (feature `texture-probe`): binds a few stage textures to menu tiles and photographs them.
+    #[cfg(feature = "texture-probe")]
+    crate::runtime::ui::texture_probe::tick(panes);
     if thumbs::run(panes) {
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }

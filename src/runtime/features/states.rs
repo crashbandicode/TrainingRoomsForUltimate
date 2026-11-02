@@ -971,7 +971,7 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     let slot = role.index();
     BUFF_ACC[slot].store(if out.buffing { accessor } else { 0 }, Ordering::Release);
     BUFF_WIIFIT[slot].store(out.buffing && kind == BuffKind::WiiFit, Ordering::Release);
-    state_effects::run_buff(accessor, raw.fighter, raw.entry, &ids, &out);
+    state_effects::run_buff(accessor, raw.entry, &ids, &out);
     if out.done {
         with(|s| s.machine.finish_wait(role));
         state_diag!("[TrainingRooms] state buff_done entry={} kind={:?}", raw.entry, kind);

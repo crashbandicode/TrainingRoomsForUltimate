@@ -114,8 +114,9 @@ pub fn buff_kind(ids: &Table, kind: i32) -> Option<BuffKind> {
 /// Execute one `ApplyBuff` frame's answer.
 ///
 /// # Safety
-/// The buff sites passed their guards; `accessor` / `fighter` are a live fighter's.
-pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table, out: &BuffOut) {
+/// The buff sites passed their guards; `accessor` is a live fighter's module accessor (every buff native takes it, Cloud's limit
+/// gauge too since 1076ddc).
+pub unsafe fn run_buff(accessor: usize, entry: i32, ids: &Table, out: &BuffOut) {
     silence(accessor, ids);
     if let Some(spell) = out.hero_cast {
         let command = match spell {

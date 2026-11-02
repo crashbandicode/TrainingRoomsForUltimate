@@ -55,6 +55,11 @@ default = ["enhancements-alpha", "native-unlink-guard", "mii-hud-portrait-alpha"
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
 diag = []
+# Eden probes with no caller in a plain diag build, each behind its own feature so the diag NRO carries none of their code: the u4
+# texture helper's Eden proof (the stage grid's thumbnails replaced it in normal builds) and the playbook's hook-sharing drill on the
+# seam rows (`foreign=` in diag.txt, HOOK-SHARING "Testing the chain in Eden").
+texture-probe = ["diag"]
+seam-drill = ["diag"]
 
 # --- Carried feature table (package 6, decision D11) ---------------------------------------------------
 # Taken from the fork's root Cargo.toml lines 82-122 and 124-240 (line 123 not printed) of stage m5o (lead-authorised, CARRY-OVER.md pkg6
