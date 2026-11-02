@@ -20,7 +20,8 @@
    "training_stage_rotation_policy": "crate::engine::stages::training_stage_rotation_policy",
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
-   "stage_menu": "crate::engine::stages::stage_menu"
+   "stage_menu": "crate::engine::stages::stage_menu",
+   "character_items": "crate::engine::items::character_items"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -48,7 +49,8 @@
    "training_stage_rotation_policy": "crate::engine::stages::training_stage_rotation_policy",
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
-   "stage_menu": "crate::engine::stages::stage_menu"
+   "stage_menu": "crate::engine::stages::stage_menu",
+   "character_items": "crate::engine::items::character_items"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -977,6 +979,30 @@
    "crate": "root",
    "src_sha256": "8a378ab2499cab662a7412a336edffea5920caed1057c11190052b6380092b40",
    "dest_sha256": "622d9e1ab6d2faf2725752934a0f73fc056391915d15d2be39f241956810aeec"
+  },
+  {
+   "src": "training_mod_consts/src/character_items.rs",
+   "dest": "src/model/items/character_items.rs",
+   "crate": "consts",
+   "src_sha256": "57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf",
+   "dest_sha256": "a1445e80861edbf4db925a89fc3a7c8c92f0aa7eac3323f65092edbd51d91ad6",
+   "edits": [
+    {
+     "old": "use {crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::Toggle, crate::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};\n",
+     "new": "",
+     "reason": "the fork's old menu structure (StatefulTable/SubMenu/App/create_app) is replaced by package 1's item-grid editor row and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    },
+    {
+     "delete_from": "impl CharacterItemChoice {\n    pub fn to_submenu() -> SubMenu<'static> {",
+     "delete_to": "impl Serialize for CharacterItemChoice",
+     "reason": "to_submenu builds the fork's SubMenu: the fork's old menu structure (StatefulTable/SubMenu/App/create_app) is replaced by package 1's item-grid editor row and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    },
+    {
+     "delete_from": "    #[test]\n    fn action_picker_discards_old_checks_and_preserves_ordinary_settings() {",
+     "delete_to": "    #[test]\n    fn all_choices_round_trip_including_second_page() {",
+     "reason": "the test drives the fork's full menu app: the fork's old menu structure (StatefulTable/SubMenu/App/create_app) is replaced by package 1's item-grid editor row and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    }
+   ]
   }
  ]
 }

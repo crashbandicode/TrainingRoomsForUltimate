@@ -6,6 +6,8 @@
 
 #[path = "../model/compat/mod.rs"]
 pub mod compat;
+#[path = "../model/items/mod.rs"]
+pub mod items;
 #[path = "../model/kirby/mod.rs"]
 pub mod kirby;
 #[path = "../model/lobby/mod.rs"]
