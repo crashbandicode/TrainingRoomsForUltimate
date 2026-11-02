@@ -62,6 +62,21 @@ maps to a named install-line reason.
 - Draw-thread callbacks: atomics only (toggle word, writer flag); no lock across game calls, no I/O, no allocation. Boot
   registration allocates once (the SDK's string copies and handler box), outside any hook.
 
+## Merge and F8 (game thread never waits)
+
+`work/implementation` 566780a (stream/sync: `hos-lock`, parking_lot gone) merged as `14016fe` (lead's request); conflicts only in
+`Cargo.toml` / `CARRY-OVER.md` (both kept) and `Cargo.lock` (theirs plus the two SDK path crates). F8 audit of this stream's
+paths (SPEC-core-01 §4.3):
+
+| Path | Thread | Lock / wait | Treatment |
+| --- | --- | --- | --- |
+| `deluxe_row::register` (SDK `register`, `host()` `OnceLock` init) | boot (`main`, before any hook runs) | none contended: first and only init of the lookup | boot only |
+| `CaptureRow::current` / `request` | Deluxe overlay draw thread | `CaptureToggle` compare-exchange loop (lock-free, no wait) | no lock |
+| `writer::persist_replay_capture` | draw thread / menu worker | one atomic store | no lock |
+| `writer::request_replay_capture`, `replay_capture()` | menu worker thread | toggle CAS + atomics | no lock |
+| INI write | writer thread | atomic swap of the due flag, file I/O on the writer thread only | off the game thread |
+| capture adapter (package 4) | game thread | toggle CAS (`is_armed`, `begin_record`, `end_record`) | unchanged, lock-free |
+
 ## Seams in other streams' files (for the lead)
 
 - `src/runtime/macros/mod.rs` (package 4): one call, `crate::runtime::deluxe_row::register()`, between `prepare_buffers` and
