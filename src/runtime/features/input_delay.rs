@@ -8,8 +8,6 @@
 //! The queue, the owner-mask rules and the pause trace are `model::input_adapter::InputAdapter` (the host
 //! tests drive the same code); the hooks only call its methods under one lock.
 
-use std::cell::Cell;
-
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
@@ -24,24 +22,70 @@ use crate::runtime::{published, scene, ui};
 
 static ADAPTER: Mutex<InputAdapter> = Mutex::new(InputAdapter::new());
 
-thread_local! {
-    /// The out record and slot of the mapping call in progress on this thread, noted before the call
-    /// and taken after it. Const-initialised, no destructor: no allocation.
-    static IN_PROGRESS: Cell<(usize, i64, usize)> = const { Cell::new((0, 0, 0)) };
-    /// The game's Controller of the mapping call in progress (package 4's chords and display read it).
-    static CONTROLLER: Cell<usize> = const { Cell::new(0) };
+// Switch std uses OS TLS boxes even for const/no-destructor thread_local!
+// values. nn::os scalar slots instead live inside each SDK ThreadType. The
+// exact 13.0.5 SDK leaves get/set as five-instruction leaf functions; allocation
+// clears the slot in existing threads, and CreateThread zeros future slots.
+// See eden/runs/ui-input-contract; no hard-coded ThreadType offsets are used.
+use crate::model::input_pending::{Pending, Tls};
+use std::sync::OnceLock;
+
+static PENDING: OnceLock<Pending> = OnceLock::new();
+struct NativeTls;
+
+extern "C" {
+    #[link_name = "_ZN2nn2os15AllocateTlsSlotEPNS0_7TlsSlotEPFvmE"]
+    fn allocate_tls_slot(key: *mut u32, destructor: Option<unsafe extern "C" fn(usize)>) -> u32;
+    #[link_name = "_ZN2nn2os11FreeTlsSlotENS0_7TlsSlotE"]
+    fn free_tls_slot(key: u32);
+    #[link_name = "_ZN2nn2os11GetTlsValueENS0_7TlsSlotE"]
+    fn get_tls_value(key: u32) -> usize;
+    #[link_name = "_ZN2nn2os11SetTlsValueENS0_7TlsSlotEm"]
+    fn set_tls_value(key: u32, value: usize);
+}
+
+impl Tls for NativeTls {
+    type Error = u32;
+    fn allocate(&self) -> Result<u32, u32> {
+        let mut key = 0;
+        // SAFETY: SDK output pointer, no destructor or per-thread allocation.
+        let result = unsafe { allocate_tls_slot(&mut key, None) };
+        if result == 0 { Ok(key) } else { Err(result) }
+    }
+    fn free(&self, key: u32) {
+        // SAFETY: Pending rolls back only its successfully reserved keys,
+        // before publication/installation. Published keys live for the process.
+        unsafe { free_tls_slot(key) };
+    }
+    fn get(&self, key: u32) -> usize {
+        // SAFETY: only Pending supplies successfully reserved, live keys.
+        unsafe { get_tls_value(key) }
+    }
+    fn set(&self, key: u32, value: usize) {
+        // SAFETY: as get; value is stored by the SDK, never dereferenced here.
+        unsafe { set_tls_value(key, value) };
+    }
+}
+
+/// Boot only, before the four input hooks are installed. Failure leaves no keys.
+pub fn init() -> Result<(), u32> {
+    if PENDING.get().is_some() { return Ok(()); }
+    let pending = Pending::reserve(&NativeTls)?;
+    if let Err(unpublished) = PENDING.set(pending) { unpublished.release(&NativeTls); }
+    Ok(())
 }
 
 /// `state` is the fourth argument of the call (x3): the controller holder, a struct whose field at +0x10 is
 /// the player's Controller. Package 5's menu keeps the holder itself, package 4 reads the Controller from it.
 fn note(out: usize, slot: i64, state: usize) {
-    let _ = IN_PROGRESS.try_with(|cell| cell.set((out, slot, state)));
+    let Some(pending) = PENDING.get() else { return };
+    pending.note(&NativeTls, out, slot, state);
     let controller = if state == 0 { 0 } else { unsafe { ((state + 0x10) as *const usize).read() } };
     // Package 6: the waiting-room practice engine's once-per-frame step, before this frame's input processing (Player 1's poll).
     if slot == 0 {
         crate::runtime::lobby::update();
     }
-    let _ = CONTROLLER.try_with(|cell| cell.set(controller));
+    pending.set_controller(&NativeTls, controller);
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
     if slot == 0 && controller != 0 && scene::is_training() {
         unsafe { chords::on_poll(controller) };
@@ -64,10 +108,11 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 
 fn apply() {
     // A pass that made no call has no note.
-    let (out, slot, holder) = IN_PROGRESS.try_with(|cell| cell.replace((0, 0, 0))).unwrap_or((0, 0, 0));
+    let Some(pending) = PENDING.get() else { return };
+    let (out, slot, holder) = pending.take(&NativeTls);
     // Package 6: the controller operating the CPU (native Behavior = Control) reaches the roster cycle's operator handlers.
     if out != 0 && slot == 1 && scene::is_training() {
-        let controller = CONTROLLER.try_with(|cell| cell.get()).unwrap_or(0);
+        let controller = pending.controller(&NativeTls);
         // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
         unsafe { crate::runtime::roster::handle_operator_input(out as *mut MappedInputs, controller) };
     }
@@ -79,7 +124,7 @@ fn apply() {
     ui::input::on_p1_poll(holder);
     // Package 6: the roster's cycle chords and the Kirby hat shortcut see P1's record before the delay (and may consume the chord).
     if slot == 0 {
-        let controller = CONTROLLER.try_with(|cell| cell.get()).unwrap_or(0);
+        let controller = pending.controller(&NativeTls);
         // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
         unsafe { crate::runtime::roster::handle_p1_input(out as *mut MappedInputs, controller) };
     }
@@ -100,7 +145,7 @@ fn apply() {
     let _ = check;
     // After the delay: the input display and the recorder see the delayed record (SPEC-input-03 §5.2).
     if slot == 0 {
-        let controller = CONTROLLER.try_with(|cell| cell.replace(0)).unwrap_or(0);
+        let controller = pending.take_controller(&NativeTls);
         // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
         unsafe {
             input_display::on_p1_poll(controller, out);

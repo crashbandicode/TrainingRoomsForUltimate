@@ -39,6 +39,8 @@ pub mod guard;
 pub mod hook_stats;
 #[path = "model/input_adapter.rs"]
 pub mod input_adapter;
+#[path = "model/input_pending.rs"]
+pub mod input_pending;
 #[path = "model/ini_files.rs"]
 pub mod ini_files;
 #[path = "model/input_delay.rs"]

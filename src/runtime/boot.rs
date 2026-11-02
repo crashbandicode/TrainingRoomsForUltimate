@@ -217,7 +217,19 @@ fn run_inner() {
         }
     };
 
-    let input_delay_on = sites::feature_usable(Feature::InputDelay, usable);
+    // Reserve every scalar TLS key before installing any input callback.
+    // A partial failure rolls back all keys and reports an unavailable feature.
+    let (input_delay_on, input_delay_reason) = if sites::feature_usable(Feature::InputDelay, usable) {
+        match input_delay::init() {
+            Ok(()) => (true, None),
+            Err(result) => {
+                diagnostic(format_args!("[TrainingRooms] input TLS reservation failed: result={result:#x}"));
+                (false, Some("native_tls_unavailable"))
+            }
+        }
+    } else {
+        (false, None)
+    };
     if input_delay_on {
         skyline::install_hook!(input_delay::caller_a_note);
         skyline::install_hook!(input_delay::caller_a_apply);
@@ -316,7 +328,7 @@ fn run_inner() {
     };
     let common_blocked = cpu_common_reason == Some("site_guard_failed");
     let features = [
-        report(Feature::InputDelay, input_delay_on, None),
+        report(Feature::InputDelay, input_delay_on, input_delay_reason),
         report(Feature::LraReset, lra_on, None),
         report(Feature::StageHazards, hazards_on, None),
         report(Feature::ResetHub, hub_on, None),
@@ -330,7 +342,7 @@ fn run_inner() {
         report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
-        FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
+        FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),
         report(Feature::Recording, recording_on, None),
         report(Feature::Notices, notices_on, None),
