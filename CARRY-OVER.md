@@ -59,3 +59,20 @@ three lines of **mixed** files (`training_mod_tui/src/containers/app.rs`: the na
 `"Player Swapping"`), besides ours-new docs. Nothing from them was used: the id came from `menu_json.rs`
 above, and the row title is the one already in MENU-DRAFT. The lead should decide whether that counts as
 opening a mixed file.
+## Package 2 (CPU behaviour), 2026-11-02
+
+Nothing was carried from the fork: package 2 is clean-room code written from `specs/` and the repo docs. No file
+of the stage or the fork worktree was opened, no search ran over the stage, and nothing under `upstream-ref/` was
+opened.
+
+Facts read from outside the specs, all public game or third-party MIT facts and none from the Training Modpack:
+
+| Source | What was used |
+| --- | --- |
+| The owned 13.0.5 ELF (`research/game-13.0.5/main-13.0.5.elf`: symbol table, disassembly, 64-byte windows) | every offset, symbol and guard of the new site rows (`tests/cpu_sites.rs`, `core01_sites_match_owned_elf`); the fighter object layout (kind +0xc, entry id +0x10, module accessor +0x20) from `sv_battle_object::entry_id` and `::module_accessor`; the game's constant lookup `lib::lua_bind_get_value<int>` at `main+0x3728e10` |
+| Third-party crate `skyline_smash` 0.1.0 (MIT, crates.io), `src/cpp/l2c_value.rs` and the shape of its `lua_const.rs` | the mechanism only: a constant's value is asked from the game by a 64-bit key of its identifier through `lua_bind_get_value`; the identifiers are the game's own names that the specs already use |
+| Third-party crate `lua_bind_hash` 1.0.1 (MIT, crates.io) | the key is XXH64 with the seed `u64::MAX` (the crate's mangled implementation was read to recognise the algorithm; `src/model/cpu/hash.rs` is a standard XXH64 written here); its three published test vectors are used as host tests |
+
+Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party `smash` constants crate may be
+used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
+`Cargo.toml`.

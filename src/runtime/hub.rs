@@ -5,14 +5,16 @@
 
 use crate::model::input_delay::Clear;
 use crate::model::lra_reset::{self, HubStep};
-use crate::runtime::features::input_delay;
+use crate::runtime::features::{cpu, input_delay};
 
 pub fn run(cause: Clear) {
     // How many queued input-delay records the hub dropped.
     let mut dropped = 0;
     lra_reset::run_hub(|step| {
-        // Steps whose features are not built yet (mash, SDI, counters, combo, ledge, throw, shield
-        // tilt) have nothing to clear.
+        // The CPU behaviours clear their own state for every step they own (mash, SDI, counters,
+        // ledge); steps whose features are not built yet (combo, throw, shield tilt) have nothing to
+        // clear.
+        cpu::hub_step(step);
         if step == HubStep::InputDelay {
             dropped = input_delay::clear(cause);
         }
