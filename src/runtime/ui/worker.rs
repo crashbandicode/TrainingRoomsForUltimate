@@ -406,7 +406,8 @@ fn stage_label(i: usize) -> &'static str {
 /// when it differs from the last one.
 fn publish_frame(s: &Session) {
     let Some(menu) = s.menu.as_ref() else { return };
-    let mut next = Frame::new();
+    let mut next = NEXT_FRAME.lock();
+    next.reset();
     if s.phase == Phase::Clip {
         let Some(view) = replay_capture::clip_view() else { return };
         clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
@@ -445,15 +446,19 @@ fn publish_frame(s: &Session) {
     }
     // The last frame handed over (only this thread takes it): an unchanged frame is not handed over again.
     let mut last = LAST_FRAME.lock();
-    if *last != next {
-        *last = next;
-        FRAME.write(next);
+    if *last != *next {
+        *last = *next;
+        FRAME.write(*next);
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }
 }
 
 /// The frame last handed to the tick (the worker's own copy; the tick reads `FRAME`).
 static LAST_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
+
+/// Scratch owned only by the menu worker. Keeping it here removes a full Frame
+/// temporary from every nested screen builder without allocating in a hook.
+static NEXT_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 
 /// The write-back of decision D1: the carried engines changed their typed view of the menu (`compat::menu`, a roster pick the
 /// cycle made, the preload rows after the INI overlay). The rows and kept keys that differ from the stored settings replace them, and

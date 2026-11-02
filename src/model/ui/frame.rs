@@ -198,6 +198,42 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Reuse a frame in place. Constructing a whole temporary on each nested
+    /// screen path exhausted the menu thread's stack when the roster grew.
+    pub fn reset(&mut self) {
+        self.view = View::List;
+        self.chip_weights.fill(0);
+        self.chip_focus = 0;
+        self.chip_visual = ChipVisual::None;
+        self.tile_cols = 0;
+        self.tile_rows = 0;
+        self.tiles.fill(Text::new());
+        self.tile_count = 0;
+        self.tile_focus = 0;
+        self.tile_n.fill(u16::MAX);
+        self.tile_stage_grid = false;
+        self.tile_roster_grid = false;
+        self.tile_cpu = false;
+        self.tile_centre_last = false;
+        self.tile_sig = 0;
+        self.tile_state.fill(0);
+        self.range = RangeView::default();
+        self.clip = ClipBar::default();
+        self.title.clear();
+        self.tabs.fill(Text::new());
+        self.tab_count = 0;
+        self.tab_active = 0;
+        self.crumb.clear();
+        self.groups.fill(Text::new());
+        self.group_count = 0;
+        self.group_active = 0;
+        self.rows.fill(RowLine::default());
+        self.row_count = 0;
+        self.focus = None;
+        self.help.fill(Text::new());
+        self.hint.clear();
+    }
+
     pub const fn new() -> Frame {
         const EMPTY_ROW: RowLine = RowLine {
             label: Text::new(),
@@ -347,7 +383,7 @@ fn value_tone(menu: &Menu, row: usize) -> Tone {
 /// The page view: tabs, the groups of the page on the left, the active group's rows on the right,
 /// the focused row's two help lines and the key hints.
 pub fn page_frame(menu: &Menu, frame: &mut Frame) {
-    *frame = Frame::new();
+    frame.reset();
     let _ = frame.title.write_str(TITLE);
     for (i, page) in menu.ring().take(TABS).enumerate() {
         let _ = frame.tabs[i].write_str(page.title());

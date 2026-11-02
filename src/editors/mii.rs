@@ -75,7 +75,7 @@ impl MiiList {
         page_frame(menu, frame);
         frame.view = View::List;
         frame.group_count = 0;
-        frame.rows = Frame::new().rows;
+        frame.rows.fill(crate::model::frame::RowLine::default());
         frame.row_count = view.panel.labels.len().min(frame.rows.len()) as u8;
         frame.focus = Some(view.panel.selected as u8);
         frame.crumb.clear();
