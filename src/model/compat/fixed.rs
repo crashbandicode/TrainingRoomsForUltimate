@@ -81,6 +81,11 @@ impl<T: Copy, const N: usize> FixedList<T, N> {
         self.len += 1;
         true
     }
+
+    pub fn pop(&mut self) -> Option<T> {
+        self.len = self.len.checked_sub(1)?;
+        Some(self.items[self.len])
+    }
 }
 
 impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {

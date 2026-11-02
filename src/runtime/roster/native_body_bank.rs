@@ -164,7 +164,7 @@ use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::Mutex;
 use crate::engine::swap::body_bank::{
-    count_extra_groups, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
+    count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Members, Phase, Special,
@@ -610,8 +610,10 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // (Pyra, PT, IC, the Miis) must not give its share to helper sources, which stay resident for the scene
             // (Yoga swoff2 steps 79-97).
             if !grouped && lane.iter().any(Option::is_some) {
-                let roster = if role == 0 { menu.player_roster.fighters() } else { menu.cpu_roster.fighters() };
-                let cycle: Vec<u32> = roster.iter().map(|fighter| fighter.kind()).collect();
+                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }
+                    else { menu.cpu_roster.fighters_excluding_fixed(None) };
+                let mut cycle = crate::engine::swap::ordered_roster::KindList::new(0);
+                for fighter in roster.iter() { cycle.push(fighter.kind()); }
                 // The `window_lane` rule: a cycle `0x4b` is a member only as this role's Solo Popo.
                 let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
                 let solo = canonical_original(menu, role) != Some(POPO)
@@ -669,8 +671,11 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // never "the first cells" with cell 0 taken as the active fighter.
             let (kinds, count) = members.logical_kinds();
             let extras = if members.is_pair_lead() { count } else { *value };
-            let shown: Vec<u32> = std::iter::once(target)
-                .chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)).collect();
+            let mut shown = crate::engine::compat::fixed::FixedList::<u32, { NATIVE_MEMBERS + 1 }>::new(0);
+            for kind in std::iter::once(target)
+                .chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)) {
+                shown.push(kind);
+            }
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&shown, target, originals[role])
         });
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
@@ -709,14 +714,16 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     };
     let special = special_policy(settings);
     let mut windows = [None; 2];
-    let mut existing: [Vec<Members>; 2] = [Vec::new(), Vec::new()];
+    let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
     for role in 0..2 {
         let state = BANKS[role].lock().unwrap();
         if let Some(bank) = state.as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
             windows[role] = Some(*bank.members);
             alias[role] = bank.alias;
-            existing[role] = bank.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| *g.members).collect();
+            for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
+                existing[role].push(*group.members);
+            }
         }
     }
     // A lane's Ice Climbers entry is a group candidate only when the role's
@@ -725,9 +732,10 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // switch that admits it: the normal pair for a pair group (`pair_groups`),
     // Solo Popo for a Solo-led ordinary group (`solo_popo_groups`); the pair
     // group wins when both are on.
-    let upcoming: [Vec<u32>; 2] = std::array::from_fn(|role| {
+    let upcoming: [_; 2] = std::array::from_fn(|role| {
+        let mut kinds = crate::engine::compat::fixed::FixedList::<u32, { crate::runtime::roster::cycle_preload::MAX_TARGETS }>::new(0);
         let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
-        lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
+        for kind in lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
             // Configured targets stay canonical, except a lane Mii under the Mii-group policy.
             .filter(|(_, t)| t.configuration.is_none() || (special.mii && (0x48..=0x4a).contains(&t.kind)))
             .filter(|(i, t)| t.kind != POPO
@@ -736,7 +744,8 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     if special.pair { form == Forms::starting(POPO) }
                     else { policy.solo_popo_groups && form == Forms::solo_popo() }
                 }))
-            .map(|(_, t)| t.kind).collect()
+            .map(|(_, t)| t.kind) { kinds.push(kind); }
+        kinds
     });
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
         originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), hats_wanted, pool_free, special });
@@ -762,7 +771,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                 settings.ready_fighters, live, capacity, POOL_RESERVE, hats_wanted, alias[role],
                 identity.map(|(i, _)| (i.index, i.tokens)));
         }
-        let counts = count_extra_groups(&bank.groups.iter().map(|g| (*g.members, g.state)).collect::<Vec<_>>());
+        let counts = count_extra_groups_iter(bank.groups.iter().map(|g| (*g.members, g.state)));
         targets[role] = counts.planned;
         let role_bodies: usize = bank.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum();
         GROUP_BODIES[role].store(role_bodies.min(usize::from(u8::MAX)) as u8, Ordering::Release);
@@ -795,7 +804,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
                 let (kinds, count) = bank.members.logical_kinds();
                 let active = bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind);
                 let extra = reusable_extras(&kinds[..count], active, originals[role]);
-                let groups = count_extra_groups(&bank.groups.iter().map(|g| (*g.members, g.state)).collect::<Vec<_>>());
+                let groups = count_extra_groups_iter(bank.groups.iter().map(|g| (*g.members, g.state)));
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }
                     else { WindowStatus::Busy };
