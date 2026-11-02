@@ -76,3 +76,14 @@ Facts read from outside the specs, all public game or third-party MIT facts and 
 Lead decision wanted: SPEC-input-02 open question 1 asks whether the third-party `smash` constants crate may be
 used; package 2 did not need it (the constants are resolved at run time by name), so nothing was added to
 `Cargo.toml`.
+
+## pkg6 (carry-over of the fork's engines), S6-0 plan phase, 2026-11-02
+
+Nothing is carried yet. This section records what S6-0 read, so the lead can audit the boundary.
+
+- Stage **m5o** (`/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`), never edited. `tools/pkg6_inventory.py` hashes (reads bytes of) only paths that `docs/provenance/provenance-files.json` lists as `ours-new` in the package-6 feature groups, plus six paths absent from that scan (a path absent from the scan is not an upstream path): `training_mod_consts/src/notice_queue.rs`, `training_mod_consts/src/body_bank/mii_publish.rs`, `src/log_stress.rs`, `training_mod_consts/src/log_stress.rs`, `docs/skyline-logger-race.md`, `docs/cpu-rolls-apply.md`. It also walks the stage's directory tree for path names only (no content) to list paths missing from the scan.
+- `tools/pkg6_deps.py` parses `use` statements and `crate::` / `training_mod_*::` paths of those same ours-new Rust files and resolves each to a file of the scan; it records which MIXED or upstream-identical file and item a carried file names (no content of a mixed or upstream file is read). Small ad-hoc scans over the same ours-new files counted external crate names, `smash::` paths, menu-struct field accesses, writer calls (`fs::write`, `OpenOptions`, …) and input-owner calls.
+- Read directly as ours-new files: `src/training/seams.rs` (lines 1-120), `src/native_install.rs` (lines 1-60), the row labels of `training_mod_consts/src/native_seams/rows_{a1,a2,a3,a4,a5,identity}.rs` (label counts by prefix) and the first line of each, `training_mod_mii/Cargo.toml`.
+- Campaign evidence (not fork source): `refactor/RC-SUMMARY.md`, `c1162/EDEN-BRIEF-m5o.md`, `c1162/ONLINE-BRIEF-m5o.md`, `stages/m5o/eden/RESULT.md`, `stages/m5m/eden/RESULT.md`.
+- No search over mixed files, none over `upstream-ref/`, none over the fork worktree. No accidental exposure to report.
+- Not carried by package 6 and why: `src/training/cpu_rolls.rs`, `training_mod_consts/src/cpu_rolls.rs` (W11's CPU-ROLLS-APPLY: package 2's SPEC-cpu-02 §5, clean-room); `training/seams.rs` and `native_seams/rows_a3.rs` (the fork's upstream-hook install table: superseded by `src/model/sites.rs` rows of packages 1-5).
