@@ -27,6 +27,14 @@ byteflags! {
     }
 }
 
+byteflags! {
+    /// Where the CPU's recordings come from (macro_source): the numbered slots or the named library. Option order as the row.
+    pub struct MacroSource {
+        pub NUMBERED = "Numbered Slots",
+        pub NAMED = "Named Library",
+    }
+}
+
 /// One setting row's elements as a typed choice: element `i` is the weight of option `i`. Missing elements count as 0 (a
 /// shorter array leaves the tail off, `settings::parse_row`).
 pub fn from_row<T>(row: &[u8], all: &[T]) -> T
@@ -53,6 +61,12 @@ const fn solo_popo_cpu_default() -> OnOff {
 }
 const fn solo_popo_original_default() -> OnOff {
     OnOff::OFF
+}
+const fn fighter_prompt_default() -> OnOff {
+    OnOff::ON
+}
+const fn macro_source_default() -> MacroSource {
+    MacroSource::NUMBERED
 }
 const fn lobby_practice_default() -> OnOff {
     OnOff::OFF
@@ -112,6 +126,12 @@ pub struct TrainingModpackMenu {
     /// Mii Groups.
     #[serde(default = "preload::default_mii_groups")]
     pub cycle_preload_mii_groups: OnOff,
+    /// Ask before a replay or a named recording switches the CPU's fighter (`fighter_prompt`, package 4).
+    #[serde(default = "fighter_prompt_default")]
+    pub fighter_prompt: OnOff,
+    /// Where the CPU's recordings come from (macro_source, package 4).
+    #[serde(default = "macro_source_default")]
+    pub macro_source: MacroSource,
     /// Lobby Practice (the waiting room runs the practice session).
     #[serde(default = "lobby_practice_default")]
     pub lobby_practice: OnOff,
@@ -141,6 +161,8 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     cycle_preload_native_groups: OnOff::ON,
     cycle_preload_pair_groups: OnOff::ON,
     cycle_preload_mii_groups: OnOff::ON,
+    fighter_prompt: OnOff::ON,
+    macro_source: MacroSource::NUMBERED,
     lobby_practice: OnOff::OFF,
     training_stage_rotation: OnOff::OFF,
     lobby_stages: LobbyStageOrder::NATIVE,
@@ -188,6 +210,8 @@ impl TrainingModpackMenu {
             cycle_preload_native_groups: on_off("cycle_preload_native_groups", BASE_MENU.cycle_preload_native_groups),
             cycle_preload_pair_groups: on_off("cycle_preload_pair_groups", BASE_MENU.cycle_preload_pair_groups),
             cycle_preload_mii_groups: on_off("cycle_preload_mii_groups", BASE_MENU.cycle_preload_mii_groups),
+            fighter_prompt: on_off("fighter_prompt", BASE_MENU.fighter_prompt),
+            macro_source: row_or(snapshot, "macro_source", &MacroSource::ALL_CONSTS, BASE_MENU.macro_source),
             lobby_practice: on_off("lobby_practice", BASE_MENU.lobby_practice),
             training_stage_rotation: on_off("training_stage_rotation", BASE_MENU.training_stage_rotation),
             // a kept key: a missing or malformed list is the native order
@@ -201,7 +225,7 @@ impl TrainingModpackMenu {
 
     /// Every row this view holds as (setting id, elements), in the order of the fields: the write-back of D1 (package 5's commit
     /// path persists them; `compat::menu::write_back(row_id, value)` is one of these pairs).
-    pub fn rows(&self) -> [(&'static str, Vec<u8>); 18] {
+    pub fn rows(&self) -> [(&'static str, Vec<u8>); 20] {
         [
             ("solo_popo_original", self.solo_popo_original.to_byte_vec()),
             ("solo_popo_player_cycle", self.solo_popo_player_cycle.to_byte_vec()),
@@ -219,6 +243,8 @@ impl TrainingModpackMenu {
             ("cycle_preload_native_groups", self.cycle_preload_native_groups.to_byte_vec()),
             ("cycle_preload_pair_groups", self.cycle_preload_pair_groups.to_byte_vec()),
             ("cycle_preload_mii_groups", self.cycle_preload_mii_groups.to_byte_vec()),
+            ("fighter_prompt", self.fighter_prompt.to_byte_vec()),
+            ("macro_source", self.macro_source.to_byte_vec()),
             ("lobby_practice", self.lobby_practice.to_byte_vec()),
             ("training_stage_rotation", self.training_stage_rotation.to_byte_vec()),
         ]
@@ -280,6 +306,18 @@ mod tests {
         // a malformed kept list is the native order, never a panic
         let loaded = crate::model::settings::parse(r#"{"menu":{"lobby_stages":[9,9]}}"#);
         assert_eq!(TrainingModpackMenu::from_snapshot(&loaded.settings.menu).lobby_stages, LobbyStageOrder::NATIVE);
+    }
+
+    #[test]
+    fn the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots() {
+        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
+        assert_eq!((factory.fighter_prompt, factory.macro_source), (OnOff::ON, MacroSource::NUMBERED));
+        let mut snapshot = Snapshot::factory();
+        snapshot.set("macro_source", &[0, 1]).unwrap();
+        snapshot.set("fighter_prompt", &[0, 1]).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        assert_eq!((view.fighter_prompt, view.macro_source), (OnOff::OFF, MacroSource::NAMED));
+        assert_eq!(MacroSource::ALL_NAMES, ["Numbered Slots", "Named Library"]);
     }
 
     #[test]

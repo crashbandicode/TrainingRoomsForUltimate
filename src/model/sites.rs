@@ -53,6 +53,8 @@ pub enum Feature {
     Recording,
     /// Package 4: HUD notices (SPEC-input-05): the Combo Display observers and the stale-moves toggle.
     Notices,
+    /// Package 4, S4-4: the named-macro layer's game calls (control reads, kinetic reads, the panel's hold and the restore pose writes).
+    NamedMacros,
     /// Package 5: the layout archive hook, the UI anchors and the manager global (`sites_ui.rs`).
     Ui,
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
@@ -84,6 +86,7 @@ impl Feature {
             Feature::StateRestore => "state_restore",
             Feature::Recording => "recording",
             Feature::Notices => "notices",
+            Feature::NamedMacros => "named_macros",
             Feature::Ui => "ui",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",

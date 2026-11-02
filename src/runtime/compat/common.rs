@@ -9,6 +9,11 @@ use crate::runtime::compat::sync::Readable;
 use crate::runtime::game::natives;
 use crate::runtime::{game, scene, state_natives};
 
+pub(crate) use crate::runtime::lobby::game_mode;
+
+/// The game version the plugin is installed for (the version guard installs nothing on any other build): the tag macros and captures carry.
+pub static SMASH_VERSION: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| "13.0.5".to_owned());
+
 /// The `FighterManager` singleton's slot address (`main + FIGHTER_MANAGER_SLOT_OFFSET`); `read(&FIGHTER_MANAGER_ADDR)` is the
 /// address, the manager pointer is the pointer stored there.
 pub struct FighterManagerAddr;
@@ -89,7 +94,14 @@ pub mod menu {
     use crate::model::input_delay::Owners;
     use crate::runtime::published;
 
-    pub use crate::runtime::compat::menu::stage_preferences;
+    pub use crate::runtime::compat::menu::{mii_preferences, stage_preferences};
+    pub use crate::runtime::ui::menu_app::MENU_RECEIVED_INPUT;
+
+    /// The Replay Window asks the plugin's menu to close by clearing this flag (the editor takes the screen); package 5's menu reads it.
+    pub static QUICK_MENU_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    /// Polls the close of the editor keeps P1 neutral for (the plugin menu's own close window).
+    pub const MENU_CLOSE_WAIT_FRAMES: u32 = 15;
 
     /// Something other than gameplay owns Player 1's input (the plugin's menu, the replay editor, the native waiting-room UI,
     /// the game's pause menu). The stop chord's own bit is not an owner: it only marks a poll the chord consumed.

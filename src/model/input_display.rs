@@ -787,3 +787,64 @@ impl Renderer {
         plan
     }
 }
+
+/// Coalesces the diag line the HUD draw writes about each plan (`input_plan`): the draw runs on every tick of the
+/// layout (hundreds per second in Eden), so a line per plan is a flood. The line is written when the plan's shape
+/// (ops, rows, icons) differs from the last one written, and otherwise once per `PlanLogGate::PERIOD` plans, so a
+/// steady HUD still shows a heartbeat. The check formats nothing and allocates nothing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlanLogGate {
+    last: Option<(usize, usize, usize)>,
+    since: u32,
+}
+
+impl PlanLogGate {
+    /// Plans between two heartbeat lines of an unchanged plan.
+    pub const PERIOD: u32 = 600;
+
+    pub const fn new() -> Self {
+        Self { last: None, since: 0 }
+    }
+
+    /// Whether the line for a plan of this shape is written now.
+    pub fn should_log(&mut self, ops: usize, rows: usize, icons: usize) -> bool {
+        let shape = Some((ops, rows, icons));
+        self.since = self.since.saturating_add(1);
+        if self.last != shape || self.since >= Self::PERIOD {
+            self.last = shape;
+            self.since = 0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod plan_log_gate_tests {
+    use super::PlanLogGate;
+
+    #[test]
+    fn the_first_plan_logs_and_an_unchanged_plan_is_quiet() {
+        let mut gate = PlanLogGate::new();
+        assert!(gate.should_log(3, 1, 1));
+        assert!((0..PlanLogGate::PERIOD - 1).all(|_| !gate.should_log(3, 1, 1)));
+    }
+
+    #[test]
+    fn a_changed_shape_logs_at_once_and_restarts_the_period() {
+        let mut gate = PlanLogGate::new();
+        assert!(gate.should_log(3, 1, 1));
+        assert!(!gate.should_log(3, 1, 1));
+        assert!(gate.should_log(5, 2, 1));
+        assert!(!gate.should_log(5, 2, 1));
+        assert!(gate.should_log(5, 2, 2));
+    }
+
+    #[test]
+    fn an_unchanged_plan_logs_one_heartbeat_per_period() {
+        let mut gate = PlanLogGate::new();
+        let lines = (0..PlanLogGate::PERIOD * 3 + 1).filter(|_| gate.should_log(4, 2, 2)).count();
+        assert_eq!(lines, 4, "the first plan and one per {} plans", PlanLogGate::PERIOD);
+    }
+}

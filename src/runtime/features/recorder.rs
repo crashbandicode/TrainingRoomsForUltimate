@@ -34,7 +34,7 @@ use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::recording::{
-    ChordAction, ControlCtx, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ChordAction, ControlCtx, ControlOut, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
 use crate::model::settings::Snapshot;
@@ -42,6 +42,7 @@ use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::features::{chords, cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
+use crate::runtime::macros::{named_macros, replay_preview};
 use crate::runtime::published;
 use crate::runtime::scene;
 
@@ -61,6 +62,9 @@ static INT_COLOR: AtomicI32 = AtomicI32::new(UNRESOLVED);
 
 /// The phase last announced (a `Phase` discriminant), so a notice is posted once per change.
 static LAST_PHASE: AtomicU8 = AtomicU8::new(0);
+
+/// P1 polls still to be made neutral (the native keyboard's closing press must not become a gameplay input).
+static SWALLOW: AtomicU8 = AtomicU8::new(0);
 
 /// Fighter object and entry layout (read from the owned 13.0.5 `main`; `tests/input_sites.rs` and the
 /// on-init notes): the fighter kind at +0xc; the entry's controller at +0x4178 (the body and accessor
@@ -146,9 +150,18 @@ pub fn init(seed: u64) {
     *RNG.lock() = Rng::new(seed);
 }
 
+/// The recorder rows as the last publish left them (the named layer reads Recording Trigger and Save State Playback).
+pub fn settings() -> RecorderSettings {
+    *SETTINGS.lock()
+}
+
 /// A menu commit or the first publish.
 pub fn publish(snapshot: &Snapshot) {
     *SETTINGS.lock() = RecorderSettings::from_snapshot(snapshot);
+    // Macro Source = Named Library: the layer's frame buffers are reserved here (the committing thread), never in a hook.
+    if snapshot.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0)) {
+        named_macros::prepare_buffers();
+    }
 }
 
 /// The CPU runtime's constants (ready once the game's table answers).
@@ -177,7 +190,7 @@ pub(crate) struct Body {
     entry_id: i32,
 }
 
-unsafe fn cpu_body() -> Option<Body> {
+pub(crate) unsafe fn cpu_body() -> Option<Body> {
     body_of(i32::from(cpu::primary_entry_now()))
 }
 
@@ -212,7 +225,19 @@ fn facing_of(lr: f32) -> i8 {
 /// `out` is the record the game just mapped.
 pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
     bump(COUNT_POLL);
-    if REC.lock().mode() == Mode::None {
+    if SWALLOW.load(Ordering::Relaxed) > 0 {
+        SWALLOW.fetch_sub(1, Ordering::Relaxed);
+        *out = MappedInputs::NEUTRAL;
+    }
+    let (mode, named) = {
+        let rec = REC.lock();
+        (rec.mode(), rec.is_named())
+    };
+    if mode == Mode::None {
+        return;
+    }
+    if named {
+        on_named_poll(out);
         return;
     }
     let wants = REC.lock().wants_cpu_status();
@@ -222,6 +247,25 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
         0
     };
     REC.lock().poll(&mut *out, PollFacts { cpu_status });
+}
+
+/// The poll stage of a named run (SPEC-input-01 section 9). The record chord while a named capture records is the stop chord: it is
+/// consumed here, before this poll's frame is stored, so the stop press is not part of the recording.
+unsafe fn on_named_poll(out: *mut MappedInputs) {
+    if REC.lock().is_recording() && chords::consume(Request::InputRecord) {
+        *out = MappedInputs::NEUTRAL;
+        finish_named_capture();
+        return;
+    }
+    let stored = REC.lock().poll_named(&mut *out);
+    if let Some((index, frame)) = stored {
+        if index == 0 {
+            if let Some(body) = cpu_body() {
+                named_macros::capture_start(&mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor));
+            }
+        }
+        named_macros::store_frame(usize::from(index), &frame);
+    }
 }
 
 // ---- the CPU control stage ----------------------------------------------------------------------------
@@ -267,7 +311,21 @@ unsafe fn on_ai_frame(ai: usize) {
         mash_start(&settings, key, body, facing);
     }
 
-    let control = REC.lock().control(&ControlCtx { facing, shulk_dial: shulk });
+    let ctx = ControlCtx { facing, shulk_dial: shulk };
+    let control = if REC.lock().is_named() {
+        // Before input 0 of a named playback the layer repositions the CPU (it may stop the playback itself): neutral controls until then.
+        let (playing, at_zero) = {
+            let rec = REC.lock();
+            (rec.mode() == Mode::Playback, rec.frame() == 0)
+        };
+        if playing && at_zero && !named_macros::prepare_playback_start(&mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor)) {
+            ControlOut { write: Some(crate::model::recording::Inject::NEUTRAL), hold_cliff_timer: false }
+        } else {
+            REC.lock().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)))
+        }
+    } else {
+        REC.lock().control(&ctx)
+    };
     if let Some(write) = control.write {
         bump(COUNT_INJECT);
         let at = |offset: usize| (controller + offset) as *mut u32;
@@ -297,6 +355,17 @@ unsafe fn on_ai_frame(ai: usize) {
     match post.ended {
         Some(Ended::Recorded { slot, frames }) => event("recording_complete", "slot", i64::from(slot), "frames", i64::from(frames)),
         Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "restarted", i64::from(post.restarted.is_some())),
+        Some(Ended::NamedCaptured { frames }) => {
+            event("named_capture_complete", "frames", i64::from(frames), "", 0);
+            named_macros::finish_capture(settings.crop);
+        }
+        Some(Ended::NamedPlayed) => {
+            event("named_playback_complete", "", 0, "", 0);
+            named_macros::end_playback();
+            if replay_preview::occupied() {
+                replay_preview::complete();
+            }
+        }
         None => {}
     }
     chord_step(&settings, body, facing);
@@ -371,6 +440,16 @@ unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
         return;
     }
     let record = record && settings.trigger_chord;
+    if crate::runtime::macros::named_active() {
+        // Macro Source = Named Library: the chords drive the named layer (SPEC-input-01 section 9). The record chord while a capture
+        // records was consumed by the poll (the stop chord); here it starts one.
+        if playback {
+            named_macros::request_playback();
+        } else if record && REC.lock().mode() == Mode::None {
+            start_named_lockout();
+        }
+        return;
+    }
     match Recorder::resolve_chords(record, playback) {
         ChordAction::None => {}
         ChordAction::Playback => {
@@ -397,9 +476,9 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     }
 }
 
-unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
-    // B4: while an AI drives P1 the recorder is refused with a notice, nothing is recorded.
-    let refusal = if natives::is_operation_cpu(0) {
+/// Why a recording (numbered or named) is not started now: B4 an AI drives P1, a fighter is missing, a save state is loading.
+unsafe fn record_refusal() -> Option<RecordRefusal> {
+    if natives::is_operation_cpu(0) {
         Some(RecordRefusal::P1DrivenByAi)
     } else if natives::fighter_entry(0) == 0 {
         Some(RecordRefusal::FightersMissing)
@@ -407,8 +486,11 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
         Some(RecordRefusal::SaveStateLoading)
     } else {
         None
-    };
-    if let Some(refusal) = refusal {
+    }
+}
+
+unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
+    if let Some(refusal) = record_refusal() {
         notices::refuse(refusal.text());
         return;
     }
@@ -424,6 +506,93 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
     };
     REC.lock().start_recording(settings, facing, start);
     event("record_lockout", "cpu_kind", i64::from(kind), "frames", i64::from(settings.duration));
+}
+
+// ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
+
+/// One short lock on the recorder for the named layer's slot export and import.
+pub(crate) fn with_recorder<R>(f: impl FnOnce(&mut Recorder) -> R) -> R {
+    f(&mut REC.lock())
+}
+
+/// The record chord of the named layer: the lockout, then the capture (the layer's buffer takes the frames).
+pub(crate) fn start_named_lockout() {
+    // SAFETY: called from the CPU control frame on a live CPU body.
+    unsafe {
+        if !load_consts() {
+            return;
+        }
+        if let Some(refusal) = record_refusal() {
+            notices::refuse(refusal.text());
+            return;
+        }
+        let Some(body) = cpu_body() else { return };
+        let facing = facing_of(natives::lr(body.accessor));
+        named_macros::begin_capture(crate::engine::macros::StartState::default());
+        REC.lock().start_named_lockout(facing);
+        event("named_record_lockout", "facing", i64::from(facing), "", 0);
+    }
+}
+
+/// The named stop chord: the capture ends and the layer offers the recording for saving.
+fn finish_named_capture() {
+    let frames = REC.lock().finish_named_capture();
+    if let Some(frames) = frames {
+        LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
+        notices::post_phase(Phase::Idle, 0);
+        event("named_capture_stop", "frames", i64::from(frames), "", 0);
+        named_macros::finish_capture(SETTINGS.lock().crop);
+    }
+}
+
+/// The layer's playback (`playback_named`, `playback_preview`): `frames` frames of its buffer, started on the CPU now.
+pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) -> bool {
+    // SAFETY: called on the game thread with live fighters.
+    unsafe {
+        let Some(body) = cpu_body() else { return false };
+        if !load_consts() {
+            return false;
+        }
+        let facing = facing_of(natives::lr(body.accessor));
+        let frames = u16::try_from(frames).unwrap_or(u16::MAX);
+        let result = REC.lock().start_named_playback(frames, facing_of(recorded_facing), status, facing);
+        match result {
+            Ok(started) => {
+                event("named_playback", "frames", i64::from(started.frames), "", 0);
+                true
+            }
+            Err(refusal) => {
+                notices::refuse(refusal.text());
+                false
+            }
+        }
+    }
+}
+
+/// P1's next `frames` polls read as neutral (see `SWALLOW`).
+/// The recorder's phase (diag lines).
+pub fn phase() -> Phase {
+    REC.lock().phase()
+}
+
+/// The recorder's frame index (the named layer's diag lines).
+pub fn frame() -> usize {
+    usize::from(REC.lock().frame())
+}
+
+/// The facing the layer restored a pose with (the next playback mirrors against it).
+pub fn set_current_facing(facing: f32) {
+    REC.lock().set_current_facing(facing_of(facing));
+}
+
+pub fn swallow_p1(frames: u8) {
+    SWALLOW.store(frames, Ordering::Release);
+}
+
+/// The CPU's accessor for the named layer's restore pose and speed (never retained).
+pub(crate) fn cpu_accessor() -> Option<usize> {
+    // SAFETY: the natives passed their guards when this answers.
+    unsafe { cpu_body() }.map(|body| body.accessor)
 }
 
 // ---- entry points for the other features ---------------------------------------------------------------
@@ -444,6 +613,12 @@ pub fn request_playback(start: PlaybackStart) {
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
 /// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
 pub fn on_state_restored(saved_on_ledge: bool) {
+    if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
+        // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
+        // SAFETY: both fighters were just restored.
+        unsafe { named_macros::service_restore() };
+        return;
+    }
     let settings = *SETTINGS.lock();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
     event(
@@ -511,8 +686,16 @@ pub fn stop() {
     let mode = REC.lock().mode();
     event("recorder_stop", "mode", mode as i64, "", 0);
     REC.lock().stop();
+    named_macros::cancel_motion();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     notices::post_phase(Phase::Idle, 0);
+}
+
+/// A save-state load was accepted (package 3): everything stops, and the named layer plans what the restore will start (a record or a
+/// playback after both fighters are back).
+pub fn on_load_request() {
+    stop();
+    named_macros::begin_restore();
 }
 
 /// The Training reset hub's step: the L+R+A reset stops the recorder (decision B8).
@@ -523,6 +706,7 @@ pub fn on_reset() {
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
     REC.lock().stop();
+    named_macros::clear_session();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     chords::session_clear();
     notices::session_clear();
