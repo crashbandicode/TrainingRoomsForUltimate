@@ -68,6 +68,9 @@ pub struct FeatureReport {
     /// Why a feature is not installed, when it has a reason to name (`no_nro_hook`, a provider that is
     /// absent: the provider pattern of HOOK-SHARING, not a workaround).
     pub reason: Option<&'static str>,
+    /// The first row of the feature's closure that its guard rejected (R2-1): `reason=site:<name>`. A
+    /// feature is not installed when any row it can reach is rejected, whichever feature owns the row.
+    pub site: Option<&'static str>,
 }
 
 /// The settings values in force at boot (what the player chose, after the file was read).
@@ -148,6 +151,8 @@ impl Display for InstallLine<'_> {
                 write!(f, " {}={}", feature.feature, if feature.installed { "installed" } else { "not_installed" })?;
                 if let Some(reason) = feature.reason {
                     write!(f, " reason={reason}")?;
+                } else if let (false, Some(site)) = (feature.installed, feature.site) {
+                    write!(f, " reason=site:{site}")?;
                 }
             }
             if let Some(extra) = self.seams {

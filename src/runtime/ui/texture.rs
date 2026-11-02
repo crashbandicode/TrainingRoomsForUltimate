@@ -98,7 +98,9 @@ pub fn install() -> [GuardOutcome; SITES.len()] {
 }
 
 pub fn usable() -> bool {
-    USABLE.load(Ordering::Acquire)
+    // R2-1: also every function the helper calls must be granted by the boot (the native-call layer's rule); `install` compares the
+    // same rows again later, so this is the boot's answer for them.
+    USABLE.load(Ordering::Acquire) && SITES.iter().all(|site| game::granted(site.offset))
 }
 
 /// The path's file-resource hash (`hash40` of the archive-relative path, lower case, no mount prefix).
@@ -185,6 +187,9 @@ impl Texture {
     /// # Safety
     /// On the UI job thread, inside the layout tick.
     pub unsafe fn poll(&self) -> Readiness {
+        if !usable() {
+            return Readiness::Loading;
+        }
         let poll: Poll = core::mem::transmute::<usize, Poll>(at(sites_u4::UI_TEX_POLL_OFFSET));
         poll(self.object());
         if facts::is_ready(self.facts()) {
@@ -252,6 +257,9 @@ pub fn retire(texture: Texture) -> bool {
 /// # Safety
 /// On the UI job thread, inside the layout tick.
 pub unsafe fn tick() {
+    if !usable() {
+        return;
+    }
     let now = FRAME.fetch_add(1, Ordering::AcqRel) + 1;
     loop {
         let due = RETIRED.lock().pop_due(now);

@@ -500,15 +500,9 @@ unsafe fn fighter_frame(fighter: usize) {
     if entry == 0 {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
-            if MASH_ON.load(Ordering::Acquire) {
-                frame_advantage(accessor);
-            }
+            frame_advantage(accessor);
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
-            if MASH_ON.load(Ordering::Acquire) {
-                PLAYER_Y.store(natives::pos_y(accessor).to_bits(), Ordering::Relaxed);
-                PLAYER_Z.store(natives::pos_z(accessor).to_bits(), Ordering::Relaxed);
-                PLAYER_VALID.store(true, Ordering::Relaxed);
-            }
+            mash_player_position(accessor);
         }
         return;
     }
@@ -544,30 +538,10 @@ unsafe fn fighter_frame(fighter: usize) {
     let prev_situation = natives::prev_situation_kind(accessor);
     let motion_frame = natives::motion_frame(accessor) as i32;
     let cpu_x = natives::pos_x(accessor);
-    let hanging = situation == SITUATION_CLIFF.load(Ordering::Acquire);
-    let (catch_cliff, cont_cliff_attack) = if hanging {
-        let flag = FLAG_CATCH_CLIFF.load(Ordering::Acquire);
-        let term = TERM_CLIFF_ATTACK.load(Ordering::Acquire);
-        (
-            flag != UNRESOLVED && natives::is_flag(accessor, flag),
-            term != UNRESOLVED && natives::is_enable_transition_term(accessor, term),
-        )
-    } else {
-        (false, false)
-    };
-
-    let (falling, reserve_dive) = if MASH_ON.load(Ordering::Acquire) {
-        let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
-        let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
-        (
-            gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
-            dive != UNRESOLVED && natives::is_flag(accessor, dive),
-        )
-    } else {
-        (false, false)
-    };
+    let (catch_cliff, cont_cliff_attack) = ledge_facts(accessor, situation);
+    let (falling, reserve_dive) = mash_facts(accessor);
     let primary = !key.partner && key.entry == primary_entry(lobby);
-    let tech = if TECH_ON.load(Ordering::Acquire) { tech_facts(accessor, status, primary) } else { TechFacts::default() };
+    let tech = tech_facts(accessor, status, primary);
 
     let out = with(|cpu| {
         let facts = FrameFacts {
@@ -624,9 +598,68 @@ unsafe fn fighter_frame(fighter: usize) {
     counts::report_if_due();
 }
 
+// ---- the per-feature facts and appliers of the frame wrapper (R2-1) -----------------------------------------
+//
+// The frame wrapper belongs to the CPU core and reads only the core's natives itself. Everything another
+// feature needs (the ledge, mash, tech and defence natives) is in a function that checks its feature's own
+// install flag first, so a feature whose rows were rejected is never reached from the wrapper
+// (`model::capabilities`: these functions are the declared boundaries of `tests/capabilities.rs`).
+
+/// SPEC-cpu-03's hook was installed (the wrapper reads the ledge facts only then).
+static LEDGE_ON: AtomicBool = AtomicBool::new(false);
+/// SPEC-cpu-02's hooks and natives were installed (the wrapper applies the clatter only then).
+static DEFENCE_ON: AtomicBool = AtomicBool::new(false);
+
+pub fn set_ledge_on(on: bool) {
+    LEDGE_ON.store(on, Ordering::Release);
+}
+
+pub fn set_defence_on(on: bool) {
+    DEFENCE_ON.store(on, Ordering::Release);
+}
+
+/// The ledge facts: a hanging fighter's catch-cliff flag and whether the cliff attack transition is open.
+unsafe fn ledge_facts(accessor: usize, situation: i32) -> (bool, bool) {
+    if !LEDGE_ON.load(Ordering::Acquire) || situation != SITUATION_CLIFF.load(Ordering::Acquire) {
+        return (false, false);
+    }
+    let flag = FLAG_CATCH_CLIFF.load(Ordering::Acquire);
+    let term = TERM_CLIFF_ATTACK.load(Ordering::Acquire);
+    (
+        flag != UNRESOLVED && natives::is_flag(accessor, flag),
+        term != UNRESOLVED && natives::is_enable_transition_term(accessor, term),
+    )
+}
+
+/// The mash's facts: whether the fighter is falling and has reserved a dive.
+unsafe fn mash_facts(accessor: usize) -> (bool, bool) {
+    if !MASH_ON.load(Ordering::Acquire) {
+        return (false, false);
+    }
+    let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
+    let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
+    (
+        gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
+        dive != UNRESOLVED && natives::is_flag(accessor, dive),
+    )
+}
+
+/// The player's y and z for the mash's distance triggers.
+unsafe fn mash_player_position(accessor: usize) {
+    if !MASH_ON.load(Ordering::Acquire) {
+        return;
+    }
+    PLAYER_Y.store(natives::pos_y(accessor).to_bits(), Ordering::Relaxed);
+    PLAYER_Z.store(natives::pos_z(accessor).to_bits(), Ordering::Relaxed);
+    PLAYER_VALID.store(true, Ordering::Relaxed);
+}
+
 /// The facts only the tech specs read. The cursor offset is the primary body's; the lay-down lock-out
 /// parameters are read only in that status.
 unsafe fn tech_facts(accessor: usize, status: i32, primary: bool) -> TechFacts {
+    if !TECH_ON.load(Ordering::Acquire) {
+        return TechFacts::default();
+    }
     let mut tech = TechFacts { end_frame: natives::motion_end_frame(accessor) as i32, ..TechFacts::default() };
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if primary && cursor != UNRESOLVED {
@@ -642,7 +675,8 @@ unsafe fn tech_facts(accessor: usize, status: i32, primary: bool) -> TechFacts {
     tech
 }
 
-/// Do what the frame asked, with no lock held.
+/// Do what the frame asked, with no lock held: the core's own requests, then each feature's, each behind its
+/// own install flag.
 unsafe fn apply(accessor: usize, out: FrameOut) {
     if let Some(value) = out.stale_flag {
         let flag = FLAG_DISABLE_PENALTY.load(Ordering::Acquire);
@@ -650,6 +684,25 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::set_flag(accessor, value, flag);
         }
         cpu_event!("stale_flag value={value} resolved={}", flag != UNRESOLVED);
+    }
+    apply_defence(accessor, &out);
+    if let Some(status) = out.request_status {
+        cpu_event!("request_status status={status} from={}", natives::status_kind(accessor));
+        natives::change_status_request(accessor, status);
+    }
+    apply_mash(accessor, &out);
+    apply_tech(accessor, &out);
+    // A playback request goes straight to the recorder (package 4's `request_playback`): the one path.
+    if let Some(start) = out.playback {
+        recorder::request_playback(start);
+        cpu_event!("playback_request slot={} ledge={}", start.slot, start.ledge);
+    }
+}
+
+/// SPEC-cpu-02: the clatter.
+unsafe fn apply_defence(accessor: usize, out: &FrameOut) {
+    if !DEFENCE_ON.load(Ordering::Acquire) {
+        return;
     }
     if let Some(delta) = out.clatter {
         cpu_event!("clatter delta={delta:.3} status={}", natives::status_kind(accessor));
@@ -659,9 +712,12 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::req_on_joint(accessor, hash40("sys_clatter"), hash40("hip"), 1.0, attributes);
         }
     }
-    if let Some(status) = out.request_status {
-        cpu_event!("request_status status={status} from={}", natives::status_kind(accessor));
-        natives::change_status_request(accessor, status);
+}
+
+/// SPEC-cpu-01: the fast fall.
+unsafe fn apply_mash(accessor: usize, out: &FrameOut) {
+    if !MASH_ON.load(Ordering::Acquire) {
+        return;
     }
     if out.fast_fall {
         cpu_event!("fast_fall from={}", natives::status_kind(accessor));
@@ -674,6 +730,13 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
             natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
         }
+    }
+}
+
+/// SPEC-cpu-04: the forced status, the cursor and the hidden model and effects of a tech animation.
+unsafe fn apply_tech(accessor: usize, out: &FrameOut) {
+    if !TECH_ON.load(Ordering::Acquire) {
+        return;
     }
     if let Some(status) = out.force_status {
         cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
@@ -694,13 +757,7 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
     }
-    // A playback request goes straight to the recorder (package 4's `request_playback`): the one path.
-    if let Some(start) = out.playback {
-        recorder::request_playback(start);
-        cpu_event!("playback_request slot={} ledge={}", start.slot, start.ledge);
-    }
 }
-
 /// Replace the on-frame vtable slot with the wrapper. Only after the slot and the original passed
 /// their guards (`boot`).
 pub fn install_frame() {
@@ -1233,6 +1290,9 @@ unsafe fn actionable(accessor: usize) -> bool {
 
 /// Frame advantage, on the player entry's frame: reads both fighters only while the row is On.
 unsafe fn frame_advantage(player: usize) {
+    if !MASH_ON.load(Ordering::Acquire) {
+        return;
+    }
     // The replay editor or a replay capture loading holds the screen: the measurement clears and waits (SPEC-cpu-07 §3).
     if recorder::replay_editor_occupied() || recorder::replay_capture_loading() {
         with(|cpu| cpu.frame_advantage(false, false));
