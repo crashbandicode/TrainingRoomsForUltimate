@@ -76,7 +76,6 @@ pub(crate) fn install_report() -> &'static str {
 
 /// The fork's `input_record` as the named layer calls the core (SPEC-input-01 section 9), over `features::recorder`.
 pub(crate) mod input_record {
-    use crate::engine::macros::MacroRecording;
     use crate::runtime::features::recorder;
 
     pub(crate) fn stop_playback() {
@@ -88,9 +87,9 @@ pub(crate) mod input_record {
     }
 
     /// A clip preview: the recording plays from the layer's buffer, on whichever fighter is on stage.
-    pub(crate) fn playback_preview(recording: MacroRecording) -> bool {
-        let started = crate::runtime::macros::named_macros::begin_preview(recording);
-        recorder::start_named_playback(started.len, started.facing, started.status)
+    pub(crate) fn playback_preview(started: super::super::named_macros::PlaybackStart) -> bool {
+        crate::runtime::macros::named_macros::begin_preview(started)
+            && recorder::start_named_playback(started.len, started.facing, started.status)
     }
 
     /// The loaded named recording plays (playback_named): false when nothing is loaded or the fighter is not ready.
@@ -113,9 +112,17 @@ pub(crate) mod input_record {
 /// on the worker thread at every wake (`ui::worker::run`): package 4 points it at its layer's worker service (draining the layer's
 /// `hos_lock::Mailbox` of game-thread events, the deferred effects, publishing `MacroQueries`). A game thread that posts an event calls
 /// `crate::runtime::ui::worker::wake()` after posting.
+pub(crate) fn worker_events() {
+    if super::ready() { super::named_macros::worker_lifecycle(); }
+}
+
+static RELOAD_FRAME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 pub(crate) fn worker_tick() {
+    worker_events();
     if !super::ready() { return; }
     slots::worker_slot_tick();
+    super::replay_capture::worker_preview_notices();
     CLIP_EVENTS.drain(|event| {
         if event.revision != super::replay_capture::selection_revision() { return; }
         match event.kind {
@@ -129,6 +136,10 @@ pub(crate) fn worker_tick() {
     }
     super::named_macros::consume_capture();
     super::named_macros::service_character();
+    let frame = crate::runtime::ui::facts::fact_frame_number();
+    if RELOAD_FRAME.swap(frame, std::sync::atomic::Ordering::AcqRel) != frame {
+        super::replay_capture::service_reload();
+    }
     super::named_macros::run_deferred();
     super::named_macros::publish_queries();
     super::sync_owner();

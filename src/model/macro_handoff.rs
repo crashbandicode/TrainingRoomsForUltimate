@@ -18,10 +18,18 @@ use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
 /// The hook-side answers of the named layer (one snapshot, written by the worker after each model change).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MacroQueries {
+    pub session: u64,
     /// Macro Source is Named Library.
     pub source_is_named: bool,
     /// A named macro is loaded and its fighter is ready (the playback chord may start it).
     pub playback_allowed: bool,
+    pub playback_len: u32,
+    pub playback_facing: f32,
+    pub playback_status: i32,
+    pub playback_generation: u32,
+    pub loaded_matches: bool,
+    pub placement: Option<(f32, f32)>,
+    pub velocity: Option<(f32, f32)>,
     /// The loaded macro plays on the current CPU whatever its fighter (no recorded-identity gate).
     pub plays_current: bool,
     /// The loaded macro's recorded fighter kind (-1: none), for the restore's identity gate.
@@ -32,6 +40,9 @@ pub struct MacroQueries {
     pub panel_visible: bool,
     /// The clip editor is in the foreground (P1's controls are the editor's).
     pub clip_foreground: bool,
+    pub replay_loading: bool,
+    pub browser_pending: bool,
+    pub browser_release: bool,
     /// A keyboard request is open or pending.
     pub naming_pending: bool,
     /// The layer is suspended (a waiting-room scene left with a draft).
@@ -43,13 +54,24 @@ pub struct MacroQueries {
 impl MacroQueries {
     /// Nothing loaded, nothing visible: what the hooks see before the worker's first publish.
     pub const IDLE: MacroQueries = MacroQueries {
+        session: 0,
         source_is_named: false,
         playback_allowed: false,
+        playback_len: 0,
+        playback_facing: 1.0,
+        playback_status: 0,
+        playback_generation: 0,
+        loaded_matches: false,
+        placement: None,
+        velocity: None,
         plays_current: false,
         loaded_kind: -1,
         restore_in_air: false,
         panel_visible: false,
         clip_foreground: false,
+        replay_loading: false,
+        browser_pending: false,
+        browser_release: false,
         naming_pending: false,
         suspended: false,
         marker: None,
@@ -285,6 +307,7 @@ const WORKER_READY: u8 = 0;
 const HOOK: u8 = 1;
 const WORKER_FULL: u8 = 2;
 const WORKER_BUSY: u8 = 3;
+const HOOK_BUSY: u8 = 4;
 
 /// The named capture's frame buffer: the hook's from `begin` to `finish`, the worker's otherwise.
 pub struct CaptureBuffer<T> {
@@ -294,7 +317,8 @@ pub struct CaptureBuffer<T> {
     len: AtomicUsize,
 }
 
-// SAFETY: exactly one side touches `frames` at a time, decided by `owner` (compare-exchange hand-offs).
+// SAFETY: every frame access holds WORKER_BUSY or HOOK_BUSY exclusively. Ownership
+// transitions use compare-exchange; competing hook calls fail immediately instead of aliasing.
 unsafe impl<T: Send> Sync for CaptureBuffer<T> {}
 
 impl<T: Copy + Default> CaptureBuffer<T> {
@@ -318,12 +342,13 @@ impl<T: Copy + Default> CaptureBuffer<T> {
 
     /// Hook: take the buffer for a capture (empty, prepared). False when the worker has not taken the last result yet.
     pub fn begin(&self) -> bool {
-        if self.owner.compare_exchange(WORKER_READY, HOOK, SeqCst, SeqCst).is_err() {
+        if self.owner.compare_exchange(WORKER_READY, HOOK_BUSY, SeqCst, SeqCst).is_err() {
             return false;
         }
-        // SAFETY: HOOK: only the capturing hook touches the buffer until `finish`.
+        // SAFETY: HOOK_BUSY excludes every other accessor while clearing the buffer.
         unsafe { (*self.frames.get()).clear() };
         self.len.store(0, SeqCst);
+        self.owner.store(HOOK, SeqCst);
         true
     }
 
@@ -335,12 +360,13 @@ impl<T: Copy + Default> CaptureBuffer<T> {
     /// Hook: store frame `index` (frames in between are default-filled). False when not capturing or past the prepared capacity
     /// (the hook never grows the buffer).
     pub fn store(&self, index: usize, frame: T) -> bool {
-        if self.owner.load(SeqCst) != HOOK {
+        if self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).is_err() {
             return false;
         }
-        // SAFETY: HOOK: this hook owns the buffer.
+        // SAFETY: HOOK_BUSY is held exclusively for this bounded write.
         let frames = unsafe { &mut *self.frames.get() };
         if index >= frames.capacity() {
+            self.owner.store(HOOK, SeqCst);
             return false;
         }
         if frames.len() <= index {
@@ -348,6 +374,7 @@ impl<T: Copy + Default> CaptureBuffer<T> {
         }
         frames[index] = frame;
         self.len.store(frames.len(), SeqCst);
+        self.owner.store(HOOK, SeqCst);
         true
     }
 
@@ -358,17 +385,21 @@ impl<T: Copy + Default> CaptureBuffer<T> {
 
     /// Hook: frame `index` of the running capture.
     pub fn frame_at(&self, index: usize) -> Option<T> {
-        if self.owner.load(SeqCst) != HOOK {
+        if self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).is_err() {
             return None;
         }
-        // SAFETY: HOOK: this hook owns the buffer.
-        unsafe { (&*self.frames.get()).get(index).copied() }
+        // SAFETY: HOOK_BUSY excludes writes and ownership transitions until the copy completes.
+        let frame = unsafe { (&*self.frames.get()).get(index).copied() };
+        self.owner.store(HOOK, SeqCst);
+        frame
     }
 
     /// Hook: the capture ended; the buffer goes to the worker with its frames. Returns the frame count (None: not capturing).
     pub fn finish(&self) -> Option<usize> {
+        self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).ok()?;
         let len = self.len.load(SeqCst);
-        self.owner.compare_exchange(HOOK, WORKER_FULL, SeqCst, SeqCst).ok().map(|_| len)
+        self.owner.store(WORKER_FULL, SeqCst);
+        Some(len)
     }
 
     /// Hook: the capture was cancelled (a load request, a stop): the buffer goes back to the worker empty.
@@ -402,6 +433,43 @@ impl<T: Copy + Default> Default for CaptureBuffer<T> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn capture_access_is_exclusive_even_when_hook_calls_overlap() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        static ENTERED: AtomicBool = AtomicBool::new(false);
+        static RELEASE: AtomicBool = AtomicBool::new(false);
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct Frame(u32);
+        impl Default for Frame {
+            fn default() -> Self {
+                ENTERED.store(true, Ordering::Release);
+                while !RELEASE.load(Ordering::Acquire) { std::thread::yield_now(); }
+                Self(0)
+            }
+        }
+        let buffer = Arc::new(super::CaptureBuffer::<Frame>::new());
+        assert!(buffer.prepare(2));
+        assert!(buffer.begin());
+        let writer = Arc::clone(&buffer);
+        let thread = std::thread::spawn(move || writer.store(0, Frame(7)));
+        while !ENTERED.load(Ordering::Acquire) { std::thread::yield_now(); }
+        // A callback retiring or reading the capture cannot alias the active write.
+        let begin = buffer.begin();
+        let finish = buffer.finish();
+        let read = buffer.frame_at(0);
+        let write = buffer.store(1, Frame(9));
+        buffer.cancel();
+        RELEASE.store(true, Ordering::Release);
+        assert!(thread.join().unwrap());
+        assert!(!begin);
+        assert_eq!(finish, None);
+        assert_eq!(read, None);
+        assert!(!write);
+        assert_eq!(buffer.finish(), Some(1));
+        assert_eq!(buffer.take(|frames| frames.to_vec()), Some(vec![Frame(7)]));
+    }
+
     use super::{CaptureBuffer, MacroQueries, PlayBuffers};
 
     #[test]

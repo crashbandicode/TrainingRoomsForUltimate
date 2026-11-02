@@ -72,6 +72,36 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 
 ### Active implementation checkpoint
 
+### Current working checkpoint (supersedes earlier active notes)
+- Claimed Yoga 15:21Z, released 15:22Z: frozen191ec5b cargo test --lib macro_handoff
+  passed 6 / failed 0 / filtered 1166. Raw host-191ec5b.log and .exit under Yoga build root.
+  Own queue entry removed; no claim remains. Preflight: 241GiB available, campaign targets25GiB.
+- New buffer audit found safe CaptureBuffer methods could alias if two callbacks overlapped:
+  added bounded CAS exclusion for begin/store/read/finish, plus overlap regression; untested.
+- rustfmt parser (emit stdout only, no edits) accepts current modified model/runtime files.
+  This is syntax-only evidence, not a compile gate.
+- Latest script errors: claim helper rejected missing phrase "on Yoga" before writing; corrected.
+  JS btoa unavailable before build dispatch; corrected using PowerShell literal quoting.
+- HEAD 191ec5b, branch stream/pkg4; slot transfer committed, subsequent design-C changes dirty and uncompiled.
+- Named playback now reads worker-filled PlayBuffers; preview requests carry Copy metadata through a mailbox.
+  Hook session state retains no recording Vec. Preview progress/failure notices go to the worker.
+- Lifecycle retirement posts to the worker before UI inputs; ui::worker has one interface call to worker_events.
+  Replay reload admission remains on game callback; worker uses copied scene/CPU facts and mailbox results.
+  Shared ui::facts and ui::worker interface additions require preservation at integration.
+- Carry/ledger/verify succeeded for 42 files after preview request/notice transforms.
+  No host tests, Switch builds, or Eden acceptance of this source yet.
+- Yoga queue contains own one-cargo-test request frozen at 191ec5b. No claim held.
+  Last ledger check found foreign deluxe-elite Eden claim; preceding queue head was lead f6 diag build.
+  Recheck both fresh before any compile. Do not use old /tmp/pkg4s44/open_claims.py parser.
+  Read shared harness ledger.py and params.py fully and reuse their read-only admission report.
+- Remaining: replay capture/live_replay hook ownership and allocations, diag dispatch audit, F11 exact SHA,
+  compile/gates and s4-09. hook_locks PENDING stays until actual ownership audit succeeds.
+- Gate after compaction: exact current thread gpt-6-astra/medium; watcher PID2936304, owner codex2589048.
+  No profiles changed, no build/Eden processes or claims started by this worker.
+- Command error disclosed: timeout cannot execute PowerShell Get-Content cmdlet directly; retried with /usr/bin/tail.
+  No source mutation from that failed read. Gate/bootstrap reads again lacked systemd scope; no compilation involved.
+
+
 - Committed first worker slice as 0bb051a (WIP, no compile/Eden). Subsequent slot-transfer work is in progress: fixed SlotTransfer request/reply payloads, game-only recorder execution, worker-only completion naming/notifications, and atomic is_playback publication. Added round-trip/refusal model coverage; not run. PENDING audit entry not yet removed. No host claim held.
 
 - Live gate reverified after compaction: exact thread remains gpt-6-astra/medium.

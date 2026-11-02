@@ -16,6 +16,7 @@ pub const FRESH_MS: u64 = 250;
 const NO_KIND: i32 = i32::MIN;
 
 static STAMP_MS: AtomicU64 = AtomicU64::new(0);
+static FRAME_NUMBER: AtomicU64 = AtomicU64::new(0);
 static READY_GO: AtomicBool = AtomicBool::new(false);
 static PRESENT: AtomicBool = AtomicBool::new(false);
 static CPU_KIND: AtomicI32 = AtomicI32::new(NO_KIND);
@@ -49,6 +50,7 @@ pub unsafe fn publish_frame_facts(cpu: &mut BattleObjectModuleAccessor) {
     PRESENT.store(crate::runtime::lobby::training::practice::acquire(), Ordering::Release);
     CPU_KIND.store(utility::get_kind(cpu), Ordering::Release);
     STAMP_MS.store(clock::uptime_ms().max(1), Ordering::Release);
+    FRAME_NUMBER.fetch_add(1, Ordering::Release);
 }
 
 /// The scene ended or the bodies were destroyed: nothing is ready until the next frame says so.
@@ -103,3 +105,5 @@ pub fn fact_cpu_status() -> Option<i32> {
 pub fn fact_cpu_situation() -> Option<i32> {
     fresh().then(|| CPU_SITUATION.load(Ordering::Acquire)).filter(|situation| *situation != NO_KIND)
 }
+
+pub fn fact_frame_number() -> u64 { FRAME_NUMBER.load(Ordering::Acquire) }

@@ -149,7 +149,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             let _scope = HookScope::enter_hook(HookId::NamedService);
             step(29);
             step(30);
-            replay_capture::service_reload();
             step(31);
             #[cfg(feature = "diag")]
             {
@@ -158,6 +157,7 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
                 diag::frame_done();
             }
             named_macros::service_character_request();
+            replay_capture::service_reload_request();
             port::slots::service_slot_request();
         }
     }

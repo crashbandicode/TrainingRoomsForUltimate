@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "92101eeca699b221516e0757ba4717398b9368cec7b379f8c5c4d703b87ea3ee",
+   "dest_sha256": "e52e77bb41c26b6976d676d723ad05c913979dad2032952819069703f09b1cea",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -768,6 +768,141 @@
      "old": "    let label = format!(\"Record Slot {}\", slot + 1);\n    match crate::runtime::macros::port::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {\n        Ok(()) => notify(&format!(\"Copied {} to {label}\", recording.name)),\n        Err(err) => notify(&err),\n    }\n}\n",
      "new": "    if let Err(error) = crate::runtime::macros::port::slots::import(slot, &recording) {\n        notify(&error);\n    }\n}\n\npub fn slot_imported(name: &str, slot: usize, result: Result<(), crate::model::recording::ImportRefusal>) {\n    match result {\n        Ok(()) => notify(&format!(\"Copied {name} to Record Slot {}\", slot + 1)),\n        Err(error) => notify(&error.message()),\n    }\n}\n",
      "reason": "Design C: numbered-slot commands run on the game owner; the worker applies completion and opens naming only after the reply"
+    },
+    {
+     "old": "use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};",
+     "new": "use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "struct Motion {\n    capturing: bool,\n    playing: bool,\n    play: Vec<InputFrame>,\n    start: StartState,\n}\n\nstatic MOTION: RwLock<Motion> = RwLock::new(Motion {\n    capturing: false,\n    playing: false,\n    play: Vec::new(),\n    start: StartState {\n        fighter_kind: -1,\n        costume: 0,\n        facing: 1.0,\n        situation: 0,\n        status: 0,\n        speed_x: 0.0,\n        speed_y: 0.0,\n    },\n});\n\n",
+     "new": "// Capture origin is game-owned. Only copied values leave it at completion.\nstatic CAPTURE_ORIGIN: hos_lock::Mutex<StartState> = hos_lock::Mutex::new(StartState {\n    fighter_kind: -1, costume: 0, facing: 1.0, situation: 0, status: 0, speed_x: 0.0, speed_y: 0.0,\n});\nstatic PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\nstatic PREVIEW_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\n// 0 idle, 1 named, 2 transient preview. Only game callbacks change this.\nstatic PLAYING: AtomicU8 = AtomicU8::new(0);\nstatic PLAY_GENERATION: AtomicU32 = AtomicU32::new(0);\nstatic PREPARED_REVISION: AtomicU64 = AtomicU64::new(u64::MAX);\nstatic RESTORE_ANCHOR: RwLock<Option<(u64, f32, f32)>> = RwLock::new(None);\nstatic RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub struct PlaybackStart {",
+     "new": "#[derive(Clone, Copy)]\npub struct PlaybackStart {",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    pub len: usize,\n}",
+     "new": "    pub len: usize,\n    pub generation: u32,\n}",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn publish_queries() {\n    let (playback_allowed, plays_current, loaded_kind, restore_in_air, marker) = {\n        let ui = lock_read(&UI);\n        (ui.playback_allowed(), ui.plays_current(),\n            ui.loaded_start().map_or(-1, |start| start.fighter_kind),\n            ui.restore_in_air(), ui.marker())\n    };\n    QUERIES.publish(crate::model::macro_handoff::MacroQueries {\n        source_is_named: source_is_named(), playback_allowed, plays_current,\n        loaded_kind, restore_in_air, panel_visible: panel_visible(),\n        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        suspended: suspended(), marker,\n    });\n}\n\n",
+     "new": "pub fn publish_queries() {\n    RESTORE_ANCHORS.drain(|(generation, x, y)| { lock_write(&UI).restored_target(generation, (x, y)); });\n    let dropped = RESTORE_ANCHORS.take_dropped();\n    if dropped != 0 { println!(\"[MacroHandoff] restore_events_dropped={dropped}\"); }\n    observe_loaded();\n    let revision = selection_revision();\n    let (playback_allowed, plays_current, start, restore_in_air, marker, placement, velocity, target) = {\n        let ui = lock_read(&UI);\n        if PLAYING.load(Ordering::Acquire) != 1 && PREPARED_REVISION.load(Ordering::Acquire) != revision {\n            // SAFETY: the menu worker alone fills/retracts these buffers.\n            unsafe {\n                match ui.loaded_frames() {\n                    Some(frames) => { PLAY_FRAMES.fill(frames); }\n                    None => PLAY_FRAMES.retract(),\n                }\n            }\n            PREPARED_REVISION.store(revision, Ordering::Release);\n        }\n        (ui.playback_allowed(), ui.plays_current(), ui.loaded_start(), ui.restore_in_air(),\n            ui.marker(), ui.loaded_placement().map(|p| (p.delta_x, p.delta_y)),\n            ui.ready_velocity(true), ui.loaded_target())\n    };\n    let loaded_matches = plays_current || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));\n    QUERIES.publish(crate::model::macro_handoff::MacroQueries {\n        source_is_named: source_is_named(),\n        playback_allowed: playback_allowed && PREPARED_REVISION.load(Ordering::Acquire) == revision,\n        playback_len: PLAY_FRAMES.len() as u32,\n        playback_facing: start.map_or(1.0, |start| start.facing),\n        playback_status: start.map_or(0, |start| start.status),\n        playback_generation: PLAY_FRAMES.generation(),\n        plays_current, loaded_matches, placement, velocity,\n        loaded_kind: start.map_or(-1, |start| start.fighter_kind),\n        restore_in_air, panel_visible: panel_visible(),\n        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        suspended: suspended(), marker,\n    });\n}\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn capture_active() -> bool {\n    lock_read(&MOTION).capturing\n}\n\npub fn playback_active() -> bool {\n    lock_read(&MOTION).playing\n}\n\npub fn using_frames() -> bool {\n    let motion = lock_read(&MOTION);\n    motion.capturing || motion.playing\n}\n\n",
+     "new": "pub fn capture_active() -> bool { CAPTURE.capturing() }\npub fn playback_active() -> bool { PLAYING.load(Ordering::Acquire) != 0 }\npub fn using_frames() -> bool { capture_active() || playback_active() }\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn begin_capture(start: StartState) -> bool {\n    if !CAPTURE.begin() { return false; }\n    let mut motion = lock_write(&MOTION);\n    motion.capturing = true;\n    motion.playing = false;\n    motion.play.clear();\n    motion.start = start;\n    true\n}\n\npub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) -> StartState {\n    let start = snapshot_start(module_accessor);\n    lock_write(&MOTION).start = start;\n    start\n}\n\n",
+     "new": "pub fn begin_capture(start: StartState) -> bool {\n    if !CAPTURE.begin() { return false; }\n    PLAYING.store(0, Ordering::Release);\n    *CAPTURE_ORIGIN.lock() = start;\n    true\n}\n\npub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) -> StartState {\n    let start = snapshot_start(module_accessor);\n    *CAPTURE_ORIGIN.lock() = start;\n    start\n}\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    let start = {\n        let mut motion = lock_write(&MOTION);\n        motion.capturing = false;\n        motion.start\n    };",
+     "new": "    let start = *CAPTURE_ORIGIN.lock();",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn begin_playback() -> Option<PlaybackStart> {\n    observe_loaded();\n    let ui = lock_read(&UI);\n    let mut motion = lock_write(&MOTION);\n    let (facing, status) = ui.copy_playback_into(&mut motion.play)?;\n    let info = PlaybackStart {\n        facing,\n        status,\n        len: motion.play.len(),\n    };\n    drop(ui);\n    motion.playing = true;\n    motion.capturing = false;\n    #[cfg(feature = \"named-input-trace\")]\n    {\n        TRACE_WRITES.store(0, Ordering::Relaxed);\n        TRACE_OBSERVATIONS.store(0, Ordering::Relaxed);\n        let run = TRACE_RUN.fetch_add(1, Ordering::Relaxed) + 1;\n        println!(\"[NamedTrace] begin run={} len={}\", run, info.len);\n    }\n    Some(info)\n}\n\n/// Transient preview bypasses MacroUi and never replaces the user's loaded entry.\npub fn begin_preview(recording: MacroRecording) -> PlaybackStart {\n    let info = PlaybackStart { facing: recording.start.facing, status: recording.start.status,\n        len: recording.frames.len() };\n    let mut motion = lock_write(&MOTION);\n    motion.playing = true;\n    motion.capturing = false;\n    motion.start = recording.start;\n    motion.play.clear();\n    motion.play.extend_from_slice(&recording.frames);\n    PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);\n    PLAYBACK_START_PENDING.store(true, Ordering::Relaxed);\n    #[cfg(feature = \"named-input-trace\")]\n    {\n        TRACE_WRITES.store(0, Ordering::Relaxed);\n        TRACE_OBSERVATIONS.store(0, Ordering::Relaxed);\n        let run = TRACE_RUN.fetch_add(1, Ordering::Relaxed) + 1;\n        println!(\"[NamedTrace] preview run={} len={}\", run, info.len);\n    }\n    info\n}\n\n",
+     "new": "pub fn begin_playback() -> Option<PlaybackStart> {\n    let q = hook_queries();\n    if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }\n    CAPTURE.cancel();\n    PLAY_GENERATION.store(q.playback_generation, Ordering::Release);\n    PLAYING.store(1, Ordering::Release);\n    let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,\n        len: q.playback_len as usize, generation: q.playback_generation };\n    trace_begin(info.len, false);\n    Some(info)\n}\n\n/// Worker only: prepare a transient preview without changing the named selection.\npub fn prepare_preview(recording: &MacroRecording) -> PlaybackStart {\n    // SAFETY: request_play runs on the menu worker, the sole preview-buffer writer.\n    let generation = unsafe { PREVIEW_FRAMES.fill(&recording.frames) };\n    PlaybackStart { facing: recording.start.facing, status: recording.start.status,\n        len: recording.frames.len(), generation }\n}\n\n/// Game callback only: the requested preview is still the prepared one.\npub fn begin_preview(info: PlaybackStart) -> bool {\n    if PREVIEW_FRAMES.generation() != info.generation { return false; }\n    CAPTURE.cancel();\n    PLAY_GENERATION.store(info.generation, Ordering::Release);\n    PLAYING.store(2, Ordering::Release);\n    PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);\n    PLAYBACK_START_PENDING.store(true, Ordering::Relaxed);\n    trace_begin(info.len, true);\n    true\n}\n\nfn trace_begin(_len: usize, _preview: bool) {\n    #[cfg(feature = \"named-input-trace\")]\n    {\n        TRACE_WRITES.store(0, Ordering::Relaxed);\n        TRACE_OBSERVATIONS.store(0, Ordering::Relaxed);\n        let run = TRACE_RUN.fetch_add(1, Ordering::Relaxed) + 1;\n        println!(\"[NamedTrace] begin run={} len={} preview={}\", run, _len, _preview);\n    }\n}\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    lock_write(&MOTION).playing = false;",
+     "new": "    PLAYING.store(0, Ordering::Release);\n    crate::runtime::ui::worker::wake();",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    let mut motion = lock_write(&MOTION);\n    motion.capturing = false;\n    motion.playing = false;",
+     "new": "    PLAYING.store(0, Ordering::Release);\n    crate::runtime::ui::worker::wake();",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    observe_loaded();\n    if !lock_read(&UI).playback_allowed() {",
+     "new": "    if !hook_queries().playback_allowed {",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn restored_target(x: f32, y: f32) -> Option<(f32, f32)> {\n    if crate::runtime::macros::replay_preview::occupied() { return None; }\n    if panel_visible() {\n        return None;\n    }\n    let generation = GENERATION.load(Ordering::Relaxed);\n    if generation == 0 {\n        return None;\n    }\n    let target = lock_write(&UI).restored_target(generation, (x, y));\n    if source_is_named() && loaded_fighter_matches() { target } else { None }\n}\n\n",
+     "new": "pub fn restored_target(x: f32, y: f32) -> Option<(f32, f32)> {\n    if crate::runtime::macros::replay_preview::occupied() { return None; }\n    let q = hook_queries();\n    if q.panel_visible || !q.source_is_named || !q.loaded_matches { return None; }\n    let generation = GENERATION.load(Ordering::Relaxed);\n    if generation == 0 { return None; }\n    let (dx, dy) = q.placement?;\n    let mut anchor = lock_write(&RESTORE_ANCHOR);\n    if anchor.is_none_or(|(saved, _, _)| saved != generation) {\n        *anchor = Some((generation, x, y));\n        RESTORE_ANCHORS.post((generation, x, y));\n        crate::runtime::ui::worker::wake();\n    }\n    let (_, x, y) = (*anchor)?;\n    Some((x + dx, y + dy))\n}\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "    let (plays_current,target)={let ui=lock_read(&UI);(ui.plays_current(),ui.loaded_target())};\n    plays_current || target.is_some_and(|target|exact_target_ready(target,cpu_kind()))",
+     "new": "    hook_queries().loaded_matches",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "        && lock_read(&UI).restore_in_air()",
+     "new": "        && hook_queries().restore_in_air",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "        if crate::runtime::macros::replay_preview::occupied() || !source_is_named() || panel_visible() || !loaded_fighter_matches() {",
+     "new": "        if crate::runtime::macros::replay_preview::occupied() || !source_is_named() || hook_queries().panel_visible || !loaded_fighter_matches() {",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "        let ui = lock_read(&UI);\n        let Some((x, y)) = ui.ready_velocity(true) else { return; };\n        (x, y, ui.loaded_facing().unwrap_or(1.0))",
+     "new": "        let q = hook_queries();\n        let Some((x, y)) = q.velocity else { return; };\n        (x, y, q.playback_facing)",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn frame_for(index: usize) -> Option<MappedInputs> {\n    let motion = lock_read(&MOTION);\n    let frame = if motion.playing {\n        motion.play.get(index).copied()\n    } else {\n        CAPTURE.frame_at(index)\n    }?;\n    Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y, rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate\n/// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).\npub fn prepare_buffers() {\n    let wanted = training_mod_macros_max_frames();\n    CAPTURE.prepare(wanted);\n    let grow = lock_read(&MOTION).play.capacity() < wanted;\n    if !grow { return; }\n    let mut play = Vec::with_capacity(wanted);\n    {\n        let mut motion = lock_write(&MOTION);\n        if motion.play.capacity() < wanted {\n            play.append(&mut motion.play);\n            std::mem::swap(&mut motion.play, &mut play);\n        }\n    }\n}\n\nfn training_mod_macros_max_frames() -> usize {\n    crate::engine::macros::MAX_FRAMES\n}\n\n",
+     "new": "pub fn frame_for(index: usize) -> Option<MappedInputs> {\n    let source = PLAYING.load(Ordering::Acquire);\n    let frame = if source == 0 {\n        CAPTURE.frame_at(index)\n    } else {\n        let buffers = if source == 1 { &PLAY_FRAMES } else { &PREVIEW_FRAMES };\n        let generation = PLAY_GENERATION.load(Ordering::Acquire);\n        if buffers.generation() != generation { return None; }\n        let frame = buffers.frame_at(index);\n        if buffers.generation() != generation { return None; }\n        frame\n    }?;\n    Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,\n        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Publishing/boot reservation only; the capture owner atomically excludes an\n/// active capture. Playback buffers are filled exclusively by the menu worker.\npub fn prepare_buffers() {\n    CAPTURE.prepare(crate::engine::macros::MAX_FRAMES);\n}\n\n",
+     "reason": "Design C: worker-prepared indexed playback and published Copy queries replace the shared MOTION/UI hook reads"
+    },
+    {
+     "old": "pub fn suspend_waiting() {\n    if SUSPENDED.swap(true, Ordering::AcqRel) { return; }\n    lock_write(&UI).invalidate_practice_context();\n    crate::runtime::macros::replay_capture::suspend_waiting();\n    cancel_character_selection();\n    retire_name(true);\n    SESSION_GENERATION.fetch_add(1, Ordering::Relaxed);\n}\npub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n        retire_name(false);\n        if SUSPENDED.swap(false, Ordering::AcqRel) {\n            lock_write(&UI).close_transient();\n            crate::runtime::macros::replay_capture::discard_waiting();\n        }\n    }\n}\n",
+     "new": "#[derive(Clone, Copy)]\nenum Lifecycle { Suspend, SceneChanged { discard: bool }, Clear { keep: bool } }\nstatic LIFECYCLE: hos_lock::Mailbox<Lifecycle, 32> = hos_lock::Mailbox::new();\n\nfn post_lifecycle(event: Lifecycle) {\n    LIFECYCLE.post(event);\n    crate::runtime::ui::worker::wake();\n}\n\npub fn suspend_waiting() {\n    if SUSPENDED.swap(true, Ordering::AcqRel) { return; }\n    SESSION_GENERATION.fetch_add(1, Ordering::AcqRel);\n    post_lifecycle(Lifecycle::Suspend);\n}\npub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n        let discard = SUSPENDED.swap(false, Ordering::AcqRel);\n        post_lifecycle(Lifecycle::SceneChanged { discard });\n    }\n}\n\n/// Drain before UI input so an old retirement cannot close a new scene's panel.\npub fn worker_lifecycle() {\n    LIFECYCLE.drain(|event| match event {\n        Lifecycle::Suspend => {\n            lock_write(&UI).invalidate_practice_context();\n            crate::runtime::macros::replay_capture::suspend_waiting();\n            cancel_character_selection();\n            retire_name(true);\n        }\n        Lifecycle::SceneChanged { discard } => {\n            retire_name(false);\n            if discard {\n                lock_write(&UI).close_transient();\n                crate::runtime::macros::replay_capture::discard_waiting();\n            }\n        }\n        Lifecycle::Clear { keep } => {\n            retire_name(keep);\n            *lock_write(&CONFIRMED_NAME) = None;\n            *lock_write(&LIST_ACTION) = None;\n            *lock_write(&LIST_CHOICE) = None;\n            if !keep {\n                *lock_write(&RECORD_SLOT) = None;\n                lock_write(&UI).close_transient();\n                crate::runtime::macros::replay_capture::close_editor();\n            }\n        }\n    });\n    let dropped = LIFECYCLE.take_dropped();\n    if dropped != 0 { println!(\"[MacroHandoff] lifecycle_events_dropped={dropped}\"); }\n}\n\n",
+     "reason": "Design C: lifecycle callbacks retire hook-visible ownership immediately and mailbox panel/keyboard destruction to the worker"
+    },
+    {
+     "old": "pub fn hook_queries() -> crate::model::macro_handoff::MacroQueries { QUERIES.read() }",
+     "new": "pub fn hook_queries() -> crate::model::macro_handoff::MacroQueries {\n    let q = QUERIES.read();\n    if q.session == session_revision() { q } else { crate::model::macro_handoff::MacroQueries::IDLE }\n}",
+     "reason": "Design C: lifecycle callbacks retire hook-visible ownership immediately and mailbox panel/keyboard destruction to the worker"
+    },
+    {
+     "old": "    RESTORE_ANCHORS.drain(|(generation, x, y)| { lock_write(&UI).restored_target(generation, (x, y)); });",
+     "new": "    RESTORE_ANCHORS.drain(|(generation, x, y)| {\n        if generation == GENERATION.load(Ordering::Acquire) {\n            lock_write(&UI).restored_target(generation, (x, y));\n        }\n    });",
+     "reason": "Design C: lifecycle callbacks retire hook-visible ownership immediately and mailbox panel/keyboard destruction to the worker"
+    },
+    {
+     "old": "    QUERIES.publish(crate::model::macro_handoff::MacroQueries {",
+     "new": "    QUERIES.publish(crate::model::macro_handoff::MacroQueries {\n        session: session_revision(),",
+     "reason": "Design C: lifecycle callbacks retire hook-visible ownership immediately and mailbox panel/keyboard destruction to the worker"
+    },
+    {
+     "old": "    retire_name(suspended());\n    // These are one-shot actions from the departing scene, not suspended\n    // keyboard drafts. A later practice visit must never consume them.\n    *lock_write(&CONFIRMED_NAME) = None;\n    *lock_write(&LIST_ACTION) = None;\n    *lock_write(&LIST_CHOICE) = None;\n    if !suspended() {\n        *lock_write(&RECORD_SLOT) = None;\n        lock_write(&UI).close_transient();\n        crate::runtime::macros::replay_capture::close_editor();\n    }\n",
+     "new": "    post_lifecycle(Lifecycle::Clear { keep: suspended() });\n",
+     "reason": "Design C: lifecycle callbacks retire hook-visible ownership immediately and mailbox panel/keyboard destruction to the worker"
+    },
+    {
+     "old": "    QUERIES.publish(crate::model::macro_handoff::MacroQueries {",
+     "new": "    let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();\n    QUERIES.publish(crate::model::macro_handoff::MacroQueries {",
+     "reason": "Design C: publish the worker browser state used by fighter hold/quiesce hooks"
+    },
+    {
+     "old": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),",
+     "new": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        replay_loading: crate::runtime::macros::replay_capture::loading(), browser_pending, browser_release,",
+     "reason": "Design C: publish replay loading/browser queries"
+    },
+    {
+     "old": "let hold_panel = hook_queries().panel_visible || (crate::runtime::macros::replay_capture::loading()",
+     "new": "let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading",
+     "reason": "Design C: hooks do not take the worker reload lock"
+    },
+    {
+     "old": "    post_lifecycle(Lifecycle::Clear { keep: suspended() });",
+     "new": "    crate::runtime::macros::replay_preview::clear_session();\n    post_lifecycle(Lifecycle::Clear { keep: suspended() });",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
     }
    ]
   },
@@ -795,7 +930,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "75b3ca8796c8fc807b50975dc0f8a7e233932e317483852b9e58bf8e8381c83d",
+   "dest_sha256": "08d3f9f2932b1b7863cc39ddd383cdce83d4ea2450c9e7e902b3b7dee27d10f3",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -853,6 +988,107 @@
      "old": "    let waiting = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby);",
      "new": "    let waiting = crate::runtime::ui::facts::fact_waiting_scene();",
      "reason": "Design C: clip editor actions consume the CPU kind/status published by the game callback"
+    },
+    {
+     "old": "crate::runtime::lobby::training::practice::enabled()",
+     "new": "crate::runtime::ui::facts::fact_practice_enabled()",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback",
+     "count": 4
+    },
+    {
+     "old": "crate::runtime::lobby::training::practice::scene_enabled()",
+     "new": "crate::runtime::ui::facts::fact_scene_enabled()",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "&& unsafe { Fighter::is_ready_go() && !crate::runtime::macros::save_states::is_loading() }",
+     "new": "&& crate::runtime::ui::facts::fact_ready_go() && !crate::runtime::macros::save_states::is_loading()",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "    let pending = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending());",
+     "new": "    let pending = crate::runtime::macros::named_macros::hook_queries().browser_pending;",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "    BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.release_cpu(clean))",
+     "new": "    crate::runtime::macros::named_macros::hook_queries().browser_release && !clean",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "unsafe fn service_browser() {",
+     "new": "fn service_browser() {",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "let eligible = crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby) && capture_ready();",
+     "new": "let eligible = crate::runtime::ui::facts::fact_waiting_scene() && capture_ready();",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "    let clean = eligible && crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n        .is_some_and(|cpu| clean_statuses().contains(&StatusModule::status_kind(cpu)));",
+     "new": "    let clean = eligible && crate::runtime::ui::facts::fact_cpu_status()\n        .is_some_and(|status| clean_statuses().contains(&status));",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "pub unsafe fn service_reload() {",
+     "new": "pub fn service_reload() {\n    consume_reload_result();",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "    let cpu=crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU);\n    let current=cpu.map(|cpu|app::utility::get_kind(&mut *cpu));",
+     "new": "    let current=crate::runtime::ui::facts::fact_cpu_kind();",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "        let grounded_idle=cpu.is_some_and(|cpu|StatusModule::status_kind(cpu)==*FIGHTER_STATUS_KIND_WAIT\n            && StatusModule::situation_kind(cpu)==*SITUATION_KIND_GROUND);",
+     "new": "        let grounded_idle=crate::runtime::ui::facts::fact_cpu_status()==Some(*FIGHTER_STATUS_KIND_WAIT)\n            && crate::runtime::ui::facts::fact_cpu_situation()==Some(*SITUATION_KIND_GROUND);",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "&& !crate::runtime::roster::character_roster::busy() && Fighter::is_ready_go() && grounded_idle",
+     "new": "&& !crate::runtime::roster::character_roster::busy() && crate::runtime::ui::facts::fact_ready_go() && grounded_idle",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "        || !Fighter::is_ready_go() {return;}",
+     "new": "        || !crate::runtime::ui::facts::fact_ready_go() {return;}",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "            if crate::runtime::roster::character_roster::cpu_reload_ready() {\n                #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n                let requested=crate::runtime::roster::character_roster::mii_replay::request(target,revision);\n                #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n                let requested=crate::runtime::roster::character_roster::request_cpu_kind(target.kind());\n                if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {\n                    pending.requested=requested;\n                }\n            }",
+     "new": "            queue_reload(target, revision);",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "pub fn browser_visible() -> bool {",
+     "new": "pub fn browser_queries() -> (bool, bool) {\n    BROWSER.lock().unwrap().as_ref().map_or((false, false), |browser|\n        (browser.ui.pending(), browser.ui.release_cpu(false)))\n}\n\npub fn browser_visible() -> bool {",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "pub fn service_reload() {",
+     "new": "static RELOAD_PENDING: AtomicBool = AtomicBool::new(false);\nstatic RELOAD_REQUEST: hos_lock::Mailbox<(Target, u64), 1> = hos_lock::Mailbox::new();\nstatic RELOAD_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();\n\nfn queue_reload(target: Target, revision: u64) {\n    if RELOAD_PENDING.swap(true, Ordering::AcqRel) { return; }\n    let posted = RELOAD_REQUEST.post((target, revision));\n    debug_assert!(posted, \"one outstanding clip character request\");\n}\n\n/// Game callback: the roster owns native admission and loading.\npub fn service_reload_request() {\n    RELOAD_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision()\n            && crate::runtime::roster::character_roster::cpu_reload_ready();\n        #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);\n        #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n        let accepted = eligible && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());\n        let posted = RELOAD_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding clip character result\");\n        crate::runtime::ui::worker::wake();\n    });\n}\n\nfn consume_reload_result() {\n    RELOAD_RESULT.drain(|(revision, accepted)| {\n        RELOAD_PENDING.store(false, Ordering::Release);\n        if let Some(pending) = RELOAD.lock().unwrap().as_mut().filter(|p| p.revision == revision) {\n            pending.requested = accepted;\n        }\n    });\n}\n\npub fn service_reload() {",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "static CLOSE_INPUT: Mutex<CloseInputGuard>",
+     "new": "static CLOSE_ARM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);\nstatic CLOSE_INPUT: Mutex<CloseInputGuard>",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "        CLOSE_INPUT.lock().unwrap().arm(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES);",
+     "new": "        CLOSE_ARM.store(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES, Ordering::Release);",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "    CLOSE_INPUT.lock().unwrap().poll(in_training, close_held)",
+     "new": "    let mut guard = CLOSE_INPUT.lock().unwrap();\n    let frames = CLOSE_ARM.swap(0, Ordering::AcqRel);\n    if frames != 0 { guard.arm(frames); }\n    guard.poll(in_training, close_held)",
+     "reason": "Design C: replay editor/reload services use published game facts on the worker; roster admission remains on the game callback"
+    },
+    {
+     "old": "pub fn preview_progress(revision: u64, consumed: u32) {\n    let mut editor = EDITOR.lock().unwrap();\n    if revision == REVISION.load(Ordering::Relaxed) {\n        if let Some(editor) = editor.as_mut() { editor.preview_progress(consumed); }\n    }\n}\n",
+     "new": "#[derive(Clone, Copy)]\nenum PreviewNotice {\n    Progress { revision: u64, consumed: u32 },\n    Failed { session: u64, revision: u64, message: &'static str },\n}\nstatic PREVIEW_NOTICES: hos_lock::Mailbox<PreviewNotice, 16> = hos_lock::Mailbox::new();\n\npub fn preview_progress(revision: u64, consumed: u32) {\n    PREVIEW_NOTICES.post(PreviewNotice::Progress { revision, consumed });\n    crate::runtime::ui::worker::wake();\n}\n\npub fn post_preview_failed(message: &'static str) {\n    PREVIEW_NOTICES.post(PreviewNotice::Failed {\n        session: crate::runtime::macros::named_macros::session_revision(),\n        revision: REVISION.load(Ordering::Acquire), message,\n    });\n    crate::runtime::ui::worker::wake();\n}\n\npub fn worker_preview_notices() {\n    PREVIEW_NOTICES.drain(|notice| match notice {\n        PreviewNotice::Progress { revision, consumed } => {\n            if revision == REVISION.load(Ordering::Acquire) {\n                if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.preview_progress(consumed); }\n            }\n        }\n        PreviewNotice::Failed { session, revision, message } => {\n            if session == crate::runtime::macros::named_macros::session_revision()\n                && revision == REVISION.load(Ordering::Acquire) {\n                preview_failed(message);\n            }\n        }\n    });\n    let dropped = PREVIEW_NOTICES.take_dropped();\n    if dropped != 0 { println!(\"[MacroHandoff] preview_notices_dropped={dropped}\"); }\n}\n",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
     }
    ]
   },
@@ -861,12 +1097,145 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "d4b0669d76675c1945304ca8a537e65c6325ef30cd0412684bfe388a052d4ccc",
+   "dest_sha256": "2140fe8745c59aacc6b1ea2948e9ea9eaf34e161235cb56171ac7367331b203a",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
      "new": "crate::runtime::features::recorder::is_primary_cpu_body(module)",
      "reason": "package 6 retired practice::primary_cpu (single owner; agreed with pkg6 5e0fab3): package 2's primary CPU entry is the owner (recorder::is_primary_cpu_body: a practice scene, the first body of cpu::primary_entry_now)"
+    },
+    {
+     "old": "enum Request { Play { recording: Box<MacroRecording>, revision: u64 }, Stop }",
+     "new": "enum Request { Play { start: StartState, playback: super::named_macros::PlaybackStart, revision: u64 }, Stop }",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "    recording: MacroRecording,",
+     "new": "    start: StartState,\n    playback: super::named_macros::PlaybackStart,",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "    *REQUEST.lock().unwrap() = Some(Request::Play { recording: Box::new(recording), revision });",
+     "new": "    if let Err(error) = recording.validate() {\n        crate::runtime::macros::replay_capture::preview_failed(&error.to_string());\n        return;\n    }\n    let playback = super::named_macros::prepare_preview(&recording);\n    *REQUEST.lock().unwrap() = Some(Request::Play { start: recording.start, playback, revision });",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": ".map(|s| s.recording.start)",
+     "new": ".map(|s| s.start)",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "s.revision, s.recording.frames.len()",
+     "new": "s.revision, s.playback.len",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "        Some(Request::Play { recording, revision }) => {",
+     "new": "        Some(Request::Play { start, playback, revision }) => {",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "if !practice::acquire() || recording.validate().is_err()",
+     "new": "if !practice::acquire()",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "                recording: *recording, revision, phase: Phase::Starting, waits: 0, cpu: None,",
+     "new": "                start, playback, revision, phase: Phase::Starting, waits: 0, cpu: None,",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "Some(Ok(Some(s.recording.clone())))",
+     "new": "Some(Ok(Some(s.playback)))",
+     "reason": "Design C: prepare preview frames on the worker and send only Copy start metadata to game callbacks; no recording clone in a hook"
+    },
+    {
+     "old": "use std::sync::{atomic::{AtomicU8, Ordering}, Mutex};",
+     "new": "use std::sync::{atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering}, Mutex};",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "enum Request {",
+     "new": "#[derive(Clone, Copy)]\nenum Request {",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "static REQUEST: Mutex<Option<Request>> = Mutex::new(None);",
+     "new": "static REQUEST: hos_lock::Mailbox<(u64, u64, Request), 32> = hos_lock::Mailbox::new();\nstatic SERIAL: AtomicU64 = AtomicU64::new(1);\nstatic REQUESTED: AtomicU64 = AtomicU64::new(0);\nstatic CONSUMED: AtomicU64 = AtomicU64::new(0);\nstatic STOP_QUEUED: AtomicBool = AtomicBool::new(false);\nstatic ACTIVE: AtomicBool = AtomicBool::new(false);\n\nfn request_pending() -> bool { REQUESTED.load(Ordering::Acquire) > CONSUMED.load(Ordering::Acquire) }\nfn post_request(request: Request) {\n    let serial = SERIAL.fetch_add(1, Ordering::Relaxed);\n    if REQUEST.post((serial, super::named_macros::session_revision(), request)) {\n        REQUESTED.fetch_max(serial, Ordering::Release);\n    } else {\n        println!(\"[MacroHandoff] preview_request_dropped=1\");\n    }\n}\nfn take_request() -> Option<Request> {\n    let mut newest = None;\n    let previous = CONSUMED.load(Ordering::Acquire);\n    REQUEST.drain(|(serial, session, request)| {\n        CONSUMED.fetch_max(serial, Ordering::Release);\n        if serial > previous && session == super::named_macros::session_revision()\n            && newest.as_ref().is_none_or(|(seen, _)| serial > *seen) {\n            newest = Some((serial, request));\n        }\n    });\n    if newest.is_some() { STOP_QUEUED.store(false, Ordering::Release); }\n    newest.map(|(_, request)| request)\n}\nfn discard_requests() { let _ = take_request(); }\n",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "    *REQUEST.lock().unwrap() = Some(Request::Play { start: recording.start, playback, revision });\n    STATUS.store(1, Ordering::Relaxed);",
+     "new": "    STATUS.store(1, Ordering::Relaxed);\n    STOP_QUEUED.store(false, Ordering::Release);\n    post_request(Request::Play { start: recording.start, playback, revision });",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "    if occupied() || REQUEST.lock().unwrap().is_some() {\n        *REQUEST.lock().unwrap() = Some(Request::Stop);",
+     "new": "    if occupied() {\n        if !STOP_QUEUED.swap(true, Ordering::AcqRel) { post_request(Request::Stop); }",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "    SESSION.lock().unwrap().is_some() || REQUEST.lock().unwrap().is_some()",
+     "new": "    ACTIVE.load(Ordering::Acquire) || request_pending()",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "    SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Failed)",
+     "new": "    ACTIVE.load(Ordering::Acquire) && STATUS.load(Ordering::Acquire) == 5",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "    REQUEST.lock().unwrap().is_none()",
+     "new": "    !request_pending()",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "crate::runtime::macros::named_macros::clip_foreground()",
+     "new": "crate::runtime::macros::named_macros::hook_queries().clip_foreground",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only",
+     "count": 2
+    },
+    {
+     "old": "    REQUEST.lock().unwrap().take();",
+     "new": "    discard_requests();",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only",
+     "count": 3
+    },
+    {
+     "old": "    SESSION.lock().unwrap().take();",
+     "new": "    SESSION.lock().unwrap().take();\n    ACTIVE.store(false, Ordering::Release);",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only",
+     "count": 2
+    },
+    {
+     "old": "    let request = REQUEST.lock().unwrap().take();",
+     "new": "    let request = take_request();",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "            *SESSION.lock().unwrap() = Some(Session {",
+     "new": "            ACTIVE.store(true, Ordering::Release);\n            *SESSION.lock().unwrap() = Some(Session {",
+     "reason": "Design C: preview requests use a value mailbox and worker visibility reads atomic ownership; SESSION is game-only"
+    },
+    {
+     "old": "unsafe fn fail(message: &str) {",
+     "new": "unsafe fn fail(message: &'static str) {",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
+    },
+    {
+     "old": "crate::runtime::macros::replay_capture::preview_failed(message);",
+     "new": "crate::runtime::macros::replay_capture::post_preview_failed(message);",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
+    },
+    {
+     "old": "crate::runtime::macros::replay_capture::preview_failed(\"Preview fighter changed; reset Training before retrying\");",
+     "new": "crate::runtime::macros::replay_capture::post_preview_failed(\"Preview fighter changed; reset Training before retrying\");",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
+    },
+    {
+     "old": "crate::runtime::macros::replay_capture::preview_failed(\"Preview start did not settle; restoring the preview setup\");",
+     "new": "crate::runtime::macros::replay_capture::post_preview_failed(\"Preview start did not settle; restoring the preview setup\");",
+     "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
     }
    ]
   },

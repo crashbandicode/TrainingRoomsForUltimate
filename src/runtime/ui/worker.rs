@@ -170,6 +170,8 @@ fn run() {
     let _ = WORKER.set(std::thread::current());
     let mut session = Session::default();
     loop {
+        // Retire departing layer state before accepting a new scene's panel input.
+        crate::runtime::macros::port::worker_events();
         // Drain first: an event pushed before this thread registered has no unpark waiting for it.
         while let Some(code) = pop() {
             handle(code, &mut session);
