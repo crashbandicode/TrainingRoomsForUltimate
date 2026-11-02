@@ -41,6 +41,10 @@ const PILOT_SITES: [usize; 23] = [
     0x30c770, 0x3119d0, 0x1671650,
 ];
 
+/// The relied-on game layouts (no symbol: instructions of the game that read or write the fields package 6 reads): F9's No. of
+/// CPUs path (root load, reader, pause-menu writer) and F11's active-cell read.
+const RELIED: [&str; 4] = ["roster_cpu_quantity_root", "roster_cpu_quantity_reader", "roster_cpu_quantity_writer", "entry_active_cell"];
+
 fn find(name: &str) -> &'static model::sites::Site {
     SITES.iter().find(|s| s.name == name).unwrap_or_else(|| panic!("no row {name}"))
 }
@@ -48,7 +52,7 @@ fn find(name: &str) -> &'static model::sites::Site {
 #[test]
 fn rows_are_the_symbols_they_name() {
     let Some(owned) = common::owned_main("pkg6_rows_are_the_symbols_they_name") else { return };
-    assert_eq!(SYMBOLS.len(), SITES.len());
+    assert_eq!(SYMBOLS.len(), SITES.len() - RELIED.len(), "every called row names its symbol");
     for (row, symbol) in SYMBOLS {
         assert_eq!(owned.symbol(symbol), Some(find(row).offset), "{row} is not {symbol}");
     }
@@ -58,10 +62,14 @@ fn rows_are_the_symbols_they_name() {
 fn every_row_matches_the_owned_elf() {
     let Some(owned) = common::owned_main("pkg6_every_row_matches_the_owned_elf") else { return };
     for site in &SITES {
-        assert_eq!(site.kind, SeamKind::Called, "{} is a called function, never hooked", site.name);
+        let relied = RELIED.contains(&site.name);
+        let kind = if relied { SeamKind::Relied } else { SeamKind::Called };
+        assert_eq!(site.kind, kind, "{}: called functions and the relied-on game layouts of F9/F11, never hooked", site.name);
         assert_eq!(owned.window(site.offset), site.guard, "{} at {:#x}", site.name, site.offset);
         assert_eq!(site.guard.len(), GUARD_BYTES);
-        let expected = if site.name.starts_with("p1_") {
+        let expected = if relied {
+            sites::Feature::Roster
+        } else if site.name.starts_with("p1_") {
             sites::Feature::P1Cpu
         } else if site.name.starts_with("roster_") {
             sites::Feature::Roster
