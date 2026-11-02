@@ -1,0 +1,649 @@
+//! Native created-entry contract shared by cache scheduling (re-exported by
+//! `crate::engine::preload::cycle_preload_capacity`) and Mii owner checks.
+//! Values only: an `Extras` never authorizes a dereference. Callers still apply
+//! every physical FE/E/D/O, index, alias and mirror check to a created entry.
+use crate::engine::mii::inventory::MiiClass;
+use crate::engine::mii::ordinary_player::Owner;
+use crate::engine::mii::backend::Layout;
+
+/// The two parked helpers are part of each witnessed native practice layout.
+pub const BASE_HELPERS: usize = 2;
+/// Native entry identities in serial creation order, never menu ordinal values.
+pub const EXTRA_SLOTS: [usize; 3] = [7, 6, 5];
+/// Waiting has native helpers 5/6 already. Extra resources use a separate
+/// creation plan, admitted only while the corresponding rows and inputs are
+/// unclaimed. These values alone never authorize creation or a native read.
+pub const WAITING_EXTRA_SLOTS: [usize; EXTRA_SLOTS.len()] = [7, 3, 2];
+/// Stable physical identities for retirement across a scene/layout transition.
+/// The active budget remains the length of one plan, not this union.
+pub const ALL_EXTRA_SLOTS: [usize; 5] = [7, 6, 5, 3, 2];
+pub const MAX_TARGETS: usize = BASE_HELPERS + EXTRA_SLOTS.len();
+
+pub fn capacity_index(slot: usize) -> Option<usize> {
+    ALL_EXTRA_SLOTS.iter().position(|candidate| *candidate == slot)
+}
+
+pub const fn extra_slots(layout: Layout) -> &'static [usize; EXTRA_SLOTS.len()] {
+    match layout {
+        Layout::Training => &EXTRA_SLOTS,
+        Layout::Ldn | Layout::Quickplay => &WAITING_EXTRA_SLOTS,
+    }
+}
+
+/// One registered creation's native roots, numeric identities only: the
+/// resource root `context+slot*8`, alias root `context+0xe8+slot*8`, the
+/// selection row byte `+0xa` and creation descriptor word 1 (entry `+4`), as
+/// recorded by the creating capacity module.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Roots {
+    pub entry: usize,
+    pub resource: usize,
+    pub alias: usize,
+    pub selection: u8,
+    pub descriptor_selector: u32,
+}
+
+/// Raw current facts of one created entry. The native caller reads them from
+/// the current FE/E/D/O and owner-table roots under its lock; values only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExtraFacts {
+    /// FE `+0xe0` and E `+0x14`.
+    pub entry_owner: u32,
+    pub row_owner: u32,
+    /// FE `+4`, descriptor word 1.
+    pub descriptor_selector: u32,
+    /// FE `+0x46`, D `+0x72` and O `+0x68`; the row index is `Owner::index`.
+    pub entry_index: u16,
+    pub information_index: u16,
+    pub object_index: u16,
+    /// FE `+0x18` and O `+0x58`.
+    pub entry_kind: u32,
+    pub object_kind: u32,
+    /// Owner table `+slot*8` and `+0xe8+slot*8`, and E `+0xa`.
+    pub resource: usize,
+    pub alias_root: usize,
+    pub selection: u8,
+}
+
+/// Registered created entries by `EXTRA_SLOTS` position (0 = absent): a
+/// creation-order prefix of distinct nonzero entry identities, with their
+/// registered roots when built by the owning registry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Extras {
+    layout: Layout,
+    entries: [usize; EXTRA_SLOTS.len()],
+    /// `None` for identity-only values; `owned_roots` and `admit` refuse them.
+    roots: [Option<Roots>; EXTRA_SLOTS.len()],
+}
+
+impl Extras {
+    pub const NONE: Self = Self {
+        layout: Layout::Training,
+        entries: [0; EXTRA_SLOTS.len()],
+        roots: [None; EXTRA_SLOTS.len()],
+    };
+
+    /// Entry identities only (value policy and tests). `owned_roots` and
+    /// `admit` refuse every extra of such a value.
+    pub fn new(entries: [usize; EXTRA_SLOTS.len()]) -> Option<Self> {
+        Self::new_for(Layout::Training, entries)
+    }
+
+    pub fn new_for(layout: Layout, entries: [usize; EXTRA_SLOTS.len()]) -> Option<Self> {
+        let count = entries.iter().take_while(|entry| **entry != 0).count();
+        if entries[count..].iter().any(|entry| *entry != 0)
+            || (0..count).any(|index| entries[..index].contains(&entries[index]))
+        {
+            return None;
+        }
+        Some(Self {
+            layout,
+            entries,
+            roots: [None; EXTRA_SLOTS.len()],
+        })
+    }
+
+    /// The owning registry's records, including their roots.
+    pub fn registered(records: [Option<Roots>; EXTRA_SLOTS.len()]) -> Option<Self> {
+        Self::registered_for(Layout::Training, records)
+    }
+
+    pub fn registered_for(layout: Layout, records: [Option<Roots>; EXTRA_SLOTS.len()]) -> Option<Self> {
+        let mut extras = Self::new_for(layout, records.map(|record| record.map_or(0, |record| record.entry)))?;
+        for (index, record) in records.iter().enumerate() {
+            if let Some(record) = record {
+                if record.resource == 0 || record.alias == 0 {
+                    return None;
+                }
+                extras.roots[index] = Some(*record);
+            }
+        }
+        Some(extras)
+    }
+
+    fn registered_roots(self, slot: usize) -> Result<Roots, &'static str> {
+        let Some(index) = extra_slots(self.layout).iter().position(|value| *value == slot)
+            .filter(|index| self.entries[*index] != 0) else {
+            return Err("extra slot is not a registered creation");
+        };
+        self.roots[index].ok_or("extra registered roots unavailable")
+    }
+
+    /// A registered extra's current native roots must equal its registration.
+    /// Raw values only; the caller reads them from current roots under its lock.
+    pub fn owned_roots(
+        self,
+        slot: usize,
+        resource: usize,
+        alias: usize,
+        selection: u8,
+    ) -> Result<(), &'static str> {
+        let roots = self.registered_roots(slot)?;
+        if resource != roots.resource {
+            return Err("extra resource root differs from its registration");
+        }
+        if alias != roots.alias {
+            return Err("extra alias root differs from its registration");
+        }
+        if selection != roots.selection {
+            return Err("extra selection byte differs from its registration");
+        }
+        Ok(())
+    }
+
+    /// The one admission rule for a registered created entry beside the layout
+    /// owners, shared by the Player0 and CPU selector owner walks (helper proofs
+    /// never admit an extra). Every check is an exact equality:
+    /// - roots, owner ids, owner object, indices and kinds as for any owner;
+    /// - descriptor word 1 equals the **registered creation descriptor** word.
+    ///   Native creation does not mirror the row selector there (C98b entry7:
+    ///   word 0, row selector 7), and every capacity load preflight keeps the
+    ///   creation descriptor except kind/count/actor words, byte 0x43 and the
+    ///   reset reference pair. A layout owner instead requires word 1 == its
+    ///   row selector; this specialization never applies to unknown entries.
+    /// - then the ordinary-only claim facts of `extra_owner`.
+    pub fn admit(self, slot: usize, owner: &Owner, facts: ExtraFacts) -> Result<(), &'static str> {
+        self.owned_roots(slot, facts.resource, facts.alias_root, facts.selection)?;
+        let roots = self.registered_roots(slot)?;
+        if owner.entry != roots.entry {
+            return Err("extra entry differs from its registration");
+        }
+        if facts.entry_owner != slot as u32 || facts.row_owner != slot as u32 {
+            return Err("extra entry/row owner differs from its slot");
+        }
+        if owner.object != facts.alias_root {
+            return Err("extra owner object is not its registered alias root");
+        }
+        if facts.descriptor_selector != roots.descriptor_selector {
+            return Err("extra descriptor selector differs from its creation descriptor");
+        }
+        if facts.entry_index != owner.index
+            || facts.information_index != owner.index
+            || facts.object_index != owner.index
+        {
+            return Err("extra index mirrors differ");
+        }
+        if facts.entry_kind != facts.object_kind {
+            return Err("extra entry/object kind differs");
+        }
+        extra_owner(slot, owner, facts.entry_kind)
+    }
+
+    pub fn count(self) -> usize {
+        self.entries.iter().filter(|entry| **entry != 0).count()
+    }
+
+    pub fn entry(self, slot: usize) -> Option<usize> {
+        extra_slots(self.layout).iter().position(|value| *value == slot)
+            .map(|index| self.entries[index])
+            .filter(|entry| *entry != 0)
+    }
+
+    /// `(slot, entry)` for each registered creation, in creation order.
+    pub fn slots(self) -> impl Iterator<Item = (usize, usize)> {
+        extra_slots(self.layout)
+            .iter().copied()
+            .zip(self.entries)
+            .filter(|(_, entry)| *entry != 0)
+    }
+
+    /// Never reinterpret one scene's registration as another scene's authority.
+    pub fn matches(self, layout: Layout) -> bool {
+        self.count() == 0 || self.layout == layout
+    }
+
+    /// The four-owner view of a physical map. Each registered slot must hold
+    /// exactly its registered entry and is zeroed; every other slot is kept, so an
+    /// unknown entry still fails the layout shape.
+    pub fn view(self, physical: &[usize; 8]) -> Option<[usize; 8]> {
+        let mut view = *physical;
+        for (slot, entry) in self.slots() {
+            if physical[slot] != entry {
+                return None;
+            }
+            view[slot] = 0;
+        }
+        Some(view)
+    }
+
+    /// The physical map implied by a view; the inverse of `view`.
+    pub fn physical(self, view: &[usize; 8]) -> [usize; 8] {
+        let mut physical = *view;
+        for (slot, entry) in self.slots() {
+            physical[slot] = entry;
+        }
+        physical
+    }
+}
+
+/// Strict facts a created entry's current owner must satisfy before Mii code
+/// accepts it beside the four layout owners. These are the claim rules applied
+/// to every present owner, checked first so a refusal names its predicate. An
+/// extra is never a Mii owner, selector destination or helper ordinal.
+pub fn extra_owner(slot: usize, owner: &Owner, kind: u32) -> Result<(), &'static str> {
+    if capacity_index(slot).is_none() {
+        return Err("extra slot outside the created-entry order");
+    }
+    if MiiClass::from_kind(kind).is_some() {
+        return Err("extra entry holds a Mii class");
+    }
+    if usize::from(owner.selector) != slot {
+        return Err("extra row selector differs from its slot");
+    }
+    if owner.alias != 0 {
+        return Err("extra owner alias is nonzero");
+    }
+    if owner.index != 0 && usize::from(owner.index) != slot {
+        return Err("extra row index is neither 0 nor its slot");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn waiting_registrations_use_their_own_slots_and_cannot_cross_layouts() {
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            let extras = Extras::new_for(layout, [0x700, 0x300, 0x200]).unwrap();
+            let original = [0x100, 0, 0, 0, 0x400, 0x500, 0x600, 0];
+            let physical = [0x100, 0, 0x200, 0x300, 0x400, 0x500, 0x600, 0x700];
+            assert_eq!(extras.physical(&original), physical);
+            assert_eq!(extras.view(&physical), Some(original));
+            assert_eq!(extras.slots().collect::<Vec<_>>(), vec![(7, 0x700), (3, 0x300), (2, 0x200)]);
+            assert!(layout.shape_with(&physical, extras));
+            for wrong in [Layout::Training, Layout::Ldn, Layout::Quickplay] {
+                if wrong != layout { assert!(!wrong.shape_with(&physical, extras)); }
+            }
+            let mut foreign = physical;
+            foreign[1] = 0x800;
+            assert!(!layout.shape_with(&foreign, extras), "another local player is not a helper");
+            let mut replaced = physical;
+            replaced[3] = 0x900;
+            assert!(!layout.shape_with(&replaced, extras), "native reclaim invalidates registration");
+            let alias = Extras::new_for(layout, [0x700, 0x500, 0x200]).unwrap();
+            assert!(!layout.shape_with(&alias.physical(&original), alias));
+        }
+        assert_eq!(ALL_EXTRA_SLOTS.len(), ALL_EXTRA_SLOTS.iter().copied().collect::<std::collections::BTreeSet<_>>().len());
+        for layout in [Layout::Training, Layout::Ldn, Layout::Quickplay] {
+            assert!(extra_slots(layout).iter().all(|slot| capacity_index(*slot).is_some()
+                && !layout.owners().contains(slot)));
+        }
+    }
+
+    fn owner(slot: usize, index: u16, selector: u8, alias: u8) -> Owner {
+        let base = 0x1000 * (slot + 1);
+        Owner {
+            entry: base,
+            row: base + 8,
+            information: base + 16,
+            object: base + 24,
+            index,
+            selector,
+            alias,
+        }
+    }
+
+    #[test]
+    fn extras_are_a_creation_order_prefix_of_distinct_identities() {
+        assert_eq!(Extras::new([0; 3]), Some(Extras::NONE));
+        assert!(Extras::new([0x70, 0x60, 0x50]).is_some());
+        assert!(Extras::new([0x70, 0, 0]).is_some());
+        assert_eq!(Extras::new([0, 0x60, 0]), None, "6 before 7");
+        assert_eq!(Extras::new([0x70, 0, 0x50]), None, "5 without 6");
+        assert_eq!(Extras::new([0x70, 0x70, 0]), None, "duplicate identity");
+        let extras = Extras::new([0x70, 0x60, 0]).unwrap();
+        assert_eq!(extras.count(), 2);
+        assert_eq!(
+            (
+                extras.entry(7),
+                extras.entry(6),
+                extras.entry(5),
+                extras.entry(4)
+            ),
+            (Some(0x70), Some(0x60), None, None)
+        );
+        assert_eq!(
+            extras.slots().collect::<Vec<_>>(),
+            vec![(7, 0x70), (6, 0x60)]
+        );
+        assert_eq!(capacity_index(7), Some(0));
+        assert_eq!(capacity_index(4), None);
+        assert_eq!(MAX_TARGETS, 5);
+    }
+
+    #[test]
+    fn view_strips_only_exact_registered_identities() {
+        let physical = [0x10, 0x20, 0x30, 0x40, 0, 0, 0x60, 0x70];
+        let extras = Extras::new([0x70, 0x60, 0]).unwrap();
+        let view = extras.view(&physical).unwrap();
+        assert_eq!(view, [0x10, 0x20, 0x30, 0x40, 0, 0, 0, 0]);
+        assert_eq!(extras.physical(&view), physical);
+        // A registered slot holding another identity is not stripped.
+        let mut moved = physical;
+        moved[7] = 0x71;
+        assert_eq!(extras.view(&moved), None);
+        // An unregistered extra stays in the view, so the shape still refuses it.
+        let only7 = Extras::new([0x70, 0, 0]).unwrap();
+        assert_eq!(only7.view(&physical).unwrap()[6], 0x60);
+        assert_eq!(Extras::NONE.view(&physical), Some(physical));
+    }
+
+    #[test]
+    fn owned_roots_require_registry_built_exact_roots() {
+        let roots = |entry, resource, alias| {
+            Some(Roots {
+                entry,
+                resource,
+                alias,
+                selection: 2,
+                descriptor_selector: 0,
+            })
+        };
+        let extras =
+            Extras::registered([roots(0x70, 0x700, 0x700), roots(0x60, 0x600, 0x600), None])
+                .unwrap();
+        assert_eq!(
+            extras,
+            Extras::registered([roots(0x70, 0x700, 0x700), roots(0x60, 0x600, 0x600), None])
+                .unwrap()
+        );
+        assert_eq!(extras.entry(6), Some(0x60));
+        assert_eq!(extras.owned_roots(7, 0x700, 0x700, 2), Ok(()));
+        assert_eq!(extras.owned_roots(6, 0x600, 0x600, 2), Ok(()));
+        assert_eq!(
+            extras.owned_roots(5, 0x500, 0x500, 2),
+            Err("extra slot is not a registered creation")
+        );
+        assert_eq!(
+            extras.owned_roots(7, 0x708, 0x700, 2),
+            Err("extra resource root differs from its registration")
+        );
+        assert_eq!(
+            extras.owned_roots(7, 0x700, 0x708, 2),
+            Err("extra alias root differs from its registration")
+        );
+        assert_eq!(
+            extras.owned_roots(7, 0x700, 0x700, 1),
+            Err("extra selection byte differs from its registration")
+        );
+        // Identity-only values never admit an extra's roots.
+        assert_eq!(
+            Extras::new([0x70, 0, 0])
+                .unwrap()
+                .owned_roots(7, 0x700, 0x700, 2),
+            Err("extra registered roots unavailable")
+        );
+        // Registry records keep the same prefix/distinct rules and require nonzero roots.
+        assert_eq!(
+            Extras::registered([None, roots(0x60, 0x600, 0x600), None]),
+            None
+        );
+        assert_eq!(
+            Extras::registered([roots(0x70, 0, 0x700), None, None]),
+            None
+        );
+    }
+
+    /// C98b live read-only probe of created entry7 after an ordinary Fox load
+    /// (`preload168/extra7-mirrors-c98b.json`), addresses normalized: FE+e0=7,
+    /// E+14=7, FE+4=0 while E+a7=7, all indices 0, FE/O kind 7, alias byte 0,
+    /// selection 2, resource root == alias root == O.
+    fn c98b_extra7() -> (Extras, Owner, ExtraFacts) {
+        let (entry, object) = (0x7000, 0x7700);
+        let extras = Extras::registered([
+            Some(Roots {
+                entry,
+                resource: object,
+                alias: object,
+                selection: 2,
+                descriptor_selector: 0,
+            }),
+            None,
+            None,
+        ])
+        .unwrap();
+        let owner = Owner {
+            entry,
+            row: 0x7800,
+            information: entry + 0x110,
+            object,
+            index: 0,
+            selector: 7,
+            alias: 0,
+        };
+        let facts = ExtraFacts {
+            entry_owner: 7,
+            row_owner: 7,
+            descriptor_selector: 0,
+            entry_index: 0,
+            information_index: 0,
+            object_index: 0,
+            entry_kind: 7,
+            object_kind: 7,
+            resource: object,
+            alias_root: object,
+            selection: 2,
+        };
+        (extras, owner, facts)
+    }
+
+    #[test]
+    fn c98b_extra7_row_facts_are_admitted_only_with_its_creation_descriptor() {
+        let (extras, owner, facts) = c98b_extra7();
+        assert_eq!(extras.admit(7, &owner, facts), Ok(()));
+        // The layout-owner rule (word 1 == row selector) is not what native
+        // creation wrote; it is refused unless that was the registered word.
+        assert_eq!(
+            extras.admit(
+                7,
+                &owner,
+                ExtraFacts {
+                    descriptor_selector: 7,
+                    ..facts
+                }
+            ),
+            Err("extra descriptor selector differs from its creation descriptor")
+        );
+        // Identity-only or unregistered values never admit the same facts.
+        assert_eq!(
+            Extras::new([owner.entry, 0, 0])
+                .unwrap()
+                .admit(7, &owner, facts),
+            Err("extra registered roots unavailable")
+        );
+        assert_eq!(
+            Extras::NONE.admit(7, &owner, facts),
+            Err("extra slot is not a registered creation")
+        );
+    }
+
+    #[test]
+    fn extra_admission_names_each_unknown_mismatch() {
+        let (extras, owner, facts) = c98b_extra7();
+        let refuse = |owner: Owner, facts: ExtraFacts| extras.admit(7, &owner, facts).unwrap_err();
+        assert_eq!(
+            extras.admit(6, &owner, facts),
+            Err("extra slot is not a registered creation")
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    resource: facts.resource + 8,
+                    ..facts
+                }
+            ),
+            "extra resource root differs from its registration"
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    alias_root: facts.alias_root + 8,
+                    ..facts
+                }
+            ),
+            "extra alias root differs from its registration"
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    selection: 1,
+                    ..facts
+                }
+            ),
+            "extra selection byte differs from its registration"
+        );
+        assert_eq!(
+            refuse(Owner { entry: owner.entry + 8, ..owner }, facts),
+            "extra entry differs from its registration"
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    entry_owner: 0,
+                    ..facts
+                }
+            ),
+            "extra entry/row owner differs from its slot"
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    row_owner: 6,
+                    ..facts
+                }
+            ),
+            "extra entry/row owner differs from its slot"
+        );
+        assert_eq!(
+            refuse(
+                Owner {
+                    object: owner.object + 8,
+                    ..owner
+                },
+                facts
+            ),
+            "extra owner object is not its registered alias root"
+        );
+        for facts in [
+            ExtraFacts {
+                entry_index: 7,
+                ..facts
+            },
+            ExtraFacts {
+                information_index: 7,
+                ..facts
+            },
+            ExtraFacts {
+                object_index: 7,
+                ..facts
+            },
+        ] {
+            assert_eq!(refuse(owner, facts), "extra index mirrors differ");
+        }
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    object_kind: 8,
+                    ..facts
+                }
+            ),
+            "extra entry/object kind differs"
+        );
+        assert_eq!(
+            refuse(
+                owner,
+                ExtraFacts {
+                    entry_kind: 0x48,
+                    object_kind: 0x48,
+                    ..facts
+                }
+            ),
+            "extra entry holds a Mii class"
+        );
+        assert_eq!(
+            refuse(
+                Owner {
+                    selector: 0,
+                    ..owner
+                },
+                facts
+            ),
+            "extra row selector differs from its slot"
+        );
+        assert_eq!(
+            refuse(Owner { alias: 1, ..owner }, facts),
+            "extra owner alias is nonzero"
+        );
+        assert_eq!(
+            refuse(
+                Owner { index: 2, ..owner },
+                ExtraFacts {
+                    entry_index: 2,
+                    information_index: 2,
+                    object_index: 2,
+                    ..facts
+                }
+            ),
+            "extra row index is neither 0 nor its slot"
+        );
+    }
+
+    #[test]
+    fn extra_owner_names_each_failed_predicate() {
+        assert_eq!(extra_owner(7, &owner(7, 7, 7, 0), 0x01), Ok(()));
+        assert_eq!(extra_owner(6, &owner(6, 0, 6, 0), 0x01), Ok(()));
+        assert_eq!(
+            extra_owner(5, &owner(5, 5, 5, 0), u32::MAX),
+            Ok(()),
+            "empty created entry"
+        );
+        assert_eq!(
+            extra_owner(4, &owner(4, 4, 4, 0), 0x01),
+            Err("extra slot outside the created-entry order")
+        );
+        assert_eq!(
+            extra_owner(7, &owner(7, 7, 7, 0), 0x48),
+            Err("extra entry holds a Mii class")
+        );
+        assert_eq!(
+            extra_owner(7, &owner(7, 7, 2, 0), 0x01),
+            Err("extra row selector differs from its slot")
+        );
+        assert_eq!(
+            extra_owner(7, &owner(7, 7, 7, 1), 0x01),
+            Err("extra owner alias is nonzero")
+        );
+        assert_eq!(
+            extra_owner(7, &owner(7, 2, 7, 0), 0x01),
+            Err("extra row index is neither 0 nor its slot")
+        );
+    }
+}

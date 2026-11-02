@@ -35,6 +35,8 @@ pub mod lra_reset;
 pub mod menu;
 #[path = "model/migration.rs"]
 pub mod migration;
+#[path = "model/scene.rs"]
+pub mod scene;
 #[path = "model/settings.rs"]
 pub mod settings;
 #[path = "model/sites_ui.rs"]
@@ -43,6 +45,8 @@ pub mod sites_ui;
 pub mod sites;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
+#[path = "model/store.rs"]
+pub mod store;
 #[path = "model/storage.rs"]
 pub mod storage;
 #[path = "model/ui/hash40.rs"]

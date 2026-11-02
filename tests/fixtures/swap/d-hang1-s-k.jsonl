@@ -1,0 +1,8 @@
+{"ev":"flags","role":0,"note":"Training (Ally d-hang1-sep e6 scene 3)"}
+{"ev":"flags","role":1}
+{"ev":"window","role":1,"cells":[11],"actors":1,"note":"CPU Captain Falcon 0xb"}
+{"ev":"window","role":0,"cells":[6,7,8],"actors":1,"active":0,"note":"S-K1: pick 1 → Kirby window [6,7,8], Kirby active and hatless; ready 4,288,810 µs; no group planned while Kirby was live (the teardown released no keys)"}
+{"ev":"reload","role":0,"cells":[27,28,29],"actors":1,"bank":true,"note":"L11040 submit → (no teardown: no group) → L11042 build → L11044 reload incoming=(3,[1b,1c,1d]) active=(3,[6,7,8]); L11062–L11066 three unloads: an activated Kirby unloads cleanly"}
+{"ev":"expect","role":0,"tree":3,"map":6,"loader":6,"note":"after state 6: three unloads cleared the old tree, the new window's three kinds requested ({0,6} each)"}
+{"ev":"ready","role":0,"note":"L11074 published; L11156 ready; L11164 PreloadMetrics (3,851,537 µs)"}
+{"ev":"expect","role":0,"loader":14,"install":false,"map":0,"tree":3}

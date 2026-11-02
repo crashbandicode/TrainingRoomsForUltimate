@@ -1,0 +1,884 @@
+{
+ "src/automation_helper/native.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/automation_helper/observer.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/body_bank_probe.rs": [
+  "src/common/game_mode.rs",
+  "src/native_fields.rs",
+  "src/preload_metrics.rs",
+  "src/replay_capture.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/seam_install.rs",
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "src/character_items.rs": [
+  "src/character_roster.rs",
+  "src/replay_preview.rs",
+  "src/source_lifetime.rs",
+  "src/turnip_identity.rs",
+  "training_mod_consts/src/character_items.rs"
+ ],
+ "src/character_lifecycle.rs": [
+  "src/character_roster.rs",
+  "src/common/game_mode.rs",
+  "src/hang_trace.rs",
+  "src/native_fields.rs",
+  "src/practice_trace.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/character_roster.rs": [
+  "src/character_items.rs",
+  "src/character_lifecycle.rs",
+  "src/character_memory.rs",
+  "src/common/game_mode.rs",
+  "src/cycle_preload.rs",
+  "src/cycle_preload_config.rs",
+  "src/hang_trace.rs",
+  "src/kirby_hats.rs",
+  "src/mii_fullconfig_probe.rs",
+  "src/mii_identity_probe.rs",
+  "src/mii_saved_file_probe.rs",
+  "src/native_fields.rs",
+  "src/native_unlink_probe.rs",
+  "src/practice_trace.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/presentation.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training/lobby.rs",
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/swap_model/presentation.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "src/character_sources.rs": [
+  "src/common/game_mode.rs",
+  "src/cycle_preload.rs",
+  "src/cycle_preload_config.rs",
+  "src/cycle_preload_policy.rs",
+  "src/preload_metrics.rs",
+  "src/replay_preview.rs",
+  "src/source_lifetime.rs",
+  "src/swap_native/seam_install.rs",
+  "training_mod_consts/src/body_bank/memory.rs",
+  "training_mod_consts/src/capacity_creation.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/source_load.rs"
+ ],
+ "src/common/game_mode.rs": [
+  "src/model.rs",
+  "src/native_fields.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/console_load_probe.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/console_map_probe.rs": [
+  "src/console_load_probe.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/cpu_pilot.rs": [
+  "src/character_roster.rs",
+  "src/common/game_mode.rs",
+  "src/native_fields.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/cycle_preload.rs": [
+  "src/character_roster.rs",
+  "src/cycle_preload_config.rs",
+  "src/cycle_preload_policy.rs",
+  "src/kirby_hats.rs",
+  "src/preload_metrics.rs",
+  "src/replay_preview.rs",
+  "src/training/lobby.rs",
+  "src/training/practice.rs",
+  "training_mod_consts/src/cycle_admission_grace.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/cycle_preload_config.rs",
+  "training_mod_consts/src/mii_cycle.rs"
+ ],
+ "src/cycle_preload_config.rs": [
+  "src/character_roster.rs",
+  "src/cycle_preload.rs",
+  "training_mod_consts/src/cycle_preload_config.rs"
+ ],
+ "src/cycle_preload_policy.rs": [
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs"
+ ],
+ "src/hang_trace.rs": [
+  "src/common/game_mode.rs",
+  "src/swap_native/seam_drill.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/item_state_probe.rs": [
+  "src/character_items.rs",
+  "src/character_roster.rs",
+  "src/replay_preview.rs",
+  "src/turnip_face_caller_probe.rs",
+  "src/turnip_identity.rs",
+  "training_mod_consts/src/character_items.rs"
+ ],
+ "src/kirby_hat_cycle.rs": [
+  "src/character_memory.rs"
+ ],
+ "src/kirby_hats.rs": [
+  "src/character_roster.rs",
+  "src/cycle_preload.rs",
+  "src/kirby_hat_cycle.rs",
+  "src/replay_preview.rs",
+  "src/source_lifetime.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "src/kirby_resource_probe.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/lobby_stage_cycle.rs": [
+  "training_mod_consts/src/lobby_stages.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "src/lobby_stage_probe.rs": [
+  "src/common/game_mode.rs",
+  "src/lobby_stage_cycle.rs",
+  "src/native_fields.rs",
+  "src/practice_stage_observer.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training_stage_rotation.rs",
+  "training_mod_consts/src/lobby_stages.rs"
+ ],
+ "src/mii_auto_init.rs": [
+  "src/replay_preview.rs"
+ ],
+ "src/mii_backend.rs": [
+  "src/common/game_mode.rs",
+  "src/mii_native_access.rs"
+ ],
+ "src/mii_catalog_request.rs": [
+  "src/mii_editor_bridge/mod.rs",
+  "src/replay_store.rs"
+ ],
+ "src/mii_cpu_adapter.rs": [
+  "src/character_roster.rs",
+  "src/mii_native_access.rs"
+ ],
+ "src/mii_editor_bridge/inline_keyboard.rs": [
+  "src/native_keyboard/inline_keyboard.rs"
+ ],
+ "src/mii_editor_bridge/mod.rs": [
+  "src/character_roster.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training/lobby.rs",
+  "src/training_stage_rotation.rs",
+  "training_mod_tui/src/mii_menu.rs",
+  "training_mod_tui/src/resume.rs"
+ ],
+ "src/mii_editor_bridge/native.rs": [
+  "src/native_fields.rs"
+ ],
+ "src/mii_editor_bridge/native_default.rs": [
+  "src/mii_native_access.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_editor_bridge/ui_resume.rs": [
+  "training_mod_tui/src/resume.rs"
+ ],
+ "src/mii_fullconfig_probe.rs": [
+  "src/mii_identity_probe.rs",
+  "src/mii_native_access.rs",
+  "src/mii_saved_file_probe.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_hud_portrait.rs": [
+  "src/common/game_mode.rs",
+  "src/mii_native_access.rs",
+  "src/native_fields.rs",
+  "src/source_lifetime.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_identity_binding.rs": [
+  "src/native_fields.rs"
+ ],
+ "src/mii_identity_probe.rs": [
+  "src/mii_identity_binding.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_ldn_qualification.rs": [
+  "src/character_lifecycle.rs",
+  "src/common/game_mode.rs",
+  "src/mii_native_access.rs"
+ ],
+ "src/mii_managed_helper.rs": [
+  "src/mii_native_access.rs",
+  "src/source_lifetime.rs"
+ ],
+ "src/mii_native_access.rs": [
+  "src/native_fields.rs"
+ ],
+ "src/mii_native_adapter.rs": [
+  "src/mii_identity_binding.rs",
+  "src/mii_native_access.rs"
+ ],
+ "src/mii_native_cpu_scope.rs": [
+  "src/character_roster.rs"
+ ],
+ "src/mii_ordinary_cpu.rs": [
+  "src/cycle_preload.rs",
+  "src/cycle_preload_config.rs",
+  "src/practice_trace.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/scope_gate.rs",
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/identity_view.rs",
+  "training_mod_consts/src/mii_cycle.rs",
+  "training_mod_consts/src/source_load.rs",
+  "training_mod_tui/src/mii_menu.rs"
+ ],
+ "src/mii_ordinary_cpu_native.rs": [
+  "src/mii_native_access.rs",
+  "src/native_fields.rs",
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "src/mii_ordinary_gate.rs": [
+  "src/native_fields.rs",
+  "src/swap_native/seam_install.rs",
+  "training_mod_consts/src/identity_view.rs"
+ ],
+ "src/mii_ordinary_native.rs": [
+  "src/mii_native_access.rs",
+  "src/native_fields.rs",
+  "src/source_lifetime.rs",
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "src/mii_ordinary_player.rs": [
+  "src/cycle_preload.rs",
+  "src/cycle_preload_config.rs",
+  "src/practice_trace.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/scope_gate.rs",
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/mii_cycle.rs",
+  "training_mod_tui/src/mii_menu.rs"
+ ],
+ "src/mii_origin_observer.rs": [
+  "src/character_lifecycle.rs",
+  "src/common/game_mode.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_pool_observer.rs": [
+  "src/character_lifecycle.rs",
+  "src/mii_identity_binding.rs",
+  "src/replay_preview.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_preview_observer.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_quit_observer.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_replay.rs": [
+  "src/mii_native_access.rs",
+  "src/replay_capture.rs",
+  "src/replay_preview.rs",
+  "src/replay_store.rs",
+  "src/training/named_macros.rs",
+  "training_mod_macros/src/lib.rs"
+ ],
+ "src/mii_saved_alpha.rs": [
+  "src/practice_trace.rs",
+  "src/replay_preview.rs",
+  "training_mod_tui/src/mii_menu.rs"
+ ],
+ "src/mii_saved_file_probe.rs": [
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "src/mii_saved_fingerprints.rs": [
+  "src/mii_native_access.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/mii_saved_native.rs": [
+  "src/mii_identity_binding.rs",
+  "src/mii_native_access.rs"
+ ],
+ "src/mii_selector_native.rs": [
+  "src/mii_native_access.rs",
+  "src/native_fields.rs",
+  "src/source_lifetime.rs",
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "src/mii_source_provenance.rs": [
+  "src/mii_native_access.rs",
+  "src/source_lifetime.rs"
+ ],
+ "src/model.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/native_seams/mod.rs"
+ ],
+ "src/native_body_bank.rs": [
+  "src/cycle_preload.rs",
+  "src/cycle_preload_config.rs",
+  "src/cycle_preload_policy.rs",
+  "src/native_fields.rs",
+  "src/preload_metrics.rs",
+  "src/swap_native/body_graph.rs",
+  "src/swap_native/copy_packages.rs",
+  "src/swap_native/identity_view.rs",
+  "src/swap_native/mii_setup.rs",
+  "src/swap_native/observe.rs",
+  "src/swap_native/r_handle.rs",
+  "src/swap_native/scope_gate.rs",
+  "src/swap_native/seam_install.rs",
+  "src/swap_native/special_articles.rs",
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/body_bank/memory.rs",
+  "training_mod_consts/src/body_bank/memory_table.rs",
+  "training_mod_consts/src/body_bank/window_share.rs",
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/cycle_preload_config.rs",
+  "training_mod_consts/src/native_seams/rows_a1.rs",
+  "training_mod_consts/src/swap_model/capabilities.rs",
+  "training_mod_consts/src/swap_model/copy_registry.rs",
+  "training_mod_consts/src/swap_model/fallback.rs",
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/lifecycle.rs",
+  "training_mod_consts/src/swap_model/mod.rs",
+  "training_mod_consts/src/swap_model/occupancy.rs",
+  "training_mod_consts/src/swap_model/request_bit.rs"
+ ],
+ "src/native_gc_guard.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/native_hud_refresh.rs": [
+  "src/native_fields.rs"
+ ],
+ "src/native_keyboard.rs": [
+  "training_mod_macros/src/lib.rs"
+ ],
+ "src/native_reload_pose.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "src/native_service.rs": [
+  "src/practice_trace.rs"
+ ],
+ "src/native_source.rs": [
+  "src/mii_native_access.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "src/native_source_actors.rs": [
+  "src/source_lifetime.rs",
+  "training_mod_consts/src/capacity_creation.rs",
+  "training_mod_consts/src/source_load.rs"
+ ],
+ "src/native_source_capacity.rs": [
+  "src/character_lifecycle.rs",
+  "src/character_roster.rs",
+  "src/source_lifetime.rs",
+  "src/swap_native/seam_install.rs",
+  "training_mod_consts/src/capacity_creation.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs"
+ ],
+ "src/native_unlink_guard.rs": [
+  "src/native_fields.rs"
+ ],
+ "src/native_unlink_install.rs": [
+  "src/native_unlink_guard.rs",
+  "src/native_unlink_probe.rs",
+  "src/practice_trace.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/native_unlink_probe.rs": [
+  "src/native_unlink_core.rs",
+  "src/practice_trace.rs",
+  "src/practice_trace_core.rs"
+ ],
+ "src/practice_stage_observer.rs": [
+  "src/character_roster.rs",
+  "src/common/game_mode.rs",
+  "src/lobby_stage_cycle.rs",
+  "src/lobby_stage_probe.rs",
+  "src/practice_stage_request.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training/lobby.rs"
+ ],
+ "src/practice_stage_request.rs": [
+  "src/character_roster.rs",
+  "src/common/game_mode.rs",
+  "src/native_fields.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training/lobby.rs",
+  "src/training_stage_rotation.rs",
+  "training_mod_consts/src/lobby_stages.rs"
+ ],
+ "src/practice_stage_request_policy.rs": [
+  "src/lobby_stage_cycle.rs",
+  "training_mod_consts/src/lobby_stages.rs"
+ ],
+ "src/practice_trace.rs": [
+  "src/practice_trace_core.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/preload_metrics.rs": [
+  "training_mod_consts/src/cycle_preload_capacity.rs"
+ ],
+ "src/process_memory.rs": [
+  "src/preload_metrics.rs",
+  "training_mod_consts/src/body_bank/memory.rs"
+ ],
+ "src/source_capacity_probe.rs": [
+  "src/character_items.rs",
+  "src/character_lifecycle.rs",
+  "src/item_state_probe.rs",
+  "src/kirby_hats.rs",
+  "src/replay_capture.rs",
+  "src/replay_preview.rs",
+  "src/training/lobby.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "src/source_ldn_capacity_probe.rs": [
+  "src/character_items.rs",
+  "src/character_lifecycle.rs",
+  "src/item_state_probe.rs",
+  "src/kirby_hats.rs",
+  "src/replay_capture.rs",
+  "src/replay_preview.rs"
+ ],
+ "src/source_lifecycle_probe.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/source_owner_probe.rs": [
+  "src/replay_preview.rs"
+ ],
+ "src/swap_native/body_graph.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/lifecycle.rs"
+ ],
+ "src/swap_native/copy_packages.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/copy_packages.rs",
+  "training_mod_consts/src/swap_model/copy_registry.rs"
+ ],
+ "src/swap_native/heap_fields.rs": [
+  "src/heap_metrics.rs"
+ ],
+ "src/swap_native/identity_view.rs": [
+  "src/native_fields.rs",
+  "src/swap_native/seam_install.rs",
+  "training_mod_consts/src/identity_view.rs",
+  "training_mod_consts/src/native_seams/mod.rs"
+ ],
+ "src/swap_native/mii_setup.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "src/swap_native/observe.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/ledger.rs"
+ ],
+ "src/swap_native/presentation.rs": [
+  "src/character_roster.rs",
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/presentation.rs"
+ ],
+ "src/swap_native/r_handle.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/request_bit.rs"
+ ],
+ "src/swap_native/scope_gate.rs": [
+  "src/common/game_mode.rs",
+  "training_mod_consts/src/swap_model/scope.rs"
+ ],
+ "src/swap_native/seam_drill.rs": [
+  "training_mod_consts/src/native_seams/drill.rs",
+  "training_mod_consts/src/native_seams/mod.rs",
+  "training_mod_consts/src/native_seams/report.rs"
+ ],
+ "src/swap_native/seam_install.rs": [
+  "src/model.rs",
+  "training_mod_consts/src/native_seams/mod.rs",
+  "training_mod_consts/src/native_seams/report.rs"
+ ],
+ "src/swap_native/special_articles.rs": [
+  "src/native_fields.rs",
+  "training_mod_consts/src/swap_model/special_articles.rs"
+ ],
+ "src/training/lobby.rs": [
+  "src/character_roster.rs",
+  "src/common/game_mode.rs",
+  "src/lobby_stage_probe.rs",
+  "src/practice_stage_request.rs"
+ ],
+ "src/training/practice.rs": [
+  "src/character_roster.rs",
+  "src/native_fields.rs",
+  "src/replay_preview.rs"
+ ],
+ "src/training/seams.rs": [
+  "src/swap_native/seam_install.rs",
+  "src/training/seams.rs",
+  "training_mod_consts/src/native_seams/rows_a3.rs"
+ ],
+ "src/training/ui/anchors.rs": [
+  "src/hang_trace.rs",
+  "src/swap_native/seam_install.rs",
+  "src/training/seams.rs",
+  "training_mod_macros/src/ui_anchor.rs"
+ ],
+ "src/training/ui/layout_registry.rs": [
+  "training_mod_macros/src/ui_anchor.rs"
+ ],
+ "src/training/ui/native_menu.rs": [
+  "src/swap_native/seam_install.rs",
+  "src/training/seams.rs"
+ ],
+ "src/training/ui/roster_grid.rs": [
+  "src/cycle_preload.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "src/training/ui/stage_grid.rs": [
+  "training_mod_consts/src/lobby_stages.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "src/training_stage_rotation.rs": [
+  "src/common/game_mode.rs",
+  "src/native_fields.rs",
+  "src/swap_native/seam_install.rs"
+ ],
+ "src/training_stage_rotation_policy.rs": [
+  "src/lobby_stage_cycle.rs",
+  "training_mod_consts/src/lobby_stages.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "src/turnip_identity.rs": [
+  "src/swap_native/seam_install.rs"
+ ],
+ "training_mod_consts/src/body_bank.rs": [
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/swap_model/capabilities.rs",
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/mod.rs",
+  "training_mod_mii/src/identity.rs"
+ ],
+ "training_mod_consts/src/body_bank/window_share.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/swap_model/capabilities.rs"
+ ],
+ "training_mod_consts/src/cycle_preload_config.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_consts/src/menu_json.rs"
+ ],
+ "training_mod_consts/src/identity_view.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/lobby_stages.rs": [
+  "training_mod_tui/src/stage_forms.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "training_mod_consts/src/mii_cycle.rs": [
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_consts/src/mii_menu_tests.rs": [
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "training_mod_consts/src/native_seams/drill.rs": [
+  "training_mod_consts/src/native_seams/mod.rs"
+ ],
+ "training_mod_consts/src/native_seams/report.rs": [
+  "training_mod_consts/src/native_seams/mod.rs"
+ ],
+ "training_mod_consts/src/ordered_roster.rs": [
+  "training_mod_consts/src/trio.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "training_mod_consts/src/practice_setup.rs": [
+  "training_mod_consts/src/character_items.rs",
+  "training_mod_consts/src/trio.rs",
+  "training_mod_macros/src/lib.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs"
+ ],
+ "training_mod_consts/src/roster_menu_tests.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/selection.rs",
+  "training_mod_tui/src/mii_menu.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "training_mod_consts/src/swap_model/capabilities.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/swap_model/copy_packages.rs": [
+  "training_mod_consts/src/swap_model/copy_registry.rs"
+ ],
+ "training_mod_consts/src/swap_model/copy_registry.rs": [
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "training_mod_consts/src/swap_model/fallback.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/native_model.rs"
+ ],
+ "training_mod_consts/src/swap_model/hud_model.rs": [
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/swap_model/ledger.rs": [
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "training_mod_consts/src/swap_model/lifecycle.rs": [
+  "training_mod_consts/src/body_bank.rs"
+ ],
+ "training_mod_consts/src/swap_model/occupancy.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/swap_model/order_replay.rs": [
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/native_model.rs"
+ ],
+ "training_mod_consts/src/swap_model/pair_after_objects.rs": [
+  "training_mod_consts/src/swap_model/ledger.rs",
+  "training_mod_consts/src/swap_model/native_model.rs"
+ ],
+ "training_mod_consts/src/swap_model/presentation.rs": [
+  "training_mod_consts/src/character_forms.rs",
+  "training_mod_consts/src/identity_view.rs"
+ ],
+ "training_mod_consts/src/swap_model/scope.rs": [
+  "training_mod_consts/src/native_seams/mod.rs"
+ ],
+ "training_mod_consts/src/swap_model/target.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/swap_model/tests.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_consts/src/character_forms.rs"
+ ],
+ "training_mod_consts/src/trio.rs": [
+  "training_mod_tui/src/roster_grid.rs"
+ ],
+ "training_mod_consts/tests/scope_callbacks.rs": [
+  "training_mod_consts/src/swap_model/scope.rs"
+ ],
+ "training_mod_consts/tests/stage_forms_restore.rs": [
+  "training_mod_consts/src/lobby_stages.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "training_mod_consts/tests/swap_replay.rs": [
+  "training_mod_consts/src/swap_model/native_model.rs"
+ ],
+ "training_mod_consts/tests/training_rotation_restore.rs": [
+  "training_mod_consts/src/lobby_stages.rs",
+  "training_mod_consts/src/menu_json.rs",
+  "training_mod_tui/src/stage_menu.rs"
+ ],
+ "training_mod_mii/src/auto_init.rs": [
+  "training_mod_mii/src/inventory.rs"
+ ],
+ "training_mod_mii/src/backend.rs": [
+  "training_mod_mii/src/capacity.rs"
+ ],
+ "training_mod_mii/src/capacity.rs": [
+  "training_mod_consts/src/cycle_preload_capacity.rs",
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/src/catalog_request.rs": [
+  "training_mod_mii/src/auto_init.rs"
+ ],
+ "training_mod_mii/src/draft.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs"
+ ],
+ "training_mod_mii/src/draft_store.rs": [
+  "training_mod_mii/src/draft.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs"
+ ],
+ "training_mod_mii/src/editor_row.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/saved.rs"
+ ],
+ "training_mod_mii/src/identity.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/ordinary_cpu.rs"
+ ],
+ "training_mod_mii/src/inventory.rs": [
+  "training_mod_mii/src/draft.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/lifetime.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/native_values.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/ordinary_cpu.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/capacity.rs",
+  "training_mod_mii/src/identity.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/replay.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/ordinary_player.rs": [
+  "training_mod_consts/src/body_bank.rs",
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/role_owner.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/remembered.rs": [
+  "training_mod_mii/src/lifetime.rs"
+ ],
+ "training_mod_mii/src/replay.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs"
+ ],
+ "training_mod_mii/src/role_adapter.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/role_owner.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/capacity.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/src/saved.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/src/selection.rs": [
+  "training_mod_mii/src/draft.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs"
+ ],
+ "training_mod_mii/src/transition.rs": [
+  "training_mod_mii/src/identity.rs",
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/tests/helper147_headgear.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/ordinary_cpu.rs"
+ ],
+ "training_mod_mii/tests/ldn_backend.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lib.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/remembered.rs",
+  "training_mod_mii/src/role_owner.rs"
+ ],
+ "training_mod_mii/tests/ldn_handshake.rs": [
+  "training_mod_mii/src/ldn_handshake.rs"
+ ],
+ "training_mod_mii/tests/mii_bank_groups.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/tests/mii_bank_publication.rs": [
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/tests/mii_setup_preflight.rs": [
+  "training_mod_mii/src/mii_setup.rs"
+ ],
+ "training_mod_mii/tests/player146_headgear_ownership.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs"
+ ],
+ "training_mod_mii/tests/quickplay_backend.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/catalog_request.rs",
+  "training_mod_mii/src/lib.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/role_owner.rs"
+ ],
+ "training_mod_mii/tests/replay185_headgear.rs": [
+  "training_mod_mii/src/backend.rs",
+  "training_mod_mii/src/draft.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/replay.rs",
+  "training_mod_mii/src/role_owner.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/tests/role_adapter.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/lifetime.rs",
+  "training_mod_mii/src/native_values.rs",
+  "training_mod_mii/src/role_adapter.rs",
+  "training_mod_mii/src/selection.rs"
+ ],
+ "training_mod_mii/tests/source_provenance.rs": [
+  "training_mod_mii/src/lib.rs"
+ ],
+ "training_mod_tui/src/mii_menu.rs": [
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/ordinary_cpu.rs",
+  "training_mod_mii/src/selection.rs",
+  "training_mod_tui/src/macro_panel.rs"
+ ],
+ "training_mod_tui/src/stage_menu.rs": [
+  "training_mod_tui/src/stage_forms.rs"
+ ],
+ "training_mod_tui/tests/test_mii_catalog.rs": [
+  "training_mod_mii/src/draft.rs",
+  "training_mod_mii/src/inventory.rs",
+  "training_mod_mii/src/ordinary_player.rs",
+  "training_mod_mii/src/selection.rs",
+  "training_mod_tui/src/mii_menu.rs",
+  "training_mod_tui/src/roster_grid.rs"
+ ]
+}

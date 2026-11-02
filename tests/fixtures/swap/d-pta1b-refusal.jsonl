@@ -1,0 +1,10 @@
+{"ev":"flags","role":1,"note":"Training (PTA116T Ally s1 / B123-pre Ally S4 L8957); CPU owner 1 → role 1"}
+{"ev":"window","role":1,"cells":[9,1,5],"actors":1,"note":"#555/#563 CPU window [9,1,5]"}
+{"ev":"prefetch","role":1,"group":0,"kinds":[33,30],"note":"#569 plan owner=1 group=0 kinds=[21,1e]"}
+{"ev":"build","role":1,"group":0,"note":"#612 swap owner=1 kind=0x21 (Phase B exchange)"}
+{"ev":"publish_rejected","role":1,"note":"#658 prequeue … header=[1,9,1,5,0] against the descriptor-derived expectation [1,0x21,0x1e,-1,FE+0x41] → #659 refused … reason=outgoing O identity/header/mirrors changed (D-PTA1). The header capture fix removes this trigger; any genuine prequeue refusal after reload_at_pose takes the same path"}
+{"ev":"reload","role":1,"cells":[47,12,9],"actors":1,"bank":true,"note":"#651 submit … target=0x2f; #653 teardown … bodies=3 contexts=3 dispatchers=1 keys=0; #655 reload incoming=(3,[2f,c,9]) active=(2,[21,1e,ffffffff]); #660 refused … prequeue refused; native epilogue selected (br 0x651464 skips the state-6 tail); #661 native_return … phase=Refused loader=6 published=false INSTALL_active=true — the last modpack line of the run"}
+{"ev":"expect","role":1,"policy":"old","loader":6,"install":true}
+{"ev":"tick","frames":120,"note":"Eden 829.958 s onward: Unmapped Read8 @ 0x3932353433393731 (ASCII '17934529' of a diagnostics String reusing the freed controller chunk) + Read8 @ 0x38, nine lines per frame at 60 Hz until the log ends at 1051.52 s (13311 cycles): the stall made the dangling route permanent"}
+{"ev":"ready","role":1,"note":"never comes for the Epilogue (Gate::enter refuses every later service call; settled(entry)=loader 14 never arrives). Under NativeContinue (D-PTA1BC-FIX §4, E2): refusal continues natively … → native state 6 installs the staged descriptor → bank build refused … INSTALL_released=true reason=CPU publication refused; native Reload settled; the CPU is playable"}
+{"ev":"expect","role":1,"policy":"recipe","loader":14,"install":false,"map":0}
