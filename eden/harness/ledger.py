@@ -134,17 +134,23 @@ def is_parallel(owner):
     return any(name in owner for name in PARALLEL)
 
 
-def parallel_turns(text, queue, host):
+def parallel_turns(text, queue, host, now=None, grace=180):
     """The queue file's interleave rule (lead, 2026-11-02, binding on every stream), for each parallel owner: on a
     host where it is queued, it takes the host after each TrainingRooms compile or Eden run and before the next
     TrainingRooms claim. One reason to wait per owner that is queued for `host` (a queue line that does not say it
     took the host or is satisfied) and has no CLAIMED on `host` after the last TrainingRooms RELEASED there (every
-    owner that is not a parallel one counts as ours)."""
+    owner that is not a parallel one counts as ours). The turn is `grace` seconds long (lead, 2026-11-02: an idle parallel line
+    must not block a host forever): once that long has passed since our last RELEASED with no CLAIMED from it, the next
+    TrainingRooms claim may go ahead; the parallel owner keeps priority for the turn after, because the next TrainingRooms
+    release starts a new grace."""
+    now = time.time() if now is None else now
     if not queue:
         return []
     events = [e for e in parse(text) if host in e.hosts]
     mine = [i for i, e in enumerate(events) if e.kind == "RELEASED" and not is_parallel(e.owner)]
     if not mine:
+        return []
+    if now - events[mine[-1]].when >= grace:
         return []
     items = queue_items(queue, host)
     later = events[mine[-1] + 1:]
@@ -154,9 +160,9 @@ def parallel_turns(text, queue, host):
             and not any(e.kind == "CLAIMED" and name in e.owner for e in later)]
 
 
-def parallel_turn(text, queue, host):
+def parallel_turn(text, queue, host, now=None, grace=180):
     """The first reason from `parallel_turns`, or None."""
-    return next(iter(parallel_turns(text, queue, host)), None)
+    return next(iter(parallel_turns(text, queue, host, now, grace)), None)
 
 def stamp(now=None):
     return time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)) + "Z"
@@ -230,7 +236,7 @@ def busy(p, text=None, now=None, queue=None):
     waited = since_release(text, me, p.host, now)
     if waited is not None and waited < p.fair_seconds:
         why.append(f"fairness: own RELEASED {waited:.0f} s ago, wait {p.fair_seconds - waited:.0f} s more")
-    return why + ([] if is_parallel(p.owner) else parallel_turns(text, queue, p.host))
+    return why + ([] if is_parallel(p.owner) else parallel_turns(text, queue, p.host, now, p.parallel_grace))
 
 
 def claim(p, body, now=None, text=None, queue=None):

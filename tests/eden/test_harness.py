@@ -16,6 +16,10 @@ import params  # noqa: E402
 
 NOW = ledger.calendar.timegm((2026, 11, 2, 12, 0, 0))
 LEDGER = """\
+2026-10-29 13:08Z CLAIMED again: Claude tangent ssbu-refresh-clock-t2 (session b52c5218) for one validation rerun: Surface display :61 + run a02, Yoga display :62
+2026-10-29 17:14Z RELEASED (not started): Claude tangent ssbu-refresh-clock-t2 run a07. The Surface stopped answering; nothing of this owner is running on Yoga.
+2026-10-31 19:09Z CLAIMED (build only, no Eden, no display): Claude e202df30 runs a bounded incremental Eden build on the Surface (unit eden-main-build).
+2026-10-31 19:17:30Z RELEASED (build only): Claude e202df30 Surface build unit eden-main-build finished; no Eden was started.
 2026-11-02 11:48:34Z CLAIMED: Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol Yoga release, one compile from source 370e72e, no Eden. Foreign Yoga claims released.
 
 2026-11-02 11:48:45Z RELEASED: Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol Yoga release passed; compile ended, no Eden started.
@@ -30,10 +34,6 @@ LEDGER = """\
 
 2026-11-02 11:55Z CLAIMED: Claude 0caa72b8/stack-eden TrainingRooms stack-stream solo Eden run st-03 on Yoga, display :99, muted.
 
-2026-10-29 13:08Z CLAIMED again: Claude tangent ssbu-refresh-clock-t2 (session b52c5218) for one validation rerun: Surface display :61 + run a02, Yoga display :62
-2026-10-29 17:14Z RELEASED (not started): Claude tangent ssbu-refresh-clock-t2 run a07. The Surface stopped answering; nothing of this owner is running on Yoga.
-2026-10-31 19:09Z CLAIMED (build only, no Eden, no display): Claude e202df30 runs a bounded incremental Eden build on the Surface (unit eden-main-build).
-2026-10-31 19:17:30Z RELEASED (build only): Claude e202df30 Surface build unit eden-main-build finished; no Eden was started.
 2026-11-02 11:57:12Z CLAIMED: Claude 0caa72b8/ui-screens-sync (ui-screens/sync) TrainingRooms gates compile on the Ally WSL, no eden.exe.
 2026-11-02 11:59:40Z RELEASED: Claude 0caa72b8/ui-screens-sync (ui-screens/sync) TrainingRooms gate compile on the Ally WSL done.
 """
@@ -50,6 +50,11 @@ QUEUE = """\
 """
 
 
+def soon(text, host="yoga"):
+    """60 s after the last RELEASED on `host` in `text`: inside a parallel owner's first-claim minutes."""
+    return max(e.when for e in ledger.parse(text) if e.kind == "RELEASED" and host in e.hosts) + 60
+
+
 def p(**kw):
     base = dict(owner="Claude 0caa72b8/stack-eden", prefix="st", root="/tmp/tr-test-root", host="yoga",
                 display=":99", ledger_ssh="", fair_seconds=180)
@@ -61,9 +66,9 @@ class LedgerParse(unittest.TestCase):
     def test_stamps_with_and_without_seconds_and_every_agent(self):
         events = ledger.parse(LEDGER)
         self.assertEqual(len(events), 13)
-        self.assertEqual(events[0].owner, "Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol")
-        self.assertEqual(events[3].owner, "Claude 0caa72b8/f6-eden")
-        self.assertEqual(events[2].owner, "Claude 0caa72b8/f6")  # "(f6 stream)" is not part of the owner
+        self.assertEqual(events[4].owner, "Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol")  # four old lines first
+        self.assertEqual(events[7].owner, "Claude 0caa72b8/f6-eden")
+        self.assertEqual(events[6].owner, "Claude 0caa72b8/f6")  # "(f6 stream)" is not part of the owner
         again = [e for e in events if "tangent" in e.text][0]
         self.assertEqual((again.kind, again.owner), ("CLAIMED", "Claude ssbu-refresh-clock-t2"))
         released = [e for e in events if e.kind == "RELEASED" and "ssbu-refresh" in e.text][0]
@@ -152,26 +157,26 @@ class InterleaveRule(unittest.TestCase):
         self.assertEqual(ledger.queue_head(QUEUE, "ally"), "ui-screens - ui-NN batches")
 
     def test_waits_while_queued_and_not_yet_served_since_our_release(self):
-        reason = ledger.parallel_turn(LEDGER, QUEUE, "yoga")
+        reason = ledger.parallel_turn(LEDGER, QUEUE, "yoga", soon(LEDGER))
         self.assertIn("imgui-nvn-sol", reason)  # TrainingRooms released 11:54Z; imgui claimed 11:48Z (before it)
-        why = ledger.busy(p(), LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED"), NOW, queue=QUEUE)
+        why = ledger.busy(p(), LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED"), soon(LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED")), queue=QUEUE)
         self.assertTrue(any("imgui-nvn-sol" in w for w in why), why)
 
     def test_clear_once_imgui_claimed_after_our_last_release(self):
         text = LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED") + (
             "\n2026-11-02 11:58Z CLAIMED: Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol Yoga ABI gates, one compile, no Eden.\n"
             "2026-11-02 11:59Z RELEASED: Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol Yoga ABI gates passed.\n")
-        self.assertIsNone(ledger.parallel_turn(text, QUEUE, "yoga"))
-        self.assertEqual(ledger.busy(p(), text, NOW, queue=QUEUE), [])
+        self.assertIsNone(ledger.parallel_turn(text, QUEUE, "yoga", soon(text)))
+        self.assertEqual(ledger.busy(p(), text, soon(text), queue=QUEUE), [])
 
     def test_not_queued_not_waiting(self):
-        self.assertIsNone(ledger.parallel_turn(LEDGER, QUEUE, "ally"))  # no imgui line for the Ally
-        self.assertIsNone(ledger.parallel_turn(LEDGER, QUEUE, "surface"))  # its Surface line is satisfied
-        self.assertIsNone(ledger.parallel_turn(LEDGER, "", "yoga"))  # no queue file
+        self.assertIsNone(ledger.parallel_turn(LEDGER, QUEUE, "ally", soon(LEDGER)))  # no imgui line for the Ally
+        self.assertIsNone(ledger.parallel_turn(LEDGER, QUEUE, "surface", soon(LEDGER)))  # its Surface line is satisfied
+        self.assertIsNone(ledger.parallel_turn(LEDGER, "", "yoga", soon(LEDGER)))  # no queue file
 
     def test_no_wait_before_our_first_release_on_the_host(self):
         text = "2026-11-02 11:00Z CLAIMED: Codex 01a19bfb/imgui-nvn-sol Yoga build, no Eden.\n"
-        self.assertIsNone(ledger.parallel_turn(text, QUEUE, "yoga"))
+        self.assertIsNone(ledger.parallel_turn(text, QUEUE, "yoga", NOW))
 
     def test_the_rule_is_not_applied_to_imgui_itself(self):
         mine = p(owner="Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol")
@@ -182,33 +187,46 @@ class InterleaveRule(unittest.TestCase):
                               "- tm-f8-terra-ally (Codex 0f3c): LDN-free Training row on the lent rig\n")
         released = ("2026-11-02 12:10Z CLAIMED: Claude 0caa72b8/ui-screens TrainingRooms ui rows on the Ally\n"
                     "2026-11-02 12:20Z RELEASED: Claude 0caa72b8/ui-screens TrainingRooms ui rows stopped on the Ally\n")
-        self.assertEqual(ledger.parallel_turns(released, queue, "yoga"), [])  # no TrainingRooms release on the Yoga here
-        why = ledger.parallel_turns(released, queue, "ally")
+        self.assertEqual(ledger.parallel_turns(released, queue, "yoga", NOW), [])  # no TrainingRooms release on the Yoga here
+        why = ledger.parallel_turns(released, queue, "ally", soon(released, "ally"))
         self.assertEqual([w.split()[0] for w in why], ["tm-f8-terra"])
         me = p(host="ally", owner="Claude 0caa72b8/ui-screens")
-        self.assertTrue(any("tm-f8-terra" in w for w in ledger.busy(me, released, NOW, queue=queue)))
+        self.assertTrue(any("tm-f8-terra" in w for w in ledger.busy(me, released, soon(released, "ally"), queue=queue)))
         for variant in ("tm-f8-terra", "tm-f8-terra-ally", "tm-f8-terra-eden"):
             served = released + f"2026-11-02 12:30Z CLAIMED: Codex 0f3c-aa/{variant} Ally LDN-free row, no LAN\n"
-            self.assertEqual(ledger.parallel_turns(served, queue, "ally"), [], variant)
+            self.assertEqual(ledger.parallel_turns(served, queue, "ally", soon(served, "ally")), [], variant)
         # a release by one parallel owner does not count as a TrainingRooms release
         only = released + "2026-11-02 12:40Z RELEASED: Codex 0f3c-aa/tm-f8-terra-ally Ally row done\n"
-        self.assertEqual(len(ledger.parallel_turns(only, queue, "ally")), 1)
+        self.assertEqual(len(ledger.parallel_turns(only, queue, "ally", ledger.calendar.timegm((2026, 11, 2, 12, 21, 0)))), 1)  # 60 s after OUR release
 
     def test_each_parallel_owner_waits_on_its_own_and_both_can_be_pending(self):
         queue = ("## Yoga\n- imgui-nvn-sol (Codex a): ABI gates\n- tm-f8-terra-eden (Codex b): Eden row\n- stack: batch\n")
         text = "2026-11-02 11:00Z CLAIMED: Claude 0caa72b8/stack TrainingRooms run on Yoga\n2026-11-02 11:10Z RELEASED: Claude 0caa72b8/stack run stopped on Yoga\n"
-        self.assertEqual(len(ledger.parallel_turns(text, queue, "yoga")), 2)
+        self.assertEqual(len(ledger.parallel_turns(text, queue, "yoga", soon(text))), 2)
         after_one = text + "2026-11-02 11:20Z CLAIMED: Codex a-1/imgui-nvn-sol Yoga ABI gates, no Eden\n"
-        self.assertEqual([w.split()[0] for w in ledger.parallel_turns(after_one, queue, "yoga")], ["tm-f8-terra"])
+        self.assertEqual([w.split()[0] for w in ledger.parallel_turns(after_one, queue, "yoga", soon(after_one))], ["tm-f8-terra"])
         both = after_one + "2026-11-02 11:30Z CLAIMED: Codex b-1/tm-f8-terra-eden Yoga Eden row\n"
-        self.assertEqual(ledger.parallel_turns(both, queue, "yoga"), [])
+        self.assertEqual(ledger.parallel_turns(both, queue, "yoga", soon(both)), [])
         for who in ("Codex a-1/imgui-nvn-sol", "Codex b-1/tm-f8-terra-eden"):
-            self.assertEqual([w for w in ledger.busy(p(host="yoga", owner=who), text, NOW, queue=queue) if "queued for" in w], [])
+            self.assertEqual([w for w in ledger.busy(p(host="yoga", owner=who), text, soon(text), queue=queue) if "queued for" in w], [])
+
+    def test_an_idle_parallel_line_blocks_only_for_the_grace_then_priority_returns(self):
+        text = LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED")  # our last release on the Yoga: 11:55Z
+        rel = ledger.calendar.timegm((2026, 11, 2, 11, 55, 0))
+        self.assertIn("imgui-nvn-sol", ledger.parallel_turn(text, QUEUE, "yoga", rel + 179))  # fresh: refused
+        self.assertIsNone(ledger.parallel_turn(text, QUEUE, "yoga", rel + 180))  # idle for 3 minutes: allowed
+        self.assertEqual(ledger.busy(p(), text, rel + 600, queue=QUEUE), [])
+        # our next run starts a new turn: the idle parallel line has priority again
+        again = text + "\n2026-11-02 12:10Z CLAIMED: Claude 0caa72b8/stack-eden Eden run st-04 on Yoga\n2026-11-02 12:20Z RELEASED: Claude 0caa72b8/stack-eden st-04 stopped on Yoga\n"
+        end = ledger.calendar.timegm((2026, 11, 2, 12, 20, 0))
+        self.assertIn("imgui-nvn-sol", ledger.parallel_turn(again, QUEUE, "yoga", end + 60))
+        # a grace of 0 (TR_PARALLEL_GRACE=0) never holds
+        self.assertEqual(ledger.parallel_turns(again, QUEUE, "yoga", end + 60, 0), [])
 
     def test_a_compile_release_counts_as_our_release(self):
         text = LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED")
         text += "\n2026-11-02 11:56Z CLAIMED: Claude 0caa72b8/slim TrainingRooms host gates on Yoga, no Eden.\n2026-11-02 11:57Z RELEASED: Claude 0caa72b8/slim gates on Yoga done.\n"
-        self.assertIn("imgui-nvn-sol", ledger.parallel_turn(text, QUEUE, "yoga"))
+        self.assertIn("imgui-nvn-sol", ledger.parallel_turn(text, QUEUE, "yoga", soon(text)))
 
 
 class Parameters(unittest.TestCase):

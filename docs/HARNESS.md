@@ -52,7 +52,9 @@ before anything else: no Eden here, display free, MemAvailable >= 10 GiB, `df` >
 claim on that host has no later RELEASED (foreign owners included; stale after `stale_hours` and listed, not blocking),
 within `fair_seconds` of your own RELEASED, and while `imgui-nvn-sol` or `tm-f8-terra*` (`-ally`, `-eden`; matched by name
 prefix, each on its own; `ledger.PARALLEL`) is queued for the host and has not had it since the last TrainingRooms release
-there (queue file interleave rule). The harness starts no cargo command: `CARGO_INCREMENTAL=0` (the lead's disk order)
+there (queue file interleave rule), but only for `parallel_grace` seconds (default 180, `TR_PARALLEL_GRACE`) after our last
+RELEASED: an idle parallel line that has not claimed by then no longer blocks the next TrainingRooms claim, and it has
+priority again after that claim's release. The harness starts no cargo command: `CARGO_INCREMENTAL=0` (the lead's disk order)
 applies to whoever runs `cargo test` for `tests/eden_harness.rs`. `Up` fails with exit 3 and the reasons; wait with
 `ledger.py wait <cap seconds>` (checks of at most 60 s) and claim in the same call with `ledger.py wait <cap> "<claim text>"`.
 A claim line must name its host as "on Yoga" / "on Surface" / "on Ally" and no other host.

@@ -30,6 +30,8 @@ host that runs Eden, so a host-side run sees the same parameters as the driver.
                       is cut before it: plugin=training_rooms/)
     TR_STALE_HOURS    an open claim older than this without a RELEASED is ledger noise (default 12)
     TR_FAIR_SECONDS   wait after your own RELEASED before claiming the same host again (default 180)
+    TR_PARALLEL_GRACE how long a queued parallel project (imgui-nvn-sol, tm-f8-terra) has first claim after a TrainingRooms
+                      release before the next TrainingRooms claim may go ahead (default 180)
     TR_LEDGER, TR_LEDGER_SSH, TR_QUEUE, TR_STREAM   claim ledger path, the host that holds it, queue file, queue name
     TR_ALLY_ROOT      the Ally rig (default: the lent rig C:/Eden/c1162-w5-ally); TR_ALLY_CLAIM the rig's CLAIM text
                       while this stream holds it; TR_ALLY_MEM_GIB the rig's Job limit (11); TR_ALLY_EDEN_SHA
@@ -62,7 +64,7 @@ HOSTS = {
 # Keys every profile copy gets: Eden keeps running behind another window, and is muted (operator rule 2026-10-09).
 FORCED = {"pauseWhenInBackground": "false", "volume": "0", "volume\\default": "false"}
 LISTS = ("nro", "extras")
-NUMBERS = ("stale_hours", "fair_seconds", "ally_mem_gib")
+NUMBERS = ("stale_hours", "fair_seconds", "parallel_grace", "ally_mem_gib")
 
 
 @dataclass(frozen=True)
@@ -86,6 +88,7 @@ class Params:
     install_gate: str = "result=installed"
     stale_hours: float = 12
     fair_seconds: float = 180
+    parallel_grace: float = 180
     ledger: str = "/tmp/deluxe-surface-1007/OWNER-COORDINATION.md"
     ledger_ssh: str = "memento-claw-yoga-ubuntu"
     queue: str = "/home/intpa/smash-training-lobby/TRAININGROOMS-EDEN-QUEUE.md"
