@@ -141,7 +141,7 @@ unsafe fn archive_alloc(ctx: &mut InlineCtx) {
 /// it) from the vanilla archive read through `arc:/`. `None` leaves the game's archive in place (the menu then cannot open).
 fn rebuilt(stock: &[u8], size: usize) -> Option<(Vec<u8>, usize, &'static str)> {
     #[cfg(feature = "diag")]
-    if refusal_forced() {
+    if crate::model::hook_stats::uncounted(refusal_forced) {
         diagnostic(format_args!("[LayoutArchive] refusal forced by refuse-archive.flag (diag): stock info_training kept (layout_arc=skipped)"));
         return None;
     }
