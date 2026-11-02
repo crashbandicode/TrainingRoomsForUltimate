@@ -15,17 +15,18 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering::{AcqRel, Acqu
 const EMPTY: u8 = 0;
 const WRITING: u8 = 1;
 const FULL: u8 = 2;
-const READING: u8 = 3;
 
 pub struct Mailbox<T: Copy, const N: usize> {
     slots: [UnsafeCell<MaybeUninit<(u64, T)>>; N],
     state: [AtomicU8; N],
     seq: AtomicU64,
+    /// The next sequence number to deliver (the consumer's).
+    next: AtomicU64,
     dropped: AtomicU32,
 }
 
-// SAFETY: a slot's cell is touched only by the one thread that moved its state to WRITING (a poster) or READING (the consumer);
-// FULL is published with Release and taken with Acquire.
+// SAFETY: a slot's cell is written only by the poster that moved it to WRITING, and read only by the one consumer while it is FULL;
+// FULL is published with Release and observed with Acquire, and only the consumer moves a FULL slot back to EMPTY.
 unsafe impl<T: Copy + Send, const N: usize> Sync for Mailbox<T, N> {}
 
 impl<T: Copy, const N: usize> Default for Mailbox<T, N> {
@@ -40,15 +41,17 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
             slots: [const { UnsafeCell::new(MaybeUninit::uninit()) }; N],
             state: [const { AtomicU8::new(EMPTY) }; N],
             seq: AtomicU64::new(0),
+            next: AtomicU64::new(0),
             dropped: AtomicU32::new(0),
         }
     }
 
     /// Post `message` (any thread). Never waits; returns false and counts a drop when every slot is full.
     pub fn post(&self, message: T) -> bool {
-        let seq = self.seq.fetch_add(1, AcqRel);
         for (i, state) in self.state.iter().enumerate() {
             if state.compare_exchange(EMPTY, WRITING, Acquire, Relaxed).is_ok() {
+                // The number is taken after the claim: a full mailbox uses none, so the consumer never waits on a gap that cannot fill.
+                let seq = self.seq.fetch_add(1, AcqRel);
                 // SAFETY: the slot is ours between WRITING and FULL.
                 unsafe { (*self.slots[i].get()).write((seq, message)) };
                 state.store(FULL, Release);
@@ -59,26 +62,37 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
         false
     }
 
-    /// The consumer: hand every posted message to `f`, oldest first. Returns how many.
+    /// The consumer: hand the posted messages to `f` in posting order. A message whose predecessor is still being written stays in
+    /// its slot until a later drain (never waits). Returns how many were delivered.
     pub fn drain(&self, mut f: impl FnMut(T)) -> usize {
-        let mut taken: [Option<(u64, T)>; N] = [None; N];
+        let mut full: [(u64, usize); N] = [(0, 0); N];
         let mut n = 0;
         for (i, state) in self.state.iter().enumerate() {
-            if state.compare_exchange(FULL, READING, Acquire, Relaxed).is_ok() {
-                // SAFETY: the slot is ours between READING and EMPTY, and FULL means a poster wrote it.
-                taken[n] = Some(unsafe { (*self.slots[i].get()).assume_init_read() });
-                state.store(EMPTY, Release);
+            if state.load(Acquire) == FULL {
+                // SAFETY: a FULL slot is written and no poster touches it (posters claim EMPTY slots only); reading its sequence number
+                // does not take it.
+                full[n] = (unsafe { (*self.slots[i].get()).assume_init_ref().0 }, i);
                 n += 1;
             }
         }
-        let taken = &mut taken[..n];
-        taken.sort_unstable_by_key(|m| m.map_or(u64::MAX, |(seq, _)| seq));
-        for (_, message) in taken.iter().flatten() {
-            f(*message);
+        let full = &mut full[..n];
+        full.sort_unstable_by_key(|(seq, _)| *seq);
+        let mut next = self.next.load(Relaxed);
+        let mut delivered = 0;
+        for (seq, i) in full.iter() {
+            if *seq != next {
+                break;
+            }
+            // SAFETY: FULL slot, see above; the consumer owns it until it stores EMPTY.
+            let (_, message) = unsafe { (*self.slots[*i].get()).assume_init_read() };
+            self.state[*i].store(EMPTY, Release);
+            f(message);
+            next += 1;
+            delivered += 1;
         }
-        n
+        self.next.store(next, Relaxed);
+        delivered
     }
-
     /// Drops since the last call (a full mailbox).
     pub fn take_dropped(&self) -> u32 {
         self.dropped.swap(0, Relaxed)
