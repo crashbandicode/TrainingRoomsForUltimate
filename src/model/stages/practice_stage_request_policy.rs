@@ -1,7 +1,7 @@
 //! Production-used admission/completion proof, independent of native pointers.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Scene {
+pub(crate) struct Scene {
     pub epoch: u64,
     pub wrapper: usize,
     pub core: usize,
@@ -10,7 +10,7 @@ pub(super) struct Scene {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Resource {
+pub(crate) struct Resource {
     pub address: usize,
     pub state: u32,
     pub kind: u32,
@@ -18,7 +18,7 @@ pub(super) struct Resource {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct View {
+pub(crate) struct View {
     pub scene: Scene,
     pub resource_owner: usize,
     pub task_owner: usize,
@@ -56,14 +56,14 @@ impl View {
 
 /// Native allocation identities, never dereferenced by pure policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct StageLease {
+pub(crate) struct StageLease {
     pub object: usize,
     pub resource: Resource,
 }
 
 /// Read only at the observed state6 acknowledgment boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct ActivationRead {
+pub(crate) struct ActivationRead {
     pub native_ready: u8,
     pub ready_bits: u64,
     pub readiness_stop_mask: u32,
@@ -75,7 +75,7 @@ pub(super) struct ActivationRead {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Commit {
+pub(crate) struct Commit {
     pub scene: Scene,
     pub resource_owner: usize,
     pub task_owner: usize,
@@ -92,12 +92,12 @@ fn check(ok: bool, why: &'static str) -> Result<(), &'static str> {
     if ok { Ok(()) } else { Err(why) }
 }
 
-pub(super) fn same_owner(v: View, c: Commit) -> bool {
+pub(crate) fn same_owner(v: View, c: Commit) -> bool {
     v.scene == c.scene && v.resource_owner == c.resource_owner
         && v.task_owner == c.task_owner && v.task == c.task
 }
 
-pub(super) fn current_request(queued: Scene, current: Scene, original: usize, active: usize) -> bool {
+pub(crate) fn current_request(queued: Scene, current: Scene, original: usize, active: usize) -> bool {
     queued == current && original != 0 && original == active
 }
 
@@ -105,7 +105,7 @@ pub(super) fn current_request(queued: Scene, current: Scene, original: usize, ac
 /// 24b9a94..9aac, explicitly acknowledges state6 only when native dc is ready.
 /// It does not force readiness or enqueue another load. The manager then owns
 /// states7..12, including observer acknowledgments and outgoing destruction.
-pub(super) fn acknowledge(v: View, c: Commit, a: ActivationRead) -> Result<Option<Commit>, &'static str> {
+pub(crate) fn acknowledge(v: View, c: Commit, a: ActivationRead) -> Result<Option<Commit>, &'static str> {
     check(same_owner(v,c), "activation owner changed")?;
     check(c.activated.is_none(), "activation already acknowledged")?;
     check(v.state==6 && v.active==c.outgoing as i32
@@ -142,7 +142,7 @@ pub(super) fn acknowledge(v: View, c: Commit, a: ActivationRead) -> Result<Optio
 
 /// State0 alone is insufficient: exact retained indices, active descriptor,
 /// outgoing release, task finalization and no cache/extra slot are required.
-pub(super) fn complete(v: View, c: Commit) -> bool {
+pub(crate) fn complete(v: View, c: Commit) -> bool {
     same_owner(v, c) && v.state == 0 && v.task_state == 0 && v.task_fiber == 0
         && v.active == c.incoming as i32 && v.incoming == c.incoming as i32
         && v.outgoing == c.outgoing as i32 && v.kind() == c.target && v.hash() == c.hash
@@ -153,7 +153,7 @@ pub(super) fn complete(v: View, c: Commit) -> bool {
         && v.resources.iter().enumerate().all(|(i, r)| i == c.incoming || r.is_none())
 }
 
-pub(super) fn admit(v: View, settled: Option<Commit>) -> Result<usize, &'static str> {
+pub(crate) fn admit(v: View, settled: Option<Commit>) -> Result<usize, &'static str> {
     check((v.scene.mode == 0x04040000 && v.scene.melee == 0x20)
         || (crate::engine::stages::lobby_stage_cycle::waiting(v.scene.mode, v.scene.melee) && v.waiting_ready), "not owned practice scene")?;
     check(v.disabled == 0 && v.stop_mask == 0 && !v.ui_busy && !v.roster_busy, "practice suspended")?;
@@ -174,7 +174,7 @@ pub(super) fn admit(v: View, settled: Option<Commit>) -> Result<usize, &'static 
     Ok(next)
 }
 
-pub(super) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
+pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
     let next = admit(v, settled)?;
     check(target != v.kind(), "stage already active")?;
     check(hash != 0 && hash <= 0xffffffffff, "invalid stage hash")?;
@@ -189,7 +189,7 @@ pub(super) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> 
 
 /// Typed ingress is also the last admission barrier before native publication.
 /// Only kind/hash change: music, hazards and all other descriptor fields survive.
-pub(super) fn plan_selection(v: View, settled: Option<Commit>, selection: crate::engine::stages::lobby_stages::Selection,
+pub(crate) fn plan_selection(v: View, settled: Option<Commit>, selection: crate::engine::stages::lobby_stages::Selection,
     hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
     let target = crate::engine::stages::lobby_stages::native_stage(selection)?;
     plan(v, settled, target, hash)

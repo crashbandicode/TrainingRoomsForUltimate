@@ -403,6 +403,29 @@ impl Parser<'_> {
     }
 }
 
+/// The names of `#[cfg(feature = "diag")] mod name;` declarations in a source text (read from the raw text: the lexer blanks
+/// string literals, and the feature name is one).
+fn lex_attrs(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut gated = false;
+    for line in src.lines() {
+        let line = line.trim();
+        if line == "#[cfg(feature = \"diag\")]" {
+            gated = true;
+        } else if gated && line.starts_with("#[") {
+            // another attribute between the cfg and the item
+        } else {
+            if gated {
+                let decl = line.trim_start_matches("pub(crate) ").trim_start_matches("pub ");
+                if let Some(name) = decl.strip_prefix("mod ").and_then(|rest| rest.strip_suffix(';')) {
+                    out.push(name.trim().to_owned());
+                }
+            }
+            gated = false;
+        }
+    }
+    out
+}
 // ---- the graph ------------------------------------------------------------------------------------------
 
 pub struct Graph {
@@ -439,9 +462,25 @@ fn module_of_file(rel: &str) -> String {
 }
 
 impl Graph {
-    pub fn scan(runtime_dir: &Path) -> Graph {
+    /// `skip_dirs`: folders (relative to `runtime_dir`) that are not scanned: package 6's own seam-guarded areas.
+    pub fn scan(runtime_dir: &Path, skip_dirs: &[&str]) -> Graph {
         let mut files = Vec::new();
         rust_files(runtime_dir, &mut files);
+        files.retain(|path| {
+            let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
+            !skip_dirs.iter().any(|dir| rel.starts_with(&format!("{dir}/")))
+        });
+        // Modules declared `#[cfg(feature = "diag")] mod x;` are Eden-only code: never in the shipped build, so not scanned.
+        let diag_only: Vec<PathBuf> = files
+            .iter()
+            .flat_map(|path| {
+                let toks = lex_attrs(&fs::read_to_string(path).unwrap());
+                let dir = path.parent().unwrap().to_path_buf();
+                let own = dir.join(path.file_stem().unwrap());
+                toks.into_iter().flat_map(move |name| [dir.join(format!("{name}.rs")), dir.join(&name).join("mod.rs"), own.join(format!("{name}.rs")), own.join(&name).join("mod.rs")]).collect::<Vec<_>>()
+            })
+            .collect();
+        files.retain(|path| !diag_only.contains(path));
         let mut funcs = Vec::new();
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -546,8 +585,14 @@ impl Graph {
         let mut i = 0;
         while i < toks.len() {
             if let Tok::Ident(first) = &toks[i] {
-                let method = i > 0 && is_punct(&toks[i - 1], '.');
+                let mut method = i > 0 && is_punct(&toks[i - 1], '.');
                 let mut segments = vec![first.clone()];
+                // `self.name(` is a method of this file's own type (a receiver that is `self` is not another module's).
+                let on_self = method && i > 1 && matches!(&toks[i - 2], Tok::Ident(s) if s == "self");
+                if on_self {
+                    segments.insert(0, "Self".to_owned());
+                    method = false;
+                }
                 let mut k = i + 1;
                 while k + 1 < toks.len() && toks[k] == Tok::PathSep {
                     match &toks[k + 1] {

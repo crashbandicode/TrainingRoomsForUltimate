@@ -42,7 +42,7 @@ impl<const N: usize> Text<N> {
         }
     }
 
-    pub fn to_string_lossy(self) -> String {
+    pub fn string_lossy(&self) -> String {
         String::from_utf16_lossy(self.units())
     }
 }
@@ -61,7 +61,7 @@ impl<const N: usize> PartialEq for Text<N> {
 
 impl<const N: usize> fmt::Debug for Text<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.to_string_lossy())
+        write!(f, "{:?}", self.string_lossy())
     }
 }
 
@@ -105,7 +105,28 @@ pub enum View {
     Chips,
     /// The item or stage grid's tiles.
     Tiles,
+    /// The delay popup (N3, mockup 19): the checklist as a grid of boxes over the min-max range control.
+    Delay,
+    /// The situation overrides screen (mockup 06): the situation line over two columns of action boxes.
+    Overrides,
 }
+
+/// The delay popup's range control: two handles on a bar over the row's value set.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RangeView {
+    /// Both handles are set (else the bar is empty).
+    pub set: bool,
+    pub min: u8,
+    pub max: u8,
+    /// The last value index (the bar's scale).
+    pub top: u8,
+    /// The control is greyed (the checklist holds a value).
+    pub grey: bool,
+    /// Which handle the cursor is on: 0 none (the cursor is on the checklist), 1 Min, 2 Max.
+    pub focus: u8,
+    pub editing: bool,
+}
+
 
 /// One frame of the menu.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -120,6 +141,9 @@ pub struct Frame {
     pub tiles: [Text<28>; super::panes::TILES],
     pub tile_count: u8,
     pub tile_focus: u8,
+    /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
+    pub tile_state: [u8; super::panes::TILES],
+    pub range: RangeView,
     pub title: Text<40>,
     pub tabs: [Text<40>; TABS],
     pub tab_count: u8,
@@ -153,6 +177,8 @@ impl Frame {
             tiles: [Text::new(); super::panes::TILES],
             tile_count: 0,
             tile_focus: 0,
+            tile_state: [0; super::panes::TILES],
+            range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,
@@ -388,13 +414,13 @@ mod tests {
         let m = menu();
         let mut f = Frame::new();
         page_frame(&m, &mut f);
-        assert_eq!(f.tabs[0].to_string_lossy(), "CPU");
+        assert_eq!(f.tabs[0].string_lossy(), "CPU");
         assert_eq!(f.tab_count, 5);
         assert_eq!(f.tab_active, 0);
         assert_eq!(f.group_count, 6);
-        assert_eq!(f.groups[0].to_string_lossy(), "Reactions  (4)");
+        assert_eq!(f.groups[0].string_lossy(), "Reactions  (4)");
         assert_eq!(f.group_active, 0);
-        assert_eq!(f.rows[0].label.to_string_lossy(), "Mash");
+        assert_eq!(f.rows[0].label.string_lossy(), "Mash");
         assert_eq!(f.row_count, 4);
         assert_eq!(f.focus, Some(0));
         assert!(!f.help[0].is_empty());
@@ -409,7 +435,7 @@ mod tests {
         let mut f = Frame::new();
         page_frame(&m, &mut f);
         assert_eq!(f.group_active, 1);
-        assert_eq!(f.rows[0].label.to_string_lossy(), "Airdodge Direction");
+        assert_eq!(f.rows[0].label.string_lossy(), "Airdodge Direction");
         assert_eq!(f.focus, Some(0));
         assert_eq!(f.row_count, 6);
     }
@@ -422,9 +448,9 @@ mod tests {
         }
         let mut f = Frame::new();
         page_frame(&m, &mut f);
-        let dropdown = (0..f.row_count as usize).find(|i| f.rows[*i].label.to_string_lossy() == "SDI Strength").unwrap();
-        assert!(f.rows[dropdown].value.to_string_lossy().starts_with("<  "));
-        let toggle = (0..f.row_count as usize).find(|i| f.rows[*i].label.to_string_lossy() == "Dodge Staling").unwrap();
+        let dropdown = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "SDI Strength").unwrap();
+        assert!(f.rows[dropdown].value.string_lossy().starts_with("<  "));
+        let toggle = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "Dodge Staling").unwrap();
         assert!(matches!(f.rows[toggle].value_tone, Tone::On | Tone::Off));
     }
 
@@ -467,6 +493,6 @@ mod tests {
     fn text_is_cut_at_its_capacity_never_past_it() {
         let mut t: Text<4> = Text::new();
         let _ = t.write_str("abcdefgh");
-        assert_eq!(t.to_string_lossy(), "abcd");
+        assert_eq!(t.string_lossy(), "abcd");
     }
 }

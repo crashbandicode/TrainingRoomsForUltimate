@@ -58,11 +58,16 @@ pub enum Feature {
     /// The input display's reads in the input-delay hook (the P1 body's status, found through the fighter manager): no
     /// rows of its own, only the natives it calls (R2-1). Input Delay installs on its own rows; the display degrades apart.
     InputDisplay,
+    /// The run-time texture helper's rows (`sites_u4.rs`, `runtime/ui/texture.rs`): a unit of its own (they are the Ui feature's rows in
+    /// their table), so the menu does not depend on a helper that is optional (R2-1 merge with u4).
+    UiTexture,
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
     /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
     CpuMash,
     CpuCommon,
+    /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
+    P1Cpu,
 }
 
 impl Feature {
@@ -87,8 +92,10 @@ impl Feature {
             Feature::Notices => "notices",
             Feature::Ui => "ui",
             Feature::InputDisplay => "input_display",
+            Feature::UiTexture => "ui_texture",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
+            Feature::P1Cpu => "p1_cpu",
         }
     }
 }

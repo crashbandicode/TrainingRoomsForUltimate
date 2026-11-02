@@ -13,7 +13,7 @@ use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
 use crate::model::capabilities::{self, Granted};
 use crate::model::guard::GuardOutcome;
-use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
 use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
@@ -24,12 +24,15 @@ use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::model::sites_pkg3::STATE_SITES;
 use crate::model::sites_pkg4;
+use crate::model::sites_pkg6;
+use crate::model::sites_u4;
 use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
     chords, cpu, cpu_common, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
+use crate::runtime::p1;
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
@@ -52,6 +55,7 @@ pub fn run() {
             verdict,
             sites: &[],
             features: &[],
+            seams: None,
             developer: None,
             settings: None,
             migration: None,
@@ -72,6 +76,8 @@ pub fn run() {
     if let Err(error) = fs::create_dir_all(storage::ROOT) {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::sync_probe::run();
     let developer = read_developer_ini();
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
@@ -131,6 +137,12 @@ pub fn run() {
     // or an unknown patch had changed those bytes, so the install decisions run on a rejected row.
     #[cfg(feature = "diag")]
     apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
+    // Package 6's CPU-as-P1 rows and the run-time texture helper's rows are compared here too (R2-1): both are capabilities.
+    let found6 = p1::check();
+    let mut u4_found = [GuardOutcome::Stock; sites_u4::SITES.len()];
+    for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
     // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
     let usable = |site: &sites::Site| {
         let by_name = |rows: &[sites::Site], outcomes: &[GuardOutcome]| rows.iter().position(|s| s.name == site.name).map(|i| outcomes[i].usable());
@@ -138,6 +150,8 @@ pub fn run() {
             .or_else(|| by_name(&STATE_SITES, &state_found))
             .or_else(|| by_name(&sites_pkg4::SITES, &found4))
             .or_else(|| by_name(&UI_SITES, &ui_found))
+            .or_else(|| by_name(&sites_pkg6::SITES, &found6))
+            .or_else(|| by_name(&sites_u4::SITES, &u4_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -223,6 +237,11 @@ pub fn run() {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
     }
 
+    // Package 6: the CPU-as-P1 fallback (Q11). It installs only while the standalone CPU pilot is absent (`ui::install` found out
+    // above) and only when the CPU core, the input hooks, the save-state natives and every game function it calls passed their guards.
+    // The natives it calls are its closure (R2-1, `capabilities`): the package 2-4 rows its code reaches, with its own rows.
+    let p1_prerequisites = cpu_core_on && input_delay_on && state_on && capabilities::unit_usable(Feature::P1Cpu, &usable);
+    let (p1_on, p1_reason, written6) = p1::install(&found6, p1_prerequisites);
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
@@ -237,6 +256,7 @@ pub fn run() {
     });
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
+    reports.extend(p1::reports(&found6, &written6));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
     let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
@@ -264,7 +284,10 @@ pub fn run() {
         report(Feature::Recording, recording_on, None),
         report(Feature::Notices, notices_on, None),
         report(Feature::Ui, ui_install.anchors, None),
+        FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason, site: if p1_on || p1_reason.is_some_and(|r| r != "prerequisite_feature") { None } else { blocked(Feature::P1Cpu) } },
+        report(Feature::UiTexture, capabilities::unit_usable(Feature::UiTexture, &usable), None),
     ];
+    let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),
         version: env!("CARGO_PKG_VERSION"),
@@ -273,6 +296,7 @@ pub fn run() {
         verdict,
         sites: &reports,
         features: &features,
+        seams: Some(Extra(&seam_fields)),
         developer: Some(DeveloperReport { on: developer.developer_page, reason: developer.reason.text() }),
         settings: Some(SettingsReport {
             input_delay: loaded.menu.input_delay(),

@@ -97,6 +97,16 @@ pub const fn tick_to_ms(tick: u64) -> u64 {
     tick / (SYSTEM_TICK_HZ / 1000)
 }
 
+/// Fields another package formats itself (the seam installer's): written after a space, as given.
+#[derive(Clone, Copy)]
+pub struct Extra<'a>(pub &'a dyn Display);
+
+impl fmt::Debug for Extra<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("Extra(..)")
+    }
+}
+
 /// Everything the install line says.
 #[derive(Clone, Copy, Debug)]
 pub struct InstallLine<'a> {
@@ -110,6 +120,8 @@ pub struct InstallLine<'a> {
     /// Empty on an unsupported game (nothing is installed).
     pub sites: &'a [SiteReport],
     pub features: &'a [FeatureReport],
+    /// The seam installer's fields (package 6: seams=<n> seams_stock=<n> ...), written after the features; None leaves them out.
+    pub seams: Option<Extra<'a>>,
     /// The Developer-page gate (decision N1); `None` leaves the `developer=` pair out (an unsupported
     /// game never reads the file).
     pub developer: Option<DeveloperReport>,
@@ -142,6 +154,9 @@ impl Display for InstallLine<'_> {
                 } else if let (false, Some(site)) = (feature.installed, feature.site) {
                     write!(f, " reason=site:{site}")?;
                 }
+            }
+            if let Some(extra) = self.seams {
+                write!(f, " {}", extra.0)?;
             }
             if let Some(d) = self.developer {
                 write!(f, " developer={} reason={}", if d.on { "on" } else { "off" }, d.reason)?;
@@ -191,6 +206,7 @@ mod tests {
             verdict: Verdict::Supported,
             sites: &[],
             features: &[],
+            seams: None,
             developer: Some(DeveloperReport { on, reason }),
             settings: None,
             migration: None,
@@ -210,6 +226,7 @@ mod tests {
             verdict: Verdict::UnsupportedVersion,
             sites: &[],
             features: &[],
+            seams: None,
             developer: None,
             settings: None,
             migration: None,

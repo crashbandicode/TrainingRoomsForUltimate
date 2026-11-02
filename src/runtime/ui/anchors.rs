@@ -5,6 +5,7 @@
 
 use skyline::hooks::InlineCtx;
 
+use crate::model::hook_stats::{HookId, HookScope};
 use crate::model::sites_ui::{UI_PASS_CALCULATE_OFFSET, UI_REGISTER_CALCULATE_OFFSET};
 use crate::runtime::ui::{registry, tick};
 
@@ -15,6 +16,7 @@ pub fn install() {
 
 #[skyline::hook(offset = UI_PASS_CALCULATE_OFFSET, inline)]
 unsafe fn ui_pass_calculate(ctx: &mut InlineCtx) {
+    let _scope = HookScope::enter_hook(HookId::UiPassCalculate);
     if let Some(layout) = registry::layout_of(ctx.registers[23].x() as *const u8) {
         tick::tick(layout, false);
     }
@@ -22,6 +24,7 @@ unsafe fn ui_pass_calculate(ctx: &mut InlineCtx) {
 
 #[skyline::hook(offset = UI_REGISTER_CALCULATE_OFFSET, inline)]
 unsafe fn ui_register_calculate(ctx: &mut InlineCtx) {
+    let _scope = HookScope::enter_hook(HookId::UiRegisterCalculate);
     if let Some(layout) = registry::layout_of(ctx.registers[21].x() as *const u8) {
         tick::tick(layout, true);
     }

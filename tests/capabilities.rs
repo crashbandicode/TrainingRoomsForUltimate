@@ -47,6 +47,16 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "cpu::tech_facts", owner: Some(Feature::CpuTech), gate: Gate::Flag("TECH_ON") },
     Boundary { function: "cpu::apply_tech", owner: Some(Feature::CpuTech), gate: Gate::Flag("TECH_ON") },
     Boundary { function: "cpu::apply_defence", owner: Some(Feature::CpuDefence), gate: Gate::Flag("DEFENCE_ON") },
+    // The run-time texture helper (u4): every entry of it checks `usable()` (its rows passed and were granted) first.
+    Boundary { function: "texture::load", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::poll", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::bind", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::unbind", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::release", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    Boundary { function: "texture::tick", owner: Some(Feature::UiTexture), gate: Gate::Flag("usable") },
+    // Package 6's CPU-as-P1 call-ins from the CPU core's frame wrapper and the input hooks: nothing runs until its install says so.
+    Boundary { function: "p1::frame", owner: Some(Feature::P1Cpu), gate: Gate::Flag("installed") },
+    Boundary { function: "p1::input", owner: Some(Feature::P1Cpu), gate: Gate::Flag("installed") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
@@ -86,6 +96,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
         "notices" => Some(Feature::Notices),
         "states" | "state_restore" => Some(Feature::StateCore),
         "anchors" | "archive" => Some(Feature::Ui),
+        "cpu_pilot" => Some(Feature::P1Cpu),
         _ => None,
     }
 }
@@ -98,7 +109,10 @@ struct Analysis {
 impl Analysis {
     fn new() -> Analysis {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let mut graph = Graph::scan(&root.join("src/runtime"));
+        // Package 6's lobby, Mii and roster code and its seam installer have their own guard system (the seam rows of
+        // `model::seams`, `seam_install::gate`) and are not part of this model; what they call through `game::natives` and
+        // `state_natives` is still behind the grant check.
+        let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
         for (from, to) in &graph.dynamic {
@@ -171,7 +185,7 @@ impl Analysis {
         // A call holds when every row naming the function passed: it is the unit's own only when they all are.
         capabilities::call_rows(offset).all(|rep| {
             capabilities::equivalent_rows(rep).any(|row| {
-                capabilities::unit_of(row.feature) == unit || row.feature == Feature::Training || (core && row.feature == Feature::CpuCore)
+                capabilities::unit_of_row(row) == unit || row.feature == Feature::Training || (core && row.feature == Feature::CpuCore)
             })
         })
     }
@@ -196,22 +210,12 @@ impl Analysis {
         for b in BOUNDARIES {
             let Some(owner) = b.owner else { continue };
             for start in self.graph.find(b.function) {
-                // A boundary's own body and whatever it reaches (other boundaries are followed too).
-                let mut pending = vec![start];
-                let mut done = BTreeSet::new();
-                while let Some(s) = pending.pop() {
-                    if !done.insert(s) {
-                        continue;
-                    }
-                    let (offsets, hit) = self.reach(s);
-                    add(owner, &offsets);
-                    for key in hit {
-                        pending.extend(self.graph.find(&key));
-                    }
-                }
+                // A boundary's own body and what it reaches without crossing another boundary: the others are processed
+                // on their own, with their own owner.
+                let (offsets, _) = self.reach(start);
+                add(owner, &offsets);
             }
-        }
-        out
+        }        out
     }
 }
 
@@ -325,6 +329,7 @@ fn every_native_the_runtime_names_is_a_guarded_row() {
         "LOG_HEAD_OFFSET",
         "TOOL_DURABILITY_OFFSET",
         "TOOL_MATERIAL_OFFSET",
+        "UI_TEX_SERVICE_SLOT_WORDS_OFFSET",
     ]
     .into();
     let mut unguarded = BTreeSet::new();
@@ -366,36 +371,14 @@ fn a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_
         let unit_blocked = |unit: Feature| capabilities::blocked_by(unit, &usable).is_some();
         for &(i, unit) in &entries {
             let f = &a.graph.funcs[i];
-            let (offsets, hits) = a.reach(i);
+            let (offsets, _) = a.reach(i);
             let reaches = |offsets: &BTreeSet<usize>| offsets.iter().any(|&o| capabilities::call_rows(o).any(|r| poisoned_names.contains(&r.name)));
             if reaches(&offsets) {
                 assert!(unit_blocked(unit), "{} ({}) can call {} but its unit stays installed", f.key(), unit.name(), poisoned.name);
             }
             // The entry's own hook row is the unit's own row.
-            if a.hook_offset(f).is_some_and(|o| capabilities::all_sites().any(|r| r.offset == o && poisoned_names.contains(&r.name) && capabilities::unit_of(r.feature) == unit)) {
+            if a.hook_offset(f).is_some_and(|o| capabilities::all_sites().any(|r| r.offset == o && poisoned_names.contains(&r.name) && capabilities::unit_of_row(r) == unit)) {
                 assert!(unit_blocked(unit), "{}: its own row {} is rejected", f.key(), poisoned.name);
-            }
-            // A boundary this entry reaches runs only when its owner is installed.
-            for key in hits {
-                let boundary = BOUNDARIES.iter().find(|b| b.function == key).unwrap();
-                let mut inner = BTreeSet::new();
-                let mut pending = vec![key.clone()];
-                let mut done = BTreeSet::new();
-                while let Some(k) = pending.pop() {
-                    if !done.insert(k.clone()) {
-                        continue;
-                    }
-                    for s in a.graph.find(&k) {
-                        let (o, h) = a.reach(s);
-                        inner.extend(o);
-                        pending.extend(h);
-                    }
-                }
-                if reaches(&inner) {
-                    if let Some(owner) = boundary.owner {
-                        assert!(unit_blocked(owner), "boundary {key} reaches {} but its owner {} stays installed", poisoned.name, owner.name());
-                    }
-                }
             }
             if !unit_blocked(unit) {
                 // Installed: every native its hard reach can call is granted.
@@ -406,6 +389,20 @@ fn a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_
                 }
             }
             checked += 1;
+        }
+    }
+    // A boundary runs only when its owner is installed: whatever it can call (without crossing another boundary) blocks the owner.
+    for poisoned in capabilities::all_sites() {
+        let poisoned_names: Vec<&str> = capabilities::equivalent_rows(poisoned).map(|r| r.name).collect();
+        let usable = |site: &model::sites::Site| !poisoned_names.contains(&site.name);
+        for b in BOUNDARIES {
+            let Some(owner) = b.owner else { continue };
+            for start in a.graph.find(b.function) {
+                let (offsets, _) = a.reach(start);
+                if offsets.iter().any(|&o| capabilities::call_rows(o).any(|r| poisoned_names.contains(&r.name))) {
+                    assert!(capabilities::blocked_by(owner, &usable).is_some(), "boundary {} reaches {} but its owner {} stays installed", b.function, poisoned.name, owner.name());
+                }
+            }
         }
     }
     assert!(checked > 5000, "{checked}");
@@ -436,6 +433,11 @@ fn the_native_call_layer_checks_the_grant() {
     assert_eq!(ats.len(), 2, "game::natives::at and state_natives::at");
     for f in ats {
         assert!(mentions(f, "granted"), "{} must check the grant", f.key());
+    }
+    // The run-time texture helper (u4) forms its addresses with its own `at` and calls through them in these functions: each checks
+    // `usable()`, which asks the boot's grant for every row it calls.
+    for f in a.graph.funcs.iter().filter(|f| f.module == "texture" && mentions(f, "transmute")) {
+        assert!(mentions(f, "usable"), "{} calls a native without checking usable()", f.key());
     }
     for f in &a.graph.funcs {
         if mentions(f, "text_base") && mentions(f, "transmute") {
@@ -510,6 +512,7 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
         verdict: model::version::Verdict::Supported,
         sites: &[],
         features: &[report],
+        seams: None,
         developer: None,
         settings: None,
         migration: None,

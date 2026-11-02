@@ -450,6 +450,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         unsafe { fighter_frame(a0) };
         // Package 3: the save-state step runs on the same per-fighter callback, after the CPU's.
         crate::runtime::features::states::frame(a0);
+        // Package 6: the CPU-as-P1 fallback's step (nothing when the pilot is absent-and-not-installed or present).
+        unsafe { crate::runtime::p1::frame(a0) };
     }
     result
 }
