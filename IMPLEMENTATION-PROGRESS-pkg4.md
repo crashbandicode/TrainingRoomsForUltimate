@@ -1019,3 +1019,5 @@ MovedONLY/tmp/pkg4-lua.txt to /home/intpa/smash-training-lobby/tmp-pkg4/pkg4-lua
 Runtimeprep foundroute4 owner stillprevious01a19c9f andSSHsocket/tmp hardcoded. Ownedadapter nowrequiresTR_OWNER orusesexactCODEX_THREAD_ID; ownTransport overridesonlySSHsocketpath toext4TMPDIR andremotecommandprefix setsownext4TMPDIR. Pinnedsharedharness untouched; no runtime/profileclaim onimport. ASTPASS, actualdryimportnext; noEden.
 
 2026-11-02T23:15:26.540214+00:00: route4dryimport/TransportconstructionPASSunderpython-B: ownerexactcurrent01a19e0c-5549-70f2-8712-babbdb33cc48/pkg4, ext4ControlPathnativeUnixlengthbelow108. NoSSHconnection/claim/launch/profile. Shared225harnesshashpinsremainunchanged.
+
+2026-11-02T23:20:11.868494+00:00: Trainingrunnernowretainsnative-save-handoff.json afteractualOnreceipt/persistedINI: label,start/togglemarks,armedstatus,priorseedcaptureIDs,explicitOPEN acceptance. SupportscontinuingsamebootthroughobservedVS/nativeSaveReplay thennewaudit_captures; no scriptedguessedVSbuttons orsyntheticcapture. AST/actualregexcheckPASS; runtimeunexecuted.

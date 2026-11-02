@@ -509,6 +509,21 @@ def main():
     row("On preference persisted", capture_preference_on(preference),
         preference.strip())
     (OUT / "replay-capture-preference.ini").write_text(preference)
+    # The same live boot continues into a real VS match and native Save Replay.
+    # Retain the arming boundary and seeded IDs so a later archive cannot be
+    # mistaken for this boot's new persisted capture.
+    (OUT / "native-save-handoff.json").write_text(json.dumps({
+        "label": LABEL,
+        "training_start_mark": START,
+        "toggle_mark": toggle_mark,
+        "toggle_receipt": toggle_receipt,
+        "armed_status": armed,
+        "prior_capture_ids": sorted(set(
+            match.group(1) for line in (OUT / "captures.txt").read_text().splitlines()
+            if (match := re.search(r"capture id=([0-9a-f]+)\b", line))
+        )),
+        "acceptance": "OPEN: same-boot native match/save, new persisted ID, audit_captures, final all-hook/Unmapped scans",
+    }, indent=2))
 
     # hook counts and allocations
     time.sleep(4)
