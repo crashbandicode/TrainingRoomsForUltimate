@@ -115,17 +115,22 @@ First numbers (st-02): the boot thread is Skyline's, **64 KiB** (`spawn name=boo
 `ui_archive` / `ui_pass_calculate` run on a stack inside a 156 MB heap block (a fiber), where svcQueryMemory cannot
 bound the stack: such sites are marked by `kind=` from the next build and are not read as stack room.
 
-## State
+## State (2026-11-02 ~12:2xZ)
 
 | Step | Result |
 | --- | --- |
-| host test `thread_stacks` | pass (124 incl. new) |
-| carry verify pkg6 / pkg4 | 262 / 42 files verified against m5q |
-| Switch diag + release builds | pending (Surface claim) |
-| Eden st-NN | queued on the Yoga |
+| gates 6541f2d (Ally WSL) | cargo test 7826 passed 0 failed, clippy -D warnings 0, no-default-features 0, Switch release `2c368003` + diag `5d21cf2f`, 0 warnings |
+| carry verify pkg6 / pkg4 | 262 / 42 files verified against m5q (after every carried edit) |
+| Eden st-02..st-12 | 8 cold boots clean; busy rows save/load/state file/ini/settings reload pass (st-10); st-11 stalled after the reload request without a fault (stream/sync's livelock); st-12 stopped by me at the lead's release order; console scans 0 in every run |
+| sizes | dc737c1: every row = max(static, measured) × 1.25 + 16 KiB (`tests/thread_stacks.rs`); spec constants from the table (SPEC-core-04 amended) |
+| hook budget | `tools/stack_depth.py <diag elf> budget`: 134 roots, 0 over (6541f2d) |
+| open for integrator-3's merged-tree boot | recording row, menu open/close, the reload stall (lead 12:1xZ) |
+
+Branch `stream/stack`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-stack`, HEAD dc737c1 (ungated:
+the shrink, boxed boot settings, captures on the boot stack, [HookStack] kind, gate split).
 
 ## Next
 
-1. Surface free → claim, `systemd-run … pwsh -File /tmp/stack-a2594031/tools/sw-build.ps1 -Diag`, then release build.
-2. `python3 -I tools/stack_depth.py <diag .so> table`; refresh `static_bound` from it.
-3. Eden st-01: ≥ 8 cold boots, save/load, recording, menu open/close last; read `[ThreadStack]` lines; fill `measured`.
+1. One compile in queue order (Surface or Ally WSL, `/tmp/stack-a2594031/tools/ally-pack.ps1` + `ally-build.sh gates`).
+2. `python3 -I tools/stack_depth.py <diag .so> table` and `… budget`; `nro_size.py` on the release NRO (resident figure).
+3. compliance.py on the release NRO; give integrator-3 (aaf990350073a351c) the gated sha; final report to the lead.
