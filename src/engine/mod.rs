@@ -24,12 +24,8 @@ pub mod mii_root;
 #[cfg(test)]
 #[path = "../model/p1/mod.rs"]
 pub mod p1;
-#[cfg(test)]
-#[path = "../model/p1/menu_session.rs"]
-pub mod p1_menu_session;
-#[cfg(test)]
-#[path = "../model/p1/stage_session.rs"]
-pub mod p1_stage_session;
+// p1_menu_session and p1_stage_session (src/model/p1/) are declared with cpu_pilot.rs, their consumer; until then their tests
+// run by path from tests/p1_sessions.rs.
 #[cfg(test)]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
