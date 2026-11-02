@@ -33,19 +33,17 @@ use crate::model::cpu::rng::Rng;
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
-use crate::model::lra_reset;
 use crate::model::recording::{
-    ChordAction, ControlCtx, Ended, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ChordAction, ControlCtx, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
-#[cfg(feature = "diag")]
-use crate::model::recording::LoadAction;
 use crate::model::settings::Snapshot;
-use crate::model::sites;
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::HookScope;
-use crate::runtime::features::{chords, cpu, input_display, notices};
-use crate::runtime::{game, published};
+use crate::runtime::features::{chords, cpu, input_display, notices, states};
+use crate::runtime::game::{self, natives};
+use crate::runtime::published;
+use crate::runtime::scene;
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 static SETTINGS: Mutex<RecorderSettings> = Mutex::new(RecorderSettings::factory());
@@ -65,11 +63,9 @@ static INT_COLOR: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static LAST_PHASE: AtomicU8 = AtomicU8::new(0);
 
 /// Fighter object and entry layout (read from the owned 13.0.5 `main`; `tests/input_sites.rs` and the
-/// on-init notes): the fighter kind at +0xc, the module accessor at +0x20; the entry's body pointers
-/// from +0x4160 and its controller at +0x4178.
+/// on-init notes): the fighter kind at +0xc; the entry's controller at +0x4178 (the body and accessor
+/// fields are in `game::natives`).
 pub(crate) const FIGHTER_KIND_FIELD: usize = 0xc;
-const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
-const ENTRY_BODY_FIELD: usize = 0x4160;
 const ENTRY_CONTROLLER_FIELD: usize = 0x4178;
 /// The CPU's controller struct (`*(ai + 8)`): the written fields (SPEC-input-01 §4). Never +0x50/+0x54.
 const CTRL_BUTTONS: usize = 0xc;
@@ -172,64 +168,6 @@ fn load_consts() -> bool {
     true
 }
 
-/// The lua_bind natives of package 4 (guarded `Called` rows of `sites_pkg4`).
-pub(crate) mod natives {
-    use super::{game, sites, sites_pkg4};
-
-    unsafe fn at<F: Copy>(offset: usize) -> F {
-        debug_assert_eq!(std::mem::size_of::<F>(), std::mem::size_of::<usize>());
-        std::mem::transmute_copy(&(game::text_base() + offset))
-    }
-
-    fn offset(name: &str) -> usize {
-        sites_pkg4::SITES.iter().find(|s| s.name == name).map_or(0, |s| s.offset)
-    }
-
-    pub unsafe fn lr(accessor: usize) -> f32 {
-        at::<extern "C" fn(usize) -> f32>(offset("posture_lr"))(accessor)
-    }
-
-    pub unsafe fn is_stop(accessor: usize) -> bool {
-        at::<extern "C" fn(usize) -> bool>(offset("stop_is_stop"))(accessor)
-    }
-
-    pub unsafe fn get_int(accessor: usize, id: i32) -> i32 {
-        at::<extern "C" fn(usize, i32) -> i32>(offset("work_get_int"))(accessor, id)
-    }
-
-    pub unsafe fn set_int(accessor: usize, id: i32, value: i32) {
-        at::<extern "C" fn(usize, i32, i32)>(offset("work_set_int"))(accessor, value, id)
-    }
-
-    pub unsafe fn set_color_rgb(accessor: usize, r: f32, g: f32, b: f32, kind: i32) {
-        at::<extern "C" fn(usize, f32, f32, f32, i32)>(offset("model_set_color_rgb"))(accessor, r, g, b, kind)
-    }
-
-    /// `FighterManager::get_fighter_entry(manager, entry id)`.
-    pub unsafe fn fighter_entry(entry: i32) -> usize {
-        let manager = ((game::text_base() + super::lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return 0;
-        }
-        at::<extern "C" fn(usize, i32) -> usize>(offset("fighter_manager_get_entry"))(manager, entry)
-    }
-
-    /// `FighterInformation::is_operation_cpu` of an entry (the game's own operator flag).
-    pub unsafe fn operated_by_cpu(entry: i32) -> bool {
-        let manager = ((game::text_base() + super::lra_reset::FIGHTER_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return false;
-        }
-        let information: extern "C" fn(usize, i32) -> usize = std::mem::transmute(game::text_base() + sites::FIGHTER_INFORMATION_OFFSET);
-        let information = information(manager, entry);
-        if information == 0 {
-            return false;
-        }
-        let is_cpu: extern "C" fn(usize) -> bool = std::mem::transmute(game::text_base() + sites::IS_OPERATION_CPU_OFFSET);
-        is_cpu(information)
-    }
-}
-
 /// A fighter entry's first body, resolved now (no pointer is kept between frames).
 #[derive(Clone, Copy)]
 pub(crate) struct Body {
@@ -249,14 +187,11 @@ unsafe fn cpu_body() -> Option<Body> {
 /// The package 4 natives must have passed their guards.
 pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     let entry_ptr = natives::fighter_entry(entry_id);
-    if entry_ptr == 0 {
-        return None;
-    }
-    let fighter = ((entry_ptr + ENTRY_BODY_FIELD) as *const usize).read();
+    let fighter = natives::entry_body(entry_ptr);
     if fighter == 0 {
         return None;
     }
-    let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
+    let accessor = natives::fighter_accessor(fighter);
     (accessor != 0).then_some(Body { entry_ptr, fighter, accessor, entry_id })
 }
 
@@ -300,7 +235,8 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 }
 
 unsafe fn on_ai_frame(ai: usize) {
-    if ai == 0 || !game::is_training_mode() {
+    // Native Training or an active lobby practice (the hot swap check below stops the recorder).
+    if ai == 0 || !(scene::is_native_training() || scene::lobby_active()) {
         return;
     }
     let controller = ((ai + AI_CONTROLLER_FIELD) as *const usize).read();
@@ -381,11 +317,9 @@ unsafe fn on_ai_frame(ai: usize) {
     let state = REC.lock().playback_state(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
-    // Interim HUD tick (package 5 moves these two calls to the layout's tick).
+    // The input log's in-game frame counters tick here, with the CPU body's frame; the HUD tick is the layout's
+    // (`features::hud_draw`).
     input_display::tick_frame();
-    let owners = published::input_owners();
-    input_display::hud_tick(owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE));
-    notices::hud_tick();
     report_counts();
 }
 
@@ -427,22 +361,13 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 
 /// The record and playback chords (SPEC-input-01 §2.2): consumed on the CPU body's frame.
 unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
-    // Eden stand-ins (diag build only, removed when packages 3 and 5 own these): the save-state chords stand
-    // for "a save state was restored" and for the menu's shortcut edit.
-    #[cfg(feature = "diag")]
-    {
-        if chords::consume(Request::SaveState) {
-            on_state_restored(false);
-        }
-        if chords::consume(Request::LoadState) {
-            let result = chords::commit_shortcut(1, crate::model::menu::chord::Chord((1 << 2) | (1 << 3)));
-            crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] standin shortcut_edit slot=2 chord=X+Y result={result:?}"));
-        }
-    }
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
-    if cpu::save_loading() {
+    if states::is_loading() {
         // Both chords are consumed and ignored while a save state loads (§6.4).
+        if record || playback {
+            event("chord_ignored_loading", "record", i64::from(record), "playback", i64::from(playback));
+        }
         return;
     }
     let record = record && settings.trigger_chord;
@@ -474,11 +399,11 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
 
 unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
     // B4: while an AI drives P1 the recorder is refused with a notice, nothing is recorded.
-    let refusal = if natives::operated_by_cpu(0) {
+    let refusal = if natives::is_operation_cpu(0) {
         Some(RecordRefusal::P1DrivenByAi)
     } else if natives::fighter_entry(0) == 0 {
         Some(RecordRefusal::FightersMissing)
-    } else if cpu::save_loading() {
+    } else if states::is_loading() {
         Some(RecordRefusal::SaveStateLoading)
     } else {
         None
@@ -517,12 +442,21 @@ pub fn request_playback(start: PlaybackStart) {
 }
 
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
-/// settings. `saved_on_ledge` is the saved situation. Package 3 will call it once per restore; until that
-/// caller exists the Eden stand-in below does (diag build only), so the release build has no dead code.
-#[cfg(feature = "diag")]
+/// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
 pub fn on_state_restored(saved_on_ledge: bool) {
     let settings = *SETTINGS.lock();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
+    event(
+        "state_restored",
+        "ledge",
+        i64::from(saved_on_ledge),
+        "action",
+        match action {
+            LoadAction::None => 0,
+            LoadAction::Record => 1,
+            LoadAction::Play(slot) => 2 + i64::from(slot),
+        },
+    );
     // SAFETY: the fighters were just restored.
     unsafe {
         let Some(body) = cpu_body() else { return };
@@ -538,9 +472,44 @@ pub fn on_state_restored(saved_on_ledge: bool) {
     }
 }
 
+/// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
+pub fn recording_or_playback() -> bool {
+    REC.lock().phase() != Phase::Idle
+}
+
+/// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so
+/// this is false until that layer exists and sets the owner bit).
+pub fn replay_editor_occupied() -> bool {
+    published::input_owners().contains(Owners::REPLAY_EDITOR)
+}
+
+/// A replay capture is loading (S4-4's clip loader; false until that layer exists).
+pub fn replay_capture_loading() -> bool {
+    false
+}
+
+/// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
+/// recording in progress is not touched.
+pub fn interrupt_playback() {
+    let settings = *SETTINGS.lock();
+    let (stopped, state) = {
+        let mut rec = REC.lock();
+        let stopped = rec.interrupt_on_mash(&settings);
+        (stopped, rec.playback_state(false))
+    };
+    if stopped {
+        // The same bookkeeping as `stop`, and the CPU sees the playback gone before the next injection.
+        LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
+        notices::post_phase(Phase::Idle, 0);
+        cpu::set_playback(state);
+        event("playback_interrupt", "mash", 1, "", 0);
+    }
+}
 /// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset
 /// (decision B8), the named layer.
 pub fn stop() {
+    let mode = REC.lock().mode();
+    event("recorder_stop", "mode", mode as i64, "", 0);
     REC.lock().stop();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     notices::post_phase(Phase::Idle, 0);
@@ -558,4 +527,6 @@ pub fn session_clear() {
     chords::session_clear();
     notices::session_clear();
     input_display::session_clear();
+    // The menu's session ends with the same departure (package 5; the fork cleared its menu and chord state together).
+    crate::runtime::ui::clear_session_state();
 }

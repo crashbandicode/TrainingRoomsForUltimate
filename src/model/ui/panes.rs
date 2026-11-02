@@ -211,6 +211,10 @@ pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
 /// `TrModInputLog` / `TrModInputLog<rr>` / `ILG_<rr>_<s>` / `ILA_<rr>_<s>` / `ILH_<rr>_<s>` / `ILF_<rr>` / `ILS_<rr>`.
 pub const LOG_ROWS: usize = 15;
 pub const LOG_SLOTS: usize = 5;
+/// A slot's x in its row, and the head of its arrow: its distance from the shaft's centre along the arrow.
+pub const LOG_SLOT_X0: f32 = -200.0;
+pub const LOG_SLOT_PITCH: f32 = 54.0;
+pub const LOG_HEAD_OFFSET: f32 = 16.0;
 pub const IDX_LOG: usize = IDX_NOTICE_TEXT + 1;
 pub const IDX_LOG_ROW: usize = IDX_LOG + 1;
 pub const IDX_LOG_GLYPH: usize = IDX_LOG_ROW + LOG_ROWS;
@@ -368,15 +372,15 @@ pub const fn spec(index: usize) -> Spec {
         }
         i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_GLYPH;
-            under(Spec { visible: false, ..text(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0, Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(Spec { visible: false, ..text(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0, Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_SHAFT;
-            under(rect(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(rect(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
             let n = i - IDX_LOG_HEAD;
-            under(rect(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 16.0, 18.0, 18.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+            under(rect(name, LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, LOG_HEAD_OFFSET, 18.0, 18.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
         }
         i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => {
             under(text(name, 130.0, 0.0, 70.0, 48.0, Align::Right, FONT_SMALL, 4, TEXT), name_of(IDX_LOG_ROW + (i - IDX_LOG_FRAME)))

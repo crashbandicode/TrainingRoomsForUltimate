@@ -12,7 +12,6 @@ import sys
 ROWS = [
     ("posture_lr", 0x206AF10, "Recording", "Called", "PostureModule::lr (lua_bind thunk): the CPU's facing, +1.0 or -1.0. Symbol _ZN3app8lua_bind22PostureModule__lr_implEPNS_26BattleObjectModuleAccessorE."),
     ("stop_is_stop", 0x20891F0, "Recording", "Called", "StopModule::is_stop (lua_bind thunk): whether the CPU is in hitstop, for the mash-triggered playback timing."),
-    ("work_get_int", 0x208DBC0, "Recording", "Called", "WorkModule::get_int (lua_bind thunk): the ledge rest timer."),
     ("work_set_int", 0x208DBD0, "Recording", "Called", "WorkModule::set_int (lua_bind thunk): lifts the ledge rest timer while the recorder holds the CPU on the ledge."),
     ("model_set_color_rgb", 0x2057790, "Recording", "Called", "ModelModule::set_color_rgb (lua_bind thunk): the recorder phase tint of the CPU model."),
     ("fighter_manager_get_entry", 0x2140F90, "Recording", "Called", "FighterManager::get_fighter_entry (lua_bind thunk): the CPU entry, whose +0x4178 is its controller and +0x4160 its first body."),

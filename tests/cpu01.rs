@@ -343,3 +343,18 @@ fn cpu01_playback_stops_on_a_triggered_mash() {
     cpu.command_flags(key, false, &facts(DAMAGE));
     assert!(!cpu.fighters[key.index()].mash.queue.is_empty());
 }
+
+/// R2-4 (review R2): the CPU's mash waits for the save-state loading fact for as long as it is true and resumes
+/// when it clears (the runtime copies `states::is_loading()` into `Cpu::save_loading` every frame).
+#[test]
+fn r2_4_cpu_mash_waits_for_the_loading_fact_throughout_the_load() {
+    let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
+    for _ in 0..30 {
+        cpu.save_loading = true;
+        cpu.command_flags(key, false, &facts(DAMAGE));
+        assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "no mash choice while a state loads");
+    }
+    cpu.save_loading = false;
+    cpu.command_flags(key, false, &facts(DAMAGE));
+    assert!(!cpu.fighters[key.index()].mash.queue.is_empty());
+}

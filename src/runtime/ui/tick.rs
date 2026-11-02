@@ -46,6 +46,9 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
 /// Set by the registration tick: the layout object is new, so its panes must be resolved again.
 static INVALIDATE: AtomicBool = AtomicBool::new(false);
 pub static TICKS: AtomicU32 = AtomicU32::new(0);
+/// How many times `info_training` was registered (a new layout object): the other packages' HUD draws compare it
+/// with the value they last saw to know that nothing they wrote to the layout is there any more.
+pub static REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
 pub static DRAWS: AtomicU32 = AtomicU32::new(0);
 
 /// `L_staying_help`'s resting `pos_y` (SPEC-core-03 §2.4).
@@ -60,6 +63,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     if registration {
         INVALIDATE.store(true, Ordering::Release);
+        REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
     }
     if !game::is_training_mode() {
         renderer_lost("not in Training");
