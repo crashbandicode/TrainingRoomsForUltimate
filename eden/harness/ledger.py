@@ -128,8 +128,8 @@ def queue_head(text, host):
 
 
 # The parallel projects' owners, matched by name prefix in the owner key and the queue line (tm-f8-terra also
-# covers tm-f8-terra-ally and tm-f8-terra-eden).
-PARALLEL = ("imgui-nvn-sol", "tm-f8-terra")
+# covers tm-f8-terra-ally and tm-f8-terra-eden; likewise tm-f8-sol, -ally, -eden).
+PARALLEL = ("imgui-nvn-sol", "tm-f8-terra", "tm-f8-sol")
 
 
 def is_parallel(owner):

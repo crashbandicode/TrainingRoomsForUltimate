@@ -212,6 +212,24 @@ class InterleaveRule(unittest.TestCase):
         only = released + "2026-11-02 12:40Z RELEASED: Codex 0f3c-aa/tm-f8-terra-ally Ally row done\n"
         self.assertEqual(len(ledger.parallel_turns(only, queue, "ally", ledger.calendar.timegm((2026, 11, 2, 12, 21, 0)))), 1)  # 60 s after OUR release
 
+    def test_tm_f8_sol_and_its_variants_get_the_same_turn(self):
+        queue = QUEUE.replace("## Ally - the lent rig\n", "## Ally - the lent rig\n"
+                              "- tm-f8-sol-ally (Codex 9d1e): Ally row on the lent rig\n"
+                              "- tm-f8-terra-ally (Codex 0f3c): LDN-free Training row on the lent rig\n")
+        released = ("2026-11-02 12:10Z CLAIMED: Claude 0caa72b8/ui-screens TrainingRooms ui rows on the Ally\n"
+                    "2026-11-02 12:20Z RELEASED: Claude 0caa72b8/ui-screens TrainingRooms ui rows stopped on the Ally\n")
+        soon_ally = ledger.calendar.timegm((2026, 11, 2, 12, 21, 0))
+        self.assertEqual(sorted(w.split()[0] for w in ledger.parallel_turns(released, queue, "ally", soon_ally)),
+                         ["tm-f8-sol", "tm-f8-terra"])  # each on its own
+        for variant in ("tm-f8-sol", "tm-f8-sol-ally", "tm-f8-sol-eden"):
+            served = released + f"2026-11-02 12:30Z CLAIMED: Codex 9d1e-bb/{variant} Ally row on the lent rig, no LAN\n"
+            left = ledger.parallel_turns(served, queue, "ally", soon_ally)
+            self.assertEqual([w.split()[0] for w in left], ["tm-f8-terra"], variant)  # sol has had its turn, terra has not
+        self.assertEqual(len(ledger.parallel_turns(released, queue, "ally", soon_ally + 100)), 2)  # inside the 3 minutes
+        self.assertEqual(ledger.parallel_turns(released, queue, "ally", soon_ally + 120), [])  # idle for 3 minutes (12:20 + 180 s): both let go
+        me = p(host="ally", owner="Codex 9d1e-bb/tm-f8-sol-ally")
+        self.assertEqual([w for w in ledger.busy(me, released, soon_ally, queue=queue) if "queued for" in w], [])  # not applied to itself
+
     def test_each_parallel_owner_waits_on_its_own_and_both_can_be_pending(self):
         queue = ("## Yoga\n- imgui-nvn-sol (Codex a): ABI gates\n- tm-f8-terra-eden (Codex b): Eden row\n- stack: batch\n")
         text = "2026-11-02 11:00Z CLAIMED: Claude 0caa72b8/stack TrainingRooms run on Yoga\n2026-11-02 11:10Z RELEASED: Claude 0caa72b8/stack run stopped on Yoga\n"
