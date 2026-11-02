@@ -111,7 +111,7 @@ pub fn complete() {
 }
 
 unsafe fn primary_cpu(module: &mut BattleObjectModuleAccessor) -> bool {
-    practice::primary_cpu(module) && crate::runtime::compat::common::is_operation_cpu(module)
+    crate::runtime::features::recorder::is_primary_cpu_body(module) && crate::runtime::compat::common::is_operation_cpu(module)
 }
 
 pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {

@@ -202,6 +202,17 @@ pub(crate) unsafe fn cpu_body() -> Option<Body> {
     body_of(i32::from(cpu::primary_entry_now()))
 }
 
+/// `module` is the practice CPU's own body: a practice scene is live (`scene::current`), and `module` is the first body of package 2's
+/// primary CPU entry (`cpu::primary_entry_now`; never Nana, the entry's second body). The named layer's per-fighter work and the clip
+/// preview run for this body only (the fork's `practice::primary_cpu`, which package 6 retired in favour of these owners).
+///
+/// # Safety
+/// `module` is a live fighter's accessor; the package 4 natives must have passed their guards.
+pub(crate) unsafe fn is_primary_cpu_body(module: &smash::app::BattleObjectModuleAccessor) -> bool {
+    scene::current().is_some()
+        && cpu_body().is_some_and(|body| body.accessor == module as *const smash::app::BattleObjectModuleAccessor as usize)
+}
+
 /// The first body of `entry_id (0 is P1).
 ///
 /// # Safety

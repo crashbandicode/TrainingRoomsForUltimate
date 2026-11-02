@@ -22,7 +22,7 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::macros::practice",
+   "training::practice": "crate::runtime::lobby::training::practice",
    "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
    "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
    "common": "crate::runtime::compat::common",
@@ -473,7 +473,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "3c12673f1caf1228bf6880ab58433eb34673f0c858c13e7cdebcfbce6df438ce",
+   "dest_sha256": "cf7699e9c95f0e5b1f4e868f3f4b257cdcbbd73077e6092e3f054fc2b5cb76ce",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -583,6 +583,26 @@
      "old": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());",
      "new": "static PANEL_STOPS: RwLock<Vec<(u32, usize, usize)>> = RwLock::new(Vec::new());\n/// Boot reservation of `PANEL_STOPS`: one entry per held fighter body, more than a match has (8 entries and their partners).\nconst PANEL_STOPS_CAPACITY: usize = 16;",
      "reason": "R5: the reservation's size, named"
+    },
+    {
+     "old": "practice::primary_cpu(module_accessor)",
+     "new": "crate::runtime::features::recorder::is_primary_cpu_body(module_accessor)",
+     "reason": "package 6 retired practice::primary_cpu (single owner; agreed with pkg6 5e0fab3): package 2's primary CPU entry is the owner (recorder::is_primary_cpu_body: a practice scene, the first body of cpu::primary_entry_now)"
+    },
+    {
+     "delete_from": "struct Legacy {",
+     "delete_to": "pub struct PlaybackStart {",
+     "reason": "deleted (lead 2026-11-02, dead code): the shared facing/status pair the fork parked around named runs; SPEC-input-01 section 9 calls it unnecessary once the pair is per slot, and the clean-room recorder keeps it per slot (Origin)"
+    },
+    {
+     "delete_from": "pub fn remember_legacy(facing: f32, status: i32) {",
+     "delete_to": "/// Close the panel and stop playback.",
+     "reason": "deleted (lead 2026-11-02, dead code): the shared facing/status pair the fork parked around named runs; SPEC-input-01 section 9 calls it unnecessary once the pair is per slot, and the clean-room recorder keeps it per slot (Origin)"
+    },
+    {
+     "delete_from": "/// Bound the earlier CPU position/status retry too",
+     "delete_to": "/// Run after the CPU's restore callback.",
+     "reason": "deleted (lead 2026-11-02, dead code): the fork called it from its own save_states position retry, which is not carried; package 3's restore has no such retry and SPEC-input-01 names no position-wait entry point"
     }
    ]
   },
@@ -598,7 +618,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "1408b6f540693f4c9184199fc16964b08948984d1c4a407bcd38d7824266725a",
+   "dest_sha256": "b868365fec5ed142ad1723218e300f631b264da8530cca55703dcaf0ccfb4e96",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -620,6 +640,12 @@
      "old": "notification(\"Clip Editor\".into(), message, 180);",
      "new": "notification(\"Clip Editor\".into(), message.into(), 180);",
      "reason": "package 6's notification facade takes Cow arguments"
+    },
+    {
+     "old": "crate::runtime::lobby::training::practice::waiting()",
+     "new": "crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)",
+     "count": 3,
+     "reason": "package 6 retired practice::waiting (single owner, pkg6 carry ledger 'Deleted fork functions'; agreed with pkg6 5e0fab3): package 2's scene is the owner, the waiting room's practice is Scene::Lobby"
     }
    ]
   },
@@ -628,7 +654,14 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "fe00ce93cf01557122567574a0d7879becb540cbf47ecbf2ad824c7b155cff2b"
+   "dest_sha256": "d4b0669d76675c1945304ca8a537e65c6325ef30cd0412684bfe388a052d4ccc",
+   "edits": [
+    {
+     "old": "practice::primary_cpu(module)",
+     "new": "crate::runtime::features::recorder::is_primary_cpu_body(module)",
+     "reason": "package 6 retired practice::primary_cpu (single owner; agreed with pkg6 5e0fab3): package 2's primary CPU entry is the owner (recorder::is_primary_cpu_body: a practice scene, the first body of cpu::primary_entry_now)"
+    }
+   ]
   },
   {
    "src": "src/replay_move_start.rs",

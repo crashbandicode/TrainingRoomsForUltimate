@@ -336,16 +336,6 @@ static MOTION: RwLock<Motion> = RwLock::new(Motion {
     },
 });
 
-struct Legacy {
-    facing: Option<f32>,
-    status: Option<i32>,
-}
-
-static LEGACY: RwLock<Legacy> = RwLock::new(Legacy {
-    facing: None,
-    status: None,
-});
-
 pub struct PlaybackStart {
     pub facing: f32,
     pub status: i32,
@@ -872,26 +862,6 @@ pub fn cancel_motion() {
     motion.playing = false;
 }
 
-pub fn remember_legacy(facing: f32, status: i32) {
-    let mut legacy = lock_write(&LEGACY);
-    if legacy.facing.is_none() {
-        legacy.facing = Some(facing);
-        legacy.status = Some(status);
-    }
-}
-
-pub fn take_legacy() -> Option<(f32, i32)> {
-    let mut legacy = lock_write(&LEGACY);
-    match (legacy.facing.take(), legacy.status.take()) {
-        (Some(facing), Some(status)) => Some((facing, status)),
-        _ => {
-            legacy.facing = None;
-            legacy.status = None;
-            None
-        }
-    }
-}
-
 /// Close the panel and stop playback. The loaded recording stays, because a
 /// character install calls session cleanup as part of the swap this macro asked for.
 pub fn clear_session() {
@@ -944,33 +914,6 @@ pub unsafe fn request_playback() {
         Ok(()) => RESTORE_ACTION.store(2, Ordering::Relaxed),
         Err(message) => notify(message),
     }
-}
-
-/// Bound the earlier CPU position/status retry too: preparation cannot run while
-/// this phase is pending. On failure, suppress playback and let the save-state
-/// caller finish its normal charge/buff/partner cleanup without further re-pins.
-pub unsafe fn position_wait_timed_out(status: i32, target: i32) -> bool {
-    if !source_is_named() || !RESTORING.load(Ordering::Relaxed)
-        || RESTORE_ACTION.load(Ordering::Relaxed) != 2
-    {
-        return false;
-    }
-    let waits = RESTORE_POSITION_WAITS.fetch_add(1, Ordering::Relaxed);
-    if waits == 0 {
-        crate::runtime::diag_log::diagnostic(format_args!(
-            "[PracticeRecording] named_restore_wait phase=position status={} target={}", status, target
-        ));
-    }
-    if waits < 60 { return false; }
-    RESTORING.store(false, Ordering::Relaxed);
-    RESTORE_ACTION.store(0, Ordering::Relaxed);
-    *lock_write(&RESTORE_POSE) = None;
-    super::input_record::stop_playback();
-    crate::runtime::diag_log::diagnostic(format_args!(
-        "[PracticeRecording] named_restore_failed phase=position status={} target={}", status, target
-    ));
-    notify("Start position could not settle; adjust placement and retry");
-    true
 }
 
 /// Run after the CPU's restore callback. No inputs start while either fighter
@@ -1085,7 +1028,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
 }
 
 unsafe fn observation_fighter(module_accessor: &mut BattleObjectModuleAccessor) -> bool {
-    practice::primary_cpu(module_accessor)
+    crate::runtime::features::recorder::is_primary_cpu_body(module_accessor)
 }
 
 /// Pair the pre-original boundary with the post-original observations below.
