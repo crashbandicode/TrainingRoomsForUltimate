@@ -377,11 +377,7 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
 
 /// Read `save_states.json` on its own thread (stack from `model::thread_stacks`), joined here (the settings reader's rule).
 fn load_save_states() -> SaveFile {
-    let spawned = crate::runtime::threads::spawn(ThreadId::StateLoad, states::load_file);
-    match spawned {
-        Ok(handle) => handle.join().unwrap_or_default(),
-        Err(_) => states::load_file(),
-    }
+    crate::runtime::threads::run_joined(ThreadId::StateLoad, states::load_file).unwrap_or_else(|_| states::load_file())
 }
 
 /// The CPU behaviours (package 2): the per-frame wrapper first (the facts every other piece reads),
@@ -548,11 +544,7 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
 /// active path before the original is retired), is `model::settings_file::load`; this only runs it and
 /// logs its notes.
 fn load_settings() -> Settings {
-    let spawned = crate::runtime::threads::spawn(ThreadId::SettingsLoad, load_settings_inner);
-    match spawned {
-        Ok(handle) => handle.join().unwrap_or_else(|_| Settings::factory()),
-        Err(_) => load_settings_inner(),
-    }
+    crate::runtime::threads::run_joined(ThreadId::SettingsLoad, load_settings_inner).unwrap_or_else(|_| load_settings_inner())
 }
 
 fn load_settings_inner() -> Settings {

@@ -98,15 +98,55 @@ fn the_runtime_starts_threads_only_through_the_table() {
             }
         }
         for row in &THREADS {
-            if text.contains(&format!("threads::spawn(crate::model::thread_stacks::ThreadId::{:?},", row.id))
-                || text.contains(&format!("threads::spawn(ThreadId::{:?},", row.id))
+            let call = if thread_stacks::joined(row.id) { "run_joined" } else { "spawn" };
+            if text.contains(&format!("threads::{call}(crate::model::thread_stacks::ThreadId::{:?},", row.id))
+                || text.contains(&format!("threads::{call}(ThreadId::{:?},", row.id))
             {
                 used[row.id as usize] = true;
             }
         }
     }
     for row in &THREADS {
-        assert!(used[row.id as usize], "{} has no spawn site", row.name);
+        assert!(used[row.id as usize], "{} has no spawn site of its kind (joined: run_joined, else spawn)", row.name);
+    }
+}
+
+/// The static stacks of `runtime::threads` (`slots! { NAME = [Id, …]; … }`): every thread has exactly one, only the boot
+/// loaders share one, and the sizes are the table's (`slot_bytes` of the row ids, the only size expression in the macro).
+#[test]
+fn every_thread_has_one_static_stack_from_the_table() {
+    let text = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/threads.rs")).unwrap();
+    let start = text.find("    slots! {").expect("slots! block");
+    let block = &text[start..start + text[start..].find("\n    }\n").expect("end of slots!")];
+    let mut seen = vec![0; THREADS.len()];
+    let mut shared = Vec::new();
+    for line in block.lines().skip(1) {
+        let Some((_, ids)) = line.split_once("= [") else { continue };
+        let ids: Vec<&str> = ids.trim_end_matches("];").split(',').map(str::trim).collect();
+        for id in &ids {
+            let row = THREADS.iter().find(|r| format!("{:?}", r.id) == *id).unwrap_or_else(|| panic!("unknown thread {id}"));
+            seen[row.id as usize] += 1;
+        }
+        if ids.len() > 1 {
+            shared.push(ids.join(","));
+        }
+    }
+    for row in &THREADS {
+        assert_eq!(seen[row.id as usize], 1, "{}: {} static stacks", row.name, seen[row.id as usize]);
+    }
+    let loaders: Vec<String> = thread_stacks::BOOT_LOADERS.iter().map(|id| format!("{id:?}")).collect();
+    assert_eq!(shared, [loaders.join(",")], "only the boot loaders share a stack");
+    for id in thread_stacks::BOOT_LOADERS {
+        assert!(thread_stacks::joined(id), "{id:?} shares a stack, so it must be joined");
+    }
+    assert!(block.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>") || text.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>"));
+    assert_eq!(thread_stacks::slot_bytes(&thread_stacks::BOOT_LOADERS), THREADS.iter().filter(|r| thread_stacks::joined(r.id)).map(|r| r.bytes).max().unwrap());
+}
+
+#[test]
+fn names_are_the_c_names() {
+    for row in &THREADS {
+        assert_eq!(row.c_name.to_str().unwrap(), row.name);
     }
 }
 

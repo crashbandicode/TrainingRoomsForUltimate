@@ -1,30 +1,239 @@
-//! The one way the runtime starts a thread (stream/stack): its name and stack size come from `model::thread_stacks::THREADS`.
+//! The one way the runtime starts a thread (stream/stack): every plugin thread runs on a static, page-aligned stack sized
+//! from `model::thread_stacks::THREADS`, with a static thread object, created through the SDK (`nn::os::CreateThread`,
+//! `SetThreadNamePointer`, `StartThread`) as the playbook's plugins do (CHECKLIST: "a writer thread on a static stack";
+//! gsp-visualizer, ssbu-gnw-judge-log). Nothing is allocated for a stack or a name. The boot loaders (`BOOT_LOADERS`, joined
+//! one after another) share one stack; a start while a stack is in use is refused (`ErrorKind::ResourceBusy`).
 //!
-//! Diag builds also measure it. At the start of the thread the region holding its stack is read with `svcQueryMemory` at
-//! the stack pointer, logged (`[ThreadStack] spawn name=… base=… size=…`, so a fault's SP can be matched to a thread), and
-//! everything below the stack pointer is painted with `PAINT`. The heartbeat later reads each live stack from the bottom
-//! up; the first word that lost the paint is the deepest the thread has reached (`[ThreadStack] high_water name=… used=…
-//! free=… low=…`, logged when it grows; `low=true` when less than the SDK reserve is left). A thread that returns reports
-//! its own mark (`[ThreadStack] exit …`). The boot thread (Skyline's, which runs `main`) is measured the same way across
-//! `boot::run`. The shipped NRO only sets the name and size.
+//! Diag builds also measure each thread. At its start the region holding its stack is read with `svcQueryMemory` at the
+//! stack pointer (the SDK maps the static array into the stack region; the array itself is not readable meanwhile), logged
+//! (`[ThreadStack] spawn name=… base=… size=…`, so a fault's SP can be matched to a thread), and everything below the stack
+//! pointer is painted with `PAINT`. The heartbeat later reads each live stack from the bottom up; the first word that lost
+//! the paint is the deepest the thread has reached (`[ThreadStack] high_water name=… used=… free=… low=…`, logged when it
+//! grows; `low=true` when less than the SDK reserve is left). A thread that returns reports its own mark
+//! (`[ThreadStack] exit …`). The boot thread (Skyline's, which runs `main`) is measured the same way across `boot::run`.
 
 use std::io;
-use std::thread::JoinHandle;
 
-use crate::model::thread_stacks::{self, ThreadId};
+use crate::model::thread_stacks::ThreadId;
 
-/// Start the thread `id` with its table name and stack size.
-pub fn spawn<F, T>(id: ThreadId, f: F) -> io::Result<JoinHandle<T>>
+/// Start the detached thread `id` (it runs for the session or ends on its own). A closure that captures nothing is passed
+/// without an allocation; one with captures is boxed once, here, at its start (never in a hook).
+pub fn spawn<F>(id: ThreadId, f: F) -> io::Result<()>
 where
-    F: FnOnce() -> T + Send + 'static,
-    T: Send + 'static,
+    F: FnOnce() + Send + 'static,
 {
-    let row = thread_stacks::of(id);
-    std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn(move || {
+    imp::spawn(id, f)
+}
+
+/// Run `f` on the joined thread `id` and wait for it (the boot loaders). The closure and its result stay on the caller's
+/// stack; the thread object is destroyed and the stack free again when this returns.
+pub fn run_joined<F, T>(id: ThreadId, f: F) -> io::Result<T>
+where
+    F: FnOnce() -> T + Send,
+    T: Send,
+{
+    imp::run_joined(id, f)
+}
+
+#[cfg(target_os = "switch")]
+mod imp {
+    use core::cell::UnsafeCell;
+    use core::sync::atomic::{AtomicBool, Ordering};
+    use std::io;
+
+    use skyline::nn;
+
+    use crate::model::thread_stacks::{self, ThreadId, THREAD_OBJECT_BYTES};
+
+    #[repr(C, align(4096))]
+    struct Stack<const N: usize>(UnsafeCell<[u8; N]>);
+    #[repr(C, align(16))]
+    struct Object(UnsafeCell<[u8; THREAD_OBJECT_BYTES]>);
+
+    /// One thread's static stack and thread object; `busy` while a thread uses them.
+    struct Slot<const N: usize> {
+        stack: Stack<N>,
+        object: Object,
+        busy: AtomicBool,
+    }
+
+    // SAFETY: the stack and the object are handed to nn::os by the one caller that set `busy`, and touched by nothing else
+    // until the thread is destroyed (joined threads) or for the session (detached threads).
+    unsafe impl<const N: usize> Sync for Slot<N> {}
+
+    impl<const N: usize> Slot<N> {
+        const fn new() -> Self {
+            Self {
+                stack: Stack(UnsafeCell::new([0; N])),
+                object: Object(UnsafeCell::new([0; THREAD_OBJECT_BYTES])),
+                busy: AtomicBool::new(false),
+            }
+        }
+
+        fn parts(&'static self) -> Parts {
+            Parts {
+                object: self.object.0.get().cast(),
+                stack: self.stack.0.get().cast(),
+                bytes: N,
+                busy: &self.busy,
+            }
+        }
+    }
+
+    struct Parts {
+        object: *mut nn::os::ThreadType,
+        stack: *mut u8,
+        bytes: usize,
+        busy: &'static AtomicBool,
+    }
+
+    /// One static slot per thread (the boot loaders share one), each the size of its table row; diag-only and
+    /// feature-only threads have their stacks only in those builds.
+    macro_rules! slots {
+        ($( $(#[$attr:meta])* $name:ident = [$($id:ident),+]; )*) => {
+            $( $(#[$attr])* static $name: Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }> = Slot::new(); )*
+            fn parts(id: ThreadId) -> Option<Parts> {
+                #[allow(unreachable_patterns)]
+                match id {
+                    $( $(#[$attr])* $(ThreadId::$id)|+ => Some($name.parts()), )*
+                    _ => None,
+                }
+            }
+        };
+    }
+
+    slots! {
+        HEARTBEAT = [Heartbeat];
+        BOOT_LOADERS = [Import, SettingsLoad, StateLoad];
+        STATE_WRITER = [StateWriter];
+        #[cfg(feature = "diag")] STATE_DIAG = [StateDiag];
+        INI_WRITER = [IniWriter];
+        TRACE_WRITER = [TraceWriter];
+        #[cfg(feature = "diag")] DIAG_RELOAD = [DiagReload];
+        IMPORT_CAPTURES = [ImportCaptures];
+        MENU = [Menu];
+        ARCHIVE = [Archive];
+        #[cfg(feature = "diag")] PROBE = [Probe];
+        #[cfg(feature = "diag")] MACRO_DIAG = [MacroDiag];
+        REPLAY_SAVE = [ReplaySave];
+        #[cfg(feature = "mii-saved-alpha")] MII_CATALOG = [MiiCatalog];
+        #[cfg(feature = "console-practice-trace")] PRACTICE_TRACE = [PracticeTrace];
+    }
+
+    /// Create `id`'s thread on its static stack, running `entry(argument)`, and name it. `busy` is held on success.
+    fn create(id: ThreadId, entry: extern "C" fn(*mut skyline::libc::c_void), argument: *mut u8) -> io::Result<Parts> {
+        let Some(parts) = parts(id) else {
+            return Err(io::Error::other("no static stack for this thread in this build"));
+        };
+        if parts.busy.swap(true, Ordering::AcqRel) {
+            return Err(io::Error::new(io::ErrorKind::ResourceBusy, "the thread's static stack is in use"));
+        }
+        // SAFETY: the object and the stack are this slot's statics (page-aligned stack, whole pages), unused while `busy`
+        // was clear; the priority is the creating thread's, as in the playbook's plugins.
+        let result = unsafe {
+            let priority = nn::os::GetThreadPriority(nn::os::GetCurrentThread());
+            nn::os::CreateThread(parts.object, entry, argument, parts.stack, parts.bytes, priority)
+        };
+        if result != 0 {
+            parts.busy.store(false, Ordering::Release);
+            return Err(io::Error::other(format!("nn::os::CreateThread failed: {result:#x}")));
+        }
+        // SAFETY: the object was just created; the name is a static C string.
+        unsafe { nn::os::SetThreadNamePointer(parts.object, thread_stacks::of(id).c_name.as_ptr().cast()) };
+        Ok(parts)
+    }
+
+    /// A detached thread's argument: the closure, boxed (in the shipped build a closure without captures is a zero-sized
+    /// box: no allocation); the diag build adds the id for its stack report.
+    struct Detached<F> {
         #[cfg(feature = "diag")]
-        let _watch = diag::Watch::begin(id);
-        f()
-    })
+        id: ThreadId,
+        f: F,
+    }
+
+    extern "C" fn detached<F: FnOnce() + Send + 'static>(argument: *mut skyline::libc::c_void) {
+        // SAFETY: `spawn` leaked exactly this box for this thread.
+        let job = unsafe { Box::from_raw(argument.cast::<Detached<F>>()) };
+        #[cfg(feature = "diag")]
+        let _watch = super::diag::Watch::begin(job.id);
+        (job.f)();
+    }
+
+    pub fn spawn<F: FnOnce() + Send + 'static>(id: ThreadId, f: F) -> io::Result<()> {
+        let job = Box::into_raw(Box::new(Detached {
+            #[cfg(feature = "diag")]
+            id,
+            f,
+        }));
+        match create(id, detached::<F>, job.cast()) {
+            Ok(parts) => {
+                // SAFETY: created above; the thread owns `job` from here on.
+                unsafe { nn::os::StartThread(parts.object) };
+                Ok(())
+            }
+            Err(error) => {
+                // SAFETY: no thread was created, so the box is still ours.
+                drop(unsafe { Box::from_raw(job) });
+                Err(error)
+            }
+        }
+    }
+
+    /// A joined thread's closure and result, on the waiting caller's stack.
+    struct Joined<F, T> {
+        id: ThreadId,
+        f: Option<F>,
+        out: Option<T>,
+    }
+
+    extern "C" fn joined<F: FnOnce() -> T, T>(argument: *mut skyline::libc::c_void) {
+        // SAFETY: `run_joined` passes its packet and waits for this thread before reading or dropping it.
+        let packet = unsafe { &mut *argument.cast::<Joined<F, T>>() };
+        #[cfg(feature = "diag")]
+        let _watch = super::diag::Watch::begin(packet.id);
+        #[cfg(not(feature = "diag"))]
+        let _ = packet.id;
+        if let Some(f) = packet.f.take() {
+            packet.out = Some(f());
+        }
+    }
+
+    pub fn run_joined<F: FnOnce() -> T + Send, T: Send>(id: ThreadId, f: F) -> io::Result<T> {
+        if !thread_stacks::joined(id) {
+            return Err(io::Error::other("not a joined thread"));
+        }
+        let mut packet = Joined { id, f: Some(f), out: None };
+        let parts = create(id, joined::<F, T>, (&mut packet as *mut Joined<F, T>).cast())?;
+        // SAFETY: created above; the packet outlives the thread (waited for and destroyed before `packet` is read).
+        unsafe {
+            nn::os::StartThread(parts.object);
+            nn::os::WaitThread(parts.object);
+            nn::os::DestroyThread(parts.object);
+        }
+        parts.busy.store(false, Ordering::Release);
+        packet.out.ok_or_else(|| io::Error::other("the joined thread returned nothing"))
+    }
+}
+
+/// Host builds (only `tests/runtime_diag_log.rs` compiles this file there): plain std threads with the table's sizes.
+#[cfg(not(target_os = "switch"))]
+mod imp {
+    use std::io;
+
+    use crate::model::thread_stacks::{self, ThreadId};
+
+    pub fn spawn<F: FnOnce() + Send + 'static>(id: ThreadId, f: F) -> io::Result<()> {
+        let row = thread_stacks::of(id);
+        std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn(f).map(|_| ())
+    }
+
+    pub fn run_joined<F: FnOnce() -> T + Send, T: Send>(id: ThreadId, f: F) -> io::Result<T> {
+        let row = thread_stacks::of(id);
+        std::thread::scope(|scope| {
+            std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn_scoped(scope, f)?.join()
+                .map_err(|_| io::Error::other("the joined thread panicked"))
+        })
+    }
 }
 
 #[cfg(feature = "diag")]

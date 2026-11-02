@@ -22,11 +22,11 @@ fn roots() -> Roots<'static> {
 /// Run the blocking part now and start the background part. Returns the install line's `migration=`
 /// words (`done captures=running skipped_staging=3`, `skipped`, `none`, …).
 pub fn start() -> FixedPath<96> {
-    let blocking = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Import, || {
+    let blocking = crate::runtime::threads::run_joined(crate::model::thread_stacks::ThreadId::Import, || {
         run_blocking(roots(), clock::uptime_ms(), env!("CARGO_PKG_VERSION"), &mut |line| diagnostic(format_args!("{line}")))
     });
-    let stage = match blocking.map(|handle| handle.join()) {
-        Ok(Ok(stage)) => stage,
+    let stage = match blocking {
+        Ok(stage) => stage,
         _ => {
             diagnostic(format_args!("[Migration] the import thread did not run"));
             return words("skipped", None, 0);

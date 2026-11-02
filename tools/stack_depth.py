@@ -131,7 +131,7 @@ def deepest(funcs, root):
     return go(root)
 
 
-ROW_RE = re.compile(r'row\(ThreadId::(\w+),\s*"([^"]+)",\s*(\d+)\s*\*\s*KIB,\s*([\d_]+),\s*([\d_]+),\s*"[^"]*",\s*"([^"]+)"')
+ROW_RE = re.compile(r'row\(ThreadId::(\w+),\s*c?"([^"]+)",\s*(\d+)\s*\*\s*KIB,\s*([\d_]+),\s*([\d_]+),\s*"[^"]*",\s*"([^"]+)"')
 
 
 def table_rows(text):
@@ -147,9 +147,12 @@ def required(static_bound, measured):
 
 def check_table(funcs, rows):
     """Lines of the report and the number of failures."""
+    # Entries: `runtime::threads::imp::{detached,joined}::<closure>` (static stacks through nn::os, entered by the SDK's
+    # thread start), or std's `spawn_unchecked` shims (std threads, entered from `thread_start`).
+    entries = [f for f in funcs.values() if "threads::imp::detached::<" in f["name"] or "threads::imp::joined::<" in f["name"]]
     start = next((f for f in funcs.values() if f["name"].endswith("::thread_start")), None)
-    base = start["frame"] if start else 0
-    shims = [f for f in funcs.values() if "spawn_unchecked<" in f["name"] and "call_once::{shim" in f["name"]]
+    base = 0 if entries else (start["frame"] if start else 0)
+    shims = entries or [f for f in funcs.values() if "spawn_unchecked<" in f["name"] and "call_once::{shim" in f["name"]]
     lines, bad = [f"thread_start frame {base} B"], 0
     for ident, name, size, static_bound, measured, symbol in rows:
         hits = [f for f in shims if symbol in f["name"]]
