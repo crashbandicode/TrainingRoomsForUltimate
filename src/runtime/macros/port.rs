@@ -32,37 +32,10 @@ pub(crate) mod consts {
 /// The mapped input record and the game's Controller as the carried layer names them.
 pub(crate) mod input {
     pub(crate) use crate::model::input_delay::MappedInputs;
-    use crate::model::chords::{bit, field, STYLE_GAMECUBE};
+    use crate::model::chords::{field, STYLE_GAMECUBE};
 
-    /// A raw button set of the game's Controller (the chord detector's layout, SPEC-input-04 section 3.1). The left and right stick's
-    /// digital direction bits are not part of that layout, so the four stick-direction methods read false: the D-pad drives
-    /// the clip editor's scrub.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-    pub(crate) struct Buttons(pub(crate) u32);
-
-    impl Buttons {
-        const fn has(self, mask: u32) -> bool {
-            self.0 & mask != 0
-        }
-        pub(crate) const fn a(self) -> bool { self.has(bit::A) }
-        pub(crate) const fn b(self) -> bool { self.has(bit::B) }
-        pub(crate) const fn x(self) -> bool { self.has(bit::X) }
-        pub(crate) const fn y(self) -> bool { self.has(bit::Y) }
-        pub(crate) const fn l(self) -> bool { self.has(bit::L) }
-        pub(crate) const fn r(self) -> bool { self.has(bit::R) }
-        pub(crate) const fn zl(self) -> bool { self.has(bit::ZL) }
-        pub(crate) const fn zr(self) -> bool { self.has(bit::ZR) }
-        pub(crate) const fn dpad_up(self) -> bool { self.has(bit::DPAD_UP) }
-        pub(crate) const fn dpad_down(self) -> bool { self.has(bit::DPAD_DOWN) }
-        pub(crate) const fn dpad_left(self) -> bool { self.has(bit::DPAD_LEFT) }
-        pub(crate) const fn dpad_right(self) -> bool { self.has(bit::DPAD_RIGHT) }
-        pub(crate) const fn real_digital_l(self) -> bool { self.has(bit::REAL_DIGITAL_L) }
-        pub(crate) const fn real_digital_r(self) -> bool { self.has(bit::REAL_DIGITAL_R) }
-        pub(crate) const fn l_left(self) -> bool { false }
-        pub(crate) const fn l_right(self) -> bool { false }
-        pub(crate) const fn r_left(self) -> bool { false }
-        pub(crate) const fn r_right(self) -> bool { false }
-    }
+    /// The raw button set of the game's `Controller`, with the d-pad and both sticks' digital direction bits (SPEC-core-03 section 4).
+    pub(crate) use crate::model::chords::Buttons;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub(crate) enum ControllerStyle {

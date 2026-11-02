@@ -416,3 +416,16 @@ fn r2_6_an_ini_shortcut_raises_the_open_menu_request_including_plus() {
     detector.poll(&set, permanent, false);
     assert!(detector.is_pending(Request::OpenMenu));
 }
+#[test]
+fn the_button_set_reads_the_dpad_and_both_sticks_digital_directions() {
+    use model::chords::{bit, Buttons};
+    let b = Buttons(bit::L_LEFT | bit::R_UP | bit::DPAD_RIGHT | bit::ZR);
+    assert!(b.l_left() && !b.l_right() && !b.l_up() && !b.l_down());
+    assert!(b.r_up() && !b.r_left() && !b.r_right() && !b.r_down());
+    assert!(b.dpad_right() && !b.dpad_left() && b.zr() && !b.zl());
+    // the layout of SPEC-core-03 section 4: bits 20..=23 are the left stick up, right, down, left; 24..=27 the right stick's
+    assert_eq!([bit::L_UP, bit::L_RIGHT, bit::L_DOWN, bit::L_LEFT], [1 << 20, 1 << 21, 1 << 22, 1 << 23]);
+    assert_eq!([bit::R_UP, bit::R_RIGHT, bit::R_DOWN, bit::R_LEFT], [1 << 24, 1 << 25, 1 << 26, 1 << 27]);
+    assert!(Buttons(bit::REAL_DIGITAL_L).real_digital_l() && !Buttons(bit::REAL_DIGITAL_L).real_digital_r());
+    assert!(!Buttons(0).l_left());
+}
