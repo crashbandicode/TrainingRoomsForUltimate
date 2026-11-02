@@ -29,6 +29,46 @@ unsafe impl GlobalAlloc for CountAlloc {
 static ALLOCATOR: CountAlloc = CountAlloc;
 
 #[test]
+fn attached_teardown_keeps_alias_validation_and_route_order_without_allocations() {
+    use crate::engine::swap::swap_model::lifecycle::*;
+    let contexts = [
+        ContextRef { ctx: 1, controller: 11, valid: false },
+        ContextRef { ctx: 1, controller: 11, valid: true },
+        ContextRef { ctx: 2, controller: 22, valid: true },
+        ContextRef { ctx: 0, controller: 33, valid: true },
+    ];
+    let cells = [
+        BodyRef { id: 1, kind: 6, cell: 1, activated: false, valid: true, registered: Some(0) },
+        BodyRef { id: 2, kind: 6, cell: 2, activated: true, valid: false, registered: Some(0) },
+    ];
+    let consumers = NativeConsumers {
+        pad_routes: std::array::from_fn(|i| Some(RouteRef { slot: i as u8,
+            controller: if i == 0 { 11 } else if i == 1 { 33 } else { 22 } })),
+        nana_owner_plus_8: Some(22),
+    };
+    COUNT.with(|count| count.set(0));
+    TRACK.with(|track| track.set(true));
+    let mut plan = attached_plan(0, &cells, &contexts, &consumers);
+    for _ in 0..32 { plan = std::hint::black_box(attached_plan(0, &cells, &contexts, &consumers)); }
+    TRACK.with(|track| track.set(false));
+    assert_eq!(COUNT.with(Cell::get), 0);
+    assert_eq!(plan.routes.iter().map(|r| r.slot).collect::<Vec<_>>(), (2..16).collect::<Vec<u8>>());
+    assert_eq!((plan.kirby_cells, plan.kirby_misplaced, plan.kirby_branch_mismatch), (1, 1, 1));
+    let generic = destroy_plan_many(&[Bundle::Attached(AttachedGroup { owner: 0,
+        cells: cells.to_vec(), contexts: contexts.to_vec() })], &consumers);
+    assert_eq!(generic.steps, plan.routes.iter().map(|r| DestroyStep::ReleasePadRoute {
+        slot: r.slot, controller: r.controller }).collect::<Vec<_>>());
+    assert!(generic.skipped.is_empty());
+    // The model accepts value records independently of native probing. Preserve
+    // all sixteen table records plus a distinct separately probed Nana slot.
+    let distinct = NativeConsumers { pad_routes: std::array::from_fn(|i|
+        Some(RouteRef { slot: (i + PAD_SLOTS) as u8, controller: 22 })), ..consumers };
+    let plan = attached_plan(0, &cells, &contexts, &distinct);
+    assert_eq!(plan.routes.len(), PAD_SLOTS + 1);
+    assert_eq!(plan.routes.last().unwrap().slot, 8);
+}
+
+#[test]
 fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
     use crate::engine::swap::swap_model::{copy_packages as packages, copy_registry::*};
     let mut roster = [Record::DEFAULT; ENTRIES];

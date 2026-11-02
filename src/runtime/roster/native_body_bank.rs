@@ -178,7 +178,7 @@ use crate::engine::preload::cycle_preload_config::Settings;
 use crate::engine::swap::character_forms::{EntryState, Forms};
 use crate::engine::mii::lifetime::Configuration;
 use crate::engine::swap::swap_model::{capabilities, form_class, group_serves, previous_cell_index};
-use crate::engine::swap::swap_model::lifecycle::{destroy_plan_many, AttachedGroup, BodyRef, Bundle, DestroyStep, DetachedGroup, DispatcherRef, RecordsRef};
+use crate::engine::swap::swap_model::lifecycle::{attached_plan, destroy_plan_many, BodyRef, Bundle, DestroyStep, DetachedGroup, DispatcherRef, RecordsRef};
 use crate::engine::swap::swap_model::copy_registry::{self, RegistryOps};
 use crate::engine::swap::swap_model::fallback::{self, Disposition, Fallback};
 use crate::engine::swap::swap_model::request_bit::{End as LeaseEnd, Lease};
@@ -2027,7 +2027,8 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
             ([read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)], count, Default::default())
         }
     };
-    let mut cells = Vec::with_capacity(count);
+    let mut cells = crate::engine::compat::fixed::FixedList::<BodyRef, NATIVE_MEMBERS>::new(
+        BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None });
     for (i, kind) in kinds.iter().enumerate().take(count) {
         let Some(body) = fields::child(entry as usize, 0x4160 + i * 8) else { continue; };
         let id = fields::read::<u32>(body, 8).unwrap_or(0);
@@ -2043,11 +2044,10 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
     }
     let contexts = graph::window_contexts(entry as usize, |context| valid_context(base, context, owner));
     let probed = contexts.len();
-    let bundle = Bundle::Attached(AttachedGroup { owner, cells, contexts });
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(std::slice::from_ref(&bundle), &consumers);
-    if !always && plan.steps.is_empty() && plan.kirby_misplaced == 0 { return; }
-    let receipt = graph::execute(base, &plan, owner, reason, &mut |_: &[u32]| (0usize, 0usize));
+    let plan = attached_plan(owner, &cells, &contexts, &consumers);
+    if !always && plan.routes.is_empty() && plan.kirby_misplaced == 0 { return; }
+    let receipt = graph::execute_attached(base, &plan, owner, reason);
     if receipt.routes_cleared != 0 {
         trace!("[GroupSwap] pad route released owner={} reason={} contexts={} cleared={}", owner, reason, probed, receipt.routes_cleared);
     }

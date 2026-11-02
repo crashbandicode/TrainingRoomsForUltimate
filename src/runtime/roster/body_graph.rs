@@ -33,7 +33,8 @@
 //!   (`swap_model::copy_registry`) keeps them the attached window's, so a detached
 //!   body unloads over empty cells (`execute_with`'s hook, `retire_groups`).
 use crate::engine::seams::native_fields as fields;
-use crate::engine::swap::swap_model::lifecycle::{Attached, ContextRef, DestroyPlan, DestroyStep, NativeConsumers, RouteRef, PAD_SLOTS};
+use crate::engine::swap::swap_model::lifecycle::{Attached, AttachedPlan, ContextRef, DestroyPlan, DestroyStep, NativeConsumers, RouteRef, PAD_SLOTS};
+use crate::engine::compat::fixed::FixedList;
 
 macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
@@ -83,8 +84,9 @@ pub(crate) unsafe fn context_ref(context: usize, valid: bool) -> ContextRef {
 
 /// The attached window's contexts, deduplicated across `+0x4178/+0x4180/+0x4188/90/98`
 /// (the aliases select among the cell contexts; GROUP-SWAP-FEASIBILITY §2.2).
-pub(crate) unsafe fn window_contexts(entry: usize, mut valid: impl FnMut(usize) -> bool) -> Vec<ContextRef> {
-    let mut out: Vec<ContextRef> = Vec::with_capacity(WINDOW_CONTEXT_OFFSETS.len());
+pub(crate) unsafe fn window_contexts(entry: usize, mut valid: impl FnMut(usize) -> bool)
+    -> FixedList<ContextRef, { WINDOW_CONTEXT_OFFSETS.len() }> {
+    let mut out = FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false });
     for offset in WINDOW_CONTEXT_OFFSETS {
         let Some(context) = fields::child(entry, offset) else { continue; };
         if out.iter().any(|c| c.ctx == context) { continue; }
@@ -154,6 +156,23 @@ pub(crate) struct DestroyReceipt {
     pub keys_kept: usize,
     /// Obligations refused: the plan's `skipped` plus execution-time refusals.
     pub skipped: usize,
+}
+
+/// Attached-window route-only plan. Native performs the later destruction;
+/// there are no body/context/dispatcher/record/key actions to materialize.
+pub(crate) unsafe fn execute_attached(base: usize, plan: &AttachedPlan, owner: u32, reason: &str) -> DestroyReceipt {
+    let mut receipt = DestroyReceipt::default();
+    for route in plan.routes.iter() {
+        match release_pad_route(base, route.slot, route.controller) {
+            Some(true) => receipt.routes_cleared += 1,
+            Some(false) => receipt.routes_stale += 1,
+            None => receipt.skipped += 1,
+        }
+    }
+    trace!("[Destroy] plan owner={} reason={} steps={} routes_cleared={} attached=NativeRetiring routes_stale={} kirby={} kirby_misplaced={} kirby_branch_mismatch={} bodies=0 contexts=0 skipped={}",
+        owner, reason, plan.routes.len(), receipt.routes_cleared, receipt.routes_stale,
+        plan.kirby_cells, plan.kirby_misplaced, plan.kirby_branch_mismatch, receipt.skipped);
+    receipt
 }
 
 /// Run the plan in order. `release_keys` is the bank's ledger release (WP4:

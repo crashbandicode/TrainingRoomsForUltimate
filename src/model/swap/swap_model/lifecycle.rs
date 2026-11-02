@@ -63,6 +63,7 @@
 //!   leak rather than corrupt (`retire_groups` since GROUP-SWAP-IMPL §4.1).
 
 use crate::engine::swap::body_bank::KIRBY;
+use crate::engine::compat::fixed::FixedList;
 
 /// Pad-manager route slots: `S->+0x98` holds sixteen 0x20-byte route objects
 /// (`0x311db0` ticks slots `i` and `i+8` for entries 0..7).
@@ -202,6 +203,47 @@ impl DestroyPlan {
     pub fn is_empty(&self) -> bool { self.steps.is_empty() && self.skipped.is_empty() }
 }
 
+/// The attached window has no mod-owned destruction or key releases. Its entire
+/// action set is bounded by the probed route table plus the separate Nana word.
+#[derive(Clone, Copy, Debug)]
+pub struct AttachedPlan {
+    pub routes: FixedList<RouteRef, { PAD_SLOTS + 1 }>,
+    pub kirby_cells: usize,
+    pub kirby_misplaced: usize,
+    pub kirby_branch_mismatch: usize,
+}
+
+pub fn attached_plan(owner: u32, cells: &[BodyRef], contexts: &[ContextRef], consumers: &NativeConsumers) -> AttachedPlan {
+    let mut routes = FixedList::<RouteRef, { PAD_SLOTS + 1 }>::new(RouteRef { slot: 0, controller: 0 });
+    for route in matching_routes(owner, contexts, consumers) {
+        if !routes.iter().any(|old| old.slot == route.slot) { routes.push(route); }
+    }
+    let [kirby_cells, kirby_misplaced, kirby_branch_mismatch] = kirby_counts(cells);
+    AttachedPlan { routes, kirby_cells, kirby_misplaced, kirby_branch_mismatch }
+}
+
+fn matching_routes<'a>(owner: u32, contexts: &'a [ContextRef], consumers: &'a NativeConsumers)
+    -> impl Iterator<Item = RouteRef> + 'a {
+    let nana = consumers.nana_owner_plus_8.and_then(|controller| {
+        let slot = owner.saturating_add(8);
+        (slot < PAD_SLOTS as u32).then_some(RouteRef { slot: slot as u8, controller })
+    });
+    consumers.pad_routes.iter().flatten().copied().chain(nana).filter(move |route| {
+        route.controller != 0 && unique_contexts(contexts)
+            .any(|context| context.valid && context.controller == route.controller)
+    })
+}
+
+fn kirby_counts(bodies: &[BodyRef]) -> [usize; 3] {
+    let mut counts = [0; 3];
+    for body in bodies.iter().filter(|body| body.valid) {
+        counts[0] += usize::from(body.kind == KIRBY);
+        counts[1] += usize::from(body.misplaced_kirby());
+        counts[2] += usize::from(body.kirby_branch_mismatch());
+    }
+    counts
+}
+
 /// Phase buckets of one or more bundles, merged in finalize's order.
 #[derive(Default)]
 struct Phases {
@@ -226,27 +268,17 @@ impl Phases {
     /// Every route slot naming a validated context's controller is cleared
     /// first (D-PTA1c), without allocating a separate controller list.
     fn routes_for(&mut self, owner: u32, contexts: &[ContextRef], consumers: &NativeConsumers) {
-        let owns = |controller| unique_contexts(contexts)
-            .any(|context| context.valid && context.controller == controller);
-        for route in consumers.pad_routes.iter().flatten() {
-            if route.controller != 0 && owns(route.controller) { self.route(route.slot, route.controller); }
-        }
-        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.
-        if let Some(controller) = consumers.nana_owner_plus_8 {
-            let slot = owner.saturating_add(8);
-            if controller != 0 && slot < PAD_SLOTS as u32 && owns(controller) { self.route(slot as u8, controller); }
-        }
+        for route in matching_routes(owner, contexts, consumers) { self.route(route.slot, route.controller); }
     }
 
     /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the
     /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby
     /// paired with the outgoing Mario body and Mario's header word reported a false mismatch).
     fn kirby(&mut self, bodies: &[BodyRef]) {
-        for body in bodies.iter().filter(|b| b.valid) {
-            if body.kind == KIRBY { self.kirby_cells += 1; }
-            if body.misplaced_kirby() { self.kirby_misplaced += 1; }
-            if body.kirby_branch_mismatch() { self.kirby_branch_mismatch += 1; }
-        }
+        let counts = kirby_counts(bodies);
+        self.kirby_cells += counts[0];
+        self.kirby_misplaced += counts[1];
+        self.kirby_branch_mismatch += counts[2];
     }
 
     fn detached_contexts(&mut self, contexts: &[ContextRef]) {
