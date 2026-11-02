@@ -47,6 +47,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "cpu::tech_facts", owner: Some(Feature::CpuTech), gate: Gate::Flag("TECH_ON") },
     Boundary { function: "cpu::apply_tech", owner: Some(Feature::CpuTech), gate: Gate::Flag("TECH_ON") },
     Boundary { function: "cpu::apply_defence", owner: Some(Feature::CpuDefence), gate: Gate::Flag("DEFENCE_ON") },
+    // The input display's reads in the input-delay hook: dormant until boot enables the display.
+    Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -515,4 +517,19 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
     }
     .to_string();
     assert!(line.contains(" cpu_mash=not_installed reason=site:motion_kind "), "{line}");
+}
+
+/// Input Delay installs on its own rows: the input display's reads in its hook are behind the display's flag
+/// (lead ruling 2026-11-02), so rejecting `status_kind` or `fighter_manager_get_entry` turns the display off and
+/// leaves Input Delay installed.
+#[test]
+fn the_input_display_degrades_apart_from_input_delay() {
+    for row in ["status_kind", "fighter_manager_get_entry"] {
+        let usable = |s: &model::sites::Site| s.name != row;
+        assert_eq!(capabilities::blocked_by(Feature::InputDelay, &usable), None, "{row} must not block Input Delay");
+        assert_eq!(capabilities::blocked_by(Feature::InputDisplay, &usable), Some(row));
+    }
+    // The CPU core's role test is the core's own: its two reset-hub rows stay in its closure.
+    let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
+    assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
 }

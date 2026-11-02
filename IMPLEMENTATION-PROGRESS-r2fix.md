@@ -38,10 +38,11 @@ Regenerate the table after a runtime change:
 - The scanner over-approximates (a method call reaches every function of that name; a bare name reaches its own file or an imported
   one) and cannot see calls through data (function-pointer tables: the one, `ui::hud::run -> hud_draw::draw`, is declared in the test).
   A new indirect call must be declared there.
-- Per-file copy errors of the import stay SPEC-core-08 rule 4 (partial, marker written): only discovery failures withhold the marker.
-- Input Delay now needs `status_kind` and `fighter_manager_get_entry` (the input display reads them from its hook); the CPU core needs
-  the reset hub's `fighter_information` and `is_operation_cpu` (role test). That is the literal closure; it can be relaxed per call by a
-  readiness boundary.
+- Import (lead ruling 2026-11-02): every I/O error, discovery or copy, withholds `migration.json` (retry next boot); only the by-design skips
+  (staging folders, exists, too_large) allow it. SPEC-core-08 rules 4, 4a and 5 say so (docs-only commit on `review/menu-proposal`: `ad9c15f`).
+- The input display's reads in the input-delay hook (`status_kind`, `fighter_manager_get_entry`) are behind `input_display::on_p1_poll`'s own flag
+  (`Feature::InputDisplay`, a unit with no rows of its own), so Input Delay installs on its own rows and the display degrades apart. The CPU core
+  keeps the reset hub's `fighter_information` and `is_operation_cpu` in its closure (its role test is the core's own).
 
 ## Switch builds (Yoga, `trainingrooms-build-r2fix`)
 

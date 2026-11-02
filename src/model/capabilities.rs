@@ -76,7 +76,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 6] = [
     (Feature::CpuCommon, &["transition_term_hook", "work_set_float"]),
     (Feature::CpuCore, &["fighter_information", "is_operation_cpu"]),
     (Feature::CpuMash, &["motion_kind", "transition_term_hook"]),
-    (Feature::InputDelay, &["fighter_manager_get_entry", "status_kind"]),
+    (Feature::InputDisplay, &["fighter_manager_get_entry", "status_kind"]),
     (Feature::Recording, &["fighter_information", "is_operation_cpu", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
     (Feature::StateCore, &["change_status_force", "damage_of", "effect_req", "effect_req_on_joint", "fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "lua_const_lookup", "pos_x", "prev_status_kind", "situation_kind", "status_kind", "work_get_param_float", "work_is_flag", "work_set_flag", "work_set_float"]),
 ];

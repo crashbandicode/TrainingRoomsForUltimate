@@ -55,6 +55,9 @@ pub enum Feature {
     Notices,
     /// Package 5: the layout archive hook, the UI anchors and the manager global (`sites_ui.rs`).
     Ui,
+    /// The input display's reads in the input-delay hook (the P1 body's status, found through the fighter manager): no
+    /// rows of its own, only the natives it calls (R2-1). Input Delay installs on its own rows; the display degrades apart.
+    InputDisplay,
     /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
     /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
@@ -83,6 +86,7 @@ impl Feature {
             Feature::Recording => "recording",
             Feature::Notices => "notices",
             Feature::Ui => "ui",
+            Feature::InputDisplay => "input_display",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
         }

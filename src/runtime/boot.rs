@@ -28,7 +28,7 @@ use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, cpu_common, hud_draw, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
+    chords, cpu, cpu_common, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
@@ -203,6 +203,9 @@ pub fn run() {
     // The recorder calls package 2's `work_get_int` row (the ledge rest timer): its own guard gates the recorder.
     // R2-1: the recorder's closure (its own rows and the other features' rows its code calls) is checked as a
     // whole; the notices keep their own per-observer rows and only need the cross-feature part here.
+    // The input display's reads in the input-delay hook have their own flag, so Input Delay does not depend on them.
+    let display_on = capabilities::unit_usable(Feature::InputDisplay, &usable);
+    input_display::set_enabled(display_on);
     let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
     let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
@@ -257,6 +260,7 @@ pub fn run() {
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
         FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
+        report(Feature::InputDisplay, display_on, None),
         report(Feature::Recording, recording_on, None),
         report(Feature::Notices, notices_on, None),
         report(Feature::Ui, ui_install.anchors, None),
