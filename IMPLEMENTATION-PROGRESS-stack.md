@@ -54,7 +54,17 @@ check/compliance.py).
 | `/tmp/stack-a2594031/y-*.ps1` | read the claim ledger (open claims) and append one claim/release line, as `solo.ps1` does for its own owner |
 | `/tmp/stack-a2594031/tools/{add_edits,probes}.py` | record clean-room edits as exact-text manifest edits (the carry tools have no add-edit command) |
 | `/tmp/stack-a2594031/tools/{find_fault,callers,memcpys}.py` | one-off ELF queries for the fault attribution and the frame analysis |
-| Eden st-NN | will use copies of `tools/eden-solo/gv.py` / `solo.ps1` (label `st-NN`, own profile), routes per MACROS.md, tile cursor per TILE-CURSOR.md |
+| `eden/stack/gv.py`, `eden/stack/solo.ps1` | copies of the playbook's `tools/eden-solo/gv.py` / `solo.ps1` (ae87443) with a small diff (below); for the playbook as an operator decision |
+
+### Diff of the eden-solo copies (for the playbook)
+
+`gv.py` (9 lines changed): `ROOT` → `/home/intpa/trainingrooms-eden-st`; `OWNER` → `Claude 0caa72b8/stack-eden`; `OUTPUT` →
+`ultimate/TrainingRooms`; `OTHER_OUTPUTS` → the tile cursor only; `FORCED` adds `volume=0`, `volume\default=false`
+(operator rule: muted, persisted in the profile); label pattern `st-\d{2}`; set-aside folder name. Why: the playbook
+copy hard-codes gsp-visualizer's root, owner, output folders and `eNN` labels; a parameter for each would let it run as is.
+`solo.ps1` (14 lines changed): the same root, owner, label pattern; display `:99`; the gpu-lock unit names; the ledger
+texts; and before `game.load` a `settings.set core.volume 0` + `settings.save` + `settings.get` through the control API
+(operator rule 2026-10-09). Why: same hard-coding, plus the mute step the playbook copy lacks.
 
 ## The fault
 

@@ -244,16 +244,19 @@ pub use diag::{boot_begin, boot_end, headroom, report};
 #[inline(always)]
 pub fn headroom(_site: &'static str) {}
 
+
+/// The diag measurements, lock-free (stream/stack): hooks run on game threads with fixed priorities, where a spinning lock can
+/// livelock (ui-screens' menu-close finding, parking_lot's busy-spin parker), so neither the hook-entry probe nor the thread
+/// registry takes a lock; every field is an atomic, claimed with a compare-and-swap.
 #[cfg(feature = "diag")]
 mod diag {
-    use parking_lot::Mutex;
+    use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
-    use crate::model::thread_stacks::{self, ThreadId, PAINT};
+    use crate::model::thread_stacks::{self, ThreadId, PAINT, THREADS};
     use crate::runtime::diag_log::diagnostic;
 
     /// Bytes left unpainted just below the stack pointer of the painting frame (its own callees' room).
     const PAINT_GAP: usize = 1024;
-    const SLOTS: usize = 32;
 
     #[repr(C)]
     #[derive(Default)]
@@ -304,40 +307,92 @@ mod diag {
     /// Untouched bytes from `base` up (stops at `limit`).
     fn untouched(base: usize, limit: usize) -> usize {
         let mut at = base;
-        // SAFETY: the stack is mapped while its thread is registered (the scan holds the registry lock, a thread
-        // unregisters before it returns); the words are read, never written.
+        // SAFETY: the caller holds a reader count on a live slot (or is the stack's own thread); a thread waits for the
+        // readers to leave before its slot is freed and it returns; the words are read, never written.
         while at + 8 <= limit && unsafe { core::ptr::read_volatile(at as *const u64) } == PAINT {
             at += 8;
         }
         at - base
     }
 
-    #[derive(Clone, Copy)]
-    struct Slot {
-        name: &'static str,
-        base: usize,
-        size: usize,
-        reported: usize,
+    const FREE: u8 = 0;
+    const CLAIMED: u8 = 1;
+    const LIVE: u8 = 2;
+    /// A thread's row index, or `BOOT` for the boot thread.
+    const BOOT: u32 = u32::MAX;
+
+    /// One measured stack. `state` FREE → CLAIMED (fields being written) → LIVE → FREE; `readers` counts heartbeat scans.
+    struct Live {
+        state: AtomicU8,
+        readers: AtomicU32,
+        who: AtomicU32,
+        base: AtomicUsize,
+        size: AtomicUsize,
+        reported: AtomicUsize,
     }
 
-    static LIVE: Mutex<[Option<Slot>; SLOTS]> = Mutex::new([None; SLOTS]);
+    const SLOTS: usize = 32;
+    static STACKS: [Live; SLOTS] = [const {
+        Live {
+            state: AtomicU8::new(FREE),
+            readers: AtomicU32::new(0),
+            who: AtomicU32::new(0),
+            base: AtomicUsize::new(0),
+            size: AtomicUsize::new(0),
+            reported: AtomicUsize::new(0),
+        }
+    }; SLOTS];
 
-    /// Find, log and paint the current stack; `None` when the region cannot be read.
-    fn start(name: &'static str, table: usize) -> Option<Slot> {
+    fn name(who: u32) -> &'static str {
+        if who == BOOT { "boot" } else { THREADS.get(who as usize).map_or("?", |row| row.name) }
+    }
+
+    fn line(what: &str, who: u32, size: usize, used: usize) {
+        diagnostic(format_args!(
+            "[ThreadStack] {what} name={} used={used} size={size} free={} low={}",
+            name(who),
+            size.saturating_sub(used),
+            thread_stacks::low(size, used)
+        ));
+    }
+
+    /// Find, log and paint the current stack, and register it; the slot index, or `None`.
+    fn start(who: u32, table: usize) -> Option<usize> {
         let here = sp();
         let Some((base, size, kind)) = region(here) else {
-            diagnostic(format_args!("[ThreadStack] spawn name={name} sp={here:#x} region=unreadable table={table:#x}"));
+            diagnostic(format_args!("[ThreadStack] spawn name={} sp={here:#x} region=unreadable table={table:#x}", name(who)));
             return None;
         };
         diagnostic(format_args!(
-            "[ThreadStack] spawn name={name} base={base:#x} size={size:#x} top={:#x} sp={here:#x} kind={kind:#x} table={table:#x}",
+            "[ThreadStack] spawn name={} base={base:#x} size={size:#x} top={:#x} sp={here:#x} kind={kind:#x} table={table:#x}",
+            name(who),
             base + size
         ));
         if here < base + PAINT_GAP || here > base + size {
             return None;
         }
         paint(base, here - PAINT_GAP);
-        Some(Slot { name, base, size, reported: 0 })
+        let index = STACKS.iter().position(|s| s.state.compare_exchange(FREE, CLAIMED, Ordering::AcqRel, Ordering::Relaxed).is_ok())?;
+        let slot = &STACKS[index];
+        slot.who.store(who, Ordering::Relaxed);
+        slot.base.store(base, Ordering::Relaxed);
+        slot.size.store(size, Ordering::Relaxed);
+        slot.reported.store(0, Ordering::Relaxed);
+        slot.state.store(LIVE, Ordering::Release);
+        Some(index)
+    }
+
+    /// Unregister (the stack's own thread, before it returns): wait for the heartbeat's scan to leave, report, free.
+    fn finish(index: usize) {
+        let slot = &STACKS[index];
+        slot.state.store(CLAIMED, Ordering::Release);
+        while slot.readers.load(Ordering::Acquire) != 0 {
+            // A sleep, not a spin: the reader may be a lower-priority thread on this core.
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        let (base, size) = (slot.base.load(Ordering::Relaxed), slot.size.load(Ordering::Relaxed));
+        line("exit", slot.who.load(Ordering::Relaxed), size, thread_stacks::used(size, untouched(base, base + size)));
+        slot.state.store(FREE, Ordering::Release);
     }
 
     pub struct Watch {
@@ -346,96 +401,75 @@ mod diag {
 
     impl Watch {
         pub fn begin(id: ThreadId) -> Self {
-            let row = thread_stacks::of(id);
-            let Some(slot) = start(row.name, row.bytes) else { return Self { slot: None } };
-            let mut live = LIVE.lock();
-            let index = live.iter().position(Option::is_none);
-            if let Some(i) = index {
-                live[i] = Some(slot);
-            }
-            Self { slot: index }
+            Self { slot: start(id as u32, thread_stacks::of(id).bytes) }
         }
     }
 
     impl Drop for Watch {
         fn drop(&mut self) {
-            let Some(i) = self.slot else { return };
-            let mut live = LIVE.lock();
-            if let Some(slot) = live[i].take() {
-                line("exit", &slot, thread_stacks::used(slot.size, untouched(slot.base, slot.base + slot.size)));
-            }
-        }
-    }
-
-    fn line(what: &str, slot: &Slot, used: usize) {
-        diagnostic(format_args!(
-            "[ThreadStack] {what} name={} used={used} size={} free={} low={}",
-            slot.name,
-            slot.size,
-            slot.size.saturating_sub(used),
-            thread_stacks::low(slot.size, used)
-        ));
-    }
-
-    /// The heartbeat's step: one `high_water` line per live thread whose mark grew since its last line, then one
-    /// `[HookStack]` line per hook or callback site whose smallest entry room shrank since its last line.
-    pub fn report() {
-        {
-            let mut live = LIVE.lock();
-            for slot in live.iter_mut().flatten() {
-                let used = thread_stacks::used(slot.size, untouched(slot.base, slot.base + slot.size));
-                if used > slot.reported {
-                    slot.reported = used;
-                    line("high_water", slot, used);
-                }
-            }
-        }
-        let mut heads = HEADS.lock();
-        for head in heads.iter_mut().flatten() {
-            if head.min_free < head.reported {
-                head.reported = head.min_free;
-                diagnostic(format_args!(
-                    "[HookStack] site={} calls={} min_free={} stack={:#x} base={:#x}",
-                    head.name, head.calls, head.min_free, head.stack, head.base
-                ));
+            if let Some(index) = self.slot {
+                finish(index);
             }
         }
     }
 
     /// One hook or callback site: how often it ran and the least stack room it found at entry (SP minus the bottom of the
-    /// region holding SP), with that region.
-    #[derive(Clone, Copy)]
+    /// region holding SP), with that region. Claimed by the site name's address.
     struct Head {
-        name: &'static str,
-        calls: u64,
-        min_free: usize,
-        stack: usize,
-        base: usize,
-        reported: usize,
+        name: AtomicPtr<u8>,
+        len: AtomicUsize,
+        calls: AtomicU64,
+        min_free: AtomicUsize,
+        base: AtomicUsize,
+        stack: AtomicUsize,
+        reported: AtomicUsize,
     }
 
     const HEAD_SLOTS: usize = 96;
-    static HEADS: Mutex<[Option<Head>; HEAD_SLOTS]> = Mutex::new([None; HEAD_SLOTS]);
+    static HEADS: [Head; HEAD_SLOTS] = [const {
+        Head {
+            name: AtomicPtr::new(core::ptr::null_mut()),
+            len: AtomicUsize::new(0),
+            calls: AtomicU64::new(0),
+            min_free: AtomicUsize::new(usize::MAX),
+            base: AtomicUsize::new(0),
+            stack: AtomicUsize::new(0),
+            reported: AtomicUsize::new(usize::MAX),
+        }
+    }; HEAD_SLOTS];
 
-    /// Record the room left below the stack pointer at the entry of `site` (a game thread's stack, or a fiber's).
+    /// Record the room left below the stack pointer at the entry of `site` (a game thread's stack, or a fiber's). No lock,
+    /// no allocation; one `svcQueryMemory` when SP is outside the region of the site's last minimum.
     pub fn headroom(site: &'static str) {
         let here = sp();
-        let mut heads = HEADS.lock();
-        let index = match heads.iter().position(|h| h.is_some_and(|h| h.name == site)) {
-            Some(i) => i,
-            None => match heads.iter().position(Option::is_none) {
-                Some(i) => {
-                    heads[i] = Some(Head { name: site, calls: 0, min_free: usize::MAX, stack: 0, base: 0, reported: usize::MAX });
-                    i
+        let key = site.as_ptr() as *mut u8;
+        let mut found = None;
+        for head in &HEADS {
+            let current = head.name.load(Ordering::Acquire);
+            if current == key {
+                found = Some(head);
+                break;
+            }
+            if current.is_null() {
+                match head.name.compare_exchange(core::ptr::null_mut(), key, Ordering::AcqRel, Ordering::Acquire) {
+                    Ok(_) => {
+                        head.len.store(site.len(), Ordering::Release);
+                        found = Some(head);
+                        break;
+                    }
+                    Err(other) if other == key => {
+                        found = Some(head);
+                        break;
+                    }
+                    Err(_) => {}
                 }
-                None => return,
-            },
-        };
-        let Some(head) = heads[index].as_mut() else { return };
-        head.calls += 1;
-        // The region of the last minimum is reused while SP lies in it; another stack (thread, fiber) is queried.
-        let (base, size) = if head.base <= here && here < head.base + head.stack {
-            (head.base, head.stack)
+            }
+        }
+        let Some(head) = found else { return };
+        head.calls.fetch_add(1, Ordering::Relaxed);
+        let (base, stack) = (head.base.load(Ordering::Relaxed), head.stack.load(Ordering::Relaxed));
+        let (base, stack) = if base <= here && here < base + stack {
+            (base, stack)
         } else {
             match region(here) {
                 Some((base, size, _)) => (base, size),
@@ -443,25 +477,62 @@ mod diag {
             }
         };
         let free = here - base;
-        if free < head.min_free {
-            head.min_free = free;
-            head.base = base;
-            head.stack = size;
+        if free < head.min_free.fetch_min(free, Ordering::AcqRel) {
+            head.base.store(base, Ordering::Relaxed);
+            head.stack.store(stack, Ordering::Relaxed);
         }
     }
 
-    static BOOT: Mutex<Option<Slot>> = Mutex::new(None);
+    /// The heartbeat's step: one `high_water` line per live thread whose mark grew since its last line, then one
+    /// `[HookStack]` line per hook or callback site whose smallest entry room shrank since its last line.
+    pub fn report() {
+        for slot in &STACKS {
+            slot.readers.fetch_add(1, Ordering::AcqRel);
+            if slot.state.load(Ordering::Acquire) == LIVE {
+                let (base, size) = (slot.base.load(Ordering::Relaxed), slot.size.load(Ordering::Relaxed));
+                let used = thread_stacks::used(size, untouched(base, base + size));
+                if used > slot.reported.load(Ordering::Relaxed) {
+                    slot.reported.store(used, Ordering::Relaxed);
+                    line("high_water", slot.who.load(Ordering::Relaxed), size, used);
+                }
+            }
+            slot.readers.fetch_sub(1, Ordering::AcqRel);
+        }
+        for head in &HEADS {
+            let (key, len) = (head.name.load(Ordering::Acquire), head.len.load(Ordering::Acquire));
+            if key.is_null() || len == 0 {
+                continue;
+            }
+            let min = head.min_free.load(Ordering::Acquire);
+            if min < head.reported.load(Ordering::Relaxed) {
+                head.reported.store(min, Ordering::Relaxed);
+                // SAFETY: `key`/`len` are a `&'static str` a probe registered.
+                let site = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(key, len)) };
+                diagnostic(format_args!(
+                    "[HookStack] site={site} calls={} min_free={min} stack={:#x} base={:#x}",
+                    head.calls.load(Ordering::Relaxed),
+                    head.stack.load(Ordering::Relaxed),
+                    head.base.load(Ordering::Relaxed)
+                ));
+            }
+        }
+    }
+
+    static BOOT_SLOT: AtomicUsize = AtomicUsize::new(usize::MAX);
 
     /// `boot::run`'s first step: measure the thread Skyline runs `main` on, and register the hook-entry probe.
     pub fn boot_begin() {
         let _ = crate::model::hook_stats::ENTRY_PROBE.set(headroom);
-        *BOOT.lock() = start("boot", 0);
+        if let Some(index) = start(BOOT, 0) {
+            BOOT_SLOT.store(index, Ordering::Release);
+        }
     }
 
     /// `boot::run`'s last step.
     pub fn boot_end() {
-        if let Some(slot) = BOOT.lock().take() {
-            line("exit", &slot, thread_stacks::used(slot.size, untouched(slot.base, slot.base + slot.size)));
+        let index = BOOT_SLOT.swap(usize::MAX, Ordering::AcqRel);
+        if index != usize::MAX {
+            finish(index);
         }
     }
 }
