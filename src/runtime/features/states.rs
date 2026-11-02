@@ -482,9 +482,46 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 raw.entry,
                 charge::read(&ids, raw.kind, &Fields(accessor, &ids))
             ));
+            if ids.is(C::KindKirby, raw.kind) {
+                // The copy flag, the copy-chara int, and the copy module's kind (SPEC-state-05 open question 5).
+                let module = n::work_get_int64(accessor, 0x1000_0106) as usize;
+                let module_kind = if module != 0 && module % 8 == 0 { ((module + 0x17398) as *const i32).read() } else { -999 };
+                diagnostic(format_args!(
+                    "[TrainingRooms] state kirby entry={} copy_flag={} on_start={} chara={} module_kind={}",
+                    raw.entry,
+                    natives::is_flag(accessor, ids.get(C::KirbyFlagCopy)),
+                    natives::is_flag(accessor, ids.get(C::KirbyFlagCopyOnStart)),
+                    n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)),
+                    module_kind
+                ));
+            }
+            if is_pokemon_kind(raw.kind) {
+                let trainer = state_restore::trainer_of(accessor, kid(K_LINK_TRAINER));
+                diagnostic(format_args!(
+                    "[TrainingRooms] state pokemon entry={} kind={} trainer={} trainer_status={} trainer_situation={}",
+                    raw.entry,
+                    raw.kind,
+                    trainer != 0,
+                    if trainer != 0 { natives::status_kind(trainer) } else { -999 },
+                    if trainer != 0 { natives::situation_kind(trainer) } else { -999 }
+                ));
+            }
         }
         if raw.entry == 1 && !nana {
             DUMP.store(false, Ordering::Release);
+        }
+    }
+    // A diag copy request: give Kirby the opponent's hat through the game's own routine.
+    #[cfg(feature = "diag")]
+    if COPY_REQ.load(Ordering::Acquire) && raw.entry == 0 && !nana {
+        if let Some(ids) = with(|s| s.ids.clone()) {
+            if ids.is(C::KindKirby, raw.kind) {
+                COPY_REQ.store(false, Ordering::Release);
+                let opponent_kind = with(|s| s.last_kinds[1]).unwrap_or(-1);
+                let opponent_entry = FIGHTER_ENTRY[1].load(Ordering::Acquire);
+                diagnostic(format_args!("[TrainingRooms] state diag_copy kind={opponent_kind} entry={opponent_entry}"));
+                n::kirby_copy_setup(accessor, opponent_entry, opponent_kind);
+            }
         }
     }
     if !nana {
@@ -1335,6 +1372,15 @@ fn request_dump() {
     DUMP.store(true, Ordering::Release);
 }
 
+/// Diag build: Kirby copies the opponent through the game's own routine at his next frame.
+#[cfg(feature = "diag")]
+static COPY_REQ: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "diag")]
+fn request_copy() {
+    COPY_REQ.store(true, Ordering::Release);
+}
+
 /// Diag build: the Eden tests drive the Save and Load chords by creating request files in the profile's
 /// `TrainingRooms` folder (`diag-save.req`, `diag-load.req`), which this thread consumes. Not in the
 /// shipped NRO.
@@ -1355,6 +1401,7 @@ pub fn start_diag_triggers() {
             ("diag-save.req", request_save as fn()),
             ("diag-load.req", request_load as fn()),
             ("diag-pos.req", request_dump as fn()),
+            ("diag-copy.req", request_copy as fn()),
         ] {
             if let Some(path) = FixedPath::<128>::in_root(name) {
                 if std::fs::remove_file(path.as_str()).is_ok() {
