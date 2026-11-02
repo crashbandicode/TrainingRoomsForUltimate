@@ -22,7 +22,7 @@ Stream rules: `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`.
 - Merged `work/implementation` `fa8b77d` (`5f98056`). Lead rulings D1-D11 recorded in the plan section 12.
 - `tools/carry_pkg6.py` (carry / verify / ledger) and manifest; 22 files carried (seam table + unlink guards, source lifetime and load,
   roster grid, preload grace and notice queue) under `src/model/{seams,swap,preload}`, `cfg(test)`-only until their consumers land.
-- Cargo features: the fork's `[features]` table (lead-authorised read of lines 82-240, disclosed in CARRY-OVER.md), `default` = the M5o release list.
+- Cargo features: the fork's `[features]` table (lead-authorised read of lines 82-122 and 124-240 (line 123 not printed), disclosed in CARRY-OVER.md), `default` = the M5o release list.
 - Gates (host, Surface, target `cargo-targets/trainingrooms-pkg6`): `cargo test` all binaries pass (the carried unit tests run in every by-path test binary),
   `cargo clippy --all-targets -- -D warnings` clean, `cargo build --no-default-features` builds. Switch builds: not run for this tranche (no runtime change; resident
   size unchanged at the package-2 value because the carried areas are test-only).

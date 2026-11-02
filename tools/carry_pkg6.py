@@ -20,7 +20,7 @@ uses: `modules[crate][fork module] = clean-room module path`.
 A re-sync from a newer stage (W19 / W20 patched stages) is `carry --stage <name> --update` followed by the tests.
 Nothing under the stage is ever written.
 """
-import argparse, hashlib, json, os, re, sys
+import argparse, hashlib, json, os, posixpath, re, sys
 
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
@@ -47,11 +47,14 @@ def split_top(inner: str):
 
 def rewrite_path(head_crate: str, member: str, modules: dict):
     """`member` is 'name' or 'name::rest' under a crate; returns the clean-room path or None when unmapped."""
-    first, _, rest = member.partition("::")
-    dest = modules.get(head_crate, {}).get(first)
-    if dest is None:
-        return None
-    return dest + ("::" + rest if rest else "")
+    segs = member.split("::")
+    table = modules.get(head_crate, {})
+    for k in range(len(segs), 0, -1):  # longest mapped prefix wins (`training::practice_policy` before `training`)
+        dest = table.get("::".join(segs[:k]))
+        if dest is not None:
+            rest = "::".join(segs[k:])
+            return dest + ("::" + rest if rest else "")
+    return None
 
 
 def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
@@ -89,15 +92,50 @@ def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
     return text
 
 
-def transform(entry: dict, modules: dict, stage_bytes: bytes) -> bytes:
+def rewrite_includes(text: str, entry: dict, dest_by_src: dict) -> str:
+    """`include_str!("../x")` (and include_bytes!/include!): the path is resolved against the stage file, mapped to the
+    destination the manifest gives that file, and written relative to this file's destination."""
+    def inc(m):
+        rel = m.group(2)
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(entry["src"]), rel))
+        if target not in dest_by_src:
+            raise SystemExit(f"{entry['src']}: {m.group(1)}(\"{rel}\") names {target}, which is not in the manifest")
+        new = posixpath.relpath(dest_by_src[target], posixpath.dirname(entry["dest"]))
+        return f'{m.group(1)}("{new}")'
+    return re.sub(r"\b(include_str!|include_bytes!|include!)\(\s*\"([^\"]+)\"\s*\)", inc, text)
+
+
+def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict) -> bytes:
     if not entry["src"].endswith(".rs"):
         out = stage_bytes
     else:
         text = stage_bytes.decode("utf-8")
         text = rewrite_source(text, entry["crate"], modules, entry["src"])
+        text = rewrite_includes(text, entry, dest_by_src)
+        if entry.get("prepend"):
+            # after the file's leading inner doc comments (`//!`), which must stay first
+            lines = text.split("\n")
+            k = 0
+            while k < len(lines) and (lines[k].startswith("//!") or lines[k].strip() == ""):
+                k += 1
+            text = "\n".join(lines[:k]) + ("\n" if k else "") + entry["prepend"] + "\n".join(lines[k:])
         out = text.encode("utf-8")
     for e in entry.get("edits", []):
         s = out.decode("utf-8")
+        if "delete_from" in e:
+            # delete [delete_from, delete_to): `delete_from` must occur once; `delete_to` is the first occurrence after it
+            # (or, with `delete_to_last`, the last occurrence in the file); the text from delete_to on stays
+            if s.count(e["delete_from"]) != 1:
+                raise SystemExit(f"{entry['src']}: delete_from `{e['delete_from'][:60]}` matches {s.count(e['delete_from'])} times")
+            a = s.index(e["delete_from"])
+            if "delete_to_last" in e:
+                b = s.rindex(e["delete_to_last"])
+            else:
+                b = s.find(e["delete_to"], a + len(e["delete_from"]))
+            if b < 0 or b < a:
+                raise SystemExit(f"{entry['src']}: delete_to for `{e['delete_from'][:60]}` not found")
+            out = (s[:a] + s[b:]).encode("utf-8")
+            continue
         n = s.count(e["old"])
         if n != e.get("count", 1):
             raise SystemExit(f"{entry['src']}: edit `{e['old'][:60]}` matches {n} times, expected {e.get('count', 1)}")
@@ -119,6 +157,7 @@ def main():
     stage_name = a.stage or manifest["stage"]
     stage = os.path.join(STAGES, stage_name, "stage")
     modules = manifest["modules"]
+    dest_by_src = {e["src"]: e["dest"] for e in manifest["files"]}
     if a.cmd == "ledger":
         write_ledger(a.root, manifest)
         return
@@ -141,7 +180,7 @@ def main():
                 entry["src_sha256"] = src_hash
             else:
                 print("STAGE CHANGED", entry["src"], entry["src_sha256"][:12], "->", src_hash[:12]); bad += 1; continue
-        out = transform(entry, modules, data)
+        out = transform(entry, modules, data, dest_by_src)
         if a.cmd == "carry":
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             open(dest, "wb").write(out)

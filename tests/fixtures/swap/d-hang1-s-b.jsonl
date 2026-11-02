@@ -1,0 +1,8 @@
+{"ev":"flags","role":0,"note":"Training (Ally d-hang1-sep e3, fresh process)"}
+{"ev":"flags","role":1}
+{"ev":"window","role":1,"cells":[11],"actors":1,"note":"CPU Captain Falcon 0xb on the CSS (no mirror with the incoming window)"}
+{"ev":"window","role":0,"cells":[5,6,7],"actors":1,"active":0,"note":"S-B1 e3 scene 1: pick 1 → Yoshi window [5,6,7]: Yoshi active, Kirby parked and never activated, Pikachu parked; ready 6,435,370 µs"}
+{"ev":"prefetch","role":0,"group":0,"kinds":[8,9,10],"note":"[8,9,a] prefetched"}
+{"ev":"reload","role":0,"cells":[27,28,29],"actors":1,"bank":true,"note":"L6475 submit … target=0x1b → L6477 teardown … keys=3 skipped=0 → L6479 build [27,28,29] → L6481 reload incoming=(3,[1b,1c,1d]) active=(3,[5,6,7]) → L6485 [CpuPilot] admission … character_roster_loading → L6487 (+21.9 ms) Unmapped Read32 @ 0x10 → FakePageFaultHandler → the Read32@0x10/Read64@0x8 loop; no NRO unload, no published, no ready (3/3 fresh processes)"}
+{"ev":"ready","role":0,"note":"never under the old policy; under 7a the window is built without the parked Kirby and completes"}
+{"ev":"expect","role":0,"policy":"recipe+7a","loader":14,"install":false,"map":0}

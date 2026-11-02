@@ -4,7 +4,7 @@
 //! Runtime142's exact-store experiment preserved the portrait update without
 //! the white/purple flash in both directions. No texture or animation is owned here.
 
-use crate::model::seams::native_fields;
+use crate::engine::seams::native_fields;
 
 unsafe fn animation_flag(hud: usize, owner: u32) -> Option<usize> {
     if owner > 1 || !native_fields::object(hud) {

@@ -101,8 +101,16 @@ Stage **m5o**, all files `ours-new`. The table (here path, fork path, source sha
 `native_seams/tests.rs` (three path/layout edits: manifest dir is the repo root, the hook-attribute scan covers only the carried runtime areas, the owned-ELF path is one level up; and the whole-tree count of 150 hooks does not apply to the subset, so the ratchet returns while no carried hook exists)
 and `native_unlink_guard.rs` (`# Safety` heading instead of the fork's crate-level `allow(clippy::missing_safety_doc)`).
 
-Deps table (decision D3 conditions): no dependency added yet.
+Deps table (decision D3 conditions; versions are those of the fork's m5o `Cargo.lock`; license fields read from the crates' own manifests in the local cargo registry / git checkouts; resident size = `nro_size.py` of the release NRO built with `cargo skyline build --release` on the Surface at this stage's HEAD):
 
-| Crate | Version (fork m5o Cargo.lock) | License field | Resident before | Resident after | Added by |
-| --- | --- | --- | --- | --- | --- |
-| (none yet) | | | | | |
+| Crate | Version / source (m5o lock) | License field | Resident before -> after | Status |
+| --- | --- | --- | --- | --- |
+| serde (feature `derive`) + serde_derive | 1.0.229, crates.io (identical to this repo's lock) | `MIT OR Apache-2.0` (both) | 233,472 -> 233,472 B (release NRO `d2722f4d…` with and without `derive`: byte-identical, nothing in the release build uses it yet) | added (needed by the Mii crate and `trio`/`ordered_roster`) |
+| serde_json | 1.0.151, crates.io (this repo's lock had 1.0.154: `cargo update --precise 1.0.151`, offline) | `MIT OR Apache-2.0` | unchanged (same NRO) | pinned |
+| parking_lot | 0.12.5, crates.io | `MIT OR Apache-2.0` | (package 1) | already present (B9) |
+| byteflags | 0.1.0, git `https://github.com/asimon-1/byteflags.git` branch `rand-0.7.4` rev `e6ac815…` | **no `license` field** in its `Cargo.toml`; the repository `LICENSE` file is the MIT text, `Copyright (c) 2023 asimon-1`; it depends on a git `rand` (`skyline-rs/rand`), serde, serde_json | not measured | **NOT ADDED: license field missing, reported to the lead** (D3 stop condition); used only by `cycle_preload_config.rs` (4 `byteflags!` groups) |
+| skyline_smash (lib name `smash`) | 0.1.0, git `https://github.com/ultimate-research/skyline-smash.git` rev `01bf583…` | `MIT` | not yet | not added yet (needed by C7) |
+| ssbu-cpu-pilot-core | 0.1.1, git `git.syntaxbyexample.com/intpa/ssbu-cpu-pilot` tag `v0.2.1` rev `8b03e3b…` | `MIT` (the operator's crate) | not yet | not added yet (C6) |
+| deluxe-plugin-sdk | 2.0.0, no source line in the lock (path dependency); not located yet | – | – | to check at C6 |
+### pkg6 carried files, tranche 2 (C3a: Mii crate, body bank, swap model, preload and kirby policy)
+Generated ledger: `docs/provenance/pkg6-carry-ledger.md` (101 files after this tranche). New in the tool: item-level and longest-prefix module mapping, `include_str!` rewriting through the manifest, `prepend` (by-path test glue) and `delete_from`/`delete_to` edits. Edits to carried files in this tranche (each offered back through the fix ledger): `trio.rs` and `ordered_roster.rs` lose the fork's menu structure (`to_submenu`, the picker/full-menu tests: replaced by package 1's editor rows and package 5's renderer); `draft_store.rs` (re-run-by-name test filter), `practice_policy.rs` (`#[derive(Default)]` for clippy). The fork's menu names the carried code expects (`OnOff`, `TrainingModpackMenu`, `BASE_MENU`) are provided by `engine::compat::menu` (ours, not carried). Carried tests: the 12 `training_mod_mii/tests` integration files that need only the Mii crate (7 carried; `quickplay_backend`, `ldn_backend`, `source_provenance`, `heap_metrics`, `ui_archive_name` and `replay185_headgear` include other root files by path and are carried with those files).

@@ -1,0 +1,12 @@
+{"ev":"flags","role":1,"note":"Yoga LDN waiting room (b123pre-lobby, B123-pre NRO 70d1be45, PT fixture, 18:11–18:12:52Z), CPU owner 4 → role 1. R+0x48/R+0x7d/R+0x7f assumed as in Training (WORKPLAN §8.5 open fact; the [Ledger] reconcile line reports the actual bytes once WP2 lands). Raw logs logs123l/ still to be copied from Yoga: this transcription follows b123pre-lobby/PROGRESS.md"}
+{"ev":"missing_keys","role":1,"keys":[3781,3823],"note":"INF as in d-sg1-aegis-orphan: the +1 files of 0x5a/0x5b absent on this card too (same card content); to be checked against the raw map= values"}
+{"ev":"window","role":1,"cells":[9,1,5],"actors":1,"note":"18:11Z row 9: CPU window [9,1,5] build (Luigi, DK, Yoshi); warm swaps DK 53.3 ms, Yoshi 53.6 ms"}
+{"ev":"prefetch","role":1,"group":0,"kinds":[33,30,47],"note":"CPU plan group 0 [21,1e,2f]"}
+{"ev":"prefetch","role":1,"group":1,"kinds":[90,91,117],"note":"CPU plan group 1 Aegis [5a,5b] special=Native(100): the prefetch registers 5a, 5b and 0x75 (0x1332, 0x1333, 0x1338)"}
+{"ev":"build","role":1,"group":0,"note":"CPU Phase B Wario r2r 635,238 µs: group [21,1e,2f] attached, the window [9,1,5] detached into the record"}
+{"ev":"expect","role":1,"map":7,"note":"the Aegis prefetch's seven keys pending (5a {0,6}, 5b {0,6}, 75 {0,1,6}); group 0's keys consumed by its tails"}
+{"ev":"reload","role":1,"cells":[36,37,38],"actors":1,"bank":false,"note":"18:12:52Z DEFECT #2 + row 8: CPU Wolf (group [21,1e,2f] attached) → PT, outside its groups → canonical PT Reload: #475 [GroupSwap] teardown owner=4 reason=mod reload groups=2 bodies=3 contexts=3 dispatchers=1 records=0 keys=3 skipped=0 (bodies=3 = the detached [9,1,5]; keys=3 = 5a, 5b, 75 released through 0x17e8610 → 0x1338 survives); #476 reload … incoming=(3,[24,25,26]) active=(3,[21,1e,2f]); #480 [MiiOrdinaryCpu] native_return … sequence: 8 phase=Refused loader=7 published=false INSTALL_active=true → CPU stall"}
+{"ev":"expect","role":1,"policy":"old","loader":7,"install":true,"map":1,"tree":0}
+{"ev":"ready","role":1,"note":"never under the old policy; under the recipe the teardown releases 0x1338 first (release_keys_guarded → release_prefetched), the map empties and the PT canonical Reload publishes"}
+{"ev":"expect","role":1,"policy":"recipe","loader":14,"install":false,"map":0}
+{"ev":"finalize","role":1,"note":"room close 2.9 s into the stall: #490 destroyed … phase=Refused INSTALL_released=true; #492 destroy owner=4 active=(3,[24,25,26]); all entries destroyed, no new failure line (row 8: the close path during a stalled Reload is clean)"}

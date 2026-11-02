@@ -82,7 +82,7 @@ pub const SITES: [(&str, &[&str]); 4] = [
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::seams::native_seams::{all, find_site, Sharing};
+    use crate::engine::seams::native_seams::{all, find_site, Sharing};
 
     #[test]
     fn the_drill_setting_parses_and_names_both_orders() {

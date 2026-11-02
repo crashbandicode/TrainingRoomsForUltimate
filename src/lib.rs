@@ -6,5 +6,9 @@
 
 pub mod model;
 
+// The carried fork engines (package 6): test-only until their consumers land, see ngine/mod.rs.
+#[cfg(test)]
+pub mod engine;
+
 #[cfg(target_os = "switch")]
 mod runtime;

@@ -309,7 +309,7 @@ estimate (1 + 2..5 + 6) is about 4 MB, under the fork's 4.88 MB. Over-budget mea
   heading on the carried function (an edit in the manifest, offered back through the fix ledger).
 - **D10:** the lead names the W19 (F1/F2) and W20 (F3) stages; re-sync is `python3 -I tools/carry_pkg6.py carry --stage <name>
   --update`, then `ledger`, then the tests.
-- **D11 accepted: the fork's cargo feature structure is kept.** The fork's `Cargo.toml` `[features]` table (lines 82-240 of
+- **D11 accepted: the fork's cargo feature structure is kept.** The fork's `Cargo.toml` `[features]` table (lines 82-122 and 124-240 (line 123 not printed) of
   m5o, lead-authorised, disclosure in CARRY-OVER.md) is in this crate's `Cargo.toml`; sub-crate features became same-name
   features. `default` is exactly the M5o release list (`enhancements-alpha, native-unlink-guard, deluxe-sdk,
   mii-hud-portrait-alpha, cycle-preload-extended, lobby-preload-extended, native-body-bank-alpha`) so

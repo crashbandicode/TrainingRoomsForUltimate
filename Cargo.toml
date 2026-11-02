@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 # JSON for settings.json and the migration receipt. `serde` without derive: the
 # readers are hand-written visitors over `serde_json::Value` so a bad field can
 # be defaulted on its own (SPEC-core-04 §3.2, decision S2).
-serde = { version = "1", default-features = false, features = ["std"] }
+serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 
 [target.'cfg(target_os = "switch")'.dependencies]
@@ -41,7 +41,7 @@ default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-p
 diag = []
 
 # --- Carried feature table (package 6, decision D11) ---------------------------------------------------
-# Taken from the fork's root Cargo.toml lines 82-240 of stage m5o (lead-authorised, CARRY-OVER.md pkg6
+# Taken from the fork's root Cargo.toml lines 82-122 and 124-240 (line 123 not printed) of stage m5o (lead-authorised, CARRY-OVER.md pkg6
 # section). Sub-crate features of the fork (`training_mod_consts/x`, `training_mod_tui/x`) are the same-name
 # features of this one crate. `dep:` entries are added with the carry of their crate (C6).
 # Not in the shipped closure ("carried, not shipped"): every `*-probe`/`*-observer`/`*-trace`/meter feature

@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn the_r_a0_runtime_rows_get_one_line_per_group_and_per_image() {
-        use crate::model::seams::native_seams::{Image, COUNT, IMAGE_COUNT, IMAGE_SITES, SITES};
+        use crate::engine::seams::native_seams::{Image, COUNT, IMAGE_COUNT, IMAGE_SITES, SITES};
         // R-A0 (Yoga, M4): 21 main rows are checked only at runtime, after the install line.
         let runtime = |i: usize| {
             SITES[i].group == "mii_ordinary_gate" || matches!(SITES[i].label, "sources.kirby_copy_clear" | "game_mode.popup_idle")

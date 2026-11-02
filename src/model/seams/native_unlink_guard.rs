@@ -18,20 +18,20 @@ pub const ABSENT_HEADER_FIELD: u64 = 8;
 /// All non-null store destinations retain the native routine's preconditions.
 pub unsafe fn store(address: u64, value: u64, node: u64, owner: u64, header_first: bool) -> u64 {
     let mut result = 0;
-    if header_first && crate::model::seams::native_fields::read::<u64>(node as usize, 0) == Some(0) {
-        let root = crate::model::seams::native_fields::child(owner as usize, 0xa0);
+    if header_first && crate::engine::seams::native_fields::read::<u64>(node as usize, 0) == Some(0) {
+        let root = crate::engine::seams::native_fields::child(owner as usize, 0xa0);
         // The native header loop obtains node from root.first. Keep that loop
         // progressing if this one backlink disappeared. No guessed parent and
         // no write through a pointer retrieved from diagnostic history.
         if let Some(root) = root {
-            if crate::model::seams::native_fields::read::<u64>(root, 8) == Some(node) {
+            if crate::engine::seams::native_fields::read::<u64>(root, 8) == Some(node) {
                 if let (Some(next), Some(previous)) = (
-                    crate::model::seams::native_fields::read::<u64>(node as usize, 0x20),
-                    crate::model::seams::native_fields::read::<u64>(node as usize, 0x18),
+                    crate::engine::seams::native_fields::read::<u64>(node as usize, 0x20),
+                    crate::engine::seams::native_fields::read::<u64>(node as usize, 0x18),
                 ) {
-                    if crate::model::seams::native_fields::write(root, 8, next) { result |= ADVANCED_ROOT; }
-                    if crate::model::seams::native_fields::read::<u64>(root, 0x10) == Some(node)
-                        && crate::model::seams::native_fields::write(root, 0x10, previous) {
+                    if crate::engine::seams::native_fields::write(root, 8, next) { result |= ADVANCED_ROOT; }
+                    if crate::engine::seams::native_fields::read::<u64>(root, 0x10) == Some(node)
+                        && crate::engine::seams::native_fields::write(root, 0x10, previous) {
                         result |= UPDATED_ROOT_LAST;
                     }
                 } else { result |= ABSENT_HEADER_FIELD; }
