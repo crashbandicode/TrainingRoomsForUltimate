@@ -3199,7 +3199,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "dest_sha256": "1f8129d6ff65f8273dd6047fefeb7424801271fa45e59e59f40810802f75abb3",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -3210,6 +3210,16 @@
      "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
      "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
      "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "use crate::engine::swap::source_descriptor as source_descriptor;\n\n#[cfg(feature = \"managed-third-source-alpha\")]\npub(super) mod managed {\n    use super::*;\n    use std::sync::Mutex;\n    use crate::engine::swap::capacity_creation::{self as creation, ExactMiiProof, OwnerAdmission, OwnerFacts, Refusal};\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    use super::super::mii_ordinary_player::native::VisibleMii;\n    /// Without the ordinary Mii adapters there is no visible exact-Mii witness.\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n",
+     "new": "use crate::engine::swap::source_descriptor as source_descriptor;\n\n#[cfg(feature = \"managed-third-source-alpha\")]\npub(super) mod managed {\n    use super::*;\n    use hos_lock::Mutex;\n    use crate::engine::swap::capacity_creation::{self as creation, ExactMiiProof, OwnerAdmission, OwnerFacts, Refusal};\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    use super::super::mii_ordinary_player::native::VisibleMii;\n    /// Without the ordinary Mii adapters there is no visible exact-Mii witness.\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n",
+     "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "        descriptor_selector: u32,\n    }\n    type CreatedSlots = [Option<Created>; ALL_EXTRA_SLOTS.len()];\n    static CREATED: Mutex<CreatedSlots> = Mutex::new([None; ALL_EXTRA_SLOTS.len()]);\n\n    /// A poisoned table reads as empty, so every ownership check fails closed.\n    fn created() -> CreatedSlots {\n        CREATED.lock().map(|created| *created).unwrap_or([None; ALL_EXTRA_SLOTS.len()])\n    }\n\n    fn register(index: usize, record: Created) -> bool {\n        let Ok(mut created) = CREATED.lock() else {\n            return false;\n        };\n        created[index] = Some(record);\n        true\n    }\n\n    /// Native owner cleanup only; never scene departure.\n    pub(super) fn unregister(index: usize) {\n        if let Ok(mut created) = CREATED.lock() {\n            created[index] = None;\n        }\n    }\n\n    /// Registered creations as the one value Mii owner checks may accept. An\n    /// inconsistent registry (order or claim/owner) yields no extras, so any live\n    /// created entry stays unknown and every Mii shape check refuses it.\n",
+     "new": "        descriptor_selector: u32,\n    }\n    type CreatedSlots = [Option<Created>; ALL_EXTRA_SLOTS.len()];\n    static CREATED: Mutex<CreatedSlots> = Mutex::new([None; ALL_EXTRA_SLOTS.len()]);\n\n    /// Copy only registered native roots; the guard never spans native work.\n    fn created() -> CreatedSlots {\n        *CREATED.lock()\n    }\n\n    fn register(index: usize, record: Created) -> bool {\n        let mut created = CREATED.lock();\n        created[index] = Some(record);\n        true\n    }\n\n    /// Native owner cleanup only; never scene departure.\n    pub(super) fn unregister(index: usize) {\n        CREATED.lock()[index] = None;\n    }\n\n    /// Registered creations as the one value Mii owner checks may accept. An\n    /// inconsistent registry (order or claim/owner) yields no extras, so any live\n    /// created entry stays unknown and every Mii shape check refuses it.\n",
+     "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
     }
    ]
   },

@@ -93,3 +93,14 @@ uses the same constant primitive. Native panic=abort excludes the old poisoned
 fallback; no successful record or disabled-measurements behavior changes.
 The remaining catalog-broker lock is already initialized by its boot owner,
 as recorded above. Direct-call reachability does not prove indirect paths absent.
+
+
+## Managed creation registry
+
+native_source_capacity::managed CREATED is a fixed numeric receipt table.
+Only created/register/unregister acquire it; they copy or update table slots,
+without native calls or nested owner locks. init sets ENABLED after checking
+the load contract and does not initialize the old mutex. Exact80ee lock5be6c
+is reachable from eight native callback roots (all-hook-standard-locks.json).
+The constant primitive preserves exclusion and index/lifetime decisions;
+release panic=abort excludes the old poisoned empty-table continuation.
