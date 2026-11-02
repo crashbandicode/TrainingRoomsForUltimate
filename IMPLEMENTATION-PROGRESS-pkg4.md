@@ -4,14 +4,16 @@
 
 ## QUESTIONS
 
-- **New confirmed Off-to-On binding defect16:4xZ:** writer::request_replay_capture only updates
-  CAPTURE_ENABLED + file slot. Live hooks read replay_store::TOGGLE; runtime census finds request_choice
+- **Off-to-On binding defect16:4xZ / narrow Q7 interface fix:** writer::request_replay_capture only updated
+  CAPTURE_ENABLED + file slot. Live hooks read replay_store::TOGGLE; the initial runtime census found request_choice
   only in feature-gated capture_plugin (deluxe-sdk absent from defaults). Thus resident hook installation
-  alone cannot make the TrainingRooms menu arm capture. Request narrow shared hunk authorization in
-  src/runtime/features/writer.rs::request_replay_capture to invoke the existing atomic CaptureToggle
-  request_choice alongside persistence. Preserve desired/latched-record semantics (Pending during a record),
-  guard failure Unavailable and existing file-write failure semantics; no polling/second provider.
-  I can implement/gate this hunk once ownership is confirmed; independent queued gates continue.
+  alone cannot make the TrainingRooms menu arm capture. Rechecked implementation-packages: Q7 is the
+  package4 SPEC-input-04 replay interface, so this necessary wiring is within the replay task (no competing
+  writer hunk was identified). Implemented only request_replay_capture's existing boundary: call the existing
+  atomic request_choice alongside persistence and log its result. Preserve desired/latched-record semantics
+  (Pending during a record), guard failure Unavailable and existing file-write failure semantics; no polling,
+  signature change or second provider. Lead: preserve/review this narrow shared interface hunk at integration.
+  Switch compile and actual Off-to-On capture evidence remain required; no acceptance claimed.
 
 
 - Replay ownership design note for lead: Vault capture will use Copy Begin/Sample/End events to the existing
@@ -91,6 +93,13 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- HEAD2330a7a freezes receiver-resolution fix and regression fixtures; staged into Yoga own gate/target-gate.
+  Queued one cargo test --test hook_locks after pkg6/UI/slim. No claim held. Runtime syntax checks pass
+  (rustfmt emit-only, no source formatting). Rust8268f0f remains staged separately in src/target for next Switch compile.
+- Command-guard disclosure: resumed document reads and some temporary-file writes again used explicit pwsh
+  without a systemd memory scope. No compile/Eden was unclaimed or unbounded. Subsequent PowerShell-only
+  operations now run inside a bounded nested explicit pwsh; native commands retain their existing scopes.
+  This historical deviation is not relabelled as a pass.
 - Host67dad67-r2 claimed/released16:41Z. lib1175 passed0failed2ignored; hook_locks2passed1failed.
   Exact violations:
   `worker::run -> ... -> named_macros::restored_target takes macros/named_macros.rs::RESTORE_ANCHOR (called from named_macros::publish_queries)`
