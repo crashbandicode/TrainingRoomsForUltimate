@@ -72,11 +72,14 @@ def ledger(line):
 
 
 def open_claims():
+    """Owners whose last ledger line is a CLAIMED that can hold this host: a claim that names another host
+    (the Ally, the Surface) and not the Yoga is not a conflict (one Eden per host)."""
     state = {}
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
         if m:
-            state[m.group(2)] = m.group(1) == "CLAIMED"
+            elsewhere = bool(re.search(r"Ally|Surface|dreamland|ubuntu-surface", line)) and "Yoga" not in line
+            state[m.group(2)] = m.group(1) == "CLAIMED" and not elsewhere
     return [k for k, v in state.items() if v and k != OWNER]
 
 
@@ -91,7 +94,7 @@ def eden_processes():
     return [l for l in out.splitlines() if "pgrep" not in l]
 
 
-def prep(label, nros, settings, diag_txt, states=None):
+def prep(label, nros, settings, diag_txt, states=None, developer_ini=None):
     receipt = {"label": label, "time": time.time(), "source": str(SOURCE), "profile": str(PROFILE),
                "set_aside": [], "archived": []}
     assert SOURCE.name != "a" and SOURCE.is_dir()
@@ -160,6 +163,9 @@ def prep(label, nros, settings, diag_txt, states=None):
     if diag_txt:
         shutil.copyfile(diag_txt, out / "diag.txt")
         receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
+    if developer_ini:
+        shutil.copyfile(developer_ini, out / "developer.ini")  # as the card swap places it; never a marker
+        receipt["developer_ini"] = (out / "developer.ini").read_bytes().hex()
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / f"PREP-{label}.json").write_text(json.dumps(receipt, indent=2) + "\n")
     return receipt
@@ -249,8 +255,8 @@ def up(args):
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
-        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.save_states).items()
-                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt", "save_states")}))
+        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.save_states, args.developer_ini).items()
+                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt", "save_states", "developer_ini")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
                         "-Action", "Start", "-Unit", f"trp3-{label}-display", "-Socket", f"wayland-trp3-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
@@ -379,6 +385,7 @@ def main():
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
     p.add_argument("--save-states")
+    p.add_argument("--developer-ini")
     p.set_defaults(fn=up)
     p = sub.add_parser("prep")  # profile copy only: touches nothing but this tool's own work root
     p.add_argument("label", type=label_ok)
@@ -386,7 +393,8 @@ def main():
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
     p.add_argument("--save-states")
-    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt, a.save_states))))
+    p.add_argument("--developer-ini")
+    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt, a.save_states, a.developer_ini))))
     p = sub.add_parser("down")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=down)
