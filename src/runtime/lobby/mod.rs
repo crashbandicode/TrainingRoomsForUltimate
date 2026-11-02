@@ -129,6 +129,7 @@ pub(crate) unsafe fn frame(fighter: usize) {
         }
     }
     // Diag build: the character-item table's constants as the game resolves them (once).
+    // (Diagnostic instrumentation, not product code: its one-time text is not a hook allocation of the plugin.)
     #[cfg(feature = "diag")]
-    training::character_specific::items::dump_once();
+    crate::model::hook_stats::uncounted(training::character_specific::items::dump_once);
 }

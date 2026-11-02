@@ -298,9 +298,14 @@ impl TrainingModpackMenu {
 
     /// The Kirby hat order of `role` as fighter kinds (Kirby removed, the Mii classes only with the helper build).
     pub fn ordered_kirby_hat_kinds(&self, role: RosterRole) -> Vec<u32> {
+        self.ordered_kirby_hat_kinds_fixed(role).to_vec()
+    }
+
+    /// The same hat order without heap: the preload planner reads it on every planning tick inside the fighter-frame hook (R5, F10).
+    pub fn ordered_kirby_hat_kinds_fixed(&self, role: RosterRole) -> crate::engine::swap::ordered_roster::KindList {
         match role {
-            RosterRole::Player => self.player_kirby_hats.hat_kinds(),
-            RosterRole::Cpu => self.cpu_kirby_hats.hat_kinds(),
+            RosterRole::Player => self.player_kirby_hats.hat_kinds_fixed(),
+            RosterRole::Cpu => self.cpu_kirby_hats.hat_kinds_fixed(),
         }
     }
 

@@ -127,7 +127,7 @@ pub(crate) unsafe fn preload_targets(menu: &crate::engine::compat::menu::Trainin
     let Some(body)=role_body(role) else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];};
     let mut cycle={let state=STATES[role].lock().unwrap();
         if state.pending.is_some() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];} state.cycle};
-    let choices=menu.ordered_kirby_hat_kinds(if role==0 {
+    let choices=menu.ordered_kirby_hat_kinds_fixed(if role==0 {
         crate::engine::swap::roster_grid::Role::Player
     } else {crate::engine::swap::roster_grid::Role::Cpu});
     let mut equipped=equipped(body);

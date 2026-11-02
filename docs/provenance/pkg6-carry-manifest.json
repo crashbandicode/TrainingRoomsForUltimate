@@ -343,7 +343,14 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20"
+   "dest_sha256": "244f9f15922470c8a1673aa49219a4a70ef7676773d6ea7f138fdddd6e4f22b6",
+   "edits": [
+    {
+     "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
+     "new": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    let mut out = Vec::new();\n    css_order_each(kinds, values, excluded, |kind| out.push(kind));\n    out\n}\n\n/// `css_order` without heap: each kind in CSS order is handed to `each` (the planner's per-tick form).\npub fn css_order_each(kinds: &[u32], values: &[u8], excluded: Option<u32>, mut each: impl FnMut(u32)) {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .for_each(&mut each);\n}",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/cycle_admission_grace.rs",
@@ -904,7 +911,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "a282e41ee3502345704983c001207b630ecda66d60962a5b8650b72b7a8b6ebe",
+   "dest_sha256": "0e4c1df979b9e9431bba06ca916318bb7fa6964fffb58a99802d6dca56863c9a",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -930,6 +937,21 @@
      "delete_from": "    #[test]\n    fn choose_deselect_reselect_preserves_selection_order() {",
      "delete_to": "    #[test]\n    fn invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected() {",
      "reason": "two tests that select through the fork's picker; the ordering rules stay covered by the other roster tests, the picker behaviour is re-tested with the editor rows"
+    },
+    {
+     "old": "    pub fn hat_kinds(self) -> Vec<u32> {\n        self.fighters()\n            .into_iter()\n            .filter(|fighter| {\n                fighter.kind() != TrioFighter::KIRBY.kind()\n                    && (cfg!(feature=\"mii-managed-helper-alpha\") || !(0x48..=0x4a).contains(&fighter.kind()))\n            })\n            .map(|fighter| fighter.kind())\n            .collect()\n    }",
+     "new": "    pub fn hat_kinds(self) -> Vec<u32> {\n        self.hat_kinds_fixed().to_vec()\n    }\n\n    /// `hat_kinds` without heap (the preload planner's per-tick form).\n    pub fn hat_kinds_fixed(self) -> KindList {\n        let mut out = KindList::new(0);\n        for fighter in self.fighters_excluding_fixed(None).iter() {\n            if fighter.kind() != TrioFighter::KIRBY.kind()\n                && (cfg!(feature=\"mii-managed-helper-alpha\") || !(0x48..=0x4a).contains(&fighter.kind()))\n            {\n                out.push(fighter.kind());\n            }\n        }\n        out\n    }\n\n    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {\n        self.fighters_excluding_fixed(original).to_vec()\n    }\n\n    /// `fighters_excluding` without heap (the preload planner's per-tick form): All in CSS order, otherwise the ranked\n    /// fighters in rank order, the original's native group left out.\n    pub fn fighters_excluding_fixed(self, original: Option<u32>) -> FighterList {\n        let mut out = FighterList::new(TrioFighter::MARIO);\n        if self.all {\n            let mut kinds = [0u32; CHOICES.len()];\n            for (slot, (kind, _)) in kinds.iter_mut().zip(CHOICES) {\n                *slot = *kind;\n            }\n            let mut values = [0u8; CHOICES.len() + 1];\n            values[0] = 1;\n            values[1..].copy_from_slice(&self.ranks);\n            crate::engine::swap::roster_grid::css_order_each(&kinds, &values, original, |kind| {\n                if let Some(fighter) = TrioFighter::from_kind(kind) {\n                    out.push(fighter);\n                }\n            });\n            return out;\n        }\n        let excluded = original.map(crate::engine::swap::roster_grid::group_kind);\n        for rank in 1..=CHOICES.len() {\n            let Some(index) = self.ranks.iter().position(|r| usize::from(*r) == rank) else { break };\n            let Some(fighter) = TrioFighter::from_kind(CHOICES[index].0) else { continue };\n            if excluded != Some(crate::engine::swap::roster_grid::group_kind(fighter.kind())) {\n                out.push(fighter);\n            }\n        }\n        out\n    }",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
+    },
+    {
+     "delete_from": "    /// Runtime callers use the same native-group exclusion as the portrait editor.\n    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {\n        let catalog",
+     "delete_to": "\n}\n",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it (the Vec body; the new one sits after hat_kinds_fixed)"
+    },
+    {
+     "old": "/// Catalog positions stay fixed; nonzero ranks represent the user's cycle order.",
+     "new": "/// Allocation-free roster and hat lists (R5, F10): the catalog bounds their length.\npub type FighterList = crate::engine::compat::fixed::FixedList<TrioFighter, { CHOICES.len() }>;\npub type KindList = crate::engine::compat::fixed::FixedList<u32, { CHOICES.len() }>;\n\n/// Catalog positions stay fixed; nonzero ranks represent the user's cycle order.",
+     "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
     }
    ]
   },
@@ -1467,7 +1489,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
+   "dest_sha256": "b837646c326bc80efe84e1ec71606d4b0fa674fec0f7c8b41c952d0ca20d7f60",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1494,6 +1516,21 @@
      "new": "training::save_states::is_loading()",
      "count": 2,
      "reason": "the lobby facade's `save_states::is_loading` is a safe function (package 3's fact): the fork's `unsafe` blocks around it are unnecessary (an `unused_unsafe` warning)"
+    },
+    {
+     "old": "fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {\n",
+     "new": "fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {\n    roster_fixed(m, role).to_vec()\n}\n\n/// `roster` without heap (the preload planner's per-tick form).\nfn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {\n",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "        Role::Player => m.player_roster.fighters_excluding(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding(excluded),\n    };\n    fighters.into_iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())).collect()\n",
+     "new": "        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),\n    };\n    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);\n    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {\n        out.push(*f);\n    }\n    out\n",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
+    },
+    {
+     "old": "    let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();\n    let original=cycle_original(role);",
+     "new": "    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);\n    for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}\n    let original=cycle_original(role);",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
     }
    ]
   },
@@ -1516,12 +1553,17 @@
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "a2e2f8df43383b61341ad8fe0c98af8a18bf3bd1299c7531e5226e683476e485",
+   "dest_sha256": "68317af3360113961406fd8ed0adf3ee16c31c223c31f8509b5b89d46dad5c0e",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
      "new": "fn notice(role: usize, text: std::borrow::Cow<'static, str>) {",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): static texts allocate nothing in a game callback (review R5; the fork passed a `String`)"
+    },
+    {
+     "old": "    let choices=menu.ordered_kirby_hat_kinds(if role==0 {",
+     "new": "    let choices=menu.ordered_kirby_hat_kinds_fixed(if role==0 {",
+     "reason": "R5 / fix ledger F10: the preload planner reads the cycle rosters and hat orders on every planning tick inside the fighter-frame hook scope; the lists are the allocation-free `FighterList` / `KindList` there (Eden s6-06 attributed 14 allocations a second to this path)"
     }
    ]
   },
