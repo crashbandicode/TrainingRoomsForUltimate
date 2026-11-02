@@ -144,6 +144,8 @@ impl Ui {
     }
 
     /// Called every worker poll, even when the menu has closed or reset.
+    // Finish Setup snapshot/JSON scratch before sync_panels enters capture I/O.
+    #[inline(never)]
     pub fn tick(&mut self) -> Option<String> {
         if self.target.is_some_and(|target| {
             native::open(target.slot, target.enabled)
