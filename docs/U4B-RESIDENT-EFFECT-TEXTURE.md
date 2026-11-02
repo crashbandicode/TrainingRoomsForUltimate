@@ -64,3 +64,22 @@ from the resident bytes (`entry + 0x10`), requires exactly as many names as entr
 console.log: one boot-time fault per boot (~3.5 s after boot: Unmapped Write64 @ ...b80, then Cannot execute instruction at unmapped address 0) in both u4b-02 boots and in u4b-01's second boot; the same fault appears in pkg4's s4-07 (10:58Z, no u4b code). It happens long before the probe runs and the game continues to Training; not this stream's code. memory.peak 7.58 GB (8 GiB limit).
 
 Not covered: the chip page itself (pkg5 / ui-screens composes the chip from pictures()), the layout destroyed while bound (the page must unbind first, as for u4), an effect mod (the walk reads names, so a mod that keeps the names works; one that renames them answers NoEffect -> arrow).
+
+## Chips in the menu (u4b-03, 2026-11-02 13:00-13:04Z; head 23249ff, diag 5b1d89ca, release a564bcb7)
+
+The DI and SDI direction grids draw the game's own texture on each chip's pointer pane (untime::ui::chips, model::effect_chips):
+DI the streak (f_cmn_line09, 64x256, tint (200, 244, 255) = the streak emitter's colour 0 at life 0.3), SDI the burst
+(f_cmn_impact13, 256x128, white) stretched x2.0 along the vector (N10); each turned to its chip's direction; Neutral keeps the ring;
+Left / Right are In / Out. The chip tile keeps its square and weight colour (the layout has two picture panes per chip: the tile and the
+pointer). Shots: den/runs/u4b-03/shots/130155-c1-di.png, 130214-c1-sdi.png. Log: [Chips] visual=Di bound=10 texture=64x256,
+[Chips] visual=Sdi bound=10 texture=256x128, [Chips] dropped (retired) on every grid change and close.
+
+Menu open/close: 4 opens and 4 closes ([Ui] menu opened / menu closed), no hang (stream/sync merged), the game running after the last
+close (130335-c4-closed.png). Allocations: the chip path is 0 (the count stays 347 across DI bind, drop and SDI bind in one open menu,
+387 across SDI then DI in the next). Not the chip path, for the lead: the count grows by 30-40 at each menu open (also an open that
+shows no chip grid) and by about 10 per second while the menu is closed in Training (hook_stats delta=90/100 after the last close; also
++236/+101 before the first open). console.log: only the known boot-time fault at 7.27 s (stack stream). memory.peak 6.60 GB.
+
+Layout teardown: chips::lose_layout (called where the layout is re-registered or the renderer is lost, next to 	humbs::lose_layout)
+releases the texture without touching a pane; the page's decisions are ffect_chips::plan (host tests: request on open, drop on
+close or swap, failure not retried until the grid closes). Not provoked in Eden.
