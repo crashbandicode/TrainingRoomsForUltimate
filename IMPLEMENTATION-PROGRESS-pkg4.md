@@ -152,3 +152,20 @@ display (:94) and unit names are constants of this file instead of gv.py's `y`/:
 `settings.json` into the data folder; `--diag-txt`; `--seed <dir>` copies a tree into the data folder before boot (captures, macros, INI); the previous output
 folder is archived as `.before-<label>`; the ledger parser keys open claims per host (`on [the] Yoga|Surface|Ally`, a claim on another host does not block);
 `call` accepts `b64:` JSON; a `macro` subcommand plays a recorded segment. The receipts (`PREP-<label>.json`, `LAUNCH-<label>.json`) have the same role as gv.py's.
+
+### Handoff state (2026-11-02 ~12:0xZ, restart-safe)
+- Branch `stream/pkg4` at the commit below this note; merged work/implementation 7bb86fd (install.rs is integrator-3's version). No claims held. Queue: Yoga
+  line "pkg4 (10:58Z): one Yoga build then s4-08" — order per the lead: stack → hitbox → pkg4 s4-08 **after stream/sync is merged** (parking_lot spin fix;
+  the s4-07 hang and the menu-close hang are that class, ui-screens owns it).
+- Not yet built: commits after 8d0fccf (port retired earlier is built: diag 1befcc2e staged on the Yoga inbox is from 8d0fccf; it predates the 7bb86fd merge,
+  `can_emit`/`progress` wiring and compat::replay_preview forwarding). The first step of the turn is a Switch build (Yoga build folder:
+  `git archive HEAD` → `/home/intpa/trainingrooms-build-pkg4/src-head.tar`, `tar -xmf` into a fresh `src/`, `build.ps1 -Diag` and `build.ps1`, under
+  systemd-run MemoryMax=6G timeout 1800), then read the release build's warnings in `src/runtime/macros/` (lead: 35 dead-code warnings in port.rs / replay_preview /
+  named_macros at bf836c8; port.rs has since been trimmed) and wire or delete each with a line here.
+- s4-08: `tr_eden4.py up s4-08 --nro inbox/pilot/libssbu_cpu_pilot.nro --nro inbox/libssbu_tile_cursor.nro --nro inbox/diag/libtraining_rooms.nro
+  --settings inbox/boot-s48.json --seed inbox/seed-s4-03` on the Yoga (boot-s48 = Macro Source Named at boot, recording duration 60), then
+  `python3 -I eden/route4.py s4-08`, then `python3 eden/rows_s44.py s4-08` (order: named capture + stop chord, library load, named playback after a diag save,
+  Copy to Record Slot then Save slot to library, replay window list/open/crop, keyboard applet through Eden's control API, cross-fighter load + Switch via the
+  roster provider, hook counts), `tr_eden4.py down s4-08`, `scan`, `restore`, results into eden/EDEN-PACKAGE-4.md S4-4.
+- Then: host gates (`cargo test`, clippy `--all-targets -D warnings`, `--no-default-features`), Switch release+diag, `nro_size.py`, `compliance.py <worktree> --nro <release>`,
+  final report to the lead.
