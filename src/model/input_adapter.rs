@@ -3,8 +3,9 @@
 //! `InputAdapter` behind a lock and call exactly these methods:
 //!
 //! - `poll`: the P1 mapping poll (`caller_*_apply`), reading the owner mask itself;
-//! - `pause_begin` / `pause_end`: the ownership producer for the game's own pause (the hooks at the
-//!   begin and end of the Training scene's `StatePause`, `model::sites_pause`);
+//! - `pause_flag` (with `pause_begin` / `pause_end` under it): the ownership producer for the native
+//!   Training menu, fed by the game's own layout state that SPEC-core-03 section 2.4 names (the help
+//!   footer pane `L_staying_help` of `info_training` left its rest position), sampled by the UI tick;
 //! - `clear`: the reset hub's and the save-state load's queue clear.
 //!
 //! The owner mask is the atomic `published::INPUT_OWNERS` (other packages set their own bits on it).
@@ -35,6 +36,15 @@ pub fn owners(mask: &AtomicU8) -> Owners {
     Owners::from_bits(mask.load(Ordering::Acquire))
 }
 
+/// An edge of the pause flag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PauseEdge {
+    /// The menu opened; the queue held this many records and was emptied.
+    Begin { dropped: usize },
+    /// The menu closed.
+    End(PauseReport),
+}
+
 /// What a pause owned, reported when it ends.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PauseReport {
@@ -59,6 +69,7 @@ pub struct ResumeCheck {
 pub struct InputAdapter {
     queue: DelayQueue,
     report: PauseReport,
+    paused: bool,
     resume_left: u8,
     resume_delay: u8,
     resume_leaked: u32,
@@ -72,7 +83,7 @@ impl Default for InputAdapter {
 
 impl InputAdapter {
     pub const fn new() -> Self {
-        Self { queue: DelayQueue::new(), report: PauseReport { queued_at_begin: 0, owned_polls: 0, owned_non_neutral: 0 }, resume_left: 0, resume_delay: 0, resume_leaked: 0 }
+        Self { queue: DelayQueue::new(), report: PauseReport { queued_at_begin: 0, owned_polls: 0, owned_non_neutral: 0 }, paused: false, resume_left: 0, resume_delay: 0, resume_leaked: 0 }
     }
 
     /// Records in the queue.
@@ -101,10 +112,21 @@ impl InputAdapter {
         (out, check)
     }
 
+    /// The pause flag as the UI tick samples it: an edge begins or ends the pause (a repeated sample
+    /// changes nothing). `delay` is the Input Delay setting now (for the resume check).
+    pub fn pause_flag(&mut self, mask: &AtomicU8, now: bool, delay: u8) -> Option<PauseEdge> {
+        match (self.paused, now) {
+            (false, true) => Some(PauseEdge::Begin { dropped: self.pause_begin(mask) }),
+            (true, false) => Some(PauseEdge::End(self.pause_end(mask, delay))),
+            _ => None,
+        }
+    }
+
     /// The game's pause began: take over P1's input and empty the queue now. Returns how many records
     /// it dropped.
     pub fn pause_begin(&mut self, mask: &AtomicU8) -> usize {
         take(mask, Owners::VANILLA_PAUSE);
+        self.paused = true;
         let dropped = self.queue.clear(Clear::NativePause);
         self.report = PauseReport { queued_at_begin: dropped, owned_polls: 0, owned_non_neutral: 0 };
         self.resume_left = 0;
@@ -114,6 +136,7 @@ impl InputAdapter {
     /// The game's pause ended: release the input (`delay` is the setting now, for the resume check).
     pub fn pause_end(&mut self, mask: &AtomicU8, delay: u8) -> PauseReport {
         release(mask, Owners::VANILLA_PAUSE);
+        self.paused = false;
         self.queue.clear(Clear::NativePause);
         self.resume_delay = delay;
         self.resume_left = delay;

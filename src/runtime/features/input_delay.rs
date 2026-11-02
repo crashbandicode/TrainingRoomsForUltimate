@@ -111,29 +111,26 @@ pub fn clear(why: Clear) -> usize {
     ADAPTER.lock().clear(why)
 }
 
-/// The game's pause began (the hook at `StatePause`'s enter): take over P1's input and empty the queue.
-pub fn pause_begin() {
-    let dropped = ADAPTER.lock().pause_begin(&published::INPUT_OWNERS);
+/// The game's Training menu flag as the UI tick samples it (`ui::state::PAUSE_ACTIVE`, SPEC-core-03 section
+/// 2.4): an edge takes over P1's input and empties the queue (begin) or releases it (end).
+pub fn pause_flag(now: bool) {
+    use crate::model::input_adapter::PauseEdge;
+    let edge = ADAPTER.lock().pause_flag(&published::INPUT_OWNERS, now, published::input_delay());
     #[cfg(feature = "diag")]
-    diagnostic(format_args!(
-        "[TrainingRooms] pause_owner begin queue_dropped={dropped} owners={:#04x}",
-        published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
-    ));
+    match edge {
+        Some(PauseEdge::Begin { dropped }) => diagnostic(format_args!(
+            "[TrainingRooms] pause_owner begin queue_dropped={dropped} owners={:#04x}",
+            published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
+        )),
+        Some(PauseEdge::End(report)) => diagnostic(format_args!(
+            "[TrainingRooms] pause_owner end queued_at_begin={} owned_polls={} owned_non_neutral={} owners={:#04x}",
+            report.queued_at_begin,
+            report.owned_polls,
+            report.owned_non_neutral,
+            published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
+        )),
+        None => {}
+    }
     #[cfg(not(feature = "diag"))]
-    let _ = dropped;
-}
-
-/// The game's pause ended (the hook at `StatePause`'s exit): release P1's input.
-pub fn pause_end() {
-    let report = ADAPTER.lock().pause_end(&published::INPUT_OWNERS, published::input_delay());
-    #[cfg(feature = "diag")]
-    diagnostic(format_args!(
-        "[TrainingRooms] pause_owner end queued_at_begin={} owned_polls={} owned_non_neutral={} owners={:#04x}",
-        report.queued_at_begin,
-        report.owned_polls,
-        report.owned_non_neutral,
-        published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
-    ));
-    #[cfg(not(feature = "diag"))]
-    let _ = report;
+    let _ = (edge, PauseEdge::Begin { dropped: 0 });
 }

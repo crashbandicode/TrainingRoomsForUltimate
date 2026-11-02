@@ -69,8 +69,6 @@ pub mod sha256;
 pub mod sites_ui;
 #[path = "model/sites.rs"]
 pub mod sites;
-#[path = "model/sites_pause.rs"]
-pub mod sites_pause;
 #[path = "model/sites_pkg3.rs"]
 pub mod sites_pkg3;
 #[path = "model/sites_pkg4.rs"]

@@ -59,8 +59,8 @@ pub fn set_developer_page(on: bool) {
 /// What other than gameplay owns P1's input right now (`Owners` bits). The packages that own those
 /// states set and clear their bit with `model::input_adapter::{take, release}`: the plugin menu and
 /// modal panels (package 5), the named stop chord and the replay editor (package 4), the native
-/// waiting-room UI (package 6). The game's own pause is set and released by the two `StatePause` hooks
-/// (`features::pause_owner`, via `InputAdapter::pause_begin` / `pause_end`). The input-delay adapter
+/// waiting-room UI (package 6). The native Training menu is set and released by the UI tick from the
+/// game's layout state (`ui::state::PAUSE_ACTIVE`, via `InputAdapter::pause_flag`). The input-delay adapter
 /// reads the mask on every poll.
 pub static INPUT_OWNERS: AtomicU8 = AtomicU8::new(0);
 

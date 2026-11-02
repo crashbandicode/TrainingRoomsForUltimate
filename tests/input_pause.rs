@@ -1,6 +1,6 @@
 //! Review R2 of package 1: the native pause is an input owner. These tests drive the REAL ownership
-//! producer, `InputAdapter::pause_begin` / `pause_end` (the code the runtime's two `StatePause` hooks
-//! call) and the REAL poll (`InputAdapter::poll`, which reads the owner mask itself) on a mask the
+//! producer, `InputAdapter::pause_flag` over `pause_begin` / `pause_end` (the code the runtime's UI
+//! tick calls with the game's menu flag) and the REAL poll (`InputAdapter::poll`, which reads the owner mask itself) on a mask the
 //! test does not hand-fill: nothing here passes an `Owners` value to the queue.
 
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -139,4 +139,58 @@ fn delay_zero_and_repeated_transitions_are_harmless() {
     // The hub's clear is independent of the owner mask.
     polls(&mut a, &mask, 2, 1, 5, game);
     assert_eq!(a.clear(Clear::TrainingReset), 2);
+}
+
+/// The runtime's producer: the UI tick samples the game's menu flag (`ui::state::PAUSE_ACTIVE`, SPEC-core-03
+/// section 2.4) once per tick and `InputAdapter::pause_flag` turns its edges into the owner and the clear.
+/// The test is the Eden pause lane in miniature: delay 5, a held stick queued, the menu opens (flag true for
+/// many ticks, with menu input polled), closes with the stick released; the flag is sampled between polls
+/// exactly as the tick does, and nothing is handed a hand-made `Owners` value.
+#[test]
+fn the_ui_flag_edges_drive_the_owner_and_nothing_old_reaches_gameplay() {
+    use model::input_adapter::PauseEdge;
+    let mask = AtomicU8::new(0);
+    let mut a = InputAdapter::new();
+    let delay = 5;
+    let mut seen = Vec::new();
+    let mut tick = |a: &mut InputAdapter, flag: bool| {
+        if let Some(edge) = a.pause_flag(&mask, flag, delay) {
+            seen.push(edge);
+        }
+    };
+    // Gameplay with the stick held: the queue fills; the flag is false on every tick.
+    for n in 1..=12 {
+        tick(&mut a, false);
+        a.poll(&mask, delay, game(n));
+    }
+    assert_eq!(a.queued(), 5);
+    // The menu opens: the first tick with the flag true takes over and empties the queue at once.
+    tick(&mut a, true);
+    assert_eq!(owners(&mask), Owners::VANILLA_PAUSE);
+    assert_eq!(a.queued(), 0);
+    // Menu input is polled for a while (the flag stays true, repeated samples change nothing), then polls stop.
+    for n in 100..130 {
+        tick(&mut a, true);
+        assert_eq!(a.poll(&mask, delay, menu(n)).0, MappedInputs::NEUTRAL);
+    }
+    for _ in 0..20 {
+        tick(&mut a, true);
+    }
+    // The menu closes with the stick released: the owner is released at the first tick with the flag false.
+    tick(&mut a, false);
+    assert_eq!(owners(&mask), Owners::NONE);
+    let after: Vec<_> = (200..208).map(|n| {
+        tick(&mut a, false);
+        a.poll(&mask, delay, MappedInputs { buttons: n, ..MappedInputs::NEUTRAL })
+    }).collect();
+    assert!(after[..5].iter().all(|(r, _)| *r == MappedInputs::NEUTRAL), "{after:?}");
+    assert_eq!(after[5].0.buttons, 200);
+    assert_eq!(after[4].1.map(|c| (c.delay, c.leaked)), Some((5, 0)));
+    // Exactly one begin and one end were produced, and the end reports what the pause owned.
+    assert_eq!(seen.len(), 2, "{seen:?}");
+    assert_eq!(seen[0], PauseEdge::Begin { dropped: 5 });
+    match seen[1] {
+        PauseEdge::End(report) => assert_eq!((report.queued_at_begin, report.owned_polls, report.owned_non_neutral), (5, 30, 0)),
+        other => panic!("{other:?}"),
+    }
 }

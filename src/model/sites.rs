@@ -38,9 +38,6 @@ pub enum Feature {
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
     CpuShield,
-    /// The native pause owner (SPEC-input-03 §4, review R2): begin and end of the Training scene's
-    /// StatePause, rows in sites_pause.
-    PauseOwner,
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
     StateCore,
     /// Package 3: the charge writes and visuals (SPEC-state-02).
@@ -78,7 +75,6 @@ impl Feature {
             Feature::CpuLedge => "cpu_ledge",
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
-            Feature::PauseOwner => "pause_owner",
             Feature::StateCore => "state_core",
             Feature::StateCharge => "state_charge",
             Feature::StateBuff => "state_buff",

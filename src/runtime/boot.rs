@@ -16,7 +16,6 @@ use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, Se
 use crate::model::settings::{self, Settings};
 use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
-use crate::model::sites_pause;
 use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
@@ -26,7 +25,7 @@ use crate::model::sites_pkg4;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, cpu_common, input_delay, lra_reset, notices, pause_owner, recorder, reset_hub, stage_hazards as hazards, states,
+    chords, cpu, cpu_common, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
 };
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
@@ -114,10 +113,6 @@ pub fn run() {
             site.slot_outcome(game::read_slot_target(site.offset))
         };
     }
-    let mut found_pause = [GuardOutcome::Stock; sites_pause::SITES.len()];
-    for (slot, site) in found_pause.iter_mut().zip(sites_pause::SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
     let mut found4 = [GuardOutcome::Stock; sites_pkg4::SITES.len()];
     for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
@@ -173,10 +168,6 @@ pub fn run() {
     let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
     let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
 
-    // The native pause as an input owner (review R2 of package 1).
-    let mut written_pause = [Written::Skipped; sites_pause::SITES.len()];
-    let pause_on = install_pause_owner(&found_pause, &mut written_pause);
-
     // Package 5: the menu's layout archive hook, UI anchors and input callers.
     let ui_install = ui::install(&loaded, input_delay_on);
 
@@ -194,9 +185,6 @@ pub fn run() {
     });
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
-    reports.extend(
-        sites_pause::SITES.iter().enumerate().map(|(i, site)| SiteReport { site: site.name, found: found_pause[i], written: written_pause[i] }),
-    );
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
@@ -214,7 +202,6 @@ pub fn run() {
         FeatureReport { feature: Feature::Recording.name(), installed: recording_on, reason: None },
         FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
         FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
-        FeatureReport { feature: Feature::PauseOwner.name(), installed: pause_on, reason: None },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -299,23 +286,6 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
         Some("site_guard_failed")
     };
     (true, defence, ledge, tech, shield, common)
-}
-
-/// The native pause as an input owner (review R2): both hooks of `StatePause` (begin and end) or neither,
-/// so the owner bit is never raised without a hook that releases it. Returns whether they were installed.
-fn install_pause_owner(found: &[GuardOutcome], written: &mut [Written]) -> bool {
-    for (slot, outcome) in written.iter_mut().zip(found) {
-        if outcome.usable() {
-            *slot = Written::Checked;
-        }
-    }
-    if !found.iter().all(|outcome| outcome.usable()) {
-        return false;
-    }
-    skyline::install_hook!(pause_owner::pause_enter);
-    skyline::install_hook!(pause_owner::pause_exit);
-    written.fill(Written::Near);
-    true
 }
 
 /// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper
