@@ -11,7 +11,7 @@ use crate::engine::mii::{
     replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},
 };
 
-const MAX_PENDING: usize = crate::runtime::compat::replay_store::MAX_RETAINED_CAPTURES * 8;
+const MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;
 static WORK: AtomicBool = AtomicBool::new(false);
 static STATE: Mutex<State> = Mutex::new(State {
     pending: VecDeque::new(),
@@ -36,7 +36,7 @@ fn generation() -> u64 {
 }
 fn current(job: &Job) -> bool {
     job.selected.as_ref().is_none_or(|(epoch, revision, _)| {
-        *epoch == generation() && *revision == crate::runtime::compat::replay_capture::selection_revision()
+        *epoch == generation() && *revision == crate::runtime::macros::replay_capture::selection_revision()
     })
 }
 fn finish(job: Job, result: Result<Configuration, String>) {
@@ -95,8 +95,8 @@ pub(crate) fn selected(target: Target, revision: u64) -> Selection {
 /// Atomic-only query: safe while the existing ordinary CPU STATE lock is held.
 pub(super) fn revision(source: SelectionSource) -> u64 {
     match source {
-        SelectionSource::Clip => crate::runtime::compat::replay_capture::selection_revision(),
-        SelectionSource::NamedMacro => crate::runtime::lobby::training::named_macros::selection_revision(),
+        SelectionSource::Clip => crate::runtime::macros::replay_capture::selection_revision(),
+        SelectionSource::NamedMacro => crate::runtime::macros::named_macros::selection_revision(),
     }
 }
 fn named_selection(target: Target) -> Selection {
@@ -126,7 +126,7 @@ pub(crate) fn refusal(target: Target, revision: u64) -> Option<&'static str> {
 pub(crate) fn ready(target: Target, kind: u32) -> bool {
     if target.configuration().is_some() {
         mii_ordinary_cpu::replay_ready(
-            selected(target, crate::runtime::compat::replay_capture::selection_revision()),
+            selected(target, crate::runtime::macros::replay_capture::selection_revision()),
             kind,
         )
     } else {
@@ -229,7 +229,7 @@ pub(super) unsafe fn service(entry: *const u8, owner: u32) {
                 return;
             }
             let (reply, result) = mpsc::channel();
-            match crate::runtime::compat::replay_store::import_mii(configuration, catalog, reply) {
+            match crate::runtime::macros::replay_store::import_mii(configuration, catalog, reply) {
                 Ok(()) => {
                     STATE.lock().unwrap().inflight = Some(Inflight {
                         job,

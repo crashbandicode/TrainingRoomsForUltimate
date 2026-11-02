@@ -52,7 +52,7 @@ unsafe fn permitted() -> bool {
             if mode.initialized && mode.melee == 0x20 && mode.mode == 0x04040000)
         && common::is_ready_go() && !menu::captures_input()
         && !crate::runtime::lobby::training::save_states::is_loading()
-        && !crate::runtime::compat::replay_capture::loading() && !crate::runtime::compat::replay_preview::occupied()
+        && !crate::runtime::macros::replay_capture::loading() && !crate::runtime::compat::replay_preview::occupied()
 }
 
 pub unsafe fn handle_input(out: &mut MappedInputs, right: bool, x: bool) {

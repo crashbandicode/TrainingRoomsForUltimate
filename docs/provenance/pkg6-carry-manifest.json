@@ -28,6 +28,7 @@
    "swap_native::seam_install": "crate::runtime::seams::seam_install",
    "common": "crate::runtime::compat::common",
    "training": "crate::runtime::lobby::training",
+   "training::named_macros": "crate::runtime::macros::named_macros",
    "replay_preview": "crate::runtime::compat::replay_preview",
    "character_roster": "crate::runtime::roster::character_roster",
    "swap_native::special_articles": "crate::runtime::roster::special_articles",
@@ -63,8 +64,8 @@
    "heap_metrics": "crate::runtime::roster::heap_metrics",
    "common::game_mode": "crate::runtime::lobby::game_mode",
    "hazard_manager": "crate::runtime::compat::hazard_manager",
-   "replay_capture": "crate::runtime::compat::replay_capture",
-   "replay_store": "crate::runtime::compat::replay_store",
+   "replay_capture": "crate::runtime::macros::replay_capture",
+   "replay_store": "crate::runtime::macros::replay_store",
    "consts": "crate::runtime::compat::consts",
    "mii_native_access": "crate::runtime::mii::mii_native_access",
    "mii_identity_binding": "crate::runtime::mii::mii_identity_binding",
@@ -160,7 +161,7 @@
   },
   "macros": {
    "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS",
-   "MAX_RETAINED_CAPTURES": "crate::runtime::compat::replay_store::MAX_RETAINED_CAPTURES"
+   "MAX_RETAINED_CAPTURES": "crate::engine::macros::MAX_RETAINED_CAPTURES"
   },
   "log": {
    "info": "crate::engine::compat::logging::log_info",
@@ -1610,7 +1611,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "9b1dfcc620feb8b25416078e4746e1da74abc0c1a8c69bf360501510e2392d75"
+   "dest_sha256": "628b44a3dd1652be29891482dd199b25404fc6c0e790ae6b648d9867cb5bb00d"
   },
   {
    "src": "src/mii_cpu_adapter.rs",
@@ -1735,7 +1736,7 @@
    "dest": "src/runtime/mii/mii_replay.rs",
    "crate": "root",
    "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-   "dest_sha256": "8ed6cbb54b9a5137961bbd1bb7669cd2c3d6a29a920799569fc9c6ba9b8e0f40"
+   "dest_sha256": "63893afd95ba42644c811b48612eef174d35de3746c5ffff8b75a0363ca8c198"
   },
   {
    "src": "src/mii_saved_alpha.rs",
@@ -2400,7 +2401,7 @@
    "dest": "src/runtime/roster/body_bank_probe.rs",
    "crate": "root",
    "src_sha256": "0744655791096b14a4cc12c58bcdeb244aeefc33344d57ef9786d91a3e3b9cd5",
-   "dest_sha256": "9f3391cc3c8b7746151853a28f8a335bc8d9c389c42103bd0b6721db18199510"
+   "dest_sha256": "688b5d07a3e618820560e3442026077e2fd3ad9267ced38e3690ba54a4d993ae"
   },
   {
    "src": "src/native_install.rs",
@@ -2435,14 +2436,14 @@
    "dest": "src/runtime/roster/source_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "a8a341ab56a3cfe72c053a15fdf8845570faa17b30f1aa56e05d46b88bbcb00e",
-   "dest_sha256": "5ffd56eb32d76b9f14e9d43c0ea219085efce235e2b8654273073032b3ba752d"
+   "dest_sha256": "59204c4695a82aa8e5d032bff10c709358508551f476cfc2aea2f6634778ff27"
   },
   {
    "src": "src/source_ldn_capacity_probe.rs",
    "dest": "src/runtime/roster/source_ldn_capacity_probe.rs",
    "crate": "root",
    "src_sha256": "e585bd004a12d0f60c0f16e48cc76a8d84b66dd6d59953793beaad5fd1837d3c",
-   "dest_sha256": "6a95d13f92b62c2f860b595c25caef094ca16867c6ae299800db9f84bee5afbc"
+   "dest_sha256": "2b03502a03a932d7dcc39dd0130b5ad71a7cd04ca3187748e0db9a80dbe0166b"
   },
   {
    "src": "src/mii_pool_observer.rs",
