@@ -30,6 +30,8 @@ pub static DROPPED: AtomicU32 = AtomicU32::new(0);
 
 const EV_OPEN: u8 = 1;
 const EV_PRESS: u8 = 2;
+/// The session ended (leaving Training): drop the model, so the next opening starts a fresh one.
+const EV_RESET: u8 = 32;
 
 fn encode(button: Button) -> u8 {
     EV_PRESS + button as u8
@@ -76,6 +78,12 @@ fn pop() -> Option<u8> {
 
 pub fn push_open() {
     push(EV_OPEN);
+}
+
+/// The menu session ends: the worker drops its model (uncommitted edits go with it).
+pub fn push_reset() {
+    push(EV_RESET);
+    wake();
 }
 
 pub fn push_press(button: Button) {
@@ -133,6 +141,11 @@ fn run() {
 }
 
 fn handle(code: u8, menu: &mut Option<Menu>) {
+    if code == EV_RESET {
+        *menu = None;
+        diagnostic(format_args!("[Ui] menu session cleared"));
+        return;
+    }
     if code == EV_OPEN {
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         match menu {

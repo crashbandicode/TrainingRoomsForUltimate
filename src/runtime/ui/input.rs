@@ -37,6 +37,14 @@ unsafe fn read_record(holder: usize) -> Option<(u32, Style)> {
     Some((buttons, Style::from_raw(style)))
 }
 
+/// The session ended: the adapter forgets the held buttons and the open chord's progress. A poll in
+/// progress keeps its lock; the adapter is then reset by the next session end (it holds no other state).
+pub fn reset_session() {
+    if let Some(mut adapter) = ADAPTER.try_lock() {
+        *adapter = Adapter::new();
+    }
+}
+
 /// One P1 poll in Training.
 pub fn on_p1_poll(holder: usize) {
     // SAFETY: `holder` is the controller-holder argument of the game's call; the reads are the record's

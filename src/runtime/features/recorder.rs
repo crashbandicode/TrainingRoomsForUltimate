@@ -511,4 +511,6 @@ pub fn session_clear() {
     chords::session_clear();
     notices::session_clear();
     input_display::session_clear();
+    // The menu's session ends with the same departure (package 5; the fork cleared its menu and chord state together).
+    crate::runtime::ui::clear_session_state();
 }
