@@ -161,9 +161,15 @@ def format_line(p, kind, body, now=None):
     return f"{stamp(now)} {kind}: {p.owner} {body}"
 
 
-def _ssh(p, *words, **kw):
-    return subprocess.run(["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", p.ledger_ssh, *words],
-                          capture_output=True, text=True, check=True, **kw)
+def _ssh(p, *words, tries=4):
+    """ssh to the ledger host; a dropped connection is retried (a claim helper must not die on one failed read)."""
+    for attempt in range(tries):
+        r = subprocess.run(["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", p.ledger_ssh, *words],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            return r
+        time.sleep(3 * (attempt + 1))
+    raise SystemExit(f"ledger host {p.ledger_ssh} unreachable ({r.returncode}): {r.stderr.strip()[:200]}")
 
 
 def local_ledger(p):

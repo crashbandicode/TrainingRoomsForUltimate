@@ -6,7 +6,8 @@ Ally owned-rig adapters W20's w20.py and the m5q wa.py). They differed in the ri
 memory limit. Those are now the harness's Ally parameters, read from `wa.config.json` beside this file (written by
 ally/client.py `deploy` from params.py: TR_ALLY_ROOT, TR_ALLY_CLAIM, TR_ALLY_MEM_GIB, TR_ALLY_EDEN_SHA) or from the
 same TR_ALLY_* variables. The root defaults to the lent rig C:/Eden/c1162-w5-ally, the only Ally rig TrainingRooms
-may run (it has an inbound firewall Block rule; restart rules 2026-11-02).
+may run (its operator-added inbound Allow rules mean Windows does not prompt; this file and the harness have no firewall step,
+and never add, change or remove a rule for it).
 
   wa.py launch PHASE             bounded Job launcher (run from a scheduled task, console-less)
   wa.py ops PHASE BASE64JSON     list of ops, each reply appended to runs\\PHASE\\ops.jsonl, JSON printed

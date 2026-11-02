@@ -95,7 +95,7 @@ $env:TR_HOST='ally'; /usr/bin/python3 -I eden/harness/route.py st-01     # AllyT
 /usr/bin/python3 -I eden/harness/ally/client.py kill st-01 ; restore   # restore verifies against the pre manifest, puts the CLAIM back
 ```
 
-Claims for the Ally go through the same ledger (`TR_HOST=ally`: "on Ally"). Never answer or dismiss a firewall prompt.
+Claims for the Ally go through the same ledger (`TR_HOST=ally`: "on Ally"). **Firewall:** the harness has no firewall step and never adds, changes or removes a rule. The lent rig's inbound Allow rules are the operator's, placed on purpose, so Training rows do not prompt; never answer or dismiss a prompt. A Block rule for a rig `eden.exe` may be added by hand (operator, 2026-11-02): record name, path and UTC time; the harness has no helper for it (Training rows need none; LDN/online from the Ally needs the lead's OK).
 The Ally variant could not be run from here; its host tests cover the log wait and the parameters only.
 
 ## What the copies differed in (measured against `eden/tr_eden.py` at `7bb86fd` and the streams' tips)

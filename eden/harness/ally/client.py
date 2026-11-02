@@ -5,8 +5,8 @@ launch), ally_conf.py (the rig root: TR_ALLY_ROOT, default the lent rig) and ede
 setaside/boot/restore, kill, shots through Eden's recorder), which were the same code with a stream's name in it.
 The parameters are the harness's (params.py): TR_ALLY_ROOT, TR_ALLY_CLAIM, TR_PREFIX, TR_OUTPUT.
 Remote Windows commands run through the MSI PowerShell 7 (`C:\\Program Files\\PowerShell\\7\\pwsh.exe`, never
-cmd.exe or Windows PowerShell 5.1) with the rig's ssh options. Never answer or dismiss a firewall prompt; the lent
-rig has an inbound Block rule (restart rules 2026-11-02).
+cmd.exe or Windows PowerShell 5.1) with the rig's ssh options. No step here touches the firewall: the lent rig's inbound
+Allow rules are the operator's (never added, changed or removed by the harness); never answer or dismiss a prompt.
 
     client.py deploy                       wa.py, wa.config.json, stage.ps1 and the macros -> <rig>\\tr-<prefix>\\
     client.py stage <set> <nro>...         payload <set>: the NROs and their sha256.txt
@@ -51,7 +51,7 @@ def host(p):
 
 
 def ps(p, snippet, timeout=120):
-    enc = base64.b64encode(snippet.encode("utf-16-le")).decode()
+    enc = base64.b64encode(("$ProgressPreference = 'SilentlyContinue'; " + snippet).encode("utf-16-le")).decode()
     cmd = f'"{PWSH}" -NoLogo -NoProfile -NonInteractive -EncodedCommand {enc}'
     r = subprocess.run(["/usr/bin/timeout", str(timeout), "/usr/bin/ssh", *SSH, host(p), cmd], capture_output=True, text=True)
     return (r.stdout + r.stderr).strip()
