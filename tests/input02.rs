@@ -399,3 +399,14 @@ fn plan_buffer_holds_a_full_redraw() {
     assert!(plan.ops().len() <= PLAN_MAX);
     assert_eq!(count(&plan, |op| matches!(op, Op::Row { .. })), 15);
 }
+
+#[test]
+fn fade_table_is_the_formula() {
+    for ttl in 1..200u32 {
+        let exact = 255.0 / 201f64.log10() * f64::from(ttl + 1).log10();
+        let got = f64::from(fade_alpha(ttl));
+        assert!((got - exact).abs() < 1.0, "ttl {ttl}: table {got}, formula {exact}");
+        assert!(got <= exact + 1e-9, "truncated, never rounded up (ttl {ttl})");
+    }
+    assert_eq!((fade_alpha(0), fade_alpha(200), fade_alpha(10_000)), (0, 255, 255));
+}
