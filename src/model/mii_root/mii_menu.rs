@@ -190,6 +190,7 @@ pub struct CatalogMenu {
     before: Preferences,
     class: MiiClass,
     role: Option<Role>,
+    list_mode: bool,
     cursor: usize,
     rows: Vec<DropdownRow>,
     #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -210,6 +211,7 @@ impl CatalogMenu {
             before: preferences.clone(),
             class: MiiClass::Brawler,
             role: None,
+            list_mode: false,
             cursor: 0,
             rows: Vec::new(),
             #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -310,14 +312,37 @@ impl CatalogMenu {
     }
     pub fn open_class(&mut self, class: MiiClass) {
         self.class = class;
+        self.list_mode = false;
         self.role = None;
         self.cursor = if self.editor_only { 2 } else { 0 };
         self.rows.clear();
     }
 
+    /// The approved class list: saved/replay entries and Add New, with one active role.
+    pub fn open_list(&mut self, class: MiiClass, preferences: &Preferences) {
+        self.open_class(class);
+        self.list_mode = true;
+        self.set_list_role(Role::Player, preferences);
+    }
+
+    fn set_list_role(&mut self, role: Role, preferences: &Preferences) {
+        self.role = Some(role);
+        self.rows = selection::dropdown(&self.snapshot, preferences, role, self.class, self.context.original);
+        self.cursor = if self.editor_only { self.rows.len() } else {
+            self.rows.iter().position(|row| row.selected).unwrap_or(0)
+        };
+    }
+
+    pub fn switch_list_role(&mut self, preferences: &Preferences) {
+        if self.list_mode && !self.editor_only {
+            let role = if self.role == Some(Role::Player) { Role::Cpu } else { Role::Player };
+            self.set_list_role(role, preferences);
+        }
+    }
+
     pub fn step(&mut self, delta: isize) {
         if self.editor_only { return; }
-        let count = if self.role.is_some() { self.rows.len() } else { 3 };
+        let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode) } else { 3 };
         if count != 0 {
             self.cursor = self.cursor.saturating_add_signed(delta).min(count - 1);
         }
@@ -326,7 +351,8 @@ impl CatalogMenu {
     /// Seed is copied by value; selecting Add New never edits a native saved row.
     #[cfg(feature = "mii-editor-alpha")]
     pub fn editor_seed(&self, preferences: &Preferences) -> Option<EditorRequest> {
-        if self.role.is_some() || self.cursor != 2 || !self.snapshot.is_complete() {
+        let add_new = if self.list_mode { self.cursor == self.rows.len() } else { self.role.is_none() && self.cursor == 2 };
+        if !add_new || !self.snapshot.is_complete() {
             return None;
         }
         let preferred = selection::resolve(&self.snapshot, preferences, Role::Player,
@@ -346,9 +372,13 @@ impl CatalogMenu {
                 // Names and save IDs are never the selection identity.
                 if let Ok(next) = preferences.clone().with(role, self.class, Some(row.canonical)) {
                     *preferences = next;
-                    self.role = None;
-                    self.cursor = usize::from(role == Role::Cpu);
-                    self.rows.clear();
+                    if self.list_mode {
+                        self.set_list_role(role, preferences);
+                    } else {
+                        self.role = None;
+                        self.cursor = usize::from(role == Role::Cpu);
+                        self.rows.clear();
+                    }
                 }
             }
         } else if self.cursor < 2 {
@@ -362,6 +392,7 @@ impl CatalogMenu {
 
     /// true means the class page remains open; false returns to Character Extras.
     pub fn back(&mut self) -> bool {
+        if self.list_mode { return false; }
         if let Some(role) = self.role.take() {
             self.cursor = usize::from(role == Role::Cpu);
             self.rows.clear();
@@ -413,12 +444,16 @@ impl CatalogMenu {
             let page_size = crate::model::panes::ROWS;
             let start = self.cursor / page_size * page_size;
             let visible = self.rows.iter().enumerate().skip(start).take(page_size);
-            let labels = visible.clone().map(|(index, row)| {
+            let mut labels: Vec<String> = visible.clone().map(|(index, row)| {
                 let moves: String = row.canonical.appearance.specials.iter()
                     .map(|value| char::from(b'1' + *value)).collect();
                 format!("{}. {}{} [{}]", index + 1, if row.selected { "✓ " } else { "" }, row.name, moves)
             }).collect();
-            let disabled = visible.map(|(_, row)| row.greyed).collect();
+            let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();
+            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {
+                labels.push("Add New…".into());
+                disabled.push(!cfg!(feature = "mii-editor-alpha") || !self.snapshot.is_complete());
+            }
             View { panel: macro_panel::View {
                 title: format!("{title} — {}", if role == Role::Player { "Player" } else { "CPU" }),
                 labels,

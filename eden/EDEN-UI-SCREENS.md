@@ -3,6 +3,39 @@
 Dated 2026-11-02. Stream `ui-screens` (lead 0caa72b8). Screenshots and logs: `eden/runs/<label>/` (gitignored); the shots of the
 rows are listed per run.
 
+## Current acceptance status (ui-screens successor, 2026-11-02)
+
+The historical runs below are not acceptance evidence for the current candidate.
+In particular, their `Unmapped` failures must not be dismissed in the final gate:
+every retained final run requires zero `Unmapped` and zero hook allocation deltas.
+
+Waiting archive/tick/HUD source through `cd09454` is **not yet runtime accepted**.
+Builder `44177d8` built and passed 11 tests; private generation/payload/pane evidence
+is in `runs/ui-waiting-build-44177d8/`. The 549 added panes preserve all 63 stock
+pane records and all 183 non-layout archive payloads. This establishes artifact
+construction, not rendering or native lifetime safety.
+
+The ui-11 driver now uses `hook_stats.gate` on complete log lines and requires
+archive/menu-draw coverage, every delta zero and the final allocation total zero.
+`gate_layout_archives` checks the separate per-load counter, matching releases
+and the 5,000 ms minimum grace; no skipped injection passes. All raw lines and
+row results are retained. A failure exits the row driver nonzero.
+
+Still required in admitted, muted, batched Eden runs:
+
+| Rows | Required evidence |
+| --- | --- |
+| ui-11 roster and Solo Popo | selections and role-specific marks persist; open/close and swap remain responsive |
+| Portraits | native costume/mod-aware image, absent-image text fallback, repeated pages and layout retirement |
+| Mii lists | all three classes, saved/replay entries, role switch, available busts, selection and Add New/editor actions |
+| Waiting host | menu/input/notices; native pause/dialog ownership; request off/on hides/restores the host; Training/waiting transitions and same-address registration refresh |
+| B3 and archive lifetime | modified archive injected via vanilla base; zero per-load allocations; every release >=5 s; boot/re-enter/stage/mode/hot-swap/reset hand-outs and any buffer-pressure refusal counted |
+
+Each final run retains source/NRO identity, full diagnostics and console log,
+`run.json`, `memory.peak`, reviewed screenshots and verified profile restoration.
+Waiting-room hosting must use an authorized host; this stream does not host from
+the Ally.
+
 ## ui-01 .. ui-05: Ally, rig `C:\Eden\trainingrooms-pkg5` (before the restart rules; that rig had no firewall rule)
 Build: diag of `a67c349` + the install-line fix (`81fcfdce…`), CPU pilot, tile cursor, nro_hook, param_hook. Route: Final Destination,
 Steve vs the CPU. Rows that ran (ui-05, shots in `eden/runs/ui-05/shots/`):
@@ -40,3 +73,17 @@ The freezes of ui-02/ui-04/ui-05 were first read as the firewall prompt of that 
   `thread_parker/generic.rs`, whose `park()` is a pure `spin_loop()`. Under Horizon's fixed priorities, a waiter that spins on the
   holder's core keeps the holder from ever running again, and the guest livelocks. Fix: the `sync` stream (kernel address-arbitration
   locks, no hook waits).
+
+## ui-12: failed diagnostic batch, restored 2026-11-02 16:30Z
+- Rust cd09454, diag NRO935f95c656d9ad837fc3da362c489f35b40d57d617d5a21a65cc3691a90d0fed. Existing lent Ally rig; muted before load, offline Training, pilot/provider coexistence.
+- Menu worker exhausted its56KiB stack. Spawn base0x10e76b5000; first unmapped write0x10e76b487c below that base; high-water57344/free0. Game continued near60fps but the menu blanked. Static direct path71680B; candidate008b564 removes nested Frame construction/copies and awaits gates.
+-18167 Unmapped lines; hook total408. Single training archive load0/release5007ms is narrow evidence, not a reload/lifetime pass. Roster/Solo/portrait acceptance FAILED; unchanged pre-existing settings made two permissive row checks false-positive. Driver now selects All before deterministic ranks, requires exact Mario/DK/Samus choices, and checks both Solo role transitions.
+- Raw console/diagnostics, run.json, memory.peak5232082944B, screenshots, row JSON, restore receipt, static trace and SHA manifest retained in runs/ui-12. Restore mismatches[] and kept-tree changes[], original rig CLAIM restored; ledger released. No final acceptance inferred.
+## ui-13: stack/roster regression, overall failed; restored 2026-11-02 17:35Z
+- Frozen8d296e2 diag3344f2377d486b6e01cf6e9091f93cd6050b9eacfb544cde6e868769c8a785ab; muted offline Ally Training with pilot/providers/tile.
+- Exact PlayerMario/DK ranks, CPUMario rank, Samusonehot and independent Solo toggles passed. Screens show labels/ranks/S marks. Menu highwater32336/61440, free29104, lowfalse; policyrequired61440. Fullconsole0Unmapped. Trainingarchive load0/grace passed for one hand-out only.
+- OverallFAIL: finalhooktotal1262 (row-end752), mostlyroster_preload1038; menu_draw1 remains. Portraitrequested0 despite texturehelperusable. Rootwrongguardregistry identified; correction not yet runtime tested. No finalacceptance/modportrait/reloadclaim.
+- Rawlogs/run.json/rows/screens/restoremanifest/evidence.json in runs/ui-13. memory.peak5239590912 from WindowsJob PeakJobMemoryUsed in run.json. Restored5plugins/2exefs/87ultimatefiles/qt with mismatches[] and keptchanges[], originalCLAIM, freshEdenprocess0; ledgerreleased17:35:29Z.
+
+## ui-14 — portrait guard-domain fix164dc3e
+The native roster guard now admits 86 portrait keys and all86 textures bind on each exercised role/page. Mario/DK ranks, CPU Mario and Samus pick pass; screenshots retain labels and runtime portraits. Full finalconsole0Unmapped; menu high-water32336/61440 (29104free), archivezero/grace pass. OverallFAIL: finalhooktotal1632 and originalCPU Solo row absent. Separate gated-by-screenshot CPU toggle persisted[1,0] without changingPlayer[1,0]; this does not erase the batch failure. Updateddriver waits for freshCPU portrait readiness beforeY and remainsungated. Costume/modreplacement/fightermissingtexture tests remainopen. Evidence: runs/ui-14 including failedrows, followupshots/settings, finalrawlogs, run.json, memory.peak5288398848 and restoremanifest. Profile fullyrestored17:58:44Z and claimreleased17:59Z.

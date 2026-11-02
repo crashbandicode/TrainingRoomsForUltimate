@@ -154,12 +154,21 @@ struct Session {
     panel: Option<Editor>,
     /// Why the last panel refused to open, shown on the row's help line until the next press.
     refusal: Option<&'static str>,
+    /// The open roster grid's editor (role, previewed forms), kept across presses.
+    roster: Option<crate::editors::roster::RosterEditor>,
+    mii: Option<crate::editors::mii::MiiList>,
+    #[cfg(feature = "mii-saved-alpha")]
+    opening: u32,
+    #[cfg(feature = "mii-saved-alpha")]
+    pending_close: Option<crate::runtime::mii::menu_handoff::CloseIntent>,
 }
 
 impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
-        self.phase != Phase::Menu
+        #[cfg(feature = "mii-saved-alpha")]
+        if self.pending_close.is_some() { return true; }
+        self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
     }
 }
 
@@ -198,6 +207,10 @@ fn handle(code: u8, s: &mut Session) {
         s.menu = None;
         s.panel = None;
         s.refusal = None;
+        s.roster = None;
+        s.mii = None;
+        #[cfg(feature = "mii-saved-alpha")]
+        { s.pending_close = None; }
         if s.phase == Phase::Clip {
             EXT_SHOWN.store(false, Ordering::Release);
         }
@@ -213,11 +226,17 @@ fn handle(code: u8, s: &mut Session) {
         }
         s.panel = None;
         s.refusal = None;
+        s.roster = None;
+        s.mii = None;
+        #[cfg(feature = "mii-saved-alpha")]
+        { s.pending_close = None; }
         if s.phase == Phase::Panel {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
         crate::runtime::ui::menu_app::note_open();
+        #[cfg(feature = "mii-saved-alpha")]
+        { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
         diagnostic(format_args!("[Ui] menu opened"));
         return;
@@ -226,7 +245,11 @@ fn handle(code: u8, s: &mut Session) {
     if s.menu.is_none() || !OPEN.load(Ordering::Acquire) || s.phase == Phase::Clip {
         return;
     }
+    #[cfg(feature = "mii-saved-alpha")]
+    if s.pending_close.is_some() { return; }
     s.refusal = None;
+    #[cfg(feature = "mii-editor-alpha")]
+    let mut editor_request = None;
     let panel = s.phase == Phase::Panel;
     let closed = {
         let Some(m) = s.menu.as_mut() else { return };
@@ -234,6 +257,24 @@ fn handle(code: u8, s: &mut Session) {
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
             external::press_panel(button);
+        } else if matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))) && button != Button::B {
+            if let Some(list) = s.mii.as_mut() {
+                #[cfg(feature = "mii-editor-alpha")]
+                if button == Button::A {
+                    editor_request = list.editor_request();
+                }
+                #[cfg(feature = "mii-editor-alpha")]
+                if editor_request.is_some() {
+                    // Add New leaves the list and closes the menu; its native
+                    // request is posted with the captured epoch before OPEN falls.
+                    m.press(Button::B);
+                    m.press(Button::B);
+                } else {
+                    list.press(button, m);
+                }
+                #[cfg(not(feature = "mii-editor-alpha"))]
+                list.press(button, m);
+            }
         } else {
             m.press(button);
             if let Some(item) = m.take_give_item() {
@@ -242,13 +283,17 @@ fn handle(code: u8, s: &mut Session) {
             if let Some((tile, button)) = m.take_stage_press() {
                 stage_press(m, tile, button, &mut s.refusal);
             }
+            if let Some((tile, button)) = m.take_roster_press() {
+                roster_press(m, &mut s.roster, tile, button);
+            }
         }
         m.is_closed()
     };
     if closed {
-        if let Some(m) = s.menu.as_mut() {
-            close(m);
-        }
+        begin_close(s,
+            #[cfg(feature = "mii-editor-alpha")]
+            editor_request,
+        );
     } else {
         sync_panels(s);
     }
@@ -261,7 +306,15 @@ fn sync_panels(s: &mut Session) {
     if s.menu.is_none() {
         return;
     }
+    #[cfg(feature = "mii-saved-alpha")]
+    if s.pending_close.is_some() {
+        retry_close(s);
+        if s.pending_close.is_some() { return; }
+    }
     let open = OPEN.load(Ordering::Acquire);
+    if open {
+        sync_mii(s);
+    }
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
             Some(Screen::External(editor)) if external::is_layer_panel(*editor) => Some(*editor),
@@ -301,8 +354,13 @@ fn sync_panels(s: &mut Session) {
             s.panel = None;
             if let Some(m) = s.menu.as_mut() {
                 m.press(Button::B);
-                close(m);
             }
+            begin_close(s,
+                #[cfg(feature = "mii-editor-alpha")]
+                None,
+            );
+            #[cfg(feature = "mii-saved-alpha")]
+            if s.pending_close.is_some() { return; }
         }
         Step::HideClip => {
             EXT_SHOWN.store(false, Ordering::Release);
@@ -314,6 +372,30 @@ fn sync_panels(s: &mut Session) {
     }
     if open || s.phase == Phase::Clip {
         publish_frame(s);
+    }
+}
+
+/// Take the owned catalog published by package 6; never inspect a native owner from the worker.
+fn sync_mii(s: &mut Session) {
+    let Some(menu) = s.menu.as_ref() else { return };
+    let class = match menu.screen() {
+        Some(Screen::External(Editor::MiiList(class))) => Some(*class),
+        _ => None,
+    };
+    #[cfg(feature = "mii-saved-alpha")]
+    if s.mii.is_none() {
+        if let Some(publication) = crate::runtime::ui::menu_app::take_catalog() {
+            // Provider rejects stale epoch/opening sequence without the native App guard.
+            // Deep catalog copies belong only to this worker.
+            s.mii = crate::editors::mii::MiiList::new(
+                (*publication.catalog).clone(), publication.context, publication.epoch, menu,
+            );
+            #[cfg(feature = "mii-ordinary-cpu-alpha")]
+            if let Some(list) = s.mii.as_mut() { list.qualify_cpu(publication.ordinary_cpu); }
+        }
+    }
+    if let Some(list) = s.mii.as_mut() {
+        if let Some(class) = class { list.open(class); } else { list.leave(); }
     }
 }
 /// A, X or Y on the Lobby Stages grid: the stage editor applies it to the menu's kept values; a Direct pick is requested from the
@@ -333,6 +415,18 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button, note: &mut Option<&'stat
             Err(why) => why,
         });
     }
+}
+
+/// A press on the portrait roster grid: package 6's roster rules on the active kept key (`editors::roster`).
+fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button) {
+    use crate::editors::roster::RosterEditor;
+    let Some(Screen::Grid { layout, .. }) = m.screen().copied() else { return };
+    let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind else { return };
+    if editor.is_none_or(|e| e.use_() != use_) {
+        *editor = Some(RosterEditor::new(use_));
+    }
+    let Some(e) = editor.as_mut() else { return };
+    e.apply(m, usize::from(tile), button);
 }
 
 /// The page's Record Slot (the row `recording_slot`, one-hot over the five slots).
@@ -358,6 +452,14 @@ fn publish_frame(s: &Session) {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = external::panel_view_now() else { return };
         panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+    } else if matches!(menu.screen(), Some(Screen::External(Editor::MiiList(_)))) {
+        if let Some(list) = s.mii.as_ref() {
+            list.frame(menu, &mut next);
+        } else {
+            frame_of(menu, &mut next, stage_label);
+            next.help = [crate::model::frame::Text::new(); 2];
+            let _ = core::fmt::Write::write_str(&mut next.help[0], "Reading saved and replay Miis…");
+        }
     } else {
         frame_of(menu, &mut next, stage_label);
         if let Some(Screen::Grid { layout, page, cell }) = menu.screen().copied() {
@@ -367,6 +469,11 @@ fn publish_frame(s: &Session) {
                     menu.top_extra(crate::editors::stages::PREFERENCES_KEY),
                 );
                 editor.decorate(&mut next, layout.tile(page, cell).unwrap_or(0));
+            }
+            if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
+                let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
+                let values = editor.values(menu.kept(editor.key()));
+                editor.decorate(&mut next, &values, editor.solo_enabled(menu));
             }
         }
         if let Some(reason) = s.refusal {
@@ -386,7 +493,8 @@ fn publish_frame(s: &Session) {
 /// The frame last handed to the tick (the worker's own copy; the tick reads `FRAME`).
 static LAST_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 
-// Scratch owned only by the UI worker, never a callback.
+/// Scratch owned only by the menu worker. Keeping it here removes a full Frame
+/// temporary from every nested screen builder without allocating in a hook.
 static NEXT_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 
 /// The write-back of decision D1: the carried engines changed their typed view of the menu (`compat::menu`, a roster pick the
@@ -417,6 +525,51 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
+
+/// Construct once on the worker. No settings/outbox side effects occur until
+/// the native handoff owns the intent; a full queue keeps this exact value.
+fn begin_close(
+    s: &mut Session,
+    #[cfg(feature = "mii-editor-alpha")]
+    editor: Option<crate::engine::mii_root::mii_menu::EditorRequest>,
+) {
+    #[cfg(feature = "mii-saved-alpha")]
+    if let Some(list) = s.mii.as_ref() {
+        s.pending_close = Some(crate::runtime::mii::menu_handoff::CloseIntent {
+            opening: s.opening,
+            epoch: list.epoch(),
+            selection: list.close(),
+            #[cfg(feature = "mii-editor-alpha")]
+            editor,
+        });
+        retry_close(s);
+        return;
+    }
+    if let Some(menu) = s.menu.as_mut() { close(menu); }
+}
+
+#[cfg(feature = "mii-saved-alpha")]
+fn retry_close(s: &mut Session) {
+    let Some(intent) = s.pending_close.take() else { return };
+    // Renderer loss/reset/reopen invalidates the captured opening. Never let a
+    // retained old close commit settings or close a newly opened menu.
+    if !OPEN.load(Ordering::Acquire)
+        || crate::runtime::ui::menu_app::sequence() != s.opening
+    { return; }
+    if intent.epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch() {
+        // This opening's native context retired without a queued UI reset.
+        // Abort its closed model without committing; the next open rebuilds it.
+        s.mii = None;
+        crate::runtime::ui::state::release_menu();
+        return;
+    }
+    match crate::runtime::mii::menu_handoff::post_close(intent) {
+        Ok(()) => {
+            if let Some(menu) = s.menu.as_mut() { close(menu); }
+        }
+        Err(intent) => s.pending_close = Some(intent),
+    }
+}
 
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu) {

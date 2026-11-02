@@ -29,6 +29,7 @@ use crate::runtime::{published, scene};
 
 /// The layout this draw serves.
 const INFO_TRAINING: &[u8] = b"info_training";
+const INFO_WAITING: &[u8] = b"info_waiting";
 
 /// The `tick::REGISTRATIONS` value the last draw saw.
 static SEEN_REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
@@ -56,10 +57,16 @@ const TEXT_UNITS: usize = 48;
 /// # Safety
 /// `layout` is the live layout the tick passed; the call is made on the UI job thread inside the tick.
 pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
-    if name != INFO_TRAINING || layout.is_null() {
+    let waiting = name == INFO_WAITING;
+    let active = if waiting {
+        crate::runtime::lobby::training::lobby::requested()
+    } else {
+        name == INFO_TRAINING && scene::is_training()
+    };
+    if !active || layout.is_null() {
         return;
     }
-    let root = (*layout).root_pane;
+    let root = if waiting { pane::find((*layout).root_pane, b"TrModPort") } else { (*layout).root_pane };
     if root.is_null() {
         return;
     }
@@ -69,9 +76,6 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         diagnostic(format_args!("[TrainingRooms] hud_draw layout registrations={registrations}"));
         notices::on_layout_registered();
         input_display::on_layout_registered();
-    }
-    if !scene::is_training() {
-        return;
     }
     let (notice, column) = {
         let mut c = CONTAINERS.lock();

@@ -53,6 +53,53 @@ def gate(text, required):
     return not reasons, reasons
 
 
+def gate_layout_archives(text, required):
+    """Require allocation-free hand-outs and a matching release after >=5 s.
+
+    Per-load accounting is separate from steady-state hook_stats. Retain the
+    full diagnostic log through the final retirement before applying this gate.
+    """
+    handed = re.compile(r"\[LayoutArchive\] handed out (\w+) bytes=(\d+) stock=\d+ base=(\w+) load_allocations=(\d+)")
+    released = re.compile(r"\[LayoutArchive\] released (\w+) bytes=(\d+) after=(\d+)ms")
+    pending, seen, reasons = {}, set(), []
+    for number, line in enumerate(text.splitlines(), 1):
+        if "[LayoutArchive]" not in line:
+            continue
+        if "layout_arc=skipped" in line:
+            reasons.append(f"line {number}: archive injection skipped")
+        match = handed.search(line)
+        if match:
+            name, size, _, allocations = match.groups()
+            seen.add(name)
+            key = (name, int(size))
+            pending[key] = pending.get(key, 0) + 1
+            if int(allocations):
+                reasons.append(f"line {number}: {name} load allocations {allocations}")
+        elif "handed out" in line:
+            reasons.append(f"line {number}: incomplete hand-out evidence")
+        match = released.search(line)
+        if match:
+            name, size, elapsed = match.groups()
+            key = (name, int(size))
+            if pending.get(key, 0) == 0:
+                reasons.append(f"line {number}: release without matching hand-out")
+            else:
+                pending[key] -= 1
+            if int(elapsed) < 5000:
+                reasons.append(f"line {number}: {name} grace only {elapsed}ms")
+        elif "released" in line:
+            reasons.append(f"line {number}: incomplete release evidence")
+    if not seen:
+        reasons.append("no archive hand-out in the log (coverage is zero)")
+    for name in required:
+        if name not in seen:
+            reasons.append(f"no {name} hand-out (coverage is zero)")
+    for (name, size), count in pending.items():
+        if count:
+            reasons.append(f"{name} bytes={size}: {count} hand-outs not retired")
+    return not reasons, reasons
+
+
 def main():
     log, required = Path(sys.argv[1]), sys.argv[2:]
     ok, reasons = gate(log.read_text(encoding="utf-8", errors="replace"), required)

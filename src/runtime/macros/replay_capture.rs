@@ -99,9 +99,13 @@ static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 /// This uses the existing native-service loading window and its safety gates.
 #[derive(Clone,Copy)]
 struct ResolveSelection { action:Option<ClipAction>, entry:usize }
+#[cfg(feature="mii-ordinary-cpu-alpha")]
+type ResolveTicket = crate::runtime::roster::character_roster::mii_replay::Ticket;
+#[cfg(not(feature="mii-ordinary-cpu-alpha"))]
+type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;
 struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     selection:Option<ResolveSelection>,
-    resolving:Option<std::sync::mpsc::Receiver<Result<Configuration,String>>> }
+    resolving:Option<ResolveTicket>, resolve_error:Option<String> }
 pub(crate) fn selection_revision()->u64 {SELECTION_REVISION.load(Ordering::Acquire)}
 fn target_ready(target:Target,current:Option<i32>)->bool {
     let Some(_kind)=current else {return false;};
@@ -352,7 +356,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
                 if let Some(mut editor) = taken {
                     editor.pause();
                     *RELOAD.lock().unwrap() = Some(Reload { editor, requested:false, ticks:0,
-                        revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive) });
+                        revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive), resolve_error:None });
                     crate::runtime::macros::replay_preview::request_stop();
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE, false);
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
@@ -509,6 +513,7 @@ pub fn suspend_waiting() {
         reload.ticks = 0;
         reload.revision = revision;
         reload.resolving = None;
+        reload.resolve_error = None;
     }
     REVISION.fetch_add(1, Ordering::Relaxed);
     *HOLD.lock().unwrap() = (0, 0, false);
@@ -603,7 +608,7 @@ pub fn service_reload() {
                 return;
             }
             let result = match pending.resolving.as_ref().map(|receive| receive.try_recv()) {
-                Some(Ok(result)) => Some(result),
+                Some(Ok(result)) => Some(result.map_err(|error| error.to_string())),
                 Some(Err(std::sync::mpsc::TryRecvError::Empty)) if pending.ticks <= 600 => None,
                 _ => Some(Err("Recorded Mii metadata could not be read; reopen this capture".into())),
             };
@@ -634,7 +639,7 @@ pub fn service_reload() {
             }
             return;
         }
-        let mut failure=None;
+        let mut failure=pending.resolve_error.take();
         if let Some(receive)=pending.resolving.as_ref() {
             match receive.try_recv() {
                 Ok(Ok(configuration))=>{
@@ -642,7 +647,7 @@ pub fn service_reload() {
                     pending.editor.resolved[entry]=Some(configuration);
                     pending.resolving=None;
                 }
-                Ok(Err(error))=>failure=Some(error),
+                Ok(Err(error))=>failure=Some(error.to_string()),
                 Err(std::sync::mpsc::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
                 Err(std::sync::mpsc::TryRecvError::Empty)=>{},
             }
@@ -675,11 +680,10 @@ pub fn service_reload() {
                 let raw=pending.editor.raw();
                 let revision=pending.revision;
                 drop(reload);
-                let result=raw.and_then(|raw|crate::runtime::roster::character_roster::mii_replay::resolve(raw,revision));
+                let result=raw.and_then(|raw|crate::runtime::roster::character_roster::mii_replay::resolve(raw,revision).map_err(|error| error.message().to_owned()));
                 if let Some(pending)=RELOAD.lock().unwrap().as_mut().filter(|p|p.revision==revision) {
                     match result {Ok(receive)=>pending.resolving=Some(receive),Err(error)=>{
-                        let (send,receive)=std::sync::mpsc::channel();let _=send.send(Err(error));
-                        pending.resolving=Some(receive);
+                        pending.resolve_error=Some(error);
                     }}
                 }
             }
@@ -709,7 +713,7 @@ pub fn service_reload() {
         Ok(target) if target.is_none_or(|target|!target_ready(target,current))=>{
             let mut pending=editor.take().unwrap();pending.pause();
             *RELOAD.lock().unwrap()=Some(Reload {editor:pending,requested:false,ticks:0,
-                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None});
+                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None,resolve_error:None});
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE,false);
             crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);
         }

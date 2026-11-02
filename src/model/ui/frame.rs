@@ -172,6 +172,11 @@ pub struct Frame {
     /// stage grid at all, and a signature that changes when the page or the layout changes (thumbnails are requested per page).
     pub tile_n: [u16; super::panes::TILES],
     pub tile_stage_grid: bool,
+    pub tile_item_grid: bool,
+    pub tile_roster_grid: bool,
+    pub tile_cpu: bool,
+    /// A short last row is centred under the full ones (the portrait roster's last row of 9 under 13 columns).
+    pub tile_centre_last: bool,
     pub tile_sig: u32,
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
@@ -208,6 +213,10 @@ impl Frame {
         self.tile_focus = 0;
         self.tile_n.fill(u16::MAX);
         self.tile_stage_grid = false;
+        self.tile_item_grid = false;
+        self.tile_roster_grid = false;
+        self.tile_cpu = false;
+        self.tile_centre_last = false;
         self.tile_sig = 0;
         self.tile_state.fill(0);
         self.range = RangeView::default();
@@ -246,6 +255,10 @@ impl Frame {
             tile_focus: 0,
             tile_n: [u16::MAX; super::panes::TILES],
             tile_stage_grid: false,
+            tile_item_grid: false,
+            tile_roster_grid: false,
+            tile_cpu: false,
+            tile_centre_last: false,
             tile_sig: 0,
             tile_state: [0; super::panes::TILES],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },

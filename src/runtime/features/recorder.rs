@@ -227,7 +227,7 @@ fn load_consts() -> bool {
     true
 }
 
-/// A fighter entry's first body, resolved now (no pointer is kept between frames).
+/// A fighter entry's active body, resolved now (no pointer is kept between frames).
 #[derive(Clone, Copy)]
 pub(crate) struct Body {
     entry_ptr: usize,
@@ -240,7 +240,7 @@ pub(crate) unsafe fn cpu_body() -> Option<Body> {
     body_of(i32::from(cpu::primary_entry_now()))
 }
 
-/// `module` is the practice CPU's own body: a practice scene is live (`scene::current`), and `module` is the first body of package 2's
+/// `module` is the practice CPU's own body: a practice scene is live (`scene::current`), and `module` is the active body of package 2's
 /// primary CPU entry (`cpu::primary_entry_now`; never Nana, the entry's second body). The named layer's per-fighter work and the clip
 /// preview run for this body only (the fork's `practice::primary_cpu`, which package 6 retired in favour of these owners).
 ///
@@ -251,13 +251,13 @@ pub(crate) unsafe fn is_primary_cpu_body(module: &smash::app::BattleObjectModule
         && cpu_body().is_some_and(|body| body.accessor == module as *const smash::app::BattleObjectModuleAccessor as usize)
 }
 
-/// The first body of `entry_id (0 is P1).
+/// The active body of `entry_id` (0 is P1), using the guarded F11 bank reader.
 ///
 /// # Safety
 /// The package 4 natives must have passed their guards.
 pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     let entry_ptr = natives::fighter_entry(entry_id);
-    let fighter = natives::entry_body(entry_ptr);
+    let fighter = natives::entry_active_body(entry_ptr);
     if fighter == 0 {
         return None;
     }
