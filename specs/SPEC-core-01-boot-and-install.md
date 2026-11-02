@@ -198,3 +198,11 @@ Upstream order differed in two ways that the clean room must not copy: it regist
 8. **`StageManager` symbol lookup** is unused upstream ("This seems unused?"). Recommendation: drop.
 9. **Chord text in notifications** depends on the `byteflags` display joiner (`ButtonConfig::to_string`). The clean room's own encoding (SPEC-core-04 Q1) decides the text; confirm the joiner string from the upstream README screenshots or choose ` + `.
 10. **Menu read cost.** `read(&MENU)` copies the whole settings struct per call, dozens of times per frame. Recommendation: one immutable snapshot per frame published at the frame start, or atomics per field; measure with the diag counters first.
+
+**Decided 2026-11-02 (operator, F8; amends §4.3 Files and threads): the game thread never waits.**
+- A hook or callback that runs on a game thread never takes a lock another thread can hold across real work, and never waits on another thread.
+- Per-frame shared state (menu snapshot, chord bindings, notices, recorder state, CPU and HUD settings, …) is published by its owning thread through a fixed-size lock-free snapshot (double or triple buffer with an atomic index or sequence counter, no heap). The game thread reads it wait-free.
+- Game-thread → worker traffic goes through bounded single-producer/single-consumer queues; a full queue drops with a counter, never waits.
+- Locks exist only between non-game threads, and they wait in the kernel (svcWaitForAddress/svcSignalToAddress). parking_lot is not used in Switch builds: its generic parker on `os=switch` busy-spins, and under Horizon's fixed-priority scheduler a spinning waiter can starve the holder, so the game freezes (Eden live-ui-09).
+- A `try_lock` with a defined skip on a game thread is allowed only where the holder never holds the lock across real work, with the reason in the audit table.
+- Test provenance: the audit table (every game-thread hook × every lock or wait, with its treatment), a host check that game-thread code cannot reach the lock types, and Eden evidence of menu-close cycles, a named-macro load and game-thread frame times.
