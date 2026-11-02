@@ -1669,8 +1669,10 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         let kirby_target = !capabilities(form_class(kind, forms)).prefetch_while_live;
         let pair_target = target_group.is_some_and(|g| bank.groups[g].state == GroupState::Prefetched
             && pair_resource_references(*bank.groups[g].members).is_some());
-        let holders: Vec<usize> = bank.groups.iter().enumerate()
-            .filter(|(i, g)| g.state == GroupState::Prefetched && Some(*i) != target_group).map(|(i, _)| i).collect();
+        let mut holders = crate::engine::compat::fixed::FixedList::<usize, MAX_EXTRA_GROUPS>::new(0);
+        for (i, g) in bank.groups.iter().enumerate() {
+            if g.state == GroupState::Prefetched && Some(i) != target_group { holders.push(i); }
+        }
         ((kirby_target || pair_target) && !holders.is_empty() && bank.prefetch.is_none() && bank.alias != 0)
             .then(|| (holders, occupancy_of(bank, role, copy), bank.alias,
                 if kirby_target { "Kirby target (drain before live)" } else { "pair build needs an exclusive reset batch" }))
@@ -1678,7 +1680,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     if let Some((holders, occupancy, alias, why)) = drain {
         let base = BASE.load(Ordering::Acquire);
         if resource(base, owner) == Some(alias) && resource_ready(alias) {
-            for group in holders {
+            for group in holders.iter().copied() {
                 let (released, kept) = release_group_keys_of(base, role, alias, group, &occupancy, owner, why);
                 let mut state = BANKS[role].lock().unwrap();
                 let Some(bank) = state.as_mut() else { return false; };
@@ -1983,18 +1985,21 @@ unsafe fn registered_kind(r: Option<usize>, cell: usize) -> Option<u32> {
 /// K15 (`swap_model::copy_packages`): the member sets this bank may register, as descriptor words:
 /// the attached window and every group that holds keys or bodies. While no group does, nothing:
 /// the window's registration stays native's own.
-fn copy_package_sets(bank: &Bank) -> Vec<[u32; NATIVE_MEMBERS]> {
+type CopyPackageSets = crate::engine::compat::fixed::FixedList<[u32; NATIVE_MEMBERS], { MAX_EXTRA_GROUPS + 1 }>;
+
+fn copy_package_sets(bank: &Bank) -> CopyPackageSets {
     let words = |members: Members| {
         let mut words = [u32::MAX; NATIVE_MEMBERS];
         let count = members.count().min(NATIVE_MEMBERS);
         words[..count].copy_from_slice(&members.kinds()[..count]);
         words
     };
-    let groups: Vec<[u32; NATIVE_MEMBERS]> = bank.groups.iter()
-        .filter(|g| g.state.holds_keys() || g.state == GroupState::Built)
-        .map(|g| words(*g.members)).collect();
-    if groups.is_empty() { return Vec::new(); }
-    std::iter::once(words(*bank.members)).chain(groups).collect()
+    let mut sets = CopyPackageSets::new([u32::MAX; NATIVE_MEMBERS]);
+    for group in bank.groups.iter().filter(|g| g.state.holds_keys() || g.state == GroupState::Built) {
+        if sets.is_empty() { sets.push(words(*bank.members)); }
+        sets.push(words(*group.members));
+    }
+    sets
 }
 
 /// The attached-window arm of the teardown protocol (`swap_model::lifecycle`, Astra §5
@@ -3136,7 +3141,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // no group does or the bank retired (`swap_native::copy_packages`). Outside a swap only.
     let copy_sets = BANKS[role].lock().unwrap().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.swap.is_none())
-        .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) } else { Vec::new() }, bank.alias));
+        .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) }
+            else { CopyPackageSets::new([u32::MAX; NATIVE_MEMBERS]) }, bank.alias));
     if let Some((sets, alias)) = copy_sets {
         if sets.is_empty() || (alias != 0 && resource(base, owner) == Some(alias)) {
             crate::runtime::roster::copy_packages::sync(base, role, owner, alias, &sets, "tick");

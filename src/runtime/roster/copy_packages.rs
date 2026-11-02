@@ -57,11 +57,11 @@ unsafe fn roster_now(base: usize) -> Roster {
 }
 
 /// What the bank should hold for `sets` (the window and every group with bodies or keys).
-unsafe fn wanted(base: usize, owner: u32, r: usize, sets: &[[u32; SUBS]]) -> Vec<Acquisition> {
+unsafe fn wanted(base: usize, owner: u32, r: usize, sets: &[[u32; SUBS]]) -> impl Iterator<Item = Acquisition> + Clone + '_ {
     let roster = roster_now(base);
     let costume = fields::read::<u32>(r, 0x64).unwrap_or(0);
     let region = fields::read::<u32>(base, REGION_WORD).unwrap_or(0);
-    sets.iter().flat_map(|set| model::acquisitions(&roster, owner, *set, costume, region)).collect()
+    sets.iter().flat_map(move |set| model::acquisitions_iter(&roster, owner, *set, costume, region))
 }
 
 /// Bring the role's holdings to `sets`. Acquisitions come first, then releases, so a key two sets
@@ -75,8 +75,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
     let wanted = wanted(base, owner, r, sets);
     let plan = {
         let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
-        model::sync(&current, &wanted)
+        model::sync_iter(held.iter().map(|h| h.acquisition), wanted)
     };
     if plan.acquire.is_empty() && plan.release.is_empty() { return false; }
     let acquire: unsafe extern "C" fn(usize, *const u8, u32, u32) = std::mem::transmute(base + ACQUIRE);
@@ -98,7 +97,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
         let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
         let added = fresh.len();
         held.extend(fresh);
-        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
+        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition).collect();
         trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, sets, added,
             released.len(), held.len());
         (held.len(), model::referenced(&current).into_keys().collect::<Vec<u32>>())
@@ -122,7 +121,7 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
     if !resident {
         let keys: Vec<u32> = {
             let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-            let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
+            let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition).collect();
             model::referenced(&current).into_keys().collect()
         };
         trace!("[CopyPkg] loading owner={} keys={:x?}", owner, keys);

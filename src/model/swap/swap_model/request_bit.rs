@@ -71,23 +71,24 @@ pub fn copy_key(kind: u32, costume: u32) -> Option<u32> {
 /// unless `0x4b/0x4c/-1`) under `costume`; any other kind takes its own key once per Kirby record,
 /// under that record's `+0x51`.
 pub fn acquired_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {
-    let mut keys = Vec::new();
-    if kind == KIRBY {
-        for record in roster {
-            let [k0, k1, k2] = record.kinds;
-            if k0 == NO_KIND || k0 == KIRBY { continue; }
-            keys.extend(copy_key(k0, costume));
-            for k in [k1, k2] {
-                if (POPO..=NANA).contains(&k) || k == NO_KIND { continue; }
-                keys.extend(copy_key(k, costume));
-            }
-        }
-    } else {
-        for record in roster {
-            if record.kinds[0] == KIRBY { keys.extend(copy_key(kind, record.costume)); }
-        }
-    }
-    keys
+    acquired_keys_iter(roster, kind, costume).collect()
+}
+
+/// Native callers can inspect or stream the same key multiset without allocating it.
+pub fn acquired_keys_iter(roster: &Roster, kind: u32, costume: u32) -> impl Iterator<Item = u32> + '_ {
+    roster.iter().flat_map(move |record| {
+        record.kinds.into_iter().enumerate().filter_map(move |(sub, member)| {
+            if kind == KIRBY {
+                if record.kinds[0] == NO_KIND || record.kinds[0] == KIRBY
+                    || (sub != 0 && ((POPO..=NANA).contains(&member) || member == NO_KIND)) {
+                    return None;
+                }
+                copy_key(member, costume)
+            } else if sub == 0 && record.kinds[0] == KIRBY {
+                copy_key(kind, record.costume)
+            } else { None }
+        })
+    })
 }
 
 /// `0x17f0290(G68, roster, kind, costume)`, transcribed a second time from its own listing (not
@@ -126,11 +127,13 @@ pub fn released_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {
 /// The header members the completion takes keys for (`0x17e8484`, `0x17e84f0–0x17e8504`,
 /// `0x17e8570–0x17e8584`).
 pub fn completion_members(header: [u32; 3]) -> Vec<u32> {
-    let mut members = vec![header[0]];
-    for kind in [header[1], header[2]] {
-        if !(POPO..=NANA).contains(&kind) && kind != NO_KIND { members.push(kind); }
-    }
-    members
+    completion_members_iter(header).collect()
+}
+
+pub fn completion_members_iter(header: [u32; 3]) -> impl Iterator<Item = u32> + Clone {
+    header.into_iter().enumerate().filter_map(|(sub, kind)| {
+        (sub == 0 || (!(POPO..=NANA).contains(&kind) && kind != NO_KIND)).then_some(kind)
+    })
 }
 
 // ---------------------------------------------------------------------------------------------

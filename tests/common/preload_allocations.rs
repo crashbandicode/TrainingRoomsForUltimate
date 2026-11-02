@@ -29,6 +29,36 @@ unsafe impl GlobalAlloc for CountAlloc {
 static ALLOCATOR: CountAlloc = CountAlloc;
 
 #[test]
+fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
+    use crate::engine::swap::swap_model::{copy_packages as packages, copy_registry::*};
+    let mut roster = [Record::DEFAULT; ENTRIES];
+    roster[0] = Record { entry: 0, kinds: [KIRBY, 0, 1], costume: 2 };
+    roster[1] = Record { entry: 1, kinds: [0x31, NO_KIND, NO_KIND], costume: 3 };
+    let sets = [[KIRBY, 0, 1], [KIRBY, 0, 1], [0x48, 0x4b, 0x4c], [NO_KIND; SUBS]];
+    let wanted = || sets.iter().flat_map(|set| packages::acquisitions_iter(&roster, 0, *set, 2, 1));
+    let held: Vec<_> = wanted().collect();
+    assert!(!held.is_empty());
+    COUNT.with(|count| count.set(0));
+    TRACK.with(|track| track.set(true));
+    let mut changed = false;
+    for _ in 0..32 {
+        let plan = packages::sync_iter(held.iter().copied(), wanted());
+        changed |= !plan.acquire.is_empty() || !plan.release.is_empty();
+        std::hint::black_box(plan);
+    }
+    TRACK.with(|track| track.set(false));
+    assert!(!changed);
+    assert_eq!(COUNT.with(Cell::get), 0);
+    // Removing one duplicate must release exactly its occurrences, keeping the
+    // earlier identical holdings and descending removal order.
+    let one = packages::acquisitions(&roster, 0, sets[0], 2, 1);
+    let duplicates: Vec<_> = one.iter().chain(&one).copied().collect();
+    let plan = packages::sync(&duplicates, &one);
+    assert!(plan.acquire.is_empty());
+    assert_eq!(plan.release, (one.len()..duplicates.len()).rev().collect::<Vec<_>>());
+}
+
+#[test]
 fn activation_history_tracks_replacement_without_growing() {
     let mut history = crate::model::body_activation::History::<(usize, u32), 12>::new();
     COUNT.with(|count| count.set(0));

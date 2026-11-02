@@ -31,12 +31,12 @@
 //! registration only once G68 reports ready.
 
 use super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};
-use super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};
+use super::request_bit::{acquired_keys, acquired_keys_iter, completion_members_iter, copy_key, released_keys};
 use std::collections::BTreeMap;
 
 /// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is
 /// `0x17f0290(G68, roster, member, costume)` with the same values.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Acquisition {
     pub set: [u32; SUBS],
     pub member: u32,
@@ -60,13 +60,16 @@ pub fn roster_for(roster: &Roster, owner: u32, set: [u32; SUBS]) -> Roster {
 /// What registering `set` takes: one acquisition per completion member that takes any key, with the
 /// costume the selector gives over the set's primary (`R+0x64` = `costume`).
 pub fn acquisitions(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32) -> Vec<Acquisition> {
-    if set[0] == NO_KIND { return Vec::new(); }
+    acquisitions_iter(roster, owner, set, costume, region).collect()
+}
+
+pub fn acquisitions_iter(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32)
+    -> impl Iterator<Item = Acquisition> + Clone {
     let roster = roster_for(roster, owner, set);
     let costume = registry_costume(set[0], costume, region);
-    completion_members(set).into_iter()
-        .map(|member| Acquisition { set, member, costume, roster })
-        .filter(|a| !a.keys().is_empty())
-        .collect()
+    completion_members_iter(set).filter(move |_| set[0] != NO_KIND)
+        .map(move |member| Acquisition { set, member, costume, roster })
+        .filter(|a| acquired_keys_iter(&a.roster, a.member, a.costume).next().is_some())
 }
 
 /// The packages the registrations of `set`'s bodies need: `copy_key(kind, costume)` of every tuple
@@ -105,15 +108,25 @@ pub struct Sync {
 }
 
 pub fn sync(held: &[Acquisition], wanted: &[Acquisition]) -> Sync {
-    let mut unmatched: Vec<Option<&Acquisition>> = held.iter().map(Some).collect();
+    sync_iter(held.iter().copied(), wanted.iter().copied())
+}
+
+/// Match occurrences, not just membership: duplicate sets retain their native reference counts.
+/// Rescanning borrowed/value iterators avoids a scratch allocation on every unchanged native tick.
+pub fn sync_iter(held: impl Iterator<Item = Acquisition> + Clone,
+    wanted: impl Iterator<Item = Acquisition> + Clone) -> Sync {
     let mut acquire = Vec::new();
-    for want in wanted {
-        match unmatched.iter().position(|h| *h == Some(want)) {
-            Some(i) => unmatched[i] = None,
-            None => acquire.push(want.clone()),
+    for (i, want) in wanted.clone().enumerate() {
+        let occurrence = wanted.clone().take(i).filter(|other| *other == want).count();
+        if occurrence >= held.clone().filter(|other| *other == want).count() {
+            acquire.push(want);
         }
     }
-    let mut release: Vec<usize> = unmatched.iter().enumerate().filter(|(_, h)| h.is_some()).map(|(i, _)| i).collect();
+    let mut release = Vec::new();
+    for (i, have) in held.clone().enumerate() {
+        let occurrence = held.clone().take(i).filter(|other| *other == have).count();
+        if occurrence >= wanted.clone().filter(|other| *other == have).count() { release.push(i); }
+    }
     release.reverse();
     Sync { acquire, release }
 }
