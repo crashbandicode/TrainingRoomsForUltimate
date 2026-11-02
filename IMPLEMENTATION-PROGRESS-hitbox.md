@@ -136,3 +136,32 @@ Status at commit `64d439f` + this file. M = mandatory, C = conditional. "open" =
   owner, display, label pattern, unit prefix, set-aside name, files to place (`--settings`, `--diag-txt`, `--extra`), claim text.
 - `eden/route_hb.py` vs `eden/route_r2.py`: the work root, the profile path, the harness name, and the install-line gate needle
   (`plugin=training_rooms/` instead of `result=installed`, because the 8 KiB install-line buffer cut the line in hb-01, see above).
+## Handover (operator order 2026-11-02 ~14:05Z: lead role moves to the Codex GPT-6 Astra lead)
+
+- **Branch** `stream/hitbox`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-hitbox`. Head: the commit
+  "WIP: handover to Astra lead" (docs only: this section and the hb-04 row) on top of `7131dba` (code; compiled and host-gated).
+  Merged with work/implementation `566780a` before the hb-04 compile.
+- **Targets**: host `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-hitbox` 2.2 GB (debug/incremental deleted; every
+  cargo call ran with CARGO_INCREMENTAL=0, script `/tmp/hitbox-re/hb-cargo.ps1 -Line "<cargo args>"`); Yoga
+  `/home/intpa/trainingrooms-build-hitbox/main` (target 301 MB; evidence NROs in `dist/`).
+- **Proven at `7131dba`**: host `cargo test` 7,963 passed 0 failed (6 ignored), `clippy --all-targets -D warnings` clean,
+  `build --no-default-features`; Switch diag `1aeec61a…ef85c`, release `af611bd4…bc8` (Yoga, no warning in the feature's files;
+  the build's warnings are the merged tree's own). Fixes for the merged tree: `hos_lock::Mutex`; the waiting-room gate is
+  `model::hitbox::visualizes_entry` (Training every object; Lobby entry 0 and `LOBBY_CPU_ENTRY` only; a lobby article never: a gap;
+  host-tested in `core06_training_gate`); one wrapper per native (`tests/native_wrappers.rs`): `game::natives::effect_req_follow`
+  / `effect_kill` now serve both the spheres and the save states (state_natives copies deleted, `STATE_EFFECT_KILL_OFFSET` removed:
+  **this touched the states stream's `state_effects.rs`, `state_natives.rs`, `sites_pkg3.rs`**, same arguments as before).
+  Eden hb-01..03 as recorded; hb-04 partial (eden/EDEN-HITBOX.md row hb-04, outputs `eden/runs/hb-04/`).
+- **Findings to act on** (hb-04): (1) Ridley's first spawn pass had `failed=2` (lead Q3 condition 3: refusals must be 0, stop and
+  report: reported here), then 0, held 74; (2) `cpu_frame` allocates in Training (+266, then +100 per 600-pass window; not the
+  hitbox scope); the 26 scene-load allocations are `input_caller_a_note:25,input_caller_a_apply:1`; (3) console fault at 7.1 s
+  of the boot (11 lines, PC=4, empty backtrace; the game ran on; hb-03 had none). None attributed further.
+- **Next**: decide (1) (e.g. spread a fighter's first spawn over passes: cap new spawns per pass in `HandleSet::reconcile`, host-test,
+  rebuild); then claim the Yoga (interleave: imgui-nvn-sol, tm-f8-terra*, tm-f8-sol* first) and finish hb-04 + hb-05:
+  `ssh memento-claw-yoga-ubuntu "cd /home/intpa/trainingrooms-eden-hb; python3 -I tr_eden_hb.py up hb-05 --nro inbox/hb04/libtraining_rooms.nro --nro inbox/pilot/libssbu_cpu_pilot.nro --nro inbox/libssbu_tile_cursor.nro --settings inbox/hb-on.json"`,
+  then `/usr/bin/python3 -I eden/hb_drive.py route hb-05 --stop-at-css`, P1 `hold lstick,up` + `a` (Steve 78), move the hand to the
+  CPU coin (stick), `a`, `lstick,up`, 10× `lstick,left` (Ridley 65), `a`, `plus`; jab into Ridley at speed 5 %, grab, shield,
+  menu open/close; `scan`, `down`, `restore`. Then hb-06 with `inbox/hb-off.json`. Then compliance.py with the release NRO and the
+  gate report.
+- **Blockers**: none technical; finding (1) needs a lead decision. **Open claims: none** (hb-04 RELEASED 14:04Z; queue lines deleted;
+  profile restored). Watcher (PID 1079962) stopped.
