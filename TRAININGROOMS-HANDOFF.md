@@ -47,7 +47,12 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
   172,032 B resident, diag `82f60e24…` 270,336 B resident (`nro_size.py`). Card-site scan of the 2026-11-01 MTP
   preflight copy: only the fork's NRO touches our hook sites. `compliance.py`: 4 rows read only `src/*.rs`
   (playbook tool limit, reported), README GIF / build line / HANDOFF rows wait for the RC.
-- Running: package-1 Eden rows (three boots, batched), tester worker; output `eden/EDEN-PACKAGE-1.md` in the worktree.
+- Eden (Yoga, tr101–tr110): all package-1 rows pass after root fixes D1–D4 (diagnostics file, Switch tick,
+  install-line semantics, diag `hub_run`) and the input hook's move to caller-side sites (`e20416a`: note/apply at
+  `0x17546e0`/`0x1754720` and `0x175523c`/`0x1755254`; the epilogue `0x1751ce8` is the CPU pilot's `fim_exit`).
+  Pilot v0.2.1 coexists in both load orders (tr108/tr109). Current NROs: release `26a5fef0…`, diag `4792c91a…`.
+- READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
+  pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
 ### Addendum 2026-11-02 (operator order via the primary): card swap and fixes in both trees
 
