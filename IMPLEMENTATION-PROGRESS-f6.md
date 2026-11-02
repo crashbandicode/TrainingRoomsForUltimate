@@ -25,8 +25,17 @@ evidence `R/stages/m5q/eden/{A,S}/RESULT.md`, `R/c1162/group-build-offthread/{RE
   `0x64f820` (control init: AI params `0x17e8890(…, kind, 0x13)` + `0x2c9900` + context vfunc `+0x90` per context) **on the task worker**;
   the carried Phase B′ calls it on the game thread (the synchronous `0x658af0` order, whose only caller is the respawn `0x65be14`). In the
   stock game `0x64f820`'s only direct caller is `0x658af0`. Hypothesis to confirm in Eden: the first-use cost sits in `control_64f820`.
-- Next: Eden `f6-01` (Surface queue #2 behind pkg6) for the split; then the fix (queue `0x64f820` as native state 8 does, wait as state 9,
-  then allocate as state 10), host tests, Switch builds, proof boot `f6-02`.
+- `e50fea0` **fix (WIP, unproven until `f6-01` confirms)**: 12 recorded edits of `native_body_bank.rs` (manifest reasons `F6 fix …`):
+  `start_async_construction` = native state 8 (`0x654dc0`, `0x655320`, then `0x64f820` queued with functor `0x4f81510` / callback
+  `0x655f30`), `queue_task` (one task builder for states 8 and 10), `queue_bodies` (state 10), `settle_construction` (state 9 poll of the
+  control task, then state 10 outside the bank lock; `[GroupSwap] bodies queued`), `drain_construction` (a destroyer in state 9 waits
+  for the control task and runs state 10, then the existing wait), fingerprints of `0x655f30` and `0x6574e0` + the live slot check of
+  `0x4f81510+0x30`. Diag: `[BuildSplit] queue` (state 10 tick), `Work::Queue`.
+- Plan (queue file, Surface #3): one Eden claim, two launches: `f6-01` with `cfe67ff9` (measure), and only if `control_64f820`
+  carries the first-use cost, `f6-02` with the fix diag NRO (proof: first build of the boot, ordinary and Kirby-first, `setup_us` ≤
+  plain-lap tick gap). Fix NRO: Yoga compile line, else one incremental Surface compile at the start of the slot.
+- Found in passing (not changed, reported): on a native allocation failure mid-loop the carried path returns `Err` with earlier
+  bodies' construction tasks still queued and untracked, and the rollback then destroys those bodies (latent, allocation-failure-only).
 
 ## Scripts written by this stream (playbook tool check)
 | Script | Playbook tool | Why the playbook does not cover it |
