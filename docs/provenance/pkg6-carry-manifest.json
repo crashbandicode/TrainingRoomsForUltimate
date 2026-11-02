@@ -14,7 +14,13 @@
    "character_memory": "crate::engine::swap::character_memory",
    "kirby_hat_cycle": "crate::engine::kirby::kirby_hat_cycle",
    "mii_hud_portrait_policy": "crate::engine::mii_root::mii_hud_portrait_policy",
-   "training::practice_policy": "crate::engine::lobby::practice_policy"
+   "training::practice_policy": "crate::engine::lobby::practice_policy",
+   "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
+   "practice_stage_request_policy": "crate::engine::stages::practice_stage_request_policy",
+   "training_stage_rotation_policy": "crate::engine::stages::training_stage_rotation_policy",
+   "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
+   "stage_forms": "crate::engine::stages::stage_forms",
+   "stage_menu": "crate::engine::stages::stage_menu"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -35,10 +41,22 @@
    "OnOff": "crate::engine::compat::menu::OnOff",
    "TrainingModpackMenu": "crate::engine::compat::menu::TrainingModpackMenu",
    "BASE_MENU": "crate::engine::compat::menu::BASE_MENU",
-   "cycle_preload_policy": "crate::engine::preload::cycle_preload_policy"
+   "cycle_preload_policy": "crate::engine::preload::cycle_preload_policy",
+   "lobby_stages": "crate::engine::stages::lobby_stages",
+   "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
+   "practice_stage_request_policy": "crate::engine::stages::practice_stage_request_policy",
+   "training_stage_rotation_policy": "crate::engine::stages::training_stage_rotation_policy",
+   "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
+   "stage_forms": "crate::engine::stages::stage_forms",
+   "stage_menu": "crate::engine::stages::stage_menu"
   },
   "tui": {
-   "roster_grid": "crate::engine::swap::roster_grid"
+   "roster_grid": "crate::engine::swap::roster_grid",
+   "stage_forms": "crate::engine::stages::stage_forms",
+   "stage_menu": "crate::engine::stages::stage_menu",
+   "lobby_stages": "crate::engine::stages::lobby_stages",
+   "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
+   "NX_SUBMENU_COLUMNS": "crate::engine::compat::menu::NX_SUBMENU_COLUMNS"
   },
   "mii": {
    "auto_init": "crate::engine::mii::auto_init",
@@ -754,7 +772,7 @@
    "dest_sha256": "c3b079332b89b5588972dbddd0ba06674b0a6e8559ea24faaa5d124acc826389",
    "edits": [
     {
-     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, training_mod_tui::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
      "new": "",
      "reason": "the fork's old menu structure (StatefulTable/SubMenu/App) is replaced by package 1's menu-model editor rows and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
@@ -790,7 +808,7 @@
    "dest_sha256": "a282e41ee3502345704983c001207b630ecda66d60962a5b8650b72b7a8b6ebe",
    "edits": [
     {
-     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, training_mod_tui::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
      "new": "",
      "reason": "the fork's old menu structure (StatefulTable/SubMenu/App) is replaced by package 1's menu-model editor rows and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
@@ -871,6 +889,94 @@
      "reason": "clippy::new_without_default (exempt in the fork because its lib exported the type); the derived Default is the same value as new()"
     }
    ]
+  },
+  {
+   "src": "training_mod_tui/src/stage_forms.rs",
+   "dest": "src/model/stages/stage_forms.rs",
+   "crate": "tui",
+   "src_sha256": "104cea14a4d26ba7791ac7b432dd39f4e44b1e09340de932789a8596c318b500",
+   "dest_sha256": "e210c9a295d4774f73fa8a1cb2a739d5d6f039306cf7782ede0fe3fbb1d88764",
+   "edits": [
+    {
+     "old": "pub(crate) enum HelpControls",
+     "new": "pub enum HelpControls",
+     "reason": "dead_code: its only constructor was the fork's tui container (not carried; package 5's renderer is the consumer); `pub` states the model API"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_tui/src/stage_menu.rs",
+   "dest": "src/model/stages/stage_menu.rs",
+   "crate": "tui",
+   "src_sha256": "7dece73f4a1563cb27d760b54577627d5ecbfe54867701737f45a3ffcb70592c",
+   "dest_sha256": "6495abb5aa8864393cac8672fde71cd831bd3a9767d4e71c6f3cd46adfb9e08f"
+  },
+  {
+   "src": "training_mod_consts/src/lobby_stages.rs",
+   "dest": "src/model/stages/lobby_stages.rs",
+   "crate": "consts",
+   "src_sha256": "86d084f7400d24e8e6be5554b391071a5b3a36d6208ccf28651727199b37586f",
+   "dest_sha256": "7c82cd2d730b475035da96af3397a69cfbb196d12f6e4a902635cfb13498271f",
+   "edits": [
+    {
+     "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::menu::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
+     "new": "",
+     "reason": "the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    },
+    {
+     "delete_from": "    pub fn to_submenu() -> SubMenu<'static> {",
+     "delete_to": "}\n\nimpl Serialize for LobbyStageOrder",
+     "reason": "to_submenu builds the fork's SubMenu: the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    },
+    {
+     "old": "    use training_mod_tui::InputControl;\n",
+     "new": "",
+     "reason": "the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    },
+    {
+     "delete_from": "    fn settings_with_preferences(preferences: serde_json::Value) -> serde_json::Value {",
+     "delete_to": "    #[test]\n    fn invalid_orders_do_not_replace_saved_preferences() {",
+     "reason": "tests through the fork's MenuJsonStruct deserializer and its picker (editor_order_roundtrips...): the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2); the settings-ingress rules are re-tested against the clean-room settings reader"
+    },
+    {
+     "old": "        let menu = LobbyStageOrder::to_submenu();\n        assert_eq!(menu.toggles.get(117 / NX_SUBMENU_COLUMNS, 117 % NX_SUBMENU_COLUMNS).unwrap().title, \"Training\");\n",
+     "new": "",
+     "reason": "the last assertion read the fork's picker grid; the choice order it checks stays covered by the assertions above it"
+    },
+    {
+     "delete_from": "    fn stage_app(enabled: bool, ordinary_training: bool)",
+     "delete_to_last": "\n}\n",
+     "reason": "the remaining tests drive the fork's full menu app (create_app, App, AppPage, MenuJsonStruct): the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
+    }
+   ]
+  },
+  {
+   "src": "src/lobby_stage_cycle.rs",
+   "dest": "src/model/stages/lobby_stage_cycle.rs",
+   "crate": "root",
+   "src_sha256": "c4a313db7890e6529419e036dbc9403a4e503f0533633438f7828df58beed3cf",
+   "dest_sha256": "78770877aaf438550213d7ede6c81606cf4f22e91696eb0f4b11545ca3749e52"
+  },
+  {
+   "src": "src/practice_stage_request_policy.rs",
+   "dest": "src/model/stages/practice_stage_request_policy.rs",
+   "crate": "root",
+   "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
+   "dest_sha256": "334962a1c9016f1000f1c9bcf7257f4a2103ee0c71c34556a663febab10727b4"
+  },
+  {
+   "src": "src/training_stage_rotation_policy.rs",
+   "dest": "src/model/stages/training_stage_rotation_policy.rs",
+   "crate": "root",
+   "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
+   "dest_sha256": "279498a1af78b0b9fbe5c2aa9d762ec2a07983aab4f2b79e3c34b623a03efcf4"
+  },
+  {
+   "src": "src/hazard_manager/policy.rs",
+   "dest": "src/model/stages/waiting_hazards_policy.rs",
+   "crate": "root",
+   "src_sha256": "8a378ab2499cab662a7412a336edffea5920caed1057c11190052b6380092b40",
+   "dest_sha256": "622d9e1ab6d2faf2725752934a0f73fc056391915d15d2be39f241956810aeec"
   }
  ]
 }

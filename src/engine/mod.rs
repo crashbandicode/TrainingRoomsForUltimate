@@ -20,3 +20,5 @@ pub mod preload;
 pub mod seams;
 #[path = "../model/swap/mod.rs"]
 pub mod swap;
+#[path = "../model/stages/mod.rs"]
+pub mod stages;

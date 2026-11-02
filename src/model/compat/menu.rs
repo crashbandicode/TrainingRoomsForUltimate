@@ -28,3 +28,5 @@ pub struct TrainingModpackMenu {
 /// The factory values (`BASE_MENU` in the fork).
 pub const BASE_MENU: TrainingModpackMenu =
     TrainingModpackMenu { solo_popo_original: OnOff::ON, solo_popo_player_cycle: OnOff::OFF, solo_popo_cpu: OnOff::OFF };
+/// Columns of the fork's stage grid page (4 x 4 per page, docs/DECISIONS.md Q14): the carried stage_menu paging constant.
+pub const NX_SUBMENU_COLUMNS: usize = 4;
