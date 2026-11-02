@@ -133,7 +133,11 @@ fn post_vault(epoch: u64, event: VaultEvent) -> bool {
 
 /// Worker entry, before UI commands may open the captured timeline.
 pub fn worker_vault_events() {
-    VAULT_EVENTS.drain(|event| {
+    // Only this worker uses the scratch; allocate directly on its heap once.
+    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());
+    let mut scratch = SCRATCH.lock().unwrap();
+    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }
+    VAULT_EVENTS.drain_with_scratch(&mut scratch, |event| {
         CAPTURE.lock().unwrap().apply(event, VAULT_DROPPED_EPOCH.load(Ordering::Acquire));
     });
     let dropped = VAULT_EVENTS.take_dropped();

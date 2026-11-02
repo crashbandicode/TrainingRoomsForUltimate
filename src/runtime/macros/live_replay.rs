@@ -76,7 +76,11 @@ fn post(event: LiveEvent) -> bool {
 
 /// Only the existing menu worker calls this; no native pointer is read here.
 pub fn worker_events() {
-    EVENTS.drain(|(serial, event)| {
+    // Only this worker uses the scratch; allocate directly on its heap once.
+    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());
+    let mut scratch = SCRATCH.lock().unwrap();
+    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }
+    EVENTS.drain_with_scratch(&mut scratch, |(serial, event)| {
         let committed = ARCHIVE.lock().unwrap().apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));
         if let Some(mut commit) = committed {
             if commit.needs_miis {

@@ -967,7 +967,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "2638c5e7b43d3da11366e8480f4217c5c93970251f43fe9fc5fd466e773e9bf0",
+   "dest_sha256": "6990b26ac421641225ab41979c5dff3b027a803ec1f3f8c4b2b8ed2878918cb5",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1183,6 +1183,11 @@
      "old": "use crate::model::macro_handoff::{VaultArchive as Capture, VaultEvent};",
      "new": "use crate::engine::macros::handoff::{VaultArchive as Capture, VaultEvent};",
      "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
+    },
+    {
+     "old": "    VAULT_EVENTS.drain(|event| {",
+     "new": "    // Only this worker uses the scratch; allocate directly on its heap once.\n    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());\n    let mut scratch = SCRATCH.lock().unwrap();\n    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n    VAULT_EVENTS.drain_with_scratch(&mut scratch, |event| {",
+     "reason": "Design C worker drain reuses heap-backed ordering scratch; removes proven 64KiB mailbox stack array without changing capacity/order/drop semantics."
     }
    ]
   },
@@ -1361,7 +1366,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "3257f2dbea5fe8c7c60cf8b5b8a6c8569ee07b516468df97206dd6d412a098b4",
+   "dest_sha256": "e769e7ed2488157e5ca496abe4d526336eeb39c81c670b0462c8f463a864eb36",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1548,6 +1553,11 @@
      "old": "use crate::model::macro_handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};",
      "new": "use crate::engine::macros::handoff::{LiveArchive, LiveEvent, LiveTokens, FixedReplayId, FixedReplayTitle, FixedReplayMiis};",
      "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
+    },
+    {
+     "old": "    EVENTS.drain(|(serial, event)| {",
+     "new": "    // Only this worker uses the scratch; allocate directly on its heap once.\n    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());\n    let mut scratch = SCRATCH.lock().unwrap();\n    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n    EVENTS.drain_with_scratch(&mut scratch, |(serial, event)| {",
+     "reason": "Design C worker drain reuses heap-backed ordering scratch; removes proven 64KiB mailbox stack array without changing capacity/order/drop semantics."
     }
    ]
   },

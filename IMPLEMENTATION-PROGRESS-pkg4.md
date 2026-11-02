@@ -4,15 +4,15 @@
 
 ## QUESTIONS
 
-- **Compiled stack root17:5xZ, shared hos-lock interface request:** diag59986e0 stack table FAIL
+- **Compiled stack root17:5xZ, implementation AUTHORIZED18:12Z:** diag59986e0 stack table FAIL
   menu97776B against57344B. Exact path port::worker_tick15616 -> worker_events70608 ->
   replay_capture::close_editor_revision3680. Mailbox::drain allocates [(u64,usize);N] on stack;
   pkg4 Vault/Live4096-slot queues therefore instantiate65536B sort scratch, even for an empty drain.
-  Proposed root fix: additive drain_with_scratch API taking caller-owned mutable sequence/index storage,
+  Lead18:12Z authorized root fix: additive drain_with_scratch API taking caller-owned mutable sequence/index storage,
   retaining exact sequence ordering/drop semantics; existing drain stays for small hook mailboxes.
   Pkg4 worker allocates/reuses scratch on its own heap, outside hooks. Need lead authorization for narrow
   crates/hos-lock/src/mailbox.rs interface hunk (no weakening bounds or worker stack-size workaround).
-  Prepared /tmp/pkg4-mailbox-scratch.patch (additive API + ordered/reuse/drop regression) and
+  Prepared /tmp/pkg4-mailbox-scratch.patch (additive API + ordered/reuse/drop regression; tests/macro_mailbox.rs includes production mailbox unit tests in root cargo test) and
   /tmp/pkg4-worker-scratch-manifest.patch (two worker-owned reusable Vec scratch consumers).
   Shared patch passes git apply --check; unapplied/untested, no shared-crate edit yet.
   No Eden boot on this unsafe compiled worker path.
@@ -140,6 +140,25 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Lead18:12Z authorized additive mailbox scratch API + two worker consumers. Applied; small drain and
+  capacity/order/drop/single-consumer semantics unchanged. Worker-only Vec scratch allocated once/reused.
+  Added pending-predecessor and undersized-refusal tests plus repeated reuse/full/drop/empty; existing
+  concurrent-posting regression now exercises caller scratch. Root tests/macro_mailbox.rs runs all5.
+  Carry42 verified, rustfmt parse/diffcheck passed; no compile/runtime acceptance yet. Withdrawn UNRUN
+  a3101c8 host queue before changes; freeze new source then requeueEND. No own claim/profile mutation.
+- Operator priority override18:1xZ read in full: TRfirst, fork one turn per2TR, imguiidleonly.
+  Temporary /tmp/pkg4-ledger-context.py now replaces ONLY old parallel_turns with this policy;
+  full open-claim parser and own fairness checks unchanged. Actual fork queue rows exclude historical
+  parenthetical notes; raw ledger/queue/process review still mandatory before claim. No shared harness edit.
+- Pending fullhosta3101c8 fixture completed: owned lua2cpp_common.nro copied to Yoga research/nro,
+  local/remote SHA43876f961a80e413370629d32c23af9de6e4cc26b448bab88d5433714a566097.
+  Wrapper explicitly removes SKIP_OWNED_ELF_FACT; existing mainELF remains verified. No skipped native facts.
+  Slim fullhost precedes ours; no pkg4 claim/profile mutation.
+- HEADa3101c8 frozen for fullhost retry; Yoga gate/target-gate1112 files hash matched archive
+  83676afa0c3b375641aa62fb5ee504fc51bce7432245f9269e8c8cfe01a00337.
+  Wrapper host-a3101c8.ps1 confirmed ordered capture, queuedEND after pkg6/slim; no own claim.
+  Previous fullhost59986e0 failed compile, no tests ran; raw log copied under eden/runs/build-59986e0/.
+  Shared scratch API and updated caller manifest patches remain /tmp, unapplied; F11 patch also pending.
 - Host compile root corrected: archive handoff types and their four unchanged regression tests moved
   from model/macro_handoff.rs to model/macros/handoff.rs, registered under engine::macros via carry.
   Generic model buffers no longer depend on engine; standalone model tests need no facade workaround.
