@@ -27,7 +27,7 @@ fn handle_code(handle: Handle) -> u8 {
 /// Build the clip editor's frame. `fighter` is the label of the track's fighter, `pace` the frames per tick of the held scrub
 /// (`replay_capture::scrub_pace`).
 pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) {
-    *frame = Frame::new();
+    frame.reset();
     let _ = frame.title.write_str(TITLE);
     let _ = write!(frame.crumb, "Replay window  >  {}", view.source_name);
     frame.view = View::Clip;

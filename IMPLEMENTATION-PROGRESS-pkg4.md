@@ -4,6 +4,15 @@
 
 ## QUESTIONS
 
+- **Exact UI dependency requested19:04Z:** apply UI-owned adapted patch
+  /tmp/ui-frame-root-for-pkg4-fabfaf6.patch (4files) plus narrow0c3cd63 three-file fiber root.
+  Raw008b564 reset names3roster fields absent here; adaptedpatch correctly excludes them and absent
+  Mii editor. No2241de2 stack increase requested. Both proposed source roots reviewed, notapplied;
+  recompute actual margin after composition. Slotphase root proven43056->27024/frame15616->4416.
+  fab fullhost capabilities+poison nowPASS with declaredtable unchanged; solefailure test scheduler
+  seen0 fixed c14c7e6 (no productionprimitivechange), next hostgate pending.
+
+
 - **Provider/consumer integration route18:56Z:** pkg6 f2bd652 cannot compile until Ticket consumer
   exists, while current rule forbids taking an ungated provider. Prepared owned consumer exact patch
   /tmp/pkg4-ticket-consumer.patch is ready (non-Copy Ticket, worker Error formatting, no synthetic
@@ -715,3 +724,5 @@ Owned test root edit: startup barrier joins allreaders, sample final stable publ
 Compiled port::worker_tick depth43056->27024/frame15616->4416 afterphase split; worker_events12944/frame7200. Rawport-stack-paths.txt; overallMenu/Fiber gates stillopen, exact table next.
 
 UI dependency refinement19:04Z: read UI owner's /tmp/ui-frame-root-for-pkg4-fabfaf6.patch completely and checked actual Frame fields. Prefer this ADAPTED four-file patch: raw008 reset also names tile_roster_grid/tile_cpu/tile_centre_last absent from pkg4base, so raw gitapply-check alone does NOT prove compilability. Adaptedpatch omits only those nonexistentfields, retains all existingfield resets/regression/worker scratch; noactualapplication. Lead authorize adapted exactpatch plus0c3fiber root, not raw008 wholesale.
+
+Applied exact lead19:10Z authorized four-file UI Frame adapter, patchSHA726fe71d9c7e862ec33d133ffd18d180d30ca1f720f39579c8f1deea60487d9e. No carriedfiles touched by patch, gitdiffcheckPASS; no budgets changed. Withdrew UNRUN c14host request before newfreeze (no claim). Current includes c14 scheduler fix; next combined fullhost and Switchdiag/compiledMenu margin. Fiber0c3 stillawaits exactauthority, noEdenacceptance.

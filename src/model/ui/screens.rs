@@ -65,7 +65,7 @@ fn base(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     page_frame(menu, frame);
     // The sub-screen owns the right-hand side: no groups, no rows of the page, its own crumb.
     frame.group_count = 0;
-    frame.rows = Frame::new().rows;
+    frame.rows.fill(RowLine::default());
     frame.row_count = 0;
     frame.focus = None;
     frame.help = [Text::new(); 2];
@@ -344,7 +344,7 @@ const HINT_PANEL: &str = "D-pad move   A confirm   Y delete or other   B back";
 pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels: &[S], selected: usize, frame: &mut Frame) {
     page_frame(menu, frame);
     frame.group_count = 0;
-    frame.rows = Frame::new().rows;
+    frame.rows.fill(RowLine::default());
     frame.row_count = 0;
     frame.focus = None;
     frame.help = [Text::new(); 2];
@@ -499,6 +499,20 @@ mod tests {
             m.press(Button::Down);
         }
         panic!("could not reach {title}");
+    }
+
+    #[test]
+    fn reused_frame_drops_roster_and_popup_state_when_returning_to_pages() {
+        let mut reused = Frame::new();
+        for title in ["Character Cycles", "SDI Strength", "Character Cycles"] {
+            let mut m = menu();
+            open(&mut m, title);
+            frame_of(&m, &mut reused, |i| if i == 0 { "Battlefield" } else { "Stage" });
+            assert_eq!(reused, frame(&m), "opening {title}");
+            m.press(Button::B);
+            frame_of(&m, &mut reused, |i| if i == 0 { "Battlefield" } else { "Stage" });
+            assert_eq!(reused, frame(&m), "leaving {title}");
+        }
     }
 
     #[test]
