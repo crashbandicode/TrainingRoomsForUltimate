@@ -30,9 +30,11 @@ def py(*args):
     return subprocess.run(["/usr/bin/python3", "-I", *args], cwd=HERE).returncode
 
 
-def one_launch(label, nro, settings, a, claim):
-    up = argparse.Namespace(label=label, nro=[f"{nro}:libtraining_rooms.nro", PILOT, TILE], settings=settings, diag_txt=None)
-    se.up(up, claim=claim)
+def one_launch(label, nro, settings, a, claim, resume=False):
+    if not resume:
+        up = argparse.Namespace(label=label, nro=[f"{nro}:libtraining_rooms.nro", PILOT, TILE], settings=settings, diag_txt=None)
+        se.up(up, claim=claim)
+    # resume: the launch is already up under our claim (a driver stopped before its route); continue from the route
     HELD.append(label)
     code = 1
     try:
@@ -71,11 +73,12 @@ def main():
     p.add_argument("--p1", type=int, default=8)
     p.add_argument("--cpu", type=int, default=4)
     p.add_argument("--p1-steps", default="up")
+    p.add_argument("--resume", action="store_true", help="the first launch is already up under our claim")
     a = p.parse_args()
     started = time.time()
     result = {"label": a.label}
     try:
-        result["laps_exit"] = one_launch(a.label, a.nro, a.settings, a, claim=True)
+        result["laps_exit"] = one_launch(a.label, a.nro, a.settings, a, claim=True, resume=a.resume)
         cause = first_build_cause(a.label)
         result["first_build_largest_step"] = cause
         if a.then and a.nro2:

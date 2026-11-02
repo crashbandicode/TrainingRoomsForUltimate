@@ -99,7 +99,9 @@ def macro(label, path, cap=120):
 
 
 def to_training(label, stage_steps, tile_gate, p1_steps):
-    wait_line(EVENTS, "result=installed", 240, "install line")
+    # The integrated tree's install line (8,142 characters in f6-01) is cut before `result=`: gate on its start; the full line is
+    # read after the run (reported to the lead as the known install-line length defect).
+    wait_line(EVENTS, "plugin=training_rooms/", 240, "install line")
     menu_box = (40, 60, 620, 380)
     for attempt in range(10):
         press(label, "a")
@@ -135,7 +137,11 @@ def to_training(label, stage_steps, tile_gate, p1_steps):
     press(label, "a")
     wait_match(label, "ready.png", (40, 40, 1240, 330), 25, 25, "ready to fight")
     press(label, "a")
-    wait_match(label, "training.png", (100, 200, 430, 500), 30, 90, "training scene")
+    # The plugin's own line, not the reference screenshot: profile g's stage tile 6 is not the reference's stage (f6-01 failed this
+    # gate inside a valid Training scene on Kongo Jungle). The screenshot stays as evidence.
+    wait_line(DIAG, "[CharacterRoster] observed owner=0", 90, "training scene (P1 entry observed)")
+    time.sleep(2)
+    shot(label, "training-scene")
     print("ROUTE DONE", flush=True)
 
 

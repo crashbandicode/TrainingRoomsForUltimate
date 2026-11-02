@@ -120,7 +120,7 @@ def main():
     s.add_argument("label")
     s.add_argument("--p1", type=int, default=8)
     s.add_argument("--cpu", type=int, default=0)
-    s.add_argument("--settle", type=float, default=90)
+    s.add_argument("--settle", type=float, default=15)
     s.add_argument("--gap", type=float, default=6)
     a = p.parse_args()
     if a.op == "settings":
