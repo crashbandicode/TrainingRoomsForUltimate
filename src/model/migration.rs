@@ -181,3 +181,20 @@ pub fn result(outcomes: &[Outcome]) -> ImportResult {
 pub const fn marker_written_after(blocking_done: bool, background_done: bool) -> bool {
     blocking_done && background_done
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_marker_alone_blocks_a_rerun() {
+        assert_eq!(plan(true, None, |_| true), Plan::MarkerPresent);
+        assert_eq!(plan(false, None, |_| true), Plan::NoSource);
+    }
+
+    #[test]
+    fn routes_rename_the_settings_file() {
+        assert_eq!(route("training_modpack_menu.conf").map(|r| r.to), Some("settings.json"));
+        assert!(route("training_modpack.json").is_none());
+    }
+}

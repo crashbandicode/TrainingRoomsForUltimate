@@ -111,3 +111,27 @@ impl Display for InstallLine<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unsupported_game_line_has_no_sites() {
+        let line = InstallLine {
+            tick: 1,
+            version: "0.1.0",
+            display: b"12.0.0",
+            build_id: None,
+            verdict: Verdict::UnsupportedVersion,
+            sites: &[],
+            features: &[],
+            migration: None,
+            heap_allocations: Some(0),
+        };
+        assert_eq!(
+            line.to_string(),
+            "1 plugin=training_rooms/0.1.0 game=12.0.0 build=none result=unsupported_version reason=display_version heap_allocations=0"
+        );
+    }
+}

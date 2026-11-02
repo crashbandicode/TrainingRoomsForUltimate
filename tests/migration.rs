@@ -1,7 +1,7 @@
 //! SPEC-core-08 (first-boot import), the pure plan. Test paths are the spec's §9 rows
 //! (`migration::…`). Not here: the item-on-load conversion (N6), receipt hashes, the copy loop.
 
-#[path = "../src/model/mod.rs"]
+#[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 

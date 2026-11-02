@@ -59,3 +59,15 @@ fn trim(mut bytes: &[u8]) -> &[u8] {
     }
     bytes
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_exact_on_shows_the_page() {
+        assert!(parse(b"developer_page=on").developer_page);
+        assert!(!parse(b"developer_page=yes").developer_page);
+        assert!(!parse(b"").developer_page);
+    }
+}

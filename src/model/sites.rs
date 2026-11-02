@@ -252,3 +252,21 @@ pub fn overlapping_pairs() -> impl Iterator<Item = (usize, usize)> {
         .flat_map(|a| (a + 1..SITES.len()).map(move |b| (a, b)))
         .filter(|&(a, b)| SITES[a].overlaps(&SITES[b]))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_site_name_is_unique_and_found() {
+        for site in &SITES {
+            assert_eq!(find(site.name).map(|s| s.offset), Some(site.offset));
+        }
+    }
+
+    #[test]
+    fn an_unsupported_game_installs_nothing() {
+        assert!(install_plan(Verdict::UnsupportedBuild).is_empty());
+        assert_eq!(install_plan(Verdict::Supported).len(), SITES.len());
+    }
+}

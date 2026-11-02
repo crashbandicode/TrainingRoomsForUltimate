@@ -2,7 +2,7 @@
 //! fixtures are real settings files of the earlier fork (`tests/fixtures/fork-menu-*.json`, see
 //! `tests/fixtures/README.md` for their origin).
 
-#[path = "../src/model/mod.rs"]
+#[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 

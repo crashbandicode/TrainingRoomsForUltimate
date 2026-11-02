@@ -1,6 +1,6 @@
 # Test provenance, package 1
 
-`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test` (88 after the SPEC-core-08 plan). "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not
+`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test` (unit tests inside the model modules are also compiled into each by-path test binary, so the per-binary counts overlap; `cargo test` in total runs 7 + 8 + 6 + 17 lib unit tests plus the spec-named tests in `tests/`). "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not
 Switch-compiled yet). Status: **host pass** = test exists and passes; **deferred** = the spec row belongs to a
 later package or needs the Switch runtime; **runtime, unbuilt** = code written, not compiled for the Switch.
 
@@ -89,6 +89,8 @@ Note 2: SPEC-core-08 §4 names `training_modpack.json` as the fork's settings fi
 updater record; the settings are in `training_modpack_menu.conf` (CARRY-OVER.md, findings). The plan and
 `storage::file::LEGACY_SETTINGS` use the real name; copying the updater file as `settings.json` would have
 loaded factory settings over the player's own. Lead: please correct the spec.
+
+Note 3: `developer.ini` compares the key and the value exactly (`developer_page`, lower-case `on`), last line wins, first 8 KiB read, a leading UTF-8 BOM skipped; `ON`, `1`, `yes` and an inline comment after the value read as hidden (lead, 2026-11-02: exact lower-case `on` is accepted).
 
 Note 1: the spec says unknown keys are dropped on rewrite. This build knows 3 of the ~90 rows, so dropping
 them would erase the player's other settings until their packages land; they are kept verbatim instead

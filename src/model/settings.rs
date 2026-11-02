@@ -536,3 +536,22 @@ pub const fn write_mode(writer_thread_started: bool) -> WriteMode {
         WriteMode::Synchronous
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn factory_round_trips() {
+        let factory = Settings::factory();
+        assert_eq!(parse(&factory.to_json()).settings, factory);
+    }
+
+    #[test]
+    fn a_bad_row_defaults_and_is_reported() {
+        let loaded = parse(r#"{"menu":{"lra_reset":"x","stage_hazards":[1,0]}}"#);
+        assert_eq!(loaded.issues.len(), 1);
+        assert!(loaded.settings.menu.lra_reset());
+        assert!(loaded.settings.menu.stage_hazards());
+    }
+}

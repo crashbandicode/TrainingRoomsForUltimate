@@ -93,3 +93,22 @@ pub fn reset_in_game_counters(counters: &mut [FrameCounter]) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn off_clears_x8_in_training_only() {
+        assert_eq!(x8_write(false, true), Some(0));
+        assert_eq!(x8_write(false, false), None);
+        assert_eq!(x8_write(true, true), None);
+    }
+
+    #[test]
+    fn the_hub_runs_every_step_in_order() {
+        let mut seen = Vec::new();
+        run_hub(|step| seen.push(step));
+        assert_eq!(seen, HUB_ORDER);
+    }
+}

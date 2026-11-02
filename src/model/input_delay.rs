@@ -173,3 +173,27 @@ pub const POLL_ORDER: [PollStage; 5] =
 pub const fn applies(player_idx: i32, training_live: bool) -> bool {
     player_idx == 0 && training_live
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rec(n: u32) -> MappedInputs {
+        MappedInputs { buttons: n, ..MappedInputs::NEUTRAL }
+    }
+
+    #[test]
+    fn two_polls_late() {
+        let mut q = DelayQueue::new();
+        let out: Vec<_> = (1..=5).map(|n| q.step(2, rec(n)).buttons).collect();
+        assert_eq!(out, [0, 0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn an_owner_empties_the_queue() {
+        let mut q = DelayQueue::new();
+        q.step(3, rec(1));
+        assert_eq!(q.poll(3, Owners::MENU, rec(2)), MappedInputs::NEUTRAL);
+        assert!(q.is_empty());
+    }
+}

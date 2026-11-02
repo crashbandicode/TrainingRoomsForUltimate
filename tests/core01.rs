@@ -4,7 +4,7 @@
 
 mod common;
 
-#[path = "../src/model/mod.rs"]
+#[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 

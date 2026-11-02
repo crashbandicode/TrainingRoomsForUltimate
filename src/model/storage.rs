@@ -139,3 +139,19 @@ pub const DIAGNOSTIC_LIMIT: u64 = 128 * 1024;
 pub const fn should_rotate(bytes: u64, incoming: usize) -> bool {
     bytes + incoming as u64 > DIAGNOSTIC_LIMIT
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paths_join_in_a_fixed_buffer() {
+        assert_eq!(Path::in_root("settings.json").unwrap().as_str(), "sd:/ultimate/TrainingRooms/settings.json");
+        assert!(FixedPath::<8>::join("sd:/ultimate", "x").is_none());
+    }
+
+    #[test]
+    fn the_first_free_copy_number_is_used() {
+        assert_eq!(first_free_invalid_copy(|name| name == "settings.invalid-1.json"), Some(2));
+    }
+}

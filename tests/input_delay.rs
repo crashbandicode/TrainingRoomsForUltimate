@@ -3,7 +3,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-#[path = "../src/model/mod.rs"]
+#[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 

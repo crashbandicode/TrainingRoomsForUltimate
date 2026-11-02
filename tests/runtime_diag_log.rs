@@ -2,7 +2,7 @@
 //! model, so it is compiled and exercised on the host by path. `init_diagnostics` and the drain
 //! thread touch the card path and are not run here; the Eden rows `core01-E8` cover them.
 
-#[path = "../src/model/mod.rs"]
+#[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 
