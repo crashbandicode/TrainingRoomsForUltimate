@@ -176,7 +176,14 @@ mod counts {
     pub const FOLLOW: usize = 5;
     pub const RUMBLE: usize = 6;
     pub const STAR_KO: usize = 7;
-    static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+    /// Trainer, Kirby and Sora sounds silenced while loading / matching sounds that passed while loading.
+    pub const SE_SILENCED: usize = 8;
+    pub const SE_PASSED: usize = 9;
+    /// Switch effects made size 0, decide hook rewrites, Kirby copy hook writes.
+    pub const SWITCH_FX: usize = 10;
+    pub const DECIDE: usize = 11;
+    pub const COPY_HOOK: usize = 12;
+    static COUNTS: [AtomicU32; 13] = [const { AtomicU32::new(0) }; 13];
     const REPORT_EVERY: u32 = 600;
 
     pub fn bump(which: usize) {
@@ -189,7 +196,7 @@ mod counts {
         }
         let take = |i: usize| COUNTS[i].swap(0, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[TrainingRooms] state_hook_counts frames={} param={} quake={} sound={} effect={} follow={} rumble={} star_ko={} heap_allocations={}",
+            "[TrainingRooms] state_hook_counts frames={} param={} quake={} sound={} effect={} follow={} rumble={} star_ko={} se_silenced={} se_passed={} switch_fx={} decide={} copy_hook={} heap_allocations={}",
             take(FRAME),
             take(PARAM),
             take(QUAKE),
@@ -198,6 +205,11 @@ mod counts {
             take(FOLLOW),
             take(RUMBLE),
             take(STAR_KO),
+            take(SE_SILENCED),
+            take(SE_PASSED),
+            take(SWITCH_FX),
+            take(DECIDE),
+            take(COPY_HOOK),
             crate::runtime::alloc::hook_allocations()
         ));
     }
@@ -220,6 +232,11 @@ mod counts_index {
     pub const FOLLOW: usize = 5;
     pub const RUMBLE: usize = 6;
     pub const STAR_KO: usize = 7;
+    pub const SE_SILENCED: usize = 8;
+    pub const SE_PASSED: usize = 9;
+    pub const SWITCH_FX: usize = 10;
+    pub const DECIDE: usize = 11;
+    pub const COPY_HOOK: usize = 12;
 }
 
 /// A line for the diag build only: the shipped NRO writes the install line and nothing else.
@@ -1097,7 +1114,12 @@ unsafe fn switch_effect_hidden(accessor: usize, effect: u64) -> bool {
         return false;
     }
     let kind = n::object_kind(accessor);
-    kind == -1 || [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD, K_WEAPON_PTRAINER, K_WEAPON_MBALL].iter().any(|k| kid(*k) == kind)
+    let hidden = kind == -1 || [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD, K_WEAPON_PTRAINER, K_WEAPON_MBALL].iter().any(|k| kid(*k) == kind);
+    if hidden {
+        bump(counts_index::SWITCH_FX);
+    }
+    state_diag!("[TrainingRooms] state switch_fx effect={:#x} class={:?} object_kind={} hidden={}", effect, class, kind, hidden);
+    hidden
 }
 
 /// `EffectModule::req_on_joint`: the trainer-switch size rule only (SPEC-state-05 §4.1).
@@ -1253,7 +1275,10 @@ unsafe fn fighter_sound_silenced(module: usize, hash: u64) -> bool {
         }
         _ => (false, false),
     };
-    pokemon::sound_silenced(sound, loading, drinking, above)
+    let silenced = pokemon::sound_silenced(sound, loading, drinking, above);
+    bump(if silenced { counts_index::SE_SILENCED } else { counts_index::SE_PASSED });
+    state_diag!("[TrainingRooms] state se hash={:#x} sound={:?} status={} silenced={}", hash, sound, status, silenced);
+    silenced
 }
 
 // ---- Pokemon Trainer decide and Kirby copy (SPEC-state-05 §5.1 step 3, §5.2 step 4) ----------------------
@@ -1283,7 +1308,10 @@ pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
     let found = Descriptor { count: read(0x14), kinds: [read(0x18), read(0x1c), read(0x20)] };
     state_diag!("[TrainingRooms] state pt_decide entry={} saved={} descriptor={:?}", entry, saved, found);
     if let Some(index) = pokemon::decide_index(saved, Some(found), kinds) {
+        bump(counts_index::DECIDE);
         ctx.registers[8].set_x(index as u64);
+    } else {
+        state_diag!("[TrainingRooms] state pt_decide_rejected entry={} saved={}", entry, saved);
     }
 }
 
@@ -1317,6 +1345,7 @@ unsafe fn kirby_copy_started(fighter: usize) {
         return;
     };
     state_effects::run_charge(accessor, fighter, &ids, &plan);
+    bump(counts_index::COPY_HOOK);
     with(|s| s.machine.finish_wait(role));
     state_diag!("[TrainingRooms] state kirby_copy_started entry={} steps={}", entry, plan.iter().count());
 }
