@@ -559,7 +559,19 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "4da80c37ed166bde0b13cee0c5c2c33651013aeca19a2bc2b1314953137c647b"
+   "dest_sha256": "ee5407ea9be3edef32a84953bc7e3f545ee43a2f4b6ae41c64e1aa5a36a1798b",
+   "edits": [
+    {
+     "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
+     "new": "crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::ReplaySave, move || {",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    },
+    {
+     "old": "let _ = std::thread::Builder::new()\n            .name(\"mii-catalog\".into())\n            .stack_size(0x20000)\n            .spawn(move || {",
+     "new": "let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    }
+   ]
   },
   {
    "src": "src/replay_capture.rs",

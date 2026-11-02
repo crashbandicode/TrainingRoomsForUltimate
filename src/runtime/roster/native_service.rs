@@ -53,6 +53,7 @@ unsafe extern "C" fn training_mod_native_service_dispatch(
     entry: *mut u8,
     context: &ServiceEntryContext,
 ) -> u64 {
+    crate::runtime::threads::headroom("native_service");
     #[cfg(feature = "console-swap-trace")]
     let native_sp = context.native_sp() as u64;
     #[cfg(not(feature = "console-swap-trace"))]

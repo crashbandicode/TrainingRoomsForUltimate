@@ -73,7 +73,7 @@ pub fn prepare() {
         parked.reserve_exact(BUFFERS);
     }
     diagnostic(format_args!("[LayoutArchive] boot buffers {BUFFERS} x {capacity} B"));
-    let spawned = std::thread::Builder::new().name("tr-archive".into()).stack_size(64 * 1024).spawn(|| {
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Archive, || {
         let _ = RETIRER.set(std::thread::current());
         loop {
             retire_expired(&PARKED, clock::uptime_ms(), GRACE_MS, |p| p.handed_out_ms, |p| {

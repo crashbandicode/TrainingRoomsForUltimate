@@ -9,6 +9,9 @@ pub mod model;
 // The carried fork engines (package 6): each area is test-only until its consumer lands, except those engine/mod.rs leaves open.
 pub mod engine;
 
+// The install line's worst-case length (model site tables + the carried seam table): the runtime's buffer size and its host test.
+pub mod install_capacity;
+
 #[cfg(target_os = "switch")]
 mod runtime;
 

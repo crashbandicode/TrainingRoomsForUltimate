@@ -3800,6 +3800,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
 /// of an attached Phase-B window), groups on or off.
 #[skyline::hook(offset = 0x6524e0)]
 unsafe fn finalize_entry(entry: *mut u8) -> u64 {
+    crate::runtime::threads::headroom("finalize_entry");
     if aligned(entry) {
         let owner = read::<u32>(entry, 0xe0);
         if PAIR_ENABLED.load(Ordering::Acquire) { pair_teardown(entry, "finalize"); }

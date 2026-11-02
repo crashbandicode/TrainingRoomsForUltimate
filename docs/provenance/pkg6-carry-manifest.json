@@ -1432,7 +1432,14 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "22718f1f019e6106de8ce88cf4daa53abebf8a69fa9f8f0b9d8802d2d80003ee"
+   "dest_sha256": "0282b287309623abd29a9dc1132f339962133fb313e357db81d7dc042943311b",
+   "edits": [
+    {
+     "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
+     "new": "    context: &ServiceEntryContext,\n) -> u64 {\n    crate::runtime::threads::headroom(\"native_service\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/native_unlink_install.rs",
@@ -1446,7 +1453,14 @@
    "dest": "src/runtime/roster/character_lifecycle.rs",
    "crate": "root",
    "src_sha256": "d3dc2989eabad2608dfa0841828103b3f8c32ce709426c57b6b9197d0a3af453",
-   "dest_sha256": "374796ae64082db4e925e88986c15829f77d243959bab34dacb3bf81e0f7d672"
+   "dest_sha256": "3a22de13ecf4536d73bfced0bdc28f6ebe61de16b4761917eee9ed73ac060eac",
+   "edits": [
+    {
+     "old": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn destruction_trace(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"destruction_trace\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/character_roster.rs",
@@ -1559,14 +1573,33 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "fdd8959105a2044865a0e4c7214ddc1cc7e3358ea363c0ca72d8a6985d71c916"
+   "dest_sha256": "9f98de93c21def149c577ff438609fdb689bee955667245679f14fdc08193750",
+   "edits": [
+    {
+     "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
+     "new": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n    crate::runtime::threads::headroom(\"finalize_entry\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/native_source_capacity.rs",
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "09d353f9631a27b058b3869da23d167ec28fc06de6666b6331bd1cf18d897fbb"
+   "dest_sha256": "0d18a438bcc36aabfc0f1912aba7deef237283590de9046fd4d8248b1db858d8",
+   "edits": [
+    {
+     "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn listener_removed(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"listener_removed\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n",
+     "new": "unsafe fn actor_cleanup(ctx: &InlineCtx) {\n    crate::runtime::threads::headroom(\"actor_cleanup\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/effect_hook_chain.rs",
@@ -1587,7 +1620,7 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "b8c285449ce80b127cc9f7e228aabffc9dce1576fb0fccad12a0a67a836471c9",
+   "dest_sha256": "55854dce68991bb0a3e8dc42ec65394af70a76f7aa7129716bf3cd1622f8f923",
    "edits": [
     {
      "old": "use std::alloc::{GlobalAlloc, Layout, System};",
@@ -1618,6 +1651,21 @@
      "old": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init};",
      "new": "#[cfg(feature = \"console-practice-trace\")]\npub use enabled::{checkpoint, event, init, TraceAllocator};",
      "reason": "`TraceAllocator` is the global allocator `runtime::alloc` installs under this feature"
+    },
+    {
+     "old": "    const STACK_BYTES: usize = 128 * 1024;\n",
+     "new": "",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build) (the local STACK_BYTES is gone)"
+    },
+    {
+     "old": "std::thread::Builder::new()\n            .stack_size(STACK_BYTES)\n            .spawn(writer)",
+     "new": "crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::PracticeTrace, writer)",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    },
+    {
+     "old": "core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,",
+     "new": "core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,",
+     "reason": "stream/stack: the session line prints the table's stack size"
     }
    ]
   },
@@ -1774,7 +1822,19 @@
    "dest": "src/runtime/mii/mii_hud_portrait.rs",
    "crate": "root",
    "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
-   "dest_sha256": "5832ced6c12f6efe582ec72f9a4258947e670c0362fab2b9e42ee366dd237210"
+   "dest_sha256": "c851ef702240c0a8900b88715091d0cdaccd3673e0d8fa6dc86fb3ea00b085cc",
+   "edits": [
+    {
+     "old": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_before_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n",
+     "new": "unsafe fn pipeline_after_tick(ctx: &mut InlineCtx) {\n    crate::runtime::threads::headroom(\"pipeline_after_tick\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    }
+   ]
   },
   {
    "src": "src/mii_ldn_qualification.rs",
@@ -1802,7 +1862,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "bffc2029ceea598b289abce75d948d251c36b7fcda754a4e73a65e46c2b0f428",
+   "dest_sha256": "ca582e25916a342413d5f9454c1d54ebbf81576a26051d432940b722f45f7356",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1818,6 +1878,16 @@
      "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
      "new": "notify_args(Role::Cpu,format_args!(\"CPU {:?} choice skipped\",choice.canonical.class));",
      "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },
@@ -1840,7 +1910,24 @@
    "dest": "src/runtime/mii/mii_ordinary_gate.rs",
    "crate": "root",
    "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
-   "dest_sha256": "ce2644f46ccf0ef9b36d16ba90051baaf6e4ba29ed471b193267836eb2d72418"
+   "dest_sha256": "1e1016ded06643d45936e7360d56dc9d11f344753b0858385b0ae53341ebebd1",
+   "edits": [
+    {
+     "old": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n",
+     "new": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n",
+     "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {\n        let valid_stack",
+     "new": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    // stream/stack: each arm is its own frame (inline(never)), so the callback's stack holds only the arm that runs.\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {return decide_cpu(entry,selected,native_sp);}\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {return decide_helper(entry,selected,native_sp);}\n    decide_player(entry,selected,native_sp)\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n#[inline(never)]\nunsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change"
+    },
+    {
+     "old": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "new": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[cfg(feature=\"mii-managed-helper-alpha\")]\n#[inline(never)]\nunsafe fn decide_helper(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[inline(never)]\nunsafe fn decide_player(entry:usize,selected:usize,native_sp:usize)->usize {\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change (the helper and player arms)"
+    }
+   ]
   },
   {
    "src": "src/mii_ordinary_native.rs",
@@ -1861,7 +1948,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "9bdb188d599b919a74085970778361d97cfaae98d194ece6994fb62af1df30ab",
+   "dest_sha256": "2d0949f60cbf908144977885db5e80b3846cb47386f99ed3a6d52ef2e51a22b0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -1877,6 +1964,16 @@
      "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
      "new": "notify_args(Role::Player,format_args!(\"Player {:?} choice skipped\",choice.canonical.class));",
      "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },
@@ -2082,7 +2179,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "b3d30e3e6ba029697e2e5a0c65f95720eb01993de78f7624e1dcf0c26e9e1265",
+   "dest_sha256": "8b2cba722f3db30f294cbd9db62018c0f1359910e826ea6b195e377f4ead0f45",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -2108,6 +2205,16 @@
      "old": "    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {\n        let path = \"sd:/ultimate/TrainingRooms/mii-editor-last.json\";\n        if let Err(error) = std::fs::write(path, bytes) {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] trace write failed: {error}\"));\n        }\n    }",
      "new": "    crate::engine::lobby::trace_slot::write_json(std::path::Path::new(\"sd:/ultimate/TrainingRooms/mii-editor-last.json\"), trace)",
      "reason": "the trace file is written transactionally (temporary file, sync, replace; the old file stays on a failure) instead of `std::fs::write` over the live file (review R1); host tests in `engine::lobby::trace_slot` cover two loads and a failed write; offered back to the fork's fix ledger"
+    },
+    {
+     "old": "#[derive(Clone, Serialize)]\npub(crate) struct Trace {",
+     "new": "// Copy (stream/stack): the writer's slot copies it into a heap buffer in place instead of moving 11 KB through stack frames.\n#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace {",
+     "reason": "stream/stack: Trace is Copy so the trace writer's BoxedSlot copies it into a boot-made heap buffer in place (moved by value it gave tr-trace-writer a 59,712 B frame on a 64 KiB stack: the Eden s4-07/u4b-02 boot fault)"
+    },
+    {
+     "old": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n",
+     "new": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n\nimpl Trace {\n    /// No events: the template of the writer slot's two buffers.\n    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };\n}\n",
+     "reason": "stream/stack: Trace::EMPTY, the template the writer slot's two heap buffers are made from at init"
     }
    ]
   },

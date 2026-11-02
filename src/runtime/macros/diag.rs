@@ -86,7 +86,7 @@ pub(crate) fn start() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    let _ = std::thread::Builder::new().name("tr-macro-diag".into()).stack_size(64 * 1024).spawn(|| loop {
+    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MacroDiag, || loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let Some(path) = FixedPath::<128>::in_root("diag-macro.req") else { continue };
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };

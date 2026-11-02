@@ -27,8 +27,6 @@ use crate::model::storage::{self, FixedPath};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::notices;
 
-/// The stack of the writer thread (file I/O and a small string).
-const STACK_BYTES: usize = 64 * 1024;
 /// How often the thread looks at its slots.
 const POLL: Duration = Duration::from_millis(100);
 
@@ -41,7 +39,7 @@ static CAPTURE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Start the writer (boot, outside any hook).
 pub fn start() {
-    let spawned = std::thread::Builder::new().name("tr-ini-writer".into()).stack_size(STACK_BYTES).spawn(run);
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::IniWriter, run);
     if spawned.is_err() {
         diagnostic(format_args!("[TrainingRooms] ini writer thread did not start; requests stay unwritten"));
     }

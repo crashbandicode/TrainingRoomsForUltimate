@@ -588,6 +588,7 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
 /// cannot clear while the owner idles fails the group at once
 /// (`crate::engine::swap::body_bank::mii_publish`). The refusal reason is noted once.
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // stream/stack: its own frame, not `service`'s
 unsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
     let Some((group,identity,c))=super::body_bank::pending_mii_publication(owner) else {return;};
@@ -1134,6 +1135,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
 
 /// Settle a CPU member switch in this owner's ready callback; never forced.
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's
 unsafe fn bank_service(entry:*mut u8,b:BankTrack) {
     let live=super::body_bank::ready_kind(entry,b.before.binding.owner);
     if STATE.lock().unwrap().departed {
