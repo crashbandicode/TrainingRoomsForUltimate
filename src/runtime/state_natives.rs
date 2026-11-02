@@ -226,9 +226,10 @@ pub unsafe fn jack_add_rebel(accessor: usize, entry: i32, amount: f32) {
     at::<extern "C" fn(usize, i32, f32)>(s::STATE_JACK_ADD_REBEL_OFFSET).map_or_else(Default::default, |f| f(accessor, entry, amount))
 }
 
-/// The game's add-limit routine `(limit, fighter object, 0)`.
-pub unsafe fn cloud_add_limit(fighter: usize, limit: f32) {
-    at::<extern "C" fn(f32, usize, i32)>(s::STATE_CLOUD_ADD_LIMIT_OFFSET).map_or_else(Default::default, |f| f(limit, fighter, 0))
+/// The game's add-limit routine `(limit, module accessor, 0)`. Its first instruction reads the work module
+/// at `accessor + 0x50` (a fighter object there is a null work module: Eden s3-03 jumped to address 4).
+pub unsafe fn cloud_add_limit(accessor: usize, limit: f32) {
+    at::<extern "C" fn(f32, usize, i32)>(s::STATE_CLOUD_ADD_LIMIT_OFFSET).map_or_else(Default::default, |f| f(limit, accessor, 0))
 }
 
 pub unsafe fn visibility_set_status_default(accessor: usize, a: u64, b: u64) {

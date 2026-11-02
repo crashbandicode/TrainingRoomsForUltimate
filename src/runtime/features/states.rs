@@ -524,8 +524,13 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 ));
             }
         }
-        if raw.entry == 1 && !nana {
-            DUMP.store(false, Ordering::Release);
+        // Both bodies are dumped, in whichever order the game runs them (a switched Pokemon runs after the CPU).
+        if !nana && raw.entry <= 1 {
+            let seen = DUMPED.fetch_or(1 << raw.entry, Ordering::AcqRel) | (1 << raw.entry);
+            if seen == 0b11 {
+                DUMPED.store(0, Ordering::Release);
+                DUMP.store(false, Ordering::Release);
+            }
         }
     }
     // A diag copy request: give Kirby the opponent's hat through the game's own routine.
@@ -1402,8 +1407,13 @@ pub fn start_writer() {
 #[cfg(feature = "diag")]
 static DUMP: AtomicBool = AtomicBool::new(false);
 
+/// Diag build: which of the two bodies the current dump has printed (bit 0 player, bit 1 CPU).
+#[cfg(feature = "diag")]
+static DUMPED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 #[cfg(feature = "diag")]
 fn request_dump() {
+    DUMPED.store(0, Ordering::Release);
     DUMP.store(true, Ordering::Release);
 }
 

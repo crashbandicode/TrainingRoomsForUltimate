@@ -131,7 +131,7 @@ pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table,
         }
     }
     if out.add_limit {
-        n::cloud_add_limit(fighter, 100.0);
+        n::cloud_add_limit(accessor, 100.0);
     }
     if out.add_rebel {
         n::jack_add_rebel(accessor, entry, 120.0);
