@@ -9,8 +9,6 @@ use crate::runtime::compat::sync::Readable;
 use crate::runtime::game::natives;
 use crate::runtime::{game, scene, state_natives};
 
-pub(crate) use crate::runtime::lobby::game_mode;
-
 /// The `FighterManager` singleton's slot address (`main + FIGHTER_MANAGER_SLOT_OFFSET`); `read(&FIGHTER_MANAGER_ADDR)` is the
 /// address, the manager pointer is the pointer stored there.
 pub struct FighterManagerAddr;
@@ -91,7 +89,7 @@ pub mod menu {
     use crate::model::input_delay::Owners;
     use crate::runtime::published;
 
-    pub use crate::runtime::compat::menu::{mii_preferences, stage_preferences};
+    pub use crate::runtime::compat::menu::stage_preferences;
 
     /// Something other than gameplay owns Player 1's input (the plugin's menu, the replay editor, the native waiting-room UI,
     /// the game's pause menu). The stop chord's own bit is not an owner: it only marks a poll the chord consumed.
