@@ -244,6 +244,67 @@ fn kirby_counts(bodies: &[BodyRef]) -> [usize; 3] {
     counts
 }
 
+/// Borrowed value receipts for a detached native group. No pointer is followed
+/// while planning; the caller has already captured and validated these records.
+#[derive(Clone, Copy)]
+pub struct DetachedView<'a> {
+    pub owner: u32,
+    pub bodies: &'a [BodyRef],
+    pub contexts: &'a [ContextRef],
+    pub dispatch: Option<DispatcherRef>,
+    pub records: Option<RecordsRef>,
+    pub held_kinds: &'a [u32],
+}
+
+pub struct DetachedPlan<'a> {
+    pub groups: &'a [DetachedView<'a>],
+    pub consumers: &'a NativeConsumers,
+}
+
+impl DetachedPlan<'_> {
+    /// All non-key actions in finalize order. The one aggregate key release
+    /// follows this iterator; `keys` supplies its first-occurrence ordering.
+    pub fn steps(&self) -> impl Iterator<Item = DestroyStep> + '_ {
+        let routes = self.groups.iter().flat_map(|g| matching_routes(g.owner, g.contexts, self.consumers))
+            .scan([false; 256], |seen, route| {
+                let first = !std::mem::replace(&mut seen[usize::from(route.slot)], true);
+                Some(first.then_some(DestroyStep::ReleasePadRoute { slot: route.slot, controller: route.controller }))
+            }).flatten();
+        let bodies = self.groups.iter().flat_map(|g| g.bodies.iter()).filter(|b| b.valid)
+            .map(|b| DestroyStep::DestroyBody { id: b.id });
+        let contexts = self.groups.iter().flat_map(|g| unique_contexts(g.contexts)).filter(|c| c.valid)
+            .map(|c| DestroyStep::FreeContext { ctx: c.ctx });
+        let dispatchers = self.groups.iter().filter_map(|g| g.dispatch).filter(|d| d.valid)
+            .map(|d| DestroyStep::DestroyDispatchers { arrays: d.arrays });
+        let records = self.groups.iter().filter_map(|g| g.records).filter(|r| r.valid)
+            .map(|r| DestroyStep::DestroyRecords { records: r.records });
+        routes.chain(bodies).chain(contexts).chain(dispatchers).chain(records)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = u32> + '_ {
+        let all = self.groups.iter().flat_map(|g| g.held_kinds.iter().copied());
+        all.clone().enumerate().filter_map(move |(i, key)|
+            (!all.clone().take(i).any(|prior| prior == key)).then_some(key))
+    }
+
+    pub fn skipped(&self) -> impl Iterator<Item = Skipped> + '_ {
+        self.groups.iter().flat_map(|g| {
+            unique_contexts(g.contexts).filter(|c| !c.valid).map(|c| Skipped::Context(c.ctx))
+                .chain(g.bodies.iter().filter(|b| !b.valid).map(|b| Skipped::Body(b.id)))
+                .chain(g.dispatch.filter(|d| !d.valid).map(|d| Skipped::Dispatchers(d.arrays)))
+                .chain(g.records.filter(|r| !r.valid).map(|r| Skipped::Records(r.records)))
+        })
+    }
+
+    pub fn kirby_counts(&self) -> [usize; 3] {
+        self.groups.iter().fold([0; 3], |mut total, group| {
+            let counts = kirby_counts(group.bodies);
+            for i in 0..3 { total[i] += counts[i]; }
+            total
+        })
+    }
+}
+
 /// Phase buckets of one or more bundles, merged in finalize's order.
 #[derive(Default)]
 struct Phases {

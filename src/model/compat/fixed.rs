@@ -86,6 +86,8 @@ impl<T: Copy, const N: usize> FixedList<T, N> {
         self.len = self.len.checked_sub(1)?;
         Some(self.items[self.len])
     }
+
+    pub fn clear(&mut self) { self.len = 0; }
 }
 
 impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
@@ -93,6 +95,10 @@ impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
     fn deref(&self) -> &[T] {
         &self.items[..self.len]
     }
+}
+
+impl<T: Copy, const N: usize> std::ops::DerefMut for FixedList<T, N> {
+    fn deref_mut(&mut self) -> &mut [T] { &mut self.items[..self.len] }
 }
 
 #[cfg(test)]

@@ -178,7 +178,8 @@ use crate::engine::preload::cycle_preload_config::Settings;
 use crate::engine::swap::character_forms::{EntryState, Forms};
 use crate::engine::mii::lifetime::Configuration;
 use crate::engine::swap::swap_model::{capabilities, form_class, group_serves, previous_cell_index};
-use crate::engine::swap::swap_model::lifecycle::{attached_plan, destroy_plan_many, BodyRef, Bundle, DestroyStep, DetachedGroup, DispatcherRef, RecordsRef};
+use crate::engine::swap::swap_model::lifecycle::{attached_plan, BodyRef, ContextRef, DetachedPlan, DetachedView, DispatcherRef, RecordsRef};
+use crate::engine::compat::fixed::{FixedList, FixedVec};
 use crate::engine::swap::swap_model::copy_registry::{self, RegistryOps};
 use crate::engine::swap::swap_model::fallback::{self, Disposition, Fallback};
 use crate::engine::swap::swap_model::request_bit::{End as LeaseEnd, Lease};
@@ -1987,6 +1988,55 @@ unsafe fn registered_kind(r: Option<usize>, cell: usize) -> Option<u32> {
 /// the window's registration stays native's own.
 type CopyPackageSets = crate::engine::compat::fixed::FixedList<[u32; NATIVE_MEMBERS], { MAX_EXTRA_GROUPS + 1 }>;
 
+/// One native group's value-only teardown receipt. Bounds are its three cells,
+/// three context words, and those members plus the special-object prefetch key.
+#[derive(Clone, Copy)]
+struct DetachedSnapshot {
+    owner: u32,
+    bodies: FixedList<BodyRef, NATIVE_MEMBERS>,
+    contexts: FixedList<ContextRef, NATIVE_MEMBERS>,
+    dispatch: Option<DispatcherRef>,
+    records: Option<RecordsRef>,
+    held_kinds: FixedList<u32, { NATIVE_MEMBERS + 1 }>,
+}
+impl DetachedSnapshot {
+    fn new(owner: u32) -> Self {
+        Self { owner,
+            bodies: FixedList::new(BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None }),
+            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false }),
+            dispatch: None, records: None, held_kinds: FixedList::new(0) }
+    }
+    fn view(&self) -> DetachedView<'_> {
+        DetachedView { owner: self.owner, bodies: &self.bodies, contexts: &self.contexts,
+            dispatch: self.dispatch, records: self.records, held_kinds: &self.held_kinds }
+    }
+}
+
+fn detached_keys(plan: &DetachedPlan<'_>) -> FixedList<u32, { MAX_EXTRA_GROUPS * (NATIVE_MEMBERS + 1) }> {
+    let mut keys = FixedList::new(0);
+    for key in plan.keys() { keys.push(key); }
+    keys
+}
+
+enum DispatchNote { Destroyed(bool, [usize; 2]), Leaked([usize; 2]) }
+impl std::fmt::Display for DispatchNote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Destroyed(destroyed, arrays) => write!(f, "dispatch_destroyed={} arrays={:x?}", destroyed, arrays),
+            Self::Leaked(dispatch) => write!(f, "dispatch_leaked={:x?}", dispatch),
+        }
+    }
+}
+
+struct MemberSets<'a>(&'a [Members]);
+impl std::fmt::Debug for MemberSets<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut list = f.debug_list();
+        for members in self.0 { list.entry(&&members.kinds()[..members.count()]); }
+        list.finish()
+    }
+}
+
 fn copy_package_sets(bank: &Bank) -> CopyPackageSets {
     let words = |members: Members| {
         let mut words = [u32::MAX; NATIVE_MEMBERS];
@@ -3021,7 +3071,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         let state = BANKS[role].lock().unwrap();
         let Some(bank) = state.as_ref() else { return; };
         let members = *bank.members;
-        let mut detached = DetachedGroup { owner, ..Default::default() };
+        let mut detached = DetachedSnapshot::new(owner);
         let mut records = [0usize; 3];
         let mut current = [0usize; 2];
         if matches!(prepared, Prepared::Build { .. }) {
@@ -3037,7 +3087,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
                     // A constructed body released its own kind's keys at construction
                     // end (§1.2); a member that never constructed still holds them.
                     None => detached.held_kinds.push(kind),
-                }
+                };
             }
             for i in 0..NATIVE_MEMBERS {
                 if let Some(context) = fields::child(entry as usize, 0x4188 + i * 8) {
@@ -3059,10 +3109,12 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             }
             if let Some(kind) = members.object_kind() { detached.held_kinds.push(kind); }
         }
-        (Bundle::Detached(detached), bank.alias, records, current)
+        (detached, bank.alias, records, current)
     };
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(std::slice::from_ref(&bundle), &consumers);
+    let views = [bundle.view()];
+    let plan = DetachedPlan { groups: &views, consumers: &consumers };
+    let keys = detached_keys(&plan);
     // The ledger (WP4): a constructed body released its own kind's keys at construction end
     // (§1.2), so its token is settled; a member that never constructed still holds its prefetch
     // keys, and the object kind never has a tail. The plan's key step returns those tokens through
@@ -3071,19 +3123,20 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     // state 7. A Mii group's identity is still in `R` here: the bodies are unloaded and these keys
     // are released under it; the window's words return below.
     let alias_ok = alias != 0 && resource(base, owner) == Some(alias);
-    let built: Vec<u32> = bundle.bodies().iter().map(|body| body.kind).collect();
+    let mut built = FixedList::<u32, NATIVE_MEMBERS>::new(0);
+    for body in bundle.bodies.iter() { built.push(body.kind); }
     if alias_ok && !built.is_empty() { r_handle::construction_settled(ledger_role(role), group, &built); }
     let releasable = alias_ok && fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0;
     let mut release = |kinds: &[u32]| {
         if !releasable { return (0, kinds.len()); }
         release_group_keys(base, role, Some(group), Some(kinds), &Occupancy::default(), owner, "build rollback")
     };
-    let receipt = graph::execute(base, &plan, owner, "swap rollback", &mut release);
+    let receipt = graph::execute(base, &plan, &keys, owner, "swap rollback", &mut release, &mut |_| {});
     let map_after = if releasable { fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64) } else { -1 };
     // A failed warm swap leaks the unverified group's arrays with its bodies (logged).
     let dispatch_note = match prepared {
-        Prepared::Build { .. } => format!("dispatch_destroyed={} arrays={:x?}", receipt.dispatchers == 1, current),
-        Prepared::Warm { dispatch, .. } => format!("dispatch_leaked={:x?}", dispatch),
+        Prepared::Build { .. } => DispatchNote::Destroyed(receipt.dispatchers == 1, current),
+        Prepared::Warm { dispatch, .. } => DispatchNote::Leaked(dispatch),
     };
     let (failed, restored) = {
         let mut state = BANKS[role].lock().unwrap();
@@ -3113,7 +3166,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
             .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
         trace!("[GroupSwap] fallback owner={} group={} reason=verification failed; destroyed={} contexts={} routes={} records={:x?} keys_released={:x?} map_after={} skipped={} {}; window restored, member {} activates",
-            owner, group, receipt.bodies, receipt.contexts, receipt.routes_cleared, records, plan.keys(), map_after, receipt.skipped, dispatch_note, via);
+            owner, group, receipt.bodies, receipt.contexts, receipt.routes_cleared, records, &*keys, map_after, receipt.skipped, dispatch_note, via);
         (failed, *bank.members)
     };
     // U18: whatever the failed group still registers leaves (its destroyed bodies' unloads already
@@ -3421,20 +3474,20 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
     // U18: each detached body's group, for the per-group header during the destroys.
-    let mut owners: Vec<(u32, Members)> = Vec::new();
+    let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
     let (mut bundles, identities, token, alias, groups) = {
         let mut state = BANKS[role].lock().unwrap();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
         let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
-        let mut bundles = Vec::with_capacity(groups);
+        let mut bundles = FixedList::<DetachedSnapshot, MAX_EXTRA_GROUPS>::new(DetachedSnapshot::new(owner));
         // A Mii group's keys are released with its identity in `R` (the release selector
         // `0x17e8410` keys on `R+0x58` like the request did): each key-holding Mii group keeps
         // its index (the ledger's group of its tokens) and identity.
-        let mut identities: Vec<(usize, MiiIdentity)> = Vec::new();
+        let mut identities = FixedVec::<(usize, MiiIdentity), MAX_EXTRA_GROUPS>::new();
         for (index, group) in bank.groups.iter().enumerate() {
-            let mut detached = DetachedGroup { owner, ..Default::default() };
+            let mut detached = DetachedSnapshot::new(owner);
             match (group.state, group.saved) {
                 (GroupState::Built, Some(saved)) => {
                     for (i, kind) in group.members.kinds().iter().enumerate().take(group.members.count()) {
@@ -3461,12 +3514,12 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                 }
                 (state, _) if state.holds_keys() => {
                     let (kinds, count) = group.members.prefetch_kinds();
-                    detached.held_kinds.extend(kinds[..count].iter().copied());
+                    for kind in kinds[..count].iter().copied() { detached.held_kinds.push(kind); }
                     if let Some(identity) = group.identity { identities.push((index, identity)); }
                 }
                 _ => {}
             }
-            bundles.push(Bundle::Detached(detached));
+            bundles.push(detached);
         }
         bank.groups.clear();
         bank.swap = None;
@@ -3479,23 +3532,21 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let alias_ok = alias != 0 && resource(base, owner) == Some(alias);
     let mut unreachable = 0usize;
     if !alias_ok {
-        for bundle in &mut bundles {
-            if let Bundle::Detached(group) = bundle {
-                unreachable += group.bodies.len() + group.held_kinds.len();
-                group.bodies.clear();
-                group.held_kinds.clear();
-            }
+        for group in bundles.iter_mut() {
+            unreachable += group.bodies.len() + group.held_kinds.len();
+            group.bodies.clear();
+            group.held_kinds.clear();
         }
     }
     // U18: detached bodies hold no registration but unload over the cells the window's registrations
     // occupy: the window leaves the registry, each group is destroyed under its own header, then the
     // window registers again (`copy_registry::teardown_begin/group/end`). Without the registry the
     // bodies are left (this function's rule: leak rather than corrupt).
-    let has_bodies = bundles.iter().any(|b| matches!(b, Bundle::Detached(group) if !group.bodies.is_empty()));
+    let has_bodies = bundles.iter().any(|group| !group.bodies.is_empty());
     let mut registry = if has_bodies { NativeRegistry::new(base, alias, owner).zip(window) } else { None };
     if has_bodies && registry.is_none() {
-        for bundle in &mut bundles {
-            if let Bundle::Detached(group) = bundle { unreachable += group.bodies.len(); group.bodies.clear(); }
+        for group in bundles.iter_mut() {
+            unreachable += group.bodies.len(); group.bodies.clear();
         }
         trace!("[Registry] teardown owner={} reason={} registry unreadable; detached bodies left", owner, reason);
     }
@@ -3505,7 +3556,11 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         (before, registry.cells())
     });
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(&bundles, &consumers);
+    let mut views = FixedList::<DetachedView<'_>, MAX_EXTRA_GROUPS>::new(DetachedView {
+        owner, bodies: &[], contexts: &[], dispatch: None, records: None, held_kinds: &[] });
+    for bundle in bundles.iter() { views.push(bundle.view()); }
+    let plan = DetachedPlan { groups: &views, consumers: &consumers };
+    let keys = detached_keys(&plan);
     // The plan's key step (DEFECT #2's per-key release on every teardown reason, row 15) hands
     // every token the ledger still holds for this role — these groups' unconsumed prefetches and a
     // window whose build never settled — back through `r_handle::release` (WP4: the orphan `0x1338`
@@ -3515,7 +3570,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let occupancy = occupancy_snapshot(role, copy);
     let mut release = |_: &[u32]| {
         let mut outcome = (0usize, 0usize);
-        for (group, identity) in &identities {
+        for (group, identity) in identities.iter() {
             let mut one = (0usize, 0usize);
             with_mii_identity(alias, Some(*identity), || {
                 one = release_group_keys(base, role, Some(*group), None, &occupancy, owner, reason);
@@ -3529,28 +3584,27 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // U18: each group's own header right before its first body, the window's before any later step.
     let mut current: Option<Members> = None;
     let receipt = {
-        let mut before_step = |step: &DestroyStep| {
+        let mut before_step = |body: Option<u32>| {
             let Some((registry, window)) = registry.as_mut() else { return; };
-            let wanted = match step {
-                DestroyStep::DestroyBody { id } => owners.iter().find(|(body, _)| body == id).map(|(_, group)| *group),
-                _ => Some(*window),
+            let wanted = match body {
+                Some(id) => owners.iter().find(|(body, _)| *body == id).map(|(_, group)| *group),
+                None => Some(*window),
             };
             if let Some(members) = wanted.filter(|m| current != Some(*m)) {
                 copy_registry::teardown_group(registry, members);
                 current = Some(members);
             }
         };
-        graph::execute_with(base, &plan, owner, reason, &mut release, &mut before_step)
+        graph::execute(base, &plan, &keys, owner, reason, &mut release, &mut before_step)
     };
     if let (Some((registry, window)), Some((before, emptied))) = (registry.as_mut(), cells) {
         copy_registry::teardown_end(registry, *window);
-        let mut detached: Vec<Vec<u32>> = Vec::new();
-        for (_, group) in &owners {
-            let kinds = group.kinds()[..group.count()].to_vec();
-            if !detached.contains(&kinds) { detached.push(kinds); }
+        let mut detached = FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group());
+        for (_, group) in owners.iter() {
+            if !detached.iter().any(|m| m.kinds()[..m.count()] == group.kinds()[..group.count()]) { detached.push(*group); }
         }
         trace!("[Registry] teardown owner={} reason={} window={:x?} detached={:x?} cells={:x?}->{:x?}->{:x?} header={:x?} r4c={:#x} task_pending={}",
-            owner, reason, &window.kinds()[..window.count()], detached, before, emptied, registry.cells(), registry.header(),
+            owner, reason, &window.kinds()[..window.count()], MemberSets(&detached), before, emptied, registry.cells(), registry.header(),
             fields::read::<u32>(alias, 0x4c).unwrap_or(0), task_pending(alias));
     }
     if let Some(token) = token { super::finish_install(token, "group prefetch retired"); }

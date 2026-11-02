@@ -140,6 +140,29 @@ pub fn referenced(held: &[Acquisition]) -> BTreeMap<u32, u32> {
     refs
 }
 
+/// Sorted unique keys for diagnostics, without building the reference-count map.
+/// Holdings remain unchanged while the caller formats this borrowed/value view.
+pub fn referenced_keys(held: impl Iterator<Item = Acquisition> + Clone) -> impl Iterator<Item = u32> {
+    let mut previous = None;
+    std::iter::from_fn(move || {
+        let mut next = None;
+        for acquisition in held.clone() {
+            for key in acquired_keys_iter(&acquisition.roster, acquisition.member, acquisition.costume) {
+                if previous.is_none_or(|old| key > old) && next.is_none_or(|old| key < old) { next = Some(key); }
+            }
+        }
+        if let Some(key) = next { previous = Some(key); }
+        next
+    })
+}
+
+pub struct KeyList<I>(pub I);
+impl<I: Iterator<Item = Acquisition> + Clone> std::fmt::Debug for KeyList<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(referenced_keys(self.0.clone())).finish()
+    }
+}
+
 /// One record of a native-layout roster buffer (`R+0xb0` layout, 8 × 0x80): `rec+0x8` entry,
 /// `rec+0x28/0x2c/0x30` kinds, `rec+0x51` costume. Those are the only fields `0x17efb40` and
 /// `0x17f0290` read.

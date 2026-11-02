@@ -93,16 +93,15 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
     for gone in &released {
         release(g68, gone.bytes.as_ptr(), gone.acquisition.member, gone.acquisition.costume);
     }
-    let (count, keys) = {
+    {
         let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
         let added = fresh.len();
         held.extend(fresh);
-        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition).collect();
         trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, sets, added,
             released.len(), held.len());
-        (held.len(), model::referenced(&current).into_keys().collect::<Vec<u32>>())
-    };
-    trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, count, keys);
+        trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, held.len(),
+            model::KeyList(held.iter().map(|h| h.acquisition)));
+    }
     true
 }
 
@@ -119,12 +118,8 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
     let ready: unsafe extern "C" fn(usize) -> bool = std::mem::transmute(ready);
     let resident = ready(g68);
     if !resident {
-        let keys: Vec<u32> = {
-            let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-            let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition).collect();
-            model::referenced(&current).into_keys().collect()
-        };
-        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, keys);
+        let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, model::KeyList(held.iter().map(|h| h.acquisition)));
     }
     resident
 }

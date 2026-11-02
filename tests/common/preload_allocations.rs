@@ -29,6 +29,47 @@ unsafe impl GlobalAlloc for CountAlloc {
 static ALLOCATOR: CountAlloc = CountAlloc;
 
 #[test]
+fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
+    use crate::engine::swap::swap_model::lifecycle::*;
+    for mask in 0..64u32 {
+        let bodies = [
+            BodyRef { id: 10, kind: 6, cell: 0, activated: false, valid: mask & 1 != 0, registered: Some(0) },
+            BodyRef { id: 11, kind: 0, cell: 1, activated: true, valid: mask & 2 != 0, registered: Some(6) },
+        ];
+        let contexts = [ContextRef { ctx: 1, controller: 22, valid: mask & 4 != 0 },
+            ContextRef { ctx: 1, controller: 22, valid: true },
+            ContextRef { ctx: 2, controller: 33, valid: mask & 8 != 0 }];
+        let groups = [DetachedView { owner: 0, bodies: &bodies, contexts: &contexts,
+            dispatch: Some(DispatcherRef { arrays: [100, 101], valid: mask & 16 != 0 }),
+            records: Some(RecordsRef { records: [200, 201, 202], valid: mask & 32 != 0 }), held_kinds: &[7, 8, 7] },
+            DetachedView { owner: 1, bodies: &bodies[1..], contexts: &contexts[1..], dispatch: None,
+                records: None, held_kinds: &[8, 9] }];
+        let consumers = NativeConsumers { pad_routes: std::array::from_fn(|slot|
+            Some(RouteRef { slot: slot as u8, controller: if slot % 2 == 0 { 22 } else { 33 } })),
+            nana_owner_plus_8: Some(22) };
+        let borrowed = DetachedPlan { groups: &groups, consumers: &consumers };
+        let owned: Vec<_> = groups.iter().map(|g| Bundle::Detached(DetachedGroup { owner: g.owner,
+            bodies: g.bodies.to_vec(), contexts: g.contexts.to_vec(), dispatch: g.dispatch,
+            records: g.records, held_kinds: g.held_kinds.to_vec() })).collect();
+        let expected = destroy_plan_many(&owned, &consumers);
+        let mut steps: Vec<_> = borrowed.steps().collect();
+        steps.push(DestroyStep::ReleaseKeys { kinds: borrowed.keys().collect() });
+        assert_eq!(steps, expected.steps, "mask {mask}");
+        assert_eq!(borrowed.skipped().collect::<Vec<_>>(), expected.skipped, "mask {mask}");
+        assert_eq!(borrowed.kirby_counts(), [expected.kirby_cells, expected.kirby_misplaced, expected.kirby_branch_mismatch]);
+        assert_eq!(borrowed.keys().collect::<Vec<_>>(), [7, 8, 9]);
+        COUNT.with(|count| count.set(0));
+        TRACK.with(|track| track.set(true));
+        for step in borrowed.steps() { std::hint::black_box(step); }
+        for key in borrowed.keys() { std::hint::black_box(key); }
+        for skipped in borrowed.skipped() { std::hint::black_box(skipped); }
+        std::hint::black_box(borrowed.kirby_counts());
+        TRACK.with(|track| track.set(false));
+        assert_eq!(COUNT.with(Cell::get), 0, "mask {mask}");
+    }
+}
+
+#[test]
 fn attached_teardown_keeps_alias_validation_and_route_order_without_allocations() {
     use crate::engine::swap::swap_model::lifecycle::*;
     let contexts = [
@@ -78,12 +119,15 @@ fn copy_package_matching_streams_duplicate_sets_without_tick_allocations() {
     let wanted = || sets.iter().flat_map(|set| packages::acquisitions_iter(&roster, 0, *set, 2, 1));
     let held: Vec<_> = wanted().collect();
     assert!(!held.is_empty());
+    let expected_keys: Vec<_> = packages::referenced(&held).into_keys().collect();
+    assert_eq!(packages::referenced_keys(held.iter().copied()).collect::<Vec<_>>(), expected_keys);
     COUNT.with(|count| count.set(0));
     TRACK.with(|track| track.set(true));
     let mut changed = false;
     for _ in 0..32 {
         let plan = packages::sync_iter(held.iter().copied(), wanted());
         changed |= !plan.acquire.is_empty() || !plan.release.is_empty();
+        for key in packages::referenced_keys(held.iter().copied()) { std::hint::black_box(key); }
         std::hint::black_box(plan);
     }
     TRACK.with(|track| track.set(false));

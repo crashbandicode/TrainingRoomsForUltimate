@@ -33,7 +33,7 @@
 //!   (`swap_model::copy_registry`) keeps them the attached window's, so a detached
 //!   body unloads over empty cells (`execute_with`'s hook, `retire_groups`).
 use crate::engine::seams::native_fields as fields;
-use crate::engine::swap::swap_model::lifecycle::{Attached, AttachedPlan, ContextRef, DestroyPlan, DestroyStep, NativeConsumers, RouteRef, PAD_SLOTS};
+use crate::engine::swap::swap_model::lifecycle::{AttachedPlan, ContextRef, DetachedPlan, DestroyStep, NativeConsumers, RouteRef, PAD_SLOTS};
 use crate::engine::compat::fixed::FixedList;
 
 macro_rules! trace {
@@ -180,19 +180,17 @@ pub(crate) unsafe fn execute_attached(base: usize, plan: &AttachedPlan, owner: u
 /// D-SG1, the live-consumer check for D-KIRBY1), returning `(released, kept)`.
 /// Never called with a bank lock held. Logs the interface line
 /// `[Destroy] plan owner={} reason={} steps={} routes_cleared={} attached=NativeRetiring|None …`.
-pub(crate) unsafe fn execute(base: usize, plan: &DestroyPlan, owner: u32, reason: &str,
-    release_keys: &mut dyn FnMut(&[u32]) -> (usize, usize)) -> DestroyReceipt {
-    execute_with(base, plan, owner, reason, release_keys, &mut |_: &DestroyStep| {})
-}
-
-/// [`execute`] with `before_step` called right before each step runs: U18's detached teardown
+/// `before_step` receives a body id for body destruction, None for every other phase: U18's detached teardown
 /// (`swap_model::copy_registry::teardown_group`) installs each group's own header before that
 /// group's first `DestroyBody`, and the window's again before the first later step.
-pub(crate) unsafe fn execute_with(base: usize, plan: &DestroyPlan, owner: u32, reason: &str,
-    release_keys: &mut dyn FnMut(&[u32]) -> (usize, usize), before_step: &mut dyn FnMut(&DestroyStep)) -> DestroyReceipt {
-    let mut receipt = DestroyReceipt { skipped: plan.skipped.len(), ..DestroyReceipt::default() };
-    for step in &plan.steps {
-        before_step(step);
+pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32], owner: u32, reason: &str,
+    release_keys: &mut dyn FnMut(&[u32]) -> (usize, usize), before_step: &mut dyn FnMut(Option<u32>)) -> DestroyReceipt {
+    let mut receipt = DestroyReceipt { skipped: plan.skipped().count(), ..DestroyReceipt::default() };
+    let mut steps = 0;
+    for step in plan.steps() {
+        steps += 1;
+        before_step(match &step { DestroyStep::DestroyBody { id } => Some(*id), _ => None });
+        let step = &step;
         match step {
             DestroyStep::ReleasePadRoute { slot, controller } => match release_pad_route(base, *slot, *controller) {
                 Some(true) => receipt.routes_cleared += 1,
@@ -213,9 +211,17 @@ pub(crate) unsafe fn execute_with(base: usize, plan: &DestroyPlan, owner: u32, r
             }
         }
     }
+    if !keys.is_empty() {
+        steps += 1;
+        before_step(None);
+        let (released, kept) = release_keys(keys);
+        receipt.keys_released += released;
+        receipt.keys_kept += kept;
+        receipt.skipped += kept;
+    }
+    let [kirby_cells, kirby_misplaced, kirby_branch_mismatch] = plan.kirby_counts();
     trace!("[Destroy] plan owner={} reason={} steps={} routes_cleared={} attached={} routes_stale={} kirby={} kirby_misplaced={} kirby_branch_mismatch={} bodies={} contexts={} skipped={}",
-        owner, reason, plan.steps.len(), receipt.routes_cleared,
-        match plan.attached { Attached::NativeRetiring => "NativeRetiring", Attached::None => "None" },
-        receipt.routes_stale, plan.kirby_cells, plan.kirby_misplaced, plan.kirby_branch_mismatch, receipt.bodies, receipt.contexts, receipt.skipped);
+        owner, reason, steps, receipt.routes_cleared, "None",
+        receipt.routes_stale, kirby_cells, kirby_misplaced, kirby_branch_mismatch, receipt.bodies, receipt.contexts, receipt.skipped);
     receipt
 }
