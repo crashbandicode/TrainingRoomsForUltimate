@@ -45,6 +45,10 @@ impl Name {
         Name { bytes, len: (p.len() + 2) as u8 }
     }
 
+    const fn from_raw(bytes: [u8; 24], len: u8) -> Name {
+        Name { bytes, len }
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..usize::from(self.len)]
     }
@@ -190,14 +194,50 @@ pub const TILES: usize = 40;
 pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
 pub const IDX_TILE: usize = IDX_TILE_HI + 1;
 pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;
+/// How many panes the menu itself owns and the runtime resolves at registration; the panes after these (the
+/// notification panel and the input log) belong to the input package, which finds them by name when it draws.
+pub const MENU_COUNT: usize = IDX_NOTICE;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`, a backing rectangle, a header and a
 /// text box. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = IDX_TILE_LABEL + TILES;
 pub const IDX_NOTICE_BASE: usize = IDX_NOTICE + 1;
 pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
 pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
+/// The input log (SPEC-input-02, lead ruling 2026-11-02: text slots, no new textures): a column container, 15 row
+/// containers, and in each row 5 slots. A slot is a text box (a button glyph of the game's font, coloured) and two
+/// rectangles (the shaft and the head of the plugin's own arrow for a stick direction), plus the held-frames text
+/// (4 units) and the status text (48 units) of the row. Names are unique across the layout:
+/// `TrModInputLog` / `TrModInputLog<rr>` / `ILG_<rr>_<s>` / `ILA_<rr>_<s>` / `ILH_<rr>_<s>` / `ILF_<rr>` / `ILS_<rr>`.
+pub const LOG_ROWS: usize = 15;
+pub const LOG_SLOTS: usize = 5;
+pub const IDX_LOG: usize = IDX_NOTICE_TEXT + 1;
+pub const IDX_LOG_ROW: usize = IDX_LOG + 1;
+pub const IDX_LOG_GLYPH: usize = IDX_LOG_ROW + LOG_ROWS;
+pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
+pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
+pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
+pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_NOTICE_TEXT + 1;
+pub const COUNT: usize = IDX_LOG_STATUS + LOG_ROWS;
+
+pub const fn log_slot(row: usize, slot: usize) -> usize {
+    row * LOG_SLOTS + slot
+}
+
+/// A name with two index numbers: `prefix` + row + `_` + slot.
+const fn name2(prefix: &str, row: usize, slot: usize) -> Name {
+    let a = Name::indexed(prefix, row);
+    let mut bytes = [0u8; 24];
+    let len = a.len as usize;
+    let mut i = 0;
+    while i < len {
+        bytes[i] = a.bytes[i];
+        i += 1;
+    }
+    bytes[i] = b'_';
+    bytes[i + 1] = b'0' + slot as u8;
+    Name::from_raw(bytes, (len + 2) as u8)
+}
 
 pub const fn tab_index(i: usize) -> usize {
     IDX_TAB + i
@@ -220,6 +260,7 @@ pub const fn name_of(index: usize) -> Name {
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
+        IDX_LOG => Name::new("TrModInputLog"),
         IDX_CHIP_HI => Name::new("tr_ch_hi"),
         IDX_TILE_HI => Name::new("tr_ti_hi"),
         IDX_BG => Name::new("tr_bg"),
@@ -234,6 +275,21 @@ pub const fn name_of(index: usize) -> Name {
         i if i == IDX_HELP => Name::new("tr_help_0"),
         i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
         IDX_HINT => Name::new("tr_hint"),
+        i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => Name::indexed("TrModInputLog", i - IDX_LOG_ROW),
+        i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_GLYPH;
+            name2("ILG_", n / LOG_SLOTS, n % LOG_SLOTS)
+        }
+        i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_SHAFT;
+            name2("ILA_", n / LOG_SLOTS, n % LOG_SLOTS)
+        }
+        i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_HEAD;
+            name2("ILH_", n / LOG_SLOTS, n % LOG_SLOTS)
+        }
+        i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => Name::indexed("ILF_", i - IDX_LOG_FRAME),
+        i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => Name::indexed("ILS_", i - IDX_LOG_STATUS),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => Name::indexed("tr_ch_", i - IDX_CHIP),
         i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Name::indexed("tr_cl_", i - IDX_CHIP_LABEL),
@@ -303,6 +359,28 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_HEADER => under(text(name, 0.0, 445.0, 960.0, 50.0, Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT => under(text(name, 0.0, 390.0, 960.0, 70.0, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, 0.0, 0.0, PANEL_W, PANEL_H, PANEL, true),
+        IDX_LOG => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: -700.0, y: 380.0, w: 520.0, h: 800.0, visible: false },
+        i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => {
+            Spec { name, parent: name_of(IDX_LOG), kind: Kind::Null, x: 0.0, y: -52.5 * (i - IDX_LOG_ROW) as f32, w: 520.0, h: 50.0, visible: true }
+        }
+        i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_GLYPH;
+            under(Spec { visible: false, ..text(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0, Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+        }
+        i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_SHAFT;
+            under(rect(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+        }
+        i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
+            let n = i - IDX_LOG_HEAD;
+            under(rect(name, -200.0 + 54.0 * (n % LOG_SLOTS) as f32, 16.0, 18.0, 18.0, TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
+        }
+        i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => {
+            under(text(name, 130.0, 0.0, 70.0, 48.0, Align::Right, FONT_SMALL, 4, TEXT), name_of(IDX_LOG_ROW + (i - IDX_LOG_FRAME)))
+        }
+        i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => {
+            under(text(name, 330.0, 0.0, 200.0, 48.0, Align::Left, FONT_SMALL, 48, TEXT_DIM), name_of(IDX_LOG_ROW + (i - IDX_LOG_STATUS)))
+        }
         IDX_CHIP_HI => rect(name, 0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0, ACCENT, false),
         IDX_TILE_HI => rect(name, 0.0, 0.0, 100.0, 60.0, ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, 0.0, 0.0, CHIP_SIZE, CHIP_SIZE, HIGHLIGHT, false),

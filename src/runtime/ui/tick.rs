@@ -123,13 +123,14 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     let total = pane::count(root);
     r.status_r = pane::find(root, b"status_R");
     r.help = pane::find(root, b"L_staying_help");
-    let mut all = [core::ptr::null_mut(); p::COUNT];
+    let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
     let mut missing = 0;
+    let container = pane::find(root, p::ROOT.as_bytes());
     for (index, slot) in all.iter_mut().enumerate() {
-        *slot = pane::find(root, p::name_of(index).as_bytes());
+        *slot = if index == p::IDX_MENU { container } else { pane::find(container, p::name_of(index).as_bytes()) };
         missing += usize::from(slot.is_null());
     }
-    if missing == p::COUNT {
+    if container.is_null() {
         diagnostic(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
         return;
     }
@@ -137,7 +138,7 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     diagnostic(format_args!(
         "[Ui] layout=info_training resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
         registry::holders().len(),
-        p::COUNT,
+        p::MENU_COUNT,
         !r.help.is_null(),
         !r.status_r.is_null()
     ));

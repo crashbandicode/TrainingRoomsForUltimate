@@ -12,7 +12,7 @@ use crate::runtime::ui::pane;
 /// The resolved panes of the menu in the layout now showing.
 pub struct Panes {
     pub container: *mut Pane,
-    pub all: [*mut Pane; p::COUNT],
+    pub all: [*mut Pane; p::MENU_COUNT],
 }
 
 // SAFETY: the pointers are only dereferenced on the UI job thread, inside the tick, while the layout lives.
