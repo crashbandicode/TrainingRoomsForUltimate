@@ -1383,7 +1383,7 @@ pub fn load_file() -> SaveFile {
 /// The writer thread: whenever a Save marked the file dirty, write the whole table through the atomic
 /// replace. A failed write keeps the old file and is retried (the file stays dirty).
 pub fn start_writer() {
-    let spawned = std::thread::Builder::new().name("tr-state-writer".into()).stack_size(128 * 1024).spawn(|| loop {
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::StateWriter, || loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
         if !DIRTY.swap(false, Ordering::AcqRel) {
             continue;
@@ -1431,7 +1431,7 @@ fn request_copy() {
 /// shipped NRO.
 #[cfg(feature = "diag")]
 pub fn start_diag_triggers() {
-    let _ = std::thread::Builder::new().name("tr-state-diag".into()).stack_size(64 * 1024).spawn(|| loop {
+    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::StateDiag, || loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
         // A settings file dropped by the test script replaces the live settings (the menu is not built yet).
         if let Some(path) = FixedPath::<128>::in_root("diag-settings.json") {

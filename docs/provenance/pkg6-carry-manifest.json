@@ -1499,7 +1499,24 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "654eced63ee07314761d4d4d368c538179788a89eb66f354e45b22bea928505c"
+   "dest_sha256": "badc64a042286fa76e63b6cbf9ec294c1810808ef9cef3b6ebbf38c8896220a6",
+   "edits": [
+    {
+     "old": "    const STACK_BYTES: usize = 128 * 1024;\n",
+     "new": "",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build) (the local STACK_BYTES is gone)"
+    },
+    {
+     "old": "std::thread::Builder::new()\n            .stack_size(STACK_BYTES)\n            .spawn(writer)",
+     "new": "crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::PracticeTrace, writer)",
+     "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    },
+    {
+     "old": "core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,",
+     "new": "core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,",
+     "reason": "stream/stack: the session line prints the table's stack size"
+    }
+   ]
   },
   {
    "src": "src/practice_trace_core.rs",
@@ -1933,7 +1950,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "b3d30e3e6ba029697e2e5a0c65f95720eb01993de78f7624e1dcf0c26e9e1265",
+   "dest_sha256": "8b2cba722f3db30f294cbd9db62018c0f1359910e826ea6b195e377f4ead0f45",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -1959,6 +1976,16 @@
      "old": "    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {\n        let path = \"sd:/ultimate/TrainingRooms/mii-editor-last.json\";\n        if let Err(error) = std::fs::write(path, bytes) {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] trace write failed: {error}\"));\n        }\n    }",
      "new": "    crate::engine::lobby::trace_slot::write_json(std::path::Path::new(\"sd:/ultimate/TrainingRooms/mii-editor-last.json\"), trace)",
      "reason": "the trace file is written transactionally (temporary file, sync, replace; the old file stays on a failure) instead of `std::fs::write` over the live file (review R1); host tests in `engine::lobby::trace_slot` cover two loads and a failed write; offered back to the fork's fix ledger"
+    },
+    {
+     "old": "#[derive(Clone, Serialize)]\npub(crate) struct Trace {",
+     "new": "// Copy (stream/stack): the writer's slot copies it into a heap buffer in place instead of moving 11 KB through stack frames.\n#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace {",
+     "reason": "stream/stack: Trace is Copy so the trace writer's BoxedSlot copies it into a boot-made heap buffer in place (moved by value it gave tr-trace-writer a 59,712 B frame on a 64 KiB stack: the Eden s4-07/u4b-02 boot fault)"
+    },
+    {
+     "old": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n",
+     "new": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n\nimpl Trace {\n    /// No events: the template of the writer slot's two buffers.\n    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };\n}\n",
+     "reason": "stream/stack: Trace::EMPTY, the template the writer slot's two heap buffers are made from at init"
     }
    ]
   },

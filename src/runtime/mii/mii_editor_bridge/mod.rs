@@ -51,10 +51,16 @@ enum Origin { Training, Quickplay, LocalWireless }
 #[derive(Clone, Copy, Serialize)]
 struct Event { name: &'static str, phase: Phase, values: [u64; 4] }
 
-#[derive(Clone, Serialize)]
+// Copy (stream/stack): the writer's slot copies it into a heap buffer in place instead of moving 11 KB through stack frames.
+#[derive(Clone, Copy, Serialize)]
 pub(crate) struct Trace {
     events: crate::engine::compat::fixed::FixedVec<Event, 192>,
     input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,
+}
+
+impl Trace {
+    /// No events: the template of the writer slot's two buffers.
+    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };
 }
 
 struct Session {

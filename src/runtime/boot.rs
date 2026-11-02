@@ -19,6 +19,7 @@ use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
 use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
+use crate::model::thread_stacks::ThreadId;
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
@@ -38,6 +39,21 @@ use crate::runtime::{clock, game, import, install, published, scene, state_boot,
 const SITE_COUNT: usize = SITES.len();
 
 pub fn run() {
+    // The diag build measures the boot thread's stack across the whole boot (stream/stack); the file must be open first.
+    #[cfg(feature = "diag")]
+    {
+        diag_log::init_diagnostics();
+        crate::runtime::threads::boot_begin();
+    }
+    run_inner();
+    #[cfg(feature = "diag")]
+    {
+        crate::runtime::threads::boot_end();
+        diag_log::flush();
+    }
+}
+
+fn run_inner() {
     diag_log::init_diagnostics();
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     diag_log::start_drain_thread();
@@ -359,9 +375,9 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
     }
 }
 
-/// Read `save_states.json` on a thread with a 128 KiB stack, joined here (the settings reader's rule).
+/// Read `save_states.json` on its own thread (stack from `model::thread_stacks`), joined here (the settings reader's rule).
 fn load_save_states() -> SaveFile {
-    let spawned = std::thread::Builder::new().name("tr-state-load".into()).stack_size(128 * 1024).spawn(states::load_file);
+    let spawned = crate::runtime::threads::spawn(ThreadId::StateLoad, states::load_file);
     match spawned {
         Ok(handle) => handle.join().unwrap_or_default(),
         Err(_) => states::load_file(),
@@ -526,13 +542,13 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
 }
 
 
-/// Read `settings.json` (or the fork's file name, once) on a thread with a 128 KiB stack, joined here
+/// Read `settings.json` (or the fork's file name, once) on its own thread (stack from `model::thread_stacks`), joined here
 /// (SPEC-core-04 §5). All of the file logic, including the recovery of a file that does not read
 /// cleanly (the original kept as `settings.invalid-<n>.json`, the sanitized settings written to the
 /// active path before the original is retired), is `model::settings_file::load`; this only runs it and
 /// logs its notes.
 fn load_settings() -> Settings {
-    let spawned = std::thread::Builder::new().name("tr-settings-load".into()).stack_size(settings::LOADER_STACK_BYTES).spawn(load_settings_inner);
+    let spawned = crate::runtime::threads::spawn(ThreadId::SettingsLoad, load_settings_inner);
     match spawned {
         Ok(handle) => handle.join().unwrap_or_else(|_| Settings::factory()),
         Err(_) => load_settings_inner(),

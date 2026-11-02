@@ -110,7 +110,7 @@ static SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
 pub fn start(settings: Settings) {
     *SETTINGS.lock() = Some(settings);
-    let spawned = std::thread::Builder::new().name("tr-menu".into()).stack_size(256 * 1024).spawn(run);
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Menu, run);
     if let Err(error) = spawned {
         diagnostic(format_args!("[TrainingRooms] menu worker did not start: {error}"));
     }

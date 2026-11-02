@@ -306,10 +306,10 @@ pub fn set_tick(step: fn()) {
     let _ = TICK.set(step);
 }
 
-/// The drain thread: every 50 ms it moves buffered lines to the card. A 64 KiB stack, named. If it
-/// cannot be created, callers keep writing synchronously (SPEC-core-01 §7).
+/// The drain thread: every 50 ms it moves buffered lines to the card. Its stack is the table's
+/// (`model::thread_stacks`). If it cannot be created, callers keep writing synchronously (SPEC-core-01 §7).
 pub fn start_drain_thread() {
-    let spawned = std::thread::Builder::new().name("tr-heartbeat".into()).stack_size(64 * 1024).spawn(|| {
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat, || {
         writer_started();
         #[cfg(feature = "diag")]
         let (mut observer, mut ticks) = (crate::model::hook_stats::Observer::new(), 0u32);
@@ -330,6 +330,8 @@ pub fn start_drain_thread() {
                     if let Some(observation) = observer.observe(crate::model::hook_stats::snapshot()) {
                         diagnostic(format_args!("{observation}"));
                     }
+                    // The threads' stack high-water marks (stream/stack), on the same 10 s beat.
+                    crate::runtime::threads::report();
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(50));

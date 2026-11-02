@@ -26,13 +26,10 @@ pub fn remember(snapshot: &Snapshot) {
 
 /// Start the poll thread (boot, after the first publish).
 pub fn start() {
-    let spawned = std::thread::Builder::new()
-        .name("tr-diag-reload".into())
-        .stack_size(settings::LOADER_STACK_BYTES)
-        .spawn(|| loop {
-            std::thread::sleep(Duration::from_secs(1));
-            poll();
-        });
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::DiagReload, || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        poll();
+    });
     if spawned.is_err() {
         diagnostic(format_args!("[TrainingRooms] diag_settings_reload thread unavailable"));
     }

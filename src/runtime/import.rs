@@ -13,8 +13,7 @@ use crate::model::storage::{self, FixedPath};
 use crate::runtime::clock;
 use crate::runtime::diag_log::diagnostic;
 
-/// Stack of the import threads (the 64 KiB copy buffer is on the heap).
-const STACK_BYTES: usize = 256 * 1024;
+// The import threads' stack sizes are rows of `model::thread_stacks` (the 64 KiB copy buffer is on the heap).
 
 fn roots() -> Roots<'static> {
     Roots { source: Path::new(storage::FORK_ROOT), dest: Path::new(storage::ROOT) }
@@ -23,7 +22,7 @@ fn roots() -> Roots<'static> {
 /// Run the blocking part now and start the background part. Returns the install line's `migration=`
 /// words (`done captures=running skipped_staging=3`, `skipped`, `none`, …).
 pub fn start() -> FixedPath<96> {
-    let blocking = std::thread::Builder::new().name("tr-import".into()).stack_size(STACK_BYTES).spawn(|| {
+    let blocking = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Import, || {
         run_blocking(roots(), clock::uptime_ms(), env!("CARGO_PKG_VERSION"), &mut |line| diagnostic(format_args!("{line}")))
     });
     let stage = match blocking.map(|handle| handle.join()) {
@@ -63,7 +62,7 @@ pub fn start() -> FixedPath<96> {
 }
 
 fn spawn_background(blocking: Blocking) {
-    let spawned = std::thread::Builder::new().name("tr-import-captures".into()).stack_size(STACK_BYTES).spawn(move || {
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::ImportCaptures, move || {
         let (receipt, marker) = run_background(roots(), blocking, &mut |line| diagnostic(format_args!("{line}")));
         match marker {
             Ok(()) => diagnostic(format_args!(
