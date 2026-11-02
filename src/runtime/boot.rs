@@ -62,6 +62,8 @@ pub fn run() {
     if let Err(error) = fs::create_dir_all(storage::ROOT) {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::sync_probe::run();
     published::set_developer_page(read_developer_ini().developer_page);
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The

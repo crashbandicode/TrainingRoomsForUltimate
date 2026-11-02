@@ -14,6 +14,8 @@ mod hub;
 mod install;
 mod published;
 mod scene;
+#[cfg(feature = "diag")]
+mod sync_probe;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {
