@@ -47,8 +47,10 @@ use crate::runtime::hub;
 use crate::runtime::scene;
 
 mod quick_reset;
+mod preview;
 pub(crate) use quick_reset::on_input as on_quick_reset_input;
 pub(crate) use quick_reset::request as request_quick_reset;
+pub(crate) use preview::{request as request_preview_restore, finish as finish_preview_restore, end as end_preview_restore};
 
 /// Everything the per-frame step owns, behind one lock.
 struct State {
@@ -377,6 +379,7 @@ pub fn cancel_pending() {
 pub(crate) fn clear_session() {
     cancel_pending();
     quick_reset::clear();
+    preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
 }
@@ -487,6 +490,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if accessor == 0 {
         return;
     }
+    preview::service_retirement();
     let scene_facts = scene::facts();
     if !crate::model::scene::is_training(scene_facts) {
         // The shared predicate is also false during a hot swap. A suspended
@@ -1027,11 +1031,9 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     }
 }
 
-/// The Save step (§5.5 step 2): read the values, store them, write the file when both are done.
-unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
-    if nana {
-        return;
-    }
+/// Read value-only fighter state without changing a numbered slot, requesting
+/// persistence or emitting the Save effect. All native calls stay outside locks.
+unsafe fn read_record(raw: &Raw) -> SavedState {
     let role = raw.role;
     let accessor = raw.accessor;
     let ids = with(|s| s.ids.clone());
@@ -1049,7 +1051,7 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
             }
         })
         .unwrap_or_default();
-    let state = SavedState {
+    SavedState {
         x: natives::pos_x(accessor),
         y: natives::pos_y(accessor),
         percent: natives::damage(accessor, 0),
@@ -1064,7 +1066,15 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         held_item: (role == Role::Player).then(|| crate::runtime::features::item_bridge::snapshot(accessor)),
         saved_stage: Some(natives::stage_id()),
         mii: None,
-    };
+    }
+}
+
+/// The Save step (§5.5 step 2): read the values, store them, write the file when both are done.
+unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
+    if nana { return; }
+    let role = raw.role;
+    let accessor = raw.accessor;
+    let state = read_record(raw);
     // Capture only the settled, exact value belonging to this loaded role.
     // JSON conversion belongs to the writer, never to this hook. A not-yet-ready
     // Mii remains explicitly absent (Setup Save refuses it until saved again).

@@ -33,6 +33,28 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
+fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
+    use model::state::{preview::Checkpoint, record::SavedState};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        let mut checkpoint = Checkpoint::new();
+        for generation in 0..20 {
+            let pair = std::array::from_fn(|role| SavedState {
+                x: 40.0 * (1.0 - 2.0 * role as f32),
+                percent: 15.0,
+                ..SavedState::never_saved()
+            });
+            checkpoint.capture(generation, pair).unwrap();
+            for _ in 0..10 { std::hint::black_box(checkpoint.restore(&generation).unwrap()); }
+            checkpoint.clear();
+        }
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
+#[test]
 fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
     use model::state::file::SaveFile;
     use model::state::machine::{Machine, Role};
