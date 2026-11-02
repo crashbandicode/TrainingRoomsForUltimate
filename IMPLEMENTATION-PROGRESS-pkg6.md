@@ -107,3 +107,43 @@ The C7 cluster (layer 6 of `docs/provenance/pkg6-layers.md`) is one strongly con
 - Allocation points left in carried callbacks (for the diag R5 row): numbered `selection_label` text per completed swap, the two Mii `skipped` notices; plus worker B's list.
 - Eden sets A/B/D: not run (the unwired consumers above block most rows).
 
+
+## Third successor (rulings 1-3), 2026-11-02 10:40Z
+- Model gate: resumed as `claude-opus-5-5` / high (was `claude-sonnet-5-5` / high before the 10:17Z session end); the lead confirmed the pair is in policy. Hidden watcher `/tmp/pkg6-watch/watch-a3-opus.ps1` (model only, exits with the harness PID, log `watch-a3.log`). Playbook read in full at `ae87443`.
+- Commits: `0edad21` (package 1 API: the counting allocator's byte meter), `c008bcf` (ruling 1: one global allocator, `tools/feature_matrix.py`; ruling 2: helper dispositions, ledger sections). Tree identical to the lead's WIP `7f15bd0`.
+- Gates on this tree (Surface, 10:14-10:17Z): `cargo test` 7,771 pass, owned-ELF facts included (62 binaries, 0 failed); clippy `--all-targets -D warnings` clean. Pending: `--no-default-features`, Switch release + diag, `feature_matrix.py --set core --mode switch`, then Eden (Surface queue #1).
+- Claims: one claim per build (`/tmp/pkg6-watch/a3_gate.ps1`: claim, one cargo call, release, also on failure). Eden harness `eden/s6_eden.py` (Surface, profile `s6`, display `:98`).
+## Playbook checklist (stream pkg6, worker A), 2026-11-02 11:50Z
+Playbook followed: ae87443 (pulled 11:47Z, already current; README, every docs/ file and tools/PROVENANCE.md read in full at the start of this worker's turn; tools run: `tools/build/nro_size.py`, `tools/check/compliance.py`). `compliance.py . --nro cargo-targets/pkg6-nro/a3-release-6961fa63.nro`: 5 machine rows fail, all repository-level (lead): 64-byte guard sizes `[0, 64]` (sizes 0 are other packages' non-compared rows), README GIF / build lines / docs/media GIF, `HANDOFF.md` (the repo's is `TRAININGROOMS-HANDOFF.md`), tree dirty at the run (this record).
+
+| Item | Tag | Status | Evidence |
+| --- | --- | --- | --- |
+| cdylib only, release profile, skyline =0.6.0, toolchain, runtime under cfg(switch), version, counting allocator, host tests | M | pass | compliance machine rows |
+| Gates: test, clippy -D warnings, no-default-features, release, diag | M | pass | Surface 10:14-10:53Z: 7,771 tests, clippy 0, no-default ok, release `6961fa63` (2,936,832 B), diag `dcf52de3`; WIP `49191f4` uncompiled (queue) |
+| Root cause, or an approved workaround | M | pass | ruling 2 wiring and deletions with ledger rows; no `allow`; QuickplayWaiting arms and allocator are root fixes |
+| No heap in hooks (`heap_allocations=0`, R5 delta 0) | M | **fail / open** | s6-04 R5: 6,311 hook allocations, attribution pending |
+| 64-byte guard on every site / called function | M | pass for package 6 rows | `tests/pkg6_sites.rs`, `pkg6_smash_calls.rs`; machine row fails repo-wide (sizes 0: other tables) |
+| Card scan before a site is chosen | M | N/A this turn | no new site added |
+| Hook sharing / stand-ins | C | N/A this turn | no new hook; the AI hook ruling (different instruction, outside every guard window) is the predecessor's |
+| Hook after the prologue / call instead | M | N/A this turn | no new hook |
+| No diag strings in the shipped NRO; only the install line | M | pass | compliance: no diag markers in `6961fa63`; diag rows behind `diag` (practice_session, diag-item.req) |
+| Online rows (read-only review, replay A/B, two consoles) | C | open | lobby practice (set D) is an LDN pair run the lead schedules |
+| Eden: claim/release, one per host, MemAvailable, not profile a / :61, hard-linked copy, link/copy rule | M | pass | s6-04 ledger lines 11:30Z / 11:45Z; `s6_eden.py up/down` (profile `s6`, display `:98`, MemAvailable and df checked by `up`) |
+| Eden: waits gated on log lines or screenshots; failed precondition aborted | M | pass | route gates and row needles (`rows_s6.py`); the install gate on `result=` failed and was replaced by the line start (finding 1) |
+| Eden: short ruleset | M | N/A | Training rows only, no match |
+| Eden: profile restored, temp removed, host released | M | pass | `down`: Eden processes 0, display stopped, RELEASED; queue line deleted |
+| Eden: console.log searched; run.json, memory.peak kept | M | pass | 12,415 lines, 0 matches; `eden/runs/s6-04/` |
+| Every local command under memory/time guard | M | pass | cargo under `systemd-run ... MemoryMax=6G timeout 1800`; Eden under `eden-run.py` bounds |
+| Disk: own target dir, df >= 40 GB | M | pass | `cargo-targets/trainingrooms-pkg6`; df 180 GB free |
+| Evidence doc dated with labels, build, results; numbers from tested scripts | M / C | pass / open | `eden/EDEN-PACKAGE-6.md` s6-04; the row numbers come from `rows_s6.py` (no host test of the script yet: open) |
+| README GIF, caption | M | open (lead/README package) | - |
+| No operator quotes; handoff current | M | pass | this file |
+| Release, tag, card | C | not authorized | nothing pushed, tagged or written to a card |
+| Model/effort gate and watcher | M | pass | Opus 5.5 high, watcher `watch-a3-opus.ps1` |
+
+Scripts of this worker, against the playbook's tools:
+- `eden/s6_eden.py` (predecessor's copy of gv.py + solo.ps1, kept: the owned profile, settings.json before boot, mute through the CLI, the Yoga ledger from the Surface; the playbook's `solo.ps1` targets the gsp-visualizer root and display :68). Change here: ledger stamps with seconds.
+- `eden/route_s6.py` (pkg2's copy, kept: the playbook's `to-css.ps1` goes to Quickplay, not Training) and `eden/route_s6_cut.py` (wrapper, kept until the install line fits again).
+- `eden/rows_s6.py`, `eden/extra_cpus_s6.py`, `eden/mk_s6_settings.py` (row logic for this plugin's diag lines and settings rows: not covered by the playbook; presses go through the same control API as `gv.py press`).
+- `tools/feature_matrix.py` (the D11 feature matrix: not covered by the playbook).
+- `/tmp/pkg6-watch/a3_{gate,claims,check,chain,matrix,sw2,up}.ps1|py` (temporary claim-per-build wrappers around `s6_eden.open_claims` and the ledger; not in the repo; the playbook's claims cover Eden only).

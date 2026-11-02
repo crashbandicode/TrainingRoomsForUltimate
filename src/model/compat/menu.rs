@@ -53,7 +53,19 @@ fn row_or<T>(snapshot: &Snapshot, id: &str, all: &[T], fallback: T) -> T
 where
     T: Copy + std::ops::Add<Output = T> + std::ops::Mul<u8, Output = T>,
 {
-    snapshot.get(id).map_or(fallback, |row| from_row(row, all))
+    if let Some(row) = snapshot.get(id) {
+        return from_row(row, all);
+    }
+    // A row the settings table does not define (the Solo Popo cycle rows, which the Character Cycles grid sets with Y): its kept key,
+    // which the write-back stores in the row's own shape (`rows()`: the option bytes). Without this the typed view always read the
+    // factory value, so Solo Popo on a cycle slot could never be on.
+    let kept = snapshot.extra().get(id).and_then(|value| value.as_array()).map(|values| {
+        values.iter().map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok())).collect::<Option<Vec<u8>>>()
+    });
+    match kept {
+        Some(Some(row)) if row.len() == all.len() => from_row(&row, all),
+        _ => fallback,
+    }
 }
 
 const fn solo_popo_player_cycle_default() -> OnOff {
@@ -91,6 +103,12 @@ const fn cpu_roster_default() -> OrderedFighterRoster {
 }
 const fn kirby_hats_default() -> OrderedFighterRoster {
     DEFAULT_KIRBY_HATS
+}
+
+/// A top-level kept key of the settings file as a typed value; a missing or malformed one is the type's default (the fork's rule for
+/// `stage_preferences` and `mii_preferences`: a bad stored preference never blocks the menu).
+pub fn kept_or_default<T: serde::de::DeserializeOwned + Default>(extra: &serde_json::Map<String, serde_json::Value>, key: &str) -> T {
+    extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
 }
 
 /// A kept key of the snapshot (a row whose value is not a plain array) as a typed value; a missing or malformed one is `fallback`.
@@ -345,6 +363,53 @@ mod tests {
         assert_eq!(OnOff::ON + OnOff::OFF, OnOff::all());
     }
 
+    /// The Solo Popo cycle rows are not rows of the settings table: their kept keys carry them (the row's option bytes), and a
+    /// malformed or missing key is the factory value.
+    #[test]
+    fn the_solo_popo_cycle_rows_come_from_their_kept_keys() {
+        let mut snapshot = Snapshot::factory();
+        assert_eq!(TrainingModpackMenu::from_snapshot(&snapshot).solo_popo_player_cycle, OnOff::OFF);
+        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0])).unwrap();
+        snapshot.set_kept("solo_popo_cpu", serde_json::json!([1, 0])).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::ON, OnOff::ON));
+        snapshot.set_kept("solo_popo_cpu", serde_json::json!("On")).unwrap();
+        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0, 0])).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::OFF, OnOff::OFF));
+    }
+
+    /// Every row-shaped field of the view (`rows()`), whether the settings table defines it (a row) or not (a kept key the
+    /// write-back stores in the same shape): a non-factory value in the snapshot reaches the typed view and comes back unchanged.
+    /// The Solo Popo cycle rows were the kept keys this missed (Eden s6-04); the test lists the others with them.
+    #[test]
+    fn every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key() {
+        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
+        let mut snapshot = Snapshot::factory();
+        let mut wanted = Vec::new();
+        let mut kept_ids = Vec::new();
+        for (id, elements) in factory.rows() {
+            let mut changed = elements.clone();
+            changed.rotate_right(1);
+            if changed == elements {
+                continue;
+            }
+            if snapshot.get(id).is_some() {
+                snapshot.set(id, &changed).unwrap();
+            } else {
+                kept_ids.push(id);
+                snapshot.set_kept(id, serde_json::json!(changed)).unwrap();
+            }
+            wanted.push((id, changed));
+        }
+        let view = TrainingModpackMenu::from_snapshot(&snapshot);
+        let got: std::collections::HashMap<_, _> = view.rows().into_iter().collect();
+        for (id, changed) in &wanted {
+            assert_eq!(got.get(id), Some(changed), "{id} did not reach the typed view");
+        }
+        assert!(kept_ids.contains(&"solo_popo_player_cycle") && kept_ids.contains(&"solo_popo_cpu"), "kept: {kept_ids:?}");
+    }
+
     #[test]
     fn a_snapshot_round_trips_through_the_view() {
         let mut snapshot = Snapshot::factory();
@@ -398,6 +463,42 @@ mod tests {
         let view = TrainingModpackMenu::from_snapshot(&snapshot);
         assert_eq!((view.fighter_prompt, view.macro_source), (OnOff::OFF, MacroSource::NAMED));
         assert_eq!(MacroSource::ALL_NAMES, ["Numbered Slots", "Named Library"]);
+    }
+
+    #[test]
+    fn a_committed_snapshot_and_settings_reach_every_typed_view() {
+        use crate::engine::mii::selection::Preferences as MiiPreferences;
+        use crate::engine::stages::stage_menu::Preferences as StagePreferences;
+        let mut menu = Snapshot::factory();
+        // rows
+        menu.set("trio_practice", &[1, 0]).unwrap();
+        menu.set("lobby_practice", &[1, 0]).unwrap();
+        menu.set("cycle_preload_group_swap", &[0, 1]).unwrap();
+        // kept keys of the snapshot: the rosters, the picks, the Kirby hats
+        fn value<T: serde::Serialize>(typed: &T) -> serde_json::Value {
+            serde_json::to_value(typed).unwrap()
+        }
+        menu.set_kept("player_roster", value(&DEFAULT_CPU_ROSTER)).unwrap();
+        menu.set_kept("cpu_roster", value(&DEFAULT_PLAYER_ROSTER)).unwrap();
+        menu.set_kept("player_character", value(&TrioFighter::KIRBY)).unwrap();
+        menu.set_kept("cpu_character", value(&TrioFighter::PIKACHU)).unwrap();
+        menu.set_kept("player_kirby_hats", value(&DEFAULT_CPU_ROSTER)).unwrap();
+        menu.set_kept("cpu_kirby_hats", value(&DEFAULT_PLAYER_ROSTER)).unwrap();
+        let view = TrainingModpackMenu::from_snapshot(&menu);
+        assert_eq!((view.trio_practice, view.lobby_practice, view.cycle_preload_group_swap), (OnOff::ON, OnOff::ON, OnOff::OFF));
+        assert_eq!((view.player_roster, view.cpu_roster), (DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER));
+        assert_eq!((view.player_character, view.cpu_character), (TrioFighter::KIRBY, TrioFighter::PIKACHU));
+        assert_eq!((view.player_kirby_hats, view.cpu_kirby_hats), (DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER));
+        // the settings-level kept keys (a `Snapshot` does not carry them: `apply_kept` reads them)
+        let mut extra = serde_json::Map::new();
+        extra.insert("stage_preferences".into(), serde_json::json!({ "direct_stage": 7 }));
+        extra.insert("mii_preferences".into(), serde_json::json!("not a preference object"));
+        let stage: StagePreferences = kept_or_default(&extra, "stage_preferences");
+        let mii: MiiPreferences = kept_or_default(&extra, "mii_preferences");
+        assert_eq!(stage.direct_stage, 7);
+        assert_eq!(mii, MiiPreferences::default(), "a malformed stored preference is the default");
+        let missing: StagePreferences = kept_or_default(&serde_json::Map::new(), "stage_preferences");
+        assert_eq!(missing, StagePreferences::default());
     }
 
     #[test]

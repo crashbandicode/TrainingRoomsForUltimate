@@ -668,6 +668,7 @@ unsafe fn verify_load(base: usize) -> bool {
 
 #[skyline::hook(offset = 0x652214, inline)]
 unsafe fn listener_removed(ctx: &InlineCtx) {
+    crate::runtime::threads::headroom("listener_removed");
     #[cfg(feature = "source-capacity-probe")]
     super::source_capacity_probe::listener_removed(ctx);
     #[cfg(feature = "managed-third-source-alpha")]
@@ -680,6 +681,7 @@ unsafe fn listener_removed(ctx: &InlineCtx) {
 ))]
 #[skyline::hook(offset = 0x6b79a0, inline)]
 unsafe fn actor_cleanup(ctx: &InlineCtx) {
+    crate::runtime::threads::headroom("actor_cleanup");
     #[cfg(feature = "source-capacity-link-probe")]
     super::source_capacity_probe::actor_cleanup(ctx);
     #[cfg(feature = "managed-third-source-alpha")]

@@ -74,6 +74,11 @@ pub enum Feature {
     Roster,
     /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
     Probes,
+    /// SPEC-cpu-05's shield damage multiplier: the game's CommonParams object, found at the moment the game fills
+    /// it from its parameter file (no provider plugin).
+    CpuShieldDamage,
+    /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
+    CpuCamera,
 }
 
 impl Feature {
@@ -105,6 +110,8 @@ impl Feature {
             Feature::P1Cpu => "p1_cpu",
             Feature::Roster => "roster",
             Feature::Probes => "probes",
+            Feature::CpuShieldDamage => "cpu_shield_damage",
+            Feature::CpuCamera => "cpu_camera",
         }
     }
 }

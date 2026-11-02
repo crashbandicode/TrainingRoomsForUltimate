@@ -152,3 +152,20 @@ state against the spec's roughly 128 bytes for one shared table; the clock still
 ## Not in this milestone
 
 The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md, "Still open").
+
+## Update 2026-11-02 (successor worker): Eden runs s2-01..s2-04 on the Ally, the two open items closed
+
+Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
+
+| Requirement | § | Host test | Eden row | Status |
+| --- | --- | --- | --- | --- |
+| Shield damage multiplier 0 for Infinite, restored otherwise, no provider plugin | cpu-05 §4, question 6 | `cpu05_damage_mul_restore`, `cpu_sites_common_params_fill_stores_shield_damage_mul_at_the_field_offset` | `cpu-05-leave-training-restores-mul` | host pass; **Eden pass** for Infinite and back to None (`write=0.000 was=1.190`, `write=1.190 was=0.000`); leaving Training not run |
+| Fixed camera centre per stage class, stage ids from the game's table | cpu-04 §5 | `cpu04_camera_table`, `cpu04_stage_class_follows_the_native_ids_and_the_record_form`, `cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default`, `cpu_sites_stage_table_records_are_the_stages_the_camera_rule_names`, `cpu_sites_fixed_camera_setup_loads_the_manager_through_the_slot_and_stores_the_centre_at_the_field` | `cpu-04-fixed-camera-bf`, `cpu-04-fixed-camera-smashville` | host pass; Eden: setup write issued for Final Destination (`write=Some([0,50,230])`, Off: `None`); the on-screen effect, camera mode 4 and Smashville not run |
+| Common-module hook guards and install | cpu-02/04/05 §9 | `cpu_common_guards_match_the_owned_module` | `cpu-0N-install-line` | **Eden pass**: `cpu_common_load module=common … cpu_common=installed` (loader name `common`) |
+| DI | cpu-02 §4 | `cpu02_di_case_lifetime` | `cpu-02-di-out-both-sides` | **Eden pass** for one side (`di_before role=true`, `di x=1.0 y=0.0`, `DAMAGE_FLY` hits only) |
+| SDI, air-dodge direction, dodge staling | cpu-02 §5 | `cpu02_sdi_period`, `cpu02_airdodge_direction_consistency`, `cpu02_stale_flag_follows_setting` | `cpu-02-sdi-high-up`, `cpu-02-airdodge-down-out`, `cpu-02-dodge-staling-off` | **Eden pass** |
+| Menu re-roll bits on a whole-settings replacement | cpu-02/03 §5, B11, Q18 A | `cpu03_whole_settings_replacement_yields_the_menus_reroll_bits` | `cpu-02-sdi-change-no-reset`, `cpu-05-tilt-change-no-reset` | **Eden pass** for the reload (`rerolls=0x3` and others); the ledge B11 row not run |
+| Ledge Roll with a delay | cpu-03 §4, §5 | `cpu03_delay_and_climb_denial` | `cpu-03-delay-60` | **Eden pass** (one grab: climb denied, then `CLIFF_ESCAPE` requested) |
+| Mash, each action | cpu-01 §5 | `cpu01_action_flags_table` | `cpu-01-mash-each-action` | **Eden pass** for 16 of 18 actions |
+| Playback request word | cpu-03 §5 | `cpu03_playback_request_word_round_trips_for_every_slot` | - | host pass |
+| Install line fits its buffer | core-01 §7 | `the_install_line_of_every_site_and_feature_fits_its_buffer_with_room_to_spare` | `cpu-0N-install-line` | host pass; found by Eden (line cut at 2048 bytes) |

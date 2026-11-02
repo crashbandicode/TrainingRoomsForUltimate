@@ -4,8 +4,8 @@
 //! writer): the same call the carried lines make in the fork. On the host it records the line into a bounded capture buffer that
 //! tests read with [`take`], so a carried test can assert what was logged and no host build needs the runtime.
 //!
-//! `heap_profile` is the fork's Eden-only heap meter hook (`plugin-heap-meter`, a diag feature whose allocator is not carried):
-//! here it does nothing, and the carried `preload_metrics` calls it only to mark a snapshot for that meter.
+//! `heap_profile` is the fork's Eden-only heap meter hook (`plugin-heap-meter`, a diag feature): the carried `preload_metrics` calls
+//! it to mark a snapshot; the meter is the byte meter of package 1's counting allocator (the fork's own allocator is not carried).
 
 use std::fmt;
 
@@ -34,8 +34,20 @@ macro_rules! log_error {
 #[cfg(target_os = "switch")]
 pub(crate) use {log_error, log_info, log_warn};
 
-/// Marks a heap-meter snapshot (no-op: the meter is not carried).
-pub fn heap_profile(_label: &str) {}
+/// Marks a heap-meter snapshot: with `plugin-heap-meter` (a diag feature) on the Switch, one `[HeapMeter]` line with the byte meter of
+/// the plugin's one counting allocator (`model::hook_stats`); nothing otherwise.
+pub fn heap_profile(label: &str) {
+    #[cfg(all(target_os = "switch", feature = "plugin-heap-meter"))]
+    {
+        let heap = crate::model::hook_stats::heap_bytes();
+        diagnostic(format_args!(
+            "[HeapMeter] label={label} live={} peak={} total={} calls={} largest={}",
+            heap.live, heap.peak, heap.total, heap.calls, heap.largest
+        ));
+    }
+    #[cfg(not(all(target_os = "switch", feature = "plugin-heap-meter")))]
+    let _ = label;
+}
 
 /// The host's capture buffer (bounded: the oldest lines are dropped).
 #[cfg(not(target_os = "switch"))]

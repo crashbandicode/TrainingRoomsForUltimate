@@ -30,6 +30,7 @@ mod state_boot;
 mod state_natives;
 #[cfg(feature = "diag")]
 mod sync_probe;
+pub(crate) mod threads;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {

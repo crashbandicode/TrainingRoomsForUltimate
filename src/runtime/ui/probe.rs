@@ -65,7 +65,7 @@ pub fn install() {
         let register: extern "C" fn(u32, extern "C" fn(u32)) = core::mem::transmute::<usize, extern "C" fn(u32, extern "C" fn(u32))>(register);
         register(MOD_FILESYSTEM_MOUNTED, mounted);
     }
-    let _ = std::thread::Builder::new().name("tr-probe".into()).stack_size(256 * 1024).spawn(move || worker(size, load));
+    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Probe, move || worker(size, load));
 }
 
 fn worker(size: usize, load: usize) {

@@ -11,6 +11,8 @@ pub mod engine;
 
 // The menu's editors that read the engines' types (clip editor, roster grid, Mii lists): pure, host-tested.
 pub mod editors;
+// The install line's worst-case length (model site tables + the carried seam table): the runtime's buffer size and its host test.
+pub mod install_capacity;
 
 #[cfg(target_os = "switch")]
 mod runtime;

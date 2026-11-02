@@ -7,10 +7,10 @@ Branch `stream/pkg3`, worktree `TrainingRoomsForUltimate-pkg3`. Not pushed. Upda
 | Milestone | State | Evidence |
 | --- | --- | --- |
 | S3-1 save/load core, JSON saves, setup library | done; Eden pass (s3-01) | `docs/test-provenance/package-3.md`, `eden/EDEN-PACKAGE-3.md` |
-| S3-2 charges, buffs | host pass; Eden: Samus charge and Bob-omb snapshot (s3-02); Cloud buff (s3-03) queued | same |
-| S3-3 items, fighter-specific restore (Steve, Olimar, Sora, Pokemon Trainer, Kirby) | host pass; Switch-compiled; Steve Eden pass; the rest queued for s3-03 | same |
-| S3-5 first-boot import (SPEC-core-08) | host pass (13 filesystem tests); Eden s3-04 queued | same |
-| S3-4 Switch builds, batched Eden rows, compliance | builds done; Eden s3-03 and s3-04 wait for the Yoga queue; compliance run after them | below |
+| S3-2 charges, buffs | host pass; Eden: Samus charge and Bob-omb snapshot (s3-02), Cloud Limit buff (s3-04, after the s3-03 crash fix) | same |
+| S3-3 items, fighter-specific restore (Steve, Olimar, Sora, Pokemon Trainer, Kirby) | host pass; Eden pass: Steve (s3-01), Pokemon Trainer (s3-05, s3-07), Kirby hat (s3-06); Olimar and Sora not Eden-run | same |
+| S3-5 first-boot import (SPEC-core-08) | host pass (13 filesystem tests); Eden pass: s3-09 (all files, staging skipped, `developer.ini` untouched) and s3-10 (N6: 5 snapshots), `check-migration.py verify` PASS | same |
+| S3-4 Switch builds, batched Eden rows, compliance | done: builds, Eden s3-03 to s3-10, `docs/compliance-package-3.md` | below |
 
 ## State of the code
 
@@ -27,17 +27,26 @@ Branch `stream/pkg3`, worktree `TrainingRoomsForUltimate-pkg3`. Not pushed. Upda
 
 ## Builds (Yoga, `cargo skyline build --release`)
 
-Built at 4fdf560 in `/home/intpa/trainingrooms-build-pkg3/dist/{release,diag}`:
+Built at 13be87c in `/home/intpa/trainingrooms-build-pkg3/dist/{release,diag}`:
 
 | Build | sha256 | Resident |
 | --- | --- | --- |
-| release | `30ae799adf2167d583e7136b1de90363eda93594c3c83b1311e4c93b735c52c4` | 421888 B (412 KiB) |
-| diag | `e4912885c2cd7fa6c9eb8b4eebdd38a5683c1bab9369e889d2eceb07799755ed` | 548864 B (536 KiB) |
+| release | `aefbcad56be10d8fa16c39b3ae2be7e9a2a874b3984235f1788489d4a2685948` | 421888 B (412 KiB) |
+| diag | `e39444a8d39d98f0942bcacfa3f401e5cd8a93370bcf78a0f283d28f5c4a90f2` | 548864 B (536 KiB) |
 
-Gates at 4fdf560: `cargo test --no-fail-fast` all pass (29 binaries); `cargo clippy --all-targets -- -D warnings`
+Gates at 13be87c (full host tests on the Surface, clippy and no-default-features on the Yoga, all green): `cargo test --no-fail-fast` all pass (29 binaries); `cargo clippy --all-targets -- -D warnings`
 and `cargo build --no-default-features` clean (run on the Yoga); runtime code is `cfg(target_os = "switch")`
 and is compiled only by the Switch build (four dead-code warnings for `request_save`, `request_load`,
 `is_loading`, `is_killing`, which package 4's chord engine consumes).
+
+## Process slip (2026-11-02)
+
+At 06:48Z `s3_eden.py up s3-08` wrote a CLAIMED line on the Yoga while the foreign claim `m5qo1` (b81ec740/tm-m5q-online)
+was open. Cause: the harness decided "free" from the owner's last line, and the foreign worker had written a
+RELEASED line for its R-D1 claim that said "Yoga continues under claim m5qo1". The up failed on the GPU lock, the
+harness wrote the matching RELEASED, nothing else was touched (the label s3-08 is consumed). Fixes: the harness
+ignores a RELEASED line that says "continues under", and the retry wrapper refuses while any other owner's claim
+on the host lacks a later RELEASED. It is now the general rule in TRAININGROOMS-STREAM-RULES.md.
 
 ## Known gaps and decisions
 

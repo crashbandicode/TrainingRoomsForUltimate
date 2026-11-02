@@ -20,12 +20,14 @@ serde = { version = "1", default-features = false, features = ["std", "derive"] 
 serde_json = { version = "1", default-features = false, features = ["std"] }
 # S4-4 (lead ruling): the shared match-data crate, vendored under crates/ (docs/provenance/pkg4-carry-ledger.md). Its sha2 and float_roundtrip are part of that ruling.
 smash-match-data = { path = "crates/smash-match-data" }
+# Locks: hos-lock (crates/hos-lock, MIT: lock_api's Mutex/RwLock over the kernel address arbiter; no allocation, `const` constructors).
+# parking_lot is not used: on this target (os = "switch", no target-family) parking_lot_core's parker is a pure spin
+# loop, which livelocks under Horizon's fixed priorities (the menu-close hang, 2026-11-02). tests/no_spin_locks.rs keeps
+# parking_lot and parking_lot_core out of the lock file.
+hos-lock = { path = "crates/hos-lock" }
 
 [target.'cfg(target_os = "switch")'.dependencies]
 skyline = "=0.6.0"
-# B9: locks come from parking_lot directly (the fork's helper crate is not kept). Used by the input
-# delay queue; no allocation, `const` constructor.
-parking_lot = "0.12"
 # Package 6 (D3, lead-accepted): the fork's game-call crate for the carried code. MIT (`license = "MIT"` in its Cargo.toml). Pinned to the rev of stage m5o's lock.
 # The pilot's core crate (the operator's, MIT): the AI-as-pad primitives the carried cpu_pilot adapter uses. Tag v0.2.1, rev 8b03e3b.
 ssbu-cpu-pilot-core = { git = "https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot", rev = "8b03e3bffea8a156628f76cd9ca31c346f52ac70", features = ["native"] }
@@ -55,6 +57,11 @@ default = ["enhancements-alpha", "native-unlink-guard", "mii-hud-portrait-alpha"
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
 diag = []
+# Eden probes with no caller in a plain diag build, each behind its own feature so the diag NRO carries none of their code: the u4
+# texture helper's Eden proof (the stage grid's thumbnails replaced it in normal builds) and the playbook's hook-sharing drill on the
+# seam rows (`foreign=` in diag.txt, HOOK-SHARING "Testing the chain in Eden").
+texture-probe = ["diag"]
+seam-drill = ["diag"]
 
 # --- Carried feature table (package 6, decision D11) ---------------------------------------------------
 # Taken from the fork's root Cargo.toml lines 82-122 and 124-240 (line 123 not printed) of stage m5o (lead-authorised, CARRY-OVER.md pkg6
@@ -90,7 +97,6 @@ practice-stage-request-alpha = ["practice-stage"]
 training-stage-rotation-alpha = ["lobby-stage", "mii-editor-alpha", "training-stage-rotation"]
 training-stage-rotation = []
 stage-asset-probe = ["lobby-stage", "diag"]
-item-state-probe = ["diag"]
 mii-identity-probe = ["diag"]
 mii-saved-alpha = []
 mii-ordinary-player-alpha = ["mii-saved-alpha"]
@@ -110,8 +116,6 @@ mii-special-change-probe = ["mii-identical-reload-probe"]
 mii-fullconfig-probe = ["mii-identical-reload-probe", "mii-saved-file-probe"]
 mii-native-adapter-probe = ["mii-fullconfig-probe"]
 mii-cpu-adapter-probe = ["mii-native-adapter-probe"]
-turnip-save-probe = ["item-state-probe"]
-gyro-variation-probe = ["item-state-probe"]
 source-owner-probe = ["diag"]
 managed-sources = []
 managed-third-source-alpha = ["managed-sources"]

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
@@ -116,7 +116,7 @@ static SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
 pub fn start(settings: Settings) {
     *SETTINGS.lock() = Some(settings);
-    let spawned = std::thread::Builder::new().name("tr-menu".into()).stack_size(256 * 1024).spawn(run);
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Menu, run);
     if let Err(error) = spawned {
         diagnostic(format_args!("[TrainingRooms] menu worker did not start: {error}"));
     }

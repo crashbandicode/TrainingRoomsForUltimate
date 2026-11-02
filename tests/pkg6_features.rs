@@ -145,6 +145,82 @@ fn the_renamed_product_features_and_their_old_names() {
     assert!(closure(&map, &["training-stage-rotation-alpha"]).contains("lobby-stage"));
 }
 
+/// Lead ruling 2026-11-02: one global allocator. The fork's `console-practice-trace`, `native-unlink-probe` and `plugin-heap-meter` each
+/// declared their own, which cannot coexist with the plugin's counting allocator; their features read the byte meter of
+/// `model::hook_stats` instead. The only `#[global_allocator]` items under `src/` are the two cfg-exclusive statics of
+/// `runtime/alloc.rs` (the counting allocator, or the recorder's forwarding `TraceAllocator` when `console-practice-trace` is on).
+#[test]
+fn the_plugin_has_one_global_allocator() {
+    fn walk(dir: &std::path::Path, hits: &mut Vec<(String, usize)>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, hits);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                let n = text.lines().filter(|l| l.trim_start().starts_with("#[global_allocator]")).count();
+                if n > 0 {
+                    hits.push((path.to_string_lossy().replace('\\', "/"), n));
+                }
+            }
+        }
+    }
+    let mut hits = Vec::new();
+    walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut hits);
+    assert_eq!(hits.len(), 1, "global allocators: {hits:?}");
+    assert!(hits[0].0.ends_with("src/runtime/alloc.rs") && hits[0].1 == 2, "{hits:?}");
+    let alloc = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/alloc.rs")).unwrap();
+    assert!(alloc.contains("#[cfg(not(feature = \"console-practice-trace\"))]\n#[global_allocator]"), "exclusive with the trace allocator");
+    assert!(alloc.contains("#[cfg(feature = \"console-practice-trace\")]\n#[global_allocator]"));
+}
+
+/// `tools/feature_matrix.py` is the CI-style build check (decision D11: every feature must build); its list covers every feature of
+/// the table in the `each` and `alone` sets and the allocator features together.
+#[test]
+fn the_feature_matrix_lists_every_feature() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let out = match std::process::Command::new("python3").current_dir(root).args(["-I", "tools/feature_matrix.py", "--list", "--set", "all"]).output() {
+        Ok(out) => out,
+        Err(_) => return, // no python on this host
+    };
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let listing = String::from_utf8_lossy(&out.stdout);
+    for name in features().keys() {
+        assert!(listing.contains(&format!("default+{name} --features {name}\n")), "{name} missing from the `each` set");
+        assert!(listing.contains(&format!("alone:{name} --no-default-features --features {name}\n")), "{name} missing from the `alone` set");
+    }
+    assert!(listing.contains("--features diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"));
+}
+
+/// The matrix skips exactly the fork's by-design exclusions: every `compile_error!` message of the sources is one row of
+/// `EXCLUSIONS` in `tools/feature_matrix.py`, and every row there names a message the sources still contain.
+#[test]
+fn the_matrix_skips_exactly_the_forks_compile_error_exclusions() {
+    fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                for line in std::fs::read_to_string(&path).unwrap().lines() {
+                    if let Some(rest) = line.trim_start().strip_prefix("compile_error!(\"") {
+                        out.push(rest.split('"').next().unwrap().to_string());
+                    }
+                }
+            }
+        }
+    }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut messages = Vec::new();
+    walk(&root.join("src"), &mut messages);
+    let tool = std::fs::read_to_string(root.join("tools/feature_matrix.py")).unwrap();
+    let rows = tool.matches("compile_error").count();
+    for message in &messages {
+        assert!(tool.contains(message.as_str()), "compile_error! not listed in EXCLUSIONS: {message}");
+    }
+    assert!(!messages.is_empty() && tool.matches(".rs:").count() >= messages.len(), "{rows} {messages:?}");
+}
+
 #[test]
 fn every_feature_dependency_is_declared() {
     let map = features();

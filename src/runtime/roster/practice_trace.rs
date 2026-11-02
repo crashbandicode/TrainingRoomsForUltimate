@@ -11,7 +11,7 @@ pub fn checkpoint(_code: u64, _args: [u64; 5]) {}
 pub fn init() {}
 
 #[cfg(feature = "console-practice-trace")]
-pub use enabled::{checkpoint, event, init};
+pub use enabled::{checkpoint, event, init, TraceAllocator};
 
 /// Private trace UI bridge, intentionally outside generated instrumentation.
 /// 0=status, 1=Start, 2=Stop, 3=persisted bytes, 4=cap, 5=drops, 6=error.
@@ -56,7 +56,8 @@ mod enabled {
     use crate::runtime::roster::practice_trace_core::{
         self as core, Error, Metadata, Progress, Queue, Recorder, Stats, Storage,
     };
-    use std::alloc::{GlobalAlloc, Layout, System};
+    use crate::model::hook_stats::{heap_bytes, CountingAllocator};
+    use std::alloc::{GlobalAlloc, Layout};
     use std::cell::UnsafeCell;
     use std::convert::TryFrom;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -70,15 +71,12 @@ mod enabled {
     const PATH: &str = "sd:/ultimate/TrainingRooms/practice-trace-swap.bin";
     #[cfg(feature = "console-swap-trace")]
     const NATIVE_PATH: &[u8] = b"sd:/ultimate/TrainingRooms/practice-trace-swap.bin\0";
-    const STACK_BYTES: usize = 128 * 1024;
     static STARTED: AtomicBool = AtomicBool::new(false);
     // Capture even the generated main-entry scope and bootstrap Rust allocations
     // before init. They stay in the same bounded FIFO until init starts the writer.
     static URGENT: AtomicBool = AtomicBool::new(false);
     static MAIN: AtomicU64 = AtomicU64::new(0);
     static WRITER_THREAD: AtomicU64 = AtomicU64::new(0);
-    static LIVE: AtomicU64 = AtomicU64::new(0);
-    static PEAK: AtomicU64 = AtomicU64::new(0);
     static QUEUE: Queue = Queue::new();
     struct Output(UnsafeCell<[u8; core::CHUNK_BYTES]>);
     // Exactly one spawned worker accesses OUTPUT, guaranteed by STARTED.
@@ -218,8 +216,8 @@ mod enabled {
         Metadata {
             tick: clock().0,
             main: MAIN.load(Ordering::Relaxed),
-            live: LIVE.load(Ordering::Relaxed),
-            peak: PEAK.load(Ordering::Relaxed),
+            live: heap_bytes().live.max(0) as u64,
+            peak: heap_bytes().peak.max(0) as u64,
             memory_total: total,
             memory_used: used,
             memory_results: u64::from(total_result) | (u64::from(used_result) << 32),
@@ -290,7 +288,7 @@ mod enabled {
         crate::engine::compat::logging::diagnostic(format_args!(
             "[PracticeTrace] continuous v2 session={} next_slot={} recovered_tail={}+{} max_bytes={} queue={} stack={} build={}",
             stream.session, stream.next_slot, stream.recovery_offset, stream.recovery_bytes,
-            core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,
+            core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,
             option_env!("PRACTICE_TRACE_BUILD_ID").unwrap_or(""),
         ));
         let mut last_flush = Instant::now();
@@ -320,92 +318,32 @@ mod enabled {
         }
     }
 
-    struct TraceAllocator;
-    #[global_allocator]
-    static ALLOCATOR: TraceAllocator = TraceAllocator;
-    fn allocated(size: usize) {
-        let live = LIVE
-            .fetch_add(size as u64, Ordering::Relaxed)
-            .saturating_add(size as u64);
-        PEAK.fetch_max(live, Ordering::Relaxed);
-    }
-    // Same System backend. Only this NRO's Rust allocator, never game/other-plugin
-    // heaps. Events have opaque pointer values; callbacks never dereference them.
+    /// The recorder's allocator: the plugin's one global allocator when `console-practice-trace` is on (`runtime::alloc`). It records
+    /// each allocation call as a trace event (100-104) and forwards to `CountingAllocator`, which counts the hook allocations and
+    /// the live/peak bytes the recorder's metadata reads (`hook_stats::heap_bytes`). Recorded clean-room change: the fork declared
+    /// this as its own `#[global_allocator]` over `System`, which clashes with the plugin's counting allocator.
+    pub struct TraceAllocator;
+    // Only this NRO's Rust allocator, never game/other-plugin heaps. Events have opaque pointer values; callbacks never dereference
+    // them.
     unsafe impl GlobalAlloc for TraceAllocator {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            let result = System.alloc(layout);
-            if !result.is_null() {
-                allocated(layout.size());
-            }
-            allocation_event(
-                100,
-                [
-                    result as u64,
-                    layout.size() as u64,
-                    layout.align() as u64,
-                    0,
-                    0,
-                ],
-            );
+            let result = CountingAllocator.alloc(layout);
+            allocation_event(100, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);
             result
         }
         unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-            let result = System.alloc_zeroed(layout);
-            if !result.is_null() {
-                allocated(layout.size());
-            }
-            allocation_event(
-                101,
-                [
-                    result as u64,
-                    layout.size() as u64,
-                    layout.align() as u64,
-                    0,
-                    0,
-                ],
-            );
+            let result = CountingAllocator.alloc_zeroed(layout);
+            allocation_event(101, [result as u64, layout.size() as u64, layout.align() as u64, 0, 0]);
             result
         }
         unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-            allocation_event(
-                102,
-                [
-                    pointer as u64,
-                    layout.size() as u64,
-                    layout.align() as u64,
-                    0,
-                    0,
-                ],
-            );
-            System.dealloc(pointer, layout);
-            LIVE.fetch_sub(layout.size() as u64, Ordering::Relaxed);
+            allocation_event(102, [pointer as u64, layout.size() as u64, layout.align() as u64, 0, 0]);
+            CountingAllocator.dealloc(pointer, layout);
         }
         unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-            allocation_event(
-                103,
-                [
-                    pointer as u64,
-                    layout.size() as u64,
-                    layout.align() as u64,
-                    size as u64,
-                    0,
-                ],
-            );
-            let result = System.realloc(pointer, layout, size);
-            if !result.is_null() {
-                LIVE.fetch_sub(layout.size() as u64, Ordering::Relaxed);
-                allocated(size);
-            }
-            allocation_event(
-                104,
-                [
-                    pointer as u64,
-                    result as u64,
-                    layout.size() as u64,
-                    size as u64,
-                    0,
-                ],
-            );
+            allocation_event(103, [pointer as u64, layout.size() as u64, layout.align() as u64, size as u64, 0]);
+            let result = CountingAllocator.realloc(pointer, layout, size);
+            allocation_event(104, [pointer as u64, result as u64, layout.size() as u64, size as u64, 0]);
             result
         }
     }
@@ -447,9 +385,7 @@ mod enabled {
             unsafe { skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize };
         MAIN.store(main as u64, Ordering::Relaxed);
         event(1, [0; 5]);
-        if let Err(error) = std::thread::Builder::new()
-            .stack_size(STACK_BYTES)
-            .spawn(writer)
+        if let Err(error) = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::PracticeTrace, writer)
         {
             QUEUE.fail(Error::Io(
                 error

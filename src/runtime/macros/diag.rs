@@ -9,7 +9,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use crate::engine::macro_ui::clip_panel::ClipAction;
 use crate::engine::macro_ui::macro_panel::Pad;
@@ -45,7 +45,7 @@ fn parse(line: &str) -> Option<Command> {
     let mut words = line.split_whitespace();
     let verb = words.next()?;
     let mut command = Command { kind: 0, number: 0, text: [0; MAX_TEXT], len: 0 };
-    let mut set_text = |text: &str, command: &mut Command| {
+    let set_text = |text: &str, command: &mut Command| {
         let bytes = text.as_bytes();
         let n = bytes.len().min(MAX_TEXT);
         command.text[..n].copy_from_slice(&bytes[..n]);
@@ -86,7 +86,7 @@ pub(crate) fn start() {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    let _ = std::thread::Builder::new().name("tr-macro-diag".into()).stack_size(64 * 1024).spawn(|| loop {
+    let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MacroDiag, || loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let Some(path) = FixedPath::<128>::in_root("diag-macro.req") else { continue };
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };

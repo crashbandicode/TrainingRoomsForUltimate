@@ -13,34 +13,76 @@ static STAGE_HAZARDS: AtomicBool = AtomicBool::new(false);
 static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 static HUD: AtomicBool = AtomicBool::new(true);
 
-/// Diag build only: which step of a publish ran (the menu-close hang, 2026-11-02: the commit never logged `menu closed`).
+/// Every feature's settings as a game-thread hook reads them: computed from a snapshot by the publishing thread (boot, the
+/// menu worker, the diag reload) and read wait-free by the hooks (stream/sync: a hook never waits on a lock another thread
+/// holds across real work; the menu-close hang of 2026-11-02 was the worker and the P1 poll meeting on `chords::STATE`).
+/// A feature that keeps per-frame state under its own lock adopts a new value at its next hook ([`live_if_newer`]) under that
+/// lock, which only game threads take.
+#[derive(Clone, Copy)]
+pub(crate) struct Live {
+    pub cpu: crate::model::cpu::settings::CpuSettings,
+    pub states: crate::model::state::settings::StateSettings,
+    pub recorder: crate::model::recording::RecorderSettings,
+    /// The six chord rows; the two menu shortcuts are not taken from here (they live in the INI, `chords::shortcuts`).
+    pub chords: crate::model::chords::ChordSet,
+    pub input_display: crate::model::input_display::Settings,
+    /// The typed menu view of the rows (`compat::menu`, decision D1).
+    pub menu: crate::engine::compat::menu::TrainingModpackMenu,
+}
+
+static LIVE: hos_lock::Published<Option<Live>> = hos_lock::Published::new(None);
+/// The menu outbox's re-roll bits the CPU has not taken yet (decisions Q18 A, B11): or-ed by each publish, taken when the CPU
+/// adopts a new value.
+static REROLLS: AtomicU8 = AtomicU8::new(0);
+
+/// The live settings (None before the first publish). Never waits.
 #[inline]
-fn probe(step: u8) {
-    #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic_now(format_args!("[Ui] probe publish {step}"));
-    let _ = step;
+pub(crate) fn live() -> Option<Live> {
+    LIVE.read()
+}
+
+/// The live settings if they changed since `seen` (one atomic load when they did not). Never waits.
+#[inline]
+pub(crate) fn live_if_newer(seen: &std::sync::atomic::AtomicU32) -> Option<Live> {
+    LIVE.read_if_newer(seen).flatten()
+}
+
+/// How many values were published (the typed menu's game-side edits are valid until the next one, `compat::menu`).
+#[inline]
+pub(crate) fn live_generation() -> u32 {
+    LIVE.generation()
+}
+
+/// The re-roll bits published since the CPU last took them.
+pub(crate) fn take_rerolls() -> u8 {
+    REROLLS.swap(0, Ordering::AcqRel)
 }
 
 /// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
-/// B11); the first publish at boot has none.
+/// B11); the first publish at boot has none. Runs where a thread may wait (boot, the menu worker, the diag reload), never in a
+/// hook, and takes no lock a hook takes: hooks get the values through [`Live`], the flags below are atomics.
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::remember(snapshot);
-    probe(1);
-    crate::runtime::features::cpu::publish(snapshot, rerolls);
-    probe(2);
-    crate::runtime::features::states::publish(crate::model::state::settings::StateSettings::from_snapshot(snapshot));
-    probe(3);
-    crate::runtime::features::recorder::publish(snapshot);
-    probe(4);
-    crate::runtime::compat::menu::apply_snapshot(snapshot);
-    probe(5);
-    crate::runtime::features::chords::publish(snapshot);
-    probe(6);
+    let published_menu = crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot);
+    let previous_menu = crate::runtime::compat::menu::view_before_publish();
+    let menu = crate::runtime::compat::menu::before_publish(published_menu, previous_menu);
+    let live = Live {
+        cpu: crate::model::cpu::settings::CpuSettings::from_snapshot(snapshot),
+        states: crate::model::state::settings::StateSettings::from_snapshot(snapshot),
+        recorder: crate::model::recording::RecorderSettings::from_snapshot(snapshot),
+        chords: crate::model::chords::ChordSet::factory().with_rows(snapshot),
+        input_display: crate::model::input_display::Settings::from_snapshot(snapshot),
+        menu,
+    };
+    crate::runtime::features::states::set_flags(&live.states);
+    // Macro Source = Named Library: the layer's frame buffers are reserved on this thread, never in a hook.
+    crate::runtime::features::recorder::prepare_named_buffers(snapshot);
+    REROLLS.fetch_or(rerolls, Ordering::AcqRel);
+    LIVE.publish(Some(live));
+    crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu);
+    // P1 CPU control: the pilot takes it through an atomic (cpu_pilot::menu_settings_changed), no lock.
     crate::runtime::p1::publish(snapshot);
-    probe(7);
-    crate::runtime::features::input_display::publish(snapshot);
-    probe(8);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);

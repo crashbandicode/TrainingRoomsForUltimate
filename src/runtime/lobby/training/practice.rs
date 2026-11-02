@@ -15,7 +15,6 @@ pub fn context() -> Option<Context> {
 }
 
 pub fn scene_enabled() -> bool { context().is_some() }
-pub fn waiting() -> bool { context() == Some(Context::Waiting) }
 pub fn enabled() -> bool {
     scene_enabled() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()
 }
@@ -60,6 +59,9 @@ pub unsafe fn acquire() -> bool {
 
 pub fn forget() { OWNED.lock().unwrap().retire(); }
 
+/// Whether a practice session (the entry lease) is held now.
+pub fn owned() -> bool { OWNED.lock().unwrap().active() }
+
 /// Invoked before consumer callbacks and before native entry destruction.
 pub fn retire() {
     let owned = OWNED.lock().unwrap().retire();
@@ -79,18 +81,6 @@ pub unsafe fn refresh() {
     let replaced = OWNED.lock().unwrap().replaced(current);
     if replaced { retire(); }
     if current.is_some() { super::named_macros::resume_waiting(); }
-}
-
-pub unsafe fn visualizes(module: *mut BattleObjectModuleAccessor) -> bool {
-    if !enabled() { return false; }
-    let Some(module) = module.as_ref() else { return false; };
-    if context() == Some(Context::Training) || role(module).is_some() { return true; }
-    if common::get_category(module) != *BATTLE_OBJECT_CATEGORY_WEAPON { return false; }
-    let owner = WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
-        *WEAPON_INSTANCE_WORK_ID_INT_LINK_OWNER) as u32;
-    common::try_get_object_accessor(owner).is_some_and(|module|
-        module.as_ref().is_some_and(|module|
-            module.battle_object_id == owner && role(module).is_some()))
 }
 
 pub fn entry_departed(entry: usize) {
@@ -115,13 +105,6 @@ pub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {
         *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID))
 }
 
-pub unsafe fn primary_cpu(module: &mut BattleObjectModuleAccessor) -> bool {
-    role(module) == Some(1)
-        && app::utility::get_kind(module) != *FIGHTER_KIND_NANA
-        && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
-            .is_some_and(|current| std::ptr::eq(current, module))
-}
-
 /// The controller mapping that operates the Training CPU under native CPU
 /// Behavior=Control: the CPU entry's own mapping index, only while a valid native
 /// FighterInformation positively reports a controller operator. P1, waiting scenes,
@@ -133,8 +116,3 @@ pub fn cpu_operator(player_idx: i32) -> bool {
             .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))
 }
 
-/// FE+0x4178 is the native controller owner used by the existing CPU pilot's
-/// verified 13.0.5 entry adapter. Do not confuse its controller slot with entry 4.
-pub unsafe fn owns_cpu_controls(controls: usize) -> bool {
-    entry(1).and_then(|entry| native_fields::child(entry, 0x4178)) == Some(controls)
-}

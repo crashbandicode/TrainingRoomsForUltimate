@@ -73,6 +73,64 @@ fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
     assert!(observer.observe(snapshot()).is_none());
 }
 
+/// The byte meter of the diag heap features (`plugin-heap-meter`, `console-practice-trace`) lives in the same allocator, so those
+/// features read this plugin's one global allocator instead of declaring their own. A block's size shows in `live` and `total`
+/// while it is held, `live` returns when it is freed, `peak` keeps the high-water mark, and a realloc counts the new size.
+#[test]
+fn the_byte_meter_counts_what_the_one_global_allocator_serves() {
+    use std::alloc::{GlobalAlloc, Layout};
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    // Other test threads (the harness) allocate too: measure with blocks far larger than anything they make and compare deltas
+    // that only this thread's calls can explain, by holding the turn (the other test also holds it).
+    // The block (64 MiB) dwarfs what the harness threads allocate or free meanwhile; `SLACK` absorbs their traffic.
+    const BLOCK: usize = 64 << 20;
+    const SLACK: isize = 4 << 20;
+    let before = model::hook_stats::heap_bytes();
+    let first = Layout::from_size_align(BLOCK, 8).unwrap();
+    // SAFETY: the layouts are valid and every block is freed with the layout it was allocated or reallocated with.
+    unsafe {
+        let pointer = ALLOCATOR.alloc(first);
+        assert!(!pointer.is_null());
+        let held = model::hook_stats::heap_bytes();
+        assert!(held.live >= before.live + BLOCK as isize - SLACK, "live holds the block: {before:?} -> {held:?}");
+        assert!(held.peak >= held.live);
+        assert!(held.total >= before.total + BLOCK && held.calls > before.calls && held.largest >= BLOCK);
+        let moved = ALLOCATOR.realloc(pointer, first, 1 << 10);
+        assert!(!moved.is_null());
+        let shrunk = model::hook_stats::heap_bytes();
+        assert!(shrunk.live <= held.live - BLOCK as isize + SLACK, "the old block left `live` at the realloc");
+        assert!(shrunk.total >= held.total + (1 << 10), "the new size counts as requested");
+        assert!(shrunk.peak >= held.peak, "peak never falls");
+        ALLOCATOR.dealloc(moved, Layout::from_size_align(1 << 10, 8).unwrap());
+    }
+    let after = model::hook_stats::heap_bytes();
+    assert!(after.live < before.live + SLACK, "the freed block is not live any more");
+}
+
+/// Attribution (R5): a steady-state allocation is charged to the innermost open scope, and the enclosing scope is current again
+/// when the inner one drops; the per-scope counts sum to the total and the report names them (`allocs=`).
+#[test]
+fn an_allocation_is_charged_to_the_innermost_scope() {
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let before = snapshot();
+    {
+        let _outer = HookScope::enter_hook(HookId::CpuFrame);
+        {
+            let _inner = HookScope::enter_hook(HookId::RosterKirby);
+            std::hint::black_box(vec![0u8; 32]);
+        }
+        std::hint::black_box(vec![0u8; 32]);
+    }
+    let after = snapshot();
+    let charged = |id: HookId| after.allocs[id as usize] - before.allocs[id as usize];
+    assert!(charged(HookId::RosterKirby) >= 1, "the inner scope made one");
+    assert!(charged(HookId::CpuFrame) >= 1, "the outer scope is current again after the inner drops");
+    assert_eq!(after.allocs.iter().sum::<u64>(), after.allocations, "per-scope counts sum to the total");
+    let mut observer = Observer::new();
+    let line = observer.observe(after).expect("activity").to_string();
+    assert!(line.contains(" allocs=") && line.contains("roster_kirby:"), "{line}");
+}
+
 /// Nesting: a hook that calls another hook's code stays inside a scope until the outer one drops.
 #[test]
 fn nested_scopes_count_until_the_outermost_ends() {
