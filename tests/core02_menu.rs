@@ -1271,6 +1271,20 @@ fn core04_last_page_roundtrip() {
     assert!(settings::parse(&text).settings.last_page().is_none());
 }
 
+#[test]
+fn mii_preferences_is_the_preserved_extra_as_json() {
+    assert!(Settings::factory().mii_preferences().is_none());
+    let text = r#"{"menu":{},"mii_preferences":{"order":[3,1,2],"name":"x"}}"#;
+    let loaded = settings::parse(text);
+    assert!(!loaded.corrupt());
+    let prefs = loaded.settings.mii_preferences().expect("kept as it is");
+    assert_eq!(prefs["order"], serde_json::json!([3, 1, 2]));
+    assert_eq!(prefs["name"], "x");
+    // It survives a save unchanged.
+    let again = settings::parse(&loaded.settings.to_json());
+    assert_eq!(again.settings.mii_preferences(), Some(prefs));
+}
+
 // ---- Q18, B11: re-roll events --------------------------------------------------------------------
 
 #[test]
