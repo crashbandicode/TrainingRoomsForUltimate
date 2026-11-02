@@ -252,6 +252,35 @@ fn cpu03_playback_paths() {
 }
 
 #[test]
+fn cpu03_playback_request_word_round_trips_for_every_slot() {
+    use model::cpu::facts::PlaybackStart;
+    for slot in 0..5u8 {
+        for ledge in [false, true] {
+            let start = PlaybackStart { slot, ledge };
+            let word = start.request_word();
+            assert_ne!(word & 0xff, 0, "0 is reserved for no request");
+            assert_eq!(word & 0xff, u32::from(slot) + 1);
+            assert_eq!(word & PlaybackStart::LEDGE_BIT != 0, ledge);
+            assert_eq!(PlaybackStart::from_request_word(word), Some(start));
+        }
+    }
+    assert_eq!(PlaybackStart::from_request_word(0), None, "no request");
+    assert_eq!(PlaybackStart::from_request_word(PlaybackStart::LEDGE_BIT), None, "ledge bit without a slot");
+    assert_eq!(PlaybackStart::from_request_word(6), None, "slot 5 does not exist");
+    assert_eq!(PlaybackStart::from_request_word(1 | (1 << 9)), None, "stray bits");
+}
+
+#[test]
+fn cpu03_ledge_playback_frame_yields_the_word_the_inbox_carries() {
+    let playback1 = option::PLAYBACK_FIRST as usize;
+    let row = settings(&[("ledge_state", ledge_row(&[playback1 + 1])), ("ledge_delay", delay_row(&[0]))]);
+    let (mut cpu, key) = cpu_with(row);
+    let start = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false)).playback.expect("early ledge playback");
+    // Slot 2 on the ledge: low byte 2, ledge bit set.
+    assert_eq!(start.request_word(), 2 | (1 << 8));
+}
+
+#[test]
 fn cpu03_post_getup_mash() {
     // Override of the performed kind first, else the mash action when the Ledge Option trigger is
     // ticked, else nothing.

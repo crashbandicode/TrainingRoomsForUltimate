@@ -172,6 +172,17 @@ mod counts_index {
     pub const STICK_DIR: usize = 10;
 }
 
+/// One diag-build line for an answer a behaviour gave (the shipped build compiles the arguments away).
+/// The line is formatted on the caller's stack into the fixed ring: nothing allocates.
+macro_rules! cpu_event {
+    ($($arg:tt)*) => {{
+        #[cfg(feature = "diag")]
+        {
+            diagnostic(format_args!("[TrainingRooms] cpu_event {}", format_args!($($arg)*)));
+        }
+    }};
+}
+
 #[cfg(feature = "diag")]
 fn bump(which: usize) {
     counts::bump(which);
@@ -509,7 +520,8 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
     }
     // A playback request goes to the input-recording package's inbox (`published`).
     if let Some(start) = out.playback {
-        published::CPU_PLAYBACK_REQUEST.store(1 + u32::from(start.slot) | (u32::from(start.ledge) << 8), Ordering::Release);
+        published::CPU_PLAYBACK_REQUEST.store(start.request_word(), Ordering::Release);
+        cpu_event!("playback_request slot={} ledge={} word={:#x}", start.slot, start.ledge, start.request_word());
     }
 }
 
