@@ -215,7 +215,7 @@ pub fn run() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
-    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason) = install_cpu(&usable, &mut mark);
+    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
     let mut state_written = [Written::Skipped; state_boot::N];
@@ -305,6 +305,8 @@ pub fn run() {
         report(Feature::CpuTech, cpu_tech_on, None),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
+        report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),
+        report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
         FeatureReport { feature: "chords", installed: input_delay_on, reason: None, site: None },
@@ -376,9 +378,9 @@ fn load_save_states() -> SaveFile {
 /// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
 /// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
 /// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
-fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>) {
+fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>, bool, bool) {
     if !sites::feature_usable(Feature::CpuCore, usable) {
-        return (false, false, false, false, false, Some("cpu_core_not_installed"));
+        return (false, false, false, false, false, Some("cpu_core_not_installed"), false, false);
     }
     cpu::install_frame();
     mark("cpu_on_frame_slot", Written::Far);
@@ -426,7 +428,21 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     } else {
         Some("site_guard_failed")
     };
-    (true, defence, ledge, tech, shield, common)
+    // The game's CommonParams object, for the shield damage multiplier (SPEC-cpu-05 section 4).
+    let shield_damage = sites::feature_usable(Feature::CpuShieldDamage, usable);
+    if shield_damage {
+        skyline::install_hook!(cpu::cpu_common_params_hook);
+        mark("common_params_fill", Written::Near);
+    }
+    // The fixed camera (SPEC-cpu-04 section 5): the stage id, the stage table and the two camera hooks.
+    let camera = sites::feature_usable(Feature::CpuCamera, usable);
+    if camera {
+        skyline::install_hook!(cpu::cpu_camera_mode_hook);
+        skyline::install_hook!(cpu::cpu_camera_setup_hook);
+        mark("camera_mode_hook", Written::Near);
+        mark("fixed_camera_setup_hook", Written::Far);
+    }
+    (true, defence, ledge, tech, shield, common, shield_damage, camera)
 }
 
 /// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper

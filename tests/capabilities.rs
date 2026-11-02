@@ -89,6 +89,8 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
         "cpu::cpu_motion_change_hook" | "cpu::cpu_quake_pos_hook" => Some(Feature::CpuTech),
         "cpu::cpu_check_button_on_hook" | "cpu::cpu_check_button_off_hook" | "cpu::cpu_stick_x_no_clamp_hook" | "cpu::cpu_stick_y_no_clamp_hook" | "cpu::cpu_shield_param_hook" => Some(Feature::CpuShield),
         "cpu::cpu_command_flag_hook" | "cpu::cpu_attack_air_kind_hook" | "cpu::cpu_stick_dir_hook" => Some(Feature::CpuMash),
+        "cpu::cpu_common_params_hook" => Some(Feature::CpuShieldDamage),
+        "cpu::cpu_camera_mode_hook" | "cpu::cpu_camera_setup_hook" => Some(Feature::CpuCamera),
         _ => None,
     };
     if by_function.is_some() {
@@ -189,7 +191,7 @@ impl Analysis {
     /// Whether every row a call of `offset` relies on belongs to `unit` (its own, Training's, or the core's for
     /// the CPU features), so it is not a cross-feature need.
     fn owned_by(&self, offset: usize, unit: Feature) -> bool {
-        let core = matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon);
+        let core = matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera);
         // A call holds when every row naming the function passed: it is the unit's own only when they all are.
         capabilities::call_rows(offset).all(|rep| {
             capabilities::equivalent_rows(rep).any(|row| {

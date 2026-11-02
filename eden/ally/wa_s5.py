@@ -17,7 +17,9 @@ Ops (as W20's: call, status, sleep, gshot, button, hold, stick, play, mark, wait
 from pathlib import Path
 import base64, hashlib, json, os, re, sys, time
 
-O = Path('C:/Eden/trainingrooms-pkg5'); PROFILE = O / 'profile'; USER = PROFILE / 'user'
+# The rig root: TR_ALLY_ROOT, else the folder above this file (it lives in <root>\tr-pkg5\, ally_conf.py). Restart rules 2026-11-02: on the
+# Ally only the lent rig C:\Eden\c1162-w5-ally may run; the owned root C:\Eden\trainingrooms-pkg5 makes Windows prompt for the firewall.
+O = Path(os.environ.get('TR_ALLY_ROOT') or Path(__file__).resolve().parent.parent); PROFILE = O / 'profile'; USER = PROFILE / 'user'
 OWNER = 'trainingrooms-pkg5-0caa72b8-sonnet55'
 EDEN_SHA = '45af318c93cbc00a2794421ee884ffbcb9dbec75bbdbdeef27af30d61cd2cbad'
 DURATION = 3600

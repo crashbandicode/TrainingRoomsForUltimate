@@ -323,6 +323,50 @@ pub const fn camera_centre(class: StageClass) -> Option<[f32; 3]> {
     }
 }
 
+/// The native stage ids the camera rule names (the game's own `StageID` numbers: the index into the form table at
+/// `main+0x454a7e8`, whose record holds the stage's name hash; `tests/cpu_sites.rs` checks each against its name).
+pub mod stage {
+    pub const BATTLEFIELD: i32 = 0;
+    pub const FINAL_DESTINATION: i32 = 3;
+    pub const SMASHVILLE: i32 = 95;
+    pub const POKEMON_STADIUM_2: i32 = 107;
+    pub const TOWN_AND_CITY: i32 = 257;
+    pub const SMALL_BATTLEFIELD: i32 = 347;
+    pub const HOLLOW_BASTION: i32 = 361;
+    /// Records in the form table (ids `0..STAGE_COUNT`).
+    pub const STAGE_COUNT: i32 = 364;
+}
+
+/// The camera class of a native stage id. `form` is the record's form field: 0 the stage itself, 1 its Omega form,
+/// 2 its Battlefield form (read from the game's table, so no list of forms is written down here); `None` for an
+/// id outside the table.
+pub const fn stage_class(stage_id: i32, form: Option<u32>) -> StageClass {
+    let Some(form) = form else { return StageClass::Other };
+    if form != 0 {
+        return StageClass::Standard;
+    }
+    match stage_id {
+        stage::BATTLEFIELD | stage::FINAL_DESTINATION | stage::SMALL_BATTLEFIELD | stage::TOWN_AND_CITY | stage::POKEMON_STADIUM_2 => {
+            StageClass::Standard
+        }
+        stage::SMASHVILLE => StageClass::Smashville,
+        stage::HOLLOW_BASTION => StageClass::HollowBastion,
+        _ => StageClass::Other,
+    }
+}
+
+/// The camera mode that is the Training fixed camera.
+pub const CAMERA_MODE_FIXED: i32 = 4;
+
+/// The centre to put in the fixed camera: the stage's value while Hide Tech Animations is On, the stage default the
+/// game set last when it is Off (`None`: the game's value stays).
+pub fn fixed_camera_centre(s: &CpuSettings, class: StageClass, stage_default: Option<[f32; 3]>) -> Option<[f32; 3]> {
+    if s.tech_hide {
+        camera_centre(class)
+    } else {
+        stage_default
+    }
+}
 /// Whether the script's requested status is one of the three tech situations (ground, wall, ceiling):
 /// only then does the status-change hook read the terms and ask the script's own check.
 pub fn is_tech_situation(t: &Table, requested: i32) -> bool {

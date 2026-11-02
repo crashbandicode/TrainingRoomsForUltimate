@@ -14,8 +14,9 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 44] = [
+const SYMBOLS: [(&str, &str); 45] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
+    ("stage_id_call", "_ZN3app14sv_information8stage_idEv"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("prev_status_kind", "_ZN3app8lua_bind35StatusModule__prev_status_kind_implEPNS_26BattleObjectModuleAccessorEj"),
     ("situation_kind", "_ZN3app8lua_bind33StatusModule__situation_kind_implEPNS_26BattleObjectModuleAccessorE"),
@@ -70,7 +71,7 @@ const PILOT_SITES: [usize; 23] = [
 ];
 
 fn cpu_sites() -> impl Iterator<Item = &'static Site> {
-    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon))
+    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera))
 }
 
 #[test]
@@ -156,7 +157,7 @@ fn cpu_sites_every_replace_hook_is_a_thunk_that_fits_the_far_jump() {
     let hooks: Vec<_> = cpu_sites()
         .filter(|s| matches!(s.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }))
         .collect();
-    assert_eq!(hooks.len(), 15, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp, command flag, attack air kind, stick dir");
+    assert_eq!(hooks.len(), 16, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp, command flag, attack air kind, stick dir, fixed camera setup");
     for site in hooks {
         assert!(!site.note.is_empty(), "{}: an entry hook needs its justification", site.name);
         // A 16-aligned entry: Skyline's far jump is 16 bytes there (20 only at an address 4 past an
@@ -170,11 +171,13 @@ fn cpu_sites_every_replace_hook_is_a_thunk_that_fits_the_far_jump() {
                 site.name
             );
         }
-        // The thunk ends in an indirect or direct branch inside its first 32 bytes (a leaf thunk).
-        let (chunks, _) = site.guard[..32].as_chunks::<4>();
+        // The thunk ends in an indirect or direct branch inside its first 32 bytes (a leaf thunk); the one
+        // leaf function (the fixed camera setup, 64 bytes) ends in `ret` inside its 64 bytes instead.
+        let (chunks, _) = site.guard.as_chunks::<4>();
         let words: Vec<u32> = chunks.iter().map(|w| u32::from_le_bytes(*w)).collect();
         let branch = |w: u32| w & 0xffff_fc1f == 0xd61f_0000 || w & 0xfc00_0000 == 0x1400_0000;
-        assert!(words.iter().any(|w| branch(*w)), "{} is not a leaf thunk", site.name);
+        let leaf_ret = site.name == "fixed_camera_setup_hook" && words.contains(&0xd65f_03c0);
+        assert!(words[..8].iter().any(|w| branch(*w)) || leaf_ret, "{} is not a leaf thunk", site.name);
         assert!(!words.contains(&0xa9bf_7bfd), "{} has a prologue (stp x29, x30, [sp, #-16]!)", site.name);
     }
 }
@@ -201,6 +204,9 @@ fn cpu_sites_features_need_the_core() {
     assert!(!sites::feature_usable(Feature::CpuTech, |s| s.name != "pos_x"), "tech needs the core natives");
     assert!(!sites::feature_usable(Feature::CpuTech, |s| s.name != "visibility_set_whole"));
     assert!(!sites::feature_usable(Feature::CpuShield, |s| s.name != "pos_x"), "shield needs the core natives");
+    assert!(!sites::feature_usable(Feature::CpuShieldDamage, |s| s.name != "pos_x"), "the multiplier needs the core's frame");
+    assert!(!sites::feature_usable(Feature::CpuShieldDamage, |s| s.name != "common_params_fill"));
+    assert!(sites::feature_usable(Feature::CpuShield, |s| s.name != "common_params_fill"), "a lost CommonParams site costs only the multiplier");
     assert!(!sites::feature_usable(Feature::CpuShield, |s| s.name != "check_button_off_hook"));
     // The core does not need the features' hooks.
     // (R2-1: the core's role test calls the reset hub's two natives, so they are part of its closure.)
@@ -216,11 +222,156 @@ fn cpu_sites_overlapping_windows_are_all_our_own() {
     let mut pairs = 0;
     for (a, b) in sites::overlapping_pairs() {
         let (a, b) = (&sites::SITES[a], &sites::SITES[b]);
-        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon);
+        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera);
         if cpu(a) || cpu(b) {
             pairs += 1;
             assert!(cpu(a) && cpu(b), "{} overlaps {} (a site of another feature)", a.name, b.name);
         }
     }
     assert!(pairs > 0, "the stick, clatter and term thunks do overlap each other");
+}
+
+/// `ldr`/`str` words of SIMD&FP 32-bit with an unsigned offset.
+const fn str_s0(base: u32, offset: u32) -> u32 {
+    0xbd00_0000 | (offset / 4) << 10 | base << 5
+}
+
+#[test]
+fn cpu_sites_common_params_fill_stores_shield_damage_mul_at_the_field_offset() {
+    let Some(owned) = common::owned_main("cpu_sites_common_params_fill_stores_shield_damage_mul_at_the_field_offset") else { return };
+    let site = sites::find("common_params_fill").expect("row");
+    assert!(matches!(site.kind, SeamKind::Hook { form: HookForm::Inline, placement: Placement::AfterPrologue }));
+    assert_eq!(site.offset, sites_pkg2::COMMON_PARAMS_FILL_OFFSET);
+    // The relied-on instruction is the site's own word: `mov x19, x0`, so x0 is the object.
+    assert_eq!(&site.guard[..4], &0xaa00_03f3u32.to_le_bytes());
+    // The prologue before it saves the callee registers the function uses (it is a real function body).
+    let words = owned.text_words();
+    let at = |offset: usize| words[offset / 4];
+    assert_eq!(at(sites_pkg2::COMMON_PARAMS_FILL_OFFSET - 0x30), 0xd102_43ff, "sub sp, sp, #0x90 starts the function");
+    // `shield_damage_mul` (hash40 0x11a8cf3b34): the fill builds the hash in x15 and stores the float it read into
+    // x19 + 0x174 within the next 80 instructions, in the one function the vtable entry 0x736a90 starts.
+    let (mut found, mut start) = (None, sites_pkg2::COMMON_PARAMS_FILL_OFFSET / 4);
+    while start < 0x74_8500 / 4 {
+        let (lo, mid, hi) = (words[start], words[start + 1], words[start + 2]);
+        let rd = lo & 0x1f;
+        if lo == 0xd280_0000 | (0x3b34 << 5) | rd && mid == 0xf2a0_0000 | (0xa8cf << 5) | rd && hi == 0xf2c0_0000 | (0x11 << 5) | rd {
+            found = Some(start);
+            break;
+        }
+        start += 1;
+    }
+    let start = found.expect("the hash of shield_damage_mul is built in the fill");
+    let store = str_s0(19, sites_pkg2::SHIELD_DAMAGE_MUL_FIELD as u32);
+    assert!(words[start..start + 80].contains(&store), "no `str s0, [x19, #0x174]` after the hash");
+    // Not past the next field: shield_damage_add's hash (0x11fcd76972) comes after the store.
+    let first_store = words[start..start + 80].iter().position(|w| *w & 0xffc0_03e0 == 0xbd00_0260).map(|i| words[start + i]);
+    assert_eq!(first_store, Some(store), "the first x19 float store after the hash is the multiplier's");
+}
+#[test]
+fn cpu_sites_stage_table_records_are_the_stages_the_camera_rule_names() {
+    use model::cpu::hash::hash40;
+    use model::cpu::tech::stage;
+    let Some(owned) = common::owned_main("cpu_sites_stage_table_records_are_the_stages_the_camera_rule_names") else { return };
+    let record = |id: usize| -> [u64; 9] {
+        let at = sites_pkg2::STAGE_TABLE_OFFSET + id * sites_pkg2::STAGE_RECORD_STRIDE;
+        let mut out = [0u64; 9];
+        for (k, word) in out.iter_mut().enumerate() {
+            let w = owned.window(at + 8 * k - (at + 8 * k) % 8);
+            *word = u64::from_le_bytes(w[..8].try_into().unwrap());
+        }
+        out
+    };
+    // Each id the rule names: record word 0 is the id, word 1 the form (0), word 2 the hash40 of the stage's name
+    // (hash40 = CRC-32 and the length in the top byte), which is how the ids are tied to the spec's `StageID` names.
+    for (id, name) in [
+        (stage::BATTLEFIELD, "battlefield"),
+        (stage::FINAL_DESTINATION, "end"),
+        (stage::SMALL_BATTLEFIELD, "battlefield_s"),
+        (stage::TOWN_AND_CITY, "animal_city"),
+        (stage::POKEMON_STADIUM_2, "poke_stadium2"),
+        (stage::SMASHVILLE, "animal_village"),
+        (stage::HOLLOW_BASTION, "trail_castle"),
+    ] {
+        let r = record(id as usize);
+        assert_eq!(r[0] & 0xffff_ffff, id as u64, "{name}: record word 0");
+        assert_eq!(r[1], 0, "{name}: form 0");
+        assert_eq!(r[2], hash40(name), "{name}: the record's name hash");
+    }
+    // The forms follow their stage in the table: Omega (1) and Battlefield (2).
+    assert_eq!(record(1)[1], 1, "Battlefield's Omega form");
+    assert_eq!(record(4)[1], 2, "Final Destination's Battlefield form");
+    for (id, form) in [(96, 1), (97, 2), (362, 1), (363, 2)] {
+        assert_eq!((record(id)[0] & 0xffff_ffff, record(id)[1]), (id as u64, form));
+    }
+    // 364 records; the table ends there (the next bytes are not a record).
+    assert_eq!(record(stage::STAGE_COUNT as usize - 1)[0] & 0xffff_ffff, 363);
+    assert_ne!(record(stage::STAGE_COUNT as usize)[0] & 0xffff_ffff, 364);
+}
+#[test]
+fn cpu_sites_fixed_camera_setup_loads_the_manager_through_the_slot_and_stores_the_centre_at_the_field() {
+    let site = sites::find("fixed_camera_setup_hook").expect("row");
+    let (chunks, _) = site.guard.as_chunks::<4>();
+    let words: Vec<u32> = chunks.iter().map(|w| u32::from_le_bytes(*w)).collect();
+    // `adrp x8, page` at +0x10, `ldr x8, [x8, #slot_low]`, `ldr x8, [x8]`.
+    let adrp = words[4];
+    assert_eq!(adrp & 0x9f00_001f, 0x9000_0008, "adrp x8");
+    let imm = (((adrp >> 5) & 0x7_ffff) << 2) | ((adrp >> 29) & 3);
+    let page = ((site.offset + 0x10) & !0xfff) + ((imm as usize) << 12);
+    let ldr = words[5];
+    assert_eq!(ldr & 0xffc0_03ff, 0xf940_0108, "ldr x8, [x8, #imm]");
+    let slot = page + (((ldr >> 10) & 0xfff) as usize) * 8;
+    assert_eq!(slot, sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET);
+    assert_eq!(words[6], 0xf940_0108, "ldr x8, [x8]");
+    // `str q0, [x8, #0xbd0]` (the centre vector) comes next.
+    let store = 0x3d80_0000 | ((sites_pkg2::CAMERA_CENTRE_FIELD as u32 / 16) << 10) | (8 << 5);
+    assert_eq!(words[8], store, "str q0, [x8, #0xbd0]");
+}
+
+/// The install line of the merged tree is never cut (Eden on the Ally: a 2048-byte buffer cut it at `cpu_tech=installed`, and later an
+/// 8 KiB one inside `macros_port`): it is rendered whole on the boot thread (`install_line::render`). Every row of every table
+/// (`capabilities::all_sites`, package 2's rows included) with the longest guard outcome, and every feature the boot reports with a
+/// reason, still ends with `result=` and `heap_allocations=`.
+#[test]
+fn the_install_line_of_every_site_and_feature_is_whole_and_ends_with_its_result() {
+    use model::capabilities;
+    use model::guard::GuardOutcome;
+    use model::install_line::{self, DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+    use model::version::Verdict;
+    let reports: Vec<SiteReport> = capabilities::all_sites()
+        .map(|s| SiteReport { site: s.name, found: GuardOutcome::Foreign { first_diff: 0 }, written: Written::Restored })
+        .collect();
+    assert!(reports.iter().any(|r| r.site == "common_params_fill") && reports.iter().any(|r| r.site == "fixed_camera_setup_hook"));
+    // The boot's feature reports (`runtime::boot::run`, `features`), in its order.
+    let names = [
+        "input_delay", "lra_reset", "stage_hazards", "reset_hub", "cpu_core", "cpu_defence", "cpu_ledge", "cpu_tech", "cpu_shield",
+        "cpu_mash", "cpu_shield_damage", "cpu_camera", "cpu_common", "state_core", "chords", "input_display", "recording", "notices", "ui",
+        "p1_cpu", "ui_texture", "named_macros", "live_replay", "macros_port", "roster",
+    ];
+    assert_eq!(Feature::CpuShieldDamage.name(), "cpu_shield_damage");
+    assert_eq!(Feature::CpuCamera.name(), "cpu_camera");
+    let features: Vec<FeatureReport> = names
+        .iter()
+        .map(|feature| FeatureReport { feature, installed: false, reason: Some("roster=unavailable_until_cycle_lands menu_app=screens_installed"), site: None })
+        .collect();
+    let seams = "seams=176 seams_stock=176 seams_other=0 seams_foreign=0 seam_groups=cpu_pilot,roster,mii,lobby";
+    let line = InstallLine {
+        tick: 1_793_599_889_128,
+        version: "0.1.0",
+        display: b"13.0.5",
+        build_id: Some(&[0x21; 20]),
+        verdict: Verdict::Supported,
+        sites: &reports,
+        features: &features,
+        seams: Some(Extra(&seams)),
+        developer: Some(DeveloperReport { on: false, reason: "missing" }),
+        settings: Some(SettingsReport { input_delay: 5, lra_reset: true, stage_hazards: false }),
+        migration: Some("partial"),
+        heap_allocations: Some(0),
+    };
+    let text = install_line::render(&line);
+    assert!(text.len() > 8192, "the merged line ({} characters) is longer than the old fixed buffer", text.len());
+    assert!(text.ends_with(" migration=partial result=installed heap_allocations=0"), "{}", &text[text.len() - 120..]);
+    assert!(text.contains(" cpu_shield_damage=not_installed reason=") && text.contains(" cpu_camera=not_installed reason="));
+    assert!(text.contains(" common_params_fill=") && text.contains(" stage_table="));
+    assert_eq!(text, line.to_string());
 }
