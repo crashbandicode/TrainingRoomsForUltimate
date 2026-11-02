@@ -24,7 +24,7 @@ import argparse, hashlib, json, os, posixpath, re, sys
 
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
-EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags"}
+EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags", "training_mod_sync": "sync"}
 
 
 def sha(data: bytes) -> str:
@@ -79,7 +79,7 @@ def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
                 out.append(new + alias)
         return "use {" + ", ".join(out) + "};"
 
-    text = re.sub(r"\buse\s+(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags)::\{((?:[^{}]|\{[^{}]*\})*)\}\s*;", group, text)
+    text = re.sub(r"\buse\s+(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags|training_mod_sync)::\{((?:[^{}]|\{[^{}]*\})*)\}\s*;", group, text)
 
     # 2. plain paths
     def plain(m):
@@ -90,7 +90,7 @@ def rewrite_source(text: str, file_crate: str, modules: dict, name: str) -> str:
             return m.group(0)
         return new
 
-    text = re.sub(r"\b(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags)::([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)", plain, text)
+    text = re.sub(r"\b(crate|training_mod_consts|training_mod_mii|training_mod_tui|byteflags|training_mod_sync)::([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)", plain, text)
     return text
 
 

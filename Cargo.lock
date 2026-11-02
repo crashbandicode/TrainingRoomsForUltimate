@@ -86,14 +86,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nnsdk"
-version = "0.6.2"
-source = "git+https://github.com/ultimate-research/nnsdk-rs#d23f131663ec72a87c84914e6e738999f3ab403d"
-dependencies = [
- "libc-nnsdk 0.5.0",
-]
-
-[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,18 +197,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b4c2c28cda0d198befe59479c593537fc306cabb61d32a9428fcd2725df35c6"
 dependencies = [
  "libc-nnsdk 0.5.0",
- "nnsdk 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "skyline_macro 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "skyline"
-version = "0.6.0"
-source = "git+https://github.com/ultimate-research/skyline-rs#6b52d321275639f26c2371d8142550ba0013a5e4"
-dependencies = [
- "libc-nnsdk 0.5.0",
- "nnsdk 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "skyline_macro 0.2.1 (git+https://github.com/ultimate-research/skyline-rs)",
+ "nnsdk",
+ "skyline_macro",
 ]
 
 [[package]]
@@ -232,17 +214,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "skyline_macro"
-version = "0.2.1"
-source = "git+https://github.com/ultimate-research/skyline-rs#6b52d321275639f26c2371d8142550ba0013a5e4"
-dependencies = [
- "lazy_static",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "skyline_smash"
 version = "0.1.0"
 source = "git+https://github.com/ultimate-research/skyline-smash.git?rev=01bf5835cc1140f5052ddfb2b4f9e98008f22679#01bf5835cc1140f5052ddfb2b4f9e98008f22679"
@@ -250,9 +221,9 @@ dependencies = [
  "compile-time-lua-bind-hash",
  "lazy_static",
  "libc-nnsdk 0.4.0",
- "nnsdk 0.6.2 (git+https://github.com/ultimate-research/nnsdk-rs)",
+ "nnsdk",
  "paste",
- "skyline 0.6.0 (git+https://github.com/ultimate-research/skyline-rs)",
+ "skyline",
 ]
 
 [[package]]
@@ -260,6 +231,11 @@ name = "smallvec"
 version = "1.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
+
+[[package]]
+name = "ssbu-cpu-pilot-core"
+version = "0.1.1"
+source = "git+https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot?rev=8b03e3bffea8a156628f76cd9ca31c346f52ac70#8b03e3bffea8a156628f76cd9ca31c346f52ac70"
 
 [[package]]
 name = "syn"
@@ -290,8 +266,9 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "skyline 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "skyline",
  "skyline_smash",
+ "ssbu-cpu-pilot-core",
 ]
 
 [[package]]

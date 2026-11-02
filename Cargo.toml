@@ -25,12 +25,22 @@ skyline = "=0.6.0"
 # delay queue; no allocation, `const` constructor.
 parking_lot = "0.12"
 # Package 6 (D3, lead-accepted): the fork's game-call crate for the carried code. MIT (`license = "MIT"` in its Cargo.toml). Pinned to the rev of stage m5o's lock.
+# The pilot's core crate (the operator's, MIT): the AI-as-pad primitives the carried cpu_pilot adapter uses. Tag v0.2.1, rev 8b03e3b.
+ssbu-cpu-pilot-core = { git = "https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot", rev = "8b03e3bffea8a156628f76cd9ca31c346f52ac70", features = ["native"] }
 smash = { package = "skyline_smash", git = "https://github.com/ultimate-research/skyline-smash.git", rev = "01bf5835cc1140f5052ddfb2b4f9e98008f22679" }
 
 # `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it
 # (this is a declaration, not an `allow`).
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
+
+# One skyline in the lock: skyline_smash asks for the skyline-rs git, this plugin for crates.io =0.6.0. The patch points the git source at the registry crate (package 6, lead ruling 2026-11-02); cargo tree -d must list no duplicate skyline.
+[patch."https://github.com/ultimate-research/skyline-rs"]
+skyline = { version = "=0.6.0" }
+
+# skyline_smash also names the nnsdk-rs git; the registry skyline uses the registry nnsdk 0.6.2: one nnsdk.
+[patch."https://github.com/ultimate-research/nnsdk-rs"]
+nnsdk = { version = "0.6.2" }
 
 [features]
 # The shipped closure MINUS deluxe-sdk (pending deviation, operator decision L1: the SDK repository has no license, D3): the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,

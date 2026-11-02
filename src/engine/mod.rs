@@ -25,6 +25,12 @@ pub mod mii_root;
 #[path = "../model/p1/mod.rs"]
 pub mod p1;
 #[cfg(test)]
+#[path = "../model/p1/menu_session.rs"]
+pub mod p1_menu_session;
+#[cfg(test)]
+#[path = "../model/p1/stage_session.rs"]
+pub mod p1_stage_session;
+#[cfg(test)]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
 #[path = "../model/seams/mod.rs"]

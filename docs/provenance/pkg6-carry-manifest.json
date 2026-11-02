@@ -25,7 +25,11 @@
    "cpu_pilot::pilot": "crate::engine::p1",
    "preload_metrics": "crate::engine::preload::preload_metrics",
    "logging": "crate::engine::compat::logging",
-   "swap_native::seam_install": "crate::runtime::seams::seam_install"
+   "swap_native::seam_install": "crate::runtime::seams::seam_install",
+   "common": "crate::runtime::p1::compat::common",
+   "training": "crate::runtime::p1::compat::training",
+   "replay_preview": "crate::runtime::p1::compat::replay_preview",
+   "character_roster": "crate::runtime::p1::compat::character_roster"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -56,7 +60,8 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "character_items": "crate::engine::items::character_items",
    "menu_json": "crate::engine::compat::menu_json",
-   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT"
+   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
+   "FighterId": "crate::runtime::p1::compat::common::FighterId"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -93,6 +98,11 @@
   "byteflags": {
    "byteflags": "crate::engine::compat::choice::byteflags",
    "count": "crate::engine::compat::choice::count"
+  },
+  "sync": {
+   "read": "crate::runtime::p1::compat::sync::read",
+   "assign": "crate::runtime::p1::compat::sync::assign",
+   "lock_write": "crate::runtime::p1::compat::sync::lock_write"
   }
  },
  "files": [
@@ -1156,6 +1166,44 @@
    "crate": "root",
    "src_sha256": "d8ba023eb0abfc27c45ed682db90ce5c694af48de2f8eada92c3caf4b5455b76",
    "dest_sha256": "8c159948f195bfed7a859cb93d497712b47c92af6265598eddfe3483ecf5c83c"
+  },
+  {
+   "src": "src/cpu_pilot/menu_session.rs",
+   "dest": "src/model/p1/menu_session.rs",
+   "crate": "root",
+   "src_sha256": "327f70c40386384a06de1e06f1a646439005325fca51b609e71b71e829095982",
+   "dest_sha256": "327f70c40386384a06de1e06f1a646439005325fca51b609e71b71e829095982"
+  },
+  {
+   "src": "src/cpu_pilot/stage_session.rs",
+   "dest": "src/model/p1/stage_session.rs",
+   "crate": "root",
+   "src_sha256": "058be3adc1bce088239c483540ae5bf77ca4ad455467393e78eaaafac21afc67",
+   "dest_sha256": "058be3adc1bce088239c483540ae5bf77ca4ad455467393e78eaaafac21afc67"
+  },
+  {
+   "src": "src/cpu_pilot.rs",
+   "dest": "src/runtime/p1/cpu_pilot.rs",
+   "crate": "root",
+   "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
+   "dest_sha256": "8a833b644132657270e5bc8c49035bcf26f9351fc79ee7b02b8d69cb56239882",
+   "edits": [
+    {
+     "old": "#[path = \"cpu_pilot/pilot.rs\"]\n// Retain the reviewed host-test API/helpers without changing frozen core files.\n#[allow(dead_code)]\nmod pilot_core;\n",
+     "new": "use crate::engine::p1 as pilot_core;\n",
+     "reason": "the fork loads its self-contained pilot core module by `#[path]` from `cpu_pilot/`; here it is the carried `engine::p1` (the files are carried unedited), so the approved `allow(dead_code)` on that declaration is not needed"
+    },
+    {
+     "old": "#[path = \"cpu_pilot/menu_session.rs\"]\nmod menu_session;\n",
+     "new": "use crate::engine::p1_menu_session as menu_session;\n",
+     "reason": "`#[path]` module of the fork replaced by the carried `engine::p1_menu_session`"
+    },
+    {
+     "old": "#[path = \"cpu_pilot/stage_session.rs\"]\nmod stage_session;\n",
+     "new": "use crate::engine::p1_stage_session as stage_session;\n",
+     "reason": "`#[path]` module of the fork replaced by the carried `engine::p1_stage_session`"
+    }
+   ]
   }
  ]
 }
