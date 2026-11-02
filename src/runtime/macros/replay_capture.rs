@@ -490,6 +490,12 @@ fn service_browser() {
     browser_effect(effect, revision);
 }
 
+/// Worker-only logical draft presence; parking for a reload is not closing.
+pub fn editor_open() -> bool {
+    let present = EDITOR.lock().unwrap().is_some();
+    present || RELOAD.lock().unwrap().is_some()
+}
+
 pub fn panel_visible() -> bool {
     !crate::runtime::macros::named_macros::suspended() && EDITOR.lock().unwrap().is_some()
 }
@@ -787,7 +793,11 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
         // BROWSER before touching named UI, whose visibility path reads BROWSER.
         (browser.take().is_some(), EDITOR.lock().unwrap().take().is_some())
     };
-    crate::runtime::macros::replay_preview::request_stop();
+    if RELOAD.lock().unwrap().is_some() {
+        crate::runtime::macros::replay_preview::request_stop();
+    } else {
+        crate::runtime::macros::replay_preview::request_close();
+    }
     PENDING.lock().unwrap().take();
     REVISION.fetch_add(1, Ordering::Relaxed);
     *HOLD.lock().unwrap() = (0, 0, false);

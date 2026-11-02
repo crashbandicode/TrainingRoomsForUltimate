@@ -47,7 +47,7 @@ pub(crate) mod save_states {
         Err("Native preview is unavailable until the preview restore is provided")
     }
 
-    pub(crate) fn finish_preview_restore() {}
+    pub(crate) fn finish_preview_restore(_editor_open: bool) {}
 
     pub(crate) fn end_preview_restore() {}
 }

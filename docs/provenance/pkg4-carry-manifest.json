@@ -485,7 +485,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "fb2dde5f7e08c9782eaa2acd7bf18c2e5e2822bcb2943e07bb4bf8a04966f149",
+   "dest_sha256": "c39e231a09477d7806c27927ba52192afae4f9b8803e3386de1ffbeca4232fa1",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -940,6 +940,11 @@
      "old": "crate::runtime::roster::character_roster::mii_replay::reacknowledge_named(target);",
      "new": "crate::runtime::macros::identity::reacknowledge_named(target);",
      "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),",
+     "new": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
     }
    ]
   },
@@ -1017,7 +1022,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "7b8fc49815018575da83623d15044e1c11bf75889e23075a3fadf529e6248e38",
+   "dest_sha256": "b14e71b7e773d2c8e7c98f9e53c2f9ab2f202634091a0598fbfa04a885a35588",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1289,6 +1294,16 @@
      "old": "        Ok(target) if target.is_none_or(|target|!target_ready(target,current))=>{\n            let mut pending=editor.take().unwrap();pending.pause();\n            *RELOAD.lock().unwrap()=Some(Reload {editor:pending,requested:false,ticks:0,\n                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None});\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE,false);\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);\n        }\n",
      "new": "        Ok(target) if target.is_none_or(|target|!target_ready(target,current))=>{\n            let mut pending=editor.take().unwrap();pending.pause();\n            *RELOAD.lock().unwrap()=Some(Reload {editor:pending,requested:false,ticks:0,\n                revision:SELECTION_REVISION.load(Ordering::Acquire),selection:None,resolving:None,resolve_error:None});\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE,false);\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT,true);\n        }\n",
      "reason": "Authorized fixed pkg6 54aa021 composition: consume pooled non-Copy replay Ticket on the existing worker, preserve resolution failures without allocating a synthetic reply channel."
+    },
+    {
+     "old": "pub fn panel_visible() -> bool {",
+     "new": "/// Worker-only logical draft presence; parking for a reload is not closing.\npub fn editor_open() -> bool {\n    let present = EDITOR.lock().unwrap().is_some();\n    present || RELOAD.lock().unwrap().is_some()\n}\n\npub fn panel_visible() -> bool {",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "    crate::runtime::macros::replay_preview::request_stop();\n    PENDING.lock().unwrap().take();",
+     "new": "    if RELOAD.lock().unwrap().is_some() {\n        crate::runtime::macros::replay_preview::request_stop();\n    } else {\n        crate::runtime::macros::replay_preview::request_close();\n    }\n    PENDING.lock().unwrap().take();",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
     }
    ]
   },
@@ -1297,7 +1312,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "2165e96147fa297667e94e4b40a9670482e5d7d498ccf78cf332e165129f4fd5",
+   "dest_sha256": "1c3673c8cffd8427c9eed6fb130e25881f745c6e19f687d3d04b47cd79060d50",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -1463,6 +1478,36 @@
      "old": "use smash::app::{self, BattleObjectModuleAccessor, Fighter};",
      "new": "use smash::app::{self, BattleObjectModuleAccessor};",
      "reason": "The guarded ready-go provider replaces the sole external Fighter reference in preview."
+    },
+    {
+     "old": "static STATUS: AtomicU8 = AtomicU8::new(0);",
+     "new": "static STATUS: AtomicU8 = AtomicU8::new(0);\nstatic RETIREMENT: crate::model::macro_handoff::PreviewRetirement = crate::model::macro_handoff::PreviewRetirement::new();",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "pub fn request_stop() {",
+     "new": "/// Worker close intent is independent of the last published focus snapshot.\npub fn request_close() {\n    RETIREMENT.request_close();\n    request_stop();\n}\n\npub fn request_stop() {",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "    } else {\n        save_states::finish_preview_restore();\n    }",
+     "new": "    } else {\n        save_states::finish_preview_restore(RETIREMENT.finish());\n    }",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "            save_states::finish_preview_restore();",
+     "new": "            save_states::finish_preview_restore(RETIREMENT.finish());",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "pub fn clear_session() {\n    discard_requests();",
+     "new": "pub fn clear_session() {\n    discard_requests();\n    RETIREMENT.clear();",
+     "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "pub fn request_stop() {\n    if occupied() {\n        if !STOP_QUEUED.swap(true, Ordering::AcqRel) { post_request(Request::Stop); }\n    } else {\n        save_states::finish_preview_restore(RETIREMENT.finish());\n    }\n}",
+     "new": "pub fn request_stop() {\n    if let Some(keep) = RETIREMENT.stop(occupied()) {\n        save_states::finish_preview_restore(keep);\n    } else if !STOP_QUEUED.swap(true, Ordering::AcqRel) {\n        post_request(Request::Stop);\n    }\n}",
+     "reason": "Use the host-tested stop/retirement decision: active cleanup must finish before consuming a close, idle close does not consult stale UI focus."
     }
    ]
   },

@@ -93,7 +93,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "diag: diag-macro.req read and parse"),
     row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_416, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}",
         "the replay capture archive and Mii preset writer"),
-    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::fallback_catalog::{closure#0}::{closure#0}",
+    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}",
         "the saved Mii catalog read for the library"),
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer",
         "console-practice-trace builds only: the practice trace file writer"),
