@@ -27,7 +27,7 @@ static ADAPTER: Mutex<InputAdapter> = Mutex::new(InputAdapter::new());
 // exact 13.0.5 SDK leaves get/set as five-instruction leaf functions; allocation
 // clears the slot in existing threads, and CreateThread zeros future slots.
 // See eden/runs/ui-input-contract; no hard-coded ThreadType offsets are used.
-use crate::model::input_pending::{Pending, Tls};
+use crate::model::input_pending::Pending;
 use std::sync::OnceLock;
 
 static PENDING: OnceLock<Pending> = OnceLock::new();
