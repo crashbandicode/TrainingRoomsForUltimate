@@ -468,7 +468,7 @@ pub fn service_keyboard() {
             let effect = lock_write(&UI).confirm_native_name(name);
             // Only a valid confirmation closes the clip. A failed write restores
             // the naming draft; the selected clip remains available until success.
-            apply_effect(effect);
+            defer_effect(effect);
         }
         crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled => {
             if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }
@@ -679,7 +679,7 @@ pub fn open_editor() {
 }
 
 fn practice_ready() -> bool {
-    if !practice::enabled() || !unsafe { practice::acquire() } {
+    if !practice::enabled() || !crate::runtime::ui::facts::fact_fighters_present() {
         notify("Wait for both practice fighters");
         return false;
     }
@@ -1280,6 +1280,23 @@ unsafe fn draw_cross(module_accessor: &mut BattleObjectModuleAccessor, x: f32, y
     }
 }
 
+/// The effect of a confirmed keyboard name, waiting for the menu worker (one at a time: a second keyboard cannot open before the first
+/// was applied). Handing it over allocates nothing.
+static DEFERRED: std::sync::Mutex<Option<Effect>> = std::sync::Mutex::new(None);
+
+fn defer_effect(effect: Effect) {
+    *DEFERRED.lock().unwrap() = Some(effect);
+    crate::runtime::ui::worker::wake();
+}
+
+/// Apply the deferred effect, on the menu worker (the library write and the loads are file I/O).
+pub fn run_deferred() {
+    let effect = DEFERRED.lock().unwrap().take();
+    if let Some(effect) = effect {
+        apply_effect(effect);
+    }
+}
+
 fn apply_effect(effect: Effect) {
     match effect {
         Effect::None => {}
@@ -1378,10 +1395,7 @@ fn request_kind(kind: i32) {
 }
 
 fn cpu_kind() -> Option<i32> {
-    unsafe {
-        let cpu = try_get_module_accessor(FighterId::CPU)?;
-        Some(utility::get_kind(&mut *cpu))
-    }
+    crate::runtime::ui::facts::fact_cpu_kind()
 }
 
 pub(crate) fn fighter_label(kind: i32) -> String {
@@ -1410,14 +1424,28 @@ pub fn frame_for(index: usize) -> Option<MappedInputs> {
 /// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate
 /// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).
 pub fn prepare_buffers() {
-    let mut motion = lock_write(&MOTION);
+    // stream/sync: the reservation (an allocation) runs before `MOTION` is taken; under the write lock the buffers are only swapped
+    // (and any frames already in them moved over), so a hook that reads `MOTION` never waits on an allocation.
     let wanted = training_mod_macros_max_frames();
-    let (captured, played) = (motion.captured.len(), motion.play.len());
-    if motion.captured.capacity() < wanted {
-        motion.captured.reserve_exact(wanted - captured);
+    let (grow_captured, grow_play) = {
+        let motion = lock_read(&MOTION);
+        (motion.captured.capacity() < wanted, motion.play.capacity() < wanted)
+    };
+    if !grow_captured && !grow_play {
+        return;
     }
-    if motion.play.capacity() < wanted {
-        motion.play.reserve_exact(wanted - played);
+    let mut captured = if grow_captured { Vec::with_capacity(wanted) } else { Vec::new() };
+    let mut play = if grow_play { Vec::with_capacity(wanted) } else { Vec::new() };
+    {
+        let mut motion = lock_write(&MOTION);
+        if grow_captured && motion.captured.capacity() < wanted && motion.captured.len() <= wanted {
+            captured.append(&mut motion.captured);
+            std::mem::swap(&mut motion.captured, &mut captured);
+        }
+        if grow_play && motion.play.capacity() < wanted && motion.play.len() <= wanted {
+            play.append(&mut motion.play);
+            std::mem::swap(&mut motion.play, &mut play);
+        }
     }
 }
 

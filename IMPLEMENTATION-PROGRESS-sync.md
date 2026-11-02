@@ -32,7 +32,14 @@ hook-lock treatment, so integrator-3 merges it first and every stream picks it u
    drop when full. Nothing in a hook waits.
 2. The kernel-waiting locks (`hos_lock::Mutex`/`RwLock`) remain for rare contention between non-game threads, and for game-thread-only
    state.
-3. Audit table below; enforcement by a capability-style scan (planned: `tests/hook_locks.rs`).
+3. Audit table below; enforcement: `tests/hook_locks.rs` follows the runtime call graph from every plugin-thread entry (menu worker, writer threads,
+   loaders, the publishing path) and fails if a reached function takes a lock a game-thread hook takes (exceptions listed with their reason).
+   Lock sites: the static followed by `.lock/.read/.write/.try_*(`, or handed by reference to a call (the carried helpers), matched in its
+   file, by `module::NAME`, or through listed re-exports. Edges: path calls, plus method calls whose name is unique among runtime functions;
+   ambiguous method names are listed (`AMBIGUOUS`), not dropped. Limits stated in the test: `dyn`/trait calls, stored closures, function
+   pointers in data, unlisted re-exports. A fixture (`tests/fixtures/hook_locks/`) seeds one violation per lock-site form and an ambiguous
+   name; `the_scan_catches_a_seeded_violation` requires all three to be reported. `report_locks_reached_from_plugin_threads` prints every
+   static lock (ours and carried package-6 code) a plugin thread reaches: the raw material for the rows below.
 4. Eden: many menu-close cycles, named-macro load, frame-time evidence that the game thread never waits.
 
 ### Slice 1 (the hang fix; first commit)
@@ -54,15 +61,15 @@ hook-lock treatment, so integrator-3 merges it first and every stream picks it u
 | --- | --- | --- | --- |
 | P1 poll: `chords::on_poll` | `chords::STATE` | menu worker (publish, commit_shortcut), boot (load_ini) | slice 1: worker no longer takes it (Live + atomic masks); game-thread-only |
 | CPU hooks: `cpu::with` | `cpu::CPU` | menu worker (publish) | slice 1: adoption in `with`; worker no longer takes it. Remaining callers of `with` off the game thread: slice 2 |
-| State hooks: `states::with` | `states::STATE` | menu worker (publish); `tr-state-writer` (clones the save file under the lock) | slice 1: publish removed. Writer clone: slice 2 (handoff) |
+| State hooks: `states::with` | `states::STATE` | menu worker (publish); `tr-state-writer` (clones the save file under the lock) | slice 1: publish removed. slice 2 (lead decision (a), 2026-11-02): the Save hook hands a copy of each captured record (heap-free: a captured state carries no Mii value) to the writer through an 8-slot mailbox (compare-exchange claimed slots, a sequence number keeps capture order, a full mailbox drops and counts); the writer keeps its own `SaveFile` (seeded at boot) and never takes `STATE`. Persisted markers are the captured `NoAction` (a load's transient markers no longer reach the file). |
 | Recorder hooks: `recorder::settings()` and 4 sites | `recorder::SETTINGS` | menu worker (publish) | slice 1: removed (reads `Live`) |
 | P1 poll / HUD: `input_display::{on_p1_poll, hud_tick}` | `input_display::SETTINGS` | menu worker (publish) | slice 1: removed (reads `Live`) |
 | Carried readers: `read(&MENU)`, `setting(&MENU)` | `compat::menu::CURRENT` (RwLock) | menu worker (apply_snapshot, apply_kept) | slice 1: rows from `Live` (wait-free); edits in `EDITED` (game threads only) |
 | Carried readers: `DEFAULTS_MENU`, `stage_preferences`, `mii_preferences` | `compat::menu::KEPT` (RwLock) | menu worker (`apply_kept`, assignment only) | slice 1: no work under the write lock. Slice 2: `Published` for Clone values or a game-side copy |
-| `named_macros` hooks | `MOTION`, `LEGACY` and other RwLocks | worker (`prepare_buffers` on publish) | slice 2 |
-| `QUICK_MENU_APP` (carried Mii code) | Mutex | menu worker (`set_open` on open/close) | slice 2 (atomic open flag) |
-| HUD tick: `notices::hud_tick` | `notices::QUEUE` | menu worker / writer thread (`post` on refusal or write failure) | slice 2 (SPSC) |
-| UI tick | `ui::FRAME` | menu worker (frame build) | already `try_lock`, skip a frame (the worker builds the frame outside the lock: slice 2 check) |
+| `named_macros` hooks | `MOTION`, `LEGACY` and other RwLocks | publishing thread (`prepare_buffers`) | slice 2: the reservation (allocation) runs before `MOTION` is taken; the write lock only swaps the buffers (pkg4 manifest edit, ledger regenerated) |
+| `QUICK_MENU_APP` (carried Mii code) | Mutex | menu worker (`set_open` on open/close, dropping the catalog boxes under the lock) | slice 2: the worker only bumps `OPEN_SEQ` (atomic); every taker catches up in `App::follow_open` under the lock it already holds; the worker no longer takes it |
+| HUD tick: `notices::hud_tick` | `notices::QUEUE` | menu worker / writer thread (`post` on refusal or write failure) | slice 2: `post` goes into an 8-slot lock-free mailbox (CAS-claimed slots of `Copy` entries; full: dropped and counted), drained by the HUD tick under `QUEUE` |
+| UI tick | `ui::FRAME` | menu worker (frame build) | slice 2: the worker builds into its own `SCRATCH` and holds `FRAME` for one copy; the tick's `try_lock` skips a draw only during that copy (allowed: the holder does no other work) |
 | others (`input_delay::ADAPTER`, `ui::input::ADAPTER`, thumbs, texture, std::sync users in carried package-6 code) | | | slice 2 |
 ## Playbook
 Playbook followed: ae87443. Read completely: README.md, docs/{CHECKLIST,WORKFLOW,EDEN,HOOK-SHARING,MACROS,TILE-CURSOR,GIFS}.md,

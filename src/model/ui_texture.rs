@@ -29,6 +29,13 @@ pub const CONTROL_ON_ZERO: usize = 0x10;
 pub const TEXTURE_HANDLE: usize = 0x00;
 pub const TEXTURE_JOB: usize = 0x18;
 pub const TEXTURE_DESCRIPTOR: usize = 0x38;
+/// The embedded texture-info's 8-byte descriptor slot (written by the view registration), its width and height (`u16` each) and the byte that says
+/// the slot is registered (the game's destroy releases the slot only then).
+pub const TEXTURE_SLOT: usize = 0x40;
+pub const TEXTURE_WIDTH: usize = 0x48;
+pub const TEXTURE_HEIGHT: usize = 0x4a;
+pub const TEXTURE_REGISTERED: usize = 0x5c;
+pub const SLOT_UNSET: u64 = u64::MAX;
 pub const TEXTURE_STATE: usize = 0x60;
 /// `[[tex+0x60]+0x18]`, the state value that means the texture finished.
 pub const STATE_FIELD: usize = 0x18;

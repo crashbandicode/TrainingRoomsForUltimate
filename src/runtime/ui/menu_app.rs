@@ -8,7 +8,7 @@
 //! accepted while the menu is open and kept until the screen exists or the menu closes.
 
 use std::any::Any;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use hos_lock::Mutex;
 
@@ -33,11 +33,13 @@ pub struct App {
     /// The owner context that came with the catalog (the Mii menu's `Context`, owned by package 6).
     context: Option<Box<dyn Any + Send>>,
     ordinary_cpu: bool,
+    /// The `OPEN_SEQ` this value last followed (`follow_open`).
+    seen_open: u32,
 }
 
 impl App {
     const fn new() -> App {
-        App { page: AppPage::CLOSED, catalog: None, context: None, ordinary_cpu: false }
+        App { page: AppPage::CLOSED, catalog: None, context: None, ordinary_cpu: false, seen_open: 0 }
     }
 
     /// Mount an owned Mii catalog for the open Mii list (the editor entry). `false` when the menu is closed or the
@@ -76,6 +78,25 @@ impl App {
         Some((catalog, epoch, self.context.take()))
     }
 
+    /// Catch up with the menu's opens and closes (`note_open`): the page follows the open flag, and a close since the last look drops
+    /// what was published and not yet shown. Run by every holder of `QUICK_MENU_APP` when it takes the lock (`compat::sync`), so the
+    /// menu worker never takes it (stream/sync: the Mii code on a game thread never waits on the worker).
+    pub fn follow_open(&mut self) {
+        let seq = OPEN_SEQ.load(Ordering::Acquire);
+        if seq == self.seen_open {
+            return;
+        }
+        let open = active();
+        // An odd distance or a closed menu means a close happened since the last look.
+        if !open || seq.wrapping_sub(self.seen_open) > 1 {
+            self.set_open(false);
+        }
+        if open {
+            self.set_open(true);
+        }
+        self.seen_open = seq;
+    }
+
     /// The menu opened or closed: closing drops what was published and not yet shown.
     pub fn set_open(&mut self, open: bool) {
         self.page = if open { AppPage::SUBMENU } else { AppPage::CLOSED };
@@ -87,6 +108,13 @@ impl App {
 }
 
 pub static QUICK_MENU_APP: Mutex<App> = Mutex::new(App::new());
+/// Bumped by the menu worker at every open and every close (after `ui::state::OPEN` changed); `App::follow_open` catches up.
+static OPEN_SEQ: AtomicU32 = AtomicU32::new(0);
+
+/// The menu worker's side of an open or a close: one atomic, no lock (`App::follow_open`).
+pub fn note_open() {
+    OPEN_SEQ.fetch_add(1, Ordering::AcqRel);
+}
 /// The Mii code's "the menu got a catalog or an input since the last check" flag.
 pub static MENU_RECEIVED_INPUT: AtomicBool = AtomicBool::new(false);
 

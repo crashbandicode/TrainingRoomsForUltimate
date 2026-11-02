@@ -92,6 +92,7 @@ fn stage_id(n: u16) -> Option<u32> {
 /// # Safety
 /// On the UI job thread, inside the Training layout's tick; `panes` are the resolved panes of that layout.
 pub unsafe fn run(panes: &Panes) -> bool {
+    let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuThumbs);
     let mut changed = false;
     if let Some(mut s) = STATE.try_lock() {
         if !s.active || s.sig != s.requested {
