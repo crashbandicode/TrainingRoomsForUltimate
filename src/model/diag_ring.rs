@@ -47,6 +47,7 @@ pub const SHIPPED_TAGS: &[&str] = &[
     "[PracticeSave]",
     "[PreloadMetrics]",
     "[ProcessMemory]",
+    "[ReplayCapture]",
     "[TrainingModpack]",
     "[TrainingRooms]",
     "[TrainingSeams]",

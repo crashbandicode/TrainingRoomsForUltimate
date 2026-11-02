@@ -48,6 +48,8 @@ pub enum HookId {
     UiArchive,
     UiPassCalculate,
     UiRegisterCalculate,
+    /// Package 4 S4-4: the live replay capture's hooks (the game's native replay recorder, the save actor, the fighter frame pair).
+    LiveReplay,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -81,6 +83,7 @@ impl HookId {
         HookId::UiArchive,
         HookId::UiPassCalculate,
         HookId::UiRegisterCalculate,
+        HookId::LiveReplay,
         HookId::Other,
     ];
 
@@ -110,6 +113,7 @@ impl HookId {
             HookId::UiArchive => "ui_archive",
             HookId::UiPassCalculate => "ui_pass_calculate",
             HookId::UiRegisterCalculate => "ui_register_calculate",
+            HookId::LiveReplay => "live_replay",
             HookId::Other => "other",
         }
     }
