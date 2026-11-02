@@ -14,7 +14,7 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 42] = [
+const SYMBOLS: [(&str, &str); 44] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("prev_status_kind", "_ZN3app8lua_bind35StatusModule__prev_status_kind_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -57,6 +57,8 @@ const SYMBOLS: [(&str, &str); 42] = [
     ("check_button_off_hook", "_ZN3app8lua_bind36ControlModule__check_button_off_implEPNS_26BattleObjectModuleAccessorEi"),
     ("stick_x_no_clamp_hook", "_ZN3app8lua_bind40ControlModule__get_stick_x_no_clamp_implEPNS_26BattleObjectModuleAccessorE"),
     ("stick_y_no_clamp_hook", "_ZN3app8lua_bind40ControlModule__get_stick_y_no_clamp_implEPNS_26BattleObjectModuleAccessorE"),
+    ("utility_get_category", "_ZN3app7utility12get_categoryEj"),
+    ("utility_get_kind", "_ZN3app7utility8get_kindEPKNS_26BattleObjectModuleAccessorE"),
 ];
 
 /// Offsets of every site of `ssbu-cpu-pilot` (commit 0162eed, `src/model.rs`; the list is the one
@@ -124,6 +126,8 @@ fn cpu_sites_are_the_symbols_they_name() {
         ("check_button_off_hook", sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET),
         ("stick_x_no_clamp_hook", sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET),
         ("stick_y_no_clamp_hook", sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET),
+        ("utility_get_category", sites_pkg2::UTILITY_GET_CATEGORY_OFFSET),
+        ("utility_get_kind", sites_pkg2::UTILITY_GET_KIND_OFFSET),
     ] {
         assert_eq!(sites::find(name).map(|s| s.offset), Some(offset), "{name}");
     }

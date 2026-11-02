@@ -70,27 +70,20 @@ pub fn session_clear() {
     RENDERER.lock().session_clear();
 }
 
-/// One HUD tick: plan the pane writes and apply them. `menu_open` is the plugin menu's flag or the
-/// vanilla pause menu's.
-pub fn hud_tick(menu_open: bool) {
-    let settings = *SETTINGS.lock();
-    let plan = {
-        let log = *LOG.lock();
-        RENDERER.lock().plan(&log, &settings, !menu_open)
-    };
-    if !plan.is_empty() {
-        write_plan(&plan);
-    }
+/// The plugin''s layout was registered (or the draw was reset): every retained row is drawn again.
+pub fn on_layout_registered() {
+    RENDERER.lock().on_layout_registered();
 }
 
-fn write_plan(plan: &Plan) {
-    #[cfg(feature = "diag")]
-    {
-        use crate::model::input_display::Op;
-        let rows = plan.ops().iter().filter(|op| matches!(op, Op::Row { .. })).count();
-        let icons = plan.ops().iter().filter(|op| matches!(op, Op::Icons { .. })).count();
-        crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));
-    }
-    #[cfg(not(feature = "diag"))]
-    let _ = plan;
+/// A pane of the log is missing from the layout (SPEC-input-02 question 5): the display is off for the session.
+pub fn disable() {
+    RENDERER.lock().disable();
+}
+
+/// One HUD tick: the pane writes the display needs now (the layout draw in `hud_draw` applies them).
+/// `menu_open` is the plugin menu''s flag or the vanilla pause menu''s.
+pub fn hud_tick(menu_open: bool) -> Plan {
+    let settings = *SETTINGS.lock();
+    let log = *LOG.lock();
+    RENDERER.lock().plan(&log, &settings, !menu_open)
 }

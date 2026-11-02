@@ -9,10 +9,10 @@ use model::cpu::rng::Rng;
 use model::cpu::settings::Weights;
 use model::state::file::SLOTS;
 use model::state::hooks::{self, DeathParam};
-use model::state::machine::{FrameIn, Machine, Out, Placing, Request, Role, SituationIds, StatusNow, Trigger};
+use model::state::machine::{FrameIn, Machine, Out, Placing, Request, Role, SituationIds, StatusNow};
 use model::state::place;
 use model::state::record::{Marker, SavedState};
-use model::state::settings::{DamageMode, Mirroring, RecordTrigger, StateSettings};
+use model::state::settings::{DamageMode, Mirroring, StateSettings};
 
 const SITUATIONS: SituationIds = SituationIds { ground: 0, air: 2, cliff: 1 };
 const GROUND: i32 = 0;
@@ -136,8 +136,7 @@ fn state01_sequence_ground() {
     assert_eq!(cpu.placing.unwrap().x, -20.0);
     assert!(!machine.is_loading());
     assert_eq!(machine.marker(Role::Player, 0), Marker::NoAction);
-    // The recording / playback trigger fires once, on the frame the second record finishes.
-    assert_eq!(player.trigger, None);
+    // The recorder is told once, on the frame the second record finishes.
 }
 
 #[test]
@@ -355,11 +354,11 @@ fn state01_save_captures_into_the_save_slot_only() {
 #[test]
 fn state01_playback_once() {
     let mut rng = rng();
-    // Recording Trigger: Save State Load starts a recording once, when both records are done.
-    let s = StateSettings { record_trigger: RecordTrigger::SaveStateLoad, ..settings() };
+    // The recording or playback after a load is package 4's decision (`Recorder::on_state_restored`): the
+    // machine only tells the recorder once, when both records are done.
+    let s = settings();
     let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
     let (player, cpu) = run_ground_load(&mut machine, &s, &mut rng);
-    assert_eq!((player.trigger, cpu.trigger), (None, Some(Trigger::Record)));
     // The recorder is told once per restore, with whether the CPU was saved on the ledge.
     assert_eq!((player.restored, cpu.restored), (None, Some(false)));
     let mut ledge = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, CLIFF, 7), 0);
@@ -372,12 +371,7 @@ fn state01_playback_once() {
     let done = ledge.frame(&FrameIn { status: StatusNow::CliffCatch, ..input(1) }, &s, &mut rng);
     assert_eq!(done.restored, Some(true));
     let idle = machine.frame(&input(1), &s, &mut rng);
-    assert_eq!(idle.trigger, None, "not again");
-    // A playback slot is drawn once.
-    let s = StateSettings { playback: Weights([0, 0, 1, 0, 0]), ..settings() };
-    let mut machine = Machine::default();
-    let (_, cpu) = run_ground_load(&mut machine, &s, &mut rng);
-    assert_eq!(cpu.trigger, Some(Trigger::Playback(2)));
+    assert_eq!(idle.restored, None, "not again");
 }
 
 #[test]
@@ -455,3 +449,25 @@ fn state01_settings_default_and_from_the_factory_snapshot() {
     assert_eq!(read.randomize, Weights([1, 0, 0, 0, 3]));
 }
 
+/// R2-4 (review R2): the loading fact is true from the acceptance of the load (before the first destructive
+/// step) to its completion, the restore is reported to the recorder exactly once, and a cancellation clears it.
+#[test]
+fn r2_4_loading_is_true_from_acceptance_to_completion_and_the_restore_is_reported_once() {
+    let mut rng = rng();
+    let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
+    assert!(!machine.is_loading());
+    let accepted = request(&mut machine, &settings(), &mut rng);
+    assert!(accepted.stop_playback, "the recorder is told to stop at acceptance");
+    assert!(machine.is_loading(), "the fact is true as soon as the load is accepted");
+    machine.cancel_all();
+    assert!(!machine.is_loading(), "a cancellation clears it");
+
+    let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
+    let (player, cpu) = run_ground_load(&mut machine, &settings(), &mut rng);
+    assert!(!machine.is_loading(), "complete");
+    let reported = [player.restored, cpu.restored].into_iter().flatten().count();
+    assert_eq!(reported, 1, "once per restore");
+    for entry in [0, 1] {
+        assert_eq!(machine.frame(&input(entry), &settings(), &mut rng).restored, None, "never again");
+    }
+}

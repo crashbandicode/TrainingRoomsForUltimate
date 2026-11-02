@@ -3,9 +3,7 @@
 //!
 //! NOT YET SWITCH-COMPILED.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
-
-use crate::model::input_delay::Owners;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::model::settings::Snapshot;
 
@@ -59,25 +57,17 @@ pub fn set_developer_page(on: bool) {
 }
 
 /// What other than gameplay owns P1's input right now (`Owners` bits). The packages that own those
-/// states set and clear their bit: the plugin menu and modal panels (package 5), the named stop chord
-/// and the replay editor (package 4), the native waiting-room UI (package 6), the game's pause menu.
-/// The input-delay hook reads it on every poll.
+/// states set and clear their bit with `model::input_adapter::{take, release}`: the plugin menu and
+/// modal panels (package 5), the named stop chord and the replay editor (package 4), the native
+/// waiting-room UI (package 6). The native Training menu is set and released by the UI tick from the
+/// game's layout state (`ui::state::PAUSE_ACTIVE`, via `InputAdapter::pause_flag`). The input-delay adapter
+/// reads the mask on every poll.
 pub static INPUT_OWNERS: AtomicU8 = AtomicU8::new(0);
 
-pub fn input_owners() -> Owners {
-    Owners::from_bits(INPUT_OWNERS.load(Ordering::Acquire))
+/// The owners now (pkg4's chords, recorder and notices and pkg5's display read it).
+pub fn input_owners() -> crate::model::input_delay::Owners {
+    crate::model::input_adapter::owners(&INPUT_OWNERS)
 }
 
 /// Set while the hot-swap engine replaces a fighter (package 6); the reset hub does not run then.
 pub static HOT_SWAP_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
-/// The input-recording package's inbox for what the CPU behaviours ask of it. A playback request is
-/// `1 + slot` in the low byte (0 = none) and bit 8 set for a ledge playback (`PlaybackStart::request_word`).
-/// The consumer takes it with `PlaybackStart::from_request_word(CPU_PLAYBACK_REQUEST.swap(0, Ordering::AcqRel))`.
-pub static CPU_PLAYBACK_REQUEST: AtomicU32 = AtomicU32::new(0);
-/// Playback Mash Interrupt: stop the running playback. The consumer swaps it to false.
-pub static CPU_STOP_PLAYBACK: AtomicBool = AtomicBool::new(false);
-
-/// The frame-advantage notification's inbox for the UI package: the last measured value and a sequence
-/// number that changes with every new measurement (the consumer shows `+N`, `-N` or `+0` for 60 frames).
-pub static FRAME_ADVANTAGE_VALUE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
-pub static FRAME_ADVANTAGE_SEQ: AtomicU32 = AtomicU32::new(0);

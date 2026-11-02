@@ -46,6 +46,9 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
 /// Set by the registration tick: the layout object is new, so its panes must be resolved again.
 static INVALIDATE: AtomicBool = AtomicBool::new(false);
 pub static TICKS: AtomicU32 = AtomicU32::new(0);
+/// How many times `info_training` was registered (a new layout object): the other packages' HUD draws compare it
+/// with the value they last saw to know that nothing they wrote to the layout is there any more.
+pub static REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
 pub static DRAWS: AtomicU32 = AtomicU32::new(0);
 
 /// `L_staying_help`'s resting `pos_y` (SPEC-core-03 §2.4).
@@ -60,6 +63,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     if registration {
         INVALIDATE.store(true, Ordering::Release);
+        REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
     }
     if !game::is_training_mode() {
         return;
@@ -74,7 +78,12 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(panes) = panes.as_ref() else { return };
 
     if !help.is_null() {
-        PAUSE_ACTIVE.store((pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5, Ordering::Release);
+        let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
+        if PAUSE_ACTIVE.swap(active, Ordering::AcqRel) != active {
+            // The native Training menu opened or closed: it owns P1's input while it is open and the
+            // delay queue is emptied at the edge (SPEC-input-03 section 5.1, review R2 of package 1).
+            crate::runtime::features::input_delay::pause_flag(active);
+        }
     }
     let open = OPEN.load(Ordering::Acquire);
     let mut alpha = 255;

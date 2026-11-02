@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, "/home/intpa/trainingrooms-eden-p1")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tr_eden as t  # noqa: E402
 
 

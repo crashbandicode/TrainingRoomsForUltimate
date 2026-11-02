@@ -128,7 +128,8 @@ Reproduce a number: `python3 -I eden/analyze_probe.py eden/runs/tr101/probes jum
 Builds (hashes verified on the Surface, again after scp to the Yoga): release 9bad6541a3b1d7497724e6c1db108083017b4a1aef3c9df49ea39a7786cc0ac5, diag db7a4dd980b17b275ee439e0e644b6090b3ed6aede297f165fd8c1e93423e475 (worktree HEAD 5247578).
 Same rules as above: claim before and release after each Down (ledger 02:09Z/02:11Z and 02:11Z/02:13Z, owner Claude 0caa72b8/pkg1-eden), own profile copy 	1, muted via the CLI (olume.get 0), display :93.
 Settings both boots: Input Delay 5, L+R+A On, Hazards Off (settings/boot1-delay5-hazoff-lraon.json). The route's last gate threshold was raised from 16 to 30 (the right scene scored 23-25 before; other screens score 75); it matched at 10.9 and 25.5.
-Note: uns/tr105/events.log and practice-diagnostics.log were re-created from the raw lines printed during the run (a later fetch had copied tr106's files over them, the profile folder being shared); the lines below are the verbatim ones.
+Note: 
+uns/tr105/events.log and practice-diagnostics.log were re-created from the raw lines printed during the run (a later fetch had copied tr106's files over them, the profile folder being shared); the lines below are the verbatim ones.
 
 | Row | Result | Evidence |
 | --- | --- | --- |
@@ -137,12 +138,14 @@ Note: uns/tr105/events.log and practice-diagnostics.log were re-created from th
 | separate settings report | **pass** | … settings: input_delay=5 lra_reset=on stage_hazards=off result=installed heap_allocations=0; the ten site outcomes are unchanged (stock, ar/
 ear/checked as before) |
 | tr105 practice-diagnostics.log non-empty | **pass** | 128 B: 483391857 #1 [PracticeDiagnostics] adapter=ring session_start; max_files=2 max_bytes_each=131072 ring_bytes=32768 line_max=9216 (was 0 B) |
-| tr105 delay regression | **pass** | continuous-run onset at macro frame **74** (uns/tr105/probes/jump-scan, noise floor 4.32; first frame above 6.5 is 7.29), against 69 for delay 0 (tr104, previous build; same method) |
+| tr105 delay regression | **pass** | continuous-run onset at macro frame **74** (
+uns/tr105/probes/jump-scan, noise floor 4.32; first frame above 6.5 is 7.29), against 69 for delay 0 (tr104, previous build; same method) |
 | tr106 (diag) hub_run on reset | **pass** | 483626945 #2 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=5 (on entering Training, before any chord), then #3 … input_delay_cleared=5 after the walk-then-L+R+A macro and #4 … input_delay_cleared=5 after the L+R+A + stick-right hold; 
  is the number of queued records (5 = the delay), so n>0 was seen. Holding the chord for 30 and 80 frames gave one hub_run each, not a repeat. |
 | tr106 diag session line | **pass** | 483562974 #1 [PracticeDiagnostics] adapter=ring-diag session_start; … ring_bytes=131072 line_max=12288 |
 | release NRO has no hub_run | **pass** | byte search of dist/release/libtraining_rooms.nro: hub_run=False input_delay_cleared=False; the diag NRO has both (True) |
-| Unmapped / panic scan | **pass** | console.log panic\|abort\|crash\|Unmapped: 0 matches in tr105 (5726 lines) and tr106 (5694 lines); un.json and memory.peak kept (6,072,090,624 and 6,077,005,824 B) |
+| Unmapped / panic scan | **pass** | console.log panic\|abort\|crash\|Unmapped: 0 matches in tr105 (5726 lines) and tr106 (5694 lines); 
+un.json and memory.peak kept (6,072,090,624 and 6,077,005,824 B) |
 | Released, profile restored | **yes** | both Downs live: false, left: []; the profile's plugins are the two original NROs, sha256 equal to source  (a restore step deleted the set-aside copies once; both were re-copied from  and verified); no display unit or lock left |
 
 ## Input Delay at the caller-side sites, with and without the CPU pilot (2026-11-02, labels tr107 to tr110)
@@ -185,3 +188,59 @@ tr113 is a third boot I added for the unknown-keys check (the lead's two labels 
 | extra unknown keys and `last_page` load | tr113, release + pilot, `settings/boot-extra-keys-delay5-hazoff-lraon.json` (the three rows plus `menu.unknown_future_row`, top-level `last_page":"misc"`, `mii_preferences`, `some_later_build_key`) | **pass** | install line `settings: input_delay=5 lra_reset=on stage_hazards=off result=installed heap_allocations=0` (same as the plain file); the folder holds only `events.log`, `practice-diagnostics.log`, `settings.json` (no `settings.invalid-<n>.json`, no `settings issue` breadcrumb); `settings.json` sha256 first 12 `E26E9F62599C` before and after boot (not rewritten) |
 | Unmapped / panic scan | tr111-tr113 | **pass** | `console.log` `panic\|abort\|crash\|Unmapped`: 0 matches in all three (5746, 5714, 5714 lines); `run.json` and `memory.peak` kept (6,039,302,144 / 5,998,366,720 / 4,901,920,768 B) |
 | Released, profile restored | | **yes** | each Down `alive: false`, `left: []`; `restore` matched the plugin set to source `b` by sha256 before removing the per-label set-aside copies; no display unit or lock left |
+
+## R1-fix (2026-11-02, stream `r1fix`, labels r1-01 to r1-09)
+
+Tester: Claude Sonnet 5.5 (high), spawned by lead `0caa72b8`. Worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-r1fix`, branch `stream/r1fix`.
+Yoga only; harness `/home/intpa/trainingrooms-eden-r1` (deployed from `eden/` with `tr_eden.r1fix.config.json` as `tr_eden.config.json`), own profile `r1` (copy of `ssbu-desync-1029/profiles/b`, never `a`), display `:98` (never `:61`),
+claim before Up and release after Down (ledger on the Yoga; every Down `alive: false`, `left: []`), muted (`settings.set core.volume 0`, `settings.save`, `settings.get` returned 0 before every `game.load`), queue per `TRAININGROOMS-EDEN-QUEUE.md`.
+Pilot: `libssbu_cpu_pilot.nro` `e3033426...` in every run (default load order, pilot first); tile cursor for the route. `console.log` `panic|abort|crash|Unmapped`: **0 matches in every run** (r1-01 5615 lines, r1-02 5646, r1-03 5689, r1-07 and r1-08 clean, r1-09 5744).
+
+### Builds
+
+| Build | Commit | File | sha256 | Resident (`nro_size.py`) |
+| --- | --- | --- | --- | --- |
+| first build (r1-01 to r1-06), pre-merge, with the since-removed `StatePause` hooks | `009f6c8` + scene wrapper | release / diag | `2dbc56a0fd74...` / `0c0925821f24...` | 249,856 B / 356,352 B |
+| merged build (r1-07 to r1-09) | `e2effe9` (merge `ffc93e4` of work/implementation `c5863bd`, R2 by the UI flag) | release `dist/release/libtraining_rooms.nro` | `11f749169554eb846f2dbcdbb064a188ee4a1eb446cf5f55a4706ca08ead9cd8` | 778,240 B |
+| | | diag `dist/diag/libtraining_rooms.nro` | `9c4ea58462f19ba7e999e2ebb4812542e588d84a93823b4f73adbae7b4b90ee3` | 933,888 B |
+
+Resident cost of the five fixes over `4895ea3` (233,472 B, bisected build by build): R4 +4,096 B (the loader), R1 +12,288 B (the JSON serializer for the sanitized file and the transaction); R3, R5 and R2 +0.
+
+### R1 (settings recovery) and R4 (developer.ini): boots
+
+`settings.json` of `eden/settings/r1-partial-bad-delay5-hazon.json`: Input Delay 5, Stage Hazards On, `lra_reset` malformed (`"bad"`), saved defaults Input Delay 3, an unknown top-level key. Boots 2 and 3 run over boot 1's data folder (`--keep-data`).
+
+| Row | Label, build | Result | Evidence |
+| --- | --- | --- | --- |
+| R1 boot 1: recovery | r1-01 (first build) and r1-07 (merged), release + pilot, `developer.ini` = `duplicate.ini` | **pass** | install line `... developer=off reason=duplicate_key settings: input_delay=5 lra_reset=on stage_hazards=on ... result=installed heap_allocations=0` (`lra_reset=on` is the factory value of the malformed field); `practice-diagnostics.log`: `settings issue at=menu.lra_reset reason=not an array`, `settings recovered; the original is kept as settings.invalid-1.json`; `settings.invalid-1.json` 581 B, sha256 `ef178b927ee9...` = the file that was installed (`EF178B927EE9`); `settings.json` rewritten to 25,918 B (sha256 `5cd6687e7941...`): menu input delay index 5, hazards `[1,0]`, saved defaults input delay index 3, `future_top_level_key` kept |
+| R1 boot 2: the recovered fields survive | r1-02 (first build), r1-08 (merged), release + pilot, `developer.ini` = `oversized-on-prefix.ini` (9,019 B, `developer_page=on` first) | **pass** | install line again `settings: input_delay=5 lra_reset=on stage_hazards=on`; no `settings issue` line; no second backup (`settings.invalid-1.json` only); `settings.json` sha256 unchanged (`5cd6687e794174...`, a clean file is not rewritten) |
+| R4 duplicate keys | r1-01, r1-07 | **pass** | `developer=off reason=duplicate_key` (`developer_page=off` then `developer_page=on`) |
+| R4 oversized, enabled prefix | r1-02, r1-08 | **pass** | `developer=off reason=too_large` (9,019 B file starting `developer_page=on`) |
+| R4 clean file | r1-09 | **pass** | `developer=on reason=on` |
+| Files after the three merged boots | r1-09 data folder | | `developer.ini`, `events.log` (3 install lines), `migration.json` (pkg3's first-boot import, `result=none`), `practice-diagnostics.log` (+ `.previous`), `settings.invalid-1.json`, `settings.json` |
+
+Evidence: `eden/runs/r1-0N/` (`data/`, `data-hashes.txt`, `console.log`, `run.json`, `memory.peak`, receipts). The write-failure path and the no-free-backup-name path are host-tested only (`tests/core04_recovery.rs`).
+
+### R2: what the investigation found, and the lane that proves the producer
+
+Probes (diag builds r1-04 to r1-06, hooks at the game's pause-begin routine `main+0x150f0c0`, both `StatePause` enter slots, the exit, and about a dozen candidate natives, with a hook on `is_training_mode` as the control): **the native Training pause menu (Plus in Training) never runs the scene's `StatePause`**; the control fired in every run; the fighters' per-frame hooks (`cpu_hook_counts frames=600` every 9.9 s) did not stall while the menu was open. The `StatePause` hooks were therefore removed. Lead ruling: the producer takes the game's layout state of SPEC-core-03 section 2.4 (`L_staying_help` off its rest position, `ui::state::PAUSE_ACTIVE`).
+
+| Row | Label | Result | Evidence |
+| --- | --- | --- | --- |
+| R2 pause lane: delay 5, a held stick queued, Training menu opened, menu input, closed with the stick released | r1-09 (merged build, diag) | **pass** | macro `tr-pause-lane` (stick right from frame 10, Plus at 70, D-pad down/up while the menu is open, Plus with the stick released at 420); `practice-diagnostics.log`: `502917297 #3318 [TrainingRooms] pause_owner begin queue_dropped=5 owners=0x10` (the queue held 5 records and was emptied at the edge), `502923596 #3321 pause_owner end queued_at_begin=5 owned_polls=386 owned_non_neutral=0 owners=0x00` (386 mapping polls were owned and none gave the game input), `502923664 #3326 pause_owner resume_checked delay=5 leaked=0` (none of the first 5 gameplay polls after the resume carried a queued record); screenshots `eden/runs/r1-09/shots/073440-pause0-before.png`, `073445-pause1-menu-open.png` (the native "Quit Training" menu), `073452-pause2-after-resume.png` |
+| (harness note) the lane's own gate printed FAIL | r1-09 | | the diag log rotated at 128 KiB mid-lane and the lane counted lines; fixed (`lanes_r1.py` now reads the previous and current file and selects by millisecond stamp); the lines above were read from `practice-diagnostics.previous.log` of the run |
+
+### R5: hook observation (diag), and the package-1 rows on the merged build
+
+| Row | Label | Result | Evidence |
+| --- | --- | --- | --- |
+| R5 `hook_stats` after the delay, reset and hazard lanes | r1-09 | **pass** | `python3 -I eden/lanes_r1.py r1-09 stats input_caller_a_apply,reset_check,reset_hub,hazard_rule` -> `GATE ok hook_stats: nonzero coverage ... and allocation delta 0 on every line`; the last line: `hook_stats allocations=0 delta=0 hook_calls=27834 hooks=input_caller_a_note:21304,input_caller_a_apply:86448,reset_check:10481,hazard_rule:1,reset_hub:2,...` (every line `delta=0`, `allocations=0`) |
+| install line still ends `heap_allocations=0` | r1-07 to r1-09 | **pass** | every install line (merged build: 49+ site tokens plus pkg3/pkg4/pkg5 rows, 6,614 B, the 8 KiB buffer holds it) |
+| Input Delay +5 (recovered setting) | r1-09 | **pass** | continuous-run jump probe `eden/runs/r1-09/probes/jump-scan`: onset at macro frame **74** (`analyze_probe.py ... 6.5`, noise floor 4.98, first frame above 6.5 is 7.96) against 69 for delay 0 (tr104, same method) |
+| Stage Hazards On (recovered setting) | r1-09 | **pass** | `lane hazards`: the stage region changes up to 25.3 (mean grey difference to the first shot) over 75 s, shots `073322-haz00.png` to `073432-haz09.png` (Stadium form, then the rock form and back) |
+| L+R+A resets | r1-09 | **pass (by eye)** | `073313-lra0-start.png` (rock form, Steve squatting at the right of the left platform), `073321-lra2-after-chord.png` (back in Stadium form, both fighters at spawn, P1 marker); the lane's grey-difference gate FAILed because Hazards On changes the stage form (it compares a fixed box), so it is judged by eye |
+| `pause_enter` / `pause_exit` rows | r1-03 | removed | the first build's install line had `pause_enter=stock/near pause_exit=stock/near pause_owner=installed`; both never fired in Training and were removed with the ruling |
+
+### Release and profile
+
+Each Down printed `alive: false`, `left: []`; the claims are in the ledger (07:30Z to 07:35Z for r1-07 to r1-09). The profile `r1` keeps the three boots' data; nothing under `profiles/b` or `a` was touched. A first attempt of the merged batch failed on a script argument bug before any Eden started (the ledger shows RELEASED lines for r1-07 to r1-09 at 07:29Z with no run behind them).

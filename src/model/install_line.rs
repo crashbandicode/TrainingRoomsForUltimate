@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! <ms> plugin=training_rooms/0.1.0 game=13.0.5 build=21450c64… <site>=<found>/<written> …
-//!   <feature>=installed|not_installed … settings: input_delay=5 lra_reset=on stage_hazards=off
+//!   <feature>=installed|not_installed … developer=off reason=missing settings: input_delay=5 lra_reset=on stage_hazards=off
 //!   migration=<…> result=installed heap_allocations=0
 //! <ms> plugin=training_rooms/0.1.0 game=13.0.4 build=none result=unsupported_version
 //!   reason=display_version heap_allocations=0
@@ -78,6 +78,14 @@ pub struct SettingsReport {
     pub stage_hazards: bool,
 }
 
+/// The Developer-page gate's outcome at boot (decision N1): `developer=on|off reason=<why>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeveloperReport {
+    pub on: bool,
+    /// `developer_ini::Reason::text()`.
+    pub reason: &'static str,
+}
+
 /// The console's system tick rate (`nn::os::GetSystemTickFrequency`, 19.2 MHz).
 pub const SYSTEM_TICK_HZ: u64 = 19_200_000;
 
@@ -111,6 +119,9 @@ pub struct InstallLine<'a> {
     pub features: &'a [FeatureReport],
     /// The seam installer's fields (package 6: seams=<n> seams_stock=<n> ...), written after the features; None leaves them out.
     pub seams: Option<Extra<'a>>,
+    /// The Developer-page gate (decision N1); `None` leaves the `developer=` pair out (an unsupported
+    /// game never reads the file).
+    pub developer: Option<DeveloperReport>,
     /// `None` leaves the `settings:` group out.
     pub settings: Option<SettingsReport>,
     /// `none`, `done`, `partial` or `skipped` (SPEC-core-08 §2); `None` leaves the token out.
@@ -141,6 +152,9 @@ impl Display for InstallLine<'_> {
             }
             if let Some(extra) = self.seams {
                 write!(f, " {}", extra.0)?;
+            }
+            if let Some(d) = self.developer {
+                write!(f, " developer={} reason={}", if d.on { "on" } else { "off" }, d.reason)?;
             }
             if let Some(s) = self.settings {
                 write!(
@@ -178,6 +192,26 @@ mod tests {
     }
 
     #[test]
+    fn the_developer_gate_outcome_is_on_the_line() {
+        let line = |on, reason| InstallLine {
+            tick: 7,
+            version: "0.1.0",
+            display: b"13.0.5",
+            build_id: None,
+            verdict: Verdict::Supported,
+            sites: &[],
+            features: &[],
+            seams: None,
+            developer: Some(DeveloperReport { on, reason }),
+            settings: None,
+            migration: None,
+            heap_allocations: Some(0),
+        };
+        assert!(line(false, "duplicate_key").to_string().contains(" developer=off reason=duplicate_key result="));
+        assert!(line(true, "on").to_string().contains(" developer=on reason=on result="));
+    }
+
+    #[test]
     fn an_unsupported_game_line_has_no_sites() {
         let line = InstallLine {
             tick: 1,
@@ -188,6 +222,7 @@ mod tests {
             sites: &[],
             features: &[],
             seams: None,
+            developer: None,
             settings: None,
             migration: None,
             heap_allocations: Some(0),

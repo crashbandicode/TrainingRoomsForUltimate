@@ -37,11 +37,10 @@ use crate::model::lra_reset::{self, HubStep};
 use crate::model::settings::Snapshot;
 use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
-use crate::runtime::alloc::HookScope;
+use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{recorder, reset_hub};
+use crate::runtime::features::{notices, recorder, reset_hub, states};
 use crate::runtime::game::{self, natives};
-use crate::runtime::published;
 
 /// The CPU behaviours' state; `None` until `init`.
 static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
@@ -51,6 +50,7 @@ static CONSTS_READY: AtomicBool = AtomicBool::new(false);
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
 static NANA_KIND: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static SITUATION_CLIFF: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static SITUATION_GROUND: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_CLIMB: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_CLIFF_ATTACK: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static FLAG_CATCH_CLIFF: AtomicI32 = AtomicI32::new(UNRESOLVED);
@@ -102,6 +102,10 @@ static PLAYER_Y: AtomicU32 = AtomicU32::new(0);
 static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
 /// The player entry has been seen this session (its position is valid for the distance triggers).
 static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
+
+/// Diag: the save-state-loading fact the CPU last saw (logged on change).
+#[cfg(feature = "diag")]
+static LAST_SAVE_LOADING: AtomicBool = AtomicBool::new(false);
 
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
 static LOBBY: AtomicBool = AtomicBool::new(false);
@@ -268,6 +272,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
 /// Package 6 sets this when the waiting room's practice is active.
 pub fn set_lobby(on: bool) {
     LOBBY.store(on, Ordering::Release);
+    crate::runtime::scene::set_lobby_active(on);
     with(|cpu| cpu.scene = if on { Scene::Lobby } else { Scene::Training });
 }
 
@@ -300,6 +305,11 @@ pub fn ids() -> Option<Table> {
     CPU.lock().as_ref().map(|cpu| cpu.ids.clone())
 }
 
+/// `SITUATION_KIND_GROUND` once the game's constants are resolved, else `UNRESOLVED`.
+pub fn situation_ground() -> i32 {
+    SITUATION_GROUND.load(Ordering::Acquire)
+}
+
 /// The entry of the primary CPU body for the current scene.
 pub fn primary_entry_now() -> u8 {
     primary_entry(LOBBY.load(Ordering::Acquire))
@@ -320,11 +330,6 @@ pub fn mash_pop(key: FighterKey) {
 /// The recorder's state, for the CPU specs that yield to a playback (decisions B5 / N4).
 pub fn set_playback(state: PlaybackState) {
     with(|cpu| cpu.playback = state);
-}
-
-/// A save state is loading (package 3 sets it).
-pub fn save_loading() -> bool {
-    with(|cpu| cpu.save_loading).unwrap_or(false)
 }
 
 /// The module accessor's body, if it is a registered CPU role.
@@ -349,6 +354,7 @@ fn ensure_consts() -> bool {
     }
     NANA_KIND.store(table.get(C::KindNana), Ordering::Release);
     SITUATION_CLIFF.store(table.get(C::SituationCliff), Ordering::Release);
+    SITUATION_GROUND.store(table.get(C::SituationGround), Ordering::Release);
     TERM_CLIMB.store(table.get(C::TermContCliffClimb), Ordering::Release);
     TERM_CLIFF_ATTACK.store(table.get(C::TermContCliffAttack), Ordering::Release);
     FLAG_CATCH_CLIFF.store(table.get(C::WorkFlagCatchCliff), Ordering::Release);
@@ -438,7 +444,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
     let original: OnFrame = unsafe { std::mem::transmute(ORIGINAL_FRAME.load(Ordering::Acquire)) };
     let result = original(a0, a1, a2, a3, a4, a5, a6, a7);
     let ready = ensure_consts();
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuFrame);
     if ready {
         // SAFETY: `a0` is the fighter object the game just ran a frame of.
         unsafe { fighter_frame(a0) };
@@ -509,6 +515,7 @@ unsafe fn fighter_frame(fighter: usize) {
     let Some(key) = FighterKey::new(entry, partner) else { return };
 
     // Read the facts with no lock held.
+    let save_loading = states::is_loading();
     let status = natives::status_kind(accessor);
     let prev_status = natives::prev_status_kind(accessor, 0);
     let situation = natives::situation_kind(accessor);
@@ -557,6 +564,12 @@ unsafe fn fighter_frame(fighter: usize) {
         };
         cpu.roles.set(accessor, key);
         cpu.fighters[key.index()].kind = kind;
+        // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
+        cpu.save_loading = save_loading;
+        #[cfg(feature = "diag")]
+        if LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
+            cpu_event!("save_loading={save_loading}");
+        }
         if primary {
             cpu.tick_clock();
             #[cfg(feature = "diag")]
@@ -659,12 +672,10 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
     }
-    // A playback request goes to the recorder (package 4's `request_playback`) and to the inbox in `published`
-    // (package 2's word; nothing reads the inbox since the recorder is called directly).
+    // A playback request goes straight to the recorder (package 4's `request_playback`): the one path.
     if let Some(start) = out.playback {
         recorder::request_playback(start);
-        published::CPU_PLAYBACK_REQUEST.store(start.request_word(), Ordering::Release);
-        cpu_event!("playback_request slot={} ledge={} word={:#x}", start.slot, start.ledge, start.request_word());
+        cpu_event!("playback_request slot={} ledge={}", start.slot, start.ledge);
     }
 }
 
@@ -684,7 +695,7 @@ pub fn install_frame() {
 /// body (decision N9: unset means no SDI, the original is not called).
 #[skyline::hook(offset = sites_pkg2::SDI_HOOK_OFFSET)]
 pub unsafe fn cpu_sdi_hook(accessor: usize, out: *mut [f32; 2]) -> u64 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuSdi);
     bump(counts_index::SDI);
     if let Some(key) = role_of(accessor) {
         let cpu_x = natives::pos_x(accessor);
@@ -728,7 +739,7 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
 /// `ControlModule::get_stick_x(accessor)`: the air-dodge direction out of hitstun.
 #[skyline::hook(offset = sites_pkg2::STICK_X_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuStickX);
     bump(counts_index::STICK_X);
     let original = call_original!(accessor);
     air_dodge_stick(accessor).map_or(original, |(x, _)| x)
@@ -738,7 +749,7 @@ pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
 /// answers after this one when it is built.
 #[skyline::hook(offset = sites_pkg2::STICK_Y_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuStickY);
     bump(counts_index::STICK_Y);
     let original = call_original!(accessor);
     if let Some((_, y)) = air_dodge_stick(accessor) {
@@ -768,7 +779,7 @@ pub unsafe fn cpu_clatter_start_hook(
     c: bool,
     d: bool,
 ) -> u64 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuClatterStart);
     bump(counts_index::CLATTER_START);
     if let Some(key) = role_of(accessor) {
         with(|cpu| cpu.clatter_start(key, manual_rate));
@@ -783,7 +794,7 @@ pub unsafe fn cpu_clatter_start_hook(
 /// while a CPU body waits, delays or waits for its playback. Every other query is the original's.
 #[skyline::hook(offset = sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)]
 pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuTransitionTerm);
     bump(counts_index::TRANSITION_TERM);
     let original = call_original!(accessor, term);
     if !original || term != TERM_CLIMB.load(Ordering::Acquire) {
@@ -811,7 +822,7 @@ pub fn set_tech_on(on: bool) {
 /// roll directions (SPEC-cpu-04 section 5, "Motion").
 #[skyline::hook(offset = sites_pkg2::MOTION_CHANGE_HOOK_OFFSET)]
 pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f32, c: bool, d: f32, e: bool, f: bool) -> u64 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuMotionChange);
     bump(counts_index::MOTION_CHANGE);
     let asked = motion;
     let motion = role_of(accessor).and_then(|key| with(|cpu| cpu.substitute_motion(key, motion))).unwrap_or(motion);
@@ -825,7 +836,7 @@ pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f3
 /// while Hide Tech Animations is On (SPEC-cpu-04 section 4).
 #[skyline::hook(offset = sites_pkg2::QUAKE_POS_HOOK_OFFSET)]
 pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3]) -> u64 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuQuakePos);
     bump(counts_index::QUAKE_POS);
     let none = QUAKE_KIND_NONE.load(Ordering::Acquire);
     let kind = match role_of(accessor) {
@@ -892,7 +903,7 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
 /// body should hold its shield.
 #[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuCheckButtonOn);
     let original = call_original!(accessor, button);
     guard_button_answer(accessor, button, true).unwrap_or(original)
 }
@@ -900,7 +911,7 @@ pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
 /// `ControlModule::check_button_off(accessor, button)`: the guard buttons do not read as released.
 #[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_off_hook(accessor: usize, button: i32) -> bool {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuCheckButtonOff);
     let original = call_original!(accessor, button);
     guard_button_answer(accessor, button, false).unwrap_or(original)
 }
@@ -928,7 +939,7 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
 /// `ControlModule::get_stick_x_no_clamp(accessor)`: the shield tilt.
 #[skyline::hook(offset = sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuStickXNoClamp);
     let original = call_original!(accessor);
     shield_tilt(accessor).map_or(original, |(x, _)| x)
 }
@@ -936,7 +947,7 @@ pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
 /// `ControlModule::get_stick_y_no_clamp(accessor)`: the shield tilt.
 #[skyline::hook(offset = sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuStickYNoClamp);
     let original = call_original!(accessor);
     shield_tilt(accessor).map_or(original, |(_, y)| y)
 }
@@ -946,7 +957,7 @@ pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
 /// is on the parameter type hash, so the common case costs two integer compares).
 #[skyline::hook(offset = sites_pkg2::SHIELD_PARAM_HOOK_OFFSET)]
 pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f32 {
-    let _scope = HookScope::enter();
+    let _scope = HookScope::enter_hook(HookId::CpuShieldParam);
     let original = call_original!(accessor, kind, name);
     if kind != PARAM_HASHES[0].load(Ordering::Acquire) {
         return original;
@@ -1140,7 +1151,8 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
     }
     if out.stop_playback {
         cpu_event!("playback_stop entry={}", key.entry);
-        published::CPU_STOP_PLAYBACK.store(true, Ordering::Release);
+        // Playback Mash Interrupt: the running playback stops (package 4's recorder).
+        recorder::interrupt_playback();
     }
     cpu_event_on_change!(
         if cat2 { ev::CMD2 } else { ev::CMD1 },
@@ -1199,6 +1211,11 @@ unsafe fn actionable(accessor: usize) -> bool {
 
 /// Frame advantage, on the player entry's frame: reads both fighters only while the row is On.
 unsafe fn frame_advantage(player: usize) {
+    // The replay editor or a replay capture loading holds the screen: the measurement clears and waits (SPEC-cpu-07 §3).
+    if recorder::replay_editor_occupied() || recorder::replay_capture_loading() {
+        with(|cpu| cpu.frame_advantage(false, false));
+        return;
+    }
     let lobby = crate::runtime::scene::current() == Some(Scene::Lobby);
     let primary = FighterKey::new(i32::from(primary_entry(lobby)), false);
     let Some(cpu_accessor) = primary.and_then(|key| CPU.lock().as_ref().and_then(|c| c.roles.accessor_of(key))) else { return };
@@ -1209,8 +1226,8 @@ unsafe fn frame_advantage(player: usize) {
     }
     let (p, c) = (actionable(player), actionable(cpu_accessor));
     if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
-        published::FRAME_ADVANTAGE_VALUE.store(value, Ordering::Release);
-        published::FRAME_ADVANTAGE_SEQ.fetch_add(1, Ordering::AcqRel);
-        cpu_event!("frame_advantage value={value} seq={}", published::FRAME_ADVANTAGE_SEQ.load(Ordering::Acquire));
+        // The notification (SPEC-cpu-07 §2): package 4's notices show it, clearing every other one.
+        notices::post_frame_advantage(value);
+        cpu_event!("frame_advantage value={value}");
     }
 }

@@ -29,6 +29,7 @@ def load(name):
 
 tr_eden = load("tr_eden")
 probe = load("analyze_probe")
+hook_stats = load("hook_stats")
 step = load("analyze_step")
 
 W, H = 1280, 674
@@ -132,6 +133,54 @@ class ScanTests(unittest.TestCase):
         log = ["a", "Core: PANIC at x", "b", "HW.Memory Unmapped Read32 @ 0x0000000000000008", "c", "Process Aborted", "CRASH"]
         self.assertEqual([n for n, _ in tr_eden.scan_lines(log)], [2, 4, 6, 7])
 
+class HarnessConfigTests(unittest.TestCase):
+    """A stream that shares the Yoga deploys `tr_eden.py` with its own config beside it."""
+
+    def test_default_labels_are_package_ones_and_the_r1fix_config_has_its_own(self):
+        import re
+        self.assertEqual(tr_eden.label_ok("tr101"), "tr101")
+        with self.assertRaises(AssertionError):
+            tr_eden.label_ok("r1-01")
+        cfg = json.loads((ROOT / "eden" / "tr_eden.r1fix.config.json").read_text())
+        self.assertTrue(re.fullmatch(cfg["label_re"], "r1-01") and not re.fullmatch(cfg["label_re"], "tr101"))
+        self.assertNotIn(cfg["display"], (":61", ":93", ":95"))
+        self.assertTrue(cfg["root"].endswith("trainingrooms-eden-r1") and cfg["profile"] != "a")
+
+
+class HookStatsGateTests(unittest.TestCase):
+    """`eden/hook_stats.py`: a lane passes only with nonzero hook coverage and a zero allocation delta."""
+
+    GOOD = ("100 #1 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=412 "
+            "hooks=input_caller_a_apply:100,reset_check:3\n"
+            "200 #2 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=60 "
+            "hooks=input_caller_a_apply:130,reset_check:3,hazard_rule:30\n")
+
+    def test_a_lane_with_coverage_and_no_allocation_passes(self):
+        ok, reasons = hook_stats.gate(self.GOOD, ["input_caller_a_apply", "hazard_rule"])
+        self.assertTrue(ok, reasons)
+
+    def test_zero_coverage_fails(self):
+        ok, reasons = hook_stats.gate(self.GOOD, ["pause_enter"])
+        self.assertFalse(ok)
+        self.assertTrue(any("pause_enter" in r for r in reasons))
+
+    def test_no_line_at_all_fails(self):
+        ok, reasons = hook_stats.gate("100 #1 [TrainingRooms] something else\n", [])
+        self.assertFalse(ok)
+        self.assertIn("no hook_stats line", reasons[0])
+
+    def test_an_allocation_delta_fails_even_if_it_was_earlier(self):
+        bad = ("1 #1 [TrainingRooms] hook_stats allocations=2 delta=2 hook_calls=5 hooks=reset_check:5\n"
+               "2 #2 [TrainingRooms] hook_stats allocations=2 delta=0 hook_calls=5 hooks=reset_check:10\n")
+        ok, reasons = hook_stats.gate(bad, ["reset_check"])
+        self.assertFalse(ok)
+        self.assertTrue(any("delta 2" in r for r in reasons) and any("total 2" in r for r in reasons))
+
+    def test_the_line_the_plugin_prints_is_parsed(self):
+        row = hook_stats.parse("[TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=3 hooks=none")[0]
+        self.assertEqual((row["delta"], row["hooks"]), (0, {}))
+        row = hook_stats.parse(self.GOOD)[1]
+        self.assertEqual(row["hooks"]["hazard_rule"], 30)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
