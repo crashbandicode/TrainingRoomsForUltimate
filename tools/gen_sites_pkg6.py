@@ -76,6 +76,12 @@ def main():
         if kind == "Hook":
             const = name.upper() + "_OFFSET"
             out.append(f"pub const {const}: usize = {off:#x};")
+    # R2-1: a called function the native-call layer (`runtime::game::natives`) calls is named by its row's offset constant, so the grant
+    # check and the capability scanner see the row. The singleton slot is read data (a `data_slots` entry of tests/capabilities.rs).
+    out.append("/// `BattleObjectManager::is_active_find_battle_object` (row `roster_find_battle_object`).")
+    out.append(f"pub const ROSTER_FIND_BATTLE_OBJECT_OFFSET: usize = {next(off for name, off, *_ in ROWS if name == 'roster_find_battle_object'):#x};")
+    out.append("/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.")
+    out.append("pub const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;")
     out.append("")
     out.append(f"pub static SITES: [Site; {len(ROWS)}] = [")
     for name, off, feature, kind, note in ROWS:

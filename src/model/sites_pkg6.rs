@@ -5,6 +5,10 @@
 use super::guard::{SeamKind, GUARD_BYTES};
 use super::sites::{Feature, Site};
 
+/// `BattleObjectManager::is_active_find_battle_object` (row `roster_find_battle_object`).
+pub const ROSTER_FIND_BATTLE_OBJECT_OFFSET: usize = 0x1fca0b0;
+/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.
+pub const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;
 
 pub static SITES: [Site; 19] = [
     Site {

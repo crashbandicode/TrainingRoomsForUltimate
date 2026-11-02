@@ -11,6 +11,9 @@ use crate::runtime::{game, scene, state_natives};
 
 pub(crate) use crate::runtime::lobby::game_mode;
 
+/// The game version the plugin is installed for (the version guard installs nothing on any other build): the tag macros and captures carry.
+pub static SMASH_VERSION: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| "13.0.5".to_owned());
+
 /// The fork's `common::consts` (`FighterId`).
 pub mod consts {
     pub use crate::runtime::compat::consts::*;
@@ -105,6 +108,12 @@ pub mod menu {
     pub use crate::runtime::compat::menu::{mii_preferences, stage_preferences};
     pub use crate::runtime::ui::menu_app::{MENU_RECEIVED_INPUT, QUICK_MENU_APP};
 
+    /// The Replay Window asks the plugin's menu to close by clearing this flag (the editor takes the screen); package 5's menu reads it.
+    pub static QUICK_MENU_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    /// Polls the close of the editor keeps P1 neutral for (the plugin menu's own close window).
+    pub const MENU_CLOSE_WAIT_FRAMES: u32 = 15;
+
     /// The stored menu is refreshed after the INI overlay: the one store is the settings file's rows, which `assign(&MENU, ..)`
     /// already wrote back (`compat::menu`), so there is no second copy to refresh.
     pub fn refresh_stored_menu_on_quick_app() {}
@@ -177,25 +186,13 @@ pub fn try_get_module_accessor(id: crate::runtime::compat::consts::FighterId) ->
     // SAFETY: `natives` answers `None` until the entry rows passed their guards and reads the live game on every call.
     unsafe { natives::module_accessor(entry) }.map(|accessor| accessor as *mut BattleObjectModuleAccessor)
 }
-/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.
-const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;
-/// `BattleObjectManager::is_active_find_battle_object(manager, object id)` (the `lua_bind` thunk, row `roster_find_battle_object`).
-const FIND_BATTLE_OBJECT_OFFSET: usize = 0x1fca0b0;
 
 /// The active battle object with `object_id`, `None` for an unknown or inactive id. The roster cycle starts only when the row
-/// `roster_find_battle_object` passed its guard (`roster::CALLED_ROWS`), and this runs only from the cycle.
+/// `roster_find_battle_object` passed its guard (`roster::CALLED_ROWS`), and this runs only from the cycle; the native layer
+/// answers nothing when the call was not granted (R2-1).
 pub fn try_get_battle_object(object_id: u32) -> Option<&'static smash::app::BattleObject> {
-    let base = game::text_base();
-    // SAFETY: the slot is a pointer-sized `.bss` word of the main image; the function is the guarded thunk and a null answer is
-    // an unknown id.
-    unsafe {
-        let manager = ((base + BATTLE_OBJECT_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return None;
-        }
-        let find: extern "C" fn(usize, u32) -> *const smash::app::BattleObject = std::mem::transmute(base + FIND_BATTLE_OBJECT_OFFSET);
-        find(manager, object_id).as_ref()
-    }
+    // SAFETY: a guarded called function; the answer is a live battle object or null (an unknown id).
+    unsafe { (natives::find_battle_object(object_id) as *const smash::app::BattleObject).as_ref() }
 }
 
 /// The mapped input record the carried files read and write.

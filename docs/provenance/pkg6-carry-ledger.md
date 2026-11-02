@@ -174,7 +174,7 @@ file in this repository.
 | `src/runtime/lobby/training_stage_rotation.rs` | `src/training_stage_rotation.rs` | `28da0ade48dbe422` | `cc0c0b022fa01a92` | path rewrite only |
 | `src/runtime/mii/mii_auto_init.rs` | `src/mii_auto_init.rs` | `93ef4e97fdb8e909` | `86c472e5635c5fa8` | path rewrite only |
 | `src/runtime/mii/mii_backend.rs` | `src/mii_backend.rs` | `c8c330a103e9db5f` | `3026d5ee1b6f8f2b` | path rewrite only |
-| `src/runtime/mii/mii_catalog_request.rs` | `src/mii_catalog_request.rs` | `87a0062a0ef9cb6c` | `9b1dfcc620feb8b2` | path rewrite only |
+| `src/runtime/mii/mii_catalog_request.rs` | `src/mii_catalog_request.rs` | `87a0062a0ef9cb6c` | `628b44a3dd1652be` | path rewrite only |
 | `src/runtime/mii/mii_cpu_adapter.rs` | `src/mii_cpu_adapter.rs` | `6008e0fe8cbb0e40` | `cce7fa18a6a05590` | path rewrite only |
 | `src/runtime/mii/mii_hud_portrait.rs` | `src/mii_hud_portrait.rs` | `a456918a0b114f95` | `5832ced6c12f6efe` | path rewrite only |
 | `src/runtime/mii/mii_ldn_qualification.rs` | `src/mii_ldn_qualification.rs` | `30a65caa8eddecfb` | `dc9aa6c4546e12cd` | path rewrite only |
@@ -185,7 +185,7 @@ file in this repository.
 | `src/runtime/mii/mii_ordinary_gate.rs` | `src/mii_ordinary_gate.rs` | `b95b5e0f54f7300c` | `ce2644f46ccf0ef9` | path rewrite only |
 | `src/runtime/mii/mii_ordinary_native.rs` | `src/mii_ordinary_native.rs` | `f359be35b161aa25` | `1cff1553d441afb7` | the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display` |
 | `src/runtime/mii/mii_ordinary_player.rs` | `src/mii_ordinary_player.rs` | `73e84c925f3aaedd` | `9bdb188d599b919a` | the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`; the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`; the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5) |
-| `src/runtime/mii/mii_replay.rs` | `src/mii_replay.rs` | `2ff322e3ec71d67c` | `8ed6cbb54b9a5137` | path rewrite only |
+| `src/runtime/mii/mii_replay.rs` | `src/mii_replay.rs` | `2ff322e3ec71d67c` | `63893afd95ba4264` | path rewrite only |
 | `src/runtime/mii/mii_saved_alpha.rs` | `src/mii_saved_alpha.rs` | `11c19c8277d129ee` | `0a4a7ea67c553f40` | path rewrite only |
 | `src/runtime/mii/mii_saved_fingerprints.rs` | `src/mii_saved_fingerprints.rs` | `3c3299699e107f41` | `faa34901752643a5` | path rewrite only |
 | `src/runtime/mii/mii_saved_native.rs` | `src/mii_saved_native.rs` | `8c2a2841660d0e08` | `d0434b8eaacdd240` | path rewrite only |
@@ -259,13 +259,13 @@ file in this repository.
 | `src/runtime/lobby/automation_helper/native.rs` | `src/automation_helper/native.rs` | `62851fc8c4e245ae` | `62b85bef9d9a32fe` | path rewrite only |
 | `src/runtime/lobby/automation_helper/observer.rs` | `src/automation_helper/observer.rs` | `dfb1910269e9a9b6` | `ca08264f8cf1cf94` | path rewrite only |
 | `src/runtime/lobby/automation_helper/plugin.rs` | `src/automation_helper/plugin.rs` | `cf5371be7299d337` | `cf5ce60065242626` | path rewrite only |
-| `src/runtime/roster/body_bank_probe.rs` | `src/body_bank_probe.rs` | `0744655791096b14` | `9f3391cc3c8b7746` | path rewrite only |
+| `src/runtime/roster/body_bank_probe.rs` | `src/body_bank_probe.rs` | `0744655791096b14` | `688b5d07a3e61882` | path rewrite only |
 | `src/runtime/roster/native_install.rs` | `src/native_install.rs` | `5f514294935e4710` | `5f514294935e4710` | path rewrite only |
 | `src/runtime/roster/native_fighter_install.rs` | `src/native_fighter_install.rs` | `106a7d1043e7f940` | `106a7d1043e7f940` | path rewrite only |
 | `src/runtime/roster/process_memory.rs` | `src/process_memory.rs` | `ec5971f8d90cdb20` | `78e25e4a303944e2` | path rewrite only |
 | `src/runtime/roster/source_lifecycle_probe.rs` | `src/source_lifecycle_probe.rs` | `3c76da55af50bda1` | `958047209cd87a45` | path rewrite only |
-| `src/runtime/roster/source_capacity_probe.rs` | `src/source_capacity_probe.rs` | `a8a341ab56a3cfe7` | `5ffd56eb32d76b9f` | path rewrite only |
-| `src/runtime/roster/source_ldn_capacity_probe.rs` | `src/source_ldn_capacity_probe.rs` | `e585bd004a12d0f6` | `6a95d13f92b62c2f` | path rewrite only |
+| `src/runtime/roster/source_capacity_probe.rs` | `src/source_capacity_probe.rs` | `a8a341ab56a3cfe7` | `59204c4695a82aa8` | path rewrite only |
+| `src/runtime/roster/source_ldn_capacity_probe.rs` | `src/source_ldn_capacity_probe.rs` | `e585bd004a12d0f6` | `2b03502a03a932d7` | path rewrite only |
 | `src/runtime/roster/mii_pool_observer.rs` | `src/mii_pool_observer.rs` | `8016285af2a24c4f` | `93cb22b2a62f900e` | path rewrite only |
 | `src/runtime/roster/mii_origin_observer.rs` | `src/mii_origin_observer.rs` | `7b5e4dfb309cdb46` | `8801c4914bd51da5` | path rewrite only |
 | `src/model/mii_root/mii_pool_observer_policy.rs` | `src/mii_pool_observer_policy.rs` | `2c2cc21037044885` | `2c2cc21037044885` | path rewrite only |

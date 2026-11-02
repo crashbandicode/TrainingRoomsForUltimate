@@ -120,7 +120,7 @@ unsafe fn idle() -> Result<(), Refusal> {
     }
     if super::training::save_states::is_loading()
         || super::training::recording_or_playback()
-        || crate::runtime::compat::replay_capture::loading()
+        || crate::runtime::macros::replay_capture::loading()
         || crate::runtime::compat::replay_preview::occupied()
         || super::button_config::has_pending_request()
     {

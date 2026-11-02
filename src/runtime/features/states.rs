@@ -622,7 +622,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     if out.stop_playback {
         // A new load: no buff carries over.
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
-        recorder::stop();
+        recorder::on_load_request();
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
     if out.pokemon_predeath {
@@ -1426,7 +1426,7 @@ pub fn start_diag_triggers() {
                 let _ = std::fs::remove_file(path.as_str());
                 let loaded = crate::model::settings::parse_bytes(&bytes);
                 crate::runtime::published::publish(&loaded.settings.menu, 0);
-                crate::runtime::compat::menu::apply(&loaded.settings);
+                crate::runtime::compat::menu::apply_kept(&loaded.settings);
                 diagnostic(format_args!("[TrainingRooms] state diag_settings applied issues={}", loaded.issues.len()));
             }
         }

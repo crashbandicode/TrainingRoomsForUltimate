@@ -48,6 +48,8 @@ pub enum HookId {
     UiArchive,
     UiPassCalculate,
     UiRegisterCalculate,
+    /// Package 4 S4-4: the live replay capture's hooks (the game's native replay recorder, the save actor, the fighter frame pair).
+    LiveReplay,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -81,6 +83,7 @@ impl HookId {
         HookId::UiArchive,
         HookId::UiPassCalculate,
         HookId::UiRegisterCalculate,
+        HookId::LiveReplay,
         HookId::Other,
     ];
 
@@ -110,6 +113,7 @@ impl HookId {
             HookId::UiArchive => "ui_archive",
             HookId::UiPassCalculate => "ui_pass_calculate",
             HookId::UiRegisterCalculate => "ui_register_calculate",
+            HookId::LiveReplay => "live_replay",
             HookId::Other => "other",
         }
     }
@@ -121,6 +125,8 @@ thread_local! {
     static HOOK_DEPTH: Cell<u32> = const { Cell::new(0) };
     /// Nesting depth of per_load sections on this thread.
     static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// Nesting depth of uncounted sections on this thread.
+    static UNCOUNTED_DEPTH: Cell<u32> = const { Cell::new(0) };
 }
 
 static HOOK_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
@@ -139,6 +145,9 @@ fn in_load() -> bool {
 /// Count one allocation made on this thread: nothing outside a hook; inside one, the steady-state counter (the lane gate
 /// wants delta 0) or, inside per_load, the per-load counter.
 fn count_allocation() {
+    if UNCOUNTED_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false) {
+        return;
+    }
     if in_hook() {
         if in_load() {
             LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
@@ -203,6 +212,20 @@ pub fn hook_allocations() -> u64 {
 /// Allocations made inside per_load sections of hooks since boot.
 pub fn load_allocations() -> u64 {
     LOAD_ALLOCATIONS.load(Ordering::Relaxed)
+}
+
+/// Run `work` without counting its allocations at all: diagnostic instrumentation that is not product code (the diag
+/// build's stock-archive dump). Never for code the shipped build runs.
+pub fn uncounted<R>(work: impl FnOnce() -> R) -> R {
+    struct Leave;
+    impl Drop for Leave {
+        fn drop(&mut self) {
+            let _ = UNCOUNTED_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
+        }
+    }
+    let _ = UNCOUNTED_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
+    let _leave = Leave;
+    work()
 }
 
 /// Run work as the once-per-load part of a hook (the layout archive the game hands over once per Training load): its

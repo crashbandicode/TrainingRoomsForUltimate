@@ -324,13 +324,54 @@ fn migration_io_error_is_partial_and_the_rest_is_copied() {
     // A directory sits on the destination's temp name: that one copy cannot be written.
     fs::create_dir_all(t.rooms().join("button_config.ini.part")).unwrap();
     let (receipt, marker) = full_import(&t);
-    marker.unwrap();
+    // A failed copy withholds the marker (lead ruling 2026-11-02): the next boot retries it.
+    assert!(marker.is_err(), "a failed copy must not be marked as imported");
+    assert!(!t.rooms().join("migration.json").exists());
     assert_eq!(receipt.result(), ImportResult::Partial);
     assert!(receipt.skipped.iter().any(|(p, r)| p == "button_config.ini" && r.starts_with("io:")), "{:?}", receipt.skipped);
     assert!(!t.rooms().join("button_config.ini").exists(), "no truncated file");
     assert!(t.rooms().join("settings.json").is_file() && t.rooms().join("replay_captures/22.smd/timeline.jsonl").is_file());
-    let m: Value = serde_json::from_slice(&fs::read(t.rooms().join("migration.json")).unwrap()).unwrap();
-    assert_eq!(m["result"], "partial");
+}
+
+#[test]
+fn migration_a_failed_copy_withholds_the_marker_and_the_second_run_completes() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    // save_states.json cannot be written (a directory on its temp name): the failure must not be lost for good.
+    fs::create_dir_all(t.rooms().join("save_states.json.part")).unwrap();
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, marker } = run_blocking(roots, 1, "0.1.0", &mut |_| {}) else { panic!() };
+    assert!(blocking.marker_withheld());
+    assert!(marker.is_none(), "captures are pending");
+    let (receipt, marker) = run_background(roots, blocking, &mut |_| {});
+    assert!(marker.is_err());
+    assert_eq!(receipt.result(), ImportResult::Partial);
+    assert!(!dest.join("migration.json").exists() && !dest.join("save_states.json").exists());
+    assert!(dest.join("settings.json").is_file(), "the other files were copied");
+    // Next boot, the obstacle gone: the missing file is copied (and converted), what exists is kept, the marker is written.
+    fs::remove_dir_all(dest.join("save_states.json.part")).unwrap();
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert!(dest.join("save_states.json").is_file() && dest.join("migration.json").is_file());
+    assert_eq!(receipt.converted, 1, "the retried save file is still converted once");
+    assert!(receipt.skipped.iter().any(|(_, r)| r == "exists"), "what was copied the first time is kept");
+}
+
+#[test]
+fn migration_deterministic_skips_still_allow_the_marker() {
+    // Staging folders, an existing destination and a file over the cap are by design, not errors.
+    let t = Tmp::new();
+    fork_folder(&t);
+    write(&t.rooms().join("button_config.ini"), b"mine\n");
+    write(&t.fork().join("macros/big.json"), &vec![1u8; 8 * 1024 * 1024 + 1]);
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.skipped_staging, 1);
+    assert!(receipt.skipped.iter().any(|(_, r)| r == "exists") && receipt.skipped.iter().any(|(_, r)| r == "too_large"));
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert!(t.rooms().join("migration.json").is_file());
 }
 
 #[test]
@@ -343,16 +384,21 @@ fn migration_unreadable_source_file_is_partial() {
         fs::set_permissions(t.fork().join("mii-presets.json"), fs::Permissions::from_mode(0o000)).unwrap();
         let (receipt, marker) = full_import(&t);
         fs::set_permissions(t.fork().join("mii-presets.json"), fs::Permissions::from_mode(0o644)).unwrap();
-        marker.unwrap();
         if receipt.result() == ImportResult::Done {
+            marker.unwrap();
             return; // running as a user that can read anything (root): the case cannot be made
         }
+        assert!(marker.is_err(), "an unreadable listed file withholds the marker");
         assert_eq!(receipt.result(), ImportResult::Partial);
-        assert!(!t.rooms().join("mii-presets.json").exists());
+        assert!(!t.rooms().join("mii-presets.json").exists() && !t.rooms().join("migration.json").exists());
         assert!(t.rooms().join("settings.json").is_file());
+        // Readable again: the next boot copies it and completes.
+        let (receipt, marker) = full_import(&t);
+        marker.unwrap();
+        assert_eq!(receipt.result(), ImportResult::Done);
+        assert!(t.rooms().join("mii-presets.json").is_file());
     }
 }
-
 #[test]
 fn migration_interrupted_background_copy_reruns_and_completes() {
     let t = Tmp::new();
@@ -404,4 +450,139 @@ fn migration_receipt_hashes_the_converted_copy_separately() {
     assert_eq!(saves.source_sha256, sha256_hex(&fs::read(t.fork().join("save_states.json")).unwrap()));
     assert_eq!(saves.sha256, sha256_hex(&fs::read(t.rooms().join("save_states.json")).unwrap()));
     assert_ne!(saves.sha256, saves.source_sha256, "the copy carries the converted snapshot");
+}
+
+// ---- R2-8: absent is not unreadable -----------------------------------------------------------------------
+
+/// The marker is withheld, the result is partial, and every error names its path and the error.
+fn assert_incomplete(receipt: &model::migration_run::Receipt, marker: &Result<(), String>, dest: &Path, path: &str) {
+    assert_eq!(receipt.result(), ImportResult::Partial, "{receipt:?}");
+    assert!(receipt.unlisted.iter().any(|(p, e)| p == path && e.starts_with("io:")), "{path}: {:?}", receipt.unlisted);
+    assert!(marker.is_err(), "no marker for an incomplete import");
+    assert!(!dest.join("migration.json").exists(), "migration.json must not exist");
+}
+
+#[test]
+fn migration_r2_8_a_directory_that_cannot_be_enumerated_is_incomplete_not_absent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    // `macros` exists but is not a folder: it cannot be enumerated (ENOTDIR, not NotFound).
+    fs::remove_dir_all(t.fork().join("macros")).unwrap();
+    write(&t.fork().join("macros"), b"not a folder");
+    let mut log_lines = Vec::new();
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, marker } = run_blocking(roots, 1, "0.1.0", &mut |l| log_lines.push(l.to_owned())) else { panic!() };
+    assert!(marker.is_none(), "captures are pending");
+    assert!(blocking.marker_withheld());
+    let (receipt, marker) = run_background(roots, blocking, &mut |l| log_lines.push(l.to_owned()));
+    assert_incomplete(&receipt, &marker, &dest, "macros");
+    assert!(log_lines.iter().any(|l| l.contains("cannot list macros:") && l.contains("io:")), "{log_lines:?}");
+    // The other paths were still imported.
+    assert!(dest.join("settings.json").is_file() && dest.join("setups/a.json").is_file());
+    assert!(dest.join("replay_captures/22.smd/timeline.jsonl").is_file());
+    assert!(!dest.join("macros").exists());
+    // Next boot, access restored: the missing content is imported, what exists is kept, the marker is written.
+    fs::remove_file(t.fork().join("macros")).unwrap();
+    write(&t.fork().join("macros/m.json"), b"{\"m\":1}");
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert!(receipt.skipped.iter().any(|(_, r)| r == "exists"));
+    assert_eq!(fs::read(dest.join("macros/m.json")).unwrap(), b"{\"m\":1}");
+    assert!(dest.join("migration.json").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn migration_r2_8_a_permission_denied_directory_is_incomplete_and_retried() {
+    use std::os::unix::fs::PermissionsExt;
+    let t = Tmp::new();
+    fork_folder(&t);
+    let macros = t.fork().join("macros");
+    fs::set_permissions(&macros, fs::Permissions::from_mode(0o000)).unwrap();
+    // A privileged runner can read anything: this premise (an actual permission error) is checked, not assumed.
+    let denied = fs::read_dir(&macros).is_err();
+    let (receipt, marker) = full_import(&t);
+    fs::set_permissions(&macros, fs::Permissions::from_mode(0o755)).unwrap();
+    if denied {
+        assert_incomplete(&receipt, &marker, &t.rooms(), "macros");
+        assert!(!t.rooms().join("macros").exists());
+        let (receipt, marker) = full_import(&t);
+        marker.unwrap();
+        assert_eq!(receipt.result(), ImportResult::Done);
+        assert!(t.rooms().join("macros/m.json").is_file() && t.rooms().join("migration.json").is_file());
+    } else {
+        assert_eq!(receipt.result(), ImportResult::Done, "root can read it, nothing to report");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn migration_r2_8_a_metadata_failure_is_incomplete_not_absent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    // A self-referencing link: stat follows it and fails with ELOOP (not NotFound), even for root.
+    fs::remove_file(t.fork().join("button_config.ini")).unwrap();
+    std::os::unix::fs::symlink("button_config.ini", t.fork().join("button_config.ini")).unwrap();
+    let (receipt, marker) = full_import(&t);
+    assert_incomplete(&receipt, &marker, &t.rooms(), "button_config.ini");
+    assert!(!t.rooms().join("button_config.ini").exists());
+    assert!(t.rooms().join("settings.json").is_file() && t.rooms().join("setups/a.json").is_file());
+    // A link inside a listed folder fails the same way when the entry is stat-ed (the file type of a link is not a
+    // file, so it is not imported, but the folder's own entries still are).
+    fs::remove_file(t.fork().join("button_config.ini")).unwrap();
+    write(&t.fork().join("button_config.ini"), b"save_state_save=zl+down\n");
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert_eq!(fs::read(t.rooms().join("button_config.ini")).unwrap(), b"save_state_save=zl+down\n");
+}
+
+#[test]
+fn migration_r2_8_a_source_that_is_not_a_folder_is_incomplete_not_none() {
+    let t = Tmp::new();
+    write(&t.fork(), b"a file where the fork's folder should be");
+    let (source, dest) = (t.fork(), t.rooms());
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 4, "0.1.0", &mut |_| {});
+    let Stage::Imported { blocking, marker } = &stage else { panic!("{stage:?}") };
+    assert!(matches!(marker, Some(Err(_))));
+    assert_eq!(blocking.receipt.unlisted.len(), 1);
+    assert_eq!(status_word(&stage), "partial");
+    assert!(!dest.join("migration.json").exists(), "an unusable source is not 'no source'");
+}
+
+#[test]
+fn migration_r2_8_absent_optional_paths_are_still_absent() {
+    let t = Tmp::new();
+    // Only a source folder with one file: every other optional path is NotFound and means nothing.
+    write(&t.fork().join("button_config.ini"), b"x\n");
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert!(receipt.unlisted.is_empty());
+    assert!(t.rooms().join("migration.json").is_file());
+}
+
+#[test]
+fn migration_r2_8_a_partial_import_keeps_what_it_copied_and_the_next_boot_completes_it() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    fs::remove_dir_all(t.fork().join("setups")).unwrap();
+    write(&t.fork().join("setups"), b"x");
+    let (receipt, marker) = full_import(&t);
+    assert_incomplete(&receipt, &marker, &t.rooms(), "setups");
+    let after_first = tree(&t.rooms());
+    assert!(after_first.iter().any(|(p, _)| p == "settings.json") && after_first.iter().any(|(p, _)| p.starts_with("replay_captures/")));
+    // The status word on the install line says partial.
+    let (source, dest) = (t.fork(), t.rooms());
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 9, "0.1.0", &mut |_| {});
+    assert_eq!(status_word(&stage), "partial", "a second run is not MarkerPresent: there is no marker");
+    // Fix the source: the third boot finishes and writes the marker.
+    fs::remove_file(t.fork().join("setups")).unwrap();
+    write(&t.fork().join("setups/a.json"), b"{\"a\":1}");
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.result(), ImportResult::Done);
+    assert!(t.rooms().join("setups/a.json").is_file() && t.rooms().join("migration.json").is_file());
 }

@@ -141,6 +141,11 @@ pub struct Frame {
     pub tiles: [Text<28>; super::panes::TILES],
     pub tile_count: u8,
     pub tile_focus: u8,
+    /// The stage grid's tiles: tile number per tile (0 = All, n = catalog stage n - 1; `u16::MAX` = none), whether this is a
+    /// stage grid at all, and a signature that changes when the page or the layout changes (thumbnails are requested per page).
+    pub tile_n: [u16; super::panes::TILES],
+    pub tile_stage_grid: bool,
+    pub tile_sig: u32,
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
     pub range: RangeView,
@@ -177,6 +182,9 @@ impl Frame {
             tiles: [Text::new(); super::panes::TILES],
             tile_count: 0,
             tile_focus: 0,
+            tile_n: [u16::MAX; super::panes::TILES],
+            tile_stage_grid: false,
+            tile_sig: 0,
             tile_state: [0; super::panes::TILES],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
             title: Text::new(),

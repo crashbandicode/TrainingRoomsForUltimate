@@ -8,22 +8,9 @@ pub(crate) mod character_specific;
 pub(crate) mod lobby;
 pub(crate) mod practice;
 
-/// INTERFACE STUB (package 4, S4-4, provides the real module: the named-macro runtime under `crate::runtime::macros`; this facade
-/// forwards to it when it lands). The waiting-room side of the named macros as the carried lobby and roster files call it. With no
-/// macro runtime there is nothing to suspend, resume or forget, and the selection never changes.
-pub(crate) mod named_macros {
-    pub fn suspend_waiting() {}
-    pub fn resume_waiting() {}
-    pub fn suspended() -> bool {
-        false
-    }
-    pub fn forget_stopped_entry(_entry: usize) {}
-    pub fn forget_stopped_scene() {}
-    pub fn waiting_scene_changed(_same_lobby: bool) {}
-    pub fn selection_revision() -> u64 {
-        0
-    }
-}
+/// The fork's `training::named_macros`: package 4's named-macro runtime (the waiting-room side the carried lobby and roster files call
+/// is `suspend_waiting`, `resume_waiting`, `suspended`, `forget_stopped_entry`, `forget_stopped_scene`, `waiting_scene_changed`).
+pub(crate) use crate::runtime::macros::named_macros;
 
 /// The fork's `tech` module as the lobby names it: package 2's CPU state drops the hidden-tech record of a departed body.
 pub(crate) mod tech {

@@ -104,6 +104,8 @@ fn apply() {
         // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
         unsafe {
             input_display::on_p1_poll(controller, out);
+            // The Replay Window's own controls (nothing unless its editor is in the foreground).
+            crate::runtime::macros::on_p1_input(controller, out);
             recorder::on_p1_poll(out);
         }
     }

@@ -21,7 +21,22 @@ ROWS = [
     ("combo_display_b_pin", 0x13E54D4, "Notices", "Relied", "The second ldrb of PauseMenu+0xb6c."),
     ("combo_display_b", 0x13E54D8, "Notices", "Hook", "Inline observer at the strb that stores it: w8 is the Combo Display byte."),
     ("stale_moves_toggle", 0x13E88C4, "Notices", "Hook", "Inline at the call after the game clears the stale-moves toggle (PauseMenu+0xb60, x22 is the menu object): the toggle is set to 1 so stale moves are on in Training."),
+    ("control_get_button", 0x20013E0, "NamedMacros", "Called", "ControlModule::get_button (lua_bind thunk): the CPU's button word, for the named playback observation lines."),
+    ("control_get_stick_x", 0x2001260, "NamedMacros", "Called", "ControlModule::get_stick_x (lua_bind thunk): the clamped stick x of the replay capture's observed input."),
+    ("control_get_stick_y", 0x2001280, "NamedMacros", "Called", "ControlModule::get_stick_y (lua_bind thunk): the clamped stick y of the observed input."),
+    ("control_get_stick_x_no_clamp", 0x2001600, "NamedMacros", "Called", "ControlModule::get_stick_x_no_clamp (lua_bind thunk): the raw stick x the capture quantises."),
+    ("control_get_stick_y_no_clamp", 0x2001610, "NamedMacros", "Called", "ControlModule::get_stick_y_no_clamp (lua_bind thunk): the raw stick y."),
+    ("control_get_sub_stick_x", 0x2001370, "NamedMacros", "Called", "ControlModule::get_sub_stick_x (lua_bind thunk): the C-stick x of the observed input."),
+    ("control_get_sub_stick_y", 0x2001390, "NamedMacros", "Called", "ControlModule::get_sub_stick_y (lua_bind thunk): the C-stick y of the observed input."),
+    ("kinetic_get_energy", 0x2043970, "NamedMacros", "Called", "KineticModule::get_energy (lua_bind thunk): the energy object the named start pose sets the speed of."),
+    ("kinetic_get_sum_speed_x", 0x2043A00, "NamedMacros", "Called", "KineticModule::get_sum_speed_x (lua_bind thunk): the start state's and the capture's x speed."),
+    ("kinetic_get_sum_speed_y", 0x2043A10, "NamedMacros", "Called", "KineticModule::get_sum_speed_y (lua_bind thunk): the start state's and the capture's y speed."),
+    ("stop_is_special_stop", 0x2089200, "NamedMacros", "Called", "StopModule::is_special_stop (lua_bind thunk): whether the panel already holds a fighter still."),
+    ("stop_set_special_stop", 0x2089290, "NamedMacros", "Called", "StopModule::set_special_stop (lua_bind thunk): holds a practice fighter still while the named panel or the clip editor is open."),
 ]
+
+# Called rows other streams name by offset constant (kept from the hand-edited file of S4-1).
+OFFSET_CONSTS = {"posture_lr", "stop_is_stop", "work_set_int", "model_set_color_rgb", "fighter_manager_get_entry"}
 
 KIND = {
     "Called": "SeamKind::Called",
@@ -66,7 +81,7 @@ def main():
         "",
     ]
     for name, off, feature, kind, note in ROWS:
-        if kind == "Hook":
+        if kind == "Hook" or name in OFFSET_CONSTS:
             const = name.upper() + "_OFFSET"
             out.append(f"pub const {const}: usize = {off:#x};")
     out.append("")

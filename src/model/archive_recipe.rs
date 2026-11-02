@@ -33,7 +33,7 @@ fn read<const N: usize>(bytes: &mut &[u8]) -> Result<[u8; N]> {
 
 /// An identity check for versioned resources (FNV-1a, 64 bit), not a cryptographic authenticity check.
 pub fn fingerprint(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(0x100_0000_01b3))
+    fingerprint_extend(FINGERPRINT_BASIS, bytes)
 }
 
 /// What a recipe says about its inputs, read without applying it.
@@ -56,39 +56,101 @@ pub fn header(mut recipe: &[u8]) -> Result<Header> {
     Ok(Header { stock_len, stock_fingerprint, output_len, output_fingerprint })
 }
 
+/// Where the stock archive's bytes come from: the slice the game just decompressed, or (decision B3: another mod replaced
+/// the archive) the vanilla file read through `arc:/` in chunks, so no copy of it is ever held.
+pub trait Stock {
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    /// FNV-1a of the whole archive.
+    fn fingerprint(&mut self) -> Result<u64>;
+    /// Fill `out` with the bytes at `offset` (the caller checked the range against `len`).
+    fn read_at(&mut self, offset: usize, out: &mut [u8]) -> Result<()>;
+}
+
+impl Stock for &[u8] {
+    fn len(&self) -> usize {
+        <[u8]>::len(self)
+    }
+    fn fingerprint(&mut self) -> Result<u64> {
+        Ok(fingerprint(self))
+    }
+    fn read_at(&mut self, offset: usize, out: &mut [u8]) -> Result<()> {
+        out.copy_from_slice(self.get(offset..offset + out.len()).ok_or("archive copy outside stock")?);
+        Ok(())
+    }
+}
+
+/// Continue an FNV-1a hash over more bytes (`fingerprint` is `fingerprint_extend(FINGERPRINT_BASIS, bytes)`).
+pub fn fingerprint_extend(hash: u64, bytes: &[u8]) -> u64 {
+    bytes.iter().fold(hash, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(0x100_0000_01b3))
+}
+
+/// The FNV-1a offset basis (the fingerprint of nothing).
+pub const FINGERPRINT_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+
 /// Reconstruct the plugin's archive from `stock`. Never accepts a partial, corrupted or mismatched
 /// recipe, a changed stock archive, or an output that does not match its fingerprint.
 pub fn build(stock: &[u8], recipe: &[u8]) -> Result<Vec<u8>> {
+    let size = header(recipe)?.output_len;
+    if !(4..=MAX_ARCHIVE_BYTES).contains(&size) {
+        return Err("invalid archive output size");
+    }
+    let mut output = Vec::with_capacity(size);
+    build_into(&mut { stock }, recipe, &mut output)?;
+    Ok(output)
+}
+
+/// As `build`, into a buffer that already has the room: the plugin makes its buffers once at boot (outside any hook) and
+/// reuses them for every load, so building allocates nothing. The output never grows `output`: a recipe that needs more
+/// than its capacity is refused. On an error `output` is left empty.
+pub fn build_into(stock: &mut impl Stock, recipe: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    output.clear();
+    let result = apply(stock, recipe, output);
+    if result.is_err() {
+        output.clear();
+    }
+    result
+}
+
+fn apply(stock: &mut impl Stock, recipe: &[u8], output: &mut Vec<u8>) -> Result<()> {
     let head = header(recipe)?;
     let mut recipe = &recipe[4 + 4 + 8 + 4 + 8..];
-    if stock.len() != head.stock_len || fingerprint(stock) != head.stock_fingerprint {
+    if stock.len() != head.stock_len || stock.fingerprint()? != head.stock_fingerprint {
         return Err("stock layout archive mismatch");
     }
     let size = head.output_len;
     if !(4..=MAX_ARCHIVE_BYTES).contains(&size) {
         return Err("invalid archive output size");
     }
-    let mut output = Vec::with_capacity(size);
+    if size > output.capacity() {
+        return Err("archive output larger than the boot buffer");
+    }
     while !recipe.is_empty() {
         let [op] = read(&mut recipe)?;
         let len = u32::from_le_bytes(read(&mut recipe)?) as usize;
         if len > size - output.len() {
             return Err("archive output exceeds declared size");
         }
-        let bytes = match op {
+        match op {
             0 => {
                 let offset = u32::from_le_bytes(read(&mut recipe)?) as usize;
-                stock.get(offset..).and_then(|bytes| bytes.get(..len)).ok_or("archive copy outside stock")?
+                if offset.checked_add(len).is_none_or(|end| end > stock.len()) {
+                    return Err("archive copy outside stock");
+                }
+                let start = output.len();
+                output.resize(start + len, 0);
+                stock.read_at(offset, &mut output[start..])?;
             }
-            2 => take(&mut recipe, len)?,
+            2 => output.extend_from_slice(take(&mut recipe, len)?),
             _ => return Err("invalid archive recipe operation"),
-        };
-        output.extend_from_slice(bytes);
+        }
     }
-    if output.len() != size || fingerprint(&output) != head.output_fingerprint {
+    if output.len() != size || fingerprint(output) != head.output_fingerprint {
         return Err("archive reconstruction mismatch");
     }
-    Ok(output)
+    Ok(())
 }
 
 /// Write a recipe that turns `stock` into `target` (the host builder and the tests). A greedy matcher:
@@ -208,5 +270,35 @@ mod tests {
         let head = header(&make(&stock, &target)).unwrap();
         assert_eq!((head.stock_len, head.output_len), (stock.len(), target.len()));
         assert_eq!(head.output_fingerprint, fingerprint(&target));
+    }
+
+    /// R2-7 (decided 2026-11-02): the plugin builds its archive into buffers made once at boot, so a hand-out allocates
+    /// nothing. This is the bound: the shipped recipe's output and stock sizes, and that `build_into` neither grows nor
+    /// moves the buffer it is given.
+    #[test]
+    fn the_shipped_recipe_fits_the_boot_buffers_and_building_never_allocates() {
+        let recipe: &[u8] = include_bytes!("../../assets/info_training.tra1");
+        let head = header(recipe).unwrap();
+        assert_eq!(head.stock_len, 451_604, "the stock Training layout archive of 13.0.5");
+        assert!(head.output_len <= MAX_ARCHIVE_BYTES);
+        // A synthetic stock of the right length would not match its fingerprint: use a small recipe of the same shape.
+        let stock: Vec<u8> = (0..4096u32).map(|i| (i * 7 + i / 13) as u8).collect();
+        let mut target = stock.clone();
+        target.extend_from_slice(b"plugin panes");
+        target[100] ^= 0xff;
+        let small = make(&stock, &target);
+        let mut output = Vec::with_capacity(header(&small).unwrap().output_len);
+        let (pointer, capacity) = (output.as_ptr(), output.capacity());
+        let mut source: &[u8] = &stock;
+        build_into(&mut source, &small, &mut output).unwrap();
+        assert_eq!(output, target);
+        assert_eq!((output.as_ptr(), output.capacity()), (pointer, capacity), "no reallocation");
+        // Built again into the same buffer (the next load): same result, still no reallocation.
+        build_into(&mut source, &small, &mut output).unwrap();
+        assert_eq!((output.as_ptr(), output.capacity()), (pointer, capacity));
+        // A buffer too small is refused, never grown.
+        let mut tiny: Vec<u8> = Vec::with_capacity(16);
+        assert_eq!(build_into(&mut source, &small, &mut tiny), Err("archive output larger than the boot buffer"));
+        assert!(tiny.is_empty() && tiny.capacity() < target.len());
     }
 }

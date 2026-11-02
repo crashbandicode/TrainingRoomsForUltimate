@@ -18,6 +18,8 @@ crate-type = ["cdylib"]
 # be defaulted on its own (SPEC-core-04 §3.2, decision S2).
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
+# S4-4 (lead ruling): the shared match-data crate, vendored under crates/ (docs/provenance/pkg4-carry-ledger.md). Its sha2 and float_roundtrip are part of that ruling.
+smash-match-data = { path = "crates/smash-match-data" }
 
 [target.'cfg(target_os = "switch")'.dependencies]
 skyline = "=0.6.0"

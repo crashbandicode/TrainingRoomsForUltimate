@@ -50,6 +50,14 @@ pub mod bit {
     pub const RIGHT_SR: u32 = 1 << 15;
     pub const STICK_L: u32 = 1 << 16;
     pub const STICK_R: u32 = 1 << 17;
+    pub const L_UP: u32 = 1 << 20;
+    pub const L_RIGHT: u32 = 1 << 21;
+    pub const L_DOWN: u32 = 1 << 22;
+    pub const L_LEFT: u32 = 1 << 23;
+    pub const R_UP: u32 = 1 << 24;
+    pub const R_RIGHT: u32 = 1 << 25;
+    pub const R_DOWN: u32 = 1 << 26;
+    pub const R_LEFT: u32 = 1 << 27;
     pub const PLUS: u32 = 1 << 18;
     pub const MINUS: u32 = 1 << 19;
     pub const REAL_DIGITAL_L: u32 = 1 << 28;
@@ -58,7 +66,40 @@ pub mod bit {
     pub const PLUS_MASK: u32 = PLUS;
 }
 
-/// `Controller` field offsets (SPEC-input-04 §3.1).
+/// A raw 32-bit button set of the game's `Controller` (SPEC-input-04 section 3.1; the bit order is SPEC-core-03 section 4): the reads the
+/// Replay Window's controls use, with the d-pad and both sticks' digital direction bits.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Buttons(pub u32);
+
+impl Buttons {
+    const fn has(self, mask: u32) -> bool {
+        self.0 & mask != 0
+    }
+    pub const fn a(self) -> bool { self.has(bit::A) }
+    pub const fn b(self) -> bool { self.has(bit::B) }
+    pub const fn x(self) -> bool { self.has(bit::X) }
+    pub const fn y(self) -> bool { self.has(bit::Y) }
+    pub const fn l(self) -> bool { self.has(bit::L) }
+    pub const fn r(self) -> bool { self.has(bit::R) }
+    pub const fn zl(self) -> bool { self.has(bit::ZL) }
+    pub const fn zr(self) -> bool { self.has(bit::ZR) }
+    pub const fn dpad_up(self) -> bool { self.has(bit::DPAD_UP) }
+    pub const fn dpad_down(self) -> bool { self.has(bit::DPAD_DOWN) }
+    pub const fn dpad_left(self) -> bool { self.has(bit::DPAD_LEFT) }
+    pub const fn dpad_right(self) -> bool { self.has(bit::DPAD_RIGHT) }
+    pub const fn real_digital_l(self) -> bool { self.has(bit::REAL_DIGITAL_L) }
+    pub const fn real_digital_r(self) -> bool { self.has(bit::REAL_DIGITAL_R) }
+    pub const fn l_up(self) -> bool { self.has(bit::L_UP) }
+    pub const fn l_right(self) -> bool { self.has(bit::L_RIGHT) }
+    pub const fn l_down(self) -> bool { self.has(bit::L_DOWN) }
+    pub const fn l_left(self) -> bool { self.has(bit::L_LEFT) }
+    pub const fn r_up(self) -> bool { self.has(bit::R_UP) }
+    pub const fn r_right(self) -> bool { self.has(bit::R_RIGHT) }
+    pub const fn r_down(self) -> bool { self.has(bit::R_DOWN) }
+    pub const fn r_left(self) -> bool { self.has(bit::R_LEFT) }
+}
+
+/// Controller field offsets (SPEC-input-04 §3.1).
 pub mod field {
     pub const CURRENT_BUTTONS: usize = 0x8;
     pub const PREVIOUS_BUTTONS: usize = 0xc;

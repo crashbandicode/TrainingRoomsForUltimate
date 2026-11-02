@@ -154,17 +154,17 @@ impl Broker {
 
     fn enqueue(&mut self) -> Effect {
         let (sender, receiver) = mpsc::sync_channel(1);
-        match crate::runtime::compat::replay_store::request_mii_catalog(sender) {
-            crate::runtime::compat::replay_store::CatalogQueue::Queued => {
+        match crate::runtime::macros::replay_store::request_mii_catalog(sender) {
+            crate::runtime::macros::replay_store::CatalogQueue::Queued => {
                 self.flight_serial = self.policy.serial();
                 self.reply = Some(receiver);
                 Effect::quiet(Step::Wait)
             }
-            crate::runtime::compat::replay_store::CatalogQueue::Full => {
+            crate::runtime::macros::replay_store::CatalogQueue::Full => {
                 drop(receiver);
                 self.policy.rejected_full()
             }
-            crate::runtime::compat::replay_store::CatalogQueue::Unavailable => {
+            crate::runtime::macros::replay_store::CatalogQueue::Unavailable => {
                 drop(receiver);
                 self.policy.failed(live())
             }

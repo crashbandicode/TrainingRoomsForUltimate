@@ -78,7 +78,7 @@ def open_claims():
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
         if m:
-            host = re.search(r"\bon (Yoga|Surface|Ally)\b", line)
+            host = re.search(r"\bon (?:the )?(Yoga|Surface|Ally)\b", line)
             other_host = bool(host) and host.group(1) != "Yoga"
             state[m.group(2)] = m.group(1) == "CLAIMED" and not other_host
     return [k for k, v in state.items() if v and k != OWNER]
@@ -94,7 +94,7 @@ def eden_processes():
     return [l for l in out.splitlines() if "pgrep" not in l]
 
 
-def prep(label, nros, settings, diag_txt):
+def prep(label, nros, settings, diag_txt, seed=None):
     receipt = {"label": label, "time": time.time(), "source": str(SOURCE), "profile": str(PROFILE),
                "set_aside": [], "archived": []}
     assert SOURCE.name != "a" and SOURCE.is_dir()
@@ -157,6 +157,9 @@ def prep(label, nros, settings, diag_txt):
     if settings:
         shutil.copyfile(settings, out / "settings.json")  # a real file, never a link
         receipt["settings"] = (out / "settings.json").read_text(encoding="utf-8")
+    if seed:
+        shutil.copytree(seed, out, dirs_exist_ok=True)
+        receipt["seed"] = sorted(str(p.relative_to(seed)) for p in Path(seed).rglob("*") if p.is_file())[:40]
     if diag_txt:
         shutil.copyfile(diag_txt, out / "diag.txt")
         receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
@@ -249,7 +252,7 @@ def up(args):
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
-        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
+        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.seed).items()
                                   if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
                         "-Action", "Start", "-Unit", f"trp4-{label}-display", "-Socket", f"wayland-trp4-{label}",
@@ -378,12 +381,14 @@ def main():
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
+    p.add_argument("--seed")  # a directory copied into the data folder (replay_captures/, macros/, replay_capture.ini) before boot
     p.set_defaults(fn=up)
     p = sub.add_parser("prep")  # profile copy only: touches nothing but this tool's own work root
     p.add_argument("label", type=label_ok)
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
+    p.add_argument("--seed")  # a directory copied into the data folder (replay_captures/, macros/, replay_capture.ini) before boot
     p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt))))
     p = sub.add_parser("down")
     p.add_argument("label", type=label_ok)

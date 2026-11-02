@@ -119,7 +119,7 @@ unsafe fn scene_permitted() -> bool {
         && common::is_ready_go()
         && !menu::captures_input()
         && !crate::runtime::lobby::training::save_states::is_loading()
-        && !crate::runtime::compat::replay_capture::loading()
+        && !crate::runtime::macros::replay_capture::loading()
         && !crate::runtime::compat::replay_preview::occupied()
 }
 
@@ -146,7 +146,7 @@ unsafe fn scene_permitted_for(layout: Layout) -> bool {
             && !crate::runtime::lobby::training::lobby::native_ui_busy() && !menu::captures_input()
             && !crate::runtime::lobby::training::save_states::is_loading()
             && !crate::runtime::lobby::training::recording_or_playback()
-            && !crate::runtime::compat::replay_capture::loading() && !crate::runtime::compat::replay_preview::occupied()
+            && !crate::runtime::macros::replay_capture::loading() && !crate::runtime::compat::replay_preview::occupied()
             && !common::button_config::has_pending_request(),
     }
 }

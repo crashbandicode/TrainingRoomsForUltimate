@@ -21,6 +21,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     crate::runtime::features::cpu::publish(snapshot, rerolls);
     crate::runtime::features::states::publish(crate::model::state::settings::StateSettings::from_snapshot(snapshot));
     crate::runtime::features::recorder::publish(snapshot);
+    crate::runtime::compat::menu::apply_snapshot(snapshot);
     crate::runtime::features::chords::publish(snapshot);
     crate::runtime::p1::publish(snapshot);
     crate::runtime::features::input_display::publish(snapshot);

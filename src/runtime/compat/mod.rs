@@ -15,5 +15,3 @@ pub(crate) mod filesystem;
 pub(crate) mod hazard_manager;
 pub(crate) mod input;
 pub(crate) mod menu_app;
-pub(crate) mod replay_capture;
-pub(crate) mod replay_store;

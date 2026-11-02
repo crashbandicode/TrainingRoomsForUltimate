@@ -15,7 +15,6 @@ pub mod kirby;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/lobby/mod.rs"]
 pub mod lobby;
-#[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii/mod.rs"]
 pub mod mii;
 #[cfg(any(test, target_os = "switch"))]
@@ -31,6 +30,10 @@ pub mod seams;
 pub mod swap;
 #[path = "../model/stages/mod.rs"]
 pub mod stages;
+#[path = "../model/macro_ui/mod.rs"]
+pub mod macro_ui;
+#[path = "../model/macros/mod.rs"]
+pub mod macros;
 // CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
 // from tests/p1_core.rs (the playbook's by-path include).
 #[cfg(target_os = "switch")]
