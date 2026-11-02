@@ -20,8 +20,8 @@ impl Limit {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Text {
     units: [u16; MACRO_UNITS + 1],
-    len: usize,
-    cursor: usize,
+    len: u8,
+    cursor: u8,
     limit: Limit,
 }
 
@@ -33,7 +33,13 @@ impl Text {
     }
 
     pub fn macro_name(name: &str, cursor: usize) -> Option<Self> {
-        Self::with_limit(&name.encode_utf16().collect::<Vec<_>>(), cursor, Limit::Macro)
+        let mut units = [0; MACRO_UNITS];
+        let mut len = 0;
+        for unit in name.encode_utf16() {
+            *units.get_mut(len)? = unit;
+            len += 1;
+        }
+        Self::with_limit(&units[..len], cursor, Limit::Macro)
     }
 
     fn with_limit(units: &[u16], cursor: usize, limit: Limit) -> Option<Self> {
@@ -41,19 +47,20 @@ impl Text {
             return None;
         }
         if limit == Limit::Macro {
-            let name = String::from_utf16(units).ok()?;
-            if name.chars().count() > MAX_NAME_CHARS || name.chars().any(char::is_control)
-                || String::from_utf16(&units[..cursor]).is_err() { return None; }
+            for (index, scalar) in char::decode_utf16(units.iter().copied()).enumerate() {
+                if index >= MAX_NAME_CHARS || scalar.ok()?.is_control() { return None; }
+            }
+            if char::decode_utf16(units[..cursor].iter().copied()).any(|c| c.is_err()) { return None; }
         }
-        let mut text = Self { units: [0; MACRO_UNITS + 1], len: units.len(), cursor, limit };
+        let mut text = Self { units: [0; MACRO_UNITS + 1], len: u8::try_from(units.len()).ok()?, cursor: u8::try_from(cursor).ok()?, limit };
         text.units[..units.len()].copy_from_slice(units);
         Some(text)
     }
 
-    pub fn units(&self) -> &[u16] { &self.units[..self.len] }
+    pub fn units(&self) -> &[u16] { &self.units[..usize::from(self.len)] }
     // Mii's native config must still receive exactly 11 units/22 bytes.
     pub fn terminated(&self) -> &[u16] { &self.units[..self.limit.units() + 1] }
-    pub fn cursor(&self) -> usize { self.cursor }
+    pub fn cursor(&self) -> usize { usize::from(self.cursor) }
     pub fn limit(&self) -> Limit { self.limit }
 }
 

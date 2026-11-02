@@ -2941,7 +2941,7 @@
    "dest": "src/model/mii/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "48b03e9ff042fdfa42fbc775f25338fd01b8312b655e641e832d1483332a3605",
+   "dest_sha256": "02b6a34331e0b4a74b8749c0a771adfd0b54cda8dbce61397d1c15df77858a35",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -3086,6 +3086,42 @@
      "new": "impl Signals {\n    pub fn change(&mut self, units: &[u16], len: i32, cursor: i32) {\n        let text = text_signal(units, len, cursor, self.limit);\n        self.invalid |= text.is_none();\n        if text.is_some() { self.text = text; }\n    }\n\n    pub fn enter(&mut self, units: &[u16], len: i32) {\n        let text = text_signal(units, len, len, self.limit);\n        self.invalid |= text.is_none();\n        if let Some(text) = text {\n            self.text = Some(text);\n            self.decision = Some(if text.limit == Limit::Mii && text.len == 0 {\n                Decision::Cancel\n            } else { Decision::Enter(text) });\n        }\n    }\n\n    pub fn cancel(&mut self) { self.decision = Some(Decision::Cancel); }\n}\n\n#[cfg(test)]\nmod tests",
      "count": 1,
      "reason": "Lead21:18 keyboard root: move actual pure value/callback implementation to host-tested engine module, preserving native ABI and ownership."
+    },
+    {
+     "old": "    len: usize,\n    cursor: usize,",
+     "new": "    len: u8,\n    cursor: u8,",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
+    },
+    {
+     "old": "        Self::with_limit(&name.encode_utf16().collect::<Vec<_>>(), cursor, Limit::Macro)",
+     "new": "        let mut units = [0; MACRO_UNITS];\n        let mut len = 0;\n        for unit in name.encode_utf16() {\n            *units.get_mut(len)? = unit;\n            len += 1;\n        }\n        Self::with_limit(&units[..len], cursor, Limit::Macro)",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
+    },
+    {
+     "old": "            let name = String::from_utf16(units).ok()?;\n            if name.chars().count() > MAX_NAME_CHARS || name.chars().any(char::is_control)\n                || String::from_utf16(&units[..cursor]).is_err() { return None; }",
+     "new": "            for (index, scalar) in char::decode_utf16(units.iter().copied()).enumerate() {\n                if index >= MAX_NAME_CHARS || scalar.ok()?.is_control() { return None; }\n            }\n            if char::decode_utf16(units[..cursor].iter().copied()).any(|c| c.is_err()) { return None; }",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
+    },
+    {
+     "old": "let mut text = Self { units: [0; MACRO_UNITS + 1], len: units.len(), cursor, limit };",
+     "new": "let mut text = Self { units: [0; MACRO_UNITS + 1], len: u8::try_from(units.len()).ok()?, cursor: u8::try_from(cursor).ok()?, limit };",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
+    },
+    {
+     "old": "&self.units[..self.len]",
+     "new": "&self.units[..usize::from(self.len)]",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
+    },
+    {
+     "old": "pub fn cursor(&self) -> usize { self.cursor }",
+     "new": "pub fn cursor(&self) -> usize { usize::from(self.cursor) }",
+     "count": 1,
+     "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
     }
    ]
   },

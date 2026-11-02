@@ -974,3 +974,17 @@ the stale KNOWN row or fixed enum layout; do not treat it as a final lint gate.
 Next freeze baseline, claim one isolated host allocation regression, preserve
 expected failure, then implement streaming validation/checked byte metadata.
 No current claims/compiler/Eden/profile; both previous targets remain retired.
+
+## Keyboard allocation reproduced and root fix staged — 21:36Z
+Frozen f7b8f4a actual-code probe ran successfully then failed its allocation
+assertion: first14, repeated64=896, positive-control1. Cargo exit101, 6.765s,
+1112 source hashes unchanged. Raw log SHA320a8ad492cae5980d4aad6854b8bb1e2c115333d6e0591e938fc1c327c90302.
+Receipts archived slim/f7b8f4a-before-allocation. Yoga released21:34; own queue
+removed, no compiler/Eden/profile. Release helper's initial missing info/title
+errors occurred before append; corrected Yoga title and exactly one release.
+Root fix replaces temporary Vec/String with fixed96-unit encoding and streaming
+decode_utf16 full/prefix validation; checked u8 metadata widens at public APIs.
+Native ABI/lease/callback buffers unchanged. Only keyboard KNOWN row removed.
+Carry253 verify PASS; ledger regenerated. Tests and exact compiled stack pending.
+Next: freeze candidate, fresh ledger/cache admission, host gates + native feature
+matrix/release/diag/static-stack; independent lead review. No READY claim.

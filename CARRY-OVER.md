@@ -413,3 +413,5 @@ lease, locking, UI-thread ownership and Finalize ordering remain in the adapter.
 The initial extraction intentionally retains usize metadata and allocating
 macro validation to reproduce the original defect with the actual shared code.
 It is a regression baseline, not a completed fix or runtime acceptance.
+
+Keyboard root follow-up: pure value carry transforms now use checked u8 metadata and allocation-free UTF-16 encoding/validation. The ten-unit raw Mii contract, 48-scalar Macro contract and cursor boundaries are preserved by original exported-code probes. Only the superseded keyboard large-enum lint row is removed.
