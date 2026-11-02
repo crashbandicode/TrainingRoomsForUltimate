@@ -54,6 +54,9 @@ class Rows(unittest.TestCase):
     def test_full_scan_never_skips_first_allocation_sample(self):
         self.assertFalse(self.run_row("r_r5", samples(allocation=0))[0][1])
         self.assertTrue(self.run_row("r_r5", samples())[0][1])
+        # The faulting first delta has rotated away, but its cumulative total remains.
+        self.assertFalse(self.run_row("r_r5", samples(allocation=0)[1:])[0][1])
+        self.assertFalse(self.run_row("r_r5", ["1000 hook_stats allocations=unknown delta=0"])[0][1])
 
 
 if __name__ == "__main__":

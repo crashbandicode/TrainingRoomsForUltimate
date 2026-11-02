@@ -391,8 +391,12 @@ def r_cpu():
 
 def r_r5():
     lines = [x for x in read_diag() if "hook_stats allocations=" in x]
-    deltas = [int(re.search(r"delta=(\d+)", x).group(1)) for x in lines]
-    row("R5: hook allocation delta 0 on every sample", lines and all(d == 0 for d in deltas), lines[-1] if lines else "none")
+    # Ring rotation can remove the sample that first reported an allocation.
+    # The cumulative total must still be zero; a later zero delta cannot erase it.
+    stats = [re.search(r"allocations=(\d+) delta=(\d+)", x) for x in lines]
+    row("R5: no hook allocations across the boot", bool(stats) and all(
+        match and int(match[1]) == 0 and int(match[2]) == 0 for match in stats),
+        lines[-1] if lines else "none")
 
 
 def r_r5_soak():
