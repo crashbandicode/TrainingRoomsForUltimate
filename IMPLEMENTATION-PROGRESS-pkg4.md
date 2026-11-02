@@ -4,6 +4,9 @@
 
 ## QUESTIONS
 
+- **999f8ba compiled stack roots PASS margin / table reconciliation needed19:36Z:** exact diag build0/42.94s; NRO7e6f8972b23bea430ee9f7bb2c2766ce0a545351e5a65377cfcb0b05ffe30ba5 ELF b90415890987e114d14d50c028d51a98aeeb29bf3b54de9cb1b31a8fc918a887. Menu static32544, required57344 == existing57344; archive/editor phase removed old61440 requirement. Fiber ui_pass_calculate7936/16384, ALL134callbacks0over. Raw eden/runs/build-999f8ba/{stack-table,hook-budget,menu-stack-path}.txt. Table stillFAIL4 solely understated static fields: heartbeat4272->4720, Menu31472->32544, replay-capture-save31616->32448, mii-catalog5856->5920; each existing stacksize covers computedrequired. Please authorize exact four static metadata updates (no stackallocation/budget changes), or owner composition. RetainFAIL until source table gate reconciles; compiled margins alone are not runtime acceptance. Fullhost999 LIVE controller54854 Yoga6G1800 remote run-p1490662-i9878233.scope.
+
+
 - **Owned fixture location verified19:19Z (for lead's missingfixture gate):** Yoga
   /home/intpa/trainingrooms-build-pkg4/research/game-13.0.5/main-13.0.5.elf physicallyexists,
   SHA0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2;
@@ -20,15 +23,7 @@
   beenready sinceFrameapproval/staging; no oldcooldown applied.
 
 
-- **Frame dependency RESOLVED19:10Z; fiber request still OPEN:** apply UI-owned adapted patch
-  /tmp/ui-frame-root-for-pkg4-fabfaf6.patch (4files) plus narrow0c3cd63 three-file fiber root.
-  Raw008b564 reset names3roster fields absent here; adaptedpatch correctly excludes them and absent
-  Mii editor. No2241de2 stack increase requested. Both proposed source roots reviewed, notapplied;
-  Frame adapter applied exactly as authorized in67dfda6; diag67 queued Yoga, fullhost next.
-  Fiber0c3 notyet authorized/applied. Recompute actual margin after composition. Slotphase root43056->27024/frame15616->4416.
-  fab fullhost capabilities+poison nowPASS with declaredtable unchanged; solefailure test scheduler
-  seen0 fixed c14c7e6 (no productionprimitivechange), next hostgate pending.
-
+- **Frame/fiber composition RESOLVED19:33Z:** exact authorized four-file Frame adapter67dfda6 + three-file0c3 compacteffect root now999f8ba, combined with owned archive/editor phase1003b17. Yoga diag CLAIMED/live controller3838 remote run-p1487643-i9873278.scope, ordered6G1800, noEden/profile. Source1113 verified/refreshed bothsrc/gate. Previous67 fullhost9656pass0fail6ignored and Menu33376/required61440>57344 FAIL retained. New compiled Menu/fiber proof pending; no budget increase.
 
 - **Provider/consumer integration route18:56Z:** pkg6 f2bd652 cannot compile until Ticket consumer
   exists, while current rule forbids taking an ungated provider. Prepared owned consumer exact patch
@@ -764,3 +759,15 @@ Fullhost67 exact receipt: {"suites": 68, "totals": [9656, 0, 6, 0, 0], "cargo_ex
 
 
 19:34Z resume/model gate Astra medium verified; one watcher active/no alert. Lead19:14 exact0c3 fiber authority now read. Withdrew UNRUN1003diag queue line before composing authorized three-file compact effect metadata root; no claim/compiler/profile. Global target inventory52.060GB before lead5.02GB retirement accepted bylead19:30; no Ally deletion. Will freeze combined candidate for ownELF Menu+fiber proof, not inherit UI numbers.
+
+Combined999f8ba frozen1113files, archive25e925be21885032931a1a050263fce609c801a173aaacc1af3fbfca4e51f3a5 staged+hashverified+mtime refreshed bothYoga src/gate; four wrappers ready, ONLYdiag queuedEND. Applied exact3file0c3 compacteffectpatch (no adaptations needed), no budget/heap/locks change. No ownclaim/profile.
+
+Diag999f8ba controller3838 ended and Yoga released; ownline removed/fullhost999 appendedEND. StaticMenu/fiber artifact gate next. No ownliveclaim/Eden/profile.
+
+Fullhost999 controller54854 ENDED wrapper0, Yoga RELEASED/ownline removed; exactrawcounts/sourcehash pending. Clippy999 queuedEND, sameunchangedgate. Carry42 destverifyPASS. Noownliveclaim/profile.
+
+Fullhost999 exact receipt: {"suites": 68, "totals": [9848, 0, 6, 0, 0], "cargo_exit": "0", "log_sha256": "7a7585ba3d368fbd6e753e27f08aeef68ec5e4dfebabcb9694a226f9deaf8c4e", "warnings": 0, "skipped": 0, "artifacts": {"diag.nro": "7e6f8972b23bea430ee9f7bb2c2766ce0a545351e5a65377cfcb0b05ffe30ba5", "diag.so": "b90415890987e114d14d50c028d51a98aeeb29bf3b54de9cb1b31a8fc918a887"}}; bothYoga gate/src1113trackedfiles posthashunchanged.
+
+LIVE19:37Z Clippy999 Yoga controller76256 remote run-p1505913-i9889337.scope, ownclaim6G1800 incremental0; gate1113posthashunchanged. NoEden/profile. Release immediatelyonend, then separatelyqueue no-default.
+
+Clippy999 ENDED controller76256 FAILcargo101/wrapper1: mem_replace_with_default at src/model/macros/handoff.rs33. YogaRELEASED/ownline removed; no oldsource no-default queued. Fix owned archive handoff to equivalent mem::take without lint suppression, then re-freeze/re-gate. Noownliveclaim/profile.

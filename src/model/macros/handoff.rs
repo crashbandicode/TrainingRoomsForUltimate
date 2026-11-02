@@ -24,13 +24,13 @@ impl VaultArchive {
         if last_lost_epoch != 0 && self.epoch <= last_lost_epoch { self.session.truncated = true; }
     }
     pub fn apply(&mut self, event: VaultEvent, last_lost_epoch: u64) {
-        use crate::engine::macros::{ReplaySession, ReplayTrack, MAX_FRAMES};
+        use crate::engine::macros::{ReplayTrack, MAX_FRAMES};
         let epoch = match event {
             VaultEvent::Begin { epoch } | VaultEvent::Sample { epoch, .. } | VaultEvent::End { epoch, .. } => epoch,
         };
         if epoch == 0 || epoch < self.epoch { return; }
         if epoch != self.epoch {
-            let previous = std::mem::replace(&mut self.session, ReplaySession::default());
+            let previous = std::mem::take(&mut self.session);
             if previous.tracks.iter().any(|track| !track.frames.is_empty()) { self.previous = Some(previous); }
             self.epoch = epoch;
             self.session.truncated = !matches!(event, VaultEvent::Begin { .. });
