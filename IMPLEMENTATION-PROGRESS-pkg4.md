@@ -1,5 +1,106 @@
 # Implementation progress, package 4 (stream `pkg4`)
 
+## Astra continuation — 2026-11-02
+
+- Objective: finish design C, resident capture adapter, s4-09 and all pkg4 gates; READY only after evidence.
+- Thread `01a19c9f-04ad-7f72-8d2f-440ee0a6a04f`: exact-thread SQLite and latest rollout turn verify `gpt-6-astra / medium`.
+- Playbook followed: `ae87443cbb801472e474b3f0c20b5f9c3f5f1f77`; ff-only pull current. README, all seven docs and tools/PROVENANCE read completely (truncated outputs re-read in bounded chunks).
+- Branch `stream/pkg4`, existing worktree only. Starting HEAD `2d25cdf`; authorized merge of fixed `ebfcb9800fba1f82b2730b19ed26e231c810a2d6` committed as `c111b81`, no conflicts. No moving-branch merge.
+- Live state: no build/Eden claims acquired, no profiles changed, no compiler started. No upstream/non-ours-new fork sources opened. No subdelegation (stream prohibition).
+- Next: audit hook/worker calls; replace shared recorder/layer state with published queries, indexed buffers and event mailboxes; request pkg6 F11 integration SHA through lead. Keep ui-screens editor implementations intact and preserve slim oracle move when integrated.
+- Bootstrap command guard disclosure: initial document reads, status, playbook pull and watcher launch used bounded tool calls but lacked systemd memory scopes. Subsequent local reads use MemoryMax=512M and timeout 30; builds will use the mandated admitted scopes.
+
+### Current-session M/C checklist
+
+Every unverified row remains open; predecessor evidence is context, not acceptance of the new HEAD.
+
+| Requirement | Tag | Result / evidence |
+| --- | --- | --- |
+| cdylib only and resident measurement | M | open: final Cargo.toml and NRO check |
+| release profile, Skyline and toolchain pin | M | open: final manifest check |
+| host model / Switch runtime split | M | open: implementation review |
+| host test, clippy zero, no-default, release, diag | M | open: queued gates on final source |
+| no heap in hooks, counting allocator | M | open: s4-09 all deltas zero |
+| fixed buffers, static-stack writer, bounded paths | M | open: design C review |
+| root cause fixes; approved workarounds recorded | M | open: final review; no new workaround proposed |
+| version guard 13.0.5 | M | open: final install evidence |
+| 64-byte guard on every hooked/called/relied site | M | open: F11 dependency and site tests |
+| card-copy scan before new site selection | M | open: inherited scan plus F11 evidence |
+| sharing/chain, foreign forms and load orders | C | open: final site audit determines applicable rows |
+| hook after prologue or call specific native | M | open: final hook audit |
+| no diag strings/code in release | M | open: compliance with final NRO |
+| shipped install line, no per-frame logging | M | open: review release paths |
+| product logging files | C | N/A: plugin is a training tool, not a logging product |
+| online read-only hook review | C | open: resident replay adapter is online-reachable |
+| replay A/B with desync detector | C | open: coordinate package-7 evidence |
+| online-only two-console rows | C | open: determine changed-path scope with lead |
+| claim before Up, release after Down/failure | M | open: no run yet |
+| one Eden/host, memory, own profile/display | M | open: no run yet |
+| hard-linked immutable content, private writable files | M | open: profile preflight |
+| one target/source, refreshed times, disk and cleanup manifest | M | open: build preflight and final cleanup |
+| every wait gated | M | open: s4-09 runner review |
+| abort missing precondition; new label retry | M | open: s4-09 evidence |
+| shortest covering ruleset | M | open: live capture match row |
+| restore profile and release claims | M | open: no run yet |
+| console scan; run.json and memory.peak retained | M | open: s4-09 evidence |
+| every local command memory/time bounded | M | fail: bootstrap exception disclosed above; corrected for subsequent commands |
+| outputs under run label | M | open: s4-09 evidence |
+| README, GIF, install/build/license/disclaimer | M | open: coordinate project-level owner |
+| dated evidence, exact build identity | M | open: final evidence document |
+| log-derived numbers from tested committed scripts | C | open: s4-09 evidence analysis |
+| no operator quotes or unsupported claims | M | open: final doc review |
+| current handoff at checkpoints | M | pass: this continuation, c111b81 |
+| version/tag/release and anonymous downloads | C | not authorized: stream forbids release |
+| tagged rebuild byte identity | C | N/A: no release authorized |
+| card transaction/preflight/readbacks | C | not authorized: stream forbids card/DBI/USB |
+| user owns connection/mount/DBI lifecycle | M | pass: no device action |
+| no push/tag/card without order | M | pass: none performed |
+| Forgejo, commit message UTF-8 file | M | pass: c111b81, /tmp/pkg4-merge-message.txt |
+| exact-thread model gate and watcher | M | pass: gpt-6-astra / medium; temporary thread-specific watcher |
+| every spawned worker's own playbook read/checklist/compliance | M | N/A: stream prohibits subdelegation; none spawned |
+| final compliance, every agent row resolved | M | open: final release NRO required |
+| hook_locks PENDING empty, no exceptions | M | open: design C must remove recorder::rec entry |
+| carry derivation/ledger and zero Unmapped | M | open: final carry verify and s4-09 |
+
+### Continuation checkpoint (context handoff)
+
+No implementation changes yet. `c111b81` is only the authorized prerequisite merge; no tests run on it in this thread.
+The active goal remains completion of pkg4, not completion of this checkpoint. No operator blocker found.
+
+Read already: worker brief, routing authority, MY_MODEL, stream rules, Astra handover, full pkg4 progress, BUILD,
+DECISIONS, implementation-packages, input index/progress/template, global implementation progress, input specs 01/02/04/05,
+playbook README/all docs/PROVENANCE, macro_handoff.rs, full recorder.rs, port.rs and hook_locks.rs.
+Large initial combined outputs were truncated: re-read MENU-DRAFT lines 1–250 if needed to verify no lost inventory rows,
+SPEC-input-01 lines 124–130 (playback/mirroring paragraph), CARRY-OVER from line 265 onward (its tail was visible in the earlier
+combined output, but explicit bounded re-read is safer). No implementation source from upstream or fork was accessed.
+
+Findings for next step:
+- `port::worker_tick` currently only calls `named_macros::run_deferred`; layer services still originate on game hooks.
+- `port::input_record::{export_named,import_named_slot,is_playback}` reach `recorder::with_recorder` and REC.
+  Export allocates a Vec inside REC; import constructs a Vec on caller then locks REC. They need a genuine command/result handoff.
+- `recorder` game hooks call named capture/frame/start/finish/restore functions directly. Keep native reads in hooks.
+- `recorder::body_of` still calls `natives::entry_body`, not pkg6's pending guarded active-body accessor.
+- `live_replay::init` lines 563–572 contains the Off-at-boot early return `if !seed && !registered { return; }`;
+  final ready publication follows seam guards, writer start and hook install. Audit start/save/tick toggle gates before editing.
+- `tests/hook_locks.rs` PENDING is recorder::rec; ALLOWED also contains named_macros::prepare_buffers/MOTION.
+  Remove actual cross-thread lock sharing, not merely scanner entries. MacroQueries/PlayBuffers/CaptureBuffer already exist.
+- No Claw/session messaging tool exists in the currently exposed/deferred catalog (searched session/message names).
+  Coordinate exact F11 SHA through the shared lead tracker or available native lead channel; no SHA requested yet.
+- Slim oracle move is not in c111b81; retain it on a later explicitly authorized integration.
+
+Exact next bounded commands (all via `/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command ...`):
+1. Reverify exact-thread model/effort and re-arm/reconcile temporary watcher after compaction, per MY_MODEL.
+2. `systemd-run --user --scope -p MemoryMax=512M /usr/bin/timeout 30 git status --short --branch`
+3. Read `tools/carry_pkg4.py` completely and its imported carry helper before any carry command. Read named_macros.rs,
+   replay_capture.rs, replay_preview.rs, live_replay.rs in bounded chunks; inspect shared Published/Mailbox implementations,
+   worker tick call sites, existing model/settings/factory/menu/outbox/sites/guards/reset/clock providers as relevant.
+4. Request/track F11 integration; implement independent worker ownership first. Read queue and live Yoga ledger before any build.
+
+Live state at checkpoint: no host claims, no queue changes, no profiles changed, no compile/Eden process launched.
+Temporary watcher `/tmp/pkg4-model-watch-01a19c9f-04ad-7f72-8d2f-440ee0a6a04f.py` was PID 2596969,
+owner PID 2596795, alert at the same path plus `.alert`; reap before yielding, re-arm on continuation.
+
+
 Branch `stream/pkg4` (worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg4`), base 473da26, merged
 `work/implementation` fa8b77d (pkg2 core) and 4895ea3 (shared Store). Implementer: Claude Sonnet 5.5 (high) under lead `0caa72b8`.
 Playbook followed: `009c9ac`. Target `/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-pkg4`; Yoga build folder
