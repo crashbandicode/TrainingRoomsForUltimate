@@ -312,3 +312,10 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 - UI worker stage_press already calls request(selection); ui_wired=true is accurate. Replaced stale default_off=true with request_driven=true and corrected request module header through manifest transforms. Default shipped enhancements-alpha includes practice-stage-request-alpha.
 - carry / ledger regenerated; full carry verify passed all264 files against pinned m5q. No fork/stage writes. Source still ungated; F11 tests and this slice await compile queue.
 - Latest ledger: foreign paired Eden released15:00Z, imgui Surface e07 released15:02:54Z. Surface queue still preceding slim/f6; pkg6 holds no claim. No own Eden/profile changes.
+
+### Mii editor shipped trace slice (ungated)
+- Slim latest retirement census does not list mii_editor_bridge; notified lead inbox before edits. No slim-listed probes touched.
+- Editor Trace/Event, session trace/input comparison snapshot, native snapshot helpers, JSON write and writer startup now require diag. compat/filesystem is compiled only for an actual diagnostic producer; mii-editor-alpha alone no longer starts the writer or allocates its two trace buffers.
+- Non-diag event/observe_inputs sinks retain call signatures without storing a trace; existing native lifecycle and hash comparisons used by that lifecycle are unchanged. This is diagnostic packaging, not a mitigation for editor behavior. Diag keeps the same trace.
+- Three carried editor files changed by exact manifest transforms, carry/ledger regenerated; full verify264 passed, git diff --check passed. Switch release+diag compile and absence-of-path binary check still required; no runtime pass claimed.
+- Stage initialization slice is bece368, F11 reader slice1de6993. Host-test baseline345c6e3 remains the only new host execution this worker has completed; do not promote it to current-head evidence.

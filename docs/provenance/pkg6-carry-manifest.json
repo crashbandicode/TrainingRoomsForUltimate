@@ -2127,7 +2127,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/native.rs",
    "crate": "root",
    "src_sha256": "ed5db356207918b67e65c2bb2a9414930aa12673c36a50c3968e8f707c4bc39e",
-   "dest_sha256": "23c0efb6eba1ebfd83d3d56e3db48b1016b34b5873c5cf920d0c021449f7d0e4",
+   "dest_sha256": "23b66414962a5f5402756dd75ea8ce479531a9920776c9d08de64b039ffef82b",
    "edits": [
     {
      "old": "#[derive(Clone, serde::Serialize)]\npub(super) struct InputChange {",
@@ -2148,6 +2148,31 @@
      "old": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    InputSnapshot([(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)]\n        .map(|(offset, len)| std::slice::from_raw_parts((base + offset) as *const u8, len).to_vec()))\n}\n\nimpl InputSnapshot {\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        let observed = input_snapshot(base);\n        std::array::from_fn(|region| {\n            let expected = &self.0[region];\n            let actual = &observed.0[region];\n            let differences = expected.iter().zip(actual).enumerate()\n                .filter(|(_, (a, b))| a != b);\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes: differences.clone().count(),\n                first_changes: differences.take(64).map(|(i, (&a, &b))| (i, a, b)).collect(),\n            }\n        })\n    }\n}",
      "new": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    let mut rows = [[0u8; 8 * 0x240]; 3];\n    for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {\n        row[..len].copy_from_slice(std::slice::from_raw_parts((base + offset) as *const u8, len));\n    }\n    InputSnapshot { rows }\n}\n\nimpl InputSnapshot {\n    /// Compares the baseline with the live regions in place (no second copy is made inside the hook).\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        std::array::from_fn(|region| {\n            let (offset, len) = INPUT_REGIONS[region];\n            let expected = &self.rows[region][..len];\n            let actual = std::slice::from_raw_parts((base + offset) as *const u8, len);\n            let mut first_changes = crate::engine::compat::fixed::FixedVec::new();\n            let mut changed_bytes = 0;\n            for (i, (&a, &b)) in expected.iter().zip(actual).enumerate() {\n                if a != b {\n                    changed_bytes += 1;\n                    first_changes.push((i, a, b));\n                }\n            }\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes,\n                first_changes,\n            }\n        })\n    }\n}",
      "reason": "`input_snapshot` fills the fixed rows and `compare` reads the live regions in place (same hashes, changed-byte count and first 64 differences; the fork copied the live regions a second time, so a byte changing between the hash and the walk can now show in one and not the other, which a private qualification diagnostic tolerates)"
+    },
+    {
+     "old": "const INPUT_REGIONS:",
+     "new": "#[cfg(feature = \"diag\")]\nconst INPUT_REGIONS:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(super) struct InputSnapshot",
+     "new": "#[cfg(feature = \"diag\")]\npub(super) struct InputSnapshot",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(super) unsafe fn input_snapshot(",
+     "new": "#[cfg(feature = \"diag\")]\npub(super) unsafe fn input_snapshot(",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "impl InputSnapshot {",
+     "new": "#[cfg(feature = \"diag\")]\nimpl InputSnapshot {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
     }
    ]
   },
@@ -2219,7 +2244,19 @@
    "dest": "src/runtime/mii/mii_editor_bridge/connected.rs",
    "crate": "root",
    "src_sha256": "982b5cd8a1518d285d433808bca83f02fb5e8cae419e9996ad46ea0e9021c568",
-   "dest_sha256": "77f36932c428a56a58bfbdcaffb5c32404434dd7d3761823585c992d29ebeae5"
+   "dest_sha256": "5ec51e205be806db162a3e9a51f416a1c2f4c947348c22f558e63063fc055673",
+   "edits": [
+    {
+     "old": "            let input_baseline = native::input_snapshot(base);",
+     "new": "            #[cfg(feature = \"diag\")]\n            let input_baseline = native::input_snapshot(base);",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "            s.input_baseline = Some(input_baseline);",
+     "new": "            #[cfg(feature = \"diag\")]\n            { s.input_baseline = Some(input_baseline); }",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/inline_keyboard.rs",
@@ -2247,7 +2284,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "8b2cba722f3db30f294cbd9db62018c0f1359910e826ea6b195e377f4ead0f45",
+   "dest_sha256": "069725175dc5b9aeb2bab111448ce6b9f0a00e507491fd6b2cf768711788f97b",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -2283,6 +2320,76 @@
      "old": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n",
      "new": "    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}\n\nimpl Trace {\n    /// No events: the template of the writer slot's two buffers.\n    pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };\n}\n",
      "reason": "stream/stack: Trace::EMPTY, the template the writer slot's two heap buffers are made from at init"
+    },
+    {
+     "old": "use serde::Serialize;",
+     "new": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]",
+     "new": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[cfg_attr(feature = \"diag\", derive(Serialize))]",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Serialize)]\nstruct Event",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, Serialize)]\nstruct Event",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace",
+     "new": "#[cfg(feature = \"diag\")]\n#[derive(Clone, Copy, Serialize)]\npub(crate) struct Trace",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "impl Trace {",
+     "new": "#[cfg(feature = \"diag\")]\nimpl Trace {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    input_baseline: Option<native::InputSnapshot>,",
+     "new": "    #[cfg(feature = \"diag\")]\n    input_baseline: Option<native::InputSnapshot>,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    trace: Trace,",
+     "new": "    #[cfg(feature = \"diag\")]\n    trace: Trace,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    unsafe fn observe_inputs(&mut self, name:",
+     "new": "    #[cfg(feature = \"diag\")]\n    unsafe fn observe_inputs(&mut self, name:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    fn event(&mut self, name:",
+     "new": "    #[cfg(not(feature = \"diag\"))]\n    unsafe fn observe_inputs(&mut self, _name: &'static str) {}\n\n    #[cfg(not(feature = \"diag\"))]\n    fn event(&mut self, _name: &'static str, _values: [u64; 4]) {}\n\n    #[cfg(feature = \"diag\")]\n    fn event(&mut self, name:",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "pub(crate) fn write_trace(",
+     "new": "#[cfg(feature = \"diag\")]\npub(crate) fn write_trace(",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    let trace = if restore.is_some() {",
+     "new": "    #[cfg(feature = \"diag\")]\n    let trace = if restore.is_some() {",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "        inputs: [0; 3], input_baseline: None, seed, catalog,",
+     "new": "        inputs: [0; 3],\n        #[cfg(feature = \"diag\")]\n        input_baseline: None,\n        seed, catalog,",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "        ldn_handshake: handshake::Handshake::new(), trace };",
+     "new": "        ldn_handshake: handshake::Handshake::new(),\n        #[cfg(feature = \"diag\")]\n        trace };",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
+    },
+    {
+     "old": "    crate::runtime::compat::filesystem::init();",
+     "new": "    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();",
+     "reason": "Shipped editor diagnostics: compile trace storage, input comparison snapshots and disk writer only with diag; retain native editor lifecycle in release."
     }
    ]
   },

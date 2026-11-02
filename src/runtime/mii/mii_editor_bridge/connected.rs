@@ -197,6 +197,7 @@ unsafe fn drive_waiting(
                 return Drive::Original;
             }
             let inputs = native::practice_inputs(base);
+            #[cfg(feature = "diag")]
             let input_baseline = native::input_snapshot(base);
             native::register_editor_sequence(base, owner.sequence(), true);
             native::write(base, 0x5307d40, 0u8);
@@ -205,7 +206,8 @@ unsafe fn drive_waiting(
             let queued = native::enqueue_sequence(base, owner.sequence(), b"CharaMakeSequenceScene");
             let mut state = STATE.lock().unwrap(); let s = state.as_mut().unwrap();
             s.inputs = inputs;
-            s.input_baseline = Some(input_baseline);
+            #[cfg(feature = "diag")]
+            { s.input_baseline = Some(input_baseline); }
             s.phase = if queued { Phase::Queued } else { Phase::Returning };
             s.event("connected_editor_queued", [u64::from(queued), inputs[0], inputs[1], inputs[2]]);
             if !queued {
