@@ -64,19 +64,23 @@ pub(crate) fn take_rerolls() -> u8 {
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::remember(snapshot);
+    let published_menu = crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot);
+    let previous_menu = crate::runtime::compat::menu::view_before_publish();
+    let menu = crate::runtime::compat::menu::before_publish(published_menu, previous_menu);
     let live = Live {
         cpu: crate::model::cpu::settings::CpuSettings::from_snapshot(snapshot),
         states: crate::model::state::settings::StateSettings::from_snapshot(snapshot),
         recorder: crate::model::recording::RecorderSettings::from_snapshot(snapshot),
         chords: crate::model::chords::ChordSet::factory().with_rows(snapshot),
         input_display: crate::model::input_display::Settings::from_snapshot(snapshot),
-        menu: crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot),
+        menu,
     };
     crate::runtime::features::states::set_flags(&live.states);
     // Macro Source = Named Library: the layer's frame buffers are reserved on this thread, never in a hook.
     crate::runtime::features::recorder::prepare_named_buffers(snapshot);
     REROLLS.fetch_or(rerolls, Ordering::AcqRel);
     LIVE.publish(Some(live));
+    crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu);
     // P1 CPU control: the pilot takes it through an atomic (cpu_pilot::menu_settings_changed), no lock.
     crate::runtime::p1::publish(snapshot);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);

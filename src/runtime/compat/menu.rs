@@ -150,6 +150,30 @@ fn kept<T: serde::de::DeserializeOwned + Default>(settings: &Settings, key: &str
     settings.extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
 }
 
+/// The typed menu a publish replaces: the view readers had (a game-side edit or the published rows), or None before the first publish
+/// of the run (boot). Read wait-free on the publishing thread.
+pub(crate) fn view_before_publish() -> Option<TrainingModpackMenu> {
+    (crate::runtime::published::live_generation() != 0).then(current_menu)
+}
+
+/// A publish's first step for the typed menu, on the publishing thread (boot, the menu worker, the diag reload), before the new value
+/// goes live and outside every lock a hook takes: the rows as published become the rows that go live. (Package 6's preload engine
+/// canonicalises them here when a menu was already live: `cycle_preload_config::publish_applied`.)
+pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) -> TrainingModpackMenu {
+    let _ = previous;
+    published
+}
+
+/// A publish's last step for the typed menu, on the publishing thread after the new value went live: rows the engines changed are
+/// written back into the settings the menu opens on. (Package 6's roster re-plan runs here when a live menu changed:
+/// `character_roster::settings_changed(&previous, None)`; the first publish of a run has nothing to compare with.)
+pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
+    if next != published {
+        PENDING.lock()[0] = Some(next);
+        crate::runtime::ui::worker::request_writeback();
+    }
+    let _ = previous;
+}
 /// The settings-only part of the typed view: the saved defaults and the two kept keys (`stage_preferences`, `mii_preferences`), which
 /// a `Snapshot` does not carry. Called after the publish at boot, at every commit and by the diag reload (never in a hook). The values
 /// are computed first; the lock is held for the assignment only. The menu rows reach `MENU` through `published::Live` (one path).
