@@ -191,7 +191,7 @@ pub fn recover_previous_ini(path: &Path) -> io::Result<IniRecovery> {
 mod tests {
     use super::*;
 
-    /// A unique directory under the system temp dir, removed on drop (the fork's 	est_util::TempDir,
+    /// A unique directory under the system temp dir, removed on drop (the fork's test_util::TempDir,
     /// reduced to what these tests use).
     struct TempDir(std::path::PathBuf);
 

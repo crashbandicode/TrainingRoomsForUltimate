@@ -15,29 +15,41 @@ LABEL = sys.argv[1]
 BOOT = sys.argv[2]
 SD = f"{r.PROFILE_SD}/TrainingRooms"
 DIAG = f"{SD}/practice-diagnostics.log"
+DIAG_PREV = f"{SD}/practice-diagnostics.previous.log"
 OUT = Path(__file__).resolve().parent / "runs" / LABEL
 OUT.mkdir(parents=True, exist_ok=True)
 RESULTS = []
 
 
 def read_diag():
-    rc, out, _ = r.remote(f"if (Test-Path {DIAG}) {{ Get-Content {DIAG} }}")
+    """Both diag files (the ring rotates at 128 KiB), oldest first."""
+    rc, out, _ = r.remote(f"foreach ($p in '{DIAG_PREV}','{DIAG}') {{ if (Test-Path $p) {{ Get-Content $p }} }}")
     return out.splitlines()
 
 
+def stamp_of(line):
+    m = re.match(r"(\d+) ", line)
+    return int(m.group(1)) if m else -1
+
+
 def mark():
-    return len(read_diag())
+    """The console uptime in ms of the newest diag line: later lines are 'after'."""
+    lines = read_diag()
+    return max((stamp_of(x) for x in lines), default=0)
+
+
+def lines_after(start):
+    return [x for x in read_diag() if stamp_of(x) > start]
 
 
 def line_after(start, needle, cap=20):
     deadline = time.time() + cap
     while time.time() < deadline:
-        for line in read_diag()[start:]:
+        for line in lines_after(start):
             if needle in line:
                 return line
         time.sleep(1.5)
     return None
-
 
 def row(name, ok, evidence):
     RESULTS.append((name, ok, evidence))
@@ -144,22 +156,85 @@ def boot_b():
     m = mark()
     tap("zr,up", wait=0.15)
     time.sleep(3)
-    lines = [x for x in read_diag()[m:] if "playback_complete" in x]
+    lines = [x for x in lines_after(m) if "playback_complete" in x]
     row("Playback Loop On: the playback restarts", any("restarted=1" in x for x in lines) and len(lines) >= 2, f"{len(lines)} completions, last: {lines[-1][:120] if lines else 'none'}")
-    # Stop it through the reset chord (decision B8: stop on reset).
+    # Stop it through the reset chord (decision B8: stop on reset): no completion between the hub's
+    # reset line and the next start.
     m = mark()
     tap("l,r,a", hold=400, wait=0.5)
-    time.sleep(1.5)
-    after = [x for x in read_diag()[m:] if "playback_complete" in x]
-    row("L+R+A reset stops the recorder (B8)", len(after) <= 1, f"{len(after)} completion lines in 1.5 s after the reset")
-    # Save-state playback through the stand-in (save-state chord = state restored).
+    hub = line_after(m, "hub_run cause=TrainingReset", 10)
+    time.sleep(2.0)
+    if hub is None:
+        row("L+R+A reset stops the recorder (B8)", False, "no hub_run line")
+    else:
+        t0 = stamp_of(hub)
+        later = [x for x in lines_after(t0) if "playback_complete" in x or "playback_shortcut" in x]
+        row("L+R+A reset stops the recorder (B8)", not later, f"hub_run at {t0}; lines after it within 2 s: {len(later)}")    # Save-state playback through the stand-in (save-state chord = state restored).
     m = mark()
     tap("zl,down", wait=0.2)
     ln = line_after(m, "playback_shortcut")
     row("save-state playback slot plays on a restore (stand-in)", ln is not None, ln or "none")
 
+    # N7 through the writer thread: the file is written outside hook scope, the counter stays at zero.
+    m = mark()
+    tap("zl,up", wait=1.5)
+    ln = line_after(m, "button_config.ini written by the writer thread", 10)
+    ini = r.remote(f"Get-Content {SD}/button_config.ini")[1]
+    (OUT / "button_config.ini").write_text(ini + "\n")
+    row("shortcut edit written by the writer thread (transaction)", ln is not None and "shortcut_2=X + Y" in ini, (ln or "no writer line") + " | " + ini.replace("\n", " | "))
+    time.sleep(22)
+    counts = [x for x in read_diag() if "input_hook_counts" in x]
+    (OUT / "hook-counts.txt").write_text("\n".join(counts) + "\n")
+    heaps = [int(re.search(r"heap_allocations=(\d+)", x).group(1)) for x in counts]
+    row("heap_allocations stays 0 through the shortcut edit (R5)", len(heaps) >= 3 and set(heaps) == {0}, f"{len(heaps)} reports, values {sorted(set(heaps))}")
 
-boot = {"A": boot_a, "B": boot_b}[BOOT]
+def boot_a2():
+    """Second pass on boot A after the shortcut edit: notices under the menu stand-in, the display's content
+    lines and the allocation counter across the hooks."""
+    # A notice (the lockout message, one second) is hidden while the menu stand-in is open and shown again after.
+    m = mark()
+    tap("zr,down", wait=0.05)
+    tap("x,y", wait=0.3)  # the edited shortcut (X + Y) opens the menu stand-in at once
+    ln = line_after(m, "notice_visible=false menu_open=true", 6)
+    row("notice hidden while the menu is open (B8)", ln is not None, ln or "none")
+    time.sleep(2.5)
+    m2 = mark()
+    tap("x,y", wait=1.0)
+    ln = line_after(m2, "notice_visible=true menu_open=false", 6)
+    row("notice visible again after the menu closes (queue kept ticking only while visible)", ln is not None, ln or "none")
+    time.sleep(3)
+    # The input display: new rows from button presses (content lines only).
+    m = mark()
+    for b in ("a", "b", "x", "a"):
+        tap(b, hold=100, wait=0.3)
+    plans = [x for x in lines_after(m) if "input_display_plan" in x and ("icons=1" in x or "rows=" in x and "rows=0" not in x)]
+    row("input display plans with row/icon writes for new rows (panes wait for package 5)", bool(plans), plans[0] if plans else "none")
+    # Hook invocation counts and the allocation counter: flat across the reports after the last stand-in.
+    time.sleep(22)
+    counts = [x for x in read_diag() if "input_hook_counts" in x]
+    (OUT / "hook-counts.txt").write_text("\n".join(counts) + "\n")
+    heaps = [int(re.search(r"heap_allocations=(\d+)", x).group(1)) for x in counts]
+    tail = heaps[-3:]
+    row("hook counts logged and heap_allocations flat in steady state (R5)", len(tail) == 3 and len(set(tail)) == 1,
+        f"last reports {tail}; first nonzero at the stand-in's file write (diag only); {counts[-1][:150] if counts else 'none'}")
+
+
+def boot_b2():
+    """The loop from boot B is still running: the reset chord stops it."""
+    m = mark()
+    tap("l,r,a", hold=400, wait=0.5)
+    hub = line_after(m, "hub_run cause=TrainingReset", 10)
+    time.sleep(2.0)
+    if hub is None:
+        row("L+R+A reset stops the recorder (B8)", False, "no hub_run line")
+    else:
+        t0 = stamp_of(hub)
+        later = [x for x in lines_after(t0) if "playback_complete" in x or "playback_shortcut" in x]
+        row("L+R+A reset stops the recorder (B8)", not later, f"hub_run at {t0}; lines after it within 2 s: {len(later)}")
+
+
+boot = {"A": boot_a, "A2": boot_a2, "B": boot_b, "B2": boot_b2}[BOOT]
 boot()
 (OUT / "rows.txt").write_text("\n".join(f"{'pass' if ok else 'FAIL'}\t{name}\t{ev}" for name, ok, ev in RESULTS) + "\n")
 sys.exit(0 if all(ok for _, ok, _ in RESULTS) else 1)
+

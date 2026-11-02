@@ -122,11 +122,7 @@ pub fn commit_shortcut(slot: usize, chord: Chord) -> Result<(), ini_files::EditR
     let current = STATE.lock().chords.shortcuts;
     let next = ini_files::check_edit(current, slot, chord)?;
     STATE.lock().chords.shortcuts = next;
-    if let Some(path) = ini_path() {
-        if let Err(error) = ini_files::write_shortcuts(Path::new(path.as_str()), next) {
-            diagnostic(format_args!("[TrainingRooms] button_config.ini not written: {error}; kept for this session"));
-            crate::runtime::features::notices::post("Menu shortcuts", "Could not save button_config.ini", 120, [0, 0, 0, 255]);
-        }
-    }
+    // The file is written by the writer thread, never from this (possibly hook) context.
+    crate::runtime::features::writer::request_shortcuts(next);
     Ok(())
 }

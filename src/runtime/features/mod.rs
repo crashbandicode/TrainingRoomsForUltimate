@@ -14,3 +14,5 @@ pub mod state_recorder;
 pub mod state_restore;
 pub mod states;
 pub mod stage_hazards;
+#[cfg(feature = "diag")]
+pub mod writer;

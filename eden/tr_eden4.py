@@ -72,13 +72,16 @@ def ledger(line):
 
 
 def open_claims():
+    """Owners with an open claim on THIS host. The ledger is shared; a claim that names the Surface and not
+    the Yoga (another host's Eden) does not hold the Yoga."""
     state = {}
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
         if m:
-            state[m.group(2)] = m.group(1) == "CLAIMED"
+            host = re.search(r"\bon (Yoga|Surface|Ally)\b", line)
+            other_host = bool(host) and host.group(1) != "Yoga"
+            state[m.group(2)] = m.group(1) == "CLAIMED" and not other_host
     return [k for k, v in state.items() if v and k != OWNER]
-
 
 def mem_available_kib():
     return next(int(l.split()[1]) for l in Path("/proc/meminfo").read_text().splitlines()
