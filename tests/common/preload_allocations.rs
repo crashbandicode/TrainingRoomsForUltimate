@@ -1,4 +1,4 @@
-//! Regression for the allocations observed on each s6-09 preload planning tick.
+//! Library-test-only regression for allocations observed on s6-09 planning ticks.
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 

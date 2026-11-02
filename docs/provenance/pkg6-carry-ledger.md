@@ -63,7 +63,7 @@ file in this repository.
 | `src/model/swap/swap_model/fallback.rs` | `training_mod_consts/src/swap_model/fallback.rs` | `2345a0a33be95738` | `cd0e90b4388ec4f9` | path rewrite only |
 | `src/model/swap/swap_model/hud_model.rs` | `training_mod_consts/src/swap_model/hud_model.rs` | `15b229a86c290378` | `28ca06df8f28d0e5` | path rewrite only |
 | `src/model/swap/swap_model/ledger.rs` | `training_mod_consts/src/swap_model/ledger.rs` | `900a579c03810163` | `58b639faf485f81d` | path rewrite only |
-| `src/model/swap/swap_model/lifecycle.rs` | `training_mod_consts/src/swap_model/lifecycle.rs` | `8bfb6a934f7d9250` | `4c83e9f021d67e3e` | path rewrite only |
+| `src/model/swap/swap_model/lifecycle.rs` | `training_mod_consts/src/swap_model/lifecycle.rs` | `8bfb6a934f7d9250` | `56125ec781cc65f0` | R5 teardown context planning reads unique contexts and controller matches directly from the existing slice, preserving first-occurrence validation and route-before-free order without temporary controller/seen Vecs. |
 | `src/model/swap/swap_model/mod.rs` | `training_mod_consts/src/swap_model/mod.rs` | `9eaf8a4afc10f7ad` | `9eaf8a4afc10f7ad` | path rewrite only |
 | `src/model/swap/swap_model/native_model.rs` | `training_mod_consts/src/swap_model/native_model.rs` | `78ba97e97253bb7f` | `9b05147ca066ddcb` | path rewrite only |
 | `src/model/swap/swap_model/occupancy.rs` | `training_mod_consts/src/swap_model/occupancy.rs` | `e190e95a1db710a7` | `bc56d91474616d0a` | path rewrite only |

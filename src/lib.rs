@@ -15,6 +15,7 @@ pub mod editors;
 pub mod install_capacity;
 
 #[cfg(test)]
+#[path = "../tests/common/preload_allocations.rs"]
 mod preload_allocation_tests;
 
 #[cfg(target_os = "switch")]

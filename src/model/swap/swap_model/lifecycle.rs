@@ -223,15 +223,18 @@ impl Phases {
         if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }
     }
 
-    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).
-    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {
+    /// Every route slot naming a validated context's controller is cleared
+    /// first (D-PTA1c), without allocating a separate controller list.
+    fn routes_for(&mut self, owner: u32, contexts: &[ContextRef], consumers: &NativeConsumers) {
+        let owns = |controller| unique_contexts(contexts)
+            .any(|context| context.valid && context.controller == controller);
         for route in consumers.pad_routes.iter().flatten() {
-            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }
+            if route.controller != 0 && owns(route.controller) { self.route(route.slot, route.controller); }
         }
         // Nana's route (`owner+8`, U2): the same rule from the separately probed word.
         if let Some(controller) = consumers.nana_owner_plus_8 {
             let slot = owner.saturating_add(8);
-            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }
+            if controller != 0 && slot < PAD_SLOTS as u32 && owns(controller) { self.route(slot as u8, controller); }
         }
     }
 
@@ -246,32 +249,25 @@ impl Phases {
         }
     }
 
-    fn contexts_of(&mut self, contexts: &[ContextRef], free: bool) -> Vec<usize> {
-        let mut controllers = Vec::new();
-        let mut seen: Vec<usize> = Vec::new();
-        for context in contexts {
-            if context.ctx == 0 || seen.contains(&context.ctx) { continue; }
-            seen.push(context.ctx);
+    fn detached_contexts(&mut self, contexts: &[ContextRef]) {
+        for context in unique_contexts(contexts) {
             if !context.valid {
-                if free { self.skipped.push(Skipped::Context(context.ctx)); }
+                self.skipped.push(Skipped::Context(context.ctx));
                 continue;
             }
-            if context.controller != 0 { controllers.push(context.controller); }
-            if free { self.contexts.push(context.ctx); }
+            self.contexts.push(context.ctx);
         }
-        controllers
     }
 
     fn attached(&mut self, group: &AttachedGroup, consumers: &NativeConsumers) {
-        let controllers = self.contexts_of(&group.contexts, false);
-        self.routes_for(group.owner, &controllers, consumers);
+        self.routes_for(group.owner, &group.contexts, consumers);
         self.kirby(&group.cells);
         self.attached = Attached::NativeRetiring;
     }
 
     fn detached(&mut self, group: &DetachedGroup, consumers: &NativeConsumers) {
-        let controllers = self.contexts_of(&group.contexts, true);
-        self.routes_for(group.owner, &controllers, consumers);
+        self.detached_contexts(&group.contexts);
+        self.routes_for(group.owner, &group.contexts, consumers);
         self.kirby(&group.bodies);
         for body in &group.bodies {
             if body.valid { self.bodies.push(body.id); } else { self.skipped.push(Skipped::Body(body.id)); }
@@ -298,6 +294,15 @@ impl Phases {
         DestroyPlan { steps, skipped: self.skipped, attached: self.attached, kirby_cells: self.kirby_cells,
             kirby_misplaced: self.kirby_misplaced, kirby_branch_mismatch: self.kirby_branch_mismatch }
     }
+}
+
+/// Native context aliases use the first occurrence, including its validation
+/// result. A later duplicate cannot upgrade an earlier refused context.
+fn unique_contexts(contexts: &[ContextRef]) -> impl Iterator<Item = &ContextRef> {
+    contexts.iter().enumerate().filter_map(|(index, context)| {
+        (context.ctx != 0 && !contexts[..index].iter().any(|prior| prior.ctx == context.ctx))
+            .then_some(context)
+    })
 }
 
 /// The plan for one bundle: an attached window yields its route releases plus
