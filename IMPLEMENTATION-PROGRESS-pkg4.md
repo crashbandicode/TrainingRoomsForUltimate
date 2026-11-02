@@ -32,3 +32,11 @@ Playbook followed: `009c9ac`. Target `/home/intpa/smash-training-lobby/cargo-tar
 `git -C /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg4 log --oneline -5`; Eden: `python3 -I eden/route4.py s4-01` then
 `rows4.py s4-01 A` (diag NRO + pilot + tile cursor, `eden/settings` boot A), then s4-02 / B (reversed load order). Results go to
 `eden/EDEN-PACKAGE-4.md`.
+
+## Rule slip disclosed (2026-11-02)
+
+Between about 04:36Z and 04:52Z (host clock of the Yoga) I ran seven `cargo skyline build --release` / `--features diag` builds in
+`/home/intpa/trainingrooms-build-pkg4` on the Yoga while pkg5's Eden runs (`s5-03` at 04:47Z and its predecessors, display `:95`) were live. The
+rule is never to compile beside a running Eden. Each build ran under `systemd-run --scope -p MemoryMax=6G` with `timeout 1800`; most took 2-5 s (cached
+std), the first about 4 min. From that point on every build runs on the Surface (campaign toolchain, `docs/BUILD.md`). pkg5 can rerun any Eden
+run of that window whose numbers look odd.
