@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import route4 as r
+import hook_stats
 
 LABEL = sys.argv[1]
 SD = f"{r.PROFILE_SD}/TrainingRooms"
@@ -385,10 +386,14 @@ def main():
     last_counts = lines[-1] if lines else ""
     row("hook allocation counter after the layer ran (R5)", "heap_allocations=0" in last_counts, last_counts[-200:] or "no report")
     # Include load and every retained scope; no inherited allocation exception.
-    stats = [x for x in read_diag() if "hook_stats allocations=" in x]
-    grew = [x for x in stats if not re.search(r" delta=0 ", x)]
-    row("R5: every retained hook_stats delta is zero", bool(stats) and not grew,
-        (f"{len(stats)} reports, all delta=0" if stats and not grew else " | ".join(re.sub(r" hook_calls=.*?(?= allocs=|$)", "", x)[-160:] for x in grew[:4]) or "no hook_stats report"))
+    all_diag = "\n".join(read_diag())
+    required = ("live_replay", "recorder_ai", "recorder_poll", "named_service", "named_restore")
+    passed, reasons = hook_stats.gate(all_diag, required)
+    row("R5: every retained hook delta/total is zero and pkg4 scopes ran",
+        passed, "; ".join(reasons) or f"covered={required}")
+    losses = [line for line in all_diag.splitlines()
+              if "[MacroHandoff]" in line and re.search(r"\bd?\w*dropped=[1-9]\d*", line)]
+    row("worker handoffs lost no events", not losses, "\n".join(losses) or "no dropped-event reports")
     (OUT / "results.json").write_text(json.dumps(RESULTS, indent=1))
     print(f"ROWS {sum(1 for x in RESULTS if x[1])}/{len(RESULTS)} pass", flush=True)
 

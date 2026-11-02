@@ -14,8 +14,8 @@
 
 - Shared-interface note: pkg4 extends ui::facts (CPU status/situation and scene/waiting snapshots) for worker ownership, without editing ui-screens editor implementations. Scene facts refresh in existing game/layout callbacks and invalidate on session retirement. Please preserve these additions in integration.
 
-- Lead: please provide the exact authorized integration SHA for pkg6's guarded `entry_active_body` F11 slice when gated. pkg4 is at `c111b81` plus progress docs, implementing independent ownership work first.
-- Lead: live_replay's existing hooks allocate through `hook_stats::per_load` (`start_recording`, per-frame pool growth), and save paths construct Strings/Arc snapshots. The brief's zero-allocation requirement must include these if "every layer" covers live replay; these are not yet fixed or accepted as exceptions. Please confirm ownership of that work while pkg4 proceeds with design C and resident adapter.
+- Lead: please provide the exact authorized integration SHA for pkg6's guarded `entry_active_body` F11 slice when gated. pkg4 Rust snapshot8268f0f is staged for the next Switch build; independent ownership changes are implemented, gating continues.
+- Live replay ownership request resolved by implementation: hook-side tokens/Copy mailboxes now replace pool Vec/Arc/String work; no per_load remains in macros. Worker-owned archive/metadata changes are committed through5425aee; fresh Switch/runtime validation remains OPEN.
 - Lead: final online replay A/B and two-console evidence is allocated to package 7 by implementation-packages; please identify the integration evidence owner for pkg4's resident capture change. No READY claim will cite absent evidence.
 
 - Objective: finish design C, resident capture adapter, s4-09 and all pkg4 gates; READY only after evidence.
@@ -81,6 +81,15 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Rust snapshot8268f0f staged in Yoga own src/target (archive808ff04ef255db8c8c53a0007de6746a5dd8860aa57a32c95090f6bdc35808c2);
+  diag-8268f0f.ps1 prepared with ordered capture, no compile/claim yet. Host gate remains frozen67dad67.
+- Full external helper reads completed: eden-run.py SHA5c9f9dca, edenctl.py2fe7c401, display-rootful.ps1a930b7a6;
+  local/Yoga file hashes match. No helper changes. Five existing HookStatsGateTests pass, reused by row runner.
+  Current dirty row improvement requires all pkg4 hook coverage plus zero total/delta and zero handoff-loss reports.
+- Raw failed-host log confirms new macro_handoff tests passed (live archive/save binding, capture overlap exclusion,
+  fixed identity/Mii transport, Vault continuity); only owned-ELF staging failed. This does not replace hook_locks/full gates.
+- Lead inbox16:3xZ read: UI owns confirmed tr-menu stack overflow from ui-12, no tolerance accepted.
+  Preserve UI root fix at authorized integration; inspect pkg4 worker compiled frames on fresh NRO before runtime.
 - Owned ELF staged/verified both hosts SHA0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2.
   Retry wrapper host-67dad67-r2.ps1 preserves original failure log, no skip env. Yoga pkg6 precedes retry.
 - Route adapter now uses shared225d16b route.py/params.py with exact file hash checks, explicit remote
