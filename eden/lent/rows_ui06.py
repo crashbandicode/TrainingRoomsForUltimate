@@ -59,8 +59,9 @@ def hook_stats():
 
 
 def main():
-    events = u.plug(PHASE, "TrainingRooms/events.log", "result=", 2)["lines"]
-    row("install line whole: result=installed heap_allocations=0", any("result=installed heap_allocations=0" in x for x in events), (events[-1][-120:] if events else "none"))
+    # The whole line from the file (the plug op cuts lines at 200 characters): its tail carries result= and heap_allocations=.
+    tail = ps(f"$l = (Get-Content '{SD}\\events.log' | Select-String -Pattern 'result=' | Select-Object -Last 1).Line; $l.Substring([Math]::Max(0, $l.Length - 160))").strip()
+    row("install line whole: ends result=installed heap_allocations=0", tail.endswith("result=installed heap_allocations=0") or "result=installed heap_allocations=0" in tail, tail[-120:] or "none")
     full = ps(f"(Get-Content '{SD}\\events.log' -TotalCount 1).Length")
     row("install line length (whole, over the old 8 KiB)", True, f"{full.strip()} characters")
     before = hook_stats()

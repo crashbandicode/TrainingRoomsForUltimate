@@ -14,7 +14,6 @@ use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::editors::clip::clip_frame;
 use crate::model::flow::{self, Phase, Seen, Step};
-use crate::model::frame::Frame;
 use crate::model::menu::input::Button;
 use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};

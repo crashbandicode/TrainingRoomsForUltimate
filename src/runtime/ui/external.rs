@@ -82,14 +82,13 @@ pub fn close_panel() {
 /// Why `editor`'s panel did not open, in the words of the layer's own refusals (its notice is hidden while the menu is open, so the
 /// menu says it on the row's help line). The predicates are the layer's: the published facts, the recorder and the save states.
 pub fn refusal_of(editor: Editor, slot: Option<usize>) -> &'static str {
-    use crate::runtime::macros::port;
     if matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary) && slot.is_none() {
         return "Choose a Record Slot first";
     }
     if !crate::runtime::ui::facts::fact_fighters_present() {
         return "Wait for both practice fighters";
     }
-    if port::recording_or_playback() || port::save_states::is_loading() {
+    if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
         return "Finish the current practice action first";
     }
     match editor {
