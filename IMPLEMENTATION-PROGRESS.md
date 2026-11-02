@@ -31,3 +31,6 @@ Playbook followed: `53fd1f2`. Host only; no Eden, no Switch, no push.
 `$env:CARGO_TARGET_DIR='/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-work'`, then, one per call,
 `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800 cargo test` / `cargo clippy --all-targets -- -D warnings`
 / `cargo build --no-default-features` (PATH needs `/home/intpa/.cargo/bin`).
+
+## Eden fixes D1-D4 (2026-11-02)
+New NROs (same launcher): release sha256 `9bad6541a3b1d7497724e6c1db108083017b4a1aef3c9df49ea39a7786cc0ac5` (file 126,976 B, resident 172,032 B), diag `db7a4dd980b17b275ee439e0e644b6090b3ed6aede297f165fd8c1e93423e475` (122,880 B, 270,336 B). They replace the hashes of the first builds above.
