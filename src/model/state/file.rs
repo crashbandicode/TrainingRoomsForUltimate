@@ -34,12 +34,12 @@ impl Default for SaveFile {
 }
 
 impl SaveFile {
-    /// Read the file's bytes. `Err` carries the all-defaults file and the reason.
-    pub fn parse(bytes: &[u8]) -> Result<Self, (Self, Defaulted)> {
-        let Ok(value) = serde_json::from_slice::<Value>(bytes) else { return Err((Self::default(), Defaulted::NotJson)) };
-        let Some(object) = value.as_object() else { return Err((Self::default(), Defaulted::WrongShape)) };
+    /// Read the file's bytes. `Err` is why it is not usable: the caller takes `SaveFile::default()`.
+    pub fn parse(bytes: &[u8]) -> Result<Self, Defaulted> {
+        let Ok(value) = serde_json::from_slice::<Value>(bytes) else { return Err(Defaulted::NotJson) };
+        let Some(object) = value.as_object() else { return Err(Defaulted::WrongShape) };
         if !object.contains_key("player") && !object.contains_key("cpu") {
-            return Err((Self::default(), Defaulted::WrongShape));
+            return Err(Defaulted::WrongShape);
         }
         let mut file = Self::default();
         for (key, records) in [("player", &mut file.player), ("cpu", &mut file.cpu)] {

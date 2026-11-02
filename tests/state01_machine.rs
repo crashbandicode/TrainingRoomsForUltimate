@@ -333,6 +333,17 @@ fn state01_playback_once() {
     let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
     let (player, cpu) = run_ground_load(&mut machine, &s, &mut rng);
     assert_eq!((player.trigger, cpu.trigger), (None, Some(Trigger::Record)));
+    // The recorder is told once per restore, with whether the CPU was saved on the ledge.
+    assert_eq!((player.restored, cpu.restored), (None, Some(false)));
+    let mut ledge = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, CLIFF, 7), 0);
+    request(&mut ledge, &s, &mut rng);
+    ledge.frame(&input(0), &s, &mut rng);
+    ledge.frame(&input(1), &s, &mut rng);
+    ledge.frame(&input(0), &s, &mut rng);
+    ledge.frame(&input(1), &s, &mut rng);
+    ledge.frame(&FrameIn { status: StatusNow::Wait, ..input(0) }, &s, &mut rng);
+    let done = ledge.frame(&FrameIn { status: StatusNow::CliffCatch, ..input(1) }, &s, &mut rng);
+    assert_eq!(done.restored, Some(true));
     let idle = machine.frame(&input(1), &s, &mut rng);
     assert_eq!(idle.trigger, None, "not again");
     // A playback slot is drawn once.

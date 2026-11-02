@@ -13,6 +13,8 @@ mod game;
 mod hub;
 mod install;
 mod published;
+mod state_boot;
+mod state_natives;
 
 #[skyline::main(name = "training_rooms")]
 pub fn main() {

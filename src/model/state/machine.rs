@@ -180,6 +180,9 @@ pub struct Out {
     /// The Save chord set both records (the slot the notification names).
     pub saved_notice: Option<usize>,
     pub trigger: Option<Trigger>,
+    /// Both records of the load are done: `Some(saved_on_ledge)`, once per restore (the recorder's
+    /// `on_state_restored`).
+    pub restored: Option<bool>,
     /// The Ice Climbers hand-off happened: Nana is placed next.
     pub nana_next: bool,
 }
@@ -357,6 +360,9 @@ impl Machine {
         if self.trigger_pending && !self.is_loading() {
             self.trigger_pending = false;
             if let Some(slot) = self.active.take() {
+                // The restore is complete: the recorder is told once (pkg4 interface), with whether
+                // the CPU was saved on the ledge; then the recording / playback trigger.
+                out.restored = Some(self.record(Role::Cpu, slot).situation_kind == input.situation.cliff);
                 out.trigger = self.trigger_for(slot, settings, rng);
             }
         }
@@ -379,14 +385,19 @@ impl Machine {
 
     /// Steps 2 to 9 of §5.3 for one body.
     fn place(&mut self, role: Role, slot: usize, input: &FrameIn, settings: &StateSettings, rng: &mut Rng, out: &mut Out) {
-        let record = self.record(role, slot).clone();
-        let situation = input.situation.classify(record.situation_kind);
-        let mut y = record.y;
+        // Copy the values out (no clone: a record may hold a heap-backed Mii identity and this runs in a
+        // frame hook).
+        let (saved_x, saved_y, saved_lr, saved_situation, saved_percent, saved_kind, saved_charge, saved_steve, saved_item) = {
+            let record = self.record(role, slot);
+            (record.x, record.y, record.lr, record.situation_kind, record.percent, record.fighter_kind, record.charge, record.steve, record.held_item)
+        };
+        let situation = input.situation.classify(saved_situation);
+        let mut y = saved_y;
         if situation == Situation::Cliff {
             y += place::ledge_raise(input.kind);
         }
-        let x = place::target_x(record.x, self.mirror_sign, input.stage_id);
-        let lr = place::target_lr(record.lr, self.mirror_sign);
+        let x = place::target_x(saved_x, self.mirror_sign, input.stage_id);
+        let lr = place::target_lr(saved_lr, self.mirror_sign);
         let request = match situation {
             Situation::Ground if input.status != StatusNow::Wait => Some(Request::Wait),
             Situation::Air if input.status != StatusNow::Fall => Some(Request::Fall),
@@ -405,7 +416,7 @@ impl Machine {
             Role::Cpu => (settings.damage_cpu, settings.limits_cpu),
         };
         let mut next = Marker::NoAction;
-        let charge = (record.fighter_kind == input.kind).then_some(record.charge);
+        let charge = (saved_kind == input.kind).then_some(saved_charge);
         if input.kirby {
             next = Marker::WaitForCopyAbility;
         }
@@ -417,10 +428,10 @@ impl Machine {
             next = Marker::WaitForPokemonSwitch;
         }
         out.done = Some(Done {
-            damage: place::load_damage(mode, record.percent, limits, rng),
-            item: (role == Role::Player && !input.nana).then_some(record.held_item).flatten(),
+            damage: place::load_damage(mode, saved_percent, limits, rng),
+            item: (role == Role::Player && !input.nana).then_some(saved_item).flatten(),
             charge,
-            steve: record.steve,
+            steve: saved_steve,
             reset_sound: role == Role::Cpu,
             next,
             pokemon_switch,

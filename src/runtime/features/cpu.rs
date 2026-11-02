@@ -240,6 +240,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
     if ready {
         // SAFETY: `a0` is the fighter object the game just ran a frame of.
         unsafe { fighter_frame(a0) };
+        // Package 3: the save-state step runs on the same per-fighter callback, after the CPU's.
+        crate::runtime::features::states::frame(a0);
     }
     result
 }

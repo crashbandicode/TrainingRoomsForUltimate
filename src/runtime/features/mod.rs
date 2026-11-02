@@ -4,4 +4,6 @@ pub mod cpu;
 pub mod input_delay;
 pub mod lra_reset;
 pub mod reset_hub;
+pub mod state_recorder;
+pub mod states;
 pub mod stage_hazards;

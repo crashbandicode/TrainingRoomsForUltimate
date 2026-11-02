@@ -76,6 +76,10 @@ def main(argv):
         for name, value in sorted(symbols(elf, sections), key=lambda s: s[1]):
             if pattern.search(name):
                 print(f"{value:#x} {name}")
+    elif cmd == "near":
+        target = int(argv[2], 16)
+        best = max((s for s in symbols(elf, sections) if s[1] <= target), key=lambda s: s[1], default=None)
+        print(f"{best[1]:#x} {best[0]} (+{target - best[1]:#x})" if best else "none")
     elif cmd == "window":
         data = window(elf, sections, int(argv[2], 16))
         print(", ".join(f"0x{b:02x}" for b in data))

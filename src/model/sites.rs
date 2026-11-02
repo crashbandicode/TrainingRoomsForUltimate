@@ -38,6 +38,8 @@ pub enum Feature {
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
     CpuShield,
+    /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
+    StateCore,
 }
 
 impl Feature {
@@ -53,6 +55,7 @@ impl Feature {
             Feature::CpuLedge => "cpu_ledge",
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
+            Feature::StateCore => "state_core",
         }
     }
 }

@@ -46,7 +46,7 @@ pub fn load(path: &Path) -> (SaveFile, Outcome) {
     };
     match SaveFile::parse(&bytes) {
         Ok(file) => (file, Outcome::Read),
-        Err((file, why)) => {
+        Err(why) => {
             // Keep one copy of what was there (a second boot over the same bytes reuses it); never
             // overwrite an earlier copy, never move the file.
             let mut kept = None;
@@ -63,7 +63,7 @@ pub fn load(path: &Path) -> (SaveFile, Outcome) {
                     }
                 }
             }
-            (file, Outcome::Defaulted { why, kept })
+            (SaveFile::default(), Outcome::Defaulted { why, kept })
         }
     }
 }

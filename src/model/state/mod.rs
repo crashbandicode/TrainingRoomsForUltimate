@@ -10,6 +10,8 @@ pub mod file;
 pub mod held_item;
 #[path = "hooks.rs"]
 pub mod hooks;
+#[path = "ids.rs"]
+pub mod ids;
 #[path = "json.rs"]
 pub mod json;
 #[path = "machine.rs"]
@@ -24,3 +26,8 @@ pub mod record;
 pub mod settings;
 #[path = "setup.rs"]
 pub mod setup;
+
+/// The ItemManager singleton's pointer slot (`_ZN3lib9SingletonIN3app11ItemManagerEE9instance_E`, in
+/// `.bss`), checked in `tests/state_sites.rs` against the guarded `adrp` / `ldr` pair of the
+/// `state_item_manager_ref` row.
+pub const ITEM_MANAGER_SLOT_OFFSET: usize = 0x52c_4070;

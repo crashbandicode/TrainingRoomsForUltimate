@@ -167,7 +167,7 @@ fn state01_ported_files_load_and_rewrite_as_the_fork_wrote_them() {
     let mut with_items = 0;
     for path in names {
         let converted = fs::read_to_string(&path).unwrap();
-        let ported = SaveFile::parse(converted.as_bytes()).unwrap_or_else(|e| panic!("{}: {:?}", path.display(), e.1));
+        let ported = SaveFile::parse(converted.as_bytes()).unwrap_or_else(|e| panic!("{}: {:?}", path.display(), e));
         let expected = imported_text(&path);
         let imported = SaveFile::parse(expected.as_bytes()).unwrap();
         assert_eq!(ported, imported, "{}: converter output differs from the toml import", path.display());
@@ -215,9 +215,9 @@ fn state01_damaged_fields_do_not_discard_adjacent_slots() {
 
 #[test]
 fn state01_file_missing_defaults_and_unusable_files_report_why() {
-    assert_eq!(SaveFile::parse(b"{ not json").unwrap_err().1, Defaulted::NotJson);
-    assert_eq!(SaveFile::parse(b"[1, 2]").unwrap_err().1, Defaulted::WrongShape);
-    assert_eq!(SaveFile::parse(b"{\"other\": 1}").unwrap_err().1, Defaulted::WrongShape);
+    assert_eq!(SaveFile::parse(b"{ not json").unwrap_err(), Defaulted::NotJson);
+    assert_eq!(SaveFile::parse(b"[1, 2]").unwrap_err(), Defaulted::WrongShape);
+    assert_eq!(SaveFile::parse(b"{\"other\": 1}").unwrap_err(), Defaulted::WrongShape);
     let defaults = SaveFile::default();
     assert_eq!(defaults.player.len(), SLOTS);
     assert!(defaults.cpu.iter().all(|r| r.fighter_kind == -1 && r.lr == 1.0 && r.steve == Some(Steve::START)));
