@@ -125,6 +125,13 @@ pub(crate) fn start() {
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };
         let _ = std::fs::remove_file(path.as_str());
         for line in text.lines() {
+            // The menu worker may be inside the keyboard applet. Observe only
+            // copied atomics here so the probe cannot queue behind that call.
+            if line.trim() == "frame_probe" {
+                diagnostic(format_args!("[NamedMacroDiag] frame_probe frames={} step={}",
+                    FRAMES.load(Ordering::Relaxed), STEP.load(Ordering::Relaxed)));
+                continue;
+            }
             let Some(command) = parse(line.trim()) else {
                 diagnostic(format_args!("[NamedMacroDiag] unknown_command line={line:?}"));
                 continue;

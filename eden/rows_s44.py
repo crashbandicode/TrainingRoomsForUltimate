@@ -3,6 +3,7 @@ reached the Training scene. The Named library, Save slot to library and Replay w
 layer through the diag request file (`runtime/macros/diag.rs`) and read the result lines. Every wait is gated on a diag line or a
 file, with a cap.  Usage: rows_s44.py <label>
 """
+import base64
 import json
 import re
 import subprocess
@@ -52,6 +53,9 @@ def line_after(start, needle, cap=20):
 def row(name, ok, evidence):
     RESULTS.append((name, ok, evidence))
     print(f"ROW {'pass' if ok else 'FAIL'} {name}: {evidence}", flush=True)
+    (OUT / "results.json").write_text(json.dumps(RESULTS, indent=1))
+    if not ok:
+        raise SystemExit(f"precondition/row failed: {name}; stop and retry with a new label")
 
 
 def tap(buttons, hold=150, wait=0.4):
@@ -69,8 +73,11 @@ def shot(name):
 def cmd(*lines):
     """Write the request file (the diag thread takes it within 200 ms) and return the diag mark taken before."""
     m = mark()
-    text = "`n".join(lines)
-    r.remote(f"Set-Content -Path {SD}/diag-macro.req -Value \"{text}\"", 30)
+    payload = base64.b64encode(("\n".join(lines) + "\n").encode()).decode()
+    rc, out, err = r.remote(
+        f"[IO.File]::WriteAllBytes('{SD}/diag-macro.req',[Convert]::FromBase64String('{payload}'))", 30)
+    if rc:
+        raise RuntimeError(f"diag request failed: {out} {err}")
     return m
 
 
@@ -135,12 +142,10 @@ def main():
     (OUT / "events.log").write_text(events)
     last = events.strip().splitlines()[-1] if events.strip() else ""
     row("install line: named_macros installed", "named_macros=installed" in events, last[:400])
-    row("install line: macros_port names only the boundary left (preview restore, menu screens)", "preview_restore=unavailable_until_pkg3" in events and "unavailable_until_cycle_lands" not in events, "present" if "preview_restore=" in events else "missing")
     row("install line complete (result=installed) and heap_allocations=0", "result=installed" in events and "heap_allocations=0" in events, "install")
     row("every named_macros row guarded (the 12 new sites)", events.count("control_get_button=stock") + events.count("stop_set_special_stop=stock") >= 2 or "control_get_button=" in events, "control_get_button / stop_set_special_stop in the line" if "control_get_button=" in events else "missing")
     cap = line_after(0, "[ReplayCapture] guarded live adapter ready", 5)
     row("live replay adapter: guards passed and hooks installed (capture on)", cap is not None, cap or "no ready line; " + (line_after(0, "live adapter disabled", 3) or "no disabled line either"))
-    row("boot restored the selected named macro (selected.txt)", line_after(0, "Loaded", 3) is not None or True, "see the seeded macros/selected.txt; restore path is silent")
 
     # named capture with the stop chord
     m = mark()
@@ -263,8 +268,6 @@ def main():
     ln = line_after(st, "[NamedMacroDiag] status", 6)
     (OUT / "status-after-open.txt").write_text(ln or "")
     row("capture opens in the clip editor", ln is not None and "editor=true" in ln, ln or "none")
-    for action in ("play",):
-        pass
     m = cmd("clip confirm")
     time.sleep(3.0)
     cr = [x for x in lines_after(m)][-12:]
@@ -318,6 +321,20 @@ def main():
     ok = False
     detail = "keyboard dialog not found in ui.tree"
     if dialog:
+        first = line_after(cmd("frame_probe"), "[NamedMacroDiag] frame_probe", 8)
+        first_count = re.search(r"frames=(\d+)", first or "")
+        row("keyboard frame probe available", first_count is not None, first or "missing")
+        baseline = int(first_count.group(1))
+        advanced = None
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            current = line_after(cmd("frame_probe"), "[NamedMacroDiag] frame_probe", 3)
+            count = re.search(r"frames=(\d+)", current or "")
+            if count and int(count.group(1)) > baseline:
+                advanced = current
+                break
+        row("game callbacks advance while keyboard is open", advanced is not None,
+            f"before={first}; after={advanced}")
         set_state = ui_do("ui.set", {"target": dialog["line_edit_osk"], "property": "text", "value": "kbtest"})
         click_state = ui_do("ui.click", {"target": dialog["button_ok"]})
         (OUT / "keyboard-ui.json").write_text(json.dumps({"dialog": dialog, "set": set_state, "click": click_state}, indent=1))
@@ -367,11 +384,10 @@ def main():
     (OUT / "hook-counts.txt").write_text("\n".join(lines))
     last_counts = lines[-1] if lines else ""
     row("hook allocation counter after the layer ran (R5)", "heap_allocations=0" in last_counts, last_counts[-200:] or "no report")
-    # R5 steady state from the first named row on: every hook_stats report since then has delta=0 (the match load's per-load and earlier
-    # packages' counts are before START); a nonzero one names its innermost scope in allocs=.
-    stats = [x for x in lines_after(START) if "hook_stats allocations=" in x]
+    # Include load and every retained scope; no inherited allocation exception.
+    stats = [x for x in read_diag() if "hook_stats allocations=" in x]
     grew = [x for x in stats if not re.search(r" delta=0 ", x)]
-    row("R5: no hook allocation while the layer ran (every hook_stats delta=0 after the first row)", bool(stats) and not grew,
+    row("R5: every retained hook_stats delta is zero", bool(stats) and not grew,
         (f"{len(stats)} reports, all delta=0" if stats and not grew else " | ".join(re.sub(r" hook_calls=.*?(?= allocs=|$)", "", x)[-160:] for x in grew[:4]) or "no hook_stats report"))
     (OUT / "results.json").write_text(json.dumps(RESULTS, indent=1))
     print(f"ROWS {sum(1 for x in RESULTS if x[1])}/{len(RESULTS)} pass", flush=True)

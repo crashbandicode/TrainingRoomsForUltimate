@@ -81,6 +81,21 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Owned ELF staged/verified both hosts SHA0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2.
+  Retry wrapper host-67dad67-r2.ps1 preserves original failure log, no skip env. Yoga pkg6 precedes retry.
+- Route adapter now uses shared225d16b route.py/params.py with exact file hash checks, explicit remote
+  pwsh7 and private pkg4 shots/profile. Used route/gv/solo/deploy files match225d16b. CLI and AST/plan
+  checks pass; no emulator claim/run yet. External launch helper reads/deployment still pending.
+- Legacy row runner corrected: persists/aborts on failure, safe UTF8 request writes, removes unconditional
+  selected-file pass and preview-stub pass, includes all retained hook reports. Keyboard frame_probe
+  reads only diagnostic atomics on existing request-reader thread, independent of UI keyboard call.
+  Rust probe uncompiled. Runner still partial: actual preview/placement and Off-to-On native-match save
+  rows remain to implement. Do not treat the legacy row count as s4-09 acceptance.
+- HEAD5425aee commits metadata serial retirement and verified carry42. Yoga67dad67 host gate
+  claimed/released16:25Z: 1174 passed,1 failed,2 ignored; hook_locks not reached. Raw failure:
+  `owned 13.0.5 ELF missing at /home/intpa/trainingrooms-build-pkg4/gate/../research/game-13.0.5/main-13.0.5.elf: link <stage>/../research, or set SKIP_OWNED_ELF_FACT=1 to skip`.
+  Fixing staging by copying the existing owned ELF to own build-root research path; no skip flag.
+  Requeued at Yoga end for host-67dad67-r2 ordered log, original failed log retained. No claim held.
 - Resumption16:2xZ: exact thread Astra/medium; hidden watcher service active, no alert.
   Prepared ordered-capture host-67dad67.ps1 under own Yoga root. No claim obtained:
   fresh claim helper refused with `ledger.Busy: ['imgui-nvn-sol is queued for the yoga and has not had it since the last TrainingRooms release there', 'tm-f8-terra is queued for the yoga and has not had it since the last TrainingRooms release there']`.
