@@ -125,25 +125,38 @@ def queue_head(text, host):
     return next((i for i in queue_items(text, host) if not i.startswith("(")), None)
 
 
-PARALLEL = "imgui-nvn-sol"
+# The parallel projects' owners, matched by name prefix in the owner key and the queue line (tm-f8-terra also
+# covers tm-f8-terra-ally and tm-f8-terra-eden).
+PARALLEL = ("imgui-nvn-sol", "tm-f8-terra")
+
+
+def is_parallel(owner):
+    return any(name in owner for name in PARALLEL)
+
+
+def parallel_turns(text, queue, host):
+    """The queue file's interleave rule (lead, 2026-11-02, binding on every stream), for each parallel owner: on a
+    host where it is queued, it takes the host after each TrainingRooms compile or Eden run and before the next
+    TrainingRooms claim. One reason to wait per owner that is queued for `host` (a queue line that does not say it
+    took the host or is satisfied) and has no CLAIMED on `host` after the last TrainingRooms RELEASED there (every
+    owner that is not a parallel one counts as ours)."""
+    if not queue:
+        return []
+    events = [e for e in parse(text) if host in e.hosts]
+    mine = [i for i, e in enumerate(events) if e.kind == "RELEASED" and not is_parallel(e.owner)]
+    if not mine:
+        return []
+    items = queue_items(queue, host)
+    later = events[mine[-1] + 1:]
+    return [f"{name} is queued for the {host} and has not had it since the last TrainingRooms release there"
+            for name in PARALLEL
+            if any(name in i and not re.search(r"\btook\b|satisfied", i) for i in items)
+            and not any(e.kind == "CLAIMED" and name in e.owner for e in later)]
 
 
 def parallel_turn(text, queue, host):
-    """The queue file's interleave rule (lead, 2026-11-02, binding on every stream): on a host where
-    `imgui-nvn-sol` is queued, it takes the host after each TrainingRooms compile or Eden run and before the next
-    TrainingRooms claim. Returns the reason to wait, or None: it waits when the host's queue section has an
-    imgui-nvn-sol line (not one that says it took the host or is satisfied) and the ledger shows no imgui-nvn-sol
-    CLAIMED on `host` after the last TrainingRooms RELEASED there (every other owner's lines count as ours)."""
-    if not queue or not any(PARALLEL in i and not re.search(r"\btook\b|satisfied", i) for i in queue_items(queue, host)):
-        return None
-    events = [e for e in parse(text) if host in e.hosts]
-    mine = [i for i, e in enumerate(events) if e.kind == "RELEASED" and PARALLEL not in e.owner]
-    if not mine:
-        return None
-    if any(e.kind == "CLAIMED" and PARALLEL in e.owner for e in events[mine[-1] + 1:]):
-        return None
-    return f"{PARALLEL} is queued for the {host} and has not had it since the last TrainingRooms release there"
-
+    """The first reason from `parallel_turns`, or None."""
+    return next(iter(parallel_turns(text, queue, host)), None)
 
 def stamp(now=None):
     return time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)) + "Z"
@@ -217,8 +230,7 @@ def busy(p, text=None, now=None, queue=None):
     waited = since_release(text, me, p.host, now)
     if waited is not None and waited < p.fair_seconds:
         why.append(f"fairness: own RELEASED {waited:.0f} s ago, wait {p.fair_seconds - waited:.0f} s more")
-    turn = parallel_turn(text, queue, p.host) if PARALLEL not in p.owner else None
-    return why + ([turn] if turn else [])
+    return why + ([] if is_parallel(p.owner) else parallel_turns(text, queue, p.host))
 
 
 def claim(p, body, now=None, text=None, queue=None):

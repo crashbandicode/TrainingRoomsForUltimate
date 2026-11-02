@@ -177,6 +177,34 @@ class InterleaveRule(unittest.TestCase):
         mine = p(owner="Codex 01a19bfb-4a8f-7dc1-969f-79c438c25f4c/imgui-nvn-sol")
         self.assertEqual([w for w in ledger.busy(mine, LEDGER, NOW, queue=QUEUE) if "queued for" in w], [])
 
+    def test_tm_f8_terra_and_its_variants_get_the_same_turn(self):
+        queue = QUEUE.replace("## Ally - the lent rig\n", "## Ally - the lent rig\n"
+                              "- tm-f8-terra-ally (Codex 0f3c): LDN-free Training row on the lent rig\n")
+        released = ("2026-11-02 12:10Z CLAIMED: Claude 0caa72b8/ui-screens TrainingRooms ui rows on the Ally\n"
+                    "2026-11-02 12:20Z RELEASED: Claude 0caa72b8/ui-screens TrainingRooms ui rows stopped on the Ally\n")
+        self.assertEqual(ledger.parallel_turns(released, queue, "yoga"), [])  # no TrainingRooms release on the Yoga here
+        why = ledger.parallel_turns(released, queue, "ally")
+        self.assertEqual([w.split()[0] for w in why], ["tm-f8-terra"])
+        me = p(host="ally", owner="Claude 0caa72b8/ui-screens")
+        self.assertTrue(any("tm-f8-terra" in w for w in ledger.busy(me, released, NOW, queue=queue)))
+        for variant in ("tm-f8-terra", "tm-f8-terra-ally", "tm-f8-terra-eden"):
+            served = released + f"2026-11-02 12:30Z CLAIMED: Codex 0f3c-aa/{variant} Ally LDN-free row, no LAN\n"
+            self.assertEqual(ledger.parallel_turns(served, queue, "ally"), [], variant)
+        # a release by one parallel owner does not count as a TrainingRooms release
+        only = released + "2026-11-02 12:40Z RELEASED: Codex 0f3c-aa/tm-f8-terra-ally Ally row done\n"
+        self.assertEqual(len(ledger.parallel_turns(only, queue, "ally")), 1)
+
+    def test_each_parallel_owner_waits_on_its_own_and_both_can_be_pending(self):
+        queue = ("## Yoga\n- imgui-nvn-sol (Codex a): ABI gates\n- tm-f8-terra-eden (Codex b): Eden row\n- stack: batch\n")
+        text = "2026-11-02 11:00Z CLAIMED: Claude 0caa72b8/stack TrainingRooms run on Yoga\n2026-11-02 11:10Z RELEASED: Claude 0caa72b8/stack run stopped on Yoga\n"
+        self.assertEqual(len(ledger.parallel_turns(text, queue, "yoga")), 2)
+        after_one = text + "2026-11-02 11:20Z CLAIMED: Codex a-1/imgui-nvn-sol Yoga ABI gates, no Eden\n"
+        self.assertEqual([w.split()[0] for w in ledger.parallel_turns(after_one, queue, "yoga")], ["tm-f8-terra"])
+        both = after_one + "2026-11-02 11:30Z CLAIMED: Codex b-1/tm-f8-terra-eden Yoga Eden row\n"
+        self.assertEqual(ledger.parallel_turns(both, queue, "yoga"), [])
+        for who in ("Codex a-1/imgui-nvn-sol", "Codex b-1/tm-f8-terra-eden"):
+            self.assertEqual([w for w in ledger.busy(p(host="yoga", owner=who), text, NOW, queue=queue) if "queued for" in w], [])
+
     def test_a_compile_release_counts_as_our_release(self):
         text = LEDGER.replace("11:55Z CLAIMED", "11:55Z RELEASED")
         text += "\n2026-11-02 11:56Z CLAIMED: Claude 0caa72b8/slim TrainingRooms host gates on Yoga, no Eden.\n2026-11-02 11:57Z RELEASED: Claude 0caa72b8/slim gates on Yoga done.\n"

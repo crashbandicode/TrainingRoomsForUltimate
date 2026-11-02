@@ -50,8 +50,10 @@ Every profile copy gets `pauseWhenInBackground=false`, `volume=0`, `volume\defau
 Common: the claim rules of `TRAININGROOMS-STREAM-RULES.md` are enforced by `ledger.py`, which `solo.ps1 -Action Up` calls
 before anything else: no Eden here, display free, MemAvailable >= 10 GiB, `df` >= 40 GB, then the claim is refused while any
 claim on that host has no later RELEASED (foreign owners included; stale after `stale_hours` and listed, not blocking),
-within `fair_seconds` of your own RELEASED, and while `imgui-nvn-sol` is queued for the host and has not had it since the
-last TrainingRooms release there (queue file interleave rule). `Up` fails with exit 3 and the reasons; wait with
+within `fair_seconds` of your own RELEASED, and while `imgui-nvn-sol` or `tm-f8-terra*` (`-ally`, `-eden`; matched by name
+prefix, each on its own; `ledger.PARALLEL`) is queued for the host and has not had it since the last TrainingRooms release
+there (queue file interleave rule). The harness starts no cargo command: `CARGO_INCREMENTAL=0` (the lead's disk order)
+applies to whoever runs `cargo test` for `tests/eden_harness.rs`. `Up` fails with exit 3 and the reasons; wait with
 `ledger.py wait <cap seconds>` (checks of at most 60 s) and claim in the same call with `ledger.py wait <cap> "<claim text>"`.
 A claim line must name its host as "on Yoga" / "on Surface" / "on Ally" and no other host.
 
