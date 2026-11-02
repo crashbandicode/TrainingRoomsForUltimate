@@ -37,7 +37,8 @@ function Py([string[]]$arguments) {
 if ($Action -eq 'Up') {
     $active = @{}
     foreach ($line in (Get-Content -LiteralPath $coord -ErrorAction SilentlyContinue)) {
-        if ($line -match '(CLAIMED|RELEASED): (\S+ \S+)') { $active[$Matches[2]] = ($Matches[1] -eq 'CLAIMED') }
+        # stream/stack: only claims on this host (Yoga) block; the ledger is shared by every host.
+        if ($line -match '(CLAIMED|RELEASED): (\S+ \S+)') { $active[$Matches[2]] = ($Matches[1] -eq 'CLAIMED') -and ($line -match 'Yoga') }
     }
     $busy = $active.GetEnumerator() | Where-Object { $_.Value -and $_.Key -notmatch '0caa72b8/stack-eden' }
     if ($busy) { throw "active claim: $($busy.Key -join ', ')" }

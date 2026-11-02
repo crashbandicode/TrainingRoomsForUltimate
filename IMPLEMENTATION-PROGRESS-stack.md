@@ -64,7 +64,12 @@ check/compliance.py).
 copy hard-codes gsp-visualizer's root, owner, output folders and `eNN` labels; a parameter for each would let it run as is.
 `solo.ps1` (14 lines changed): the same root, owner, label pattern; display `:99`; the gpu-lock unit names; the ledger
 texts; and before `game.load` a `settings.set core.volume 0` + `settings.save` + `settings.get` through the control API
-(operator rule 2026-10-09). Why: same hard-coding, plus the mute step the playbook copy lacks.
+(operator rule 2026-10-09); the claim check counts only claims whose line names the Yoga (the playbook copy refuses
+while any owner holds a claim on any host, which never clears with several streams on three hosts). Why: same
+hard-coding, plus the mute step and the per-host claim rule the playbook copy lacks.
+`eden/stack/st_run.py` drives the runs: Up/Down through the copies above, pkg4's screen-gated `route4.py` steps and
+reference shots for the route to Training, the diag request files for the busy rows, then fetch and console scan.
+`tools/stack_table.py` (+ `tools/test_stack_table.py`) turns the `[ThreadStack]`/`[HookStack]` lines into the tables.
 
 ## The fault
 
