@@ -4,6 +4,15 @@
 
 ## QUESTIONS
 
+- **Provider/consumer integration route18:56Z:** pkg6 f2bd652 cannot compile until Ticket consumer
+  exists, while current rule forbids taking an ungated provider. Prepared owned consumer exact patch
+  /tmp/pkg4-ticket-consumer.patch is ready (non-Copy Ticket, worker Error formatting, no synthetic
+  channel; no application). Please authorize a fixed composition route for gating rather than require
+  provider-only compile that its API break cannot satisfy. I can apply own patch through pkg4 carry
+  transforms after an exact merge/cherry-pick direction; UI has its own prepared take_catalog patch.
+  Do not infer runtime acceptance from the proposed composition. Source currently fabfaf6 gated next.
+
+
 - **Ready-go guard root found18:54Z; do NOT simply remove CROSS_NEEDS:** capabilities613 sole
   mismatch is declared NamedMacros/ui_is_ready_go absent from scanner closure. Source audit finds
   actual native Fighter::is_ready_go still called in replay_preview.rs166, replay_capture.rs1005/1032,
@@ -681,3 +690,28 @@ ENDED/RELEASED18:52Z Surface capabilities613b8f0 controller83850 scope run-p3890
 
 ### Capabilities613 result18:52Z
 cargo101/wrapper1;153passed/1failed/4ignored, actual compile and all3originalreceiver regressions PASS, poisoned-row PASS. Sole failure cross_needs_match_the_call_graph: declared named_macros includes ui_is_ready_go while computed closure lacks it. All other sets identical. Raw log/exit eden/runs/build-613b8f0;1113source files unchanged. No blanket regeneration/allowlist. Next inspect exact native-to-published-fact migration and request narrow removal of obsolete declaration if confirmed. Controller83850 ended, Surface claim released/own queue removed; Yoga613diag still pending.
+
+
+### Guarded-ready-go fabfaf6 / throughput override18:57Z
+Owned replay_capture/live_replay/replay_preview now call existing game::is_ready_go (no new provider); carry42 verified. No CROSS_NEEDS change. ui/facts shared hunk still requested. Scanner613 passed3original regressions + poison; fullhostfab queued SurfaceEND. Withdrew UNRUN Yoga613diag before restaging newest source, no claim taken. Operator newqueue4-5 read: two compile claims/host with noEden, ownsource/target,6G each,MemAvailable>=10GiB/disk>=40GB, noTR180sgap. Compile-only localcontext /tmp/pkg4-compile-context.py preserves fullledger/Eden exclusion/max2 and skips alreadyclaimed queue lines; old exclusive context retained for Eden. No sharedharness edit.
+
+Prepared unapplied Ticket/F11 patches also persisted under eden/runs/pkg4-prepared/ (same basenames) for restart safety; /tmp is not the sole copy. Ticket patch expects provider composition and carry transform regeneration, not direct hand-edit of carried destination.
+
+
+### Live gates19:02Z
+Yoga fabfaf6 Switchdiag PASS0/42.10s, controller44642 ended/released/ownqueue removed; warnings retained. Surface fullhostfab stillrunning55160 scope run-p3947080-i16517743.scope with separate source/target. No own Eden/profile mutation. Need fetch/hash/compiledstack and fullhost exit before next gates.
+
+### Minimal UI dependency identified for lead19:02Z
+Read exact008b5646634357b3c18b663b94317f67b9aa80c7. Its Frame::reset + screen row reuse + worker-owned NEXT_FRAME root applies cleanly to fabfaf6 in FOUR existing files: src/model/ui/frame.rs, src/model/ui/screens.rs, src/editors/clip.rs, src/runtime/ui/worker.rs. Fifth UI hunk src/editors/mii.rs is absent from this pkg4 base, so fullcommit cannot apply without broaderUI history. Read-only git apply --check --exclude=src/editors/mii.rs /tmp/pkg4-ui-frame-dependency.patch PASS; NO application. This is minimal proposed composition for currentFrame path, no2241de2 stack enlargement. Fresh static margin required after composition.
+Separate fiber root0c3cd63ebc4839e49ac57f021ff3301211a28d35 applies cleanly to existing three files src/model/effect_chips.rs, src/model/effect_texture.rs, src/runtime/ui/effect_texture.rs (git apply --check PASS). Need both roots for owncurrent UI fiber+Menu failures. Await exact lead authorization; noforeignedits.
+
+
+Fullhostfab controller55160 ended/released19:03Z cargo101/wrapper1, sole failedtargetcpu03. Rawlog/exit retained eden/runs/build-fabfaf6; exactcounts/failure review next. No ownlivecompileclaims/Eden/profilechanges. Stackanalysis98727 stillrunning localbounded read-only.
+
+
+### Fullhostfab exact failure and slot-stack proof19:04Z
+68suites9607passed/1failed/6ignored/0filtered. Rawloge69903ffecfccb17823e8fe7edf2bd1df7fecb228498f03a89c00e6311013dbf; actual training_rooms compile. Capability cross-needs + poison PASS unchangedtable; all3newscanner regressions pass in3includingtargets. Solecpu03 failure readers_never_see_a_torn_buffer_while_the_worker_republishes at macro_handoff.rs559: assertion seen>0. Scheduler can complete2000writerfills before newly spawned readers enter while(!stop), so zero reads is possible, unrelated to buffer tearing.
+Owned test root edit: startup barrier joins allreaders, sample final stable publication AFTER observing stop (Acquire/Release), preserve generation/torn-pairassertions, require EACH reader>0 instead of aggregate. No sleep/retry/production primitive change. Untestedpendingnextfullhost.
+Compiled port::worker_tick depth43056->27024/frame15616->4416 afterphase split; worker_events12944/frame7200. Rawport-stack-paths.txt; overallMenu/Fiber gates stillopen, exact table next.
+
+UI dependency refinement19:04Z: read UI owner's /tmp/ui-frame-root-for-pkg4-fabfaf6.patch completely and checked actual Frame fields. Prefer this ADAPTED four-file patch: raw008 reset also names tile_roster_grid/tile_cpu/tile_centre_last absent from pkg4base, so raw gitapply-check alone does NOT prove compilability. Adaptedpatch omits only those nonexistentfields, retains all existingfield resets/regression/worker scratch; noactualapplication. Lead authorize adapted exactpatch plus0c3fiber root, not raw008 wholesale.

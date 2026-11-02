@@ -523,17 +523,20 @@ mod tests {
     #[test]
     fn readers_never_see_a_torn_buffer_while_the_worker_republishes() {
         use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
+        use std::sync::{Arc, Barrier};
         let buffers = Arc::new(PlayBuffers::<u64>::new());
         let stop = Arc::new(AtomicBool::new(false));
+        let start = Arc::new(Barrier::new(4));
         // SAFETY: the main thread is the only writer.
         unsafe { buffers.prepare(256) };
         let readers: Vec<_> = (0..3)
             .map(|_| {
-                let (buffers, stop) = (buffers.clone(), stop.clone());
+                let (buffers, stop, start) = (buffers.clone(), stop.clone(), start.clone());
                 std::thread::spawn(move || {
                     let mut seen = 0u64;
-                    while !stop.load(Ordering::Relaxed) {
+                    start.wait();
+                    loop {
+                        let finished = stop.load(Ordering::Acquire);
                         // Every buffer the worker publishes holds one value in every frame: two reads of one macro agree.
                         let generation = buffers.generation();
                         if generation % 2 == 1 {
@@ -545,18 +548,24 @@ mod tests {
                             }
                             seen += 1;
                         }
+                        // A reader can be descheduled for the whole publication burst.
+                        // Still sample the final stable publication before honoring stop;
+                        // otherwise scheduler timing makes this test vacuous (seen == 0).
+                        if finished { break; }
                     }
                     seen
                 })
             })
             .collect();
+        start.wait();
         for value in 0..2000u64 {
             // SAFETY: the only writer.
             unsafe { buffers.fill(&[value; 256]) };
         }
-        stop.store(true, Ordering::Relaxed);
-        let seen: u64 = readers.into_iter().map(|r| r.join().unwrap()).sum();
-        assert!(seen > 0);
+        stop.store(true, Ordering::Release);
+        for reader in readers {
+            assert!(reader.join().unwrap() > 0, "each reader must inspect a published buffer");
+        }
     }
 
     #[test]
