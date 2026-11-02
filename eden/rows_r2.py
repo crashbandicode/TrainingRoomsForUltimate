@@ -24,6 +24,10 @@ import route_r2 as r
 LABEL = sys.argv[1]
 MODE = sys.argv[2]
 assert MODE in ("poison", "clean")
+# Eden finding (r2-01, r2-02): the emulated nn::fs shows a permission-denied host folder as empty and a file where a folder belongs as absent, so no\n# host fixture makes the import hit a non-NotFound error; the default is therefore `probe` (record what was reported). The error paths are host-proven\n# (tests/migration_run.rs, real directories). `partial` and `complete` are kept for a console or a file system that does report the error.\n# What the import should have done: partial (an enumeration error withheld the marker), complete (second boot) or probe (record what
+# the emulated file system reported, whatever it was).
+IMPORT = sys.argv[3] if len(sys.argv) > 3 else ("probe" if MODE == "poison" else "complete")
+assert IMPORT in ("partial", "complete", "probe")
 SD = f"{r.PROFILE_SD}/TrainingRooms"
 DIAG = f"{SD}/practice-diagnostics.log"
 DIAG_PREV = f"{SD}/practice-diagnostics.previous.log"
@@ -130,7 +134,11 @@ def main():
 
     # ---- R2-8 --------------------------------------------------------------------------------------------------
     marker = exists(f"{SD}/migration.json")
-    if MODE == "poison":
+    if IMPORT == "probe":
+        word = re.search(r"migration=\S+( captures=\S+)?", install).group(0) if "migration=" in install else "no migration token"
+        cannot = line_after(0, "cannot list macros:", 5)
+        row("R2-8 probe: what the emulated file system reported for the present-but-not-a-folder `macros` (recorded, not asserted)", True, f"{word} | marker={marker} | {cannot or "no cannot-list line"}")
+    elif IMPORT == "partial":
         row("R2-8 the import is partial and the install line says so", " migration=partial captures=incomplete" in install, re.search(r"migration=\S+( captures=\S+)?", install).group(0) if "migration=" in install else "no migration token")
         cannot = line_after(0, "cannot list macros:", 15)
         row("R2-8 the unreadable folder is logged with its path and error, the import stays incomplete", cannot is not None and "io:" in cannot, cannot or "no line")
