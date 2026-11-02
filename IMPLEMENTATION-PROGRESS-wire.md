@@ -34,15 +34,11 @@ consumer in this tree (`cpu::situation_ground`, `game::natives::{module_accessor
 `recorder::recording_or_playback`). `compliance.py`: no diag strings in the release NRO; machine rows still failing are the project-level ones (README GIF,
 HANDOFF.md, dirty tree) and the guard-size row (see item 2).
 
-## Eden w-01 (batched, one boot)
+## Eden (see `eden/EDEN-WIRE.md`)
 
-Waits for the Yoga (queue line 5; the fork's `m5qo1` online round holds both hosts). Rows: `eden/rows_w.py` (install line and HUD draw registered, input log and notice
-on screen, frame advantage notice, Save/Load chords, recorder stop on a load and restore, Recording Trigger = Save State Load, Playback Mash Interrupt, shortcut edit and
-replay-capture toggle through the writer thread with R5 delta 0, a real menu close writing `settings.json`).
-
-Next commands: `ssh memento-claw-yoga-ubuntu`, claim per the queue file, then from the Surface worktree:
-`ssh … "cd /home/intpa/trainingrooms-eden-wire; python3 -I tr_eden_w.py up w-01 --nro inbox/diag/libtraining_rooms.nro --nro inbox/libssbu_tile_cursor.nro --nro inbox/pilot/libssbu_cpu_pilot.nro --settings inbox/boot-w.json"`,
-`python3 -I eden/route_w.py w-01`, `python3 -I eden/rows_w.py w-01`, `tr_eden_w.py scan w-01`, `tr_eden_w.py down w-01`, `tr_eden_w.py restore`.
+w-01 (3a682e9): 18 of 19 rows; the input log was not drawn (pane search cap), fixed in `2f4dee5`. w-02 on the merge of `work/implementation` 915fda1 (`475deb4`): all 19 rows pass,
+`console.log` clean, R5 delta 0. Gates at `475deb4`: `cargo test` all pass, clippy 0, `--no-default-features` ok, Switch release `3810cbc7a44a22f576c96401fbd090f13e78f77ec509e6a55e2747f5a431c74d`
+(file 737,280 B, resident 794,624 B) and diag `2a86a6804e8b816812bed8e5f138643fe096a9d6254e86f9a7e732cc146d4640` (resident 946,176 B); release warnings only the pkg6-facing API of items 10-12.
 
 ## Build log note (2026-11-02)
 
