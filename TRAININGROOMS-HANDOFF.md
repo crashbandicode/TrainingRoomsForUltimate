@@ -54,6 +54,14 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 - READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
   pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
+### 2026-11-02 — first code push (operator's order, executed by the primary)
+
+- `origin/work/implementation` = `e8dbcc9` (verified with `git ls-remote`): package 1 without the menu model —
+  crate, carried code, settings, Input Delay (caller-side sites, coexists with the CPU pilot), Stage Hazards,
+  L+R+A + reset hub, Eden tr101–tr110, compliance report.
+- Local only (8 commits, `e8dbcc9..473da26`): the review-branch merge, the menu model (`b462d2f`), `docs/BUILD.md`
+  (`b895414`, `68a072b`), Eden tr111–tr113 (`473da26`), plus package 2 work after it. Every further code push needs
+  its own operator order, asked through the primary with an illustrated summary.
 ### 2026-11-02 ~04:1xZ — package 1 complete locally; package 2 started
 
 - `work/implementation` HEAD `68a072b` = package 1 complete: menu model `b462d2f` (5 pages + hidden Developer page,
