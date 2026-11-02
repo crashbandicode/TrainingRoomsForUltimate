@@ -4,18 +4,29 @@
 
 ## QUESTIONS
 
-- **Capabilities gate18:31Z / shared scanner AUTHORIZED18:38Z:** fullhost4d44184 ran68 suites:
-  9597passed/2failed/6ignored/0filtered; only capabilities target fails. All5 mailbox tests, moved4archive
-  tests and hook_locks4 pass; new production crate compilation explicit, noSKIPPED lines.
-  Exact failures tests/capabilities.rs325 cross_needs_match_the_call_graph and390 poisoned-row:
-  recorder::ai_epilogue (recording) can call work_set_flag but its unit stays installed.
-  Raw /home/intpa/trainingrooms-build-pkg4-surface/host-4d44184.log lines1371-1389.
-  Current shared Graph::resolve(method=true) returns ALL same-name functions, including free functions;
-  unlike hook_locks's corrected receiver-qualified resolver. New hook-owned model method calls may collide
-  with unrelated free native state functions. Need witness/check before any capability table regeneration.
-  Request narrow shared Graph receiver-filter + regression authority, then recompute actual remaining
-  capability differences. No allowlist, no poison-test bypass, no blanket CROSS_NEEDS expansion.
+- **Ready-go guard root found18:54Z; do NOT simply remove CROSS_NEEDS:** capabilities613 sole
+  mismatch is declared NamedMacros/ui_is_ready_go absent from scanner closure. Source audit finds
+  actual native Fighter::is_ready_go still called in replay_preview.rs166, replay_capture.rs1005/1032,
+  live_replay.rs602 and ui/facts.rs43. Scanner sees only runtime source/constants, not external smash
+  bindings. Existing guarded provider game::is_ready_go uses UI_IS_READY_GO_OFFSET, READY_GO_USABLE
+  and granted; compat::common::is_ready_go already forwards it. Removing declaration would hide
+  native readiness dependency rather than prove it vanished. Proposed root: route owned macro calls
+  through existing guarded game::is_ready_go, and ui/facts publisher likewise. No second provider or
+  expanded table. Please authorize narrow shared ui/facts.rs43 hunk (owned macro transforms can proceed);
+  this retains real capability and fail-closed behavior. Earlier stale-declaration attribution was
+  premature; retained failing evidence is correct. Scanner613 original regressions+poison PASS.
 
+
+- **Capabilities scanner613b8f0 ready for lead diff review (ungated):** lead18:38 authority applied.
+  Frozen4d diagnostic witness exit0/1test: recorder::ai_epilogue -> recorder::on_ai_frame ->
+  named_macros::finish_capture -> states::finish -> state_effects::run_charge -> natives::set_flag.
+  Dot finish() incorrectly resolves unrelated free states::finish. Minimal receiver-only filter preserves
+  ALL same-name receivers and direct/qualified resolution. Three original parsed-fixture regressions cover
+  negative free/associated collision, both ambiguous receiver native dependencies, and direct/qualified
+  free calls. No CROSS_NEEDS/poison tests changed. Exact git show613b8f0 -- tests/common/callgraph.rs;
+  Surface capabilities queuedEND, Yoga613b Switchdiag queuedEND (includes port-phase505 root).
+  Before fullhost4d:68suites9597pass/2fail/6ignored; failures only capabilities, all5mailbox/4archive/
+  4hook_locks pass. Claims released; no runtime acceptance. Please review scanner diff before integration.
 
 - **Mailbox scratch scope RESOLVED18:12Z / implementation4d44184:** Lead authorized the additive
   hos-lock API and both worker consumers. Implemented worker-only reusable heap scratch, preserving
@@ -656,3 +667,17 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
 
 ### 18:45Z capability before-fix witness
 Model gate reverified Astra/medium, existing hidden watcher active/no alert. Surface actual head/full ledger parsed/process idle/disk234GB; one admitted frozen4d44184 diagnostic test exit0, 1passed/154filtered. Exact witness: recorder::ai_epilogue -> recorder::on_ai_frame -> named_macros::finish_capture -> states::finish -> state_effects::run_charge -> natives::set_flag. This is diagnostic evidence, not capability acceptance. Raw log/exit in eden/runs/build-4d44184. Controller78318 ended; claim released and own queue line removed. No Eden/profile changes. Applying lead18:38 narrow receiver filter with original regressions next; current owned port-phase HEAD505ac1b remains ungated.
+
+
+### Receiver candidate613b8f0 / lead review request
+Authorized18:38 minimal Graph::resolve(method=true) filters only !has_receiver candidates. Original parsed fixture covers unrelated free/associated collision, BOTH ambiguous receiver dependencies, and direct/qualified free call reachability. Direct/qualified resolver and poisoned-row checks untouched; no CROSS_NEEDS edits. Exact diff: git show613b8f0 -- tests/common/callgraph.rs. Lead review required before integration. Frozen1113-file source refreshed on Surface, capabilities gate queuedEND; current port phase fix505ac1b included and still awaiting compiled stack gate. No live claims/profile mutations.
+
+
+### Typed broker consumer preparation18:49Z (unapplied)
+Prepared /tmp/pkg4-ticket-consumer.patch against owned replay_capture.rs for pkg6's non-Copy Ticket + Error API. Feature-gated Ticket alias preserves non-Mii build shape; worker polls convert Error to String only on worker, retires ticket on existing cancellation, and stores immediate resolve failure in worker Reload.resolve_error instead of creating a synthetic channel. Existing revision/selection, timeout, failed-selection and metadata refusal flow preserved. Worker service_reload is called from port::worker_tick; native service_reload_request remains Copy handoff only. Patch NOT applied until exact gated provider integration; carry transform must be regenerated at application. No foreign provider edit or acceptance.
+
+ENDED/RELEASED18:52Z Surface capabilities613b8f0 controller83850 scope run-p3890184-i16460385.scope, admitted actualhead/process/ledger/disk234GB, ordered6G1800 incremental0. Do not change isolated source until ended/released. Yoga613diag remains queued behind foreign memory-guard-B e04 and preceding TR. No Eden/profile mutation.
+
+
+### Capabilities613 result18:52Z
+cargo101/wrapper1;153passed/1failed/4ignored, actual compile and all3originalreceiver regressions PASS, poisoned-row PASS. Sole failure cross_needs_match_the_call_graph: declared named_macros includes ui_is_ready_go while computed closure lacks it. All other sets identical. Raw log/exit eden/runs/build-613b8f0;1113source files unchanged. No blanket regeneration/allowlist. Next inspect exact native-to-published-fact migration and request narrow removal of obsolete declaration if confirmed. Controller83850 ended, Surface claim released/own queue removed; Yoga613diag still pending.

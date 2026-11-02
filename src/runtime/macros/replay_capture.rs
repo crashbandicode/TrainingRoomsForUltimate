@@ -1002,7 +1002,7 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
 
 pub unsafe fn before_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::before_frame(fighter);
-    if !in_replay() || !Fighter::is_ready_go() {
+    if !in_replay() || !crate::runtime::game::is_ready_go() {
         let mut hook = VAULT_HOOK.lock();
         if hook.recording {
             post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: hook.truncated });
@@ -1029,7 +1029,7 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
 
 pub unsafe fn after_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::after_frame(fighter);
-    if !in_replay() || !Fighter::is_ready_go() { return; }
+    if !in_replay() || !crate::runtime::game::is_ready_go() { return; }
     let Some(module) = fighter.battle_object.module_accessor.as_mut() else { return };
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);

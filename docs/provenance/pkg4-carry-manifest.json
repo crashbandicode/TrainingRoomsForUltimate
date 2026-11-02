@@ -967,7 +967,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "6990b26ac421641225ab41979c5dff3b027a803ec1f3f8c4b2b8ed2878918cb5",
+   "dest_sha256": "33289b1967c91686b502ae3230bda27ed7bdbf18997bd8cfdffb0ffb83a32ad9",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1188,6 +1188,12 @@
      "old": "    VAULT_EVENTS.drain(|event| {",
      "new": "    // Only this worker uses the scratch; allocate directly on its heap once.\n    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());\n    let mut scratch = SCRATCH.lock().unwrap();\n    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n    VAULT_EVENTS.drain_with_scratch(&mut scratch, |event| {",
      "reason": "Design C worker drain reuses heap-backed ordering scratch; removes proven 64KiB mailbox stack array without changing capacity/order/drop semantics."
+    },
+    {
+     "old": "Fighter::is_ready_go()",
+     "new": "crate::runtime::game::is_ready_go()",
+     "count": 2,
+     "reason": "Route the actual native readiness call through the existing guarded provider (READY_GO_USABLE and granted), preserving the declared NamedMacros ui_is_ready_go dependency instead of hiding external smash calls from the scanner."
     }
    ]
   },
@@ -1196,7 +1202,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "469cd09081a0d732a9ab3291a49fed1c82bc66b1323cedaa61406f706d4f23c3",
+   "dest_sha256": "2165e96147fa297667e94e4b40a9670482e5d7d498ccf78cf332e165129f4fd5",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -1351,6 +1357,17 @@
      "old": "use std::sync::{atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering}, Mutex};",
      "new": "use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};",
      "reason": "SESSION now uses the fully qualified static callback lock; remove its unused standard Mutex import."
+    },
+    {
+     "old": "Fighter::is_ready_go()",
+     "new": "crate::runtime::game::is_ready_go()",
+     "count": 1,
+     "reason": "Route the actual native readiness call through the existing guarded provider (READY_GO_USABLE and granted), preserving the declared NamedMacros ui_is_ready_go dependency instead of hiding external smash calls from the scanner."
+    },
+    {
+     "old": "use smash::app::{self, BattleObjectModuleAccessor, Fighter};",
+     "new": "use smash::app::{self, BattleObjectModuleAccessor};",
+     "reason": "The guarded ready-go provider replaces the sole external Fighter reference in preview."
     }
    ]
   },
@@ -1366,7 +1383,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "e769e7ed2488157e5ca496abe4d526336eeb39c81c670b0462c8f463a864eb36",
+   "dest_sha256": "d323030e5e196f5afb04c73941e5badf5f2e2912de41ec11439ddaa33b581091",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1558,6 +1575,12 @@
      "old": "    EVENTS.drain(|(serial, event)| {",
      "new": "    // Only this worker uses the scratch; allocate directly on its heap once.\n    static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());\n    let mut scratch = SCRATCH.lock().unwrap();\n    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n    EVENTS.drain_with_scratch(&mut scratch, |(serial, event)| {",
      "reason": "Design C worker drain reuses heap-backed ordering scratch; removes proven 64KiB mailbox stack array without changing capacity/order/drop semantics."
+    },
+    {
+     "old": "Fighter::is_ready_go()",
+     "new": "crate::runtime::game::is_ready_go()",
+     "count": 1,
+     "reason": "Route the actual native readiness call through the existing guarded provider (READY_GO_USABLE and granted), preserving the declared NamedMacros ui_is_ready_go dependency instead of hiding external smash calls from the scanner."
     }
    ]
   },

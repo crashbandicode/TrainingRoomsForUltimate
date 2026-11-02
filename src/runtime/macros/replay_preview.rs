@@ -1,7 +1,7 @@
 //! Native input preview, using the existing Training save-state/playback paths.
 //! UI requests carry values only. Game-object work runs on the CPU callback.
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
-use smash::app::{self, BattleObjectModuleAccessor, Fighter};
+use smash::app::{self, BattleObjectModuleAccessor};
 use {crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 
 use crate::runtime::macros::{input_record, save_states, practice};
@@ -163,7 +163,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
     if !primary_cpu(module) {
         return;
     }
-    if crate::runtime::roster::character_roster::busy() || !Fighter::is_ready_go() {
+    if crate::runtime::roster::character_roster::busy() || !crate::runtime::game::is_ready_go() {
         if occupied() { input_record::stop_playback(); save_states::cancel_pending(); }
         clear_session();
         return;

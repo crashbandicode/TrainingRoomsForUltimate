@@ -599,7 +599,7 @@ unsafe fn write_record_shared(ctx: &mut InlineCtx) {
 fn live_scene() -> bool {
     crate::runtime::lobby::game_mode::current().is_some_and(|mode|
         mode.initialized && mode.melee != 0x0d && mode.mode != 0x05010100)
-        && unsafe { !crate::runtime::compat::common::is_native_training_mode() && Fighter::is_ready_go() }
+        && unsafe { !crate::runtime::compat::common::is_native_training_mode() && crate::runtime::game::is_ready_go() }
 }
 
 pub unsafe fn before_frame(fighter: &mut Fighter) {
