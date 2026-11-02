@@ -267,8 +267,8 @@ def ops(phase, items):
                         time.sleep(0.25)
                 rec({'op': op, 'line': hit[:300]})
             elif k == 'settings':
-                out = USER / 'sdmc' / 'ultimate' / 'TrainingRooms'; out.mkdir(parents=True, exist_ok=True)
-                tmp = out / '.diag-settings-next.tmp'; tmp.write_bytes(Path(op[1]).read_bytes()); os.replace(tmp, out / 'diag-settings-next.json')
+                sdir = USER / 'sdmc' / 'ultimate' / 'TrainingRooms'; sdir.mkdir(parents=True, exist_ok=True)
+                tmp = sdir / '.diag-settings-next.tmp'; tmp.write_bytes(Path(op[1]).read_bytes()); os.replace(tmp, sdir / 'diag-settings-next.json')
                 rec({'op': op, 'sha256': sha(Path(op[1]))[:16]})
             elif k == 'mute':
                 rec({'op': op, 'set': call(phase, 'settings.set', {'key': 'core.volume', 'value': 0}), 'save': call(phase, 'settings.save'),

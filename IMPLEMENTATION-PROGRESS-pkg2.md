@@ -132,3 +132,11 @@ Playbook followed: `ae87443`. Gates run on the Surface worktree (target `cargo-t
   and `cpu_camera_setup_hook` (the latter writes after the original, so the caller's struct is never written); feature `cpu_camera` (own sites, the
   core's natives). Model: `Cpu::camera_setup` / `camera_mode`, `StageClass`, host tests in `tests/cpu04.rs`.
   Not decided by this analysis: camera mode 4 = fixed (spec, upstream) is confirmed only by the Eden diag line `camera_mode mode=`.
+
+## Eden on the Ally, 2026-11-02 (successor worker)
+Four boots (s2-01 release, s2-02 to s2-04 diag) on the Ally's owned rig: see `eden/EDEN-PACKAGE-2.md` (rows, hashes, lines) and `eden/ALLY-SETUP.md`
+(the rig for every stream). Found and fixed: the install line was cut at 2048 bytes (`2d1df59`). Confirmed: the `common` module's loader name is `common`;
+DI, SDI, air-dodge direction, dodge staling, the shield multiplier (1.19 -> 0.0 -> 1.19 through the game's own `CommonParams` object), the ledge Roll row, the
+mash table (16 of 18 actions) and the fixed-camera setup write. Not run: tech, mistech, hide tech effects, clatter, out of shield, throws, B11 on a ledge, camera
+mode 4, leaving Training. Open items for the lead: none parked; the spec's camera manager slot is `0x52b8f00`; whether `libparam_hook` stays a dependency
+(this package no longer needs it).

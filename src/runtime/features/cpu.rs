@@ -225,7 +225,10 @@ mod ev {
     pub const CLIMB_DENIED: usize = 14;
     pub const STATUS: usize = 15;
     pub const ROLE: usize = 16;
-    pub const COUNT: usize = 17;
+    pub const DI_CALL: usize = 17;
+    pub const TECH_CALL: usize = 18;
+    pub const OOS_CALL: usize = 19;
+    pub const COUNT: usize = 20;
 }
 
 #[cfg(feature = "diag")]
@@ -528,7 +531,7 @@ unsafe fn fighter_frame(fighter: usize) {
         ev::ROLE,
         key.index(),
         Some(accessor as u64),
-        "role entry={} partner={} kind={kind} lobby={lobby}",
+        "role entry={} partner={} kind={kind} lobby={lobby} accessor={accessor:#x}",
         key.entry,
         key.partner
     );
@@ -1024,6 +1027,7 @@ pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
 
 /// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
 pub(crate) unsafe fn di_before(accessor: usize) {
+    cpu_event_on_change!(ev::DI_CALL, 0, Some(accessor as u64), "di_before accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let Some(key) = role_of(accessor) else { return };
     let (x, y) = (WORK_VECOR_X.load(Ordering::Acquire), WORK_VECOR_Y.load(Ordering::Acquire));
     if x == UNRESOLVED || y == UNRESOLVED {
@@ -1040,6 +1044,7 @@ pub(crate) unsafe fn di_before(accessor: usize) {
 /// Tech: the status a CPU body's script is about to change to, or the one to request instead. `passive`
 /// asks the script's own "is passive enabled".
 pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<i32> {
+    cpu_event_on_change!(ev::TECH_CALL, 0, Some((accessor as u64) ^ ((requested as u32 as u64) << 48)), "tech_call accessor={accessor:#x} requested={requested} role={}", role_of(accessor).is_some());
     let key = role_of(accessor)?;
     if !with(|cpu| is_tech_situation(&cpu.ids, requested))? {
         return None;
@@ -1085,6 +1090,7 @@ pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl
 
 /// Out of shield: after the script continuation, the dodge or roll status to change to, if any.
 pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
+    cpu_event_on_change!(ev::OOS_CALL, 0, Some(accessor as u64), "oos_call accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let key = role_of(accessor)?;
     let prev = natives::prev_status_kind(accessor, 0);
     let status_now = natives::status_kind(accessor);
@@ -1180,16 +1186,23 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
         cpu_event!("playback_stop entry={}", key.entry);
         published::CPU_STOP_PLAYBACK.store(true, Ordering::Release);
     }
-    cpu_event_on_change!(
-        if cat2 { ev::CMD2 } else { ev::CMD1 },
-        key.index(),
-        if out.bits != 0 { Some(u64::from(out.bits)) } else { None },
-        "command_flags entry={} cat={} bits={:#x} status={}",
-        key.entry,
-        if cat2 { 2 } else { 1 },
-        out.bits,
-        natives::status_kind(accessor)
-    );
+    #[cfg(feature = "diag")]
+    {
+        let (queued, latched) = with(|cpu| cpu.mash_debug(key)).unwrap_or((false, false));
+        let status = natives::status_kind(accessor);
+        let state = (u64::from(status as u32) << 20) ^ (u64::from(out.bits) << 2) ^ (u64::from(queued) << 1) ^ u64::from(latched);
+        cpu_event_on_change!(
+            if cat2 { ev::CMD2 } else { ev::CMD1 },
+            key.index(),
+            Some(state),
+            "command_query entry={} cat={} status={status} bits={:#x} request={:?} queued={queued} latched={latched} situation={:?}",
+            key.entry,
+            if cat2 { 2 } else { 1 },
+            out.bits,
+            out.request_status,
+            facts.situation
+        );
+    }
     original | out.bits
 }
 

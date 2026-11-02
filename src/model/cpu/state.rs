@@ -479,6 +479,12 @@ impl Cpu {
             || fighter.mash.rolled.attack_angle.is_some()
     }
 
+    /// Diag: whether the body's mash queue holds an action and whether a situation latch is set.
+    pub fn mash_debug(&self, key: FighterKey) -> (bool, bool) {
+        let mash = &self.fighters[key.index()].mash;
+        (!mash.queue.is_empty(), mash.latch.is_some())
+    }
+
     /// A command-flag query of the body `key` (`get_command_flag_cat`): the bits to OR into the game's
     /// answer. Category 1 runs the mash (choose, then perform); category 2 delivers the throw bits.
     pub fn command_flags(&mut self, key: FighterKey, cat2: bool, f: &CmdFacts) -> CmdOut {
