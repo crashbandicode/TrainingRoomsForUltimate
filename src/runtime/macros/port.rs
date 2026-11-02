@@ -71,7 +71,7 @@ pub(crate) mod input {
 /// What the install line says about the dependency boundary that is left: the clip preview's temporary setup restore (package 3 does not
 /// provide it yet) and the menu's panel screens (package 5; the layer's API is ready for them).
 pub(crate) fn install_report() -> &'static str {
-    "preview_restore=unavailable_until_pkg3 menu_screens=unavailable_until_pkg5"
+    "preview_restore=unavailable_until_pkg3"
 }
 
 /// The fork's `input_record` as the named layer calls the core (SPEC-input-01 section 9), over `features::recorder`.
@@ -160,4 +160,12 @@ pub(crate) mod input_record {
     pub(crate) fn refusal_text(refusal: ExportRefusal) -> &'static str {
         refusal.message()
     }
+}
+
+/// Design C (lead, 2026-11-02): the named-macro layer's model has one owner, the menu worker. This is the worker's tick for it, called
+/// on the worker thread at every wake (`ui::worker::run`): package 4 points it at its layer's worker service (draining the layer's
+/// `hos_lock::Mailbox` of game-thread events, the deferred effects, publishing `MacroQueries`). A game thread that posts an event calls
+/// `crate::runtime::ui::worker::wake()` after posting.
+pub(crate) fn worker_tick() {
+    crate::runtime::macros::named_macros::run_deferred();
 }

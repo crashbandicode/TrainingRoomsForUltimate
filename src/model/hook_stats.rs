@@ -66,6 +66,13 @@ pub enum HookId {
     RecorderPoll,
     NamedService,
     NamedRestore,
+    /// ui-screens, nested in the UI and input hooks so the menu's own allocations are charged to the step that made them (the lead's
+    /// menu-open attribution, 2026-11-02): the menu's input adapter (open, close, presses), the tick's menu draw (panes, text), the stage
+    /// grid's thumbnails, and any call a hook still makes into package 4's named-macro panel model (design C: none should remain).
+    MenuInput,
+    MenuDraw,
+    MenuThumbs,
+    MacroPanel,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -111,6 +118,10 @@ impl HookId {
         HookId::RecorderPoll,
         HookId::NamedService,
         HookId::NamedRestore,
+        HookId::MenuInput,
+        HookId::MenuDraw,
+        HookId::MenuThumbs,
+        HookId::MacroPanel,
         HookId::Other,
     ];
 
@@ -152,6 +163,10 @@ impl HookId {
             HookId::RecorderPoll => "recorder_poll",
             HookId::NamedService => "named_service",
             HookId::NamedRestore => "named_restore",
+            HookId::MenuInput => "menu_input",
+            HookId::MenuDraw => "menu_draw",
+            HookId::MenuThumbs => "menu_thumbs",
+            HookId::MacroPanel => "macro_panel",
             HookId::Other => "other",
         }
     }

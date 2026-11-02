@@ -7,4 +7,11 @@ pub fn run() {
     crate::runtime::macros::named_macros::reserve();
     // A method name two runtime functions carry: not followed, listed as ambiguous.
     settings.tick();
+    // A local function and an atomic method of the same name as another module's lock taker: neither reaches named_macros::store.
+    store(1);
+    FLAG.store(true, Ordering::Release);
+}
+
+fn store(value: u8) {
+    let _ = value;
 }

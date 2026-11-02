@@ -6,12 +6,13 @@ the host a claim is ON comes from its "on <host>" phrase, so a line names ONLY t
     python3 -I ledger.py release ally "<text>"
 """
 import calendar
+import os
 import re
 import subprocess
 import sys
 import time
 
-OWNER = "Claude 0caa72b8/pkg5-eden"
+OWNER = os.environ.get("LEDGER_OWNER", "Claude 0caa72b8/pkg5-eden")
 LEDGER = "/tmp/deluxe-surface-1007/OWNER-COORDINATION.md"
 SSH = ["/usr/bin/ssh", "-o", "BatchMode=yes", "-i", "/home/intpa/.ssh/id_rsa", "memento-claw-yoga-ubuntu"]
 STALE_HOURS = 12
@@ -26,7 +27,8 @@ def open_claims(host):
     state = {}
     now = time.time()
     for line in text().splitlines():
-        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        # Stamps come with or without seconds (`13:07Z`, `13:07:05Z`): a line the pattern misses would hide an open claim.
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?::\d{2})?Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
         if not m:
             continue
         stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))

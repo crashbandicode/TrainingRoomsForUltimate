@@ -156,7 +156,7 @@ pub fn open_editor() {
 }
 
 fn open_browser(expected_revision: Option<u64>) {
-    if !crate::runtime::lobby::training::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::lobby::training::practice::acquire() }
+    if !crate::runtime::lobby::training::practice::enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()
         || crate::runtime::lobby::training::recording_or_playback()
         || crate::runtime::macros::save_states::is_loading()
         || crate::runtime::roster::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()

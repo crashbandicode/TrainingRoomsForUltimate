@@ -92,6 +92,12 @@ pub struct Outbox {
     pub button_config: Option<[Chord; 2]>,
     /// The Replay capture toggle changed: write `replay_capture.ini` (Q7).
     pub replay_capture: Option<bool>,
+    /// A on a tile of the Give item grid: the item (index of `ITEM_NAMES`) to give Player 1 now. Taken at once with
+    /// `Menu::take_give_item` (the request is made from the game-synchronized tick, not at close).
+    pub give_item: Option<u8>,
+    /// A, X or Y on a tile of the Lobby Stages grid (tile 0 is All): the stage editor (ditors::stages, which knows the carried
+    /// stage catalog) applies it. Taken at once with Menu::take_stage_press.
+    pub stage_press: Option<(u16, Button)>,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -1239,10 +1245,57 @@ impl Menu {
                 let cell = cell.min(layout.page_len(next).saturating_sub(1));
                 self.top(screen(next, cell));
             }
+            // A, X, Y on the Lobby Stages grid: the stage editor applies them (rotation order, direct stage, form).
+            Button::A | Button::X | Button::Y if layout.kind == GridKind::Stages => {
+                if let Some(tile) = layout.tile(page, cell) {
+                    self.outbox.stage_press = u16::try_from(tile).ok().map(|tile| (tile, button));
+                }
+            }
+            // A on the Give item grid: give the item now (every press, the already-chosen item included).
+            Button::A if layout.kind == GridKind::Items => {
+                if let Some(item) = layout.tile(page, cell) {
+                    self.outbox.give_item = u8::try_from(item).ok();
+                }
+            }
             Button::B => {
                 self.stack.pop();
             }
             _ => {}
+        }
+    }
+
+    /// The item the player chose on the Give item grid since the last call, if any.
+    pub fn take_give_item(&mut self) -> Option<u8> {
+        self.outbox.give_item.take()
+    }
+
+    /// The press on the Lobby Stages grid since the last call, if any: (tile, button), tile 0 being All.
+    pub fn take_stage_press(&mut self) -> Option<(u16, Button)> {
+        self.outbox.stage_press.take()
+    }
+
+    /// A kept key of the menu snapshot (a non-array row: the rosters, the hats, the stage order).
+    pub fn kept(&self, key: &str) -> Option<&serde_json::Value> {
+        self.settings.menu.extra().get(key)
+    }
+
+    /// Replace a kept key of the menu snapshot (an editor's write); notes the change for the commit.
+    pub fn set_kept(&mut self, key: &str, value: serde_json::Value) {
+        if self.kept(key) != Some(&value) && self.settings.menu.set_kept(key, value).is_ok() {
+            self.outbox.changed = true;
+        }
+    }
+
+    /// A top-level key of the settings file kept as it is (stage_preferences, mii_preferences).
+    pub fn top_extra(&self, key: &str) -> Option<&serde_json::Value> {
+        self.settings.extra.get(key)
+    }
+
+    /// Replace a top-level kept key (an editor's write); notes the change for the commit.
+    pub fn set_top_extra(&mut self, key: &str, value: serde_json::Value) {
+        if self.top_extra(key) != Some(&value) {
+            self.settings.extra.insert(key.to_owned(), value);
+            self.outbox.changed = true;
         }
     }
 }

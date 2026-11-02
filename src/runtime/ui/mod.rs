@@ -12,6 +12,8 @@ pub mod anchors;
 pub mod archive;
 pub mod chips;
 pub mod effect_texture;
+pub mod external;
+pub mod facts;
 pub mod hud;
 pub mod input;
 pub mod menu_app;
@@ -19,6 +21,7 @@ pub mod pane;
 #[cfg(feature = "diag")]
 pub mod probe;
 pub mod registry;
+pub mod requests;
 pub mod state;
 pub mod texture;
 pub mod thumbs;
@@ -99,6 +102,7 @@ pub fn clear_session_state() {
     menu_app::note_open();
     crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
     input::reset_session();
+    facts::forget_frame_facts();
     worker::push_reset();
     state::FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
