@@ -163,4 +163,14 @@ eden-solo/{gv.py,solo.ps1,step.ps1}, eden-pair/solo_surface.ps1.
 
 ## Gates
 
-Host gates: above. Switch release + diag, `nro_size.py`, `compliance.py --nro`: open (queued for a compile slot).
+- Host gates of `166d3cd` (Surface, 11:23–11:27Z): `cargo test` 7706 passed / 0 failed / 6 ignored; `clippy --all-targets -- -D
+  warnings` 0 warnings; `build --no-default-features` ok. Of the merged tree `14016fe`: open (one Surface claim, queued).
+- Switch builds of `14016fe` (Yoga, `/home/intpa/trainingrooms-build-deluxe`, git archive, `build.ps1` copy; claim 12:49Z,
+  released at once): release `3b1a39c257608768ec99c9f19b0bb3b70eb3b66eecb5be8243d6a66cdf2d154b`, built twice byte-identical, 0
+  warnings; `nro_size.py`: file 2,916,352, resident 2,965,504 B (2896 KiB). Diag
+  `a7c0c64831b566e5826ca8b8b7bba1e080ba30aeb038ce145fd41125df32a818`, resident 3,194,880 B (3120 KiB).
+- `compliance.py <worktree> --nro <release>` (12:5xZ, HEAD `1a09e37`): this stream's rows pass ("no diag strings in the shipped
+  NRO": no markers). Four machine rows fail repository-wide, none from this stream: README GIF and `docs/media/*.gif` (the
+  README is the lead's), `HANDOFF.md` (the repo keeps `TRAININGROOMS-HANDOFF.md`), "every site guard is 64 bytes" (a checker
+  limit: it reads the carried seam table's `guard: [0; GUARD_BYTES]` initialiser in `src/model/seams/native_seams/mod.rs` as a
+  0-byte guard).
