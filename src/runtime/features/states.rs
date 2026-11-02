@@ -627,6 +627,25 @@ fn nana_removed(entry: i32) -> bool {
     crate::runtime::roster::running() && crate::runtime::roster::character_roster::solo_popo_active(entry != 0)
 }
 
+/// The per-role "state load started / completed" notification of the Mii HUD portrait (SPEC-state-01 section 9): the roster cycle's
+/// presentation check observes the role's HUD card when a load starts and compares it when that role's restore completes (a load must
+/// change no card). Only while the cycle runs and its install recorded the main image base.
+#[cfg(feature = "mii-hud-portrait-alpha")]
+unsafe fn hud_load(role: usize, started: bool) {
+    let base = if crate::runtime::roster::running() { crate::runtime::roster::character_roster::main_base() } else { 0 };
+    if base == 0 {
+        return;
+    }
+    if started {
+        crate::runtime::roster::presentation::state_load_started(base, role);
+    } else {
+        crate::runtime::roster::presentation::state_load_completed(base, role);
+    }
+}
+
+#[cfg(not(feature = "mii-hud-portrait-alpha"))]
+unsafe fn hud_load(_role: usize, _started: bool) {}
+
 /// Do what the frame asked, with no lock held.
 unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     let accessor = raw.accessor;
@@ -634,6 +653,9 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         // A new load: no buff carries over.
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
         recorder::on_load_request();
+        // The Mii HUD portrait's state-load check (SPEC-state-01 section 9: the per-role "load started" notification): both records load.
+        hud_load(0, true);
+        hud_load(1, true);
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
     if out.pokemon_predeath {
@@ -753,6 +775,9 @@ unsafe fn place(accessor: usize, placing: &Placing) {
 /// buffs, the item snapshot, the fighter-specific restores).
 unsafe fn finish(raw: &Raw, done: &Done) {
     let accessor = raw.accessor;
+    if let Some(role) = Role::of_entry(raw.entry) {
+        hud_load(role.index(), false);
+    }
     if let Some(target) = done.damage {
         n::heal(accessor, -natives::damage(accessor, 0));
         n::add_damage(accessor, target);

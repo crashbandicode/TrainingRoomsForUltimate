@@ -62,8 +62,27 @@ pub(crate) unsafe fn frame(fighter: usize) {
         // Entries replaced (a hot swap) retire the session first, then a session with both entries ready acquires the lease: the
         // practice session the save and record slots belong to. `entry_departed` (the roster's destruction path) retires at once.
         training::practice::refresh();
+        #[cfg(feature = "diag")]
+        let held = training::practice::owned();
         if !training::practice::owned() && training::practice::enabled() {
             training::practice::acquire();
+        }
+        // Diag build: one line per change of the practice session (the entry lease), so an Eden row sees a hot swap retire it
+        // (`refresh` found an entry replaced) and the next frame acquire a fresh one.
+        #[cfg(feature = "diag")]
+        {
+            use std::sync::atomic::{AtomicBool, Ordering};
+            static LOGGED: AtomicBool = AtomicBool::new(false);
+            let now = training::practice::owned();
+            if held != LOGGED.load(Ordering::Relaxed) || now != held {
+                if held != LOGGED.load(Ordering::Relaxed) {
+                    crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] practice_session held={held} (retired or acquired before this frame)"));
+                }
+                if now != held {
+                    crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] practice_session held={now}"));
+                }
+                LOGGED.store(now, Ordering::Relaxed);
+            }
         }
         // The roster cycle's once-per-game-frame steps run on Player 1's body (each returns at once when nothing is pending): the
         // source leases, the Kirby hat requests, the item engine (a granted or restored item) and the preload planner.

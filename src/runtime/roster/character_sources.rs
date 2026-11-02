@@ -1253,6 +1253,7 @@ pub fn scene_changed() {
 /// Preserve the old probe's Training owner2 automation suppression independently
 /// of its diagnostics. This is not resource admission or native source ownership.
 #[cfg(any(feature = "source-owner-probe", feature = "managed-sources"))]
+#[cfg(feature = "source-owner-probe")]
 pub unsafe fn legacy_training_owner_reserved(body: &mut app::BattleObjectModuleAccessor) -> bool {
     crate::runtime::compat::common::is_native_training_mode()
         && app::utility::get_category(body) == *BATTLE_OBJECT_CATEGORY_FIGHTER

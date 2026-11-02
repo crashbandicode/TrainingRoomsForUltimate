@@ -1517,12 +1517,17 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "0f06b4e1cb4a84f4cba4e38ed797030feac22cea7afe3afeecf9ddf373fcd4f9",
+   "dest_sha256": "7261a8121d80490640efcc8222614725ab5851ac699a2d431c11384c9e929e0a",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
      "delete_to": "/// Finish a load this entry already owns.",
      "reason": "`reserved(body)` removed (lead ruling 2026-11-02: no silent dead code): the fork's per-fighter automation callbacks (mixed code) asked it to skip the helper bodies the cycle owns (entries 2, 3, 5, 6). The clean room's automations are keyed by role, never by 'every fighter': package 2's role table (`model::cpu::role`: entry 0, 1 and the lobby's 4 are roles, `Role::of_entry` / `is_cpu_role` / `FighterKey`), package 3's `Role::of_entry` and package 4's `cpu_body()` ignore every other entry, so an owned helper is skipped by construction. Mapping in docs/provenance/pkg6-carry-ledger.md, \"Deleted fork functions\""
+    },
+    {
+     "old": "pub unsafe fn legacy_training_owner_reserved(",
+     "new": "#[cfg(feature = \"source-owner-probe\")]\npub unsafe fn legacy_training_owner_reserved(",
+     "reason": "diag code out of the shipped NRO (D11): the only caller is the diag probe `source_owner_probe` (feature `source-owner-probe`); with `reserved` removed (automations are keyed by role) nothing in the release build calls it"
     }
    ]
   },
