@@ -14,7 +14,7 @@
 use crate::engine::seams::native_fields as fields;
 use crate::engine::compat::fixed::DebugIter;
 use std::sync::Mutex;
-use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition, ROSTER_BYTES};
+use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition};
 use crate::engine::swap::swap_model::copy_registry::{Record, Roster, ENTRIES, SUBS};
 
 macro_rules! trace {
@@ -29,13 +29,15 @@ const OWNER_TABLE: usize = 0x5324680;
 const G68_SLOT: usize = 0x68;
 const REGION_WORD: usize = 0x523d00c;
 
-struct Held {
-    acquisition: Acquisition,
-    /// The native-layout roster both calls read (kept for the release).
-    bytes: Box<[u8; ROSTER_BYTES]>,
-}
+static HELD: [Mutex<Vec<Acquisition>>; 2] = [Mutex::new(Vec::new()), Mutex::new(Vec::new())];
 
-static HELD: [Mutex<Vec<Held>>; 2] = [Mutex::new(Vec::new()), Mutex::new(Vec::new())];
+/// Both native routines consume the roster synchronously; callees receive only kind/costume
+/// or a key, never its address. Keep the value receipt and reconstruct identical bytes for release.
+/// Owned-ELF evidence: docs/provenance/pkg6-copy-roster-lifetime.md.
+unsafe fn call(function: unsafe extern "C" fn(usize, *const u8, u32, u32), g68: usize, acquisition: &Acquisition) {
+    let bytes = model::roster_bytes(&acquisition.roster);
+    function(g68, bytes.as_ptr(), acquisition.member, acquisition.costume);
+}
 
 unsafe fn g68(base: usize) -> Option<usize> {
     fields::child(fields::child(base, OWNER_TABLE)?, G68_SLOT)
@@ -76,23 +78,22 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
     let wanted = wanted(base, owner, r, sets);
     let plan = {
         let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        model::sync_iter(held.iter().map(|h| h.acquisition), wanted)
+        model::sync_iter(held.iter().copied(), wanted)
     };
     if plan.acquire.is_empty() && plan.release.is_empty() { return false; }
     let acquire: unsafe extern "C" fn(usize, *const u8, u32, u32) = std::mem::transmute(base + ACQUIRE);
     let release: unsafe extern "C" fn(usize, *const u8, u32, u32) = std::mem::transmute(base + RELEASE);
     let mut fresh = Vec::with_capacity(plan.acquire.len());
     for acquisition in plan.acquire {
-        let bytes = Box::new(model::roster_bytes(&acquisition.roster));
-        acquire(g68, bytes.as_ptr(), acquisition.member, acquisition.costume);
-        fresh.push(Held { acquisition, bytes });
+        call(acquire, g68, &acquisition);
+        fresh.push(acquisition);
     }
-    let released: Vec<Held> = {
+    let released: Vec<Acquisition> = {
         let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
         plan.release.iter().map(|i| held.remove(*i)).collect()
     };
     for gone in &released {
-        release(g68, gone.bytes.as_ptr(), gone.acquisition.member, gone.acquisition.costume);
+        call(release, g68, gone);
     }
     {
         let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
@@ -101,7 +102,7 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
         trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, sets, added,
             released.len(), held.len());
         trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, held.len(),
-            DebugIter(model::referenced_keys(held.iter().map(|h| h.acquisition))));
+            DebugIter(model::referenced_keys(held.iter().copied())));
     }
     true
 }
@@ -120,7 +121,7 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
     let resident = ready(g68);
     if !resident {
         let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, DebugIter(model::referenced_keys(held.iter().map(|h| h.acquisition))));
+        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, DebugIter(model::referenced_keys(held.iter().copied())));
     }
     resident
 }
