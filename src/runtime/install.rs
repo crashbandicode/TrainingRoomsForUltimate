@@ -7,11 +7,11 @@ use std::fmt::Write as _;
 use std::fs::OpenOptions;
 use std::io::Write as _;
 
-use crate::model::install_line::InstallLine;
+use crate::model::install_line::{InstallLine, INSTALL_LINE_CAPACITY};
 use crate::model::storage::{self, FixedPath};
 
 pub fn write(line: &InstallLine<'_>) {
-    let mut buffer = FixedPath::<2048>::new();
+    let mut buffer = FixedPath::<INSTALL_LINE_CAPACITY>::new();
     // A line that does not fit is cut, not dropped.
     let _ = write!(buffer, "{line}");
     let text = buffer.as_str();

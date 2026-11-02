@@ -78,6 +78,11 @@ pub struct SettingsReport {
     pub stage_hazards: bool,
 }
 
+/// The bytes the runtime formats the install line into (a stack buffer). A line that is longer is cut, which loses
+/// `result=` and `heap_allocations=`: `tests/cpu_sites.rs` renders the line of every site and feature of the table and
+/// keeps it under this with room to spare, so adding sites cannot silently cut it again.
+pub const INSTALL_LINE_CAPACITY: usize = 4096;
+
 /// The console's system tick rate (`nn::os::GetSystemTickFrequency`, 19.2 MHz).
 pub const SYSTEM_TICK_HZ: u64 = 19_200_000;
 

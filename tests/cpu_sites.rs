@@ -320,3 +320,38 @@ fn cpu_sites_fixed_camera_setup_loads_the_manager_through_the_slot_and_stores_th
     let store = 0x3d80_0000 | ((sites_pkg2::CAMERA_CENTRE_FIELD as u32 / 16) << 10) | (8 << 5);
     assert_eq!(words[8], store, "str q0, [x8, #0xbd0]");
 }
+
+#[test]
+fn the_install_line_of_every_site_and_feature_fits_its_buffer_with_room_to_spare() {
+    use model::guard::GuardOutcome;
+    use model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written, INSTALL_LINE_CAPACITY};
+    use model::version::Verdict;
+    let reports: Vec<SiteReport> =
+        sites::SITES.iter().map(|s| SiteReport { site: s.name, found: GuardOutcome::Stock, written: Written::Far }).collect();
+    let features: Vec<FeatureReport> = [
+        "input_delay", "lra_reset", "stage_hazards", "reset_hub", "cpu_core", "cpu_defence", "cpu_ledge", "cpu_tech", "cpu_shield",
+        "cpu_mash", "cpu_shield_damage", "cpu_camera", "cpu_common",
+    ]
+    .iter()
+    .map(|f| FeatureReport { feature: f, installed: false, reason: Some("awaiting_common_nro") })
+    .collect();
+    let line = InstallLine {
+        tick: 1_793_599_889_128,
+        version: "0.1.0",
+        display: b"13.0.5",
+        build_id: Some(&[0x21; 20]),
+        verdict: Verdict::Supported,
+        sites: &reports,
+        features: &features,
+        settings: Some(SettingsReport { input_delay: 5, lra_reset: true, stage_hazards: false }),
+        migration: Some("partial"),
+        heap_allocations: Some(0),
+    };
+    let text = line.to_string();
+    assert!(text.ends_with("result=installed heap_allocations=0"), "{}", &text[text.len() - 80..]);
+    assert!(
+        text.len() + 1024 <= INSTALL_LINE_CAPACITY,
+        "the install line is {} bytes of {INSTALL_LINE_CAPACITY}: raise the buffer before it is cut",
+        text.len()
+    );
+}
