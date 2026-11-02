@@ -536,3 +536,30 @@ fn other_status_keeps_the_placeholder_term() {
     assert_eq!(Recorder::term_for_status(&t, 51), C::TermContEscapeAir);
     assert_eq!(Recorder::term_for_status(&t, 82), C::TermContEscapeF);
 }
+
+/// R2-5 (review R2): a running playback stops on a mash interrupt only when the row is On, and the CPU's view of
+/// the recorder (`playback_state`) follows at once.
+#[test]
+fn r2_5_mash_interrupt_stops_a_running_playback_only_when_enabled() {
+    let mut s = settings(60, true);
+    let mut r = Recorder::new();
+    locked_out(&mut r, &s);
+    for k in 0..60 {
+        frame(&mut r, &s, if k < 30 { press(1) } else { MappedInputs::NEUTRAL });
+    }
+    r.start_playback(0, 1).unwrap();
+    frame(&mut r, &s, MappedInputs::NEUTRAL);
+    assert!(r.playback_state(false).running);
+    s.mash_interrupt = false;
+    assert!(!r.interrupt_on_mash(&s));
+    assert!(r.playback_state(false).running, "continues while the row is Off");
+    let (out, ..) = frame(&mut r, &s, MappedInputs::NEUTRAL);
+    let _ = out;
+    assert_eq!(r.mode(), Mode::Playback);
+    s.mash_interrupt = true;
+    assert!(r.interrupt_on_mash(&s));
+    assert!(!r.playback_state(false).running, "the CPU no longer sees a playback");
+    // Nothing is injected on the next frame: the recorder is idle.
+    let (_, control, _) = frame(&mut r, &s, MappedInputs::NEUTRAL);
+    assert!(control.write.is_none());
+}

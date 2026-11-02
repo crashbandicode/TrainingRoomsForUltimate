@@ -31,6 +31,10 @@ pub struct HoldRepeat {
 }
 
 impl HoldRepeat {
+    pub const fn new() -> HoldRepeat {
+        HoldRepeat { held: 0 }
+    }
+
     /// Advance one input frame; `true` when the held direction repeats on this frame.
     pub fn frame(&mut self, held: bool) -> bool {
         if !held {

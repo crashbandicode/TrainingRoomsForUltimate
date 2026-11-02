@@ -36,6 +36,7 @@ pub const SHIPPED_TAGS: &[&str] = &[
     "[KirbyHats]",
     "[KirbyPark]",
     "[LobbyPractice]",
+    "[Migration]",
     "[MiiHelper]",
     "[MiiOrdinaryCpu]",
     "[MiiOrdinaryPlayer]",

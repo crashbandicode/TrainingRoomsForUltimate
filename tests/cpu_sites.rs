@@ -11,9 +11,10 @@ mod model;
 
 use model::guard::{HookForm, Placement, SeamKind};
 use model::sites::{self, Feature, Site};
+use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 32] = [
+const SYMBOLS: [(&str, &str); 44] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("prev_status_kind", "_ZN3app8lua_bind35StatusModule__prev_status_kind_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -41,11 +42,23 @@ const SYMBOLS: [(&str, &str); 32] = [
     ("work_get_param_float", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("motion_change_hook", "_ZN3app8lua_bind32MotionModule__change_motion_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40Effbfbb"),
     ("quake_pos_hook", "_ZN3app8lua_bind32CameraModule__req_quake_pos_implEPNS_26BattleObjectModuleAccessorEiRKN3phx8Vector3fE"),
+    ("command_flag_hook", "_ZN3app8lua_bind40ControlModule__get_command_flag_cat_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("attack_air_kind_hook", "_ZN3app8lua_bind39ControlModule__get_attack_air_kind_implEPNS_26BattleObjectModuleAccessorE"),
+    ("stick_dir_hook", "_ZN3app8lua_bind33ControlModule__get_stick_dir_implEPNS_26BattleObjectModuleAccessorE"),
+    ("work_get_int", "_ZN3app8lua_bind24WorkModule__get_int_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("kinetic_sum_speed_y", "_ZN3app8lua_bind35KineticModule__get_sum_speed_y_implEPNS_26BattleObjectModuleAccessorEi"),
+    ("pos_y", "_ZN3app8lua_bind25PostureModule__pos_y_implEPNS_26BattleObjectModuleAccessorE"),
+    ("pos_z", "_ZN3app8lua_bind25PostureModule__pos_z_implEPNS_26BattleObjectModuleAccessorE"),
+    ("effect_req", "_ZN3app8lua_bind22EffectModule__req_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ERKNS3_8Vector3fES7_fjibi"),
+    ("cancel_is_enable", "_ZN3app8lua_bind35CancelModule__is_enable_cancel_implEPNS_26BattleObjectModuleAccessorE"),
+    ("motion_kind", "_ZN3app8lua_bind30MotionModule__motion_kind_implEPNS_26BattleObjectModuleAccessorE"),
     ("shield_param_hook", "_ZN3app8lua_bind32WorkModule__get_param_float_implEPNS_26BattleObjectModuleAccessorEmm"),
     ("check_button_on_hook", "_ZN3app8lua_bind35ControlModule__check_button_on_implEPNS_26BattleObjectModuleAccessorEi"),
     ("check_button_off_hook", "_ZN3app8lua_bind36ControlModule__check_button_off_implEPNS_26BattleObjectModuleAccessorEi"),
     ("stick_x_no_clamp_hook", "_ZN3app8lua_bind40ControlModule__get_stick_x_no_clamp_implEPNS_26BattleObjectModuleAccessorE"),
     ("stick_y_no_clamp_hook", "_ZN3app8lua_bind40ControlModule__get_stick_y_no_clamp_implEPNS_26BattleObjectModuleAccessorE"),
+    ("utility_get_category", "_ZN3app7utility12get_categoryEj"),
+    ("utility_get_kind", "_ZN3app7utility8get_kindEPKNS_26BattleObjectModuleAccessorE"),
 ];
 
 /// Offsets of every site of `ssbu-cpu-pilot` (commit 0162eed, `src/model.rs`; the list is the one
@@ -57,7 +70,7 @@ const PILOT_SITES: [usize; 23] = [
 ];
 
 fn cpu_sites() -> impl Iterator<Item = &'static Site> {
-    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield))
+    sites::SITES.iter().filter(|s| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon))
 }
 
 #[test]
@@ -69,40 +82,52 @@ fn cpu_sites_are_the_symbols_they_name() {
     }
     // The constant that `sites.rs` names for each is the row's offset.
     for (name, offset) in [
-        ("cpu_on_frame_slot", sites::CPU_ON_FRAME_SLOT_OFFSET),
-        ("cpu_on_frame", sites::CPU_ON_FRAME_OFFSET),
-        ("lua_const_lookup", sites::LUA_CONST_LOOKUP_OFFSET),
-        ("status_kind", sites::STATUS_KIND_OFFSET),
-        ("prev_status_kind", sites::PREV_STATUS_KIND_OFFSET),
-        ("situation_kind", sites::SITUATION_KIND_OFFSET),
-        ("prev_situation_kind", sites::PREV_SITUATION_KIND_OFFSET),
-        ("change_status_request", sites::CHANGE_STATUS_REQUEST_OFFSET),
-        ("motion_frame", sites::MOTION_FRAME_OFFSET),
-        ("pos_x", sites::POS_X_OFFSET),
-        ("work_is_flag", sites::WORK_IS_FLAG_OFFSET),
-        ("work_set_flag", sites::WORK_SET_FLAG_OFFSET),
-        ("sdi_hook", sites::SDI_HOOK_OFFSET),
-        ("stick_x_hook", sites::STICK_X_HOOK_OFFSET),
-        ("stick_y_hook", sites::STICK_Y_HOOK_OFFSET),
-        ("clatter_start_hook", sites::CLATTER_START_HOOK_OFFSET),
-        ("add_clatter_time", sites::ADD_CLATTER_TIME_OFFSET),
-        ("effect_req_on_joint", sites::EFFECT_REQ_ON_JOINT_OFFSET),
-        ("transition_term_hook", sites::TRANSITION_TERM_HOOK_OFFSET),
-        ("change_status_force", sites::CHANGE_STATUS_FORCE_OFFSET),
-        ("visibility_set_whole", sites::VISIBILITY_SET_WHOLE_OFFSET),
-        ("effect_set_visible_kind", sites::EFFECT_SET_VISIBLE_KIND_OFFSET),
-        ("motion_end_frame", sites::MOTION_END_FRAME_OFFSET),
-        ("damage_of", sites::DAMAGE_OF_OFFSET),
-        ("work_get_float", sites::WORK_GET_FLOAT_OFFSET),
-        ("work_set_float", sites::WORK_SET_FLOAT_OFFSET),
-        ("work_get_param_float", sites::WORK_GET_PARAM_FLOAT_OFFSET),
-        ("motion_change_hook", sites::MOTION_CHANGE_HOOK_OFFSET),
-        ("quake_pos_hook", sites::QUAKE_POS_HOOK_OFFSET),
-        ("shield_param_hook", sites::SHIELD_PARAM_HOOK_OFFSET),
-        ("check_button_on_hook", sites::CHECK_BUTTON_ON_HOOK_OFFSET),
-        ("check_button_off_hook", sites::CHECK_BUTTON_OFF_HOOK_OFFSET),
-        ("stick_x_no_clamp_hook", sites::STICK_X_NO_CLAMP_HOOK_OFFSET),
-        ("stick_y_no_clamp_hook", sites::STICK_Y_NO_CLAMP_HOOK_OFFSET),
+        ("cpu_on_frame_slot", sites_pkg2::CPU_ON_FRAME_SLOT_OFFSET),
+        ("cpu_on_frame", sites_pkg2::CPU_ON_FRAME_OFFSET),
+        ("lua_const_lookup", sites_pkg2::LUA_CONST_LOOKUP_OFFSET),
+        ("status_kind", sites_pkg2::STATUS_KIND_OFFSET),
+        ("prev_status_kind", sites_pkg2::PREV_STATUS_KIND_OFFSET),
+        ("situation_kind", sites_pkg2::SITUATION_KIND_OFFSET),
+        ("prev_situation_kind", sites_pkg2::PREV_SITUATION_KIND_OFFSET),
+        ("change_status_request", sites_pkg2::CHANGE_STATUS_REQUEST_OFFSET),
+        ("motion_frame", sites_pkg2::MOTION_FRAME_OFFSET),
+        ("pos_x", sites_pkg2::POS_X_OFFSET),
+        ("work_is_flag", sites_pkg2::WORK_IS_FLAG_OFFSET),
+        ("work_set_flag", sites_pkg2::WORK_SET_FLAG_OFFSET),
+        ("sdi_hook", sites_pkg2::SDI_HOOK_OFFSET),
+        ("stick_x_hook", sites_pkg2::STICK_X_HOOK_OFFSET),
+        ("stick_y_hook", sites_pkg2::STICK_Y_HOOK_OFFSET),
+        ("clatter_start_hook", sites_pkg2::CLATTER_START_HOOK_OFFSET),
+        ("add_clatter_time", sites_pkg2::ADD_CLATTER_TIME_OFFSET),
+        ("effect_req_on_joint", sites_pkg2::EFFECT_REQ_ON_JOINT_OFFSET),
+        ("transition_term_hook", sites_pkg2::TRANSITION_TERM_HOOK_OFFSET),
+        ("change_status_force", sites_pkg2::CHANGE_STATUS_FORCE_OFFSET),
+        ("visibility_set_whole", sites_pkg2::VISIBILITY_SET_WHOLE_OFFSET),
+        ("effect_set_visible_kind", sites_pkg2::EFFECT_SET_VISIBLE_KIND_OFFSET),
+        ("motion_end_frame", sites_pkg2::MOTION_END_FRAME_OFFSET),
+        ("damage_of", sites_pkg2::DAMAGE_OF_OFFSET),
+        ("work_get_float", sites_pkg2::WORK_GET_FLOAT_OFFSET),
+        ("work_set_float", sites_pkg2::WORK_SET_FLOAT_OFFSET),
+        ("work_get_param_float", sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET),
+        ("motion_change_hook", sites_pkg2::MOTION_CHANGE_HOOK_OFFSET),
+        ("quake_pos_hook", sites_pkg2::QUAKE_POS_HOOK_OFFSET),
+        ("command_flag_hook", sites_pkg2::COMMAND_FLAG_HOOK_OFFSET),
+        ("attack_air_kind_hook", sites_pkg2::ATTACK_AIR_KIND_HOOK_OFFSET),
+        ("stick_dir_hook", sites_pkg2::STICK_DIR_HOOK_OFFSET),
+        ("work_get_int", sites_pkg2::WORK_GET_INT_OFFSET),
+        ("kinetic_sum_speed_y", sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET),
+        ("pos_y", sites_pkg2::POS_Y_OFFSET),
+        ("pos_z", sites_pkg2::POS_Z_OFFSET),
+        ("effect_req", sites_pkg2::EFFECT_REQ_OFFSET),
+        ("cancel_is_enable", sites_pkg2::CANCEL_IS_ENABLE_OFFSET),
+        ("motion_kind", sites_pkg2::MOTION_KIND_OFFSET),
+        ("shield_param_hook", sites_pkg2::SHIELD_PARAM_HOOK_OFFSET),
+        ("check_button_on_hook", sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET),
+        ("check_button_off_hook", sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET),
+        ("stick_x_no_clamp_hook", sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET),
+        ("stick_y_no_clamp_hook", sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET),
+        ("utility_get_category", sites_pkg2::UTILITY_GET_CATEGORY_OFFSET),
+        ("utility_get_kind", sites_pkg2::UTILITY_GET_KIND_OFFSET),
     ] {
         assert_eq!(sites::find(name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -117,11 +142,11 @@ fn cpu_sites_the_frame_slot_holds_the_original_it_replaces() {
     // seam table's value) and boot compares the live slot with it (`Site::slot_outcome`) before the
     // wrapper replaces it.
     assert_eq!(owned.window(slot.offset), [0u8; 64]);
-    assert_eq!(slot.expected_slot_target(), Some(sites::CPU_ON_FRAME_OFFSET as u64));
-    assert_eq!(slot.slot_outcome(sites::CPU_ON_FRAME_OFFSET as u64), model::guard::GuardOutcome::Stock);
+    assert_eq!(slot.expected_slot_target(), Some(sites_pkg2::CPU_ON_FRAME_OFFSET as u64));
+    assert_eq!(slot.slot_outcome(sites_pkg2::CPU_ON_FRAME_OFFSET as u64), model::guard::GuardOutcome::Stock);
     assert!(!slot.slot_outcome(0x123456).usable());
     // The function the slot points at is the row the wrapper calls.
-    assert_eq!(sites::find("cpu_on_frame").map(|s| s.offset), Some(sites::CPU_ON_FRAME_OFFSET));
+    assert_eq!(sites::find("cpu_on_frame").map(|s| s.offset), Some(sites_pkg2::CPU_ON_FRAME_OFFSET));
     assert!(matches!(slot.kind, SeamKind::Hook { form: HookForm::VtableSlot, placement: Placement::Data }));
 }
 
@@ -131,7 +156,7 @@ fn cpu_sites_every_replace_hook_is_a_thunk_that_fits_the_far_jump() {
     let hooks: Vec<_> = cpu_sites()
         .filter(|s| matches!(s.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }))
         .collect();
-    assert_eq!(hooks.len(), 12, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp");
+    assert_eq!(hooks.len(), 15, "sdi, stick x/y, start_clatter, transition term, change_motion, req_quake_pos, shield param, button on/off, stick x/y no clamp, command flag, attack air kind, stick dir");
     for site in hooks {
         assert!(!site.note.is_empty(), "{}: an entry hook needs its justification", site.name);
         // A 16-aligned entry: Skyline's far jump is 16 bytes there (20 only at an address 4 past an
@@ -189,7 +214,7 @@ fn cpu_sites_overlapping_windows_are_all_our_own() {
     let mut pairs = 0;
     for (a, b) in sites::overlapping_pairs() {
         let (a, b) = (&sites::SITES[a], &sites::SITES[b]);
-        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield);
+        let cpu = |s: &Site| matches!(s.feature, Feature::CpuCore | Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon);
         if cpu(a) || cpu(b) {
             pairs += 1;
             assert!(cpu(a) && cpu(b), "{} overlaps {} (a site of another feature)", a.name, b.name);

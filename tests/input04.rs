@@ -367,3 +367,52 @@ fn shortcut_change_applies_immediately() {
     d.poll(&set, sample(&[logical::X], &[logical::X]), false);
     assert!(d.consume(Request::OpenMenu));
 }
+
+/// R2-3 (review R2): the Save and Load chords are raised by the detector and pulled once each by their consumer; a
+/// request stays pending until its consumer runs, and a blocked poll raises nothing.
+#[test]
+fn r2_3_save_and_load_chords_are_pulled_once_each_and_wait_for_their_consumer() {
+    let set = ChordSet::factory();
+    let mut detector = Detector::new();
+    let save = sample(&[logical::ZL, logical::DPAD_DOWN], &[logical::DPAD_DOWN]);
+    let load = sample(&[logical::ZL, logical::DPAD_UP], &[logical::DPAD_UP]);
+    detector.poll(&set, save, false);
+    assert!(detector.is_pending(Request::SaveState));
+    assert_eq!(detector.poll(&set, load, true), 0, "a blocked poll raises nothing");
+    assert!(!detector.is_pending(Request::LoadState));
+    detector.poll(&set, load, false);
+    assert!(detector.is_pending(Request::LoadState));
+    // Several polls later the requests are still pending (the consumer is the save-state fighter step).
+    for _ in 0..30 {
+        detector.poll(&set, sample(&[], &[]), false);
+    }
+    assert!(detector.consume(Request::SaveState));
+    assert!(!detector.consume(Request::SaveState), "once");
+    assert!(detector.is_pending(Request::LoadState), "a load nobody is eligible for yet stays pending");
+    assert!(detector.consume(Request::LoadState));
+}
+
+/// R2-6 (review R2): a nondefault INI shortcut raises the OpenMenu request, also a Plus shortcut, from the raw
+/// sample (the Plus bits are cleared only afterwards), and the permanent chord is not a shortcut.
+#[test]
+fn r2_6_an_ini_shortcut_raises_the_open_menu_request_including_plus() {
+    let mut set = ChordSet::factory();
+    set.shortcuts = MenuShortcuts::parse("[menu]\nshortcut_1=Plus\nshortcut_2=X + Y\n");
+    let mut detector = Detector::new();
+    let plus = sample(&[logical::PLUS], &[logical::PLUS]);
+    detector.poll(&set, plus, false);
+    assert!(detector.is_pending(Request::OpenMenu));
+    assert!(plus_shortcut_accepted(&set, plus), "an accepted Plus shortcut consumes the pause press");
+    assert!(detector.consume(Request::OpenMenu));
+    let xy = sample(&[logical::X, logical::Y], &[logical::Y]);
+    detector.poll(&set, xy, false);
+    assert!(detector.is_pending(Request::OpenMenu));
+    assert!(detector.consume(Request::OpenMenu));
+    // The default shortcut is gone once the file says otherwise; the permanent chord always opens.
+    let minus = sample(&[logical::MINUS], &[logical::MINUS]);
+    detector.poll(&set, minus, false);
+    assert!(!detector.is_pending(Request::OpenMenu));
+    let permanent = sample(&[logical::B, logical::DPAD_UP], &[logical::DPAD_UP]);
+    detector.poll(&set, permanent, false);
+    assert!(detector.is_pending(Request::OpenMenu));
+}

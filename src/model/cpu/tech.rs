@@ -322,3 +322,18 @@ pub const fn camera_centre(class: StageClass) -> Option<[f32; 3]> {
         StageClass::Other => None,
     }
 }
+
+/// Whether the script's requested status is one of the three tech situations (ground, wall, ceiling):
+/// only then does the status-change hook read the terms and ask the script's own check.
+pub fn is_tech_situation(t: &Table, requested: i32) -> bool {
+    [
+        C::StatusDown,
+        C::StatusDamageFlyReflectD,
+        C::StatusStopWall,
+        C::StatusDamageFlyReflectLr,
+        C::StatusStopCeil,
+        C::StatusDamageFlyReflectU,
+    ]
+    .iter()
+    .any(|c| t.is(*c, requested))
+}

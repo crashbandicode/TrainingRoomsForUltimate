@@ -1271,6 +1271,20 @@ fn core04_last_page_roundtrip() {
     assert!(settings::parse(&text).settings.last_page().is_none());
 }
 
+#[test]
+fn mii_preferences_is_the_preserved_extra_as_json() {
+    assert!(Settings::factory().mii_preferences().is_none());
+    let text = r#"{"menu":{},"mii_preferences":{"order":[3,1,2],"name":"x"}}"#;
+    let loaded = settings::parse(text);
+    assert!(!loaded.corrupt());
+    let prefs = loaded.settings.mii_preferences().expect("kept as it is");
+    assert_eq!(prefs["order"], serde_json::json!([3, 1, 2]));
+    assert_eq!(prefs["name"], "x");
+    // It survives a save unchanged.
+    let again = settings::parse(&loaded.settings.to_json());
+    assert_eq!(again.settings.mii_preferences(), Some(prefs));
+}
+
 // ---- Q18, B11: re-roll events --------------------------------------------------------------------
 
 #[test]
@@ -1515,13 +1529,13 @@ fn core03_item_grid_layout_handheld() {
 fn core03_stage_grid_layout_docked() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
     assert_eq!((l.cols, l.rows, l.short_names), (5, 8, true));
-    assert_eq!(l.tiles(), 118, "All + 117");
+    assert_eq!(l.tiles(), STAGE_TILES, "All + the catalog");
 }
 
 #[test]
 fn core03_stage_grid_pages_docked_40_40_38() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
-    assert_eq!(pages_of(&l), [40, 40, 38]);
+    assert_eq!(pages_of(&l), [40, 40, STAGE_TILES - 80]);
 }
 
 #[test]
@@ -1534,7 +1548,7 @@ fn core03_stage_grid_layout_handheld() {
 fn core03_stage_grid_pages_handheld_8() {
     let l = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
     assert_eq!(l.pages(), 8);
-    assert_eq!(pages_of(&l), [16, 16, 16, 16, 16, 16, 16, 6]);
+    assert_eq!(pages_of(&l), [16, 16, 16, 16, 16, 16, 16, STAGE_TILES - 112]);
 }
 
 #[test]
@@ -1547,7 +1561,7 @@ fn core03_item_grid_pages_cover_38_items_once() {
 }
 
 #[test]
-fn core03_stage_grid_pages_cover_118_tiles_once() {
+fn core03_stage_grid_pages_cover_every_tile_once() {
     for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
         let l = GridLayout::new(GridKind::Stages, mode);
         let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.per_page()).filter_map(move |c| l.tile(p, c))).collect();

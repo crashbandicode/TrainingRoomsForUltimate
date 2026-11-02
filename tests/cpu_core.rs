@@ -562,3 +562,15 @@ fn cpu_core_frame_with_no_work_asks_for_nothing() {
     let again = cpu.frame(key, &facts);
     assert_eq!(again, Default::default());
 }
+
+#[test]
+fn cpu_ids_resolved_entries_lists_exactly_what_resolved_by_name() {
+    // The diag build prints these so a log's ids can be read by name.
+    let table = Table::with(&[(C::StatusWait, 7), (C::SituationCliff, 3)]);
+    let entries: Vec<(&str, i32)> = table.resolved_entries().collect();
+    assert_eq!(entries.len(), 2);
+    assert!(entries.contains(&("FIGHTER_STATUS_KIND_WAIT", 7)));
+    assert!(entries.contains(&("SITUATION_KIND_CLIFF", 3)));
+    assert_eq!(Table::unresolved().resolved_entries().count(), 0);
+    assert_eq!(table.resolved_entries().count() + table.missing().count(), ids::COUNT);
+}

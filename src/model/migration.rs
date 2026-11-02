@@ -55,10 +55,20 @@ pub fn route(rel: &str) -> Option<Route<'_>> {
     if SAME_NAME_DIRS.iter().any(|dir| inside(dir)) {
         return Some(Route { to: rel, part: Part::Blocking, capped: true });
     }
-    if inside(CAPTURES_DIR) {
+    // A capture is a bundle folder of files (`<id>.smd/` with its `.tmrc`, `manifest.json`,
+    // `timeline.jsonl`), so anything below `replay_captures/` is imported, at any depth.
+    if rel.len() > CAPTURES_DIR.len() && rel.starts_with(CAPTURES_DIR) {
         return Some(Route { to: rel, part: Part::Background, capped: false });
     }
     None
+}
+
+/// Whether a path (relative to the source folder) is inside one of the fork's unpublished capture
+/// staging folders, `.<id>.smd-<digits>.tmp`: never copied, never touched (decision 2026-11-02; they
+/// hold a half-written capture, not a published one).
+pub fn is_staging(rel: &str) -> bool {
+    let Some(inside) = rel.strip_prefix(CAPTURES_DIR) else { return false };
+    inside.split('/').any(|part| part.len() > 1 && part.starts_with('.') && part.ends_with(".tmp"))
 }
 
 /// The temporary name a capture is written under before its rename.
@@ -79,6 +89,8 @@ pub enum Skip {
     /// The destination exists: a hand-copied folder or another version wins.
     Exists,
     TooLarge,
+    /// A capture staging folder (`.<id>.smd-N.tmp`): counted as `skipped_staging`.
+    Staging,
 }
 
 impl Skip {
@@ -86,6 +98,7 @@ impl Skip {
         match self {
             Skip::Exists => "exists",
             Skip::TooLarge => "too_large",
+            Skip::Staging => "staging",
         }
     }
 }
@@ -126,7 +139,9 @@ pub fn plan<'a>(
         let Some(route) = route(file.rel) else {
             continue;
         };
-        let skip = if destination_exists(route.to) {
+        let skip = if is_staging(file.rel) {
+            Some(Skip::Staging)
+        } else if destination_exists(route.to) {
             Some(Skip::Exists)
         } else if route.capped && file.bytes > MAX_COPY_BYTES {
             Some(Skip::TooLarge)

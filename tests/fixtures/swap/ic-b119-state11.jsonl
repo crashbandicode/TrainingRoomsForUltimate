@@ -1,0 +1,8 @@
+{"ev":"flags","role":0,"note":"Training (IC119 Ally run)"}
+{"ev":"window","role":0,"cells":[0],"actors":1,"note":"original Mario"}
+{"ev":"reload","role":0,"cells":[75,76,2],"actors":2,"bank":true,"note":"IC119: pair-lead bank [0x4b,0x4c,0x2] count 3 actors 2 flags 6; state 6 sets R+0x50 = 1 then 2 (650010.c:615–618); native requests Popo and R+0x5c; the hook acquires only X (supplemental skips cells 0/1); B122 writes R+0x50 = 3"}
+{"ev":"expect","role":0,"policy":"old","pair_refs":2,"note":"native-stall1.json decoded (C122 §1.3): post-reset state R+0x4c=0 R+0x50=0 map 0 with nro_count 3; before the tails the value was the vanilla 2"}
+{"ev":"expect","role":0,"policy":"recipe","pair_refs":3,"note":"[IcPair] resource owner=0 … refs 2->3 kinds=[4b, 4c, 2]"}
+{"ev":"ready","role":0,"note":"C122 §1.2–1.3: every tail takes the pair rule; the second body to finish sees R+0x50 == 1 and resets the whole R while the third is still constructing: Popo b47 +0x20=0, Nana b48 +0x20=0, Link b49 +0x20=1 forever; state 11 waits"}
+{"ev":"expect","role":0,"policy":"old","loader":6,"install":true}
+{"ev":"expect","role":0,"policy":"recipe","loader":14,"install":false,"map":0,"pair_refs":0,"note":"the reset fires after the third construction"}

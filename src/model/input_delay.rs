@@ -81,6 +81,9 @@ pub enum Clear {
     SaveStateLoad,
     /// Training was reset with L+R+A or by the game (decision B8; the reset hub's last step).
     TrainingReset,
+    /// The game's own pause began or ended (SPEC-input-03 §5.1, question 3): whatever was queued
+    /// before the pause, and whatever the pause menu's input produced, never reaches gameplay.
+    NativePause,
 }
 
 /// The delay queue.
@@ -134,19 +137,27 @@ impl DelayQueue {
     /// One P1 poll with delay `delay` (clamped to `MAX_DELAY`) and the record the game just mapped.
     /// Returns the record the game should see (SPEC-input-03 §5).
     ///
+    /// 0. Delay 0 empties the queue and passes `actual` through at once: whatever was queued at a
+    ///    higher delay is never played, so the transition poll already returns the current record
+    ///    (SPEC-input-03 §5: "setting the delay to 0 empties the queue on the next poll and passes
+    ///    input through unchanged"; review R3).
     /// 1. `actual` is the poll's record.
-    /// 2. Fewer than `delay` queued: neutral. Otherwise the oldest queued record, if any.
+    /// 2. Fewer than `delay` queued: neutral. Otherwise the oldest queued record.
     /// 3. `actual` is queued as the newest.
     /// 4. The oldest records are dropped until at most `delay` remain.
+    ///
+    /// Lowering a nonzero delay from `a` to `b` follows steps 1 to 4 as they are: this poll still
+    /// plays the oldest record (`a` polls old), the `a - b` records between it and the new steady
+    /// state are discarded unplayed, and from the next poll the output is `b` polls old, so the
+    /// output jumps forward in time by `a - b` frames (SPEC-input-03 §5, "Decreasing d").
     pub fn step(&mut self, delay: u8, actual: MappedInputs) -> MappedInputs {
         let delay = usize::from(delay.min(MAX_DELAY));
-        let out = if self.len < delay {
-            MappedInputs::NEUTRAL
-        } else if self.len > 0 {
-            self.ring[self.head]
-        } else {
-            actual
-        };
+        if delay == 0 {
+            self.head = 0;
+            self.len = 0;
+            return actual;
+        }
+        let out = if self.len < delay { MappedInputs::NEUTRAL } else { self.ring[self.head] };
         self.push_newest(actual);
         while self.len > delay {
             self.pop_oldest();

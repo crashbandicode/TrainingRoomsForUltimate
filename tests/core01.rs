@@ -9,7 +9,7 @@ mod common;
 mod model;
 
 use model::guard::{GuardOutcome, HookForm, Placement, SeamKind, GUARD_BYTES};
-use model::install_line::{FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+use model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use model::sites::{self, Feature, Phase, SITES};
 use model::storage::{self, FixedPath};
 use model::version::{self, Verdict};
@@ -60,6 +60,7 @@ fn core01_unsupported_logs_and_returns() {
             verdict,
             sites: &[],
             features: &[],
+            developer: None,
             settings: None,
             migration: None,
             heap_allocations: Some(0),
@@ -80,8 +81,8 @@ fn core01_install_line_format() {
         SiteReport { site: "reset_check", found: GuardOutcome::Foreign { first_diff: 8 }, written: Written::Skipped },
     ];
     let features = [
-        FeatureReport { feature: "input_delay", installed: true },
-        FeatureReport { feature: "lra_reset", installed: false },
+        FeatureReport { feature: "input_delay", installed: true, reason: None },
+        FeatureReport { feature: "lra_reset", installed: false, reason: None },
     ];
     let settings = SettingsReport { input_delay: 5, lra_reset: false, stage_hazards: true };
     let line = InstallLine {
@@ -92,6 +93,7 @@ fn core01_install_line_format() {
         verdict: Verdict::Supported,
         sites: &sites,
         features: &features,
+        developer: Some(DeveloperReport { on: false, reason: "duplicate_key" }),
         settings: Some(settings),
         migration: Some("none"),
         heap_allocations: Some(0),
@@ -100,7 +102,7 @@ fn core01_install_line_format() {
         line.to_string(),
         "123456 plugin=training_rooms/0.1.0 game=13.0.5 build=21450c647b8c5940ed5b68218ea128fd3c5d597d \
          input_caller_a_note=stock/near hazard_flag=other/checked reset_check=foreign/skipped \
-         input_delay=installed lra_reset=not_installed settings: input_delay=5 lra_reset=off stage_hazards=on \
+         input_delay=installed lra_reset=not_installed developer=off reason=duplicate_key settings: input_delay=5 lra_reset=off stage_hazards=on \
          migration=none result=installed heap_allocations=0"
     );
     let unmetered = InstallLine { heap_allocations: None, ..line };
@@ -263,25 +265,87 @@ fn core01_no_network_symbols() {
 
 #[test]
 fn core01_developer_ini() {
-    use model::developer_ini::parse;
+    use model::developer_ini::{parse, Reason};
     assert!(parse(b"developer_page=on\n").developer_page);
+    assert_eq!(parse(b"developer_page=on\n").reason, Reason::On);
     assert!(parse(b"  developer_page = on  \r\n").developer_page);
     assert!(parse(b"\xef\xbb\xbfdeveloper_page=on").developer_page);
     assert!(parse(b"; note\n[dev]\n# x\ndeveloper_page=on\nother=1").developer_page);
-    // Missing file (empty), other values, other keys, comments: hidden.
-    assert!(!parse(b"").developer_page);
-    assert!(!parse(b"developer_page=off").developer_page);
-    assert!(!parse(b"developer_page=ON").developer_page);
-    assert!(!parse(b"developer_page=1").developer_page);
-    assert!(!parse(b"developer_page").developer_page);
-    assert!(!parse(b"; developer_page=on").developer_page);
-    assert!(!parse(b"x_developer_page=on").developer_page);
+    // Other values, other keys, comments: hidden, with the reason that says why.
+    assert_eq!(parse(b"").reason, Reason::KeyAbsent);
+    assert_eq!(parse(b"developer_page=off").reason, Reason::NotOn);
+    assert_eq!(parse(b"developer_page=ON").reason, Reason::NotOn);
+    assert_eq!(parse(b"developer_page=1").reason, Reason::NotOn);
+    assert_eq!(parse(b"developer_page").reason, Reason::KeyAbsent);
+    assert_eq!(parse(b"; developer_page=on").reason, Reason::KeyAbsent);
+    assert_eq!(parse(b"x_developer_page=on").reason, Reason::KeyAbsent);
+    for text in [&b""[..], b"developer_page=off", b"developer_page=ON", b"developer_page=1", b"developer_page", b"; developer_page=on"] {
+        assert!(!parse(text).developer_page);
+    }
+}
+
+/// R4 (review R1-astra-pkg1): the gate fails closed on a repeated key (either order), an oversized
+/// file whose prefix says `on`, bytes that are not UTF-8 anywhere in the file, and a read error.
+#[test]
+fn core01_developer_ini_fails_closed() {
+    use model::developer_ini::{parse, read, Reason, MAX_BYTES};
+    // A repeated key, in both orders and with equal values: hidden.
+    assert_eq!(parse(b"developer_page=off\ndeveloper_page=on").reason, Reason::DuplicateKey);
+    assert_eq!(parse(b"developer_page=on\ndeveloper_page=off").reason, Reason::DuplicateKey);
+    assert_eq!(parse(b"developer_page=on\n; x\ndeveloper_page=on").reason, Reason::DuplicateKey);
+    assert!(!parse(b"developer_page=on\n  developer_page = on").developer_page);
+    // An enabled prefix and a tail past the limit: hidden, whichever way the bytes arrive.
+    let mut long = b"developer_page=on\n".to_vec();
+    long.resize(MAX_BYTES + 1, b'#');
+    assert_eq!(parse(&long).reason, Reason::TooLarge);
+    assert!(!read(&long[..]).developer_page);
+    // Exactly the limit is accepted.
+    let mut exact = b"developer_page=on\n".to_vec();
+    exact.resize(MAX_BYTES, b'#');
+    assert!(read(&exact[..]).developer_page);
+    // Even a reader that has far more than the limit is only asked for MAX_BYTES + 1.
+    let endless = std::io::repeat(b'#');
+    assert_eq!(read(endless).reason, Reason::TooLarge);
+    // Invalid UTF-8 after an enabled line, in a comment, and in the leading bytes.
+    assert_eq!(parse(b"developer_page=on\n; \xff\xfe\n").reason, Reason::NotUtf8);
+    assert!(!parse(b"developer_page=on\n\xc3\x28").developer_page);
     assert!(!parse(&[0xff, 0xfe, 0x00]).developer_page);
-    // The last line wins.
-    assert!(parse(b"developer_page=off\ndeveloper_page=on").developer_page);
-    assert!(!parse(b"developer_page=on\ndeveloper_page=off").developer_page);
-    // Only the first 8 KiB are read.
-    let mut long = vec![b'#'; 9000];
-    long.extend_from_slice(b"\ndeveloper_page=on");
-    assert!(!parse(&long).developer_page);
+    // A read error after an enabled prefix was read: rejected, not a prefix parse.
+    struct Fails(Vec<u8>);
+    impl std::io::Read for Fails {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.0.is_empty() {
+                return Err(std::io::Error::other("boom"));
+            }
+            let n = self.0.len().min(buf.len());
+            buf[..n].copy_from_slice(&self.0[..n]);
+            self.0.drain(..n);
+            Ok(n)
+        }
+    }
+    let failing = read(Fails(b"developer_page=on\n".to_vec()));
+    assert!(!failing.developer_page);
+    assert_eq!(failing.reason, Reason::Unreadable);
+}
+
+/// The boot loader's path (`developer_ini::load`) on real files: missing, duplicate, oversized,
+/// a directory in the file's place (the open succeeds on Linux, the read fails) and a clean file.
+#[test]
+fn core01_developer_ini_load_from_files() {
+    use model::developer_ini::{load, Reason, MAX_BYTES};
+    let dir = std::env::temp_dir().join(format!("tr-devini-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = |name: &str| dir.join(name).to_str().unwrap().to_owned();
+    assert_eq!(load(&path("absent.ini")).reason, Reason::Missing);
+    std::fs::write(path("clean.ini"), "developer_page=on\n").unwrap();
+    assert!(load(&path("clean.ini")).developer_page);
+    std::fs::write(path("dup.ini"), "developer_page=off\ndeveloper_page=on\n").unwrap();
+    assert_eq!(load(&path("dup.ini")).reason, Reason::DuplicateKey);
+    let mut big = b"developer_page=on\n".to_vec();
+    big.resize(MAX_BYTES * 4, b'#');
+    std::fs::write(path("big.ini"), &big).unwrap();
+    assert_eq!(load(&path("big.ini")).reason, Reason::TooLarge);
+    std::fs::create_dir_all(path("isdir.ini")).unwrap();
+    assert!(!load(&path("isdir.ini")).developer_page);
+    std::fs::remove_dir_all(&dir).unwrap();
 }

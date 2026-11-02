@@ -1,0 +1,10 @@
+{"ev":"flags","role":0,"r48":0,"r7d":0,"r7f":0,"note":"LDN waiting room (lobby-compat-c114), flags assumed as Training; SOLO-STALL-RCA §4: no LDN-specific condition"}
+{"ev":"window","role":0,"cells":[0],"actors":1,"note":"#82 original Mario [0,-1,-1]"}
+{"ev":"reload","role":0,"cells":[75,3,7],"actors":1,"bank":true,"note":"#82–#90 Mario → Solo bank [0x4b,3,7] count 3 actor 1 flags 4 (SOLO §2): native 0x17e5bc0 requests Popo (R+0x58) and, through the kind-0x24 table 0x17e5c7c, Link (R+0x5c); the C114 hook requested members 1 and 2 again → Link twice, Fox once"}
+{"ev":"ready","role":0,"note":"#90 bank Ready; #100–#114 member 0 → 1 → 2 with the same three body addresses/IDs"}
+{"ev":"expect","role":0,"policy":"old","map":2,"pair_refs":2,"note":"SOLO §2: Link's keys 3*42+{0,6} keep refs 1 after one release each; [0x4b,3,7] fails the pair test so R+0x50 stays at state 6's 2"}
+{"ev":"expect","role":0,"policy":"recipe","map":0,"pair_refs":0,"note":"one acquisition per kind; the last tail empties the map and the native reset clears R+0x50"}
+{"ev":"reload","role":0,"cells":[0],"actors":1,"bank":false,"note":"#168–#169 Target::Original submits canonical Mario [0,-1,-1] count 1 actor 1 bank_build=false; state 3 clears the NRO tree, state 6 finds R+0x18 = 2"}
+{"ev":"expect","role":0,"policy":"old","loader":7,"install":true,"map":2,"tree":0,"note":"#171 phase=Refused loader=7 published=false INSTALL_active=true (285 s before #175 destruction released it)"}
+{"ev":"ready","role":0}
+{"ev":"expect","role":0,"policy":"recipe","loader":14,"install":false,"map":0}

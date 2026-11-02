@@ -1,0 +1,9 @@
+{"ev":"flags","role":1,"note":"Training (PTA116T Ally s1); CPU owner 1 → role 1, pad route slot 1 (dpta5: S->table0[1] == A_1->+0 == ctx(Wolf,+0x4178)->+0x58)"}
+{"ev":"window","role":1,"cells":[9,1,5],"actors":1,"note":"#555/#563 CPU window [9,1,5] (Luigi bank) from the original Jigglypuff 0xc; route slot 1 → the active context's controller"}
+{"ev":"prefetch","role":1,"group":0,"kinds":[33,30],"note":"#569 [GroupSwap] plan owner=1 group=0 kinds=[21,1e] ready_fighters=8 pool=9/24 (2 members: budget)"}
+{"ev":"build","role":1,"group":0,"note":"#612 [GroupSwap] swap owner=1 kind=0x21 request_to_ready_us=1095453 bodies=[{589824},{655360},{0}] (Phase B; exchange minted, R header unchanged); the window [9,1,5] is the detached bundle"}
+{"ev":"reload","role":1,"cells":[47,12,9],"actors":1,"bank":true,"note":"#651 submit … outgoing=0x21 target=0x2f index=0; #653 teardown owner=1 reason=mod reload groups=1 bodies=3 contexts=3 dispatchers=1 keys=0 skipped=0 alias_ok=true (destroys the detached [9,1,5] bundle); #654 [BodyBank] build … [47,12,9]; #655 [TrioBoundary] reload incoming=(3,[2f,c,9]) active=(2,[21,1e,ffffffff]); states 1–3 (651660) free the window contexts, including the controller the route still names"}
+{"ev":"tick","frames":60,"note":"Eden 828.8–829.9 s: Unmapped Read64 @ 0x0 + Read8 @ 0x38 pairs every 1–3 frames (76 pairs) — the per-frame route tick 0x2f7b80 (ldr x8,[x8] at 0x2f7bb0; ldrb w9,[x8,#0x38] at 0x2f7bb4) on the freed controller B (D-PTA1BC-FIX §0.1)"}
+{"ev":"ready","role":1,"note":"a healthy Reload: activation (656ee0+0xd0 → 313b00(obj)) re-points A_1->+0; the burst ends at completion (85–96 pairs in the healthy P1 cases)"}
+{"ev":"tick","frames":60,"note":"no reads after completion"}
+{"ev":"expect","role":1,"loader":14,"install":false,"map":0}

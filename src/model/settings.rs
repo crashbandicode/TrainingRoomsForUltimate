@@ -27,6 +27,8 @@ use serde_json::{Map, Value};
 
 /// Top-level key holding the page id the menu opens on (Q5; SPEC-core-04 §3.1).
 pub const LAST_PAGE_KEY: &str = "last_page";
+/// The fork's top-level `mii_preferences` key, preserved verbatim (package 6 reads it).
+pub const MII_PREFERENCES_KEY: &str = "mii_preferences";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
 /// Largest slider value (the two damage ranges).
@@ -199,6 +201,11 @@ impl Snapshot {
         self.rows[LRA_RESET][0] != 0
     }
 
+    /// HUD (Display & Controls, default On): the first option (`On`) set, or neither set.
+    pub fn hud(&self) -> bool {
+        self.get("hud").is_none_or(|row| row.first().copied().unwrap_or(0) != 0 || row.iter().all(|v| *v == 0))
+    }
+
     /// Stage Hazards: On when the first option (`On`) is set.
     pub fn stage_hazards(&self) -> bool {
         self.rows[STAGE_HAZARDS][0] != 0
@@ -235,6 +242,12 @@ impl Settings {
     /// with the other top-level keys. `None` when absent or not a string.
     pub fn last_page(&self) -> Option<&str> {
         self.extra.get(LAST_PAGE_KEY).and_then(Value::as_str)
+    }
+
+    /// The preserved `mii_preferences` extra as its JSON value (read-only; absent when the file has none).
+    /// It is written back unchanged with the other top-level keys.
+    pub fn mii_preferences(&self) -> Option<&Value> {
+        self.extra.get(MII_PREFERENCES_KEY)
     }
 
     /// Record the page the menu is left on; the next close writes it.

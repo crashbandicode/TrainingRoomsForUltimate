@@ -1,0 +1,19 @@
+{"ev":"flags","role":0,"r48":0,"r7d":0,"r7f":0,"note":"Training; D-SG1-RCA §7: R+0x48 != 1 and R+0x7f == 0 inferred from the per-kind key counts of the ordinary laps"}
+{"ev":"missing_keys","role":0,"keys":[3781,3823],"note":"INF: the +1 files of 0x5a/0x5b are absent (keys 0x5a*42+1, 0x5b*42+1): L7866 map=7 for {5a,5b,75} where the table predicts 3+3+3=9 (D-SG1 §1 arithmetic: 15-9=6 keys gone after the Aegis build = the tails' {0,6}x2 plus the weapon's 0x1332/0x1333)"}
+{"ev":"window","role":0,"cells":[92,93],"actors":1,"note":"L7760 canonical Reload of the Kazuya window incoming=(2,[5c,5d,ff],1,0); map 0 after the build, tree 2"}
+{"ev":"expect","role":0,"map":0,"tree":2}
+{"ev":"prefetch","role":0,"group":0,"kinds":[90,91,117],"note":"L7848 plan group=0 kinds=[5a,5b] special=Native(100); L7866 prefetched group=0 … map=7 tree=5 (acquire loop ran 0x17e64d0 for 5a, 5b, 75)"}
+{"ev":"expect","role":0,"map":7,"tree":5}
+{"ev":"prefetch","role":0,"group":1,"kinds":[36,37,38,114],"note":"L7850 plan group=1 kinds=[24,25,26] special=Native(5); L7886 prefetched group=1 … map=15 tree=9 (24, 25, 26, 72)"}
+{"ev":"expect","role":0,"map":15,"tree":9}
+{"ev":"build","role":0,"group":0,"note":"L7923 build group=0 … map=15 → diag #1338 built ok=true installed=2 entry_flags=0x64 map=9; L7935 released owner=0 object_kind=0x75 map=9 (owned 0x17e8610(R,0x75) changed nothing)"}
+{"ev":"expect","role":0,"policy":"old","map":9}
+{"ev":"expect","role":0,"policy":"recipe","map":8,"note":"E3: released … object_kind=0x75 map=8 … orphan_keys=[1338]"}
+{"ev":"build","role":0,"group":1,"note":"L7980 build group=1 … map=9 → diag #1357 built ok=true installed=3 entry_flags=0x5 map=1; L7986 released owner=0 object_kind=0x72 map=1"}
+{"ev":"expect","role":0,"policy":"old","map":1}
+{"ev":"expect","role":0,"policy":"recipe","map":0,"note":"E3: after the last group build map=0"}
+{"ev":"reload","role":0,"cells":[75,76,0],"actors":2,"bank":true,"note":"L8021 submit … outgoing=0x24 target=0x4b bank_build=true; L8023 teardown … groups=2 bodies=4 contexts=4 dispatchers=2 records=1 keys=0 skipped=0 alias_ok=true; L8025 [BodyBank] build … [75,76,0] pair_lead: true; L8029 [TrioBoundary] reload incoming=(3,[4b,4c,0],2,0) active=(3,[24,25,26],1,0) loader=14; L8033–L8067 nine NRO unloads (tree 9 → 0)"}
+{"ev":"expect","role":0,"policy":"old","loader":7,"install":true,"map":1,"tree":0,"note":"L8069 native_return … sequence: 82 phase=Refused loader=7 published=false INSTALL_active=true; state 3 cleared the tree (nine unloads), state 6 refused before any request"}
+{"ev":"expect","role":0,"policy":"recipe","loader":6,"map":6,"tree":3,"pair_refs":3,"note":"recipe: the map was empty, state 6 published; native requested Popo and Nana through R+0x5c (17e5bc0.c:230-235; Nana is an ordinary 0x17e64d0 request, Yoga icp4d 0xc78/0xc7e, C122 nro_count 3) and the hook Mario ({0,6} each → 6 keys, tree {4b, 4c, 0}); the hook wrote R+0x50 = 3 (C122)"}
+{"ev":"ready","role":0,"note":"never under the old policy; E3 under the recipe: [IcPair] build … [IcPair] ready … [MiiOrdinaryPlayer] ready"}
+{"ev":"expect","role":0,"policy":"recipe","loader":14,"install":false,"map":0,"pair_refs":0}

@@ -9,6 +9,8 @@
 //! and its buffer entry), `facts` (what the runtime reads and applies). The features follow, one
 //! module per spec as it is built: `defence` (SPEC-cpu-02), `ledge` (SPEC-cpu-03), `tech` (SPEC-cpu-04), `shield` (SPEC-cpu-05).
 
+pub mod advantage;
+pub mod command;
 pub mod counter;
 pub mod defence;
 pub mod facts;
@@ -24,3 +26,4 @@ pub mod shield;
 pub mod state;
 pub mod status;
 pub mod tech;
+pub mod throw;

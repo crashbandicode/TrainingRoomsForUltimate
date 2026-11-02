@@ -252,6 +252,16 @@ fn cpu03_playback_paths() {
 }
 
 #[test]
+fn cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge() {
+    let playback1 = option::PLAYBACK_FIRST as usize;
+    let row = settings(&[("ledge_state", ledge_row(&[playback1 + 1])), ("ledge_delay", delay_row(&[0]))]);
+    let (mut cpu, key) = cpu_with(row);
+    let start = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false)).playback.expect("early ledge playback");
+    // Slot 2 (index 1) on the ledge.
+    assert_eq!((start.slot, start.ledge), (1, true));
+}
+
+#[test]
 fn cpu03_post_getup_mash() {
     // Override of the performed kind first, else the mash action when the Ledge Option trigger is
     // ticked, else nothing.
@@ -428,4 +438,27 @@ fn cpu03_playback_yield_and_reset() {
     assert_eq!(cpu.fighters[key.index()].counters.count(CounterId::Ledge), 0);
     assert_eq!(cpu.fighters[key.index()].ledge.delay, None);
     assert_eq!(cpu.fighters[key.index()].ledge.case, case);
+}
+
+#[test]
+fn cpu03_whole_settings_replacement_yields_the_menus_reroll_bits() {
+    // The diag build replaces the whole settings from a file; the bits are the ones the menu sets row by
+    // row: Ledge Options (B11), SDI Direction, Shield Tilt and Throw Options, but not Ledge Delay.
+    let base = Snapshot::factory();
+    assert_eq!(model::menu::rerolls_between(&base, &base), 0);
+    let mut next = Snapshot::factory();
+    next.set("ledge_state", &ledge_row(&[option::ROLL as usize])).unwrap();
+    assert_eq!(model::menu::rerolls_between(&base, &next), reroll::LEDGE_OPTIONS);
+    let mut delayed = next.clone();
+    delayed.set("ledge_delay", &delay_row(&[10])).unwrap();
+    assert_eq!(model::menu::rerolls_between(&next, &delayed), 0, "a Ledge Delay change is not a re-roll");
+    let mut both = delayed.clone();
+    both.set("ledge_state", &ledge_row(&[])).unwrap();
+    both.set("sdi_state", &{
+        let mut row = base.get("sdi_state").unwrap().to_vec();
+        row[1] = 1;
+        row
+    })
+    .unwrap();
+    assert_eq!(model::menu::rerolls_between(&delayed, &both), reroll::LEDGE_OPTIONS | reroll::SDI_DIRECTION);
 }

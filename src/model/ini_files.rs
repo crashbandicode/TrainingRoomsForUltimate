@@ -15,7 +15,7 @@
 
 use std::ffi::OsString;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use super::menu::chord::Chord;
@@ -129,38 +129,9 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(os)
 }
 
-/// Write `bytes` to `path` as a transaction (see the module doc).
+/// Write `bytes` to `path` as a transaction (see the module doc): the Store's one write, `store::write_replace`.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let tmp = with_suffix(path, ".tmp");
-    let write = || -> io::Result<()> {
-        let mut file = fs::File::create(&tmp)?;
-        file.write_all(bytes)?;
-        file.sync_all()
-    };
-    let result = write().and_then(|()| replace(&tmp, path));
-    if result.is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
-    result
-}
-
-fn replace(tmp: &Path, dest: &Path) -> io::Result<()> {
-    let first = match fs::rename(tmp, dest) {
-        Ok(()) => return Ok(()),
-        Err(error) => error,
-    };
-    if !dest.try_exists().unwrap_or(false) {
-        return Err(first);
-    }
-    let backup = with_suffix(dest, ".bak");
-    let _ = fs::remove_file(&backup);
-    fs::rename(dest, &backup)?;
-    if let Err(error) = fs::rename(tmp, dest) {
-        let _ = fs::rename(&backup, dest);
-        return Err(error);
-    }
-    let _ = fs::remove_file(&backup);
-    Ok(())
+    super::store::write_replace(path, bytes)
 }
 
 /// A `.bak` without its file means a crash inside the swap above: put it back.
