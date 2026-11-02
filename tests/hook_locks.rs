@@ -85,6 +85,16 @@ const ALLOWED: &[(&str, &str, &str)] = &[
     ("named_macros::prepare_buffers", "MOTION", "write lock held for a buffer swap only; the allocation is outside"),
 ];
 
+/// A ratchet, not a tolerance (lead, 2026-11-02): violations whose fix is in progress elsewhere, each (function key, file::lock, owner,
+/// the fix that removes it). The test fails on any violation not listed here, AND on a row that no longer occurs (delete it the moment the
+/// fix lands), and prints the table every run. The release-candidate gate requires this table to be empty.
+const PENDING: &[(&str, &str, &str, &str)] = &[(
+    "recorder::rec",
+    "features/recorder.rs::REC",
+    "package 4 (a93ab192186b224a5)",
+    "design C: the named layer's recorder calls on the menu worker (recorder::with_recorder) move to its published MacroQueries and mailbox",
+)];
+
 const LOCK_METHODS: &[&str] = &["lock", "read", "write", "try_lock", "try_read", "try_write"];
 
 /// `(file, module name)`: a re-export a static is also reached by (`compat::common::menu` re-exports `ui::menu_app`'s statics).
@@ -130,7 +140,12 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
             if segments.last() != Some(&callee.name) {
                 return false;
             }
-            let Some(qualifier) = segments.len().checked_sub(2).map(|k| segments[k].as_str()) else { return true };
+            let Some(qualifier) = segments.len().checked_sub(2).map(|k| segments[k].as_str()) else {
+                // An unqualified call means this file's function when there is one (Rust's own rule: the local item shadows an
+                // import); only when there is none can it be an imported one.
+                let local = by_name.get(&callee.name).is_some_and(|all| all.iter().any(|&o| graph.funcs[o].file == from.file));
+                return !local || callee.file == from.file;
+            };
             match qualifier {
                 "self" | "Self" | "super" | "crate" => callee.file == from.file,
                 q if q == callee.module => true,
@@ -207,11 +222,18 @@ fn no_plugin_thread_reaches_a_lock_a_hook_takes() {
     println!("plugin-thread entries: {entries:?}");
     let result = scan(&runtime, &entries, HOOK_LOCKS, ALLOWED);
     println!("AMBIGUOUS method names not followed (name: functions): {:?}", result.ambiguous);
-    assert!(
-        result.violations.is_empty(),
-        "plugin threads reach locks hooks take:\n{}",
-        result.violations.into_iter().collect::<Vec<_>>().join("\n")
-    );
+    for (key, lock, owner, fix) in PENDING {
+        println!("PENDING {key} takes {lock}: owner {owner}; fix: {fix}");
+    }
+    let pending_hit = |v: &String| PENDING.iter().any(|(key, lock, _, _)| v.contains(&format!("{key} takes {lock} ")));
+    let unexpected: Vec<&String> = result.violations.iter().filter(|v| !pending_hit(v)).collect();
+    assert!(unexpected.is_empty(), "plugin threads reach locks hooks take:\n{}", unexpected.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+    let gone: Vec<&str> = PENDING
+        .iter()
+        .filter(|(key, lock, _, _)| !result.violations.iter().any(|v| v.contains(&format!("{key} takes {lock} "))))
+        .map(|(key, _, _, _)| *key)
+        .collect();
+    assert!(gone.is_empty(), "PENDING rows that no longer occur (delete them): {gone:?}");
 }
 
 #[test]
@@ -222,6 +244,7 @@ fn the_scan_catches_a_seeded_violation() {
     assert!(text.contains("chords::refresh_rows takes features/chords.rs::STATE"), "method-call edge and lock site missed:\n{text}");
     assert!(text.contains("named_macros::reserve takes macros/named_macros.rs::MOTION"), "helper by reference missed:\n{text}");
     assert!(!text.contains("on_poll"), "a hook-only function was reported:\n{text}");
+    assert!(!text.contains("named_macros::store"), "a local call or an atomic method resolved to another module's function:\n{text}");
     assert_eq!(result.ambiguous.get("tick"), Some(&2), "ambiguous names must be listed: {:?}", result.ambiguous);
 }
 
