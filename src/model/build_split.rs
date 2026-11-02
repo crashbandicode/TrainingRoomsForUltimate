@@ -178,6 +178,8 @@ pub enum Work {
     Setup,
     /// The settlement: cells, verification, acknowledgement.
     Settle,
+    /// Native state 10 after the control init settled on the worker: the bodies allocated and their construction queued.
+    Queue,
 }
 
 impl Work {
@@ -186,6 +188,7 @@ impl Work {
             Work::Poll => "poll",
             Work::Setup => "setup",
             Work::Settle => "settle",
+            Work::Queue => "queue",
         }
     }
 }
@@ -366,6 +369,10 @@ mod tests {
         assert_eq!(g.top(), &[Gap { tick: 1, us: 10, after: Work::Poll }]);
         assert_eq!(Gaps::default().to_string(), "ticks=0 top=[]");
         assert_eq!(Gaps::IDLE, Gaps::default());
+        let mut q = Gaps::arm(0);
+        q.note(Work::Queue);
+        q.observe(30_000);
+        assert_eq!(q.to_string(), "ticks=1 top=[t1:30000:queue]");
         assert_eq!(Split::IDLE, Split::default());
     }
 }

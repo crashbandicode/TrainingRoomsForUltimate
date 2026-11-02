@@ -76,6 +76,25 @@ mod meter {
         }
     }
 
+    /// Native state 10's tick (F6): the bodies allocated and queued once the control init settled on the worker.
+    pub fn start_queue(role: usize) {
+        let t = now();
+        if let Ok(mut s) = SPLIT.lock() {
+            *s = Split::start(t);
+        }
+        note(role, Work::Queue);
+    }
+
+    pub fn report_queue(owner: u32, group: usize) {
+        let split = SPLIT.lock().map(|mut s| {
+            s.stop();
+            *s
+        });
+        if let Ok(split) = split {
+            crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] queue owner={} group={} {}", owner, group, split));
+        }
+    }
+
     pub fn arm(role: usize, now_us: u64) {
         if let Some(Ok(mut g)) = GAPS.get(role).map(|m| m.lock()) {
             *g = Gaps::arm(now_us);
@@ -123,6 +142,10 @@ mod meter {
     pub fn start_settle(_role: usize) {}
     #[inline(always)]
     pub fn report_settle(_owner: u32, _group: usize) {}
+    #[inline(always)]
+    pub fn start_queue(_role: usize) {}
+    #[inline(always)]
+    pub fn report_queue(_owner: u32, _group: usize) {}
     #[inline(always)]
     pub fn arm(_role: usize, _now_us: u64) {}
     #[inline(always)]

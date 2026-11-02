@@ -14,6 +14,7 @@ import statistics
 import sys
 
 SETUP = re.compile(r"\[BuildSplit\] setup owner=(\d+) group=(\d+) kinds=\[([0-9a-f, ]*)\] build_of_boot=(\d+) carried_setup_us=(\d+) (.*)$")
+QUEUE = re.compile(r"\[BuildSplit\] queue owner=(\d+) group=(\d+) (.*)$")
 SETTLE = re.compile(r"\[BuildSplit\] settle owner=(\d+) group=(\d+) settle_of_boot=(\d+) (.*)$")
 GAPS = re.compile(r"\[BuildSplit\] gaps owner=(\d+) kind=(0x[0-9a-f]+) ticks=(\d+) top=\[(.*)\]")
 SWAP = re.compile(r"\[GroupSwap\] swap owner=(\d+) kind=(0x[0-9a-f]+) request_to_ready_us=(\d+) .* max_tick_gap_us=(\d+) ticks=(\d+)")
@@ -38,9 +39,14 @@ def parse(lines):
             b = {"owner": int(m.group(1)), "group": int(m.group(2)),
                  "kinds": [int(k, 16) for k in m.group(3).replace(" ", "").split(",") if k],
                  "build_of_boot": int(m.group(4)), "carried_setup_us": int(m.group(5)), "steps": steps, **summary,
-                 "settle": None, "max_tick_gap_us": None, "request_to_ready_us": None, "gaps": []}
+                 "queue": None, "settle": None, "max_tick_gap_us": None, "request_to_ready_us": None, "gaps": []}
             builds.append(b)
             open_by_owner[b["owner"]] = b
+        elif (m := QUEUE.search(line)):
+            b = open_by_owner.get(int(m.group(1)))
+            if b is not None and b["queue"] is None:
+                steps, summary = parse_steps(m.group(3))
+                b["queue"] = {"steps": steps, **summary}
         elif (m := SETTLE.search(line)):
             b = open_by_owner.get(int(m.group(1)))
             if b is not None and b["settle"] is None:
@@ -75,15 +81,17 @@ def compare(builds):
 
 
 def table(builds):
-    out = ["| # | owner | kinds | carried setup_us | split setup_us | largest step | top steps (us) | max_tick_gap_us | largest gaps (tick:us:after) |",
-           "| --- | --- | --- | ---: | ---: | --- | --- | ---: | --- |"]
+    out = ["| # | owner | kinds | carried setup_us | split setup_us | largest step | top steps (us) | state-10 queue tick (us, largest) | max_tick_gap_us | largest gaps (tick:us:after) |",
+           "| --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | --- |"]
     for b in builds:
         top = sorted(b["steps"].items(), key=lambda kv: -kv[1][0])[:4]
         steps = ", ".join(f"{n} {us}" for n, (us, _) in top)
         gaps = ", ".join(f"t{g['tick']}:{g['us']}:{g['after']}" for g in b["gaps"][:3])
         kinds = "[" + ", ".join(f"{k:x}" for k in b["kinds"]) + "]"
+        q = b["queue"]
+        queue = f"{q['total_us']} ({q['largest']})" if q else "-"
         out.append(f"| {b['build_of_boot']} | {b['owner']} | {kinds} | {b['carried_setup_us']} | {b.get('setup_us')} | "
-                   f"{b.get('largest')} | {steps} | {b['max_tick_gap_us']} | {gaps} |")
+                   f"{b.get('largest')} | {steps} | {queue} | {b['max_tick_gap_us']} | {gaps} |")
     rows = compare(builds)
     if rows:
         out += ["", "| step | first build (us) | later builds, median (us) |", "| --- | ---: | ---: |"]

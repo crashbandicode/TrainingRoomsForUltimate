@@ -11,6 +11,7 @@ import f6_split_table as t  # noqa: E402
 LOG = """\
 100 [GroupSwap] build owner=0 group=0 kinds=[2d, 2c, 1c] mode=async reason=-
 101 [BuildSplit] setup owner=0 group=0 kinds=[2d, 2c, 1c] build_of_boot=1 carried_setup_us=77000 plugin=900/9 unprepare_17f26c0=400/1 roster_17e4f50=300/1 log=200/2 memory_svc=100/1 models_654dc0=1000/1 contexts_655320=500/1 control_64f820=73600/1 allocate_3ae5f0=3000/3 setup_us=77000 total_us=80000 largest=control_64f820
+150 [BuildSplit] queue owner=0 group=0 free_tasks=20/1 allocate_3ae5f0=3000/3 task_392e290=60/3 setup_us=20 total_us=3100 largest=allocate_3ae5f0
 102 [BuildSplit] settle owner=0 group=0 settle_of_boot=1 install_cells=10/1 free_tasks=50/1 verify_ack=900/1 setup_us=0 total_us=960 largest=verify_ack
 103 [GroupSwap] swap owner=0 kind=0x2d request_to_ready_us=2300000 bodies=[..] max_tick_gap_us=100211 ticks=138
 104 [BuildSplit] gaps owner=0 kind=0x2d ticks=138 top=[t1:100211:setup, t90:20000:settle, t3:17000:poll]
@@ -33,7 +34,10 @@ class SplitTable(unittest.TestCase):
         self.assertEqual(b["settle"]["steps"]["verify_ack"], (900, 1))
         self.assertEqual((b["max_tick_gap_us"], b["request_to_ready_us"]), (100211, 2300000))
         self.assertEqual(b["gaps"][0], {"tick": 1, "us": 100211, "after": "setup"})
+        self.assertEqual(b["queue"]["largest"], "allocate_3ae5f0")
+        self.assertEqual(b["queue"]["total_us"], 3100)
         k = self.builds[1]
+        self.assertIsNone(k["queue"])
         self.assertEqual(k["kinds"], [6, 0x2d, 0x2c])
         self.assertIsNone(k["settle"])
         self.assertEqual(k["gaps"][0]["after"], "settle")
