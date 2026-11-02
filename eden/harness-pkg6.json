@@ -1,0 +1,15 @@
+{
+  "owner": "Codex 01a19cb7/pkg6",
+  "prefix": "s6",
+  "stream": "pkg6",
+  "host": "surface",
+  "root": "/home/intpa/trainingrooms-eden-pkg6",
+  "profile": "s6",
+  "display": ":98",
+  "unit": "trp6",
+  "refs": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6/eden/refs",
+  "macros": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-pkg6/eden/macros",
+  "install_gate": "plugin=training_rooms/",
+  "pilot": "/home/intpa/ssbu-cpu-pilot-install/switch-mtp-v0101-v021/pilot/after/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libssbu_cpu_pilot.nro",
+  "tile": "/home/intpa/trainingrooms-eden-pkg6/nro/aid/libssbu_tile_cursor.nro"
+}

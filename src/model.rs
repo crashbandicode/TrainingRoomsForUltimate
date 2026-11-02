@@ -117,3 +117,33 @@ pub mod panes;
 pub mod version;
 #[path = "model/thread_stacks.rs"]
 pub mod thread_stacks;
+/// F9: Training's parked CPU entries and the roster cycle's helper sources (the give-back decision).
+#[path = "model/parked_entries.rs"]
+pub mod parked_entries;
+/// F11: the running cell of a fighter entry's window (the game's active-cell index).
+#[path = "model/entry_cells.rs"]
+pub mod entry_cells;
+
+/// Startup-allocated catalog reply transport; native callers never allocate channels.
+#[path = "model/catalog_reply.rs"]
+pub mod catalog_reply;
+
+/// Boot-allocated storage for immutable native transaction snapshots.
+#[path = "model/reusable_snapshot.rs"]
+pub mod reusable_snapshot;
+
+/// Boot-reserved replay request identities and completion lifecycle.
+#[path = "model/replay_jobs.rs"]
+pub mod replay_jobs;
+
+/// Native publication ownership transferred to the UI worker.
+#[path = "model/catalog_mailbox.rs"]
+pub mod catalog_mailbox;
+
+/// Reply endpoints returned only after both request owners retire.
+#[path = "model/pooled_reply.rs"]
+pub mod pooled_reply;
+
+/// Owned menu close intents retained until their matching native transition.
+#[path = "model/close_handoff.rs"]
+pub mod close_handoff;

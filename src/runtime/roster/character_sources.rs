@@ -1882,6 +1882,16 @@ unsafe fn admission_declined(
 /// Only called with the current native loader callback's argument.
 /// Already-owned loads run before any scene, mode or ownership gate.
 pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
+    // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an
+    // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).
+    #[cfg(feature = "diag")]
+    {
+        static SEEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
+        let quantity = native_source::training_cpu_quantity().unwrap_or(u32::MAX - 1);
+        if SEEN.swap(quantity, Ordering::Relaxed) != quantity {
+            crate::engine::compat::logging::diagnostic(format_args!("[CharacterSources] cpu_quantity={quantity} seen_by_service slot={slot}"));
+        }
+    }
     let is_capacity=is_capacity_entry(entry,slot);
     if !cfg!(feature = "managed-sources") || !callback_slot(slot) {
         return;

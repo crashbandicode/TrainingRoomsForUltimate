@@ -1,4 +1,4 @@
-//! Default-off request API. Called by the existing StageManager update entry hook.
+//! Feature-gated request API. Called by the verified StageManager update entry hook.
 //! No global match selector, stage/resource pointer, task, or refcount writes.
 //! UI integration is feature-gated; actual native mutation acceptance is pending.
 
@@ -367,5 +367,5 @@ pub(crate) fn init(base:usize) {
             && std::slice::from_raw_parts((base+offset) as *const u32,words.len())==*words
     }));
     VERIFIED.store(verified,Ordering::Release);
-    crate::engine::compat::logging::diagnostic(format_args!("[PracticeStageRequest] verified={verified} default_off=true ui_wired=true"));
+    crate::engine::compat::logging::diagnostic(format_args!("[PracticeStageRequest] verified={verified} request_driven=true ui_wired=true"));
 }

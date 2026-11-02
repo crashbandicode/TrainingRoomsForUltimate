@@ -23,6 +23,7 @@ use crate::engine::mii::editor_row as value;
 use crate::engine::mii::ldn_handshake as handshake;
 mod fingerprints;
 
+#[cfg(feature = "diag")]
 use serde::Serialize;
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex};
@@ -42,22 +43,26 @@ static EDIT_LEAF_SCENE: AtomicUsize = AtomicUsize::new(0);
 static RELEASED_SCENE: AtomicUsize = AtomicUsize::new(0);
 static STATE: Mutex<Option<Session>> = Mutex::new(None);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "diag", derive(Serialize))]
 enum Phase { Requested, Quitting, Queued, Editing, Exiting, Returning, Finished, Refused }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Origin { Training, Quickplay, LocalWireless }
 
+#[cfg(feature = "diag")]
 #[derive(Clone, Copy, Serialize)]
 struct Event { name: &'static str, phase: Phase, values: [u64; 4] }
 
 // Copy (stream/stack): the writer's slot copies it into a heap buffer in place instead of moving 11 KB through stack frames.
+#[cfg(feature = "diag")]
 #[derive(Clone, Copy, Serialize)]
 pub(crate) struct Trace {
     events: crate::engine::compat::fixed::FixedVec<Event, 192>,
     input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,
 }
 
+#[cfg(feature = "diag")]
 impl Trace {
     /// No events: the template of the writer slot's two buffers.
     pub(crate) const EMPTY: Trace = Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() };
@@ -84,6 +89,7 @@ struct Session {
     request_deadline: Instant,
     observation_bits: u8,
     inputs: [u64; 3],
+    #[cfg(feature = "diag")]
     input_baseline: Option<native::InputSnapshot>,
     seed: Draft,
     catalog: Arc<Snapshot>,
@@ -93,10 +99,12 @@ struct Session {
     // Local Wireless only: one committed round-handshake edge per session,
     // observed from fresh service reads. Quickplay never touches it.
     ldn_handshake: handshake::Handshake,
+    #[cfg(feature = "diag")]
     trace: Trace,
 }
 
 impl Session {
+    #[cfg(feature = "diag")]
     unsafe fn observe_inputs(&mut self, name: &'static str) {
         if self.trace.input_checks.len() < 4 {
             if let Some(baseline) = &self.input_baseline {
@@ -105,6 +113,13 @@ impl Session {
         }
     }
 
+    #[cfg(not(feature = "diag"))]
+    unsafe fn observe_inputs(&mut self, _name: &'static str) {}
+
+    #[cfg(not(feature = "diag"))]
+    fn event(&mut self, _name: &'static str, _values: [u64; 4]) {}
+
+    #[cfg(feature = "diag")]
     fn event(&mut self, name: &'static str, values: [u64; 4]) {
         if self.trace.events.push(Event { name, phase: self.phase, values }) {
             // the callback only copies the newest state into the writer's slot (coalesced, no allocation, no file I/O)
@@ -113,6 +128,7 @@ impl Session {
     }
 }
 
+#[cfg(feature = "diag")]
 pub(crate) fn write_trace(trace: &Trace) -> std::io::Result<()> {
     if let Some(event) = trace.events.last() {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] {} {:?} {:?}",
@@ -158,6 +174,7 @@ fn begin_session(
     if !catalog.is_complete() { return Err("Mii catalog is incomplete"); }
     let mut state = STATE.try_lock().map_err(|_| "Editor request is busy")?;
     if ACTIVE.load(Ordering::Acquire) { return Err("An editor request is already active"); }
+    #[cfg(feature = "diag")]
     let trace = if restore.is_some() {
         state.as_ref().map(|s| s.trace.clone())
     } else { None }.unwrap_or_else(|| Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() });
@@ -169,9 +186,14 @@ fn begin_session(
         restore_entered: false, restore_frames: 0, restore_state: -1,
         phase: Phase::Requested, owner: 0, editor: 0, thread: 0,
         mode: 0, wait_frames: 0, request_deadline: Instant::now() + Duration::from_secs(10), observation_bits: 0,
-        inputs: [0; 3], input_baseline: None, seed, catalog,
+        inputs: [0; 3],
+        #[cfg(feature = "diag")]
+        input_baseline: None,
+        seed, catalog,
         explicit_save_finished: false, saved_native: None, writer_state: None,
-        ldn_handshake: handshake::Handshake::new(), trace };
+        ldn_handshake: handshake::Handshake::new(),
+        #[cfg(feature = "diag")]
+        trace };
     session.event(if restore.is_some() { "automatic_resume_requested" } else { "requested" },
         [seed.hash(), 0, 0, 0]);
     if let Draft::NativeDefault(class) = seed {
@@ -228,27 +250,34 @@ pub(crate) fn menu_ready(opening: u64) {
 
 pub(crate) enum OpenedCatalog {
     Shown,
-    Later(Snapshot),
+    Later(std::sync::Arc<Snapshot>),
     Dropped,
 }
 
 /// Mount one owned snapshot into the already-open menu. A non-submenu page keeps the snapshot.
-pub(crate) fn mount_opened_catalog(catalog: Snapshot, opening: u64) -> OpenedCatalog {
+pub(crate) fn mount_opened_catalog(catalog: std::sync::Arc<Snapshot>, opening: u64) -> OpenedCatalog {
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
-    let mut app = crate::runtime::compat::sync::lock_write(&crate::runtime::compat::menu_app::QUICK_MENU_APP);
+    let Some(mut app) = crate::runtime::ui::menu_app::QUICK_MENU_APP.try_lock() else {
+        return OpenedCatalog::Later(catalog);
+    };
+    app.follow_open();
     if !editor_opening_current(opening) {
         return OpenedCatalog::Dropped;
     }
     if app.page != crate::runtime::compat::menu_app::AppPage::SUBMENU {
         return OpenedCatalog::Later(catalog);
     }
-    if app.mount_mii_editor_catalog(catalog, opening) {
-        crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
-        OpenedCatalog::Shown
-    } else {
-        OpenedCatalog::Dropped
+    drop(app);
+    match crate::runtime::ui::menu_app::publish_catalog(crate::runtime::ui::menu_app::CatalogPublication {
+        catalog, epoch: opening, context: None, ordinary_cpu: false,
+    }) {
+        Ok(()) => {
+            crate::runtime::compat::sync::assign(&crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT, true);
+            OpenedCatalog::Shown
+        }
+        Err(publication) => OpenedCatalog::Later(publication.catalog),
     }
 }
 
@@ -723,6 +752,7 @@ pub(crate) fn init() {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] unsupported native code; disabled"));
         return;
     }
+    #[cfg(feature = "diag")]
     crate::runtime::compat::filesystem::init();
     BASE.store(base, Ordering::Release);
     unsafe { native_default::init(base); }

@@ -398,7 +398,8 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     }
     let (mut current,mut cursor)={let s=state_for(role).lock().unwrap();
         let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
-    let kinds:Vec<_>=roster(menu,role).iter().map(|f|f.kind()).collect();
+    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
+    for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}
     let original=cycle_original(role);
     let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
     for target in &mut targets {
@@ -533,6 +534,11 @@ fn notify_selection(role: Role, fighter: TrioFighter, slot: Option<usize>) {
 }
 
 fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
+    roster_fixed(m, role).to_vec()
+}
+
+/// `roster` without heap (the preload planner's per-tick form).
+fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {
     let excluded = match role {
         Role::Player => crate::engine::swap::roster_grid::cycle_exclusion(
             original_kind(role),
@@ -545,10 +551,14 @@ fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
         }
     };
     let fighters = match role {
-        Role::Player => m.player_roster.fighters_excluding(excluded),
-        Role::Cpu => m.cpu_roster.fighters_excluding(excluded),
+        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),
+        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),
     };
-    fighters.into_iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())).collect()
+    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);
+    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {
+        out.push(*f);
+    }
+    out
 }
 
 /// Numbered slot of `kind`'s group in `role`'s current cycle.
@@ -2390,6 +2400,10 @@ pub fn init() {
         BASE.store(base, Ordering::Release);
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::init(base);
+    #[cfg(feature="mii-managed-helper-alpha")]
+    mii_managed_helper::init_storage();
+    #[cfg(feature="mii-ordinary-cpu-alpha")]
+    mii_replay::init();
         // Validate the original destructor range before capacity installs its
         // listener-removed hook at 0x652214 inside that range. The Mii gate's
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.

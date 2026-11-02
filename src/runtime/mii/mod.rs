@@ -28,3 +28,6 @@ pub(crate) fn init() {
     #[cfg(feature = "mii-fullconfig-probe")]
     mii_fullconfig_probe::init();
 }
+
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) mod menu_handoff;

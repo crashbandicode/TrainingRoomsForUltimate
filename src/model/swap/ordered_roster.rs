@@ -5,6 +5,10 @@ use {crate::engine::swap::trio::{
         PRE_MII_CHOICE_COUNT,
     }, crate::engine::swap::trio::TrioFighter};
 
+/// Allocation-free roster and hat lists (R5, F10): the catalog bounds their length.
+pub type FighterList = crate::engine::compat::fixed::FixedList<TrioFighter, { CHOICES.len() }>;
+pub type KindList = crate::engine::compat::fixed::FixedList<u32, { CHOICES.len() }>;
+
 /// Catalog positions stay fixed; nonzero ranks represent the user's cycle order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OrderedFighterRoster {
@@ -70,42 +74,56 @@ impl OrderedFighterRoster {
 
     /// Known roster catalog with Kirby removed. Does not apply original-P1 exclusion.
     pub fn hat_kinds(self) -> Vec<u32> {
-        self.fighters()
-            .into_iter()
-            .filter(|fighter| {
-                fighter.kind() != TrioFighter::KIRBY.kind()
-                    && (cfg!(feature="mii-managed-helper-alpha") || !(0x48..=0x4a).contains(&fighter.kind()))
-            })
-            .map(|fighter| fighter.kind())
-            .collect()
+        self.hat_kinds_fixed().to_vec()
     }
 
-    /// Runtime callers use the same native-group exclusion as the portrait editor.
-    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {
-        let catalog = TrioFighter::available();
-        if self.all {
-            let kinds: Vec<_> = catalog.iter().map(|f| f.kind()).collect();
-            let values: Vec<_> = std::iter::once(1).chain(self.ranks).collect();
-            return crate::engine::swap::roster_grid::css_order(&kinds, &values, original)
-                .into_iter()
-                .filter_map(TrioFighter::from_kind)
-                .collect();
+    /// `hat_kinds` without heap (the preload planner's per-tick form).
+    pub fn hat_kinds_fixed(self) -> KindList {
+        let mut out = KindList::new(0);
+        for fighter in self.fighters_excluding_fixed(None).iter() {
+            if fighter.kind() != TrioFighter::KIRBY.kind()
+                && (cfg!(feature="mii-managed-helper-alpha") || !(0x48..=0x4a).contains(&fighter.kind()))
+            {
+                out.push(fighter.kind());
+            }
         }
-        let mut selected: Vec<_> = catalog
-            .into_iter()
-            .zip(self.ranks)
-            .filter(|(_, rank)| *rank != 0)
-            .collect();
-        selected.sort_unstable_by_key(|(_, rank)| *rank);
-        selected
-            .into_iter()
-            .map(|(fighter, _)| fighter)
-            .filter(|fighter| {
-                original.map(crate::engine::swap::roster_grid::group_kind)
-                    != Some(crate::engine::swap::roster_grid::group_kind(fighter.kind()))
-            })
-            .collect()
+        out
     }
+
+    pub fn fighters_excluding(self, original: Option<u32>) -> Vec<TrioFighter> {
+        self.fighters_excluding_fixed(original).to_vec()
+    }
+
+    /// `fighters_excluding` without heap (the preload planner's per-tick form): All in CSS order, otherwise the ranked
+    /// fighters in rank order, the original's native group left out.
+    pub fn fighters_excluding_fixed(self, original: Option<u32>) -> FighterList {
+        let mut out = FighterList::new(TrioFighter::MARIO);
+        if self.all {
+            let mut kinds = [0u32; CHOICES.len()];
+            for (slot, (kind, _)) in kinds.iter_mut().zip(CHOICES) {
+                *slot = *kind;
+            }
+            let mut values = [0u8; CHOICES.len() + 1];
+            values[0] = 1;
+            values[1..].copy_from_slice(&self.ranks);
+            crate::engine::swap::roster_grid::css_order_each(&kinds, &values, original, |kind| {
+                if let Some(fighter) = TrioFighter::from_kind(kind) {
+                    out.push(fighter);
+                }
+            });
+            return out;
+        }
+        let excluded = original.map(crate::engine::swap::roster_grid::group_kind);
+        for rank in 1..=CHOICES.len() {
+            let Some(index) = self.ranks.iter().position(|r| usize::from(*r) == rank) else { break };
+            let Some(fighter) = TrioFighter::from_kind(CHOICES[index].0) else { continue };
+            if excluded != Some(crate::engine::swap::roster_grid::group_kind(fighter.kind())) {
+                out.push(fighter);
+            }
+        }
+        out
+    }
+
 
 }
 
