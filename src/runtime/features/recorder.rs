@@ -475,6 +475,22 @@ pub fn on_state_restored(saved_on_ledge: bool) {
     }
 }
 
+/// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
+pub fn recording_or_playback() -> bool {
+    REC.lock().phase() != Phase::Idle
+}
+
+/// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so
+/// this is false until that layer exists and sets the owner bit).
+pub fn replay_editor_occupied() -> bool {
+    published::input_owners().contains(Owners::REPLAY_EDITOR)
+}
+
+/// A replay capture is loading (S4-4's clip loader; false until that layer exists).
+pub fn replay_capture_loading() -> bool {
+    false
+}
+
 /// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset
 /// (decision B8), the named layer.
 pub fn stop() {

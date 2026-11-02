@@ -21,6 +21,7 @@ use crate::model::menu_shortcuts;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
+use crate::runtime::features::recorder;
 use crate::runtime::published;
 
 struct State {
@@ -49,7 +50,7 @@ pub unsafe fn on_poll(controller: usize) {
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
     let sample = Sample::of(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
-    let modal = published::input_owners().contains(Owners::MENU) || published::input_owners().contains(Owners::REPLAY_EDITOR);
+    let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let accepted = {
         let mut state = STATE.lock();
         state.style = style;
