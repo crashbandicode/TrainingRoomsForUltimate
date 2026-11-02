@@ -2,7 +2,7 @@
 
 - **Spec id:** `SPEC-core-08`
 - **Origin:** project decision (operator, 2026-11-01), not upstream behaviour; no upstream reading was needed. The file names it imports are the fork's (ours).
-- **Status:** draft (policy proposed for the operator's confirmation; open questions in §10)
+- **Status:** draft (the operator answered the open questions of §10 on 2026-11-01 and the policy below is updated accordingly; see §10)
 - **Spec writer:** project lead (Fable 5.1), 2026-11-01
 - **Fork reference:** `training_mod_consts/src/files.rs` (`TRAINING_MODPACK_ROOT`, `SETUP_LIBRARY_DIR`), `training_mod_consts/src/menu_json.rs`, `src/replay_store.rs`, `docs/named-macros.md`, `docs/setup-library.md`, `docs/mii-fighters.md`, `docs/menu-shortcuts.md`, `docs/cycle-preload.md` in stage M5i.
 - **Decides:** SPEC-core-01 Q2 (migration of the user's folder), SPEC-core-04 Q3 (file location), SPEC-input-01 open question 15 and SPEC-state-01 open question 9 (storage root).
@@ -32,7 +32,18 @@ same card and a downgrade loses nothing.
 - The import runs once. `sd:/ultimate/TrainingRooms/migration.json` is the
   marker; while it exists nothing is imported again, even if the player deletes
   files under `TrainingRooms/`. Deleting the marker re-runs the import on the
-  next boot (documented in the README).
+  next boot (documented in the README). There is no menu row for it (S1 item 5,
+  decided 2026-11-01).
+- **Draft 9 additions (decided 2026-11-01).** The import also (a) copies the
+  fork's `training_modpack.json` under the new name `settings.json` (S1 item 1);
+  (b) copies `button_config.ini` and `replay_capture.ini` (S1 item 2);
+  (c) copies `replay_captures/` **in full, with no size cap** (S1 item 3, N8),
+  because it holds the companions the Replay Window crops macros from; it does
+  this **without blocking the boot** (§5); (d) converts the dropped *Item on
+  load* setting once (N6, §4 *Item-on-load conversion*). TOML-only cards are
+  still not converted (S1 item 4).
+- `developer.ini` (SPEC-core-01 §2) is new in the clean room: the fork has no
+  such file, so the import neither reads nor creates it.
 
 ## 3. Inputs
 
@@ -51,7 +62,10 @@ Imported (copied; the operator's list, 2026-11-01):
 
 | Source (`sd:/ultimate/TrainingModpack/`) | Destination (`sd:/ultimate/TrainingRooms/`) | What it holds | Rule |
 | --- | --- | --- | --- |
-| `training_modpack.json` | `training_modpack.json` (open question 1 proposes `settings.json`) | menu settings and saved defaults (fork JSON envelope, SPEC-core-04); retired keys `update_policy`, `menu_open_start_press` ignored on load | copy if destination absent |
+| `training_modpack.json` | `settings.json` (S1 item 1, decided 2026-11-01; the loader also accepts the old name once) | menu settings and saved defaults (fork JSON envelope, SPEC-core-04); retired keys `update_policy`, `menu_open_start_press`, `character_item` ignored on load | copy if destination absent |
+| `button_config.ini` | `button_config.ini` (S1 item 2, decided 2026-11-01) | the menu shortcuts (SPEC-input-04 §7); the file of record that the menu now edits | copy if destination absent |
+| `replay_capture.ini` | `replay_capture.ini` (S1 item 2) | the replay-capture on/off choice (`enabled=on/off`) | copy if destination absent |
+| `replay_captures/` (every file) | `replay_captures/` (S1 item 3, N8; decided 2026-11-01) | the match captures (`.smd`) the Replay Window crops macros from, in full, no size cap | copy each file if absent; **background, non-blocking** (§5); the originals stay |
 | `save_states.json` | `save_states.json` | the five slots per role, item snapshots, Mii identity, setup bindings (SPEC-state-01 §7) | copy if destination absent |
 | `setups/` (every file) | `setups/` | the setup library's portable setup files (fork, carried over) | copy each file if absent; part of "save states" in the operator's list |
 | `mii-presets.json` | `mii-presets.json` | replay-discovered Miis (fork, carried over) | copy if destination absent |
@@ -62,9 +76,7 @@ Not migrated (and why):
 | Source | Why not |
 | --- | --- |
 | `training_modpack_menu.conf`, `training_modpack_menu_defaults.conf`, `training_modpack_menu.json`, `*.toml` | legacy formats of upstream and of the fork before its JSON port; the fork's `tools/port_save_states.py` converted them at the C116 upgrade; a card that has only these never ran the JSON fork (open question 4) |
-| `button_config.ini`, `replay_capture.ini` | user configuration, but not in the operator's list; the plugin creates fresh defaults (Minus; capture on). Recommendation: add both to the import (open question 2) |
-| `cycle_preload.ini` | a cache of menu choices the fork rewrites at boot; the imported `training_modpack.json` is authoritative and the plugin regenerates it |
-| `replay_captures/` | match captures (`.smd`), large and re-capturable; the Replay Window starts empty (open question 3) |
+| `cycle_preload.ini` | a cache of menu choices the fork rewrites at boot; the imported settings file is authoritative and the plugin regenerates it |
 | `practice-diagnostics.log`, `practice-diagnostics.previous.log`, `version.txt` | fork diagnostics and version stamp |
 | `dev.json`, `layout.arc` | development-only inputs of the fork (`dev_config`, `layout_arc_from_file`) |
 | the legacy root `sd:/TrainingModpack/` | upstream moved off it years ago; the fork migrated it into `sd:/ultimate/TrainingModpack/` already; not read |
@@ -75,8 +87,11 @@ Rules for every copy:
 2. If the destination exists, keep it and record `skipped reason=exists`
    (a hand-copied folder or a second plugin version wins).
 3. Copy through a fixed 64 KiB buffer; a file larger than 8 MiB is skipped
-   with `reason=too_large` (none of the imported kinds should be; captures,
-   which can be, are not imported).
+   with `reason=too_large`. **Exception (N8):** files under `replay_captures/`
+   have no size cap. Each copy is written to `<name>.part` and renamed to its
+   final name only when complete, so a copy interrupted by a power-off or by
+   quitting the game never leaves a truncated file that the exists rule
+   (rule 2) would keep; a leftover `.part` is overwritten on the next run.
 4. Any read or write error skips that one file (`reason=io:<code>`) and the
    import continues; the result is `partial`.
 5. Write `migration.json` last: `{ "source": "sd:/ultimate/TrainingModpack",
@@ -88,12 +103,47 @@ Rules for every copy:
 6. If `TrainingModpack/` does not exist: write the marker with `result: none`
    and no files; the notification says nothing was imported.
 
+**Item-on-load conversion (N6, decided 2026-11-01; menu question 6).** The
+*Item on load (older saves)* row and its setting `character_item` are dropped
+(SPEC-core-04 §3.1; SPEC-state-04 §2). So that older saves keep their item,
+the import reads `character_item` from the source settings file once, after
+that file and `save_states.json` are copied, and, for each **player-role**
+save-state record in the copied `save_states.json` that has no `held_item`
+snapshot, writes one from the old setting: the setting's index resolves to an
+item by the rule of SPEC-state-04 §5.2 steps 1–2 (Player 1st–8th: the
+player record's own `fighter_kind`; CPU 1st–8th: the `fighter_kind` of the CPU
+record in the same slot), and a record whose resolved fighter kind has no entry
+for that variation, a never-saved record (`fighter_kind` -1), or a setting of
+`None`, gets no snapshot (it stays absent, which
+now means no item). Only the copy under `TrainingRooms/` is changed; the
+fork's original file is untouched. The conversion runs once with the import
+(the marker blocks a second run), logs one line per converted record, and
+never overwrites an existing snapshot (`held_item` of any state, including
+`empty` and `unsupported`).
+
 ## 5. Timing and frame rules
 
 Boot, after the version guard passes and before the settings load
-(SPEC-core-01 boot order), so the imported settings are the ones loaded. The
-import is bounded: at most the files listed above, each at most 8 MiB. It
-never runs on the game thread and nothing of it runs per frame.
+(SPEC-core-01 boot order), so the imported settings are the ones loaded. It
+never runs on the game thread and nothing of it runs per frame. The import has
+two parts (draft 9, N8):
+
+1. **Blocking part (bounded).** The small files: `settings.json`, both INI
+   files, `save_states.json` (with the item-on-load conversion), `setups/`,
+   `mii-presets.json`, `macros/`, each at most 8 MiB. It finishes before the
+   settings load, so the imported settings and saves are there when Training
+   opens.
+2. **Background part (non-blocking).** `replay_captures/` is copied on its own
+   plugin thread with an explicit stack (64 KiB, SPEC-core-01 threads), started
+   after the blocking part and never joined by the boot: the boot, the settings
+   load and the first Training frame do not wait for it, and no frame hook
+   waits for it. The Replay Window lists the capture files that are complete
+   when it opens (a `.part` file is not listed). `migration.json` is written
+   after the last file of both parts; if the game quits first, the next boot
+   runs the import again and the exists rule (rule 2) skips what was copied.
+   The install line says `migration=done|partial|skipped captures=running|done`
+   (the diagnostics file carries the final `[Migration]` line when the
+   background copy ends).
 
 ## 6. Edge cases and interactions
 
@@ -140,7 +190,12 @@ else is the owning spec's file, now under the new root.
 | First boot on a profile with a populated `TrainingModpack/`: files copied, originals' hashes unchanged, settings loaded from the copy, install line `migration=done`, notification shown | — | CORE08-E01 | |
 | Second boot: no copies, `migration=skipped reason=marker_present` not logged as an error | — | CORE08-E02 | |
 | One unreadable source file → `partial`, the rest copied | `migration::io_error_is_partial` | CORE08-E05 (file made unreadable in the profile) | |
-| Oversized file → `too_large` | `migration::too_large_skipped` | — | |
+| Oversized file → `too_large` (not under `replay_captures/`) | `migration::too_large_skipped` | — | |
+| **S1 items 1–2** The settings file is copied as `settings.json`; both INI files are copied; the loader accepts the old name once | `migration::settings_renamed_on_copy`, `migration::ini_files_copied`, `migration::loader_accepts_old_name_once` | CORE08-E06 | |
+| **N6** Item-on-load conversion: a player-role record without `held_item` gets a snapshot resolved from `character_item` against its own `fighter_kind`; `None`, no entry for that kind, an existing snapshot (any state) and CPU-role records are left alone; only the copy changes; runs once | `migration::item_on_load_converts_player_records`, `migration::item_on_load_never_overwrites_snapshot`, `migration::item_on_load_none_and_no_entry_leave_absent`, `migration::item_on_load_runs_once` | CORE08-E07 profile with a fork save file that has no snapshot and `character_item` = Player 1st Var.: after the first boot the save restores the item; the original files' hashes are unchanged | |
+| **N6** After the import the settings file has no `character_item`, the menu has no *Item on load* row, and the retired key is ignored on load | `migration::character_item_ignored_after_import` (with `core04_character_item_retired`) | CORE08-E07 | |
+| **N8** `replay_captures/` is copied in full with no size cap (a file above 8 MiB is copied); originals stay; a `.part` file is renamed only when complete and a leftover `.part` is overwritten next run | `migration::captures_have_no_size_cap`, `migration::captures_part_then_rename`, `migration::captures_originals_untouched` | CORE08-E08 | |
+| **N8** The capture copy does not block: the boot, the settings load and the first Training frame complete before it ends; the Replay Window lists only complete files; the marker is written after the last file | `migration::plan_splits_blocking_and_background`, `migration::marker_after_background_part` | CORE08-E09 profile with a large `replay_captures/` (several hundred MiB): Training opens and the menu works while the copy runs; the install line says `captures=running`, the diagnostics file later `done` | |
 
 ## 10. Open questions
 
@@ -148,17 +203,17 @@ else is the owning spec's file, now under the new root.
    `training_modpack.json` (zero change to the carried-over JSON code and the
    fork's `port_save_states.py`) or rename it to `settings.json` at import
    (cleaner; one rename in the loader). Recommendation: rename; the loader
-   also accepts the old name once.
+   also accepts the old name once. **Decided 2026-11-01 (S1 item 1): as recommended;** rename (the file is copied under the name `settings.json`).
 2. **Import `button_config.ini` and `replay_capture.ini`** as well? They are
    user configuration the operator's list did not name. Recommendation: yes,
-   same rules.
+   same rules. **Decided 2026-11-01 (S1 item 2): as recommended;** both are imported.
 3. **`replay_captures/`**: not imported as proposed. Alternative: import when
    the folder is under a size cap (for example 64 MiB) so the Replay Window
    keeps its history. Recommendation: not imported; document how to copy it by
-   hand.
+   hand. **Decided 2026-11-01 (S1 item 3, N8): not as recommended;** `replay_captures/` is imported in full, with no size cap, because it holds the companions the Replay Window crops macros from; the copy does not block the boot (§5), and the originals stay.
 4. **TOML-only cards** (the fork before its JSON port): the importer does not
    convert. Recommendation: document the fork's `tools/port_save_states.py`
-   as the offline path; do not carry a TOML reader into the clean room.
+   as the offline path; do not carry a TOML reader into the clean room. **Decided 2026-11-01 (S1 item 4): as recommended;** not converted.
 5. **Re-run by deleting the marker**: acceptable as the documented way, or
    should the menu offer "Import Training Modpack data again"? Recommendation:
-   the marker only; no menu row.
+   the marker only; no menu row. **Decided 2026-11-01 (S1 item 5): as recommended;** the marker only, no menu row.

@@ -1,24 +1,30 @@
-# Menu mockup screens (proposal v9, in-game look, 1280x720)
+# Menu mockup screens (proposal v10, in-game look, 1280x720)
 
 Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the group that best shows the new controls; the help bar shows the focused item's text. The portrait grid uses the real fighter icons, cropped from captures of the fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality is settled. The DI and SDI Direction chips show the game's own DI streak and SDI spark as renders made from the game's effect file (one still per effect, turned to each direction as the game turns that effect to the launch angle / SDI vector; SPEC-core-07 §4.6); the chip sheet shows crops of real captures beside them as the visual check. The Airdodge Direction and Shield Tilt arrows are the clean room's own vector art. The screens carry no origin tags (upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table in `docs/MENU-PROPOSAL.md`.
 
+Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along the SDI vector (screens 01, 16, 17; the stretches are compared on 21; method and measurements below, `DECISIONS.md` N10); the decided items are drawn (`DECISIONS.md` N1-N7): 02 Respawn invincibility added and Item on load gone, 03 the advanced row Settings override playback, 05 editable menu shortcuts, 11 and 18 the item grid docked (5x8, one page) and handheld (4x4, three pages), 19 the delay popup with checklist and range, 20 the hidden Developer page. Preload Samples left the Loading group (04, 14 and 15 now count 6 rows there).
+
 - `01-cpu.png` / `.svg` — page CPU (Defence group: direction grids; the DI and SDI rows preview their selected chips)
-- `02-saves.png` / `.svg` — page Saves
-- `03-recording.png` / `.svg` — page Recording
+- `02-saves.png` / `.svg` — page Saves (Save states group; Respawn invincibility focused, Item on load gone)
+- `03-recording.png` / `.svg` — page Recording (Playback group; the advanced row Settings override playback focused)
 - `04-fighters-stages.png` / `.svg` — page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)
-- `05-display-controls.png` / `.svg` — page Display & Controls
+- `05-display-controls.png` / `.svg` — page Display & Controls (Controls group; Menu shortcut 1 / 2 are editor rows, Permanent shortcut stays info)
 - `06-situation-overrides.png` / `.svg` — sub-screen Situation overrides (CPU > Reactions)
 - `07-button-chords.png` / `.svg` — sub-screen Button chords (Display & Controls > Controls)
 - `08-swap-groups.png` / `.svg` — sub-screen Swap groups (Fighters & Stages > Loading)
 - `09-direction-grid.png` / `.svg` — sub-screen DI Direction: the 3x3 direction grid of DI streak chips with absolute Left/Right and weights
 - `10-character-grid.png` / `.svg` — sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges
-- `11-item-grid.png` / `.svg` — sub-screen Give item: 4x8 item grid with the fork's own item icons, page 1 of 2
+- `11-item-grid.png` / `.svg` — sub-screen Give item, docked: one page of 5x8 tiles (38 used) with short names and the fork's own item icons, page 1 of 1
 - `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures
 - `13-kirby-hats-grid.png` / `.svg` — sub-screen Kirby Hats: the same portrait grid as a two-role hat order
 - `14-fighters-extras.png` / `.svg` — page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)
 - `15-fighters-stage-rows.png` / `.svg` — page Fighters & Stages (Stages group: stage order preview)
 - `16-chip-sheet.png` / `.svg` — review sheet: the placeholder chip at full and row size for its three uses, the rendered DI and SDI chips with crops of the captures beside them as the check, and the Airdodge / Shield Tilt arrows
 - `17-sdi-direction-grid.png` / `.svg` — sub-screen SDI Direction: the 3x3 direction grid of SDI spark chips with absolute Left/Right and weights (same layout as 09)
+- `18-item-grid-handheld.png` / `.svg` — sub-screen Give item, handheld: 4x4 tiles with full names, page 1 of 3, with a small handheld tag
+- `19-delay-popup.png` / `.svg` — popup Aerial Delay with both controls, two states: (a) checklist active (0, 5, 10 ticked), range greyed; (b) range 0 - 10 active, checklist greyed; Y clears the active one
+- `20-developer.png` / `.svg` — sixth page Developer, hidden unless developer.ini has developer_page=on: Preload Samples (moved from Loading), Reload developer config, Debug hooks
+- `21-sdi-stretch-compare.png` / `.svg` — review sheet: SDI Up and In chips at 60 and 30 px for the v9 render and four stretches along the SDI vector (x1.17, x1.4, x1.7, x2.0), beside the captured Up and In crops at the same size
 
 ## Image sources (review mockup only, not shipped artwork)
 
@@ -187,6 +193,24 @@ DI and SDI chip renders (proposal v9): the DI and SDI chips on 01, 09, 16 and 17
 | --- | --- | --- | --- |
 | DI Up (432x432) | `captures/renders/di-up-4x-layer.png` | `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/di-sdi-extract/out/chips/di-up-4x-layer.png` | `b87f8d8122ed5c752f623a95f4832f34fea1f7242cf82851105524910c494ccb` |
 | SDI Up (432x432) | `captures/renders/sdi-up-4x-layer.png` | `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/c1162/di-sdi-extract/out/chips/sdi-up-4x-layer.png` | `9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254` |
+
+SDI burst, longer (proposal v10): the SDI chips (01, 16, 17 and the decision pictures 17 and 18) draw `captures/renders/sdi-up-4x-layer-stretch.png` (the burst stretched x2.0 along the SDI vector), not W9's own `sdi-up-4x-layer.png` (kept above, unused). Measured on the SDI Up captures (`c1162/captures-ally-sdi/sdi-up`, frames +10 to +15; the largest connected pixels with min(R,G,B) >= 240, bounding box): height / width 1.76, 1.47, 1.78, 1.84, 1.65, 1.57, median 1.71 (frames +16 and +17 are merged with the fighters and left out). W9's render, the solid burst (alpha >= 230, crown and legs, the thin line excluded): 58 x 86 px, height / width 1.48. The first try (x1.17, height / width 1.72, the captured median) was not visible at chip size, because the capture's burst is bolder and reaches much farther from the head in chip terms: measured against the captured crops at the chip scale of sheet 16 (reach 0.40 of the chip), the captured Up burst tip is 0.36 of the chip from the head and the captured In burst tip 0.31 with detached streaks going on past 0.40, while W9's burst tip is 0.19. Sheet 21 shows the Up and In chips at 60 and 30 px for x1.0 (v9), x1.17, x1.4, x1.7 and x2.0 beside the captured crops; x2.0 (tip 0.39) is the closest in reach and in weight, x1.7 (tip 0.32) falls short of the Up capture and of the In streaks, so x2.0 is drawn. Remaining difference: the render's burst keeps its width (about 13 % of the chip against about 29 % in the capture), so it is a taller, thinner flame than the captured arch. The thin line (`spark1`, W9's calibrated quad) is unchanged. Method, the root route as far as the file goes: W9's own renderer (`di-sdi-extract/tools/render_chips.py`, imported read-only) is run by `tools/render_sdi_stretch.py`, which changes only the burst emitter `impactring1`'s scale-Y. x1.17 reads its own scale-key table at particle life 0.5 instead of 0.3 (y key 1.356 -> 1.584, alpha still 1.0). That table ends at y = 1.93 (x1.42) at life 1.0, where the burst has faded to alpha 0.14, so x1.4, x1.7 and x2.0 are not in the file: they multiply the life-0.3 scale-Y by the factor, CALIBRATED against the captures, like W9's `spark1` quad. The scale-X, the origin, the colours, the gain, the framing and the other emitter are unchanged. The tool self-checks that factor 1 reproduces W9's file pixel for pixel. It needs numpy, so it runs under the ssbu-recomp venv Python (`tools/crop_menu_captures.py` calls it); the inputs are pinned by sha256 below. No `.eff`, texture, mesh or parameter file is in the repository.
+
+| field | value |
+| --- | --- |
+| file drawn | `captures/renders/sdi-up-4x-layer-stretch.png` (432x432, RGBA light layer), factor 2.0 (scale); same pixels as `captures/renders/variants/sdi-up-4x-layer-x2.0.png` |
+| sha256 | `11d9e2d29004c918fe7dc266216140d7087b3993a0dc1e19fe48f6967dbb4d61` |
+| tool | `tools/render_sdi_stretch.py (imports W9 tools/render_chips.py)`; W9 `tools/render_chips.py` sha256 `b123bc3baa7ba3c47d963327f756d6fc086433df2f9003303544558e73e7b0bb` |
+| inputs | stock 13.0.5 `ef_common.eff` sha256 `8ff5bad0681cc922dfc4988acfb0212def0514d717bb62b4df17b916d04e0023`; W9 `sdi-up-4x-layer.png` sha256 `9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254` |
+
+Compared stretches (sheet 21, review material; the file drawn is the x2.0 one):
+
+| factor | file | source | sha256 |
+| --- | --- | --- | --- |
+| x1.17 | `captures/renders/variants/sdi-up-4x-layer-x1.17.png` | emitter key table at life 0.5 (y key 1.356 -> 1.584) | `03afeaacc00f7071b161c37cd855ceb899955f108385c8b3b058c042148d8cdb` |
+| x1.4 | `captures/renders/variants/sdi-up-4x-layer-x1.4.png` | life-0.3 S.y x 1.4 (calibrated) | `09a8a003dfbabbba3ac5a297c7c1f51f7d379c8ef3c400bd693e0874ebde01a2` |
+| x1.7 | `captures/renders/variants/sdi-up-4x-layer-x1.7.png` | life-0.3 S.y x 1.7 (calibrated) | `2d63be098dc73c7cefe96c016946c39814129f8bdddb779231d610868dd9e5cb` |
+| x2.0 | `captures/renders/variants/sdi-up-4x-layer-x2.0.png` | life-0.3 S.y x 2.0 (calibrated) | `11d9e2d29004c918fe7dc266216140d7087b3993a0dc1e19fe48f6967dbb4d61` |
 
 DI streak (proposal v8; the visual check since v9): the game's own DI visual (system effect `sys_vector`), cut from one frame of a real capture. v8 drew the DI chips from this crop; since v9 the chip sheet (16) shows it once, as captured, beside the rendered DI chips. The game draws one effect and turns it about Z to the DI-corrected launch angle (SPEC-core-07 §4.6, from the static trace `c1162/di-sdi-trace/RESULT.md` §3.1). The clean room reads the effect from the player's game files at run time and never ships a picture of it. Capture: `c1162/captures-ally` run A (Ally Eden, fork M5l, Training on Final Destination, Steve forward smash on CPU Sora, DI Direction = Up, Hitbox Visualization off), Eden's GIF recorder, 1280x720 game frame, 256-colour palette; frame +13 after first contact (the streak shows from about +5 to +15). The strip: rotate the frame about the centre by the streak's measured axis so the streak points along +x, cut along and across it, feather the strip's edges in alpha (smoothstep; pixels unchanged). The frame's background and the CPU's keyblade show through.
 

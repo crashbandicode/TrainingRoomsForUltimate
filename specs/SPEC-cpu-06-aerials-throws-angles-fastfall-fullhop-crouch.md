@@ -21,13 +21,13 @@ These settings shape how the CPU executes the actions chosen in SPEC-cpu-01: whe
 | --- | --- | --- | --- | --- |
 | Attack Angle (Mash) | `attack_angle` | multi-select, weighted | Neutral (`NEUTRAL`), Up (`UP`), Down (`DOWN`) | none |
 | Throw Options (Mash) | `throw_state` | multi-select, weighted | None (`NONE`), Forward Throw (`FORWARD`), Backward Throw (`BACKWARD`), Up Throw (`UP`), Down Throw (`DOWN`) | None |
-| Throw Delay (Mash) | `throw_delay` | multi-select, weighted | 0, 5, 10, …, 150 frames | none (= 0) |
-| Pummel Delay (Mash) | `pummel_delay` | multi-select, weighted | 0, 5, 10, …, 150 frames | none (= no pummelling) |
+| Throw Delay (Mash) | `throw_delay` | **multi-select + range** (draft 9, N3): weighted checklist or a min–max range, one at a time (SPEC-core-02 §2.8) | 0, 5, 10, …, 150 frames; range: any step value from min to max, uniform | none (= 0) |
+| Pummel Delay (Mash) | `pummel_delay` | **multi-select + range** (N3), same | 0, 5, 10, …, 150 frames; range as above | none (= no pummelling; a set range counts as a selection, so the CPU pummels) |
 | Falling Aerials (Mash) | `falling_aerials` | multi-select, weighted | True, False | False |
 | Full Hop (Mash) | `full_hop` | multi-select, weighted | True, False | True |
-| Aerial Delay (Mash) | `aerial_delay` | multi-select, weighted | 0 … 30 frames | none (= 0) |
+| Aerial Delay (Mash) | `aerial_delay` | **multi-select + range** (N3) | 0 … 30 frames; range: any value from min to max, uniform | none (= 0) |
 | Fast Fall (Mash) | `fast_fall` | multi-select, weighted | True, False | False |
-| Fast Fall Delay (Mash) | `fast_fall_delay` | multi-select, weighted | 0 … 30 frames | none (= 0) |
+| Fast Fall Delay (Mash) | `fast_fall_delay` | **multi-select + range** (N3) | 0 … 30 frames; range as above | none (= 0) |
 | Crouch (Defensive) | `crouch` | on/off | On, Off | Off |
 
 Help texts (upstream): "For attacks that can be angled, such as some forward tilts"; "Throw to be performed when a grab is landed"; "How many frames to delay the throw option"; "How many frames after a grab to wait before starting to pummel"; "Should aerials be performed when rising or when falling"; "Should the CPU perform a full hop or a short hop when jumping"; "How long to delay an aerial attack"; "Should the CPU fastfall during a jump"; "How many frames the CPU should delay their fastfall"; "Have the CPU crouch when on the ground".
@@ -122,7 +122,7 @@ Live; held rolls persist until their next roll point.
 - **Kirby**: inhale is a special, not a grab; no effect. **Mii, Aegis, Steve, Olimar, Rosalina**: no special handling.
 - **Pokémon Trainer**: a switch is impossible while holding; nothing special.
 - **Tether grabs** (Link, Samus, …): the catch statuses are the same once the grab connects.
-- **Playback**: full hop, fast fall and attack angle yield to playback; throws do not check playback but the command-flag hook as a whole is not reached for a possessed CPU in a way that matters (the recording drives category inputs; open question 7).
+- **Playback** (**decided 2026-11-01, B5 / N4**): full hop, fast fall and attack angle yield to playback; by default throws now also yield (the throw rule checks playback; the recording wins), and apply again when the playback ends. The advanced row *Settings override playback* (SPEC-input-01 §2.1, default Off) restores upstream's rule when On: the throw settings then override the recording (open question 7).
 - **Save states**: the reset bundle resets the throw delay; the held case clears when the grab ends.
 - **Lobby practice**: the throw bits are produced only for permitted entries (0 and 4), as the whole command-flag hook is.
 - **Hot swap**: session clear resets held values.
@@ -152,14 +152,17 @@ Nothing is written. Settings live in the menu JSON.
 | Crouch in the six statuses only; air-dodge direction wins | `cpu06_crouch_statuses` | `cpu-06-crouch` | `evidence/cpu-06/crouch.md` |
 | Throw: case/delays once per grab; None does nothing; pummel timing; throw bits on category 2; mash after throw | `cpu06_throw_state_machine` | `cpu-06-uthrow-delay-30-pummel-10`, `cpu-06-throw-none` | `evidence/cpu-06/throw.md` |
 | Per-fighter state (Ice Climbers) | `cpu06_per_fighter_state` | `cpu-06-ice-climbers-grab` | `evidence/cpu-06/ic.md` |
+| **N3** Aerial, Fast Fall, Throw and Pummel delay ranges: a set range is picked uniformly where the checklist is picked today; a checklist stays a weighted pick; the two are exclusive; a set Pummel Delay range counts as a selection (pummelling on); a file with no range loads as a checklist | `cpu06_aerial_delay_range_pick`, `cpu06_fast_fall_delay_range_pick`, `cpu06_throw_delay_range_pick`, `cpu06_pummel_delay_range_pick`, `cpu06_delay_rows_exclusive_and_legacy_load` | `cpu-06-aerial-range-5-15`, `cpu-06-throw-range-20-40`, `cpu-06-pummel-range-on` | `evidence/cpu-06/delay-range.md` |
+| **N4 / B5** Throws yield to playback by default (the throw rule checks playback); with *Settings override playback* On the throw settings override the recording | `cpu06_throw_yields_to_playback`, `cpu06_throw_playback_override_on` | `cpu-06-throw-during-playback-off`, `cpu-06-throw-during-playback-on` | `evidence/cpu-06/playback.md` |
 
 ## 10. Open questions
 
 1. **Throw bits and the query category.** Upstream ORs the category-2 throw flags into the result of every category query (1 to 4) while the throw rule fires. The throw flags are category-2 bits, so on the category-1 query they are read as unrelated category-1 commands for that frame. This spec delivers them on the category-2 query only; an Eden row must confirm the throw still comes out on the first possible frame (if the game reads category 2 before the plugin's rule fires in the frame, deliver on both 1 and 2 and record it).
 2. **Pummel speed.** One pummel is requested per frame in `CATCH_WAIT` once the pummel delay has elapsed; the game's own pummel cooldown limits the rate. Confirm the resulting rhythm is acceptable or whether a repeat interval is wanted.
-3. **Mash after the throw ignores triggers.** Upstream always buffers a `mash_state` action after a throw, even with no trigger ticked. Recommendation: keep it (the throw is itself the trigger) but say so in the help text; or add a "Throw" entry to Mash Triggers in the menu redesign.
-4. **Attack angle persists.** The held angle applies to the CPU's native angled attacks until the next mash buffers. Recommendation: clear the angle when the queue empties, so only mash-driven attacks are angled.
-5. **Per-fighter state.** Upstream shares all of this state between CPU fighters (Ice Climbers). Confirm per-fighter state.
+3. **Mash after the throw ignores triggers.** Upstream always buffers a `mash_state` action after a throw, even with no trigger ticked. Recommendation: keep it (the throw is itself the trigger) but say so in the help text; or add a "Throw" entry to Mash Triggers in the menu redesign. **Decided 2026-11-01 (B8 batch, kept line): kept as the fork does it** (the mash after a throw ignores Mash Triggers; the help text says so).
+4. **Attack angle persists.** The held angle applies to the CPU's native angled attacks until the next mash buffers. Recommendation: clear the angle when the queue empties, so only mash-driven attacks are angled. **Decided 2026-11-01 (B8 batch): accepted.**
+5. **Per-fighter state.** Upstream shares all of this state between CPU fighters (Ice Climbers). Confirm per-fighter state. **Decided 2026-11-01 (B6): as recommended;** one state per fighter.
 6. **Cargo throws.** Donkey Kong's cargo hold is not driven. Follow-up with Eden evidence if wanted.
-7. **Throws during playback.** The throw rule does not check playback. Recommendation: yield to playback like the other rules (decide with SPEC-cpu-02 question 7).
-8. **Full Hop default True.** With the default a mash `JUMP` is always a full hop; confirm the default for the redesigned menu.
+7. **Throws during playback.** The throw rule does not check playback. Recommendation: yield to playback like the other rules (decide with SPEC-cpu-02 question 7). **Decided 2026-11-01 (B5, N4): the recording wins by default,** with the advanced row *Settings override playback* (default Off) restoring the upstream rule (§6).
+8. **Full Hop default True.** With the default a mash `JUMP` is always a full hop; confirm the default for the redesigned menu. **Decided 2026-11-01 (B8 batch, kept line): Yes, as the fork has it.**
+9. **Throw option changed while the CPU already holds someone (B11, open).** The throw case is held once per grab, so a CPU already holding a fighter ignores a newly selected throw until the next grab; this is the same question as SPEC-cpu-03 question 6 (re-roll on menu change, or apply on the next grab). **Open: not answered 2026-11-01.** Working default: re-roll on change (the recommendation).

@@ -13,7 +13,8 @@ When a save state finishes loading, the player's fighter can be handed one of th
 
 ## 2. User-visible behaviour
 
-- Menu item (Save States tab): **Character Item**, setting id `character_item`, single-choice, default None. Values: None; Player 1st Var. … Player 8th Var.; CPU 1st Var. … CPU 8th Var. Upstream help: "The item to give to the player's fighter when loading a save state". Fork help (carried over, since the fork made this a fallback): "Item for older saves without an item snapshot. New saves restore the item held when saved; use Character Extras to give an item."
+- **Draft 9 (N6, decided 2026-11-01; menu question 6): the menu item is dropped.** The row (*Character Item*, *Item on load (older saves)* in the redesign) and its setting `character_item` no longer exist in the clean room. The first-boot import converts older saves once: each player-role save record that has no `held_item` snapshot gets one written from the old setting (SPEC-core-08 §4 *Item-on-load conversion*), using the resolution rule of §5.2 steps 1–2 and the table of §2.1. At run time the only item source on a load is the record's `held_item` snapshot (§5.1). The rest of this section describes the dropped upstream row; it is kept because the conversion reads it.
+- (Dropped) Menu item (Save States tab): **Character Item**, setting id `character_item`, single-choice, default None. Values: None; Player 1st Var. … Player 8th Var.; CPU 1st Var. … CPU 8th Var. Upstream help: "The item to give to the player's fighter when loading a save state". Fork help (carried over, since the fork made this a fallback): "Item for older saves without an item snapshot. New saves restore the item held when saved; use Character Extras to give an item."
 - Live in Training only (fork: and owned lobby-practice restores). Only the **player's** fighter ever receives the item, and never Nana.
 - Visible output: on load completion the player's fighter holds the item (or, for Diddy's banana, the banana is produced and handed over). If the chosen fighter has fewer variations than the index, nothing appears. No notification.
 
@@ -65,9 +66,9 @@ Upstream leaves Snake's cardboard box and Wario's bike out deliberately. Items w
 
 ### 5.1 When
 
-On the PosMove completion frame of SPEC-state-01 §5.3 step 8b, for the player record only, not Nana. Fork order (folded as the required order): if the record carries a held-item snapshot, restore that snapshot through the fork's item engine and skip the menu item; otherwise, if Character Item is not None, apply the menu item. Single frame.
+On the PosMove completion frame of SPEC-state-01 §5.3 step 8b, for the player record only, not Nana. **Draft 9 order:** if the record carries a held-item snapshot, restore that snapshot through the fork's item engine; otherwise grant nothing (there is no menu item to apply, N6). Single frame. (Upstream and the fork also applied the menu item when there was no snapshot; that branch, and the grant paths A–C of §5.2 steps 3–5, are no longer reached from a setting. Whether the clean room still builds them is open question 5.)
 
-### 5.2 Resolving and granting the menu item
+### 5.2 Resolving and granting the menu item (draft 9: steps 1–2 are used by the import conversion; steps 3–5 are the dropped upstream grant)
 
 1. `idx` = position of the setting: Player 1st … 8th → 1…8 (variation `idx − 1` of the **player's** fighter kind); CPU 1st … 8th → 9…16 (variation `idx − 9` of the **CPU's** fighter kind).
 2. Take the `variation`-th entry of §2.1 for that kind. If there is none, do nothing except clear the mash queue.
@@ -98,7 +99,7 @@ A single global optional face number. While set, the sixteen probability hooks f
 
 ## 7. Persistence
 
-Menu setting `character_item` (carried over in `training_modpack.json`). The fork's held-item snapshot is part of the save-state record (SPEC-state-01 §7.2 `held_item`): `{"state": "item", "choice": u8 (index into the fork's 38-item list), "variation": i32, "lifetime": i32, "lifetime_max": i32, "fuse": i32, "fuse_max": i32}` or `{"state": "empty"}` or `{"state": "unsupported"}`; absent in older saves, in which case the menu item is the fallback. The fork writes the item's remaining lifetime and fuse back only when the item's maxima match the saved maxima (carried over).
+Menu setting `character_item`: **retired 2026-11-01 (N6)**; accepted and ignored on load, never written (SPEC-core-04 §3.1), after the import converted it (SPEC-core-08 §4). The fork's held-item snapshot is part of the save-state record (SPEC-state-01 §7.2 `held_item`): `{"state": "item", "choice": u8 (index into the fork's 38-item list), "variation": i32, "lifetime": i32, "lifetime_max": i32, "fuse": i32, "fuse_max": i32}` or `{"state": "empty"}` or `{"state": "unsupported"}`; absent in older saves; **draft 9:** the import writes a snapshot for each such player record from the old menu setting, so the menu item is no longer a fallback. A converted snapshot is `{"state": "item", "choice": <index into the fork's 38-item list for the §2.1 entry>, "variation": <the entry's variation>, …}` with the lifetime and fuse fields set so the restore skips their write-back (open question 6); a record whose fighter has no entry for the variation, or a setting of None, gets no snapshot. The fork writes the item's remaining lifetime and fuse back only when the item's maxima match the saved maxima (carried over).
 
 ## 8. Resource budget
 
@@ -120,11 +121,16 @@ Menu setting `character_item` (carried over in `training_modpack.json`). The for
 | Face hooks: 58.0 / 0.0 while overridden, pass-through otherwise | `state04_face_probability_hooks` | `E-state-04-face-roll` | |
 | Mash queue cleared after grant | `state04_clears_mash_queue` | `E-state-04-no-instant-throw` | |
 | Player only, never Nana, never CPU | `state04_player_only` | `E-state-04-ice-climbers` | |
-| Snapshot present → fork restore, menu skipped; absent → menu item | `state04_snapshot_precedence` | `E-state-04-snapshot-vs-menu` | |
+| Snapshot present → fork restore; absent → nothing granted (no menu fallback after N6) | `state04_snapshot_precedence` | `E-state-04-snapshot-vs-menu` | |
+| **N6** The import conversion resolves the old `character_item` to a snapshot for a player-role record without one: index → (role kind, variation) (§5.2 steps 1–2), §2.1 entry → the fork's 38-item `choice`; no entry or None → no snapshot; an existing snapshot is never overwritten; CPU-role records untouched | `state04_convert_setting_to_snapshot` (all 17 values × representative fighters), `state04_convert_no_entry_leaves_absent`, `state04_convert_never_overwrites` | `E-state-04-converted-save-restores-item` (a fork save without a snapshot, setting Player 1st Var., imported: the load gives the item) | |
+| **N6** The row and the setting are gone: no `character_item` row in the factory table; the key is ignored on load and not written | `state04_setting_retired` (with `core04_character_item_retired`) | `E-state-04-no-row` (Saves page has no *Item on load* row) | |
+| **N6** The load no longer applies a menu item: a save without a snapshot loads with no item even when the old key is present in a settings file | `state04_no_menu_item_applied_on_load` | `E-state-04-no-menu-grant` | |
 
 ## 10. Open questions
 
 1. The hand-over takes "active item 0" of the ItemManager. It is correct only because the load wiped every item two frames earlier; a stage item spawned in between would be handed over instead. Recommendation: hand over the item whose battle object id the generation returned, or fall back to the newest active item of the expected kind (the fork's engine already searches by kind).
 2. Path A gives CPU-owned kinds (Snake's grenade to a non-Snake player) with a plain `have_item`; some of these kinds behave oddly without their owner's data in the match. Upstream accepts this. Recommendation: keep, document per item in the user guide which ones need the owner present.
-3. The menu's variation list is positional ("Player 3rd Var.") and does not name the item; the fork replaced it with a named, iconed menu (carried over). Recommendation for the menu redesign: keep the positional setting only as the legacy fallback the fork made it.
+3. The menu's variation list is positional ("Player 3rd Var.") and does not name the item; the fork replaced it with a named, iconed menu (carried over). Recommendation for the menu redesign: keep the positional setting only as the legacy fallback the fork made it. **Decided 2026-11-01 (menu question 6): not kept;** the row is dropped and the import converts older saves once (N6).
 4. The sixteen symbol hooks cost sixteen guarded sites for one feature. Recommendation: confirm with the lead that the turnip faces justify them; otherwise restrict to the four selectable faces (eight hooks) and leave faces 2–5 at their game probability.
+5. **Is the upstream grant code still built? (added 2026-11-01, N6.)** With the menu item dropped nothing reaches paths A–C and the turnip face override from a setting; the fork's item engine does every grant from a snapshot and from *Give item*. Recommendation: do not implement paths A–C and the sixteen face hooks here; keep §2.1 (for the conversion) and let the fork's engine own face selection through its own interface. Not decided by the operator.
+6. **Conversion details the sources do not fix (N6).** (a) The map from a §2.1 entry to the fork's 38-item `choice` index (the fork's `character_items.rs` list) is not transcribed in this spec; the importer needs it, with a fixture taken from a real fork save. (b) A converted snapshot has no lifetime or fuse values; they must be set so the fork's restore skips the write-back (it writes them back only when the maxima match). (c) A save whose record stores a fighter kind of -1 (never saved) gets no snapshot. Recommendation: write the table once from the fork's list, test it against the fork's own `held_item` fixtures, and treat (b) and (c) as stated.

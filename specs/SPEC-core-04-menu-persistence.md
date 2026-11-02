@@ -41,6 +41,7 @@ The player's menu choices and their saved defaults survive a restart: they are w
 - A wrong array length: elements beyond the option count are dropped by the model's bulk update; a shorter array leaves the tail off (SPEC-core-02 §5). Upstream's struct types rejected a wrong length at parse time for its own fields (fixed-size); the fork's roster import tests confirm "wrong length → error" for those fields.
 - Duplicate keys: serde rejects a repeated known key; the fork additionally rejects any repeated key inside the two snapshots (`duplicate field` error).
 - Values above 255 or negative: parse error.
+- **Draft 9 fields (decided 2026-11-01).** New settings: `respawn_invincibility` (OnOff, default Off; SPEC-state-01), `settings_override_playback` (OnOff, default Off; SPEC-input-01), the Developer rows `dev_reload_config` and `dev_debug_hooks` (OnOff, default Off; SPEC-core-02 §2.8; `preload_samples` is the existing id), and an optional range per delay row (N3): `<delay id>_range`, a two-element array `[min, max]`, absent when no range is set (the checklist then applies; SPEC-core-02 §2.8). Every new field has a default, so a file without them loads (§3.2). Retired: `character_item` (N6, dropped row): accepted and ignored on load like `update_policy`, never written; the first-boot import has already converted it (SPEC-core-08 §4, SPEC-state-04 §7).
 
 ## 4. Outputs and native state touched
 
@@ -48,11 +49,11 @@ None in game memory. Files:
 
 | Output | Path (upstream → clean room) | Format | When |
 | --- | --- | --- | --- |
-| Settings file | `sd:/ultimate/TrainingModpack/training_modpack_menu.conf` (JSON despite the extension) → `sd:/ultimate/TrainingRooms/menu.json` (Q3 for the name) | pretty-printed JSON `{"menu":{…},"defaults_menu":{…}}` (fork adds `"mii_preferences"` and `"stage_preferences"`, carry-over) | written on every menu close (queued to the writer thread, whole-file rewrite) |
+| Settings file | `sd:/ultimate/TrainingModpack/training_modpack_menu.conf` (JSON despite the extension) → `sd:/ultimate/TrainingRooms/settings.json` (Q3 for the name) | pretty-printed JSON `{"menu":{…},"defaults_menu":{…}}` (fork adds `"mii_preferences"` and `"stage_preferences"`, carry-over) | written on every menu close (queued to the writer thread, whole-file rewrite) |
 | Published settings | the global settings value every feature reads (`MENU`) and the defaults (`DEFAULTS_MENU`) | in-memory copies | assigned at load and at every close **before** the file write is queued |
 | Legacy menu paths (unused upstream constants) | `training_modpack_menu.json`, `training_modpack_menu_defaults.conf` | — | never read or written; do not carry |
 | Updater config | `training_modpack.toml` → fork `training_modpack.json` (`{"update":{"last_update_version":"<RFC 3339 UTC>"}}`, created with the current time when absent, recreated when unparsable) | existed only for the dropped auto-update | drop (Q4) |
-| Developer config | `dev.toml` → fork `dev.json`, an empty object; re-read while P1 holds L+R+A | development only | not shipped (SPEC-core-01 Q5) |
+| Developer config | `dev.toml` → fork `dev.json`, an empty object; re-read while P1 holds L+R+A | development only | **ships (draft 9)** as the *Reload developer config* row of the hidden Developer page, gated by `developer.ini` (SPEC-core-01 §2 and Q5, decided 2026-11-01); the file is not part of the settings and is not imported |
 | Legacy root | `sd:/TrainingModpack/*` moved into the data folder, old folder removed | — | SPEC-core-01 Q2 |
 | Other constants | `version.txt`, `layout.arc` (dev override, SPEC-core-05), `UNPACK_PATH = sd:/` (updater) | — | not carried |
 
@@ -66,7 +67,7 @@ None in game memory. Files:
 ## 6. Edge cases and interactions
 
 - **Missing file**: factory settings; the file is created at the first close.
-- **Corrupt file** (not JSON, wrong types, missing required key, duplicate key): upstream deleted it on the spot and continued with factory settings. Recommendation (Q2): keep the file, rename it to `menu.invalid-<n>.json`, log, continue with factory settings; load every setting that parses and default the rest (per-field defaults).
+- **Corrupt file** (not JSON, wrong types, missing required key, duplicate key): upstream deleted it on the spot and continued with factory settings. Recommendation (Q2): keep the file, rename it to `settings.invalid-<n>.json`, log, continue with factory settings; load every setting that parses and default the rest (per-field defaults).
 - **File from a newer build** with extra keys: loads; extras are ignored and **dropped on the next write** (the writer emits only known keys).
 - **File from an older build** with fewer keys: loads only if every known key has a default (clean room) — upstream would have deleted it.
 - **Upstream file in the user's old folder**: the key set and value shape are identical for all upstream rows, so an upstream `training_modpack_menu.conf` can be imported as-is (SPEC-core-01 Q2); `update_policy` and `menu_open_start_press` are ignored.
@@ -78,7 +79,7 @@ None in game memory. Files:
 
 ## 7. Persistence
 
-This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/menu.json` (Q3), JSON as §3.1, pretty-printed, whole-file rewrite on close, read once at boot. Missing → factory; malformed → logged, preserved under another name, factory used (Q2).
+This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/settings.json` (Q3), JSON as §3.1, pretty-printed, whole-file rewrite on close, read once at boot. Missing → factory; malformed → logged, preserved under another name, factory used (Q2).
 
 ## 8. Resource budget
 
@@ -104,12 +105,14 @@ This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/menu.json`
 | Load publishes globals before the first Training frame; commit publishes before the write is queued | `core04_publish_order` (sequence) | `core04-E6` setting visible next frame | — |
 | Writer thread stack/size; synchronous fallback | `core04_writer_fallback` | `core04-E7` | — |
 | No write on unplug-close | `core04_no_write_on_unplug` | `core04-E8` | — |
+| **Draft 9** New fields default when absent (`respawn_invincibility`, `settings_override_playback`, `dev_*`, `<delay id>_range`); the retired `character_item` key is accepted, ignored and not written back | `core04_draft9_fields_default`, `core04_character_item_retired` | `core04-E9` older fork file loads; the next close drops `character_item` | — |
+| **S2** (decided) Corrupt file kept as `settings.invalid-<n>.json`, every field that parses is loaded, the rest default | `core04_corrupt_file_policy` (above), `core04_per_field_default_on_bad_field` | `core04-E4` | `docs/EDEN-RESULTS.md` |
 
 ## 10. Open questions
 
 1. **Byte-exact sample.** The writer did not transcribe a real upstream settings file (none is checked into either tree). Recommendation: capture one from an Eden run of the fork into the test fixtures before implementation, so the clean room's fixture is validated against a real file rather than this description.
-2. **Corrupt-file policy.** Upstream deletes; recommendation: preserve and rename, per-field defaults. Operator decision because it changes a user-visible recovery path.
-3. **File name and location.** `menu.json` under `sd:/ultimate/TrainingRooms/`; or keep upstream's `.conf` name for drop-in import. Recommendation: new name, plus a one-time import of the upstream file (SPEC-core-01 Q2).
+2. **Corrupt-file policy.** Upstream deletes; recommendation: preserve and rename, per-field defaults. Operator decision because it changes a user-visible recovery path. **Decided 2026-11-01 (S2): as recommended;** keep a renamed copy and load field by field.
+3. **File name and location.** `settings.json` under `sd:/ultimate/TrainingRooms/`; or keep upstream's `.conf` name for drop-in import. Recommendation: new name, plus a one-time import of the upstream file (SPEC-core-01 Q2). **Decided 2026-11-01 (S1 item 1, SPEC-core-08): `settings.json`;** the import copies the fork's `training_modpack.json` under that name, and the loader also accepts the old name once. (This spec's earlier working name `menu.json` is superseded.)
 4. **Updater config file.** With auto-update dropped, `training_modpack.json` has no reader. Recommendation: do not create it.
 5. **Asynchronous write.** Keep the writer thread (shared with save states and recordings) or write the small menu file synchronously at close. Recommendation: keep one writer thread with a 64 KiB stack for all files, flush on the panic path.
 6. **Pretty vs compact JSON.** Upstream pretty-printed. Recommendation: pretty, for hand editing.

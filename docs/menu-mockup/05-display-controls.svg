@@ -12,25 +12,23 @@
 <text x="1220.0" y="64.8" font-size="16" fill="rgb(150,156,170)" text-anchor="end">TrainingRooms</text>
 <polyline points="48.0,88.0 1232.0,88.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="48.0,628.0 1232.0,628.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Show the Training HUD overlay (damage, state, frame data).</text>
+<text x="56.0" y="650.8" font-size="16" fill="rgb(236,236,232)" text-anchor="start">Opens the chord editor. A change applies at once and is written to button_config.ini.</text>
 <text x="56.0" y="675.2" font-size="14" fill="rgb(150,156,170)" text-anchor="start">L/R page   D-pad move   A change / open   B back   X reset page</text>
-<rect x="48.0" y="98.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
-<rect x="48.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
-<text x="62.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">On screen  (6)</text>
-<text x="62.0" y="160.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">Controls  (5)</text>
+<text x="62.0" y="120.0" font-size="20" fill="rgb(150,156,170)" text-anchor="start">On screen  (6)</text>
+<rect x="48.0" y="138.0" width="324.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="48.0" y="138.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="62.0" y="160.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start" font-weight="bold">Controls  (5)</text>
 <polyline points="388.0,96.0 388.0,620.0" fill="none" stroke="rgb(70,76,90)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="404.0" y="98.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
-<rect x="404.0" y="98.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
-<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">HUD</text>
-<text x="1220.0" y="120.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">[ON]</text>
-<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Hitbox Visualization</text>
-<text x="1220.0" y="158.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
-<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Frame Advantage</text>
-<text x="1220.0" y="196.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
-<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Display</text>
-<text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  Smash Inputs  &gt;</text>
-<text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Group inputs by status</text>
-<text x="1220.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">[OFF]</text>
-<text x="418.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Input Delay</text>
-<text x="1220.0" y="310.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">&lt;  0 frames  &gt;</text>
+<text x="418.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Button chords</text>
+<text x="1220.0" y="120.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">6 chords  &gt;</text>
+<text x="418.0" y="158.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">L+R+A Reset</text>
+<text x="1220.0" y="158.0" font-size="20" fill="rgb(111,195,154)" text-anchor="end">[ON]</text>
+<rect x="404.0" y="174.0" width="828.0" height="32.0" fill="rgb(38,42,52)"/>
+<rect x="404.0" y="174.0" width="4.0" height="32.0" fill="rgb(176,52,42)"/>
+<text x="418.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Menu shortcut 1</text>
+<text x="1220.0" y="196.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">Minus  &gt;</text>
+<text x="418.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Menu shortcut 2</text>
+<text x="1220.0" y="234.0" font-size="20" fill="rgb(236,236,232)" text-anchor="end">disabled  &gt;</text>
+<text x="418.0" y="272.0" font-size="20" fill="rgb(236,236,232)" text-anchor="start">Permanent shortcut</text>
+<text x="1220.0" y="272.0" font-size="20" fill="rgb(150,156,170)" text-anchor="end">B + D-pad Up</text>
 </svg>

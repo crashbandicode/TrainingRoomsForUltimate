@@ -20,7 +20,7 @@ When the practice CPU hangs on a ledge it gets up the way the player wants to dr
 | Row (Defensive tab) | Setting key | Type | Values | Default |
 | --- | --- | --- | --- | --- |
 | Ledge Options | `ledge_state` | multi-select, weighted | Neutral Getup (`NEUTRAL`), Roll (`ROLL`), Jump (`JUMP`), Getup Attack (`ATTACK`), Wait (`WAIT`), Playback Slot 1–5 (`PLAYBACK_1`…`PLAYBACK_5`) | Neutral Getup, Roll, Jump, Getup Attack |
-| Ledge Delay | `ledge_delay` | multi-select, weighted | 0, 10, 20, …, 300 frames (31 steps) | none (behaves as 0, but see §5 playback buffering) |
+| Ledge Delay | `ledge_delay` | **multi-select + range** (draft 9, N3): weighted checklist or a min–max range, one at a time (SPEC-core-02 §2.8) | 0, 10, 20, …, 300 frames (31 steps); range: any step value from min to max, uniform | none (behaves as 0, but see §5 playback buffering) |
 
 Override tab rows read here (weighted Action multi-selects, default none): Ledge Neutral Getup `ledge_neutral_override`, Ledge Roll `ledge_roll_override`, Ledge Jump `ledge_jump_override`, Ledge Attack `ledge_attack_override`. Mash tab: trigger "Ledge Option" in `mash_triggers` and `mash_state`.
 
@@ -57,7 +57,7 @@ The CPU's getup; a playback option starts the recording spec's playback (its own
 All of this runs in the once-per-frame dispatch (after the fighter's frame) for each CPU-operated fighter, after fast fall and before shield (SPEC-cpu-01 §5), and only when no input playback is running and `ledge_state` is non-empty.
 
 1. **Not hanging** (situation is not cliff): clear the held ledge case, clear the held delay and reset the delay counter. Return. (So both are re-rolled on the next grab.)
-2. **Hanging**: if no delay is held, pick one from `ledge_delay` (an empty row gives 0). If no case is held, pick one from the effective `ledge_state`. If the effective set is empty (fork fix, required), hold nothing and return: the CPU behaves natively this grab and the climb is not denied.
+2. **Hanging**: if no delay is held, pick one from `ledge_delay` (an empty row gives 0; a checklist is a weighted pick; a set range is a uniform pick among its step values, N3). If no case is held, pick one from the effective `ledge_state`. If the effective set is empty (fork fix, required), hold nothing and return: the CPU behaves natively this grab and the climb is not denied.
 3. Compute, with `frame` = integer motion frame, `delay` = held delay, `catch_flag` = the `CATCH_CLIFF` work flag:
    - `buffer_playback_now` = `delay == 0` and `frame == 13` (18 − 5 frames of input buffer).
    - `buffer_now` = in `CLIFF_WAIT` with previous status `CLIFF_CATCH` (a regular grab): `delay == 0` and `frame == 19` and `!catch_flag`; in `CLIFF_WAIT` otherwise (a tether/lasso grab): `delay == 0` and `frame == 18` and `catch_flag`; else false.
@@ -69,7 +69,7 @@ All of this runs in the once-per-frame dispatch (after the fighter's frame) for 
 
 The held case is not re-rolled while hanging (so Wait keeps waiting). The delay is held for the whole grab. Both reset when the CPU leaves the ledge (step 1); the reset bundle (L+R+A, save-state load) also resets the delay and its counter but not the case (the case clears through step 1 anyway).
 
-Setting changes apply to the next grab, except that an edit that empties `ledge_state` stops the feature immediately (step gate) and the climb is no longer denied.
+Setting changes apply to the next grab (the fork's rule, option (b) of the open question 6 below), except that an edit that empties `ledge_state` stops the feature immediately (step gate) and the climb is no longer denied. **Open (B11, not answered 2026-11-01):** the recommendation, and the working default until the operator answers, is option (a): re-roll the held ledge case (and the throw case) when the menu changes the row, so the CPU takes the new option during the same hang; if (a) is confirmed or used as the default, this paragraph changes accordingly.
 
 ## 6. Edge cases and interactions
 
@@ -108,12 +108,15 @@ Nothing is written. Settings live in the menu JSON.
 | Post-getup mash: override per kind, else trigger, else none | `cpu03_post_getup_mash` | `cpu-03-roll-then-fsmash` | `evidence/cpu-03/mash.md` |
 | Empty effective set → native behaviour (lobby without practice) | `cpu03_empty_effective_set` | `cpu-03-lobby-playback-only` | `evidence/cpu-03/lobby.md` |
 | Per-fighter state for Ice Climbers | `cpu03_per_fighter_state` | `cpu-03-ice-climbers` | `evidence/cpu-03/ic.md` |
+| **N3** Ledge Delay range: a set range is picked uniformly among its step values once per grab; a checklist stays a weighted pick; a set range counts as a non-empty Ledge Delay row for the early playback buffering (question 1) | `cpu03_ledge_delay_range_pick`, `cpu03_range_counts_as_nonempty_row` | `cpu-03-delay-range-30-60` | `evidence/cpu-03/delay.md` |
+| **N3** Checklist and range are mutually exclusive on this row; a file with no range loads as a checklist | `cpu03_ledge_delay_exclusive_and_legacy_load` (with `core02_delay_row_exclusion`) | — | — |
 | Yields during input playback; reset bundle resets delay | `cpu03_playback_yield_and_reset` | `cpu-03-savestate-on-ledge` | `evidence/cpu-03/reset.md` |
 
 ## 10. Open questions
 
 1. **Ledge Delay row required for early playback buffering.** Upstream buffers a playback option at frame 13 only when the Ledge Delay row has a selection (even "0"); with the row empty the playback starts only when the ledge becomes actionable, which can be a few frames late (trumpable). Recommendation: treat an empty row exactly as a selected "0" everywhere, removing the special case.
 2. **Tuned frame numbers.** The 13/18/19 frames and the 5/4-frame playback buffer are empirical for 13.0.5. The Eden rows above must confirm them; if a fighter-specific ledge-grab animation differs, record it.
-3. **Wait never times out.** With Wait the CPU hangs until the game forces a drop, and the climb denial persists; confirm this is the intended drill (it matches upstream).
-4. **Per-fighter state.** Upstream kept one case/delay for all CPU fighters; this spec asks for per-fighter state (Ice Climbers). Confirm.
+3. **Wait never times out.** With Wait the CPU hangs until the game forces a drop, and the climb denial persists; confirm this is the intended drill (it matches upstream). **Decided 2026-11-01 (B8 batch, kept line): kept as the fork does it.**
+4. **Per-fighter state.** Upstream kept one case/delay for all CPU fighters; this spec asks for per-fighter state (Ice Climbers). Confirm. **Decided 2026-11-01 (B6): as recommended;** one state per fighter.
 5. **Transition-term hook cost.** `is_enable_transition_term` is one of the most frequently called game functions; the hook must do nothing beyond the original call unless the fighter is CPU-operated and hanging. Measure the per-frame cost on Eden (diag counter) and consider denying the climb through a cheaper site if it is significant.
+6. **Ledge options changed while the CPU is already on the ledge (B11, added 2026-11-01; applies to the fork too, where it is unchanged).** A CPU rolls its ledge option once per hang and holds it until it leaves the ledge, and the held roll also survives while the Ledge Options row is empty. A CPU already parked on the ledge (for example with Wait) therefore ignores a newly selected option until it leaves the ledge and grabs again; the throw option behaves the same for a CPU already holding someone (SPEC-cpu-06). Options: (a) re-roll the ledge options (and the throw options) when the menu changes them, like SDI Direction, so the CPU takes the new option during the same hang; (b) apply on the next ledge grab, which the fork does today and §5 currently says. Recommendation: (a), the same rule as menu question 18; cost: one more roll cleared on a menu change, and a CPU already hanging can act differently the moment the row changes. **Open: not answered by the operator on 2026-11-01** (docs/DECISIONS.md B11). Working default: (a). Source: the fork's `c1162/di-sdi-apply/PROGRESS.md`, *For the primary* item 2.

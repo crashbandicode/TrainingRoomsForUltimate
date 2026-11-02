@@ -2,7 +2,8 @@
 """Crop the fork's real grid-picker captures into per-cell images for the menu mockup (proposal v4),
 copy the fork's 38 item icons byte for byte (proposal v5), crop the game's DI streak from a real
 capture for the DI direction chips (proposal v8), and crop the game's SDI spark from a real capture for
-the SDI direction chips, plus one captured In spark as a visual check (proposal v9).
+the SDI direction chips, plus one captured In spark as a visual check (proposal v9); v10 re-renders the SDI Up
+still with a taller burst through tools/render_sdi_stretch.py (venv Python, W9 renderer imported read-only).
 
 Review-mockup material only, never shipped artwork: the crops show game assets (stock fighter icons,
 stage thumbnails) exactly as the fork's own grid pickers draw them in Training; the item icons are the
@@ -21,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 from PIL import Image
@@ -112,6 +114,14 @@ W9_RENDERS = ("c1162/di-sdi-extract/out/chips",
                "sdi-up-4x-layer.png": "9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254"})
 
 
+# The SDI chip's still (proposal v10): the same W9 render with the burst's `impactring1` scale-Y read from its own key
+# table at particle life 0.6 instead of 0.3 (tools/render_sdi_stretch.py; it needs numpy, so it runs under the
+# ssbu-recomp venv Python, imports W9's own renderer read-only and self-checks that life 0.3 reproduces W9's file).
+# The result is the one file the SDI chips draw; the byte copy of W9's own Up layer above stays beside it.
+W9_DIR = "c1162/di-sdi-extract"
+VENV_PYTHON = "/home/intpa/ssbu-recomp/deps/venv/bin/python3"
+
+
 def load_renderer():
     spec = importlib.util.spec_from_file_location("render_menu_mockup", REPO / "tools" / "render_menu_mockup.py")
     mod = importlib.util.module_from_spec(spec)
@@ -184,7 +194,7 @@ def main():
         if digest != sha:
             sys.exit(f"{path}: sha256 {digest} != pinned {sha}")
         images[key] = Image.open(path).convert("RGB")
-    for sub in ("portraits", "stages", "items", "di", "sdi", "renders"):
+    for sub in ("portraits", "stages", "items", "di", "sdi", "renders", "renders/variants"):
         (OUT / sub).mkdir(parents=True, exist_ok=True)
         for old in (OUT / sub).glob("*.png"):
             old.unlink()
@@ -246,6 +256,11 @@ def main():
         (OUT / "renders" / name).write_bytes(data)
         renders.append({"file": f"renders/{name}", "source": str(render_dir / name), "sha256": sha,
                         "size": list(Image.open(render_dir / name).size)})
+    run = subprocess.run([VENV_PYTHON, "-I", str(REPO / "tools" / "render_sdi_stretch.py"), str(ROOT / W9_DIR),
+                          str(OUT / "renders")], capture_output=True, text=True)
+    if run.returncode:
+        sys.exit(f"render_sdi_stretch.py failed ({run.returncode}): {run.stderr.strip() or run.stdout.strip()}")
+    stretch = json.loads(run.stdout)
     manifest = {
         "purpose": "Review mockup only; game-asset captures of the fork's grid pickers, byte copies of the fork's "
                    "item icons, crops of the game's DI streak and SDI spark from Eden captures and two game-derived DI / "
@@ -258,6 +273,7 @@ def main():
         "sdi_spark": spark,
         "sdi_spark_check": spark_check,
         "w9_renders": {"path": str(render_dir), "manifest_sha256": render_manifest_sha, "files": renders},
+        "sdi_stretch": stretch,
     }
     (OUT / "crops.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {len(cells)} crops, {len(items)} item icons, the DI streak and the SDI spark (+ In check) to {OUT}")

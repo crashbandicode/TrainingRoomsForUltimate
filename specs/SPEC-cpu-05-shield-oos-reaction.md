@@ -21,8 +21,8 @@ The practice CPU holds its shield so the player can practise pressure, with the 
 | --- | --- | --- | --- | --- |
 | Shield Toggles (Defensive) | `shield_state` | single-select | None (`NONE`), Infinite (`INFINITE`), Hold (`HOLD`), Constant (`CONSTANT`) | None |
 | Shield Tilt (Defensive) | `shield_tilt` | single-select | Direction list | none |
-| OoS Offset (Mash) | `oos_offset` | multi-select, weighted | 0 … 30 (hits) | none (= 0) |
-| Reaction Time (Mash) | `reaction_time` | multi-select, weighted | 0 … 30 frames | none (= 0) |
+| OoS Offset (Mash) | `oos_offset` | **multi-select + range** (draft 9, N3): weighted checklist or a min–max range, one at a time (SPEC-core-02 §2.8) | 0 … 30 (hits); range: any value from min to max, uniform | none (= 0) |
+| Reaction Time (Mash) | `reaction_time` | **multi-select + range** (draft 9, N3), same | 0 … 30 frames; range as above | none (= 0) |
 
 Also read: trigger "Shieldstun" in `mash_triggers` (default ticked), `mash_state`, Override row Shieldstun `shieldstun_override`.
 
@@ -100,7 +100,7 @@ The suspension is also re-evaluated for the new front action every time the mash
 
 ### Shield tilt
 
-The tilt direction is a single selection; its angle is used as is (no mirroring: Out = right, In = left; open question 2). Upstream re-reads the selection only on the reset bundle (and the fork on a lobby settings change); this spec requires the current selection to apply immediately (read live or refresh on every menu save). Empty selection → native stick.
+The tilt direction is a single selection. **Decided 2026-11-01 (B7): the opponent-relative rule shared with DI and SDI** (SPEC-cpu-02 §2): In is toward the opponent and Out away on both sides, mirrored when the player stands on the CPU's other side; Left and Right stay absolute (open question 2). Upstream re-reads the selection only on the reset bundle (and the fork on a lobby settings change). **Decided 2026-11-01 (menu question 18 A, the fork's M5o rule):** a changed Shield Tilt applies at the next CPU frame, in Training as in lobby practice, and is also re-read by the reset bundle (read live or refresh on every row change; no reset is needed). Empty selection → native stick.
 
 ### Ordering
 
@@ -147,15 +147,18 @@ Nothing is written. Settings live in the menu JSON.
 | Each OoS action: roll/spotdodge via status, jump/aerial/upB/usmash via native release, grab/usmash without drop, others with suspension | `cpu05_oos_action_table` | `cpu-05-oos-each-action` | `evidence/cpu-05/actions.md` |
 | Shieldstun override vs trigger | `cpu05_shieldstun_override` | `cpu-05-shieldstun-override-nair` | `evidence/cpu-05/mash.md` |
 | Shield tilt angle applied immediately, empty → native | `cpu05_shield_tilt` | `cpu-05-tilt-up` | `evidence/cpu-05/tilt.md` |
+| **Q18 A** A changed Shield Tilt applies at the next CPU frame with no reset (the fork's R-APPLY rows) | `cpu05_shield_tilt_applies_next_frame` | `cpu-05-tilt-change-no-reset` | `evidence/cpu-05/tilt.md` |
+| **B7** Shield Tilt In / Out are opponent-relative on both sides; Left / Right absolute | `cpu05_shield_tilt_opponent_relative` | `cpu-05-tilt-in-left-and-right` | `evidence/cpu-05/tilt.md` |
+| **N3** OoS Offset and Reaction Time ranges: a set range is picked uniformly where the checklist is picked today (OoS Offset: at each offset reset while idle or in hitstun; Reaction Time: on the first frame of each shieldstun), a checklist stays a weighted pick; exclusive; a file with no range loads as a checklist | `cpu05_oos_offset_range_pick`, `cpu05_reaction_time_range_pick`, `cpu05_delay_rows_exclusive_and_legacy_load` | `cpu-05-oos-range-1-3`, `cpu-05-reaction-range-5-15` | `evidence/cpu-05/oos.md` |
 | Per-fighter state (Ice Climbers) | `cpu05_per_fighter_state` | `cpu-05-ice-climbers` | `evidence/cpu-05/ic.md` |
 | Common-module hook guard; param-hook absent path logs once | `cpu05_guards_and_missing_provider` | `cpu-05-install-line` | `evidence/cpu-05/install.md` |
 
 ## 10. Open questions
 
-1. **Decay override with Shield None.** In upstream the override condition is satisfied whenever the decay flag is false, which with None is always; so the CPU's shield in Training never decays and regenerates instantly even with Shield Toggles = None. This spec requires None to be native. Confirm with the lead and verify on Eden that the native Training CPU's shield decays again (it is a visible behaviour change against the fork).
-2. **Shield tilt convention.** Upstream tilts by absolute angle (Out = right), unlike DI/SDI (opponent-relative). Recommendation: use the opponent-relative rule shared with SPEC-cpu-02, or reduce the row to Up/Down/Left/Right and the four diagonals; decide with the menu redesign.
+1. **Decay override with Shield None.** In upstream the override condition is satisfied whenever the decay flag is false, which with None is always; so the CPU's shield in Training never decays and regenerates instantly even with Shield Toggles = None. This spec requires None to be native. Confirm with the lead and verify on Eden that the native Training CPU's shield decays again (it is a visible behaviour change against the fork). **Decided 2026-11-01 (B8 batch): accepted.**
+2. **Shield tilt convention.** Upstream tilts by absolute angle (Out = right), unlike DI/SDI (opponent-relative). Recommendation: use the opponent-relative rule shared with SPEC-cpu-02, or reduce the row to Up/Down/Left/Right and the four diagonals; decide with the menu redesign. **Decided 2026-11-01 (B7): as recommended;** opponent-relative (the direction grid labels its chips In and Out, so they mean the same on every row).
 3. **Offset observation point.** Upstream decrements the hit counter inside the parameter-read hook (the first parameter read of the shieldstun frame). Recommendation: observe shieldstun entry in the script-continuation hook before the out-of-shield decision, which is the only consumer; the `+1` compensation can then go. Needs an Eden row proving "OoS Offset N = exactly N shielded hits".
-4. **Per-fighter state.** Upstream shares all shield state between Popo and Nana; this spec asks for per-fighter state. Confirm.
+4. **Per-fighter state.** Upstream shares all shield state between Popo and Nana; this spec asks for per-fighter state. Confirm. **Decided 2026-11-01 (B6): as recommended;** one state per fighter.
 5. **Shield mash completion** interacts with holding (SPEC-cpu-01 open question 4).
 6. **Param-hook dependency.** The damage multiplier needs `libparam_hook`'s pointer. Alternative: locate `CommonParams` through a guarded needle and drop the plugin dependency. The lead decides whether the dependency stays.
 7. **Upstream HEAD `077a8e43`** keeps the multiplier restore outside training (adopted).
