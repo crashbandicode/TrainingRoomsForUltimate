@@ -256,6 +256,17 @@ fn core06_training_gate() {
             }
         }
     }
+    // Which objects a scene visualizes: native Training every object; the waiting room's practice only Player 1 (entry 0) and the
+    // practice CPU (package 2's lobby entry), never another member of the room nor an object whose entry is unknown (an article);
+    // no practice scene, nothing.
+    use model::scene::Scene;
+    let lobby_cpu = model::cpu::role::LOBBY_CPU_ENTRY;
+    for entry in [None, Some(0), Some(1), Some(2), Some(3), Some(lobby_cpu), Some(7)] {
+        assert!(hitbox::visualizes_entry(Some(Scene::Training), entry));
+        assert!(!hitbox::visualizes_entry(None, entry));
+        assert_eq!(hitbox::visualizes_entry(Some(Scene::Lobby), entry), entry == Some(0) || entry == Some(lobby_cpu), "{entry:?}");
+    }
+    assert_eq!(hitbox::ENTRY_ID_NAME, "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID");
     // The command hooks draw only with the setting On in a practice scene.
     for enabled in [false, true] {
         for visualizes in [false, true] {

@@ -19,8 +19,7 @@
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
-use smash::app::BattleObjectModuleAccessor;
+use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::guard::GuardOutcome;
@@ -31,7 +30,7 @@ use crate::model::settings::Snapshot;
 use crate::model::sites_hitbox;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::{self, natives};
-use crate::runtime::{lobby, scene};
+use crate::runtime::scene;
 
 /// Boot: the feature's closure (its rows, the Training predicate and the rows of the natives it shares) passed its guards and its
 /// three hooks are installed. The per-frame pass does nothing before.
@@ -42,6 +41,9 @@ static SETTING: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
 static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
 static ATTRIBUTE: AtomicU32 = AtomicU32::new(0);
+/// The work id of a fighter's entry (`hitbox::ENTRY_ID_NAME`), for the lobby gate; resolved with the status ids.
+static ENTRY_WORK: AtomicI32 = AtomicI32::new(0);
+static ENTRY_WORK_READY: AtomicBool = AtomicBool::new(false);
 /// Calls of `ensure_ready` since boot: the table is asked again every 30th call until it answers.
 static TRIES: AtomicU32 = AtomicU32::new(0);
 /// The `Hash40` of `sys_shield`.
@@ -82,6 +84,10 @@ fn ensure_ready() -> bool {
         let Some(value) = (unsafe { game::lua_const(lua_bind_hash(name)) }) else { return false };
         attribute |= value as u32;
     }
+    // SAFETY: as above.
+    let Some(entry_work) = (unsafe { game::lua_const(lua_bind_hash(hitbox::ENTRY_ID_NAME)) }) else { return false };
+    ENTRY_WORK.store(entry_work, Ordering::Release);
+    ENTRY_WORK_READY.store(true, Ordering::Release);
     for (slot, value) in IDS.iter().zip(ids) {
         slot.store(value, Ordering::Release);
     }
@@ -94,14 +100,18 @@ fn status_ids() -> StatusIds {
     StatusIds::from_values(std::array::from_fn(|i| IDS[i].load(Ordering::Acquire)))
 }
 
-/// Whether the practice visualizes this object: native Training, every object; the waiting room's practice, only its practice
-/// fighters and their articles (the lobby engine's gate); every other scene (online, a hot swap) never.
+/// Whether the practice visualizes this object (`hitbox::visualizes_entry`): native Training, every object; the waiting room's
+/// practice, only its practice fighters (Player 1 and package 2's lobby CPU entry, read from the fighter's work), never an article
+/// there; every other scene (online, a hot swap) never.
 unsafe fn visualizes(accessor: usize) -> bool {
-    match scene::current() {
-        Some(Scene::Training) => true,
-        Some(Scene::Lobby) => lobby::training::practice::visualizes(accessor as *mut BattleObjectModuleAccessor),
-        None => false,
-    }
+    let scene = scene::current();
+    let entry = match scene {
+        Some(Scene::Lobby) if ENTRY_WORK_READY.load(Ordering::Acquire) && natives::is_fighter(accessor) => {
+            Some(natives::get_int(accessor, ENTRY_WORK.load(Ordering::Acquire)))
+        }
+        _ => None,
+    };
+    hitbox::visualizes_entry(scene, entry)
 }
 
 fn book_set(accessor: usize, slept: bool) {

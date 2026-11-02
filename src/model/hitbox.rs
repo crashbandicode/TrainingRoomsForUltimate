@@ -401,6 +401,21 @@ pub fn kill_on_rebound(rebound: bool, visualizes: bool, enabled: bool, shielding
     !rebound && visualizes && enabled && !shielding
 }
 
+/// Which fighters the practice visualizes: in native Training every one; in the waiting room's lobby practice only the practice
+/// fighters, Player 1 (entry 0) and the practice CPU (package 2's `LOBBY_CPU_ENTRY`), never the opponents in the room; in any other
+/// scene (online, a hot swap) none. `entry` is `None` for an object whose entry is unknown (an article in the lobby: not drawn).
+pub fn visualizes_entry(scene: Option<super::scene::Scene>, entry: Option<i32>) -> bool {
+    use super::scene::Scene;
+    match scene {
+        Some(Scene::Training) => true,
+        Some(Scene::Lobby) => matches!(entry, Some(e) if e == 0 || e == super::cpu::role::LOBBY_CPU_ENTRY),
+        None => false,
+    }
+}
+
+/// The work id the lobby gate reads a command's object's entry with (resolved through the constant table).
+pub const ENTRY_ID_NAME: &str = "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID";
+
 /// Whether the animation commands draw the shape they create: the setting is On and the object is one the practice visualizes.
 pub fn draw_on_command(enabled: bool, visualizes: bool) -> bool {
     enabled && visualizes
