@@ -72,6 +72,12 @@ const REROLL_IDS: [(&str, u8); 4] = [
     ("throw_state", reroll::THROW_OPTIONS),
 ];
 
+/// The re-roll bits that replacing the whole settings `old` by `new` makes (the menu sets them one row at a
+/// time in `put`; the diag build's settings reload replaces a whole snapshot, so it asks this).
+pub fn rerolls_between(old: &settings::Snapshot, new: &settings::Snapshot) -> u8 {
+    REROLL_IDS.iter().filter(|(id, _)| old.get(id) != new.get(id)).fold(0, |bits, (_, bit)| bits | bit)
+}
+
 /// What the menu asks the runtime to do. Taken with `Menu::take_outbox`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Outbox {

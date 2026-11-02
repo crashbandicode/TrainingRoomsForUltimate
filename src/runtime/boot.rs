@@ -73,6 +73,8 @@ pub fn run() {
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);
     published::publish(&loaded.menu, 0);
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_reload::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
     let mut found = [GuardOutcome::Stock; SITE_COUNT];

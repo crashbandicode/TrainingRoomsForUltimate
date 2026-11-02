@@ -17,6 +17,8 @@ static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 /// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
 /// B11); the first publish at boot has none.
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_reload::remember(snapshot);
     crate::runtime::features::cpu::publish(snapshot, rerolls);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
