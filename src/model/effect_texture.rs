@@ -475,15 +475,9 @@ pub fn tint_rgba(c: &EmitterColours) -> [u8; 4] {
 
 /// A byte image of the game's memory for tests and for the walk's own checks: regions of bytes at fixed addresses.
 #[cfg(test)]
+#[derive(Default)]
 pub struct Image {
     regions: Vec<(usize, Vec<u8>)>,
-}
-
-#[cfg(test)]
-impl Default for Image {
-    fn default() -> Image {
-        Image { regions: Vec::new() }
-    }
 }
 
 #[cfg(test)]
