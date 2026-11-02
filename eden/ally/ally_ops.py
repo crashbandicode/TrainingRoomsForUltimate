@@ -1,4 +1,5 @@
-"""Surface-side client of the Ally adapter (`wa_s5.py` on the Ally): send a list of ops, print the replies, fetch files.
+"""Surface-side client of the Ally adapter (`wa_s2.py` / `wa_s5.py` on the Ally, by the phase's label): send a list of ops, print the
+replies, fetch files. The rig and the stream's folder on it come from `ally_conf` (the lent rig by default).
 
     ally_ops.py ops <phase> '<json list of ops>' [timeout_s]
     ally_ops.py ops <phase> @file.json [timeout_s]
@@ -14,12 +15,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ally_conf as conf
+
 SSH = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "UserKnownHostsFile=/tmp/opencode/ally-known-hosts",
        "-i", "/home/intpa/.ssh/id_rsa"]
-HOST = "intpa@dreamland-ally"
-ROOT = "C:/Eden/trainingrooms-pkg5"
-PYTHON = r"C:\Program Files\Python312\python.exe"
-WA = r"C:\Eden\trainingrooms-pkg5\wa_s5.py"
+HOST = conf.HOST
+ROOT = conf.ROOT
+PYTHON = conf.PYTHON
 
 
 def ps(snippet, timeout=120):
@@ -31,7 +34,7 @@ def ps(snippet, timeout=120):
 
 def ops(phase, items, timeout=300):
     b64 = base64.b64encode(json.dumps(items).encode()).decode()
-    return ps(f"& '{PYTHON}' '{WA}' ops {phase} {b64}", timeout)
+    return ps(f"& '{PYTHON}' '{conf.adapter(conf.stream(phase))}' ops {phase} {b64}", timeout)
 
 
 def get(phase, rel, dest="."):

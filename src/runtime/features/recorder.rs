@@ -23,7 +23,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::chords::Request;
@@ -56,7 +56,6 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 pub fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Release);
 }
-static SETTINGS: Mutex<RecorderSettings> = Mutex::new(RecorderSettings::factory());
 static RNG: Mutex<Rng> = Mutex::new(Rng::new(0x5EED));
 
 // The constants the recorder needs, taken from the CPU runtime's table once it exists.
@@ -160,14 +159,14 @@ pub fn init(seed: u64) {
 }
 
 /// The recorder rows as the last publish left them (the named layer reads Recording Trigger and Save State Playback).
+/// Read wait-free from `published::Live` (stream/sync); the factory rows before the first publish.
 pub fn settings() -> RecorderSettings {
-    *SETTINGS.lock()
+    crate::runtime::published::live().map_or(RecorderSettings::factory(), |live| live.recorder)
 }
 
-/// A menu commit or the first publish.
-pub fn publish(snapshot: &Snapshot) {
-    *SETTINGS.lock() = RecorderSettings::from_snapshot(snapshot);
-    // Macro Source = Named Library: the layer's frame buffers are reserved here (the committing thread), never in a hook.
+/// A menu commit or the first publish (the publishing thread, never a hook): Macro Source = Named Library reserves the layer's
+/// frame buffers here. The recorder rows themselves reach the hooks through `published::Live`.
+pub fn prepare_named_buffers(snapshot: &Snapshot) {
     if snapshot.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0)) {
         named_macros::prepare_buffers();
     }
@@ -311,7 +310,7 @@ unsafe fn on_ai_frame(ai: usize) {
         return;
     }
     bump(COUNT_AI_FRAME);
-    let settings = *SETTINGS.lock();
+    let settings = settings();
     let key = FighterKey::new(body.entry_id, false);
     let facing = facing_of(natives::lr(body.accessor));
     let kind = ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read();
@@ -353,7 +352,7 @@ unsafe fn on_ai_frame(ai: usize) {
             && game::natives::status_kind(body.accessor) == STATUS_CLIFF_WAIT.load(Ordering::Acquire)
             && natives::get_int(body.accessor, rest) < crate::model::recording::CLIFF_REST_TIMER_LOW
         {
-            natives::set_int(body.accessor, rest, crate::model::recording::CLIFF_REST_TIMER);
+            natives::set_int(body.accessor, crate::model::recording::CLIFF_REST_TIMER, rest);
         }
     }
 
@@ -553,7 +552,7 @@ fn finish_named_capture() {
         LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
         notices::post_phase(Phase::Idle, 0);
         event("named_capture_stop", "frames", i64::from(frames), "", 0);
-        named_macros::finish_capture(SETTINGS.lock().crop);
+        named_macros::finish_capture(settings().crop);
     }
 }
 
@@ -639,7 +638,7 @@ pub fn on_state_restored(saved_on_ledge: bool) {
         unsafe { named_macros::service_restore() };
         return;
     }
-    let settings = *SETTINGS.lock();
+    let settings = settings();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
     event(
         "state_restored",
@@ -686,7 +685,7 @@ pub fn replay_capture_loading() -> bool {
 /// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
 /// recording in progress is not touched.
 pub fn interrupt_playback() {
-    let settings = *SETTINGS.lock();
+    let settings = settings();
     let (stopped, state) = {
         let mut rec = REC.lock();
         let stopped = rec.interrupt_on_mash(&settings);

@@ -7,7 +7,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use parking_lot::{Mutex, MutexGuard};
+use hos_lock::{Mutex, MutexGuard};
 
 use crate::runtime::ui::menu_app::App;
 

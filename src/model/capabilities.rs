@@ -55,7 +55,7 @@ pub const fn unit_of(feature: Feature) -> Feature {
 }
 
 const fn is_cpu_unit(unit: Feature) -> bool {
-    matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon)
+    matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera)
 }
 
 /// The rows a *call* of the function at `offset` relies on. A called or relied-on row says the bytes are the

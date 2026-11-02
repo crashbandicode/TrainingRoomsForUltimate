@@ -29,14 +29,6 @@ pub struct Vector3f {
     pub z: f32,
 }
 
-pub unsafe fn pos_y(accessor: usize) -> f32 {
-    at::<extern "C" fn(usize) -> f32>(s::STATE_POS_Y_OFFSET).map_or_else(Default::default, |f| f(accessor))
-}
-
-pub unsafe fn lr(accessor: usize) -> f32 {
-    at::<extern "C" fn(usize) -> f32>(s::STATE_LR_OFFSET).map_or_else(Default::default, |f| f(accessor))
-}
-
 pub unsafe fn set_lr(accessor: usize, lr: f32) {
     at::<extern "C" fn(usize, f32)>(s::STATE_SET_LR_OFFSET).map_or_else(Default::default, |f| f(accessor, lr))
 }
@@ -142,14 +134,6 @@ pub unsafe fn item_remove(manager: usize, object_id: u32) {
     at::<extern "C" fn(usize, u32)>(s::STATE_ITEM_REMOVE_OFFSET).map_or_else(Default::default, |f| f(manager, object_id))
 }
 
-pub unsafe fn work_get_int(accessor: usize, id: i32) -> i32 {
-    at::<extern "C" fn(usize, i32) -> i32>(s::STATE_WORK_GET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
-}
-
-pub unsafe fn work_set_int(accessor: usize, value: i32, id: i32) {
-    at::<extern "C" fn(usize, i32, i32)>(s::STATE_WORK_SET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
-}
-
 pub unsafe fn work_on_flag(accessor: usize, id: i32) {
     at::<extern "C" fn(usize, i32)>(s::STATE_WORK_ON_FLAG_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
 }
@@ -161,10 +145,6 @@ pub unsafe fn work_off_flag(accessor: usize, id: i32) {
 /// `StatusModule::change_status_request(accessor, status, false)`: the placement handshake.
 pub unsafe fn status_request(accessor: usize, status: i32) {
     at::<extern "C" fn(usize, i32, bool)>(s::STATE_STATUS_REQUEST_OFFSET).map_or_else(Default::default, |f| f(accessor, status, false))
-}
-
-pub unsafe fn stage_id() -> i32 {
-    at::<extern "C" fn() -> i32>(s::STATE_STAGE_ID_OFFSET).map_or_else(Default::default, |f| f())
 }
 
 /// The ItemManager singleton, read through the slot `manager_slot_offset` recomputed from the guarded
@@ -186,13 +166,6 @@ pub unsafe fn effect_req_common(accessor: usize, effect: u64) {
 pub unsafe fn effect_req_follow(accessor: usize, effect: u64, joint: u64, pos: &Vector3f, rot: &Vector3f, attribute: u32, lifetime: i32) -> u64 {
     type ReqFollow = extern "C" fn(usize, u64, u64, *const Vector3f, *const Vector3f, f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u64;
     at::<ReqFollow>(s::STATE_EFFECT_REQ_FOLLOW_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0, 0, false, false))
-}
-
-/// `EffectModule::req(accessor, effect, pos, rot, 1.0, 0, -1, false, 0)`: Min Min's arm effect.
-pub unsafe fn effect_req(accessor: usize, effect: u64) -> u64 {
-    type Req = extern "C" fn(usize, u64, *const Vector3f, *const Vector3f, f32, u32, i32, bool, i32) -> u64;
-    let zero = Vector3f { x: 0.0, y: 0.0, z: 0.0 };
-    at::<Req>(s::STATE_EFFECT_REQ_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, &zero, &zero, 1.0, 0, -1, false, 0))
 }
 
 pub unsafe fn effect_kill(accessor: usize, handle: u32) {
@@ -226,9 +199,10 @@ pub unsafe fn jack_add_rebel(accessor: usize, entry: i32, amount: f32) {
     at::<extern "C" fn(usize, i32, f32)>(s::STATE_JACK_ADD_REBEL_OFFSET).map_or_else(Default::default, |f| f(accessor, entry, amount))
 }
 
-/// The game's add-limit routine `(limit, fighter object, 0)`.
-pub unsafe fn cloud_add_limit(fighter: usize, limit: f32) {
-    at::<extern "C" fn(f32, usize, i32)>(s::STATE_CLOUD_ADD_LIMIT_OFFSET).map_or_else(Default::default, |f| f(limit, fighter, 0))
+/// The game's add-limit routine `(limit, module accessor, 0)`. Its first instruction reads the work module
+/// at `accessor + 0x50` (a fighter object there is a null work module: Eden s3-03 jumped to address 4).
+pub unsafe fn cloud_add_limit(accessor: usize, limit: f32) {
+    at::<extern "C" fn(f32, usize, i32)>(s::STATE_CLOUD_ADD_LIMIT_OFFSET).map_or_else(Default::default, |f| f(limit, accessor, 0))
 }
 
 pub unsafe fn visibility_set_status_default(accessor: usize, a: u64, b: u64) {
@@ -243,12 +217,6 @@ pub unsafe fn visibility_set(accessor: usize, a: u64, b: u64) {
 pub unsafe fn motion_add_partial_dragon(accessor: usize, part: i32, motion: u64) {
     type Partial = extern "C" fn(usize, i32, u64, f32, f32, bool, bool, f32, bool, bool, bool);
     at::<Partial>(s::STATE_MOTION_ADD_PARTIAL_OFFSET).map_or_else(Default::default, |f| f(accessor, part, motion, 0.0, 1.0, false, false, 0.0, true, true, false))
-}
-
-/// `StatusModule::change_status_force(accessor, status, block)` (the CPU core's native always passes
-/// `true`; the buffs need `false` for Wii Fit).
-pub unsafe fn status_force(accessor: usize, status: i32, block: bool) {
-    at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_pkg2::CHANGE_STATUS_FORCE_OFFSET).map_or_else(Default::default, |f| f(accessor, status, block))
 }
 
 /// `WorkModule::get_param_int(accessor, kind, name)` through the save states' hook (a pass-through for
