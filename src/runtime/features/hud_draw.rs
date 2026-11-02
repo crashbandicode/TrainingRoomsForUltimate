@@ -48,6 +48,8 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     }
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if SEEN_REGISTRATIONS.swap(registrations, Ordering::AcqRel) != registrations {
+        #[cfg(feature = "diag")]
+        diagnostic(format_args!("[TrainingRooms] hud_draw layout registrations={registrations}"));
         notices::on_layout_registered();
         input_display::on_layout_registered();
     }
@@ -59,6 +61,12 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     write_notice(root, &notices::hud_tick());
     let plan = input_display::hud_tick(menu_open);
     if !plan.is_empty() {
+        #[cfg(feature = "diag")]
+        {
+            let rows = plan.ops().iter().filter(|op| matches!(op, Op::Row { .. })).count();
+            let icons = plan.ops().iter().filter(|op| matches!(op, Op::Icons { .. })).count();
+            diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));
+        }
         write_plan(root, &plan);
     }
 }

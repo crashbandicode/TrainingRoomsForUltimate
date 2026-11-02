@@ -443,6 +443,17 @@ pub fn request_playback(start: PlaybackStart) {
 pub fn on_state_restored(saved_on_ledge: bool) {
     let settings = *SETTINGS.lock();
     let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
+    event(
+        "state_restored",
+        "ledge",
+        i64::from(saved_on_ledge),
+        "action",
+        match action {
+            LoadAction::None => 0,
+            LoadAction::Record => 1,
+            LoadAction::Play(slot) => 2 + i64::from(slot),
+        },
+    );
     // SAFETY: the fighters were just restored.
     unsafe {
         let Some(body) = cpu_body() else { return };
@@ -486,6 +497,8 @@ pub fn interrupt_playback() {
 /// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset
 /// (decision B8), the named layer.
 pub fn stop() {
+    let mode = REC.lock().mode();
+    event("recorder_stop", "mode", mode as i64, "", 0);
     REC.lock().stop();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     notices::post_phase(Phase::Idle, 0);

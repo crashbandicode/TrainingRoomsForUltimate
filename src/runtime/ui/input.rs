@@ -1,6 +1,6 @@
 //! Player 1's input for the menu (SPEC-core-03 §3): once per P1 poll of the game's final input mapping,
 //! the hook hands this module the controller holder the call was given. The holder's record carries the
-//! raw buttons (`current_buttons` at +0x8) and the controller style (+0x60). The adapter (`model::ui::
+//! raw buttons (`current_buttons` at +0x8) and the controller style (+0x9c, the field the game's own mapping reads at `main+0x1750e0c`: `ldr w2, [x20, #0x9c]` after `ldr x20, [x3, #0x10]`; the same `Controller` package 4's chords read, `chords::field`). The adapter (`model::ui::
 //! adapter`) turns them into the open chord and logical presses, which go to the menu worker through a
 //! lock-free ring; while the menu is open or closing the `Owners::MENU` bit empties P1's mapped output
 //! (the delay stage of `features::input_delay` already neutralises a poll whose owners are set).
@@ -32,8 +32,8 @@ unsafe fn read_record(holder: usize) -> Option<(u32, Style)> {
     if record == 0 || record % 4 != 0 {
         return None;
     }
-    let buttons = *((record + 0x8) as *const u32);
-    let style = *((record + 0x60) as *const u32);
+    let buttons = *((record + crate::model::chords::field::CURRENT_BUTTONS) as *const u32);
+    let style = *((record + crate::model::chords::field::STYLE) as *const u32);
     Some((buttons, Style::from_raw(style)))
 }
 
