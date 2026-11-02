@@ -292,6 +292,48 @@ def r_popo_path():
     row("Solo Popo: the load took the no-Nana path (nana_removed=true)", any("nana_removed=true" in x for x in lines), lines[-3:])
 
 
+def r_reload_alive():
+    """A diag settings reload, then the log must keep going (stack st-11 went silent after one)."""
+    m, line = reload({"cycle_preload_slots": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0]}, "reload liveness")
+    time.sleep(12)
+    later = [x for x in after(m) if "hook_stats" in x or "hook_counts" in x]
+    row("diag settings reload: the log keeps going afterwards", line is not None and len(later) >= 1, f"{line} | {len(later)} periodic lines after")
+
+
+def r_record():
+    """P1 moves, the record chord (ZR + D-pad Down) records a slot, the playback chord (ZR + D-pad Up) plays it."""
+    m = mark()
+    tap("zr,down", wait=0.1)
+    time.sleep(0.8)
+    rt.stick(LABEL, 1, 0, 600)
+    tap("a", hold=200, wait=0.2)
+    rec = wait_for(m, "recording_complete", 25)
+    row("recording: a slot is recorded", rec is not None, rec)
+    m = mark()
+    tap("zr,up", wait=0.15)
+    start = wait_for(m, "playback_shortcut", 10)
+    time.sleep(1.5)
+    shot("playback")
+    row("recording: the playback chord plays it", start is not None, start)
+
+
+def r_menu_cycles():
+    """Last rows of a boot (known menu-close hang class): open and close the TrainingRooms menu three times (Minus, then B)."""
+    results = []
+    for i in range(3):
+        m = mark()
+        tap("minus", wait=1.5)
+        opened = wait_for(m, "[Ui] menu opened", 8)
+        m = mark()
+        tap("b", wait=2.0)
+        closed = wait_for(m, "[Ui] menu closed", 8)
+        time.sleep(2)
+        alive = wait_for(m, "hook_stats", 15)
+        results.append((opened is not None, closed is not None, alive is not None))
+    shot("after-menu-cycles")
+    row("menu open/close x3, the game keeps running after each close", all(all(r) for r in results), results)
+
+
 def r_pt():
     m, queued, done = cycle(0, cap=60)
     shot("swap-pt")
@@ -317,7 +359,7 @@ def r_r5():
 
 
 ROWS = {"install": r_install, "itemtable": r_itemtable, "item": r_item, "preload": r_preload, "swap": r_swap, "kirby": r_kirby,
-        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
+        "ic": r_ic, "solo": r_solo, "solo2": r_solo2, "pause": r_pause, "reloadalive": r_reload_alive, "record": r_record, "menu": r_menu_cycles, "lease": r_lease, "r5split": r_r5_split, "popo": r_popo_path, "pt": r_pt, "mii": r_mii, "cpu": r_cpu, "r5": r_r5}
 
 
 def main():
