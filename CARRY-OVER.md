@@ -325,7 +325,6 @@ UI portrait admission correction after ui-13: the existing enforcing character_r
 
 ### UI item picture assets (2026-11-02)
 38 PNGs and sources.json, identity-copied from frozen m5q scripts/item-icons/assets, all ours-new verified before reading. Full digests/transforms: docs/provenance/ui-item-assets.json; generated ledger: docs/provenance/ui-item-assets-ledger.md. tools/carry_ui_items.py verifies binary files (the existing Rust carry tools rewrite UTF-8 text). No fork/stage mutation. The pinned MIT layout builder appends item textures/materials to both Training and waiting archives; stage/fighter pictures still load at runtime. Runtime/recipe gates pending in stream progress.
-
 ## Lead exact-Mii state capture, 2026-11-02
 Clean-room runtime/features/states.rs now passes a Copy Configuration from the
 existing settled role accessor to the writer, which serializes it off-hook.

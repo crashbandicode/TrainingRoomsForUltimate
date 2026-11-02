@@ -93,7 +93,7 @@ fn apply() {
         let controller = pending.controller(&NativeTls);
         // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
         if unsafe { crate::runtime::features::states::on_quick_reset_input(controller, out as *mut MappedInputs) } {
-            pending.take_controller(&NativeTls);
+            pending.set_controller(&NativeTls, 0);
             return;
         }
         unsafe { crate::runtime::roster::handle_p1_input(out as *mut MappedInputs, controller) };

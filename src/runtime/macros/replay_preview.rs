@@ -55,6 +55,7 @@ fn discard_requests() { let _ = take_request(); }
 
 static SESSION: hos_lock::Mutex<Option<Session>> = hos_lock::Mutex::new(None);
 static STATUS: AtomicU8 = AtomicU8::new(0);
+static RETIREMENT: crate::model::macro_handoff::PreviewRetirement = crate::model::macro_handoff::PreviewRetirement::new();
 
 pub fn request_play(recording: MacroRecording, revision: u64) {
     if let Err(error) = recording.validate() {
@@ -67,11 +68,17 @@ pub fn request_play(recording: MacroRecording, revision: u64) {
     post_request(Request::Play { start: recording.start, playback, revision });
 }
 
+/// Worker close intent is independent of the last published focus snapshot.
+pub fn request_close() {
+    RETIREMENT.request_close();
+    request_stop();
+}
+
 pub fn request_stop() {
-    if occupied() {
-        if !STOP_QUEUED.swap(true, Ordering::AcqRel) { post_request(Request::Stop); }
-    } else {
-        save_states::finish_preview_restore();
+    if let Some(keep) = RETIREMENT.stop(occupied()) {
+        save_states::finish_preview_restore(keep);
+    } else if !STOP_QUEUED.swap(true, Ordering::AcqRel) {
+        post_request(Request::Stop);
     }
 }
 
@@ -111,6 +118,7 @@ pub fn needs_native_update(_module: &BattleObjectModuleAccessor) -> bool { occup
 
 pub fn clear_session() {
     discard_requests();
+    RETIREMENT.clear();
     SESSION.lock().take();
     ACTIVE.store(false, Ordering::Release);
     save_states::end_preview_restore();
@@ -212,7 +220,10 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
             if let Err(error) = save_states::request_preview_restore(false) { fail(error); }
             else { println!("[ClipPreview] restore_stop"); }
         }
-        Some(Request::Stop) => STATUS.store(0, Ordering::Relaxed),
+        Some(Request::Stop) => {
+            save_states::finish_preview_restore(RETIREMENT.finish());
+            STATUS.store(0, Ordering::Relaxed);
+        },
         None => {}
     }
 }
@@ -258,7 +269,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
             discard_requests();
             SESSION.lock().take();
     ACTIVE.store(false, Ordering::Release);
-            save_states::finish_preview_restore();
+            save_states::finish_preview_restore(RETIREMENT.finish());
             STATUS.store(0, Ordering::Relaxed);
             println!("[ClipPreview] restored_idle");
         }

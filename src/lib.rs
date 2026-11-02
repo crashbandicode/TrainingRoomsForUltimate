@@ -14,6 +14,10 @@ pub mod editors;
 // The install line's worst-case length (model site tables + the carried seam table): the runtime's buffer size and its host test.
 pub mod install_capacity;
 
+#[cfg(test)]
+#[path = "../tests/common/preload_allocations.rs"]
+mod preload_allocation_tests;
+
 #[cfg(target_os = "switch")]
 mod runtime;
 

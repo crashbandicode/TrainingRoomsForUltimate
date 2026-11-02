@@ -120,7 +120,7 @@ pub unsafe fn service(entry: *mut u8, owner: u32) -> bool {
             trace!("[BodyBankProbe] refused: start native Training as Mario; fixture [Mario,Link,Samus]");
             return false;
         }
-        if super::STATES.iter().any(|s| { let s=s.lock().unwrap(); s.active.is_some() || s.pending.is_some() }) {
+        if super::STATES.iter().any(|s| { let s=s.lock(); s.active.is_some() || s.pending.is_some() }) {
             return false;
         }
         let Some(resource) = native_source::resource_owner(0) else { return false; };

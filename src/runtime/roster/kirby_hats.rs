@@ -1,7 +1,7 @@
 //! Shortcut-driven copy abilities. No game pointer is retained between callbacks.
 
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 
 use smash::app::{self, lua_bind::*};
 use smash::lib::lua_const::*;
@@ -64,7 +64,7 @@ static PENDING_ROLES: AtomicU8 = AtomicU8::new(0);
 
 #[cfg(feature = "source-capacity-probe")]
 pub(crate) fn capacity_probe_idle() -> bool {
-    STATES.iter().all(|state| state.lock().unwrap().pending.is_none())
+    STATES.iter().all(|state| state.lock().pending.is_none())
         && PENDING_ROLES.load(Ordering::Acquire) == 0
 }
 
@@ -125,7 +125,7 @@ pub(crate) fn preload_pending() -> bool { PENDING_ROLES.load(Ordering::Acquire)!
 pub(crate) unsafe fn preload_targets(menu: &crate::engine::compat::menu::TrainingModpackMenu,
     role: usize) -> [Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     let Some(body)=role_body(role) else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];};
-    let mut cycle={let state=STATES[role].lock().unwrap();
+    let mut cycle={let state=STATES[role].lock();
         if state.pending.is_some() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];} state.cycle};
     let choices=menu.ordered_kirby_hat_kinds_fixed(if role==0 {
         crate::engine::swap::roster_grid::Role::Player
@@ -159,7 +159,7 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
         .buttons
         .intersects(Buttons::SPECIAL | Buttons::SPECIAL_RAW | Buttons::SPECIAL_RAW2);
     let neutral = out.lstick_x.unsigned_abs() < 20 && out.lstick_y.unsigned_abs() < 20;
-    let mut shortcut = latch.lock().unwrap();
+    let mut shortcut = latch.lock();
     let mut bodies = [None; 2];
     if shortcut.would_request(special, neutral, left_click, right_click) && permitted() {
         let role = usize::from(right_click);
@@ -192,7 +192,7 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
     } else {
         crate::engine::swap::roster_grid::Role::Cpu
     });
-    let mut state = STATES[role].lock().unwrap();
+    let mut state = STATES[role].lock();
     if state.pending.is_some() {
         return;
     }
@@ -244,7 +244,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     // this role's memory. Never restore onto the temporary character-select body.
     let settled = waiting && common::is_ready_go()
         && crate::runtime::roster::character_roster::waiting_choice_settled(role);
-    let mut state = STATES[role].lock().unwrap();
+    let mut state = STATES[role].lock();
     if state.pending.is_none() && settled {
         if state.continuation.pending() {
             if !permitted() { return; }
@@ -336,7 +336,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             drop(state);
             // No state mutex is held across native cleanup or its listeners.
             if let Err(reason) = sources::clear_hat_for_switch(body) {
-                clear_pending(role, &mut STATES[role].lock().unwrap());
+                clear_pending(role, &mut STATES[role].lock());
                 #[cfg(feature = "source-capacity-probe")]
                 observe_pending(role, pending, "error", reason);
                 notice(role, reason.into());
@@ -405,7 +405,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 
 pub fn cancel_pending() {
     for (role, state) in STATES.iter().enumerate() {
-        let mut state = state.lock().unwrap();
+        let mut state = state.lock();
         #[cfg(feature = "source-capacity-probe")]
         let pending = state.pending;
         clear_pending(role, &mut state);
@@ -419,7 +419,7 @@ pub fn cancel_pending() {
 
 fn invalidate_runtime(same_lobby: Option<bool>) {
     for (role, state) in STATES.iter().enumerate() {
-        let mut state = state.lock().unwrap();
+        let mut state = state.lock();
         #[cfg(feature = "source-capacity-probe")]
         let pending = state.pending;
         state.pending = None;
@@ -435,8 +435,8 @@ fn invalidate_runtime(same_lobby: Option<bool>) {
         #[cfg(not(feature = "source-capacity-probe"))]
         let _ = role;
     }
-    *SHORTCUT.lock().unwrap() = ShortcutLatch::default();
-    *OPERATOR_SHORTCUT.lock().unwrap() = ShortcutLatch::default();
+    *SHORTCUT.lock() = ShortcutLatch::default();
+    *OPERATOR_SHORTCUT.lock() = ShortcutLatch::default();
     PENDING_ROLES.store(0, Ordering::Release);
 }
 
@@ -456,7 +456,7 @@ pub fn fresh_lobby() { invalidate_runtime(Some(false)); }
 /// An accepted swap away from Kirby must not restore an obsolete hat later.
 pub fn fighter_committed(role: usize, kind: u32) {
     if kind == 6 { return; }
-    let mut state = STATES[role].lock().unwrap();
+    let mut state = STATES[role].lock();
     state.continuation.clear();
     state.cycle = HatCycle::new();
 }
@@ -466,7 +466,7 @@ pub fn fighter_committed(role: usize, kind: u32) {
 pub unsafe fn restore(body: *mut app::BattleObjectModuleAccessor, kind: u32) {
     let role = if role_body(0) == Some(body) { 0 }
         else if role_body(1) == Some(body) { 1 } else { return; };
-    let mut state = STATES[role].lock().unwrap();
+    let mut state = STATES[role].lock();
     #[cfg(feature = "source-capacity-probe")]
     let superseded = state.pending;
     clear_pending(role, &mut state);

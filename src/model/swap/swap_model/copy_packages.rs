@@ -31,12 +31,37 @@
 //! registration only once G68 reports ready.
 
 use super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};
-use super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};
+use super::request_bit::{acquired_keys, acquired_keys_iter, completion_members_iter, copy_key, released_keys};
 use std::collections::BTreeMap;
+use crate::engine::compat::fixed::FixedList;
+use crate::engine::swap::body_bank::{MAX_EXTRA_GROUPS, NATIVE_MEMBERS};
+
+/// The attached window plus the bank's physical groups; each has at most three
+/// completion members. This bounds native holdings, not the generic model API.
+pub type PackageSets = FixedList<[u32; NATIVE_MEMBERS], { MAX_EXTRA_GROUPS + 1 }>;
+pub const MAX_HOLDINGS: usize = (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS;
+pub type Holdings = FixedList<Acquisition, MAX_HOLDINGS>;
+
+pub const fn empty_holdings() -> Holdings {
+    Holdings::new(Acquisition { set: [NO_KIND; SUBS], member: NO_KIND, costume: 0,
+        roster: [super::copy_registry::Record::DEFAULT; ENTRIES] })
+}
+
+pub struct BoundedSync {
+    pub acquire: Holdings,
+    pub release: FixedList<usize, MAX_HOLDINGS>,
+}
+
+pub fn sync_bounded(held: &Holdings, wanted: &Holdings) -> BoundedSync {
+    let mut plan = BoundedSync { acquire: empty_holdings(), release: FixedList::new(0) };
+    sync_changes(held.iter().copied(), wanted.iter().copied(),
+        |value| assert!(plan.acquire.push(value)), |index| assert!(plan.release.push(index)));
+    plan
+}
 
 /// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is
 /// `0x17f0290(G68, roster, member, costume)` with the same values.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Acquisition {
     pub set: [u32; SUBS],
     pub member: u32,
@@ -60,13 +85,16 @@ pub fn roster_for(roster: &Roster, owner: u32, set: [u32; SUBS]) -> Roster {
 /// What registering `set` takes: one acquisition per completion member that takes any key, with the
 /// costume the selector gives over the set's primary (`R+0x64` = `costume`).
 pub fn acquisitions(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32) -> Vec<Acquisition> {
-    if set[0] == NO_KIND { return Vec::new(); }
+    acquisitions_iter(roster, owner, set, costume, region).collect()
+}
+
+pub fn acquisitions_iter(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32)
+    -> impl Iterator<Item = Acquisition> + Clone {
     let roster = roster_for(roster, owner, set);
     let costume = registry_costume(set[0], costume, region);
-    completion_members(set).into_iter()
-        .map(|member| Acquisition { set, member, costume, roster })
-        .filter(|a| !a.keys().is_empty())
-        .collect()
+    completion_members_iter(set).filter(move |_| set[0] != NO_KIND)
+        .map(move |member| Acquisition { set, member, costume, roster })
+        .filter(|a| acquired_keys_iter(&a.roster, a.member, a.costume).next().is_some())
 }
 
 /// The packages the registrations of `set`'s bodies need: `copy_key(kind, costume)` of every tuple
@@ -105,17 +133,33 @@ pub struct Sync {
 }
 
 pub fn sync(held: &[Acquisition], wanted: &[Acquisition]) -> Sync {
-    let mut unmatched: Vec<Option<&Acquisition>> = held.iter().map(Some).collect();
+    sync_iter(held.iter().copied(), wanted.iter().copied())
+}
+
+/// Match occurrences, not just membership: duplicate sets retain their native reference counts.
+/// Rescanning borrowed/value iterators avoids a scratch allocation on every unchanged native tick.
+pub fn sync_iter(held: impl Iterator<Item = Acquisition> + Clone,
+    wanted: impl Iterator<Item = Acquisition> + Clone) -> Sync {
     let mut acquire = Vec::new();
-    for want in wanted {
-        match unmatched.iter().position(|h| *h == Some(want)) {
-            Some(i) => unmatched[i] = None,
-            None => acquire.push(want.clone()),
+    let mut release = Vec::new();
+    sync_changes(held, wanted, |value| acquire.push(value), |index| release.push(index));
+    Sync { acquire, release }
+}
+
+fn sync_changes(held: impl Iterator<Item = Acquisition> + Clone,
+    wanted: impl Iterator<Item = Acquisition> + Clone,
+    mut acquire: impl FnMut(Acquisition), mut release: impl FnMut(usize)) {
+    for (i, want) in wanted.clone().enumerate() {
+        let occurrence = wanted.clone().take(i).filter(|other| *other == want).count();
+        if occurrence >= held.clone().filter(|other| *other == want).count() {
+            acquire(want);
         }
     }
-    let mut release: Vec<usize> = unmatched.iter().enumerate().filter(|(_, h)| h.is_some()).map(|(i, _)| i).collect();
-    release.reverse();
-    Sync { acquire, release }
+    for i in (0..held.clone().count()).rev() {
+        let have = held.clone().nth(i).expect("repeatable holdings iterator");
+        let occurrence = held.clone().take(i).filter(|other| *other == have).count();
+        if occurrence >= wanted.clone().filter(|other| *other == have).count() { release(i); }
+    }
 }
 
 /// The key multiset `held` keeps referenced in G68.
@@ -125,6 +169,22 @@ pub fn referenced(held: &[Acquisition]) -> BTreeMap<u32, u32> {
         for key in acquisition.keys() { *refs.entry(key).or_insert(0) += 1; }
     }
     refs
+}
+
+/// Sorted unique keys for diagnostics, without building the reference-count map.
+/// Holdings remain unchanged while the caller formats this borrowed/value view.
+pub fn referenced_keys(held: impl Iterator<Item = Acquisition> + Clone) -> impl Iterator<Item = u32> + Clone {
+    let mut previous = None;
+    std::iter::from_fn(move || {
+        let mut next = None;
+        for acquisition in held.clone() {
+            for key in acquired_keys_iter(&acquisition.roster, acquisition.member, acquisition.costume) {
+                if previous.is_none_or(|old| key > old) && next.is_none_or(|old| key < old) { next = Some(key); }
+            }
+        }
+        if let Some(key) = next { previous = Some(key); }
+        next
+    })
 }
 
 /// One record of a native-layout roster buffer (`R+0xb0` layout, 8 × 0x80): `rec+0x8` entry,

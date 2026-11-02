@@ -4,6 +4,14 @@
 
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
+/// Format a repeatable iterator as a debug list without collecting its items.
+pub struct DebugIter<I>(pub I);
+impl<I: Iterator + Clone> std::fmt::Debug for DebugIter<I> where I::Item: std::fmt::Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.0.clone()).finish()
+    }
+}
+
 /// Up to `N` copies of `T`.
 #[derive(Clone, Copy, Debug)]
 pub struct FixedVec<T: Copy, const N: usize> {
@@ -81,6 +89,22 @@ impl<T: Copy, const N: usize> FixedList<T, N> {
         self.len += 1;
         true
     }
+
+    pub fn pop(&mut self) -> Option<T> {
+        self.len = self.len.checked_sub(1)?;
+        Some(self.items[self.len])
+    }
+
+    pub fn clear(&mut self) { self.len = 0; }
+
+    /// Remove one initialized item, preserving the order of the remaining items.
+    pub fn remove(&mut self, index: usize) -> T {
+        assert!(index < self.len);
+        let item = self.items[index];
+        self.items.copy_within(index + 1..self.len, index);
+        self.len -= 1;
+        item
+    }
 }
 
 impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
@@ -88,6 +112,10 @@ impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
     fn deref(&self) -> &[T] {
         &self.items[..self.len]
     }
+}
+
+impl<T: Copy, const N: usize> std::ops::DerefMut for FixedList<T, N> {
+    fn deref_mut(&mut self) -> &mut [T] { &mut self.items[..self.len] }
 }
 
 #[cfg(test)]

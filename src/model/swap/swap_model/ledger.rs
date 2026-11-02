@@ -98,7 +98,7 @@ impl KeySet {
     pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }
     pub const fn is_empty(self) -> bool { self.0 == 0 }
     pub const fn len(self) -> usize { self.0.count_ones() as usize }
-    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {
+    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> + Clone {
         (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })
     }
 }
@@ -231,10 +231,18 @@ pub struct NativeRequest {
 /// kinds get exactly the keys native registers for them (`0x72` → `+0`; `0x75` → `+0, +1`),
 /// not the generic set the bank's prefetch would.
 pub fn native_window_requests(cells: [u32; 3], flags: RFlags) -> Vec<NativeRequest> {
+    native_window_requests_fixed(cells, flags).iter().copied().collect()
+}
+
+/// Three descriptor cells and at most one special-object request.
+pub fn native_window_requests_fixed(cells: [u32; 3], flags: RFlags)
+    -> crate::engine::compat::fixed::FixedList<NativeRequest, 4> {
+    let mut out = crate::engine::compat::fixed::FixedList::new(
+        NativeRequest { kind: NO_KIND, keys: KeySet::EMPTY, nro: false });
     let primary = cells[0];
-    if primary == NO_KIND { return Vec::new(); }
+    if primary == NO_KIND { return out; }
     let member = |kind: u32| NativeRequest { kind, keys: registration_set(kind, flags), nro: true };
-    let mut out = vec![member(primary)];
+    out.push(member(primary));
     match primary {
         0x24..=0x26 => {
             out.push(NativeRequest { kind: PT_OBJECT_KIND, keys: KeySet::of(&[0]), nro: true });
@@ -247,7 +255,7 @@ pub fn native_window_requests(cells: [u32; 3], flags: RFlags) -> Vec<NativeReque
             // so a pair's Nana is modelled as an ordinary registration of `0x4c`.
             if cells[1] != NO_KIND { out.push(member(cells[1])); }
         }
-        NANA => out.push(member(POPO)),
+        NANA => { out.push(member(POPO)); }
         0x5a | 0x5b => {
             out.push(NativeRequest { kind: AEGIS_OBJECT_KIND, keys: KeySet::of(&[0, 1]), nro: true });
             if cells[1] != NO_KIND { out.push(member(cells[1])); }
@@ -299,6 +307,9 @@ pub enum NativeCall {
     WritePairRefs(u8),
     SetRequestBit,
 }
+
+/// At most eight bits in KeySet, followed by the one per-kind native release.
+pub type ReleaseCalls = crate::engine::compat::fixed::FixedList<NativeCall, 9>;
 
 /// An acquisition the ledger tracks. Not `Clone`/`Copy`; dropping it is a leak the owner must
 /// report through [`Ledger::retain_dropped`] (no native work in `Drop`, WORKPLAN §5.4).
@@ -466,6 +477,22 @@ pub struct Reconciliation {
     pub missing: Vec<(u32, u32)>,
     pub matched: usize,
 }
+
+/// BTreeMap collection semantics without storage: sorted keys, final duplicate wins.
+fn ordered_actual(input: impl Iterator<Item = (u32, u32)> + Clone)
+    -> impl Iterator<Item = (u32, u32)> + Clone {
+    let mut previous = None;
+    std::iter::from_fn(move || {
+        let mut next = None;
+        for (key, refs) in input.clone() {
+            if previous.is_none_or(|old| key > old) && next.is_none_or(|(best, _)| key <= best) {
+                next = Some((key, refs));
+            }
+        }
+        if let Some((key, _)) = next { previous = Some(key); }
+        next
+    })
+}
 impl Reconciliation {
     pub fn balanced(&self) -> bool { self.residual.is_empty() && self.missing.is_empty() }
 }
@@ -599,6 +626,15 @@ impl Ledger {
         occupancy: &dyn LiveConsumers,
         role: Role,
     ) -> Result<Vec<NativeCall>, (AcqToken, LedgerRefusal)> {
+        self.release_fixed(token, occupancy, role).map(|calls| calls.to_vec())
+    }
+
+    pub fn release_fixed(
+        &mut self,
+        token: AcqToken,
+        occupancy: &dyn LiveConsumers,
+        role: Role,
+    ) -> Result<ReleaseCalls, (AcqToken, LedgerRefusal)> {
         if let Some(conflict) = occupancy.conflict(role, token.kind, Use::Release) {
             return Err((token, LedgerRefusal::Conflict(conflict)));
         }
@@ -606,9 +642,11 @@ impl Ledger {
             return Err((token, LedgerRefusal::UnknownToken));
         };
         let _ = self.acquisitions.remove(i);
-        let mut calls: Vec<NativeCall> = orphan_keys(token.kind, self.flags).iter(token.kind)
-            .map(NativeCall::ReleaseKey).collect();
-        calls.push(NativeCall::ReleaseKind { kind: token.kind });
+        let mut calls = ReleaseCalls::new(NativeCall::ReleaseKind { kind: token.kind });
+        for key in orphan_keys(token.kind, self.flags).iter(token.kind) {
+            assert!(calls.push(NativeCall::ReleaseKey(key)));
+        }
+        assert!(calls.push(NativeCall::ReleaseKind { kind: token.kind }));
         Ok(calls)
     }
 
@@ -653,13 +691,19 @@ impl Ledger {
 
     /// `(key value, refs)` the model predicts in `R+0x10` right now, sorted by key.
     pub fn predicted(&self) -> Vec<(u32, u32)> {
-        let mut map: BTreeMap<u32, u32> = BTreeMap::new();
-        for a in &self.acquisitions {
-            for key in a.keys.iter(a.kind) { *map.entry(key.value()).or_insert(0) += 1; }
-        }
-        map.into_iter().collect()
+        self.predicted_iter().collect()
     }
-    pub fn predicted_map_nodes(&self) -> usize { self.predicted().len() }
+    pub fn predicted_iter(&self) -> impl Iterator<Item = (u32, u32)> + Clone + '_ {
+        let mut previous = None;
+        std::iter::from_fn(move || {
+            let keys = || self.acquisitions.iter().flat_map(|a| a.keys.iter(a.kind).map(KeyId::value));
+            let next = keys().filter(|key| previous.is_none_or(|old| *key > old)).min()?;
+            let refs = keys().filter(|key| *key == next).fold(0u32, |n, _| n + 1);
+            previous = Some(next);
+            Some((next, refs))
+        })
+    }
+    pub fn predicted_map_nodes(&self) -> usize { self.predicted_iter().count() }
 
     /// Nothing held by us or recorded for native: a canonical Reload may be issued (state 6 needs
     /// `R+0x18 == 0`, `0x17e4700`).
@@ -670,21 +714,29 @@ impl Ledger {
 
     /// Compare the prediction with the owner's actual `(key value, refs)` pairs.
     pub fn reconcile(&self, actual: &[(u32, u32)]) -> Reconciliation {
-        let predicted: BTreeMap<u32, u32> = self.predicted().into_iter().collect();
-        let actual: BTreeMap<u32, u32> = actual.iter().copied().collect();
-        let mut out = Reconciliation::default();
-        for (key, refs) in &actual {
-            match predicted.get(key) {
-                Some(p) if p == refs => out.matched += 1,
-                Some(p) if p < refs => out.residual.push((*key, refs - p)),
-                Some(p) => out.missing.push((*key, p - refs)),
-                None => out.residual.push((*key, *refs)),
+        Reconciliation { residual: self.residual_iter(actual.iter().copied()).collect(),
+            missing: self.missing_iter(actual.iter().copied()).collect(),
+            matched: ordered_actual(actual.iter().copied()).filter(|pair| self.predicted_iter().any(|p| p == *pair)).count() }
+    }
+
+    pub fn residual_iter<'a>(&'a self, actual: impl Iterator<Item = (u32, u32)> + Clone + 'a)
+        -> impl Iterator<Item = (u32, u32)> + Clone + 'a {
+        ordered_actual(actual).filter_map(move |(key, refs)| {
+            match self.predicted_iter().find(|(k, _)| *k == key) {
+                Some((_, p)) if p < refs => Some((key, refs - p)),
+                None => Some((key, refs)),
+                _ => None,
             }
-        }
-        for (key, refs) in &predicted {
-            if !actual.contains_key(key) { out.missing.push((*key, *refs)); }
-        }
-        out
+        })
+    }
+
+    pub fn missing_iter<'a>(&'a self, actual: impl Iterator<Item = (u32, u32)> + Clone + 'a)
+        -> impl Iterator<Item = (u32, u32)> + Clone + 'a {
+        // Preserve the original two-pass order: short actual keys, then absent keys.
+        ordered_actual(actual.clone()).filter_map(move |(key, refs)| {
+            self.predicted_iter().find(|(k, _)| *k == key)
+                .and_then(|(_, p)| (p > refs).then(|| (key, p - refs)))
+        }).chain(self.predicted_iter().filter(move |(key, _)| !actual.clone().any(|(k, _)| k == *key)))
     }
 
     /// WP2 shadow mode: a ledger mirroring what the current bank code holds — one `OwnedPerKind`

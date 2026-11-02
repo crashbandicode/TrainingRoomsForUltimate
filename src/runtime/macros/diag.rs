@@ -5,7 +5,7 @@
 //!
 //! Commands: `save_slot <n> <name>` (export slot n, offer it to the panel, confirm the name: the keyboard's confirmed path),
 //! `open_library <n>`, `pad <left|right|up|down|confirm|back|extra>`, `view`, `status`, `name <text>`, `replay_window`,
-//! `clip <in|out|play|restart|prev|next|capture|leadin|confirm|cancel|nudge N>`, `list_captures`, `restart_capture`.
+//! `clip <in|out|play|restart|prev|next|capture|leadin|confirm|cancel|nudge N>`, `list_captures`, `audit_captures` (read-only full archive decode).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -51,6 +51,7 @@ const CLIP: u8 = 8;
 const LIST_CAPTURES: u8 = 9;
 const EXPORT_SLOT: u8 = 10;
 const OPEN_PLACEMENT: u8 = 11;
+const AUDIT_CAPTURES: u8 = 12;
 
 fn parse(line: &str) -> Option<Command> {
     let mut words = line.split_whitespace();
@@ -92,6 +93,7 @@ fn parse(line: &str) -> Option<Command> {
         }
         "replay_window" => command.kind = REPLAY_WINDOW,
         "list_captures" => command.kind = LIST_CAPTURES,
+        "audit_captures" => command.kind = AUDIT_CAPTURES,
         _ => return None,
     }
     Some(command)
@@ -266,6 +268,7 @@ fn run(command: Command) {
             }
             Err(error) => diagnostic(format_args!("[NamedMacroDiag] captures error={error}")),
         },
+        AUDIT_CAPTURES => audit_captures(),
         STATUS => {
             diagnostic(format_args!(
                 "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?} cpu_kind={:?}",
@@ -281,4 +284,41 @@ fn run(command: Command) {
         }
         _ => {}
     }
+}
+
+
+// Worker-only, read-only acceptance evidence. A listing validates only headers;
+// loading through the production reader also checks the complete frame payload.
+#[inline(never)]
+fn audit_captures() {
+    let archive = replay_store::archive();
+    let listing = match archive.list() {
+        Ok(listing) => listing,
+        Err(error) => {
+            diagnostic(format_args!("[NamedMacroDiag] capture_audit error={error}"));
+            return;
+        }
+    };
+    diagnostic(format_args!("[NamedMacroDiag] capture_audit count={} skipped={}",
+        listing.entries.len(), listing.skipped.len()));
+    for entry in listing.entries {
+        match archive.load(&entry.id) {
+            Ok(capture) => {
+                let nonempty = !capture.session.tracks.is_empty()
+                    && capture.session.tracks.iter().all(|track| !track.frames.is_empty());
+                diagnostic(format_args!(
+                    "[NamedMacroDiag] capture_audit id={} native_id={:?} native_name={:?} version={:?} tracks={} truncated={} nonempty={}",
+                    entry.id, capture.replay_id, capture.replay_name, capture.game_version,
+                    capture.session.tracks.len(), capture.session.truncated, nonempty));
+                for track in &capture.session.tracks {
+                    diagnostic(format_args!(
+                        "[NamedMacroDiag] capture_audit_track id={} entry={} frames={}",
+                        entry.id, track.entry, track.frames.len()));
+                }
+            }
+            Err(error) => diagnostic(format_args!(
+                "[NamedMacroDiag] capture_audit id={} error={error}", entry.id)),
+        }
+    }
+    diagnostic(format_args!("[NamedMacroDiag] capture_audit complete"));
 }

@@ -482,6 +482,7 @@ pub fn publish_queries() {
         loaded_kind: start.map_or(-1, |start| start.fighter_kind),
         restore_in_air, panel_visible: panel_visible(),
         clip_foreground: clip_foreground(), naming_pending: naming_pending(),
+        clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),
         replay_loading: crate::runtime::macros::replay_capture::loading(), browser_pending, browser_release,
         suspended: suspended(), marker,
     });

@@ -13,7 +13,7 @@
 //! The buffers allocate only on the worker (`prepare`, `fill`); a hook's `push`/`frame_at` stay within the prepared capacity.
 
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
 
 /// The hook-side answers of the named layer (one snapshot, written by the worker after each model change).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -40,6 +40,8 @@ pub struct MacroQueries {
     pub panel_visible: bool,
     /// The clip editor is in the foreground (P1's controls are the editor's).
     pub clip_foreground: bool,
+    /// The editor draft exists, including parking in a pending Mii reload.
+    pub clip_editor_open: bool,
     pub replay_loading: bool,
     pub browser_pending: bool,
     pub browser_release: bool,
@@ -69,6 +71,7 @@ impl MacroQueries {
         restore_in_air: false,
         panel_visible: false,
         clip_foreground: false,
+        clip_editor_open: false,
         replay_loading: false,
         browser_pending: false,
         browser_release: false,
@@ -76,6 +79,21 @@ impl MacroQueries {
         suspended: false,
         marker: None,
     };
+}
+
+/// Closing an editor retires its checkpoint only after native stop cleanup.
+/// Ordinary stop/crop/export never erase a pending close. The worker may request
+/// close while a prior stop is already queued or running.
+#[derive(Default)]
+pub struct PreviewRetirement { close: AtomicBool }
+impl PreviewRetirement {
+    pub const fn new() -> Self { Self { close: AtomicBool::new(false) } }
+    pub fn request_close(&self) { self.close.store(true, SeqCst); }
+    /// Active cleanup defers retirement; idle Stop may finish immediately.
+    pub fn stop(&self, active: bool) -> Option<bool> { (!active).then(|| self.finish()) }
+    /// Called at idle or successful native stop completion; true retains anchor.
+    pub fn finish(&self) -> bool { !self.close.swap(false, SeqCst) }
+    pub fn clear(&self) { self.close.store(false, SeqCst); }
 }
 
 /// One message from a game thread to the worker. `Copy` and small, so posting allocates nothing.
@@ -445,6 +463,53 @@ impl<T: Copy + Default> Default for CaptureBuffer<T> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn preview_idle_close_ignores_a_stale_open_snapshot() {
+        let retirement = super::PreviewRetirement::new();
+        let snapshot = MacroQueries { clip_editor_open: true, ..MacroQueries::IDLE };
+        retirement.request_close();
+        assert!(snapshot.clip_editor_open);
+        assert_eq!(retirement.stop(false), Some(false));
+        assert_eq!(retirement.stop(false), Some(true));
+    }
+
+    #[test]
+    fn preview_active_close_survives_coalesced_stops_until_cleanup_finishes() {
+        let retirement = super::PreviewRetirement::new();
+        assert_eq!(retirement.stop(true), None);
+        retirement.request_close();
+        for _ in 0..3 {
+            retirement.request_close();
+            assert_eq!(retirement.stop(true), None, "never retire before native cleanup");
+        }
+        assert!(!retirement.finish(), "close after a queued Stop still retires");
+        assert!(retirement.finish(), "completed close is consumed exactly once");
+        retirement.request_close();
+        retirement.clear();
+        assert!(retirement.finish(), "scene invalidation owns its separate retirement");
+    }
+
+    #[test]
+    fn preview_close_cancelling_queued_play_retires_when_drain_becomes_idle() {
+        let retirement = super::PreviewRetirement::new();
+        retirement.request_close();
+        assert_eq!(retirement.stop(true), None, "queued Play counts as occupied at posting");
+        // Newest Stop supersedes Play; no native session was started by drain.
+        assert_eq!(retirement.stop(false), Some(false));
+        assert!(retirement.finish(), "retirement was delivered exactly once");
+    }
+
+    #[test]
+    fn preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus() {
+        let retirement = super::PreviewRetirement::new();
+        let parked = MacroQueries { clip_editor_open: true, replay_loading: true,
+            naming_pending: true, clip_foreground: false, ..MacroQueries::IDLE };
+        assert!(parked.clip_editor_open && !parked.clip_foreground);
+        assert_eq!(retirement.stop(false), Some(true), "parking is not explicit close");
+        assert_eq!(retirement.stop(true), None);
+        assert!(retirement.finish(), "crop/export stop retains the same anchor");
+    }
+
     #[test]
     fn capture_access_is_exclusive_even_when_hook_calls_overlap() {
         use std::sync::atomic::{AtomicBool, Ordering};

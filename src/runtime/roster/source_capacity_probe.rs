@@ -80,7 +80,7 @@ static STATE: Mutex<Probe> = Mutex::new(Probe {
 /// takes and releases its own lock; no plugin mutex spans any native call.
 fn plugin_idle() -> bool {
     if super::STATES.iter().any(|state| {
-        let state = state.lock().unwrap();
+        let state = state.lock();
         state.pending.is_some() || state.active.is_some() || state.loaded.is_some()
     }) { return false; }
     plugin_consumers_idle()

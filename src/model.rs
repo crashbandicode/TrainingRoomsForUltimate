@@ -134,6 +134,9 @@ pub mod catalog_reply;
 #[path = "model/reusable_snapshot.rs"]
 pub mod reusable_snapshot;
 
+#[path = "model/body_activation.rs"]
+pub mod body_activation;
+
 /// Boot-reserved replay request identities and completion lifecycle.
 #[path = "model/replay_jobs.rs"]
 pub mod replay_jobs;

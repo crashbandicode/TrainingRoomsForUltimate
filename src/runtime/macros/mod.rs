@@ -30,8 +30,7 @@ pub(crate) mod replay_store;
 pub(crate) use crate::runtime::lobby::training::{lobby, practice};
 pub(crate) use port::input_record;
 
-/// The fork's `save_states` as the named layer and the clip preview call it: package 3's own functions, and the preview restore, which
-/// package 3 does not provide yet (`install_report` names it).
+/// Package 3's save-state facade, including its game-owned temporary preview checkpoint.
 pub(crate) mod save_states {
     pub(crate) use crate::runtime::features::states::cancel_pending;
     pub(crate) use crate::runtime::lobby::training::save_states::is_loading;
@@ -42,14 +41,20 @@ pub(crate) mod save_states {
         Ok(())
     }
 
-    /// The clip preview's temporary setup restore (a restore of the clip's own start state, then the saved state again).
-    pub(crate) fn request_preview_restore(_start: bool) -> Result<(), &'static str> {
-        Err("Native preview is unavailable until the preview restore is provided")
+    /// Capture the live pair once, then reuse it for native preview start/stop.
+    /// # Safety
+    /// Only the existing primary-CPU game callback may request native restoration.
+    pub(crate) unsafe fn request_preview_restore(start: bool) -> Result<(), &'static str> {
+        crate::runtime::features::states::request_preview_restore(start)
     }
 
-    pub(crate) fn finish_preview_restore() {}
+    pub(crate) fn finish_preview_restore(editor_open: bool) {
+        crate::runtime::features::states::finish_preview_restore(editor_open);
+    }
 
-    pub(crate) fn end_preview_restore() {}
+    pub(crate) fn end_preview_restore() {
+        crate::runtime::features::states::end_preview_restore();
+    }
 }
 
 use crate::runtime::alloc::{HookId, HookScope};

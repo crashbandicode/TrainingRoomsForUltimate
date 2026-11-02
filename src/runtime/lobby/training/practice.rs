@@ -1,6 +1,6 @@
 //! Current native entry ownership for save/record/preview. No retained pointers
 //! are dereferenced: each callback resolves the manager and current body again.
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use smash::{app::{self, lua_bind::*, BattleObjectModuleAccessor}, lib::lua_const::*};
 use {crate::runtime::compat::common, crate::engine::seams::native_fields};
 use super::practice_policy::{self, Context, Entries, EntryLease};
@@ -54,17 +54,17 @@ pub unsafe fn acquire() -> bool {
     let Some(current) = entries() else { return false; };
     if common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::Player).is_none()
         || common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU).is_none() { return false; }
-    OWNED.lock().unwrap().acquire(current)
+    OWNED.lock().acquire(current)
 }
 
-pub fn forget() { OWNED.lock().unwrap().retire(); }
+pub fn forget() { OWNED.lock().retire(); }
 
 /// Whether a practice session (the entry lease) is held now.
-pub fn owned() -> bool { OWNED.lock().unwrap().active() }
+pub fn owned() -> bool { OWNED.lock().active() }
 
 /// Invoked before consumer callbacks and before native entry destruction.
 pub fn retire() {
-    let owned = OWNED.lock().unwrap().retire();
+    let owned = OWNED.lock().retire();
     if owned || crate::runtime::compat::replay_preview::occupied() || super::recording_or_playback() {
         super::clear_session_state();
     }
@@ -76,9 +76,9 @@ pub fn retire() {
 /// destruction or scene change does not wait for this.
 pub unsafe fn refresh() {
     if !enabled() { return; }
-    if !OWNED.lock().unwrap().active() && !super::named_macros::suspended() { return; }
+    if !OWNED.lock().active() && !super::named_macros::suspended() { return; }
     let current = entries();
-    let replaced = OWNED.lock().unwrap().replaced(current);
+    let replaced = OWNED.lock().replaced(current);
     if replaced { retire(); }
     if current.is_some() { super::named_macros::resume_waiting(); }
 }
@@ -86,7 +86,7 @@ pub unsafe fn refresh() {
 pub fn entry_departed(entry: usize) {
     super::named_macros::forget_stopped_entry(entry);
     super::tech::forget_hidden_entry(entry);
-    let owned = OWNED.lock().unwrap().owns(entry);
+    let owned = OWNED.lock().owns(entry);
     if owned {
         if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }
         retire();

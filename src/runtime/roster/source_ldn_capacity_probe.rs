@@ -88,7 +88,7 @@ pub(super) unsafe fn roster_settled() -> bool {
     if !waiting() { return false; }
     for (owner, state) in [0u32, 4].iter().copied().zip(super::STATES.iter()) {
         let before = {
-            let state = state.lock().unwrap();
+            let state = state.lock();
             if state.pending.is_some() || state.active.is_some() { return false; }
             (state.epoch, state.revision, state.loaded, state.observed)
         };
@@ -99,7 +99,7 @@ pub(super) unsafe fn roster_settled() -> bool {
                 || super::ready_forms(entry, owner).is_none_or(|(_, active)| active != kind)
             { return false; }
         }
-        let state = state.lock().unwrap();
+        let state = state.lock();
         if state.pending.is_some() || state.active.is_some()
             || (state.epoch, state.revision, state.loaded, state.observed) != before
         { return false; }

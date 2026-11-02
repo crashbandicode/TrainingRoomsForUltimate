@@ -12,8 +12,9 @@
 //! `[CopyPkg] loading owner={} keys={:x?}`, `[CopyPkg] forget owner={} held={} reason={}`.
 
 use crate::engine::seams::native_fields as fields;
-use std::sync::Mutex;
-use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition, ROSTER_BYTES};
+use crate::engine::compat::fixed::DebugIter;
+use hos_lock::Mutex;
+use crate::engine::swap::swap_model::copy_packages::{self as model, Acquisition, Holdings, PackageSets, empty_holdings};
 use crate::engine::swap::swap_model::copy_registry::{Record, Roster, ENTRIES, SUBS};
 
 macro_rules! trace {
@@ -28,13 +29,15 @@ const OWNER_TABLE: usize = 0x5324680;
 const G68_SLOT: usize = 0x68;
 const REGION_WORD: usize = 0x523d00c;
 
-struct Held {
-    acquisition: Acquisition,
-    /// The native-layout roster both calls read (kept for the release).
-    bytes: Box<[u8; ROSTER_BYTES]>,
-}
+static HELD: [Mutex<Holdings>; 2] = [Mutex::new(empty_holdings()), Mutex::new(empty_holdings())];
 
-static HELD: [Mutex<Vec<Held>>; 2] = [Mutex::new(Vec::new()), Mutex::new(Vec::new())];
+/// Both native routines consume the roster synchronously; callees receive only kind/costume
+/// or a key, never its address. Keep the value receipt and reconstruct identical bytes for release.
+/// Owned-ELF evidence: docs/provenance/pkg6-copy-roster-lifetime.md.
+unsafe fn call(function: unsafe extern "C" fn(usize, *const u8, u32, u32), g68: usize, acquisition: &Acquisition) {
+    let bytes = model::roster_bytes(&acquisition.roster);
+    function(g68, bytes.as_ptr(), acquisition.member, acquisition.costume);
+}
 
 unsafe fn g68(base: usize) -> Option<usize> {
     fields::child(fields::child(base, OWNER_TABLE)?, G68_SLOT)
@@ -57,11 +60,15 @@ unsafe fn roster_now(base: usize) -> Roster {
 }
 
 /// What the bank should hold for `sets` (the window and every group with bodies or keys).
-unsafe fn wanted(base: usize, owner: u32, r: usize, sets: &[[u32; SUBS]]) -> Vec<Acquisition> {
+unsafe fn wanted(base: usize, owner: u32, r: usize, sets: &PackageSets) -> Holdings {
     let roster = roster_now(base);
     let costume = fields::read::<u32>(r, 0x64).unwrap_or(0);
     let region = fields::read::<u32>(base, REGION_WORD).unwrap_or(0);
-    sets.iter().flat_map(|set| model::acquisitions(&roster, owner, *set, costume, region)).collect()
+    let mut wanted = empty_holdings();
+    for acquisition in sets.iter().flat_map(|set| model::acquisitions_iter(&roster, owner, *set, costume, region)) {
+        assert!(wanted.push(acquisition));
+    }
+    wanted
 }
 
 /// Bring the role's holdings to `sets`. Acquisitions come first, then releases, so a key two sets
@@ -70,40 +77,37 @@ unsafe fn wanted(base: usize, owner: u32, r: usize, sets: &[[u32; SUBS]]) -> Vec
 /// # Safety
 /// `base` is the main image base; `r` is the role's proved resource owner in this callback; no
 /// bank lock is held.
-pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: &[[u32; SUBS]], reason: &str) -> bool {
+pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: &PackageSets, reason: &str) -> bool {
     let Some(g68) = g68(base) else { return false; };
     let wanted = wanted(base, owner, r, sets);
     let plan = {
-        let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
-        model::sync(&current, &wanted)
+        let held = HELD[role].lock();
+        model::sync_bounded(&held, &wanted)
     };
     if plan.acquire.is_empty() && plan.release.is_empty() { return false; }
     let acquire: unsafe extern "C" fn(usize, *const u8, u32, u32) = std::mem::transmute(base + ACQUIRE);
     let release: unsafe extern "C" fn(usize, *const u8, u32, u32) = std::mem::transmute(base + RELEASE);
-    let mut fresh = Vec::with_capacity(plan.acquire.len());
-    for acquisition in plan.acquire {
-        let bytes = Box::new(model::roster_bytes(&acquisition.roster));
-        acquire(g68, bytes.as_ptr(), acquisition.member, acquisition.costume);
-        fresh.push(Held { acquisition, bytes });
+    for acquisition in plan.acquire.iter() {
+        call(acquire, g68, acquisition);
     }
-    let released: Vec<Held> = {
-        let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        plan.release.iter().map(|i| held.remove(*i)).collect()
+    let released = {
+        let mut held = HELD[role].lock();
+        let mut released = empty_holdings();
+        for index in plan.release.iter() { assert!(released.push(held.remove(*index))); }
+        released
     };
-    for gone in &released {
-        release(g68, gone.bytes.as_ptr(), gone.acquisition.member, gone.acquisition.costume);
+    for gone in released.iter() {
+        call(release, g68, gone);
     }
-    let (count, keys) = {
-        let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-        let added = fresh.len();
-        held.extend(fresh);
-        let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
-        trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, sets, added,
+    {
+        let mut held = HELD[role].lock();
+        let added = plan.acquire.len();
+        for acquisition in plan.acquire.iter() { assert!(held.push(*acquisition)); }
+        trace!("[CopyPkg] sync owner={} reason={} sets={:x?} acquired={} released={} held={}", owner, reason, &**sets, added,
             released.len(), held.len());
-        (held.len(), model::referenced(&current).into_keys().collect::<Vec<u32>>())
-    };
-    trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, count, keys);
+        trace!("[CopyPkg] held owner={} acquisitions={} keys={:x?}", owner, held.len(),
+            DebugIter(model::referenced_keys(held.iter().copied())));
+    }
     true
 }
 
@@ -112,20 +116,16 @@ pub(crate) unsafe fn sync(base: usize, role: usize, owner: u32, r: usize, sets: 
 ///
 /// # Safety
 /// As for [`sync`].
-pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets: &[[u32; SUBS]]) -> bool {
+pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets: &PackageSets) -> bool {
     sync(base, role, owner, r, sets, "admission");
-    if HELD[role].lock().unwrap_or_else(|p| p.into_inner()).is_empty() { return true; }
+    if HELD[role].lock().is_empty() { return true; }
     let Some(g68) = g68(base) else { return false; };
     let Some(ready) = fields::child(g68, 0).and_then(|vtable| fields::read::<usize>(vtable, 0x30)).filter(|f| *f != 0) else { return false; };
     let ready: unsafe extern "C" fn(usize) -> bool = std::mem::transmute(ready);
     let resident = ready(g68);
     if !resident {
-        let keys: Vec<u32> = {
-            let held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
-            let current: Vec<Acquisition> = held.iter().map(|h| h.acquisition.clone()).collect();
-            model::referenced(&current).into_keys().collect()
-        };
-        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, keys);
+        let held = HELD[role].lock();
+        trace!("[CopyPkg] loading owner={} keys={:x?}", owner, DebugIter(model::referenced_keys(held.iter().copied())));
     }
     resident
 }
@@ -133,7 +133,7 @@ pub(crate) unsafe fn admit(base: usize, role: usize, owner: u32, r: usize, sets:
 /// Drop the role's holdings without native calls: the scene is ending and its loop resets every
 /// holder, G68 included (`0x134efb4`, FEASIBILITY §4.2).
 pub(crate) fn forget(role: usize, owner: u32, reason: &str) {
-    let mut held = HELD[role].lock().unwrap_or_else(|p| p.into_inner());
+    let mut held = HELD[role].lock();
     if !held.is_empty() {
         trace!("[CopyPkg] forget owner={} held={} reason={}", owner, held.len(), reason);
         held.clear();

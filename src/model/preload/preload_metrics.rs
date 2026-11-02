@@ -13,7 +13,7 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 
 /// Result stored when this build cannot issue the SVC (host value tests).
 pub const UNSUPPORTED: u32 = u32::MAX;
@@ -335,10 +335,11 @@ impl OperationStamp {
     /// session totals and writes one diagnostic line.
     pub fn finish(self, frame: u32, outcome: Outcome, preload: Preload) -> Record {
         let record = self.record(MemorySample::capture(), frame, outcome, preload);
-        let (scene, baseline) = SESSION.lock().map_or((0, None), |mut session| {
+        let (scene, baseline) = {
+            let mut session = SESSION.lock();
             session.absorb(&record);
             (session.scene, session.baseline)
-        });
+        };
         legend();
         crate::engine::compat::logging::diagnostic(format_args!(
             "{}",
@@ -569,9 +570,7 @@ pub fn snapshot(enabled: bool, label: Label, frame: u32, preload: Preload) {
         return;
     }
     let sample = MemorySample::capture();
-    let Ok(mut session) = SESSION.lock() else {
-        return;
-    };
+    let mut session = SESSION.lock();
     let report = session.snapshot(label, sample, preload);
     drop(session);
     crate::engine::compat::logging::heap_profile(label.name());
