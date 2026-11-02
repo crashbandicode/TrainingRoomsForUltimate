@@ -54,6 +54,19 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 - READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
   pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
+### 2026-11-02 ~04:1xZ — package 1 complete locally; package 2 started
+
+- `work/implementation` HEAD `68a072b` = package 1 complete: menu model `b462d2f` (5 pages + hidden Developer page,
+  96 rows, 68 host tests), `docs/BUILD.md` (`b895414`/`68a072b`: the playbook recipe — pin 1.98.1 for host gates,
+  cargo-skyline's `skyline-v3` for Switch builds; the Surface's default `~/.rustup` lacks `skyline-v3`; a clean
+  checkout reproduced `26a5fef0` byte-identical). Final NROs built on the Yoga (operator 2026-11-02: Surface, Yoga
+  and Ally available; never compile beside an Eden): release `434d8176…` 180,224 B, diag `3192a97b…` 282,624 B.
+  Yoga build copy `/home/intpa/trainingrooms-build/` (src from `git archive`, own target, `build.ps1`).
+- Eden regression tr111/tr112 (Yoga, with the CPU pilot) running; then the push request for `68a072b`.
+- Package 2 (CPU, SPEC-cpu-01…07) implementer started on the same branch: P2-1 CPU core → P2-8 frame advantage.
+- Storage 2026-11-02: Surface df 253 GB, work target 1.0 GB; Yoga 283 GB, build dir 0.2 GB. A probe target
+  (219 MB) deleted with manifest `/tmp/tr-pin-probe-deleted.json`.
+
 ### Addendum 2026-11-02 (operator order via the primary): card swap and fixes in both trees
 
 - **Done** = a release candidate with the full gate, batched Eden rows, the playbook's online rows, compliance and an
