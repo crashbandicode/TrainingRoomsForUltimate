@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::{Mutex, MutexGuard};
 
-use crate::engine::mii::inventory::Snapshot;
 
 /// Which page of the menu is showing, as the Mii code asks: only "the menu's own page list is up" matters to it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,7 +27,9 @@ impl AppPage {
 /// What the Mii code last published into the menu.
 pub struct App {
     pub page: AppPage,
-    catalog: Option<(Snapshot, u64)>,
+    /// The published catalog (package 6's ngine::mii::inventory::Snapshot, which is behind a feature this module does
+    /// not depend on: held type-erased, the Mii list screen downcasts it).
+    catalog: Option<(Box<dyn Any + Send>, u64)>,
     /// The owner context that came with the catalog (the Mii menu's `Context`, owned by package 6).
     context: Option<Box<dyn Any + Send>>,
     ordinary_cpu: bool,
@@ -41,17 +42,17 @@ impl App {
 
     /// Mount an owned Mii catalog for the open Mii list (the editor entry). `false` when the menu is closed or the
     /// epoch is stale (an older capture finished after a newer opening).
-    pub fn mount_mii_editor_catalog(&mut self, catalog: Snapshot, epoch: u64) -> bool {
+    pub fn mount_mii_editor_catalog<S: Any + Send>(&mut self, catalog: S, epoch: u64) -> bool {
         // The menu's open flag is the truth (it is also cleared when the renderer is lost, R2-2); page follows the worker.
         if !active() || self.catalog.as_ref().is_some_and(|(_, held)| *held > epoch) {
             return false;
         }
-        self.catalog = Some((catalog, epoch));
+        self.catalog = Some((Box::new(catalog), epoch));
         true
     }
 
     /// Publish the catalog with its owner context into the open menu; `on_mounted` runs once it is held.
-    pub fn publish_mii_catalog<C: Any + Send>(&mut self, catalog: Snapshot, context: C, epoch: u64, on_mounted: impl FnOnce()) -> bool {
+    pub fn publish_mii_catalog<S: Any + Send, C: Any + Send>(&mut self, catalog: S, context: C, epoch: u64, on_mounted: impl FnOnce()) -> bool {
         if !self.mount_mii_editor_catalog(catalog, epoch) {
             return false;
         }
@@ -70,7 +71,7 @@ impl App {
     }
 
     /// The Mii list screen takes what was published (and its context), once.
-    pub fn take_catalog(&mut self) -> Option<(Snapshot, u64, Option<Box<dyn Any + Send>>)> {
+    pub fn take_catalog(&mut self) -> Option<(Box<dyn Any + Send>, u64, Option<Box<dyn Any + Send>>)> {
         let (catalog, epoch) = self.catalog.take()?;
         Some((catalog, epoch, self.context.take()))
     }
