@@ -305,3 +305,10 @@ Inherited F11 implementation found in game.rs and model/entry_cells.rs: it curre
 ## QUESTIONS
 - F11: newest review/menu-proposal fix ledger row147 specifies fallback to cell0 for invalid index/guard. This slice preserves it while testing the actual reader. Confirm whether a no-body policy is wanted; predecessor's intent above is superseded until answered.
 - Need exact committed slim inline-deletion slice before editing character_roster/Mii manifest; exact authorized harness slice before adoption. No moving-branch merge is authorized.
+
+### Practice-stage single initialization — current successor slice
+- After compaction, exact thread 01a19cb7 model reverified Astra/medium; watcher session6380 remains live, no duplicate watcher.
+- Removed unconditional request init from runtime/lobby/mod.rs. The feature-gated observer update hook owns the sole init after its seam checks succeed; an absent/failed update hook cannot enable requests.
+- UI worker stage_press already calls request(selection); ui_wired=true is accurate. Replaced stale default_off=true with request_driven=true and corrected request module header through manifest transforms. Default shipped enhancements-alpha includes practice-stage-request-alpha.
+- carry / ledger regenerated; full carry verify passed all264 files against pinned m5q. No fork/stage writes. Source still ungated; F11 tests and this slice await compile queue.
+- Latest ledger: foreign paired Eden released15:00Z, imgui Surface e07 released15:02:54Z. Surface queue still preceding slim/f6; pkg6 holds no claim. No own Eden/profile changes.

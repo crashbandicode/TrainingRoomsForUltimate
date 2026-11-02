@@ -2508,12 +2508,22 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "7d8ac84b4258ad163e41ddf42e280c44b689a5ac28a613e301d5ceeba7ef9618",
+   "dest_sha256": "846c9386080b4506602be32c066c82d319a8137b51fcc57e83cfcdcc42bed628",
    "edits": [
     {
      "old": "notification(\"Practice Stage\".into(), message, 180);",
      "new": "notification(\"Practice Stage\".into(), message.into(), 180);",
      "reason": "the notification facade takes `Cow<'static, str>` so static texts allocate nothing; the formatted message moves in as `Cow::Owned`"
+    },
+    {
+     "old": "//! Default-off request API. Called by the existing StageManager update entry hook.",
+     "new": "//! Feature-gated request API. Called by the verified StageManager update entry hook.",
+     "reason": "The shipped feature closure enables practice-stage-request-alpha; requests still require an explicit UI selection and verified update hook."
+    },
+    {
+     "old": "[PracticeStageRequest] verified={verified} default_off=true ui_wired=true",
+     "new": "[PracticeStageRequest] verified={verified} request_driven=true ui_wired=true",
+     "reason": "The Lobby Stages UI calls request(selection); default_off was false for the shipped feature closure. Initialization is owned once by the verified practice update hook."
     }
    ]
   },

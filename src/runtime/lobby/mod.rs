@@ -18,13 +18,12 @@ use smash::app::BattleObjectModuleAccessor;
 use crate::model::lra_reset::{entry_id_valid, FIGHTER_ENTRY_ID_FIELD};
 use crate::runtime::game;
 
-/// Start the lobby's files, in the order the fork's `main` did: the practice engine (it reads the game mode fingerprint), the stage
-/// probe (it starts the rotation), the practice stage request and, in a diag build, its observer. Called once from boot, after the
-/// roster cycle's own `init` and before the install line.
+/// Start the practice engine and stage rotation, then the feature-gated practice update hook.
+/// That hook initializes stage requests only after its native checks pass. Called once from boot,
+/// after the roster cycle's own `init` and before the install line.
 pub(crate) fn init() {
     training::lobby::init();
     lobby_stage_probe::init();
-    practice_stage_request::init(game::text_base());
     #[cfg(feature = "practice-stage")]
     practice_stage_observer::init();
 }
