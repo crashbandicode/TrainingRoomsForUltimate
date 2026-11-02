@@ -13,6 +13,7 @@ Importable: `import ui_lent as u; u.ops(phase, [...]); u.shot(phase, name); u.pl
 import base64
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -32,7 +33,7 @@ HOST = "intpa@dreamland-ally"
 AID = r"C:\Eden\trainingrooms-pkg5\nro\diag"   # read only: the four aid NROs (sha-checked by the stage)
 AIDS = ["libnro_hook.nro", "libparam_hook.nro", "libssbu_cpu_pilot.nro", "libssbu_tile_cursor.nro"]
 MACRO = HERE.parent / "macros" / "tr-main-to-stage-select.edenmacro.json"
-SHOTS = Path("/tmp/tr-ui/shots")
+SHOTS = Path(os.environ.get("TMPDIR", str(HERE.parents[2] / "tmp-ui-screens"))) / "shots"
 TILE = "ssbu-tile-cursor/events.log"
 DIAG = "TrainingRooms/practice-diagnostics.log"
 
