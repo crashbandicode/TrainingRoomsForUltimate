@@ -1,0 +1,42 @@
+[package]
+name = "training_rooms"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Training Rooms for Ultimate: practice tools for Super Smash Bros. Ultimate 13.0.5 (Skyline plugin)"
+publish = false
+
+# cdylib only: an rlib next to it makes Cargo skip LTO for the crate and leaves
+# unused code in the resident image (playbook, docs/CHECKLIST.md "Implementation").
+# Tests include the pure `model` by path (see tests/).
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# JSON for settings.json and the migration receipt. `serde` without derive: the
+# readers are hand-written visitors over `serde_json::Value` so a bad field can
+# be defaulted on its own (SPEC-core-04 §3.2, decision S2).
+serde = { version = "1", default-features = false, features = ["std"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+
+[target.'cfg(target_os = "switch")'.dependencies]
+skyline = "=0.6.0"
+# B9: locks come from parking_lot directly (the fork's helper crate is not kept). Used by the input
+# delay queue; no allocation, `const` constructor.
+parking_lot = "0.12"
+
+# `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it
+# (this is a declaration, not an `allow`).
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
+
+[features]
+default = []
+# Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it.
+diag = []
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

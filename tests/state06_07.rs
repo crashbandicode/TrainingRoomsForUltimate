@@ -1,0 +1,170 @@
+//! SPEC-state-06 (L+R+A Reset, reset hub) and SPEC-state-07 (Stage Hazards). Test names are the
+//! specs' §9 rows. `state07_scan_matches_pinned` re-runs the instruction scans on the owned 13.0.5
+//! `.text`.
+
+mod common;
+
+#[path = "../src/model/mod.rs"]
+#[allow(dead_code)]
+mod model;
+
+use model::lra_reset::{self, FrameCounter, FrameCounterType, HubStep};
+use model::sites;
+use model::stage_hazards::{self as hz, Missing, Plan};
+
+fn words_of(guard: &[u8; 64]) -> Vec<u32> {
+    guard.as_chunks::<4>().0.iter().map(|w| u32::from_le_bytes(*w)).collect()
+}
+
+#[test]
+fn state06_lra_register_rule() {
+    // Off in native Training: x8 is cleared so the game's check fails. On: untouched.
+    assert_eq!(lra_reset::x8_write(false, true), Some(0));
+    assert_eq!(lra_reset::x8_write(true, true), None);
+    // Outside native Training the register is never touched (the fork's early return).
+    assert_eq!(lra_reset::x8_write(false, false), None);
+    assert_eq!(lra_reset::x8_write(true, false), None);
+    // The setting decodes from the file: [1,0] On, [0,1] Off.
+    let mut s = model::settings::Snapshot::factory();
+    assert!(s.lra_reset());
+    s.set("lra_reset", &[0, 1]).unwrap();
+    assert!(!s.lra_reset());
+    assert_eq!(lra_reset::x8_write(s.lra_reset(), true), Some(0));
+    // The inverted upstream gate is not adopted: the hub never runs outside Training.
+    assert!(!lra_reset::hub_should_run(true, false, false));
+}
+
+#[test]
+fn state06_hub_trigger_rules() {
+    assert!(lra_reset::hub_should_run(true, true, false));
+    assert!(!lra_reset::hub_should_run(false, true, false), "only the CPU's init triggers it");
+    assert!(!lra_reset::hub_should_run(true, false, false), "native Training only");
+    assert!(!lra_reset::hub_should_run(true, true, true), "not during a hot swap");
+    // The reset-check hook and the on-init wrapper sit on sites that this build guards.
+    assert!(sites::find("reset_check").is_some());
+    assert!(sites::find("on_init_slot").is_some());
+    assert!(sites::find("on_init").is_some());
+}
+
+#[test]
+fn state06_hub_order() {
+    assert_eq!(
+        lra_reset::HUB_ORDER[..7],
+        [HubStep::Mash, HubStep::Sdi, HubStep::FrameCounters, HubStep::Combo, HubStep::Ledge, HubStep::Throw, HubStep::ShieldTilt]
+    );
+    // This plugin's own step (decision B8) comes after the spec's seven.
+    assert_eq!(lra_reset::HUB_ORDER[7], HubStep::InputDelay);
+    let mut seen = Vec::new();
+    lra_reset::run_hub(|step| seen.push(step));
+    assert_eq!(seen, lra_reset::HUB_ORDER);
+}
+
+#[test]
+fn state06_counter_types() {
+    let mut counters = [
+        FrameCounter { kind: FrameCounterType::InGame, frames: 40, counting: true },
+        FrameCounter { kind: FrameCounterType::InGameNoReset, frames: 41, counting: true },
+        FrameCounter { kind: FrameCounterType::Real, frames: 42, counting: true },
+    ];
+    lra_reset::reset_in_game_counters(&mut counters);
+    assert_eq!(counters[0], FrameCounter { kind: FrameCounterType::InGame, frames: 0, counting: false });
+    assert_eq!(counters[1].frames, 41);
+    assert!(counters[1].counting);
+    assert_eq!(counters[2].frames, 42);
+    assert!(counters[2].counting);
+}
+
+#[test]
+fn state06_hub_idempotent() {
+    // Running the hub twice in a frame (CPU-as-P1, two CPUs) leaves the same state as once.
+    #[derive(Default, PartialEq, Debug, Clone)]
+    struct State {
+        mash_queue: Vec<u8>,
+        counters: Vec<FrameCounter>,
+        delay_queue_len: usize,
+    }
+    let start = State {
+        mash_queue: vec![1, 2],
+        counters: vec![FrameCounter { kind: FrameCounterType::InGame, frames: 9, counting: true }],
+        delay_queue_len: 3,
+    };
+    let hub = |s: &mut State| {
+        lra_reset::run_hub(|step| match step {
+            HubStep::Mash => s.mash_queue.clear(),
+            HubStep::FrameCounters => lra_reset::reset_in_game_counters(&mut s.counters),
+            HubStep::InputDelay => s.delay_queue_len = 0,
+            _ => {}
+        })
+    };
+    let mut once = start.clone();
+    hub(&mut once);
+    let mut twice = start;
+    hub(&mut twice);
+    hub(&mut twice);
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn state07_flag_address_arithmetic() {
+    // The two words at the scan site in 13.0.5 give the pinned byte.
+    let site = sites::find("hazard_flag").unwrap();
+    assert_eq!(site.offset, hz::FLAG_SCAN_OFFSET);
+    let w = words_of(&site.guard);
+    assert_eq!(hz::flag_offset(site.offset, w[0], w[1]), Some(hz::FLAG_OFFSET));
+    assert_eq!(hz::FLAG_OFFSET, 0x530a985);
+    // The pieces: adrp's page offset and add's immediate.
+    assert!(hz::is_adrp(w[0]) && hz::is_add_imm(w[1]));
+    assert_eq!(hz::adrp_offset(w[0]) + 0x1740000, 0x530a985 - 9 - hz::add_imm_value(w[1]) as i64);
+    // A shifted add, a negative adrp, and non-instructions.
+    assert_eq!(hz::add_imm_value(0x9140_0400), 0x1000);
+    assert_eq!(hz::add_imm_value(0x9100_0400), 1);
+    assert_eq!(hz::adrp_offset(0xf000_0000 | (0x7_ffff << 5)), -4096);
+    assert_eq!(hz::flag_offset(0x1000, 0x1400_0000, w[1]), None);
+    assert_eq!(hz::flag_offset(0x1000, w[0], 0x1400_0000), None);
+}
+
+#[test]
+fn state07_scan_matches_pinned() {
+    // The pinned windows hold exactly the instruction runs the scans look for.
+    let flag = sites::find("hazard_flag").unwrap();
+    assert_eq!(hz::find_flag_run(&words_of(&flag.guard)), Some(0));
+    let window = sites::find("hazard_window").unwrap();
+    let hook = sites::find("hazard_hook").unwrap();
+    assert_eq!(hz::find_hook_run(&words_of(&window.guard)), Some(0));
+    assert_eq!(window.offset + 8, hook.offset);
+    assert_eq!(hook.offset, hz::HOOK_SITE_OFFSET);
+    // On the owned `.text` the first match of each scan is the pinned one.
+    let Some(main) = common::owned_main("state07_scan_matches_pinned") else {
+        return;
+    };
+    let words = main.text_words();
+    let flag_run = hz::find_flag_run(&words).expect("flag run");
+    assert_eq!(flag_run * 4, hz::FLAG_SCAN_OFFSET);
+    assert_eq!(hz::flag_offset(flag_run * 4, words[flag_run], words[flag_run + 1]), Some(hz::FLAG_OFFSET));
+    let hook_run = hz::find_hook_run(&words).expect("hook run");
+    assert_eq!((hook_run + 2) * 4, hz::HOOK_SITE_OFFSET);
+}
+
+#[test]
+fn state07_write_rule() {
+    assert_eq!(hz::rule_byte(true, true), Some(1));
+    assert_eq!(hz::rule_byte(false, true), Some(0));
+    assert_eq!(hz::rule_byte(true, false), None);
+    assert_eq!(hz::rule_byte(false, false), None);
+    let mut s = model::settings::Snapshot::factory();
+    assert_eq!(hz::rule_byte(s.stage_hazards(), true), Some(0), "default Off writes 0 in Training");
+    s.set("stage_hazards", &[1, 0]).unwrap();
+    assert_eq!(hz::rule_byte(s.stage_hazards(), true), Some(1));
+}
+
+#[test]
+fn state07_missing_address_disables() {
+    assert_eq!(hz::plan(Some(1), true), Plan::Enabled);
+    assert_eq!(hz::plan(None, true), Plan::Disabled(Missing::Flag));
+    assert_eq!(hz::plan(Some(1), false), Plan::Disabled(Missing::Hook));
+    assert_eq!(hz::plan(None, false), Plan::Disabled(Missing::Both));
+    // Each condition has its own text (upstream's were swapped).
+    assert_ne!(Missing::Flag.text(), Missing::Hook.text());
+    assert!(Missing::Flag.text().contains("rule byte"));
+    assert!(Missing::Hook.text().contains("hook site"));
+}
