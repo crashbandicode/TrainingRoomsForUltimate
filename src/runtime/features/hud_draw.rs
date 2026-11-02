@@ -42,7 +42,7 @@ struct Containers {
     column: usize,
 }
 
-static CONTAINERS: Mutex<Containers> = Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, column: 0 });
+/// The coalescer of the `input_display_plan` diag line.\n#[cfg(feature = "diag")]\nstatic PLAN_LOG: Mutex<crate::model::input_display::PlanLogGate> = Mutex::new(crate::model::input_display::PlanLogGate::new());\n\nstatic CONTAINERS: Mutex<Containers> = Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, column: 0 });
 
 /// The longest text written to one pane (the status text's 48 units, the held-frames' 4).
 const TEXT_UNITS: usize = 48;
@@ -85,7 +85,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         {
             let rows = plan.ops().iter().filter(|op| matches!(op, Op::Row { .. })).count();
             let icons = plan.ops().iter().filter(|op| matches!(op, Op::Icons { .. })).count();
-            diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));
+            // Coalesced (`PlanLogGate`): the line is for a changed plan or a heartbeat, never one per tick; the check and the\n            // line format on the stack and allocate nothing, so the hook counter stays at 0 with the HUD drawing.\n            if PLAN_LOG.lock().should_log(plan.ops().len(), rows, icons) {\n                diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));\n            }
         }
         write_plan(column, &plan);
     }
