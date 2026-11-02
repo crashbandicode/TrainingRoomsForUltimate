@@ -58,8 +58,10 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 
 - Order: build every remaining package end to end (all designed and agreed features, N1–N10, carried fork features,
   fix-ledger rows as the fork lands them), gated and pushed fast-forward; online rows on the Surface + Yoga pair;
-  an RC (gates + size statement + provenance matrix + illustrated summary) → tell the primary, then Fable 5.1 and
-  Codex Astra review it and their findings are fixed at the root before the card swap (the primary's order).
+  an RC (gates + size statement + provenance matrix + illustrated summary) → add `## RC READY` (RC sha, NRO hashes,
+  evidence paths) to TRAININGROOMS-STATUS.md (the primary's watcher fires on it and on a non-empty `## BLOCKED`); the
+  review is Codex Astra (high) (the operator replaced Fable); its findings are fixed at the root before the card swap.
+  Astra's early package-1 review is running; findings come via the primary.
   Blockers go to `TRAININGROOMS-STATUS.md` "## BLOCKED"; non-root workarounds are parked as operator decisions.
 - Streams (Sonnet 5.5 high), rules `/home/intpa/smash-training-lobby/TRAININGROOMS-STREAM-RULES.md`: pkg2 CPU,
   pkg3 save states, pkg4 recording/input, pkg5 menu rendering/layout/assets, pkg6 carry-over (plan first). Each on
