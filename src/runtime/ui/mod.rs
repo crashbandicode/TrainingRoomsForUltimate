@@ -10,6 +10,9 @@
 
 pub mod anchors;
 pub mod archive;
+pub mod effect_texture;
+#[cfg(feature = "diag")]
+pub mod effect_probe;
 pub mod hud;
 pub mod input;
 pub mod menu_app;
@@ -39,6 +42,8 @@ pub struct UiInstall {
     pub anchors: bool,
     /// The u4 texture helper's guards (`sites_u4::SITES`).
     pub texture_found: [GuardOutcome; crate::model::sites_u4::SITES.len()],
+    /// The u4b effect-texture helper's guards (`sites_u4b::SITES`).
+    pub effect_found: [GuardOutcome; crate::model::sites_u4b::SITES.len()],
 }
 
 /// The install-line rows of the package's sites.
@@ -63,6 +68,11 @@ pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteRepor
             },
         })
         .chain(texture)
+        .chain(crate::model::sites_u4b::SITES.iter().enumerate().map(|(i, site)| SiteReport {
+            site: site.name,
+            found: install.effect_found[i],
+            written: if install.effect_found[i].usable() { Written::Checked } else { Written::Skipped },
+        }))
         .collect()
 }
 
@@ -145,5 +155,7 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     }
     // The game-file texture helper (u4): the stage grid's thumbnails ride on it; without it the tiles keep their text.
     let texture_found = texture::install();
-    UiInstall { found, archive_hook, anchors, texture_found }
+    // The resident effect-texture helper (u4b): the DI / SDI chips ride on it; without it they keep the clean room's arrows.
+    let effect_found = effect_texture::install();
+    UiInstall { found, archive_hook, anchors, texture_found, effect_found }
 }

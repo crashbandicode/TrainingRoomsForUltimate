@@ -26,6 +26,7 @@ use crate::model::sites_pkg3::{self, STATE_SITES};
 use crate::model::sites_pkg4;
 use crate::model::sites_pkg6;
 use crate::model::sites_u4;
+use crate::model::sites_u4b;
 use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
@@ -146,6 +147,10 @@ pub fn run() {
     for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
     }
+    let mut u4b_found = [GuardOutcome::Stock; sites_u4b::SITES.len()];
+    for (slot, site) in u4b_found.iter_mut().zip(sites_u4b::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
     // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
     let usable = |site: &sites::Site| {
         let by_name = |rows: &[sites::Site], outcomes: &[GuardOutcome]| rows.iter().position(|s| s.name == site.name).map(|i| outcomes[i].usable());
@@ -155,6 +160,7 @@ pub fn run() {
             .or_else(|| by_name(&UI_SITES, &ui_found))
             .or_else(|| by_name(&sites_pkg6::SITES, &found6))
             .or_else(|| by_name(&sites_u4::SITES, &u4_found))
+            .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -233,7 +239,7 @@ pub fn run() {
         ui::install(&loaded, input_delay_on)
     } else {
         diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
-        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false }
+        ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found, effect_found: u4b_found }
     };
     // Package 4's notices and input log draw from the layout tick package 5 just installed.
     if !ui::hud::register(hud_draw::draw) {

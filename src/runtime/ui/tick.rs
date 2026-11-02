@@ -136,6 +136,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if thumbs::run(panes) {
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::ui::effect_probe::tick(panes);
 }
 
 /// A log line from the tick. The tick runs inside the UI hooks; its lines are the once-per-registration kind (layout

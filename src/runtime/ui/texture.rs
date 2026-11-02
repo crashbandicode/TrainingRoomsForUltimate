@@ -23,6 +23,7 @@ use skyline::nn::ui2d::Pane;
 use crate::model::guard::GuardOutcome;
 use crate::model::hash40::hash40;
 use crate::model::sites_u4::{self, SITES};
+use crate::model::sites_u4b;
 use crate::model::sites_ui::decode_adrp_ldr;
 use crate::model::ui_texture::{self as facts, RetireQueue, TextureFacts};
 use crate::runtime::diag_log::diagnostic;
@@ -64,6 +65,8 @@ type Bind = extern "C" fn(*mut Pane, *const u8, i32);
 type Clear = extern "C" fn(*mut Pane);
 type ReleaseWeak = extern "C" fn(*mut u8);
 type OnZero = extern "C" fn(*mut u8);
+/// `register(u64* slot_out, texture_view*, user) -> bool` (`sites_u4b::UI_REGISTER_VIEW_OFFSET`).
+type Register = extern "C" fn(*mut u64, *const u8, usize) -> bool;
 
 fn at(offset: usize) -> usize {
     game::text_base() + offset
@@ -141,6 +144,51 @@ pub unsafe fn load(hash: u64) -> Option<Texture> {
     if read_usize(texture.holder) != at(facts::HOLDER_VTABLE) || read_usize(texture.control) != at(facts::CONTROL_VTABLE) {
         return None;
     }
+    Some(texture)
+}
+
+/// A UI texture over a texture view the game already built (stream u4b: the DI / SDI effect textures, which live in `ef_common.eff`'s
+/// `BNTX`, built in place by the particle system). The game's own constructor makes the UI texture with no file handle (the
+/// constructor's `0xffffff` case: nothing is queued, nothing is loaded), the game's own registration function puts the view in the
+/// shared descriptor pool for this texture (the call the UI texture update makes for a file texture), and the three fields the update
+/// would have written are written here: slot (by the registration), size and the "registered" byte, so the game's destroy releases the
+/// slot. `None` when the helper is not usable or the pool is full (nothing is left behind).
+///
+/// # Safety
+/// On the UI job thread, inside the layout tick; `view` is a live texture view of the game (the effect resource's) that outlives the
+/// returned texture, and `width` and `height` are its texture's size.
+pub unsafe fn load_resident(view: usize, width: u16, height: u16) -> Option<Texture> {
+    if !usable() || !game::granted(sites_u4b::UI_REGISTER_VIEW_OFFSET) || view == 0 {
+        return None;
+    }
+    let make: Make = core::mem::transmute::<usize, Make>(at(sites_u4::UI_TEX_MAKE_OFFSET));
+    let register: Register = core::mem::transmute::<usize, Register>(at(sites_u4b::UI_REGISTER_VIEW_OFFSET));
+    let none = facts::HANDLE_NONE;
+    let mut pair = [0usize; 2];
+    make(pair.as_mut_ptr(), &none);
+    let texture = Texture { holder: pair[0], control: pair[1] };
+    if texture.holder == 0 || texture.control == 0 || texture.object().is_null() {
+        return None;
+    }
+    if read_usize(texture.holder) != at(facts::HOLDER_VTABLE) || read_usize(texture.control) != at(facts::CONTROL_VTABLE) {
+        return None;
+    }
+    let object = texture.object() as usize;
+    // The constructor left the texture empty: no handle, no pending job, no state object. Anything else is not the layout the guards say.
+    if !facts::is_ready(texture.facts()) {
+        release(texture);
+        return None;
+    }
+    let mut slot = facts::SLOT_UNSET;
+    let registered = register(&mut slot, view as *const u8, 0);
+    if !registered {
+        release(texture);
+        return None;
+    }
+    ((object + facts::TEXTURE_SLOT) as *mut u64).write_unaligned(slot);
+    ((object + facts::TEXTURE_WIDTH) as *mut u16).write_unaligned(width);
+    ((object + facts::TEXTURE_HEIGHT) as *mut u16).write_unaligned(height);
+    ((object + facts::TEXTURE_REGISTERED) as *mut u8).write_unaligned(1);
     Some(texture)
 }
 
