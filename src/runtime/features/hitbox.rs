@@ -181,13 +181,14 @@ impl Effects for GameEffects {
 
     fn sphere_kill_own(&mut self, handle: u32) {
         // SAFETY: as above; `handle` is one of this fighter's own spheres that still exists.
-        unsafe { natives::sphere_kill(self.accessor, handle) }
+        unsafe { natives::effect_kill(self.accessor, handle) }
     }
 
     fn sphere_spawn(&mut self, sphere: &Sphere) -> u32 {
         // SAFETY: as above.
         unsafe {
-            let handle = natives::sphere_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, sphere.scale, self.attribute);
+            let tail = (true, self.attribute, 0, 0, 0, 0, true, true);
+            let handle = natives::effect_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, &[0.0; 3], sphere.scale, tail);
             if handle != 0 {
                 natives::sphere_set_rgb(self.accessor, sphere.tint);
                 natives::sphere_set_rate(self.accessor, hitbox::RATE);

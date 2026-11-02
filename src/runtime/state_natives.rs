@@ -160,18 +160,6 @@ pub unsafe fn effect_req_common(accessor: usize, effect: u64) {
     at::<extern "C" fn(usize, u64, f32) -> u64>(s::STATE_EFFECT_REQ_COMMON_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, 0.0));
 }
 
-/// `EffectModule::req_follow(accessor, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0, 0,
-/// false, false)`: the handle of the effect (through the save states' own hook: a pass-through for
-/// everything but `sys_score_aura`).
-pub unsafe fn effect_req_follow(accessor: usize, effect: u64, joint: u64, pos: &Vector3f, rot: &Vector3f, attribute: u32, lifetime: i32) -> u64 {
-    type ReqFollow = extern "C" fn(usize, u64, u64, *const Vector3f, *const Vector3f, f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u64;
-    at::<ReqFollow>(s::STATE_EFFECT_REQ_FOLLOW_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, joint, pos, rot, 1.0, false, attribute, 0, lifetime, 0, 0, false, false))
-}
-
-pub unsafe fn effect_kill(accessor: usize, handle: u32) {
-    at::<extern "C" fn(usize, u32, bool, bool)>(s::STATE_EFFECT_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
-}
-
 pub unsafe fn effect_set_scale_one(accessor: usize, handle: u32) {
     let one = Vector3f { x: 1.0, y: 1.0, z: 1.0 };
     at::<extern "C" fn(usize, u32, *const Vector3f)>(s::STATE_EFFECT_SET_SCALE_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, &one))

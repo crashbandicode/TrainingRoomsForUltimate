@@ -436,17 +436,30 @@ pub mod natives {
         at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
     }
 
-    /// `EffectModule::req_follow(accessor, effect, joint, pos, zero rot, scale, follow = true, attribute, 0, 0, 0, 0, true, true)`: the
-    /// effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none (or the call was not granted).
-    pub unsafe fn sphere_req_follow(accessor: usize, effect: u64, joint: u64, pos: &[f32; 3], scale: f32, attribute: u32) -> u32 {
+    /// `EffectModule::req_follow(accessor, effect, joint, pos, rot, scale, tail.0, ..., tail.7)`: `tail` is the native's last eight
+    /// arguments in the symbol's order (`bool, u32, i32, i32, i32, i32, bool, bool`; the second is the effect attribute, the fourth the
+    /// lifetime). The effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none or the
+    /// row was not granted. The one wrapper of this native (tests/native_wrappers.rs): the hitbox spheres pass
+    /// `(true, attribute, 0, 0, 0, 0, true, true)` at their scale, the save states' charge effects `(false, attribute, 0, lifetime, 0,
+    /// 0, false, false)` at scale 1.0. The save states' own hook of this native sees both (a pass-through for all but `sys_score_aura`).
+    pub unsafe fn effect_req_follow(
+        accessor: usize,
+        effect: u64,
+        joint: u64,
+        pos: &[f32; 3],
+        rot: &[f32; 3],
+        scale: f32,
+        tail: (bool, u32, i32, i32, i32, i32, bool, bool),
+    ) -> u32 {
         type ReqFollow = extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u32;
-        let zero = [0.0f32; 3];
-        at::<ReqFollow>(crate::model::sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET)
-            .map_or_else(Default::default, |f| f(accessor, effect, joint, pos, &zero, scale, true, attribute, 0, 0, 0, 0, true, true))
+        at::<ReqFollow>(crate::model::sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET).map_or_else(Default::default, |f| {
+            f(accessor, effect, joint, pos, rot, scale, tail.0, tail.1, tail.2, tail.3, tail.4, tail.5, tail.6, tail.7)
+        })
     }
 
-    /// `EffectModule::kill(accessor, handle, false, true)`: ends one of the plugin's own effects (never by kind).
-    pub unsafe fn sphere_kill(accessor: usize, handle: u32) {
+    /// `EffectModule::kill(accessor, handle, false, true)`: ends one effect by its handle (never by kind). The one wrapper of this
+    /// native: the hitbox spheres and Min Min's arm effect in the save states.
+    pub unsafe fn effect_kill(accessor: usize, handle: u32) {
         at::<extern "C" fn(usize, u32, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
     }
 
