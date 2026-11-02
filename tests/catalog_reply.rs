@@ -113,3 +113,39 @@ fn boot_reserved_import_box_and_endpoint_survive_full_retry_and_completion() {
         assert_eq!(payload.as_ref().unwrap()[255], n);
     }
 }
+
+#[path = "../src/model/catalog_mailbox.rs"]
+mod catalog_mailbox;
+#[test]
+fn native_catalog_post_full_retry_and_worker_take_allocate_nothing() {
+    use catalog_mailbox::{channel, Publication};
+    let (producer, mut consumer) = channel(1);
+    for epoch in 0..32 {
+        let catalog = Arc::new(vec![epoch; 256]); // file worker
+        let make = || Publication { sequence: 4, epoch, value: Arc::clone(&catalog) };
+        assert!(native(|| producer.post(make())).is_ok());
+        let retained = native(|| producer.post(make())).err().unwrap();
+        assert!(Arc::ptr_eq(&consumer.take(4, epoch, true).unwrap(), &catalog));
+        assert!(native(|| producer.post(retained)).is_ok());
+        assert!(Arc::ptr_eq(&consumer.take(4, epoch, true).unwrap(), &catalog));
+    }
+}
+
+#[path = "../src/model/pooled_reply.rs"]
+mod pooled_reply;
+#[test]
+fn reply_pool_first_use_full_drop_and_reuse_allocate_nothing() {
+    let pool = pooled_reply::Pool::new(1);
+    for n in 0..64 {
+        let (ticket, job) = native(|| pool.claim().unwrap());
+        assert!(native(|| pool.claim()).is_none());
+        native(|| drop(ticket));
+        assert!(native(|| pool.claim()).is_none());
+        native(|| job.complete(n));
+        let (ticket, job) = native(|| pool.claim().unwrap());
+        assert!(matches!(native(|| ticket.try_recv()), Err(std::sync::mpsc::TryRecvError::Empty)));
+        native(|| drop(job));
+        assert_eq!(native(|| ticket.try_recv()), Ok(Err(())));
+        native(|| drop(ticket));
+    }
+}

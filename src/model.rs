@@ -133,3 +133,11 @@ pub mod reusable_snapshot;
 /// Boot-reserved replay request identities and completion lifecycle.
 #[path = "model/replay_jobs.rs"]
 pub mod replay_jobs;
+
+/// Native publication ownership transferred to the UI worker.
+#[path = "model/catalog_mailbox.rs"]
+pub mod catalog_mailbox;
+
+/// Reply endpoints returned only after both request owners retire.
+#[path = "model/pooled_reply.rs"]
+pub mod pooled_reply;
