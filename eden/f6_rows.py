@@ -7,6 +7,7 @@ The native baseline explicitly selects --native-reload and requires `[CharacterR
 A missing completion ends the lane with a retained failed receipt. Options come from the settings file.
 
 Usage: f6_rows.py settings <out.json>
+       f6_rows.py bootstrap <label> --harness <shared eden/harness>
        f6_rows.py laps <label> --harness <shared eden/harness> [--native-reload] [--p1 N] [--cpu N]
 Results: `eden/runs/<label>/laps.jsonl` (one record per press) and the diag lines it waited on.
 """
@@ -54,6 +55,7 @@ def settings(out):
 
 
 def laps(args):
+    bootstrap = getattr(args, "bootstrap", False)
     # Use the shared, reviewed harness; do not start or claim an instance here.
     harness = Path(args.harness or os.environ.get("TR_HARNESS", str(HERE / "harness")))
     if not (harness / "route.py").is_file():
@@ -96,7 +98,7 @@ def laps(args):
             return f"shot failed: {exc}"
 
     start = 0
-    if not args.native_reload:
+    if not args.native_reload and not bootstrap:
         ready = wait_for(start, "[GroupSwap] prefetched", args.settle)
         if ready is None:
             raise SystemExit("GATE FAIL: no prefetched group; no cycle inputs sent")
@@ -104,6 +106,8 @@ def laps(args):
     records = []
     for role, n in ((0, args.p1), (1, args.cpu)):
         for i in range(n):
+            if bootstrap and wait_for(0, f"[CharacterRoster] observed owner={role}", args.settle) is None:
+                raise SystemExit(f"GATE FAIL: bootstrap owner={role} was not observed; no cycle input sent")
             m = count()
             session.press("zl,right" if role == 0 else "zl,left", 200)
             queued = wait_for(m, f"[CharacterRoster] queued owner={role}", 8)
@@ -111,11 +115,11 @@ def laps(args):
             done = wait_for(m, f"{completion} owner={role}", 20)
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
-            rec = {"role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,
+            rec = {"phase": "bootstrap" if bootstrap else "lap", "role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,
                    "shot": shot(f"r{role}-p{i + 1}") if any("[GroupSwap] built" in x for x in built) else None}
             records.append(rec)
             # Persist each attempted lap, including a failure, before another input.
-            with (out / "laps.jsonl").open("a", encoding="utf-8") as f:
+            with (out / ("bootstrap.jsonl" if bootstrap else "laps.jsonl")).open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
             if done is None:
                 shot(f"r{role}-p{i + 1}-gate-failed")
@@ -124,9 +128,9 @@ def laps(args):
             for x in built:
                 print("  ", x[:400], flush=True)
             # Let a prefetch of the next group finish before the next press (the planner's own pace).
-            if not args.native_reload:
+            if not args.native_reload and not bootstrap:
                 wait_for(count(), "[GroupSwap] prefetched", args.gap)
-    print("LAPS DONE", len(records), flush=True)
+    print("BOOTSTRAP DONE" if bootstrap else "LAPS DONE", len(records), flush=True)
 
 
 def main():
@@ -142,6 +146,11 @@ def main():
     s.add_argument("--gap", type=float, default=6)
     s.add_argument("--harness", help="shared eden/harness directory (or TR_HARNESS)")
     s.add_argument("--native-reload", action="store_true", help="no bank prefetch; require native roster completion")
+    s = sub.add_parser("bootstrap", help="enter each role's first body bank before waiting for group prefetch")
+    s.add_argument("label")
+    s.add_argument("--harness")
+    s.add_argument("--settle", type=float, default=20)
+    s.set_defaults(bootstrap=True, native_reload=False, p1=1, cpu=1, gap=0)
     a = p.parse_args()
     if a.op == "settings":
         settings(a.out)
