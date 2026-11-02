@@ -132,6 +132,11 @@ class AllyTransport(route.Transport):
     """route.py's transport for the rig: every command is one batch of wa.py ops. Screenshots are one frame of Eden's own
     recorder (renderer read-back; the desktop does not matter)."""
 
+    # The Ally's renders differ from the Yoga's references: its main menu has its own (960 wide), and the stage and
+    # character selects are gated on the tile cursor's log, as ally_route.py did; no gate before the match.
+    menu = ("ally-main-menu.png", (0, 0, 600, 540), 25)
+    log_screens = {"stage select": ("tile", "screen=sss"), "character select": ("tile", "screen=css"), "ready to fight": None}
+
     def __init__(self, p, label):
         self.p, self.label = p, label
         self.logs = {"events": f"{p.output}/events.log", "diag": f"{p.output}/practice-diagnostics.log",
@@ -147,7 +152,7 @@ class AllyTransport(route.Transport):
     def stick(self, x, y, ms):
         self.run([["stick", "left", x, y, ms, 0.25]])
 
-    def shot(self, name, width=1280):
+    def shot(self, name, width=960):
         from PIL import Image
         self.run([["gshot", name, 2, width, 700]])
         dest = HERE.parent.parent / "runs" / self.label / "shots"

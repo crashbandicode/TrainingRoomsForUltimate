@@ -44,7 +44,12 @@ MACRO = "tr-main-to-stage-select.edenmacro.json"
 
 
 class Transport:
-    """What the route needs from the instance: input, a screenshot as a local PNG, plugin log lines, a macro."""
+    """What the route needs from the instance: input, a screenshot as a local PNG, plugin log lines, a macro.
+    `menu` is the main menu's (reference, box, limit); `log_screens` maps a screen to a (log, text) gate used instead
+    of the screenshot match, or to None for no gate (the Ally's renders differ from the Yoga's references)."""
+
+    menu = GATES["main menu"][:3]
+    log_screens = {}
 
     def press(self, buttons, hold=150):
         raise NotImplementedError
@@ -191,6 +196,14 @@ class Session:
             self.sleep(1.0)
         self.fail(screen, f"best_dist={best:.1f} limit={limit}")
 
+    def wait_screen(self, screen, ref=None):
+        """The screen's gate: the transport's log gate when it has one, else the screenshot match."""
+        gate = self.t.log_screens.get(screen, False)
+        if gate is False:
+            return self.wait_match(screen, ref=ref)
+        if gate is not None:
+            return self.wait_line(gate[0], gate[1], GATES[screen][3], screen)
+
     def press(self, buttons, hold=150):
         self.t.press(buttons, hold)
 
@@ -247,7 +260,7 @@ def to_training(s, args):
         elif kind == "macro":
             print("macro", json.dumps(s.macro(step[1], 90)), flush=True)
         elif kind == "wait_match":
-            s.wait_match(step[1], ref=step[2] if len(step) > 2 else None)
+            s.wait_screen(step[1], ref=step[2] if len(step) > 2 else None)
             if step[1] == "stage select":
                 mark = len(s.t.lines("tile"))
         elif kind == "tile":
@@ -260,7 +273,7 @@ def to_training(s, args):
 
 def to_main_menu(s):
     """Title -> main menu: A until the menu's reference matches (up to 10 presses), then a pause."""
-    menu, box, limit, _ = GATES["main menu"]
+    menu, box, limit = s.t.menu
     for attempt in range(10):
         s.press("a")
         s.sleep(3)
@@ -275,6 +288,7 @@ def to_main_menu(s):
             s.sleep(1.5)
             return
     s.fail("main menu", "never matched")
+
 
 def session(label, p=None, transport=None):
     p = p or params.load()

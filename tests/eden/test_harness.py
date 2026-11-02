@@ -557,6 +557,118 @@ class Route(unittest.TestCase):
         self.assertEqual(t.calls[-1], ("shot", "training-scene"))
 
 
+class Transports(unittest.TestCase):
+    def setUp(self):
+        import route
+        self.route = route
+
+    def test_local_transport_drives_the_control_api_through_gv(self):
+        import tempfile
+        import gv
+        calls = []
+
+        def fake(label, method, params_=None, timeout=15):
+            calls.append((method, params_))
+            if method == "ui.tree":
+                return {"children": [{"class": "GRenderWindow", "id": "w1"}]}
+            if method == "macro.status":
+                return {"state": "finished", "error": ""}
+            return {}
+
+        with tempfile.TemporaryDirectory() as d:
+            mine = p(root=d, macros=d)
+            (Path(d) / "m.edenmacro.json").write_text("{}")
+            real, sleeper = gv.client_call, self.route.time.sleep
+            gv.client_call, self.route.time.sleep, gv.time.sleep = fake, lambda s: None, lambda s: None
+            try:
+                t = self.route.Local(mine, "st-01")
+                t.press("lstick,up", 150)
+                t.stick(0, -1, 250)
+                png = t.shot("x")
+                receipt = t.macro("m.edenmacro.json", 5)
+                t.call("status")
+            finally:
+                gv.client_call, self.route.time.sleep, gv.time.sleep = real, sleeper, sleeper
+            self.assertEqual([c[0] for c in calls][:4], ["input.button", "input.button", "input.button", "input.button"])
+            self.assertEqual(calls[0][1], {"button": "lstick", "state": "press", "lease_ms": 650})  # L3 first
+            self.assertEqual(calls[2][1]["state"], "release")
+            self.assertIn(("input.stick", {"stick": "left", "x": 0, "y": -1, "lease_ms": 250}), calls)
+            self.assertTrue(str(png).endswith("-x.png") and "shots/st-01" in str(png))
+            self.assertEqual(receipt["state"], "finished")
+            self.assertEqual(len(receipt["sha256"]), 64)
+            self.assertTrue((Path(d) / "runs/st-01/macros.jsonl").exists())  # the receipt is kept with the run
+
+    def test_ssh_transport_builds_one_gv_call_per_command(self):
+        sent = []
+
+        class Done:
+            returncode, stderr = 0, ""
+
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def fake_run(cmd, **kw):
+            sent.append(cmd)
+            return Done("{}" if " call " in cmd[-1] else "")
+
+        real = self.route.subprocess.run
+        self.route.subprocess.run = fake_run
+        try:
+            t = self.route.Ssh(p(host="yoga", root="/home/intpa/trainingrooms-eden-st"), "st-01")
+            t.press("lstick,right", 150)
+            t.lines("tile", 7)
+            t.call("status")
+        finally:
+            self.route.subprocess.run = real
+        self.assertTrue(all(c[-2] == "memento-claw-yoga-ubuntu" for c in sent))
+        self.assertEqual(sent[0][-1], "/usr/bin/python3 -I /home/intpa/trainingrooms-eden-st/harness/gv.py press st-01 lstick,right 150")
+        self.assertTrue(sent[1][-1].endswith("harness/gv.py lines tile --after 7"))
+        self.assertIn("ControlPath=/tmp/trssh-st-%C", sent[0])
+
+    def test_the_ally_gates_stages_on_the_tile_log_and_has_its_own_menu(self):
+        import importlib.util
+        sys.path.insert(0, str(ROOT / "eden/harness/ally"))
+        spec = importlib.util.spec_from_file_location("client", ROOT / "eden/harness/ally/client.py")
+        client = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(client)
+        t = client.AllyTransport(p(host="ally", ally_claim="x"), "st-01")
+        self.assertEqual(t.menu[0], "ally-main-menu.png")
+        self.assertEqual(t.logs["events"], "TrainingRooms/events.log")
+        logs = {"events": ["plugin=training_rooms/ ok"], "tile": []}
+
+        class Fake(client.route.Transport):
+            menu, log_screens = t.menu, t.log_screens
+            calls = []
+
+            def lines(self, name, after=0):
+                return logs.get(name, [])[after:]
+
+            def press(self, buttons, hold=150):
+                self.calls.append(buttons)
+                if buttons == "lstick,right":
+                    logs["tile"].append("settled screen=sss at=4 hovered=none")
+
+            def macro(self, name, cap=120):
+                logs["tile"].append("step screen=sss")
+                return {}
+
+            def shot(self, name):
+                logs["tile"].append("screen=css") if name == "after-a" and False else None
+                return Path("/s/x.png")
+
+        clock = type("C", (), {"t": 0.0})
+        s = client.route.Session(Fake(), "/refs", sleep=lambda x: setattr(clock, "t", clock.t + x), clock=lambda: clock.t)
+        client.route.dist = lambda *a: 1.0
+        logs["tile"][:] = ["screen=sss first", "screen=css"]
+        a = client.route.build_parser().parse_args(["st-01", "--stage-steps", "right:4", "--tile-gate", "4",
+                                                    "--install-gate", "plugin=training_rooms/",
+                                                    "--training-gate", "diag:cpu_hook_counts frames="])
+        logs["diag"] = ["cpu_hook_counts frames=60"]
+        client.route.to_training(s, a)
+        self.assertEqual(s.t.calls.count("lstick,right"), 4)  # the stage steps; no screenshot gate for "ready to fight"
+        client.route.dist = self.route.dist
+
+
 class AllyAdapter(unittest.TestCase):
     def test_wait_log_hits_misses_and_continues_after_the_hit(self):
         import importlib.util
