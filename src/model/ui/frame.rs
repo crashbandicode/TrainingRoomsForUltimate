@@ -105,7 +105,28 @@ pub enum View {
     Chips,
     /// The item or stage grid's tiles.
     Tiles,
+    /// The delay popup (N3, mockup 19): the checklist as a grid of boxes over the min-max range control.
+    Delay,
+    /// The situation overrides screen (mockup 06): the situation line over two columns of action boxes.
+    Overrides,
 }
+
+/// The delay popup's range control: two handles on a bar over the row's value set.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RangeView {
+    /// Both handles are set (else the bar is empty).
+    pub set: bool,
+    pub min: u8,
+    pub max: u8,
+    /// The last value index (the bar's scale).
+    pub top: u8,
+    /// The control is greyed (the checklist holds a value).
+    pub grey: bool,
+    /// Which handle the cursor is on: 0 none (the cursor is on the checklist), 1 Min, 2 Max.
+    pub focus: u8,
+    pub editing: bool,
+}
+
 
 /// One frame of the menu.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -120,6 +141,9 @@ pub struct Frame {
     pub tiles: [Text<28>; super::panes::TILES],
     pub tile_count: u8,
     pub tile_focus: u8,
+    /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
+    pub tile_state: [u8; super::panes::TILES],
+    pub range: RangeView,
     pub title: Text<40>,
     pub tabs: [Text<40>; TABS],
     pub tab_count: u8,
@@ -153,6 +177,8 @@ impl Frame {
             tiles: [Text::new(); super::panes::TILES],
             tile_count: 0,
             tile_focus: 0,
+            tile_state: [0; super::panes::TILES],
+            range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,

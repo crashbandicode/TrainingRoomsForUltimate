@@ -328,6 +328,8 @@ pub fn linear(srgb: [u8; 4]) -> [u8; 4] {
 pub const PANEL: [u8; 4] = [8, 10, 14, 255];
 pub const ACCENT: [u8; 4] = [176, 48, 40, 255];
 pub const HIGHLIGHT: [u8; 4] = [38, 44, 56, 255];
+/// The focus ring of a box or handle that is itself on the accent.
+pub const ACCENT_RING: [u8; 4] = [240, 240, 240, 255];
 pub const RULE: [u8; 4] = [60, 66, 78, 255];
 pub const TEXT: [u8; 4] = [236, 238, 242, 255];
 pub const TEXT_DIM: [u8; 4] = [150, 156, 168, 255];

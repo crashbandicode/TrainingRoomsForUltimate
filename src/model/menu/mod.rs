@@ -207,6 +207,12 @@ pub enum Screen {
     External(Editor),
 }
 
+/// The delay popup's checklist is drawn as columns of this many boxes (mockup 19).
+pub const DELAY_ROWS: usize = 4;
+
+/// The situation overrides screen draws its 13 actions in two columns: the first holds this many (mockup 06).
+pub const OVERRIDE_COLUMN: usize = 7;
+
 /// The menu.
 #[derive(Clone, Debug)]
 pub struct Menu {
@@ -957,6 +963,12 @@ impl Menu {
                     self.move_handle(range_id, cursor - len, if forward { 1 } else { -1 });
                 } else if on_handle {
                     self.top(screen(if cursor == len { len + 1 } else { len }, false));
+                } else {
+                    // The checklist is drawn as columns of DELAY_ROWS boxes: Left / Right step a column, staying put at an edge.
+                    let next = if forward { cursor + DELAY_ROWS } else { cursor.wrapping_sub(DELAY_ROWS) };
+                    if next < len {
+                        self.top(screen(next, false));
+                    }
                 }
             }
             Button::A if on_handle => {
@@ -1141,6 +1153,14 @@ impl Menu {
                 self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0));
             }
             Button::Right if cursor == 0 => self.top(screen((situation + 1) % SITUATIONS.len(), 0)),
+            // The actions are drawn in two columns of OVERRIDE_COLUMN (mockup 06): Left / Right step to the other column.
+            Button::Left | Button::Right if cursor > 0 => {
+                let at = cursor - 1;
+                let next = if button == Button::Right { at + OVERRIDE_COLUMN } else { at.wrapping_sub(OVERRIDE_COLUMN) };
+                if next < options::ACTIONS.len() {
+                    self.top(screen(situation, next + 1));
+                }
+            }
             Button::A if cursor > 0 => self.toggle_entry(id, cursor - 1),
             Button::ZL if cursor > 0 => self.all_or_none(id),
             Button::B => {

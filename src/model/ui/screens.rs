@@ -6,13 +6,13 @@
 
 use core::fmt::Write;
 
-use super::frame::{page_frame, Frame, RowLine, Text, Tone, View};
+use super::frame::{page_frame, Frame, RangeView, RowLine, Text, Tone, View};
 use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
 use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout};
 use super::menu::table::{Control, Row, GROUPS, ROWS};
-use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState};
+use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
 const HINT_LIST: &str = "Up/Down choose   A set   B back";
@@ -164,6 +164,8 @@ fn checklist_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, fram
     let _ = frame.hint.write_str(HINT_CHECKLIST);
 }
 
+/// The delay popup (N3, mockup 19): the checklist as a grid of boxes (a ticked value on the accent) over the min-max
+/// range control. One of the two is greyed while the other holds a value; the help panel says why on the greyed one.
 fn delay_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, editing: bool, frame: &mut Frame) {
     base(menu, screen, frame);
     let r = &ROWS[row];
@@ -172,39 +174,56 @@ fn delay_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, editing:
     let ticked = settings.get(r.id).map(<[u8]>::to_vec).unwrap_or_default();
     let range = settings.get(range_id).map(<[u8]>::to_vec).unwrap_or_default();
     let (check_grey, range_grey) = menu.delay_grey(row);
-    let total = ticked.len() + 2;
-    lines_window(frame, cursor, total, |i, line| {
-        if i < ticked.len() {
-            let _ = write!(line.label, "{}", first + step * i as u16);
-            let (text, tone) = mark(ticked[i] != 0);
-            let _ = line.value.write_str(text);
-            line.value_tone = if check_grey.is_some() { Tone::Off } else { tone };
-            if check_grey.is_some() {
-                line.label_tone = Tone::Off;
-            }
-        } else {
-            let handle = i - ticked.len();
-            let _ = line.label.write_str(if handle == 0 { "Range: Min" } else { "Range: Max" });
-            match range.get(handle) {
-                Some(index) => {
-                    let _ = write!(line.value, "{}", first + step * u16::from(*index));
-                    if editing && cursor == i {
-                        let _ = line.value.write_str("  (editing)");
-                    }
-                }
-                None => {
-                    let _ = line.value.write_str("not set");
-                    line.value_tone = Tone::Dim;
-                }
-            }
-            if range_grey.is_some() {
-                line.label_tone = Tone::Off;
-                line.value_tone = Tone::Off;
-            }
+    let count = ticked.len().min(DELAY_TILES);
+    frame.view = View::Delay;
+    frame.tile_cols = DELAY_TILES.div_ceil(DELAY_ROWS) as u8;
+    frame.tile_rows = DELAY_ROWS as u8;
+    frame.tile_count = count as u8;
+    for (i, mark) in ticked.iter().enumerate().take(count) {
+        let _ = write!(frame.tiles[i], "{}", first + step * i as u16);
+        frame.tile_state[i] = if check_grey.is_some() { 2 } else { u8::from(*mark != 0) };
+    }
+    let on_handle = cursor >= ticked.len();
+    frame.tile_focus = if on_handle { 255 } else { cursor as u8 };
+    let top = ticked.len().saturating_sub(1) as u8;
+    frame.range = RangeView {
+        set: range.len() == 2,
+        min: range.first().copied().unwrap_or(0),
+        max: range.get(1).copied().unwrap_or(0),
+        top,
+        grey: range_grey.is_some(),
+        focus: if on_handle { (cursor - ticked.len() + 1) as u8 } else { 0 },
+        editing,
+    };
+    // Four text lines the view places: the checklist's header and count, the range's header and value, then the
+    // two handle labels.
+    let n_ticked = ticked.iter().filter(|v| **v != 0).count();
+    let rows = &mut frame.rows;
+    let _ = rows[0].label.write_str("Checklist");
+    let _ = if n_ticked == 0 { rows[0].value.write_str("none ticked") } else { write!(rows[0].value, "{n_ticked} ticked") };
+    let _ = rows[1].label.write_str("Range (min - max)");
+    match (frame.range.set, range.as_slice()) {
+        (true, [lo, hi]) => {
+            let _ = write!(rows[1].value, "{} - {}", first + step * u16::from(*lo), first + step * u16::from(*hi));
+            let _ = write!(rows[2].label, "min {}", first + step * u16::from(*lo));
+            let _ = write!(rows[3].label, "max {}", first + step * u16::from(*hi));
         }
-    });
+        _ => {
+            let _ = rows[1].value.write_str("not set");
+            rows[1].value_tone = Tone::Dim;
+        }
+    }
+    if check_grey.is_some() {
+        rows[0].label_tone = Tone::Off;
+        rows[0].value_tone = Tone::Off;
+    }
+    if range_grey.is_some() {
+        rows[1].label_tone = Tone::Off;
+        rows[1].value_tone = Tone::Off;
+    }
+    frame.row_count = 4;
     // A greyed control says why on the help panel's second line.
-    let reason = if cursor < ticked.len() { check_grey } else { range_grey };
+    let reason = if on_handle { range_grey } else { check_grey };
     if let Some(grey) = reason {
         frame.help[1].clear();
         let _ = frame.help[1].write_str(Grey::text(grey));
@@ -212,6 +231,8 @@ fn delay_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, editing:
     let _ = frame.hint.write_str(HINT_DELAY);
 }
 
+/// The delay popup's checklist grid: columns of DELAY_ROWS boxes, up to 32 boxes (the longest value set has 31).
+pub const DELAY_TILES: usize = 32;
 fn slider_frame(menu: &Menu, screen: &Screen, row: usize, state: SliderState, frame: &mut Frame) {
     base(menu, screen, frame);
     let values = menu.settings().menu.get(ROWS[row].id).map(<[u8]>::to_vec).unwrap_or_default();
@@ -323,26 +344,29 @@ fn swap_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     let _ = frame.hint.write_str("Up/Down move   A switch   B back");
 }
 
+/// Situation overrides (mockup 06): the situation dropdown line, then the 13 actions as boxes in two columns (7 and 6);
+/// a ticked action is on the accent. Left / Right on the situation line change it, on a box they step a column.
 fn overrides_frame(menu: &Menu, screen: &Screen, situation: usize, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
     let (name, id) = SITUATIONS[situation];
     let current = menu.settings().menu.get(id).map(<[u8]>::to_vec).unwrap_or_default();
-    lines_window(frame, cursor, ACTIONS.len() + 1, |i, line| {
-        if i == 0 {
-            let _ = write!(line.label, "Situation  ({} of {})", situation + 1, SITUATIONS.len());
-            let _ = write!(line.value, "<  {name}  >");
-        } else {
-            let _ = line.label.write_str(ACTIONS[i - 1]);
-            let (text, tone) = mark(current.get(i - 1).copied().unwrap_or(0) != 0);
-            let _ = line.value.write_str(text);
-            line.value_tone = tone;
-        }
-    });
+    frame.view = View::Overrides;
+    frame.tile_cols = 2;
+    frame.tile_rows = OVERRIDE_COLUMN as u8;
+    frame.tile_count = ACTIONS.len() as u8;
+    for (i, action) in ACTIONS.iter().enumerate() {
+        let _ = frame.tiles[i].write_str(action);
+        frame.tile_state[i] = u8::from(current.get(i).copied().unwrap_or(0) != 0);
+    }
+    frame.tile_focus = if cursor == 0 { 255 } else { (cursor - 1) as u8 };
+    let _ = write!(frame.rows[0].label, "Situation  ({} of {})", situation + 1, SITUATIONS.len());
+    let _ = write!(frame.rows[0].value, "<  {name}  >");
+    frame.row_count = 1;
+    frame.focus = (cursor == 0).then_some(0);
     let _ = frame.help[0].write_str("The actions the CPU may take in this situation (one at random).");
     frame.help[1].clear();
-    let _ = frame.hint.write_str("Left/Right situation   Up/Down move   A tick   ZL all or none   B back");
+    let _ = frame.hint.write_str("Left/Right situation or column   Up/Down move   A tick   ZL all or none   B back");
 }
-
 fn chords_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
     lines_window(frame, cursor, CHORD_ROWS.len(), |i, line| {
@@ -463,8 +487,11 @@ mod tests {
         let mut m = menu();
         open(&mut m, "Ledge Delay");
         let f = frame(&m);
-        // 31 values plus the Min and Max handles, in a window.
-        assert_eq!(f.row_count as usize, ROW_LINES);
+        // The popup is the delay view: 31 boxes in 4 rows of columns, then the range control (none set yet).
+        assert_eq!(f.view, View::Delay);
+        assert_eq!((f.tile_count, f.tile_rows, f.tile_cols), (31, 4, 8));
+        assert_eq!(f.tiles[1].string_lossy(), "10");
+        assert!(!f.range.set && !f.range.grey && f.range.top == 30);
         // Down to Min (index 31), A creates the range [0, 0] and starts editing.
         for _ in 0..31 {
             m.press(Button::Down);
@@ -472,9 +499,10 @@ mod tests {
         m.press(Button::A);
         m.press(Button::B);
         let f = frame(&m);
-        let first = f.rows[0];
-        assert_eq!(first.value_tone, Tone::Off, "a ticked entry greys while a range is set");
-        // Back on the first entry the help panel names the reason.
+        assert!(f.range.set && f.range.focus == 1 && !f.range.editing);
+        assert_eq!(f.tile_state[0], 2, "a box greys while a range is set");
+        assert_eq!(f.rows[1].value.string_lossy(), "0 - 0");
+        // Back on the first box the help panel names the reason.
         for _ in 0..40 {
             m.press(Button::Up);
         }
@@ -482,6 +510,45 @@ mod tests {
         assert!(f.help[1].string_lossy().contains("range is set"), "{:?}", f.help[1]);
     }
 
+    #[test]
+    fn left_and_right_step_a_column_of_the_delay_checklist_and_stop_at_the_edge() {
+        let mut m = menu();
+        open(&mut m, "Ledge Delay");
+        m.press(Button::Right);
+        assert_eq!(frame(&m).tile_focus, 4);
+        m.press(Button::Left);
+        m.press(Button::Left);
+        assert_eq!(frame(&m).tile_focus, 0, "no step past the first column");
+        for _ in 0..9 {
+            m.press(Button::Right);
+        }
+        assert_eq!(frame(&m).tile_focus, 28, "the last full column; 32 would be past the 31 boxes");
+        m.press(Button::A);
+        assert_eq!(frame(&m).tile_state[28], 1, "a tick shows");
+    }
+    #[test]
+    fn the_overrides_screen_is_two_columns_of_boxes_and_left_right_step_a_column() {
+        let mut m = menu();
+        open(&mut m, "Situation overrides");
+        let f = frame(&m);
+        assert_eq!((f.view, f.tile_count, f.tile_rows, f.tile_cols), (View::Overrides, 13, 7, 2));
+        assert_eq!(f.tile_focus, 255, "the cursor starts on the situation line");
+        assert_eq!(f.focus, Some(0));
+        m.press(Button::Down);
+        assert_eq!(frame(&m).tile_focus, 0);
+        m.press(Button::Right);
+        assert_eq!(frame(&m).tile_focus, 7, "the other column, same row");
+        m.press(Button::Left);
+        m.press(Button::Left);
+        assert_eq!(frame(&m).tile_focus, 0, "no step past the first column");
+        for _ in 0..6 {
+            m.press(Button::Down);
+        }
+        m.press(Button::Right);
+        assert_eq!(frame(&m).tile_focus, 6, "the second column holds 6: row 7 has no right neighbour");
+        m.press(Button::A);
+        assert_eq!(frame(&m).tile_state[6], 1);
+    }
     #[test]
     fn the_swap_groups_overrides_chords_and_chord_editor_have_frames() {
         let mut m = menu();
