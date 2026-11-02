@@ -1,0 +1,165 @@
+//! `cycle_preload.ini` as a boot cache of `settings.json` (decision D7 and the lead's ruling of 2026-11-02); written for this
+//! repository, not carried.
+//!
+//! The fork kept the 13 `cycle_preload_*` rows in two places and let the INI overlay the menu at startup. Here `settings.json`
+//! (through the typed view of `compat::menu`) is the only source of the active choice. The INI is regenerated from it: written when
+//! it is missing, stale, unreadable or rejected, left alone when it already says the same, and never read back to change the
+//! active choice. A first boot therefore writes the player's imported (or the factory) settings, not the engine's own defaults, and
+//! a rejected or failed cache cannot turn the preload on or off by itself. The carried reader and the transactional writer
+//! (`store_ini`: temporary file, rename, `.previous` recovery) do the file work.
+
+use super::cycle_preload_config::{load_ini, publish_decision, settings_from_menu, startup_settings, store_ini, Publish, Settings};
+use crate::engine::compat::menu::TrainingModpackMenu;
+
+/// What the cache did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cache {
+    /// The file already said the active choice.
+    Unchanged,
+    /// The file was missing, stale or rejected and now says the active choice.
+    Written,
+    /// The file could not be written (the reason); the active choice is unaffected and the next boot tries again.
+    Failed(&'static str),
+}
+
+/// The active choice and what happened to the cache.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Synced {
+    pub active: Settings,
+    pub cache: Cache,
+}
+
+/// The choice `settings.json` asks for. Rows that do not read as one choice each fail closed (preload off), the carried
+/// `Settings::FAIL_CLOSED`, never the engine default.
+pub fn desired(menu: &TrainingModpackMenu) -> Settings {
+    settings_from_menu(menu).unwrap_or(Settings::FAIL_CLOSED)
+}
+
+/// Boot, and a menu apply: make the INI say what the settings say.
+pub fn sync(path: &str, menu: &TrainingModpackMenu) -> Synced {
+    let active = desired(menu);
+    let on_disk = startup_settings(load_ini(path));
+    let cache = match publish_decision(on_disk, menu) {
+        // A choice the menu cannot express keeps the file as it is; the active choice is already fail-closed.
+        Publish::Keep(kept) if settings_from_menu(menu).is_none() || kept == active => Cache::Unchanged,
+        Publish::Keep(_) | Publish::Store(_) => match store_ini(path, active) {
+            Ok(()) => Cache::Written,
+            Err(reason) => Cache::Failed(reason),
+        },
+    };
+    Synced { active, cache }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::compat::menu::{OnOff, BASE_MENU};
+    use crate::engine::preload::cycle_preload_config::{render, CyclePreloadSlots, IniLoad};
+    use crate::model::settings::Snapshot;
+    use std::path::PathBuf;
+
+    struct Dir(PathBuf);
+    impl Dir {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("tr-preload-boot-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+        fn path(&self) -> String {
+            self.0.join("cycle_preload.ini").to_str().unwrap().to_owned()
+        }
+    }
+    impl Drop for Dir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn imported() -> TrainingModpackMenu {
+        let mut menu = BASE_MENU;
+        menu.cycle_preload_slots = CyclePreloadSlots::TWO;
+        menu.cycle_preload_group_swap = OnOff::OFF;
+        menu.cycle_preload_measurements = OnOff::ON;
+        menu
+    }
+
+    #[test]
+    fn the_factory_menu_is_the_factory_snapshot_and_the_engine_default() {
+        // The approved fresh-install defaults (factory table, MENU-DRAFT) are the engine's defaults: Solo Popo Off, Preload Samples Off.
+        assert_eq!(BASE_MENU, TrainingModpackMenu::from_snapshot(&Snapshot::factory()));
+        assert_eq!(desired(&BASE_MENU), Settings::DEFAULT);
+        assert_eq!(BASE_MENU.solo_popo_original, OnOff::OFF);
+        assert_eq!(BASE_MENU.cycle_preload_measurements, OnOff::OFF);
+        let samples = Settings::DEFAULT.measurements;
+        assert!(!samples);
+    }
+
+    #[test]
+    fn a_first_boot_writes_the_players_settings_and_the_second_boot_leaves_the_file_alone() {
+        let dir = Dir::new("first");
+        let path = dir.path();
+        let first = sync(&path, &imported());
+        assert_eq!(first.active, desired(&imported()));
+        assert_ne!(first.active, Settings::DEFAULT);
+        assert_eq!(first.cache, Cache::Written);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), render(first.active), "written from settings.json, not the engine default");
+        let bytes = std::fs::read(&path).unwrap();
+        let second = sync(&path, &imported());
+        assert_eq!((second.active, second.cache), (first.active, Cache::Unchanged));
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_stale_cache_never_overrides_settings_json() {
+        let dir = Dir::new("stale");
+        let path = dir.path();
+        // The cache says preload 5 with samples on; settings.json says 2 with group swap off.
+        store_ini(&path, Settings { measurements: true, ..Settings::DEFAULT }).unwrap();
+        let boot = sync(&path, &imported());
+        assert_eq!(boot.active.slots, 2);
+        assert!(!boot.active.group_swap);
+        assert_eq!(boot.cache, Cache::Written);
+        assert_eq!(load_ini(&path), IniLoad::Parsed(boot.active), "the cache now follows the settings");
+    }
+
+    #[test]
+    fn a_rejected_cache_is_regenerated_and_cannot_change_the_active_choice() {
+        let dir = Dir::new("rejected");
+        let path = dir.path();
+        std::fs::write(&path, "[cycle_preload]\nslots=9\n").unwrap();
+        let boot = sync(&path, &BASE_MENU);
+        assert_eq!(boot.active, Settings::DEFAULT, "not FAIL_CLOSED: the bad file is not the source");
+        assert_eq!(boot.cache, Cache::Written);
+        assert_eq!(load_ini(&path), IniLoad::Parsed(Settings::DEFAULT));
+        assert_eq!(sync(&path, &BASE_MENU).cache, Cache::Unchanged);
+    }
+
+    #[test]
+    fn a_cache_that_cannot_be_written_leaves_the_active_choice_and_the_old_file() {
+        let dir = Dir::new("failed");
+        let path = dir.path();
+        store_ini(&path, Settings::DEFAULT).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        std::fs::create_dir(format!("{path}.tmp")).unwrap();
+        let boot = sync(&path, &imported());
+        assert_eq!(boot.active, desired(&imported()));
+        assert_eq!(boot.cache, Cache::Failed("could not write cycle preload ini"));
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn rows_that_are_not_one_choice_fail_closed_and_do_not_touch_the_file() {
+        let dir = Dir::new("malformed");
+        let path = dir.path();
+        store_ini(&path, Settings::DEFAULT).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let mut menu = BASE_MENU;
+        menu.cycle_preload_slots = CyclePreloadSlots::empty();
+        let boot = sync(&path, &menu);
+        assert_eq!(boot.active, Settings::FAIL_CLOSED);
+        assert_eq!(boot.active.slots, 0);
+        assert_eq!(boot.cache, Cache::Unchanged);
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+    }
+}

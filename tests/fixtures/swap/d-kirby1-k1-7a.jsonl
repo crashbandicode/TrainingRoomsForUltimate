@@ -1,0 +1,8 @@
+{"ev":"flags","role":0,"note":"The D-KIRBY1 K1 shape as 7a builds it (WP1 CellRule::FirstOnly): Kirby only as the target at cell 0 of its own window; E4a/E4b under the recipe + 7a"}
+{"ev":"window","role":0,"cells":[6,7,8],"actors":1,"active":0,"note":"Kirby window [6,7,8], Kirby live at cell 0 (hatless)"}
+{"ev":"prefetch","role":0,"group":0,"kinds":[0],"note":"the banked original Mario group is planned while Kirby is live: E4a `prefetch deferred … reason=live Kirby may copy a group kind (D-KIRBY1)` (Planned, no keys)"}
+{"ev":"expect","role":0,"policy":"recipe+7a","map":0,"tree":3}
+{"ev":"copy_acquired","role":0,"kind":0,"note":"hat shortcut: Kirby copies Mario on its own R"}
+{"ev":"reload","role":0,"cells":[8,0,7],"actors":1,"bank":true,"note":"E4b: [KirbyPark] fallback … canonical Reload; teardown … keys=0 keys_kept=0; the Kirby at cell 0 unloads cleanly (S-K shape)"}
+{"ev":"ready","role":0,"note":"E4b: [BodyBank] ready owner=0 … kind=0x8 within ~6 s"}
+{"ev":"expect","role":0,"policy":"recipe+7a","loader":14,"install":false,"map":0}

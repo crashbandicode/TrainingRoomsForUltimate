@@ -6,5 +6,8 @@
 
 pub mod model;
 
+// The carried fork engines (package 6): each area is test-only until its consumer lands, except those engine/mod.rs leaves open.
+pub mod engine;
+
 #[cfg(target_os = "switch")]
 mod runtime;

@@ -1,0 +1,242 @@
+//! Practice roster choices, including individual starting forms.
+//! Order is serialized as one-hot menu choices: keep it stable.
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+pub(crate) const LEGACY_CHOICE_COUNT: usize = 80;
+pub(crate) const PRE_IC_CHOICE_COUNT: usize = 85;
+pub(crate) const PRE_MII_CHOICE_COUNT: usize = 86;
+pub(crate) const MII_ALPHA_CHOICE_COUNT: usize = 87; // Existing Sword-only envelope.
+pub(crate) const MII_CLASSES_CHOICE_COUNT: usize = 89;
+
+pub(crate) const CHOICES: &[(u32, &str)] = &[
+    (0x00, "Mario"),
+    (0x01, "Donkey Kong"),
+    (0x02, "Link"),
+    (0x03, "Samus"),
+    (0x04, "Dark Samus"),
+    (0x05, "Yoshi"),
+    (0x06, "Kirby"),
+    (0x07, "Fox"),
+    (0x08, "Pikachu"),
+    (0x09, "Luigi"),
+    (0x0a, "Ness"),
+    (0x0b, "Captain Falcon"),
+    (0x0c, "Jigglypuff"),
+    (0x0d, "Peach"),
+    (0x0e, "Daisy"),
+    (0x0f, "Bowser"),
+    (0x10, "Sheik"),
+    (0x11, "Zelda"),
+    (0x12, "Dr. Mario"),
+    (0x13, "Pichu"),
+    (0x14, "Falco"),
+    (0x15, "Marth"),
+    (0x16, "Lucina"),
+    (0x17, "Young Link"),
+    (0x18, "Ganondorf"),
+    (0x19, "Mewtwo"),
+    (0x1a, "Roy"),
+    (0x1b, "Chrom"),
+    (0x1c, "Mr. Game & Watch"),
+    (0x1d, "Meta Knight"),
+    (0x1e, "Pit"),
+    (0x1f, "Dark Pit"),
+    (0x20, "Zero Suit Samus"),
+    (0x21, "Wario"),
+    (0x22, "Snake"),
+    (0x23, "Ike"),
+    (0x27, "Diddy Kong"),
+    (0x28, "Lucas"),
+    (0x29, "Sonic"),
+    (0x2a, "King Dedede"),
+    (0x2b, "Olimar"),
+    (0x2c, "Lucario"),
+    (0x2d, "R.O.B."),
+    (0x2e, "Toon Link"),
+    (0x2f, "Wolf"),
+    (0x30, "Villager"),
+    (0x31, "Mega Man"),
+    (0x32, "Wii Fit Trainer"),
+    (0x33, "Rosalina & Luma"),
+    (0x34, "Little Mac"),
+    (0x35, "Greninja"),
+    (0x36, "Palutena"),
+    (0x37, "PAC-MAN"),
+    (0x38, "Robin"),
+    (0x39, "Shulk"),
+    (0x3a, "Bowser Jr."),
+    (0x3b, "Duck Hunt"),
+    (0x3c, "Ryu"),
+    (0x3d, "Ken"),
+    (0x3e, "Cloud"),
+    (0x3f, "Corrin"),
+    (0x40, "Bayonetta"),
+    (0x41, "Inkling"),
+    (0x42, "Ridley"),
+    (0x43, "Simon"),
+    (0x44, "Richter"),
+    (0x45, "King K. Rool"),
+    (0x46, "Isabelle"),
+    (0x47, "Incineroar"),
+    (0x51, "Piranha Plant"),
+    (0x52, "Joker"),
+    (0x53, "Hero"),
+    (0x54, "Banjo & Kazooie"),
+    (0x55, "Terry"),
+    (0x56, "Byleth"),
+    (0x57, "Min Min"),
+    (0x58, "Steve"),
+    (0x59, "Sephiroth"),
+    (0x5c, "Kazuya"),
+    (0x5d, "Sora"),
+    // Append forms: old saved catalog positions must not move.
+    (0x5a, "Pyra"),
+    (0x5b, "Mythra"),
+    (0x24, "Squirtle"),
+    (0x25, "Ivysaur"),
+    (0x26, "Charizard"),
+    // Native entry descriptor, not the individual Popo/Nana actor kinds.
+    (0x4b, "Ice Climbers"),
+    #[cfg(feature = "mii-saved-alpha")]
+    (0x49, "Mii Swordfighter"),
+    // Append only: retain the existing Sword index in persisted arrays.
+    #[cfg(feature = "mii-saved-alpha")]
+    (0x48, "Mii Brawler"),
+    #[cfg(feature = "mii-saved-alpha")]
+    (0x4a, "Mii Gunner"),
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrioFighter(u32);
+
+impl TrioFighter {
+    pub const MARIO: Self = Self(0);
+    pub const KIRBY: Self = Self(0x06);
+    pub const PIKACHU: Self = Self(0x08);
+    pub const BOWSER: Self = Self(0x0f);
+    pub const LUCINA: Self = Self(0x16);
+    pub const GAMEWATCH: Self = Self(0x1c);
+    pub const PALUTENA: Self = Self(0x36);
+    pub const BAYONETTA: Self = Self(0x40);
+    pub const ICE_CLIMBERS: Self = Self(0x4b);
+
+    pub const fn kind(self) -> u32 {
+        self.0
+    }
+    pub fn name(self) -> &'static str {
+        CHOICES
+            .iter()
+            .find(|(kind, _)| *kind == self.0)
+            .map(|(_, name)| *name)
+            .unwrap_or("Unavailable")
+    }
+    pub fn supported_kind(kind: u32) -> bool {
+        CHOICES.iter().any(|(candidate, _)| *candidate == kind)
+    }
+    pub fn available() -> Vec<Self> {
+        CHOICES.iter().map(|(kind, _)| Self(*kind)).collect()
+    }
+    pub fn from_kind(kind: u32) -> Option<Self> {
+        Self::supported_kind(kind).then_some(Self(kind))
+    }
+}
+
+impl Serialize for TrioFighter {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        CHOICES
+            .iter()
+            .map(|(kind, _)| u8::from(*kind == self.0))
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+}
+impl<'de> Deserialize<'de> for TrioFighter {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let values = Vec::<u8>::deserialize(deserializer)?;
+        if ![
+            LEGACY_CHOICE_COUNT,
+            PRE_IC_CHOICE_COUNT,
+            PRE_MII_CHOICE_COUNT,
+            MII_ALPHA_CHOICE_COUNT,
+            MII_CLASSES_CHOICE_COUNT,
+        ]
+        .contains(&values.len())
+            || values.iter().any(|v| *v > 1)
+            || values.iter().filter(|v| **v == 1).count() != 1
+        {
+            return Err(serde::de::Error::custom(
+                "select exactly one supported trio fighter",
+            ));
+        }
+        let selected = values.iter().position(|v| *v == 1).unwrap();
+        // Only the exact known alpha extension is accepted. On a base build,
+        // its unsupported sole Sword choice downgrades to Mario, never All.
+        Ok(CHOICES
+            .get(selected)
+            .map_or(Self::MARIO, |(kind, _)| Self(*kind)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn every_choice_round_trips_and_unsupported_groups_are_excluded() {
+        for (kind, _) in CHOICES {
+            let choice = TrioFighter(*kind);
+            assert_eq!(
+                serde_json::from_str::<TrioFighter>(&serde_json::to_string(&choice).unwrap())
+                    .unwrap(),
+                choice
+            );
+        }
+        for kind in [
+            #[cfg(not(feature = "mii-saved-alpha"))]
+            0x48,
+            #[cfg(not(feature = "mii-saved-alpha"))]
+            0x49,
+            #[cfg(not(feature = "mii-saved-alpha"))]
+            0x4a,
+            0x4c,
+            0x4d,
+            0x4e,
+            0x4f,
+            0x50,
+            0x75,
+            u32::MAX,
+        ] {
+            assert!(!TrioFighter::supported_kind(kind));
+        }
+    }
+    #[test]
+    fn legacy_one_hot_positions_remain_stable() {
+        // Saved before forms existed: Sora was the final choice, at index 79.
+        let mut legacy = vec![0u8; 80];
+        legacy[79] = 1;
+        let fighter: TrioFighter = serde_json::from_value(serde_json::json!(legacy)).unwrap();
+        assert_eq!(fighter.kind(), 0x5d);
+        let current = serde_json::to_value(fighter).unwrap();
+        assert_eq!(current.as_array().unwrap().len(), CHOICES.len());
+        assert_eq!(current[79], 1);
+        assert_eq!(current[80], 0);
+        for length in [0, 79, 81, 84, MII_ALPHA_CHOICE_COUNT + 1] {
+            let mut invalid = vec![0u8; length];
+            if length > 0 {
+                invalid[0] = 1;
+            }
+            assert!(serde_json::from_value::<TrioFighter>(serde_json::json!(invalid)).is_err());
+        }
+        legacy[0] = 1;
+        assert!(serde_json::from_value::<TrioFighter>(serde_json::json!(legacy)).is_err());
+    }
+    #[test]
+    fn malformed_choices_are_not_randomized() {
+        for values in [vec![0; CHOICES.len()], vec![1; CHOICES.len()], vec![1]] {
+            assert!(
+                serde_json::from_str::<TrioFighter>(&serde_json::to_string(&values).unwrap())
+                    .is_err()
+            );
+        }
+    }
+
+}

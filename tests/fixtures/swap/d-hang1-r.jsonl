@@ -1,0 +1,8 @@
+{"ev":"flags","role":0,"note":"Training (Ally d-hang1-sep e1 = the Surface pick-7 shape: mirror plus parked Kirby)"}
+{"ev":"flags","role":1}
+{"ev":"window","role":1,"cells":[29],"actors":1,"note":"CPU Meta Knight 0x1d"}
+{"ev":"window","role":0,"cells":[5,6,7],"actors":1,"active":0,"note":"R1 e1: Yoshi window [5,6,7] with Kirby parked and never activated; ready 6,520,133 µs"}
+{"ev":"prefetch","role":0,"group":0,"kinds":[8,9,10],"note":"[8,9,a] prefetched"}
+{"ev":"reload","role":0,"cells":[27,28,29],"actors":1,"bank":true,"note":"L7823 submit outgoing=0x5 target=0x1b; L7826 teardown keys=3 skipped=0; L7829 build [27,28,29]; L7832 reload incoming=(3,[1b,1c,1d]) active=(3,[5,6,7]); L7838 character_roster_loading; L7703/L7715–L7717 one wild Read8, FakePageFaultHandler, then the loop until frames stopped at 532.738 s"}
+{"ev":"ready","role":0,"note":"never under the old policy"}
+{"ev":"expect","role":0,"policy":"recipe+7a","loader":14,"install":false,"map":0}

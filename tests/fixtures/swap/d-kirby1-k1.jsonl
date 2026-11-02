@@ -1,0 +1,10 @@
+{"ev":"flags","role":0,"note":"Training (Ally B123-pre S2)"}
+{"ev":"window","role":0,"cells":[7,6,8],"actors":1,"active":0,"note":"diag #225/#230: P1 window [7,6,8] (Fox, Kirby, Pikachu) built and Ready; original_bank on"}
+{"ev":"prefetch","role":0,"group":0,"kinds":[0],"note":"#241 plan owner=0 group=0 kinds=[0] (banked original Mario); #243/#244 prefetch … kinds=[0] R=0x11f19ce300 map=2 → prefetched … map=2 tree=4"}
+{"ev":"expect","role":0,"map":2,"tree":4}
+{"ev":"activate","role":0,"cell":1,"note":"#245/#249 warm in-window switch Fox → Kirby (reuse … kind=0x6, 63.8 ms); Kirby is the live member, hatless"}
+{"ev":"expect","role":0,"policy":"old","map":2}
+{"ev":"expect","role":0,"policy":"recipe","map":0,"tree":4,"note":"E4a: keys returned owner=0 group=0 kinds=[0] released=1 kept=0 reason=live Kirby (D-KIRBY1); replanned (the NRO of kind 0 stays in the tree until a Reload clears it)"}
+{"ev":"copy_acquired","role":0,"kind":0,"note":"L6989/#275 [KirbyHats] request role=0 kind=0x0 source_slot=2 body=0x70001; L6997/#277 confirmed — the copy registers kind 0 on Kirby's own R (KirbyProbe request owner=R kind=0x0)"}
+{"ev":"reload","role":0,"cells":[8,0,7],"actors":1,"bank":true,"note":"L7087/#289 [KirbyPark] fallback owner=0 target=0x8 reason=Kirby holds a copy ability; canonical Reload; L7089 submit … outgoing=0x7 target=0x8 bank_build=true; L7091/#291 teardown owner=0 reason=mod reload groups=1 bodies=0 contexts=0 dispatchers=0 records=0 keys=1 skipped=0 — the one key is kind 0x0, released through 0x17e8610(R, 0) while the copy is live; L7093 build [8,0,7]; L7095 reload incoming=(3,[8,0,7]) active=(3,[7,6,8]); L7099 (+25 ms) Unmapped Read32 @ 0x10 / Read64 @ 0x8 alternating to the end of the log"}
+{"ev":"ready","role":0,"note":"never under the old policy (no unload, no published). E4b as written expects `[BodyBank] ready … kind=0x8` under the recipe; the WP-K static RE predicts the cell-1 Kirby's unload spins regardless of keys (K-R1 decides) — see d-kirby1-k1-7a for the 7a shape"}
