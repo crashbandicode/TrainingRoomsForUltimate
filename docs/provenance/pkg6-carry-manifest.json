@@ -3429,12 +3429,18 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "0fcfff1f44cfc25141b48cb598257292f5e923a12356b1600c07279eb74de998",
+   "dest_sha256": "1eb3c80490d7b7c45815a3816a11275ac954d3816940dca1dd4fa472607faeb3",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
      "new": "super::note(format_args!(\"[MiiOrdinaryCpu] bank settle diverged",
      "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),",
+     "new": "                #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),",
+     "count": 1,
+     "reason": "Fix actual editor-only E0599: this arm must share the existing Helper::Ready variant coexistence/test scope; full-feature runtime behavior unchanged."
     }
    ]
   },

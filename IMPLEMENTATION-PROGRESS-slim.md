@@ -1,34 +1,33 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
-## Current worker checkpoint — 2026-11-02 20:43Z
+## Current worker checkpoint — 2026-11-02 21:50Z
 Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
-Branch stream/slim codeHEADa6e4d07 Featuretable; prior8fHookId slice fully gated.
-Raw98865, normalized126452excludingtools (-20bothfrom8f); ceiling103200 preserves
-4318pendingmergeallowance. Onlyauthorizedmerge ebfcb98 via dae0787.
-ALLFIVEa6gatesPASS: fullhost67.81s,clippy18.40s0warnings,no-default2.53s,
-Switchdiag40existingwarnings/release41existingwarnings;1110sourcehashesunchanged.
-Allclaims/queues RELEASED/removed20:42; NOowncompiler/Eden/profile.
-Releasec6229b70 resident3444736 unchangedvs8f; diag9c167b423784704 unchanged.
-Exacta6stack same5thread-tableFAIL and1fiberFAIL; no budget/tablewaiver.
-Menu49392 required81920>57344; fiber25104>16384. Noa6runtimeacceptance.
-Artifacts slim/a6e4d07-{host,clippy,no-default,diag,release,preflight}.
-Latestallhosttargetcensus20:39total57,128,742,311B (<60GB). Ownfinisheda6targets
-nowRETIRED: Surface322,249,256B andYoga1,634,279,828B (1,956,529,084B freed).
-Manifests+lastbinaries archivedcache-retirement-a6e4d07; noownactivecache remains.
-NativeTextproposalUNAPPLIED pendingbaseline/ownership;4unapprovedenumrows/hos2approved.
-HelperpathEdenheld;sl02allocationFAIL818/delta100on10stillopen. LatestleadSTATUS
-mtime19:38:20at20:42check; asyncprimaryresumeleadquestionpending. NoREADY.
-a6complianceonclean07e1463 exit1samefourmachinefailures/29agentrows. Handoffb8dda80
-postedunderQUESTIONS; primaryresumeleadrequestreissuedwithgatedcommits. Awaitexact
-native/integration/stack decisions; no nativeTextapplication orhelperbootauthorized.
-Watcher2674699 ownerboundalive/noalert at20:31; exactthreadAstra/mediumconfirmed.
-Coordination update (2026-11-02T20:59:36.595790+00:00):
-The primary's new inbox entry starts successor lead tr-lead-astra-4 and resumes
-pkg4/UI successors. Slim remains this same thread; no replacement or new watcher.
-The primary also supersedes F9 design B with helper promotion; pkg6 owns that
-change. It does not authorize a slim native refactor, moving merge, or helper boot.
-Exact integration/native/stack requests remain under QUESTIONS, with all source,
-artifact, stack and compliance receipts available. No READY claim.
+Branch stream/slim; source78f440d, docsHEADc7efbd1 plus current notes.
+Lead tr-lead-astra-4 scoped keyboard authorization21:18 applied; no other native
+refactor or moving merge. Only authorized merge remains ebfcb98 via dae0787.
+Actual pure keyboard implementation extractedf7b8f4a; before-fix actual allocation
+probe FAIL14first/896repeated, control1. Fix78f440d uses fixedUTF16/streaming
+validation/checkedu8 metadata. Hostzeroalloc/boundary/frozenEnter testsPASS.
+Raw98877 normalized126470excltools; ceiling103200 unchanged (4318pending=103195).
+Allfive78gatesPASS: fullhost70.121s,clippy20.753s0warnings,nodefault3.125s,
+Switchrelease52.614s/diag37.207s;1112frozenfilesunchanged.
+Release17d0877e resident3440640;diag5ee38f2e resident3780608 (-4096eachvs a6).
+Three stale/exceeded table rowsFAIL; Menu49392 requires81920>allocated57344;
+fiber25104>16384. No budget increase. Retained keyboarddrop2176→2000 and
+Signalsmutex976→816; opening/registration/callback symbols ABSENT in BOTHa6/78
+shippingELFs, so nativecallbackstack proof awaits fixed consumer composition.
+Independent leadreview requested21:38; exactroute question in QUESTIONS/inbox.
+CORE9 native matrix PASS; extraeditor-alone FAIL E0599 missingReadycfg.
+One-arm exactcfg fix staged; rerun owed. SMD/hos-lockcratePASS. No ownedclaim.
+PreparedSignals const-mutex patch awaiting leadscopeapproval; no application.
+SameownedYoga source/target78 idle; noSurfaceclaim/Eden/profile. Lastfreshcache21:43:
+57,665,437,885B TrainingRooms; foreignfork8.894GB explicitly excluded.
+Own a6targets previously retired with manifests; f7hosttarget moved/reused78.
+HelperpathEdenhold andsl02allocationFAIL818/delta100on10remainopen. No78runtime.
+Artifacts slim/78f440d-*; beforeprobe slim/f7b8f4a-before-allocation.
+Latestcompliance remainsa6/fourmachinefails/29agentrows; rerunexact78releasepending.
+Watcher2674699 sameownerboundalive/noalert; exactmodel confirmed aftercompaction.
+No READY; continue gates and lead integration coordination.
 
 Historical predecessor record follows; later datedentries andoperator/lead overrides supersede it.
 
@@ -270,6 +269,12 @@ READY remains absent. All final acceptance criteria remain open; no operator blo
 
 First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.
 ## QUESTIONS
+
+Keyboard Signals const-mutex root approval requested: exact prepared patch and native OnceBox evidence in latest inbox/progress entry; no code change applied.
+
+
+Keyboard78f440d: fixed integrated consumer revision/route needed for native callback stack proof: constructor/registration/callback paths absent in both a6 and78 shipping ELFs. Source/host proofs and retained value-stack paths available; see latest native stack milestone.
+
 
 ### For successor lead 4: exact next scope needed
 
@@ -1043,3 +1048,75 @@ crate-owned tests and independentleadreview remain pending.
 Temporary admission/release adapters /tmp/slim/yoga-{admit,release}.py only
 compose already-read ledger primitives, fresh resource/queue checks and archive
 receipts; needed because old single-compile parser predates operator two-slot.
+
+## Slim host/release milestone — 2026-11-02T21:45:36.322666+00:00
+78f440d fullhost70.121sPASS (70resultlines/raw9445/0/6, nestedcounts caveat);
+clippyalltargets20.753sPASS0warnings; no-default3.125sPASS;1112filesunchanged.
+SwitchreleasePASS52.614s, NRO17d0877e64a086937e58588c7be0659c49872193a9747e93329bfe8285950423,
+ELF7b37e08334537983dd8cdac1a7ee083805e9b8419798c825f5015191f1d9aea8,
+resident3440640 (-4096vs a6); same41nativewarnings retained.
+Diag currentlyrunning ownYoga claim. Next native matrix CORE9 (default/diag
+covered by builds) plus no-default+mii-editor-alpha for moved constructor cfg;
+each check independently queued/claimed. Crate tests and exactstack remainowed.
+Independent review request above remains open; no behavior/SDK/runtime pass claim.
+
+
+## Slim native stack evidence limit — 2026-11-02T21:49:03.503601+00:00
+78f440d diagPASS, NRO5ee38f2e6951aa44d424f59cfc2ecef3dab87f6b8f2aaa518a9f7a0b97c8c65c,
+ELF37f502acf052517b95f584464c8f1c09747827fc2f6c3f844332fbb717697ceb,
+resident3780608 (-4096vs a6). Exacttable3FAIL: Heartbeat4720>4272,
+Menu49392/required81920>allocated57344, ReplaySave32432>31616; fiber25104>16384.
+Important limit: BOTH a6 and78 ELF lack inline constructor/changed/moved/entered
+and SDK constructor/callback-registration symbols; only Calc/Finalize/Disappear/
+destructor remain. Current consumer composition strips the opening path.
+Therefore no callback-stack acceptance inferred. Actual retained Keyboard-drop
+depth2176→2000 and Signals mutex976→816; raw nm and path receipts archived.
+Need exact integrated consumer revision/route before remaining callback stack/
+runtime proof. No dead-code retention flag or invented acceptance probe added.
+Continuing native CORE+editor matrix and crate gates; independent review pending.
+
+
+## Slim keyboard Signals lock root proposal — 2026-11-02T21:54:18.126168+00:00
+Exact78diag confirms Signals lock5d688 coldzero branch5d6b4 callsOnceBox1ca1ac;
+retained raw signals-lock/once-init.txt under78f440d-diag/stack. Same stdpthread
+source hashes and rustc1.95-a423f68 onYoga/Surface (toolchain receipts retained).
+Purevalidation zeroalloc PASS does NOT establish whole nativecallback zeroalloc.
+Prepared /tmp/slim/keyboard-signals-const-mutex.patch SHA3684a52f658428329783c34634664f644da3a4952d319a2e7219cb6eddc3c2ae
+(not applied): only nativeadapter import uses establishedhos_lock::Mutex and
+Signals guard unwrap removal; no lease/SDK/thread/guardextent changes. Existing
+contract: SDK callbacks synchronous withinCalc on owning UIthread; no SDK call
+while guardheld, nextowner onlyafterFinalize. Preserve mutual exclusion.
+Request scoped ownership approval for this root before code/manifest edits;
+otherwise retain finding for integrated acceptance. No blanket mutex replacement.
+
+
+## Slim editor-only matrix root correction — 2026-11-02T21:55:23.922304+00:00
+CORE9 passed; extra no-default+mii-editor-alpha failed E0599:
+src/runtime/roster/../mii/mii_ordinary_cpu_native.rs:653 Helper::Ready absent.
+Root: my earlier feature-scope cleanup gates Ready on test/coexistence feature,
+but this one CPU match arm missed the identical cfg. Ready cannot exist in this
+combination; no new runtime restriction or feature dependency is needed.
+I will add the same cfg to only this arm through exact carry transform/ledger,
+preserving full-feature code. This is a correction to my own earlier scope edit,
+not an A/B/D behavior refactor. Pkg6: hunk653 only; preserve your lock/provider work.
+Raw failed gate a4a592ff654060c2f808e154dfb1344a133603c672d063f87e61395d9b008f76 retained;
+1112files unchanged, claimreleased21:54. New frozen revision and rerun owed.
+
+
+## Slim pending review/scope (latest entries also at inbox TOP) — 2026-11-02T21:57:22.028106+00:00
+78f440d actualpure keyboard + streamingUTF16/byteindices: allfivehost/native gates
+andnativeCORE9PASS; raw98877 normalized126470, unchangedceiling103200.
+BothNROresident -4096; actualpurefirst/repeat0alloc (before14/896). Carry253PASS.
+Please independently review exactsource/tests/carry: request at21:38 TOP.
+Extraeditor-alone found missingReadycfg frommypriorcleanup; one-arm correction
+staged/coordinated21:55, fullfeatureunchanged; rerunowed.
+Nativecallbackregistration absentbothold/newELF: needfixedconsumer route later;
+current Menu49392/fiber25104 failures retained, no acceptance claim.
+Separately prepared Signals const-mutex patch3684a52f658428329783c34634664f644da3a4952d319a2e7219cb6eddc3c2ae
+/tmp/slim/keyboard-signals-const-mutex.patch; exactSignals coldlock5d6b4→OnceBox
+1ca1ac→count_allocation1ca1bc→calloc40 at1ca1c8. Scopeapproval requested beforeapply;
+samelease/SDK/guardextents, establishedhos_lock. No othermutex ornativeeditplanned.
+SMDcratePASS; hos-lockcratecurrentlyownedYoga. NoEden/profile; continuing.
+
+
+78f440d crate gate receipts: SMD cargo0 4.423s, raw40c71e96adc38d1acb23e6d0a3ffaf56f410a1d83d3eae8c93aeb12f29db645c; hos-lock cargo0 0.481s, rawb787c60a11f9622c0cb78f77e67aa6a8086c5d58906d5bd5556970087c288f3a. Both1112sourcehashesunchanged, allclaimsreleased21:58.

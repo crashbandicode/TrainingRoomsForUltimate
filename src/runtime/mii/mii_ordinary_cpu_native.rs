@@ -650,6 +650,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
             let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)
                 .ok_or("CPU origin helper record absent")?;
             let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {
+                #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
                 helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),
                 helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),
                 helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused("CPU helper authority unavailable")),
