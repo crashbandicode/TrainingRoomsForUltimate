@@ -1,0 +1,11 @@
+{
+ "owner": "Claude 0caa72b8/stack-eden",
+ "prefix": "st",
+ "root": "/home/intpa/trainingrooms-eden-st",
+ "profile": "y",
+ "display": ":99",
+ "host": "yoga",
+ "pilot": "/home/intpa/trainingrooms-eden-st/nro/libssbu_cpu_pilot.nro",
+ "install_gate": "result=installed",
+ "stream": "stack"
+}

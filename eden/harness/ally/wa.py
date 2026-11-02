@@ -1,0 +1,307 @@
+"""TrainingRooms Ally adapter, one file for every stream: the Windows variant of gv.py (launch, ops, kill).
+Runs ON the Ally with the Windows Python 3.12 (standard library only; no params.py import).
+
+Origin: eden/ally/wa_s2.py, wa_s5.py and eden/lent/wui.py (three copies of one 274-line file, which were copies of the
+Ally owned-rig adapters W20's w20.py and the m5q wa.py). They differed in the rig root, the CLAIM text and the Job's
+memory limit. Those are now the harness's Ally parameters, read from `wa.config.json` beside this file (written by
+ally/client.py `deploy` from params.py: TR_ALLY_ROOT, TR_ALLY_CLAIM, TR_ALLY_MEM_GIB, TR_ALLY_EDEN_SHA) or from the
+same TR_ALLY_* variables. The root defaults to the lent rig C:/Eden/c1162-w5-ally, the only Ally rig TrainingRooms
+may run (its operator-added inbound Allow rules mean Windows does not prompt; this file and the harness have no firewall step,
+and never add, change or remove a rule for it).
+
+  wa.py launch PHASE             bounded Job launcher (run from a scheduled task, console-less)
+  wa.py ops PHASE BASE64JSON     list of ops, each reply appended to runs\\PHASE\\ops.jsonl, JSON printed
+  wa.py kill PHASE               end the run through its Job object (Eden hangs at power-off on this rig)
+Ops: call, status, sleep, gshot, button, hold, stick, play, mark, waitlog, waitlog_opt, count, waitstatus (W20's) and
+  ["shot", name]                    ui.screenshot target=screen (the whole 1920x1080 screen) -> runs\\PHASE\\shots\\name.png
+  ["macro", name_or_path, cap]      play macros\\<name>.edenmacro.json (or an absolute path), wait for it; sha256 kept in ops.jsonl
+  ["plug", relpath, regex, n]       the last n lines of sdmc\\ultimate\\<relpath> matching regex (the plugin's own logs)
+  ["lines", relpath, after]         the lines of that file from index `after` (route log gates)
+  ["waitplug", relpath, regex, s]   wait until a line of that file matches (after the lines present at op start)
+  ["settings", localpath]           write that file as sdmc\\ultimate\\TrainingRooms\\diag-settings-next.json (tmp + rename)
+  ["mute"]                          settings.set core.volume 0, settings.save, settings.get (muted before the game boots)
+  ["load"]                          game.load of the pinned xci
+"""
+from pathlib import Path
+import base64, hashlib, json, os, re, sys, time
+
+HERE = Path(__file__).resolve().parent
+_CFG = json.loads((HERE / 'wa.config.json').read_text()) if (HERE / 'wa.config.json').exists() else {}
+
+
+def cfg(key, env, default):
+    return os.environ.get(env) or _CFG.get(key) or default
+
+
+O = Path(cfg('ally_root', 'TR_ALLY_ROOT', 'C:/Eden/c1162-w5-ally')); PROFILE = O / 'profile'; USER = PROFILE / 'user'
+OWNER = cfg('ally_claim', 'TR_ALLY_CLAIM', '')
+EDEN_SHA = cfg('ally_eden_sha', 'TR_ALLY_EDEN_SHA', '45af318c93cbc00a2794421ee884ffbcb9dbec75bbdbdeef27af30d61cd2cbad')
+MEM_GIB = int(float(cfg('ally_mem_gib', 'TR_ALLY_MEM_GIB', 11)))
+OUTPUT = cfg('output', 'TR_OUTPUT', 'TrainingRooms')
+DURATION = 3600
+
+
+def sha(p):
+    with Path(p).open('rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+
+def retry_manifest(fn, *args, **kwargs):
+    for attempt in range(21):
+        try:
+            return fn(*args, **kwargs)
+        except PermissionError:
+            if attempt == 20:
+                raise
+            time.sleep(.01)
+
+
+def modules():
+    sys.path.insert(0, str(O / 'runner'))
+    import winplat, winjob, winaccept, winlaunch
+    if not hasattr(winplat, '_park_read_manifest'):
+        winplat._park_read_manifest = winplat.read_manifest
+        winplat.read_manifest = lambda *a, **k: retry_manifest(winplat._park_read_manifest, *a, **k)
+    winplat.configure(O, USER); winplat.EDEN = PROFILE / 'eden.exe'; winplat.EDEN_SHA256 = EDEN_SHA
+    winplat.EDEN_WORKDIR = PROFILE
+    return winplat, winjob, winaccept, winlaunch
+
+
+def owned():
+    assert OWNER and (O / 'CLAIM').read_text().strip() == OWNER, 'the rig CLAIM is not this stream (stage.ps1 setaside)'
+
+
+def launch(phase):
+    owned(); p, j, a, l = modules(); m = j.system_memory()
+    assert not p.processes(), p.processes()
+    assert m['available_bytes'] > 10 * 1024 ** 3 and m['commit_available_bytes'] > 8 * 1024 ** 3, m
+    assert sha(PROFILE / 'eden.exe') == EDEN_SHA and not (O / 'runs' / phase).exists()
+    for key in list(os.environ):
+        if key == 'EDEN_NSO_LAN_CONFIG' or key.startswith('EDEN_LAN_'):
+            os.environ.pop(key)
+    os.environ['EDEN_WIN_ROOT'] = str(O); os.environ['EDEN_WIN_PROFILE'] = str(USER)
+    os.chdir(PROFILE)
+    with (O / (phase + '-launcher.log')).open('x') as log:
+        sys.stdout = log; sys.stderr = log
+        try:
+            raise SystemExit(l.main(['--phase', phase, '--eden', str(PROFILE / 'eden.exe'), '--memory-gib', str(MEM_GIB),
+                                     '--runtime', str(DURATION), '--normal-stop', str(DURATION - 180),
+                                     '--startup-timeout', '180', '--hang-timeout', '90', '--stall-timeout', '0',
+                                     '--guard-available-gib', '3']))
+        except BaseException:
+            import traceback; traceback.print_exc(); raise
+
+
+def kill(phase):
+    owned(); p, j, a, l = modules()
+    run = json.loads((O / 'runs' / phase / 'run.json').read_text())
+    pids = [x for x in (run.get('pid'), run.get('launcher_pid')) if x]
+    h, name = p.open_job(run['unit'], pids, j.JOB_OBJECT_QUERY | j.JOB_OBJECT_TERMINATE)
+    print('unit', run['unit'], 'job', name, 'pids before', j.pids(h) if h else None)
+    if h:
+        j.terminate(h, 137); j.close(h)
+    for _ in range(100):
+        if not j.process_alive(run['pid']):
+            break
+        time.sleep(0.2)
+    print('alive after:', j.process_alive(run['pid']))
+
+
+def call(phase, method, params=None, timeout=30):
+    owned(); p, j, a, l = modules()
+    r = json.loads(retry_manifest((O / 'runs' / phase / 'run.json').read_text))
+    assert r['state'] == 'ready' and not r.get('ended_at') and p.process_alive(r['pid'])
+    assert r['command'][0] == str(PROFILE / 'eden.exe') and r['memory_max_bytes'] == MEM_GIB * 1024 ** 3
+    return p.call(phase, method, params or {}, timeout=timeout)
+
+
+def finish(phase, seconds=90):
+    end = time.monotonic() + seconds
+    try:
+        while True:
+            status = call(phase, 'macro.status'); assert not status.get('error'), status
+            if status['state'] == 'finished':
+                return status
+            assert time.monotonic() < end, status
+            time.sleep(.2)
+    finally:
+        call(phase, 'macro.stop'); call(phase, 'input.reset')
+
+
+def play(phase, name):
+    path = HERE / 'macros' / (name + '.edenmacro.json'); assert path.is_file()
+    st = call(phase, 'status'); assert st['running'] and not st['modal'], st
+    assert call(phase, 'macro.status')['state'] in ('idle', 'finished')
+    call(phase, 'macro.play', {'path': str(path)})
+    return finish(phase)
+
+
+def wait_log(clog, pos, pattern, cap, optional=False, sleep=time.sleep, clock=time.monotonic):
+    """Scan the complete lines of console.log from byte `pos` for `pattern`: (line or None, next pos). The next
+    wait starts right after the hit line, or after the last complete line when there is none. A timeout raises, or
+    with `optional` (W20: a line that may already have passed) returns None."""
+    pat, end, hit = re.compile(pattern), clock() + cap, None
+    while hit is None:
+        with clog.open('rb') as f:
+            f.seek(pos); data = f.read()
+        off = 0
+        while True:
+            nl = data.find(b'\n', off)
+            if nl < 0:
+                break
+            line = data[off:nl].decode('utf-8', 'replace'); off = nl + 1
+            if pat.search(line):
+                hit = line; break
+        pos += off
+        if hit is None:
+            if clock() > end:
+                if optional:
+                    return None, pos
+                raise TimeoutError(pattern)
+            sleep(0.25)
+    return hit, pos
+
+
+def plug_lines(rel):
+    f = USER / 'sdmc' / 'ultimate' / rel
+    return f.read_text(errors='replace').splitlines() if f.exists() else []
+
+
+def ops(phase, items):
+    run = O / 'runs' / phase; shots = run / 'shots'; shots.mkdir(exist_ok=True)
+    receipt = run / 'ops.jsonl'; out = []
+    clog = run / 'console.log'
+    mark = {'pos': clog.stat().st_size if clog.exists() else 0}
+
+    def rec(e):
+        e['at'] = time.time()
+        with receipt.open('a') as f:
+            f.write(json.dumps(e) + '\n')
+        out.append(e)
+
+    try:
+        for op in items:
+            k = op[0]
+            if k == 'call':
+                r = call(phase, op[1], op[2] if len(op) > 2 else {})
+                rec({'op': op, 'result': r if len(json.dumps(r)) < 1500 else str(r)[:1500]})
+            elif k == 'status':
+                rec({'op': op, 'result': call(phase, 'status')})
+            elif k == 'play':
+                st = play(phase, op[1]); rec({'op': op, 'status': {x: st.get(x) for x in ('state', 'frame', 'duration_frames')}})
+            elif k == 'sleep':
+                time.sleep(op[1])
+            elif k == 'mark':
+                mark['pos'] = clog.stat().st_size if clog.exists() else 0
+                rec({'op': op, 'pos': mark['pos']})
+            elif k in ('waitlog', 'waitlog_opt'):
+                try:
+                    hit, mark['pos'] = wait_log(clog, mark['pos'], op[1], op[2] if len(op) > 2 else 60, k == 'waitlog_opt')
+                except TimeoutError:
+                    rec({'op': op, 'error': 'timeout'})
+                    raise SystemExit('waitlog timeout: ' + op[1])
+                rec({'op': op, 'line': hit[:300] if hit else None, **({'timeout': hit is None} if k == 'waitlog_opt' else {})})
+            elif k == 'waitstatus':
+                # tm-m5q-eden-a: ["waitstatus", key, value, timeout_s] polls Eden `status` until result[key] == value (e.g. loading_complete true)
+                end = time.monotonic() + (op[3] if len(op) > 3 else 120); st = {}
+                while True:
+                    st = call(phase, 'status')
+                    if st.get(op[1]) == op[2]:
+                        break
+                    if time.monotonic() > end:
+                        rec({'op': op, 'error': 'timeout', 'last': {op[1]: st.get(op[1])}})
+                        raise SystemExit('waitstatus timeout: ' + op[1])
+                    time.sleep(0.5)
+                rec({'op': op, 'ok': True})
+            elif k == 'count':
+                pat = re.compile(op[1])
+                n = sum(1 for line in clog.read_text(errors='replace').splitlines() if pat.search(line))
+                rec({'op': op, 'count': n})
+            elif k == 'gshot':
+                # Eden's own GIF recorder (renderer read-back, unaffected by windows covering the desktop)
+                path = shots / (op[1] + '.gif'); fps = op[2] if len(op) > 2 else 2
+                width = op[3] if len(op) > 3 else 1280; dur = op[4] if len(op) > 4 else 600
+                t0 = time.time()
+                call(phase, 'recording.start', {'path': str(path), 'fps': fps, 'width': width, 'duration_ms': dur})
+                st = {}
+                for _ in range(int(dur / 100) + 150):
+                    st = call(phase, 'recording.status')
+                    if st.get('state') in ('finished', 'error', 'idle'):
+                        break
+                    time.sleep(0.1)
+                rec({'op': op, 'path': str(path), 't0': t0, 'state': st.get('state'), 'frames': st.get('frames'),
+                     'error': st.get('error')})
+            elif k == 'button':
+                call(phase, 'input.button', {'button': op[1], 'state': 'tap', 'duration_ms': op[2] if len(op) > 2 else 100,
+                                              'player': 0, 'lease_ms': max(1000, (op[2] if len(op) > 2 else 100) + 300)})
+                rec({'op': op}); time.sleep(op[3] if len(op) > 3 else 0.25)
+            elif k == 'hold':
+                for b in op[1]:
+                    call(phase, 'input.button', {'button': b, 'state': 'press', 'player': 0, 'lease_ms': op[2] + 400})
+                time.sleep(op[2] / 1000)
+                for b in op[1]:
+                    call(phase, 'input.button', {'button': b, 'state': 'release', 'player': 0})
+                rec({'op': op}); time.sleep(op[3] if len(op) > 3 else 0.3)
+            elif k == 'stick':
+                call(phase, 'input.stick', {'stick': op[1], 'x': op[2], 'y': op[3], 'player': 0,
+                                            'lease_ms': max(1000, op[4] + 300)})
+                time.sleep(op[4] / 1000)
+                call(phase, 'input.stick', {'stick': op[1], 'x': 0, 'y': 0, 'player': 0, 'lease_ms': 1000})
+                rec({'op': op}); time.sleep(op[5] if len(op) > 5 else 0.25)
+            elif k == 'shot':
+                path = shots / (op[1] + '.png')
+                r = call(phase, 'ui.screenshot', {'path': str(path), 'target': 'screen'}, timeout=60)
+                rec({'op': op, 'path': str(path), 'result': r if len(json.dumps(r)) < 400 else str(r)[:400]})
+            elif k == 'macro':
+                name = op[1]
+                path = Path(name) if (':' in name or name.startswith('/')) else HERE / 'macros' / (name if name.endswith('.json') else name + '.edenmacro.json')
+                assert path.is_file(), path
+                st = call(phase, 'status'); assert st['running'] and not st['modal'], st
+                call(phase, 'macro.play', {'path': str(path)})
+                st = finish(phase, op[2] if len(op) > 2 else 120)
+                rec({'op': op, 'sha256': sha(path), 'status': {x: st.get(x) for x in ('state', 'frame', 'duration_frames')}})
+            elif k == 'plug':
+                pat = re.compile(op[2]); got = [x for x in plug_lines(op[1]) if pat.search(x)]
+                rec({'op': op, 'count': len(got), 'lines': [x[:200] for x in got[-(op[3] if len(op) > 3 else 5):]]})
+            elif k == 'lines':
+                rec({'op': op, 'lines': [x[:300] for x in plug_lines(op[1])[op[2] if len(op) > 2 else 0:][:2000]]})
+            elif k == 'waitplug':
+                pat = re.compile(op[2]); end = time.monotonic() + (op[3] if len(op) > 3 else 60)
+                before, hit = len(plug_lines(op[1])), None
+                while hit is None:
+                    hit = next((x for x in plug_lines(op[1])[before:] if pat.search(x)), None)
+                    if hit is None:
+                        if time.monotonic() > end:
+                            rec({'op': op, 'error': 'timeout'}); raise SystemExit('waitplug timeout: ' + op[2])
+                        time.sleep(0.25)
+                rec({'op': op, 'line': hit[:300]})
+            elif k == 'settings':
+                sdir = USER / 'sdmc' / 'ultimate' / OUTPUT; sdir.mkdir(parents=True, exist_ok=True)
+                tmp = sdir / '.diag-settings-next.tmp'; tmp.write_bytes(Path(op[1]).read_bytes()); os.replace(tmp, sdir / 'diag-settings-next.json')
+                rec({'op': op, 'sha256': sha(Path(op[1]))[:16]})
+            elif k == 'mute':
+                rec({'op': op, 'set': call(phase, 'settings.set', {'key': 'core.volume', 'value': 0}), 'save': call(phase, 'settings.save'),
+                     'get': call(phase, 'settings.get', {'key': 'core.volume'})})
+            elif k == 'load':
+                import winplat as _wp
+                rec({'op': op, 'result': call(phase, 'game.load', {'path': str(_wp.GAME)}, timeout=90)})
+            else:
+                raise SystemExit('unknown op ' + k)
+    finally:
+        try:
+            call(phase, 'input.reset')
+        except Exception as e:
+            out.append({'input_reset_error': str(e)})
+        print(json.dumps(out)[-5000:])
+
+
+if __name__ == '__main__':
+    op, phase = sys.argv[1:3]
+    if op == 'launch':
+        launch(phase)
+    elif op == 'ops':
+        ops(phase, json.loads(base64.b64decode(sys.argv[3])))
+    elif op == 'kill':
+        kill(phase)
+    else:
+        raise SystemExit('unknown operation')
