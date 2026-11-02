@@ -6,7 +6,7 @@
 //! its own callback. The decisions of the open questions follow the specs' recommendations: a load
 //! request is ignored while a load is in progress and the slot is latched at the request (OQ 5), no
 //! random draw while idle (OQ 4), damage ends are (Lower, Upper) for both roles (OQ 6), one
-//! recording/playback trigger when both records are done (OQ 7), every marker is cancelled when
+//! recorder hand-off (`Out::restored`, package 4 decides the recording or playback, OQ 7) when both records are done, every marker is cancelled when
 //! Enable Save States is turned Off (§5.6).
 
 use crate::model::cpu::rng::Rng;
@@ -15,7 +15,7 @@ use super::file::{SaveFile, SLOTS};
 use super::held_item::HeldItem;
 use super::place;
 use super::record::{Charge, Marker, SavedState, Steve};
-use super::settings::{RecordTrigger, StateSettings};
+use super::settings::StateSettings;
 
 /// Which half of a slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,15 +150,6 @@ pub struct Done {
     pub pokemon_switch: bool,
 }
 
-/// A recording or playback to start now that the load is complete.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Trigger {
-    /// Start an input recording (Recording Trigger: Save State Load).
-    Record,
-    /// Start the playback of this slot.
-    Playback(u8),
-}
-
 /// The answer for one fighter frame.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Out {
@@ -179,7 +170,6 @@ pub struct Out {
     pub capture: Option<usize>,
     /// The Save chord set both records (the slot the notification names).
     pub saved_notice: Option<usize>,
-    pub trigger: Option<Trigger>,
     /// The fighter's record waits on a feature (`ApplyBuff`, `WaitForPokemonSwitch`,
     /// `WaitForCopyAbility`): the runtime runs that feature's step this frame.
     pub wait: Option<Marker>,
@@ -200,8 +190,8 @@ pub struct Machine {
     pub random_slot: usize,
     /// The slot of the load in progress, latched at the request.
     active: Option<usize>,
-    /// A recording / playback trigger is waiting for the load to finish.
-    trigger_pending: bool,
+    /// The recorder has not been told yet that the load finished.
+    restore_pending: bool,
 }
 
 impl Default for Machine {
@@ -212,7 +202,7 @@ impl Default for Machine {
 
 impl Machine {
     pub fn new(file: SaveFile) -> Self {
-        Self { file, mirror_sign: 1.0, random_slot: 0, active: None, trigger_pending: false }
+        Self { file, mirror_sign: 1.0, random_slot: 0, active: None, restore_pending: false }
     }
 
     fn records(&self, role: Role) -> &[SavedState; SLOTS] {
@@ -278,7 +268,7 @@ impl Machine {
             }
         }
         self.active = None;
-        self.trigger_pending = false;
+        self.restore_pending = false;
     }
 
     /// Accept a load request if none is in progress (OQ 5): pick the slot (a weighted random one when
@@ -300,7 +290,7 @@ impl Machine {
             self.set_marker(role, slot, Marker::KillPlayer);
         }
         self.mirror_sign = place::next_mirror_sign(settings.mirroring, self.mirror_sign, rng);
-        self.trigger_pending = true;
+        self.restore_pending = true;
         true
     }
 
@@ -368,31 +358,19 @@ impl Machine {
             out.capture = Some(save_slot);
         }
 
-        // 10. One recording / playback trigger when both records are done.
-        if self.trigger_pending && !self.is_loading() {
-            self.trigger_pending = false;
+        // 10. The recorder is told once when both records are done.
+        if self.restore_pending && !self.is_loading() {
+            self.restore_pending = false;
             if let Some(slot) = self.active.take() {
                 // The restore is complete: the recorder is told once (pkg4 interface), with whether
-                // the CPU was saved on the ledge; then the recording / playback trigger.
+                // the CPU was saved on the ledge. Package 4 then records or plays per its own settings.
                 out.restored = Some(self.record(Role::Cpu, slot).situation_kind == input.situation.cliff);
-                out.trigger = self.trigger_for(slot, settings, rng);
             }
         }
         if !self.is_loading() {
             self.active = None;
         }
         out
-    }
-
-    fn trigger_for(&self, slot: usize, settings: &StateSettings, rng: &mut Rng) -> Option<Trigger> {
-        if settings.record_trigger == RecordTrigger::SaveStateLoad {
-            return Some(Trigger::Record);
-        }
-        // Ledge playback is left to the ledge-option feature: no trigger for a saved ledge state. The
-        // CPU's half names the situation (the playback runs on the CPU).
-        let ledge = self.record(Role::Cpu, slot).situation_kind;
-        let _ = ledge;
-        settings.playback.pick(rng).map(|slot| Trigger::Playback(slot as u8))
     }
 
     /// Steps 2 to 9 of §5.3 for one body.

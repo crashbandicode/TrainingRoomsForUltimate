@@ -31,6 +31,10 @@ pub mod diag_ring;
 pub mod factory;
 #[path = "model/guard.rs"]
 pub mod guard;
+#[path = "model/hook_stats.rs"]
+pub mod hook_stats;
+#[path = "model/input_adapter.rs"]
+pub mod input_adapter;
 #[path = "model/ini_files.rs"]
 pub mod ini_files;
 #[path = "model/input_delay.rs"]
@@ -57,6 +61,8 @@ pub mod notify;
 pub mod recording;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/settings_file.rs"]
+pub mod settings_file;
 #[path = "model/sha256.rs"]
 pub mod sha256;
 #[path = "model/sites_ui.rs"]

@@ -63,6 +63,23 @@ fn pilot_present() -> bool {
     result == 0 && address != 0
 }
 
+/// The menu's session ends with Training (the fork's `clear_session_state`): the menu is closed without a
+/// commit, its close fade and the pause flag are forgotten, the `Owners::MENU` bit is released, the input
+/// adapter is reset and the worker drops its model. Called where the CPU runtime clears the other
+/// session state (`features::recorder::session_clear`).
+pub fn clear_session_state() {
+    use std::sync::atomic::Ordering;
+    state::OPEN.store(false, Ordering::Release);
+    state::CLOSING.store(false, Ordering::Release);
+    state::CLOSE_COUNT.store(0, Ordering::Release);
+    state::MENU_SHOWN.store(false, Ordering::Release);
+    state::PAUSE_ACTIVE.store(false, Ordering::Release);
+    crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
+    input::reset_session();
+    worker::push_reset();
+    state::FRAME_SEQ.fetch_add(1, Ordering::Release);
+}
+
 pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     state::PILOT_PRESENT.store(pilot_present(), std::sync::atomic::Ordering::Release);
     #[cfg(feature = "diag")]
