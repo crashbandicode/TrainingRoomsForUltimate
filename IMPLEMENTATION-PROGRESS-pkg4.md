@@ -213,3 +213,13 @@ folder is archived as `.before-<label>`; the ledger parser keys open claims per 
   watchdog loop; stack line kept, size now from the table), pkg4 carry manifest (stack's replay_store edits; carry verify clean, ledger regenerated),
   tests/hook_alloc.rs: ours (the child-process exact meter test the lead accepted; work/implementation had a 64 MiB block with a 4 MiB SLACK tolerance).
 - Gates on the merged tree: host tests all pass, clippy -D warnings 0, --no-default-features builds, Switch release + diag build (unclaimed, see above).
+### Design C (lead ruling 2026-11-02 ~13:2xZ; estimate ~4.5 h, layer side) — state at 371d9b1
+- Part 1 committed: model::macro_handoff (MacroQueries, PlayBuffers, CaptureBuffer, LayerEvent), host-tested.
+- Waiting on: (a) integrator-3 landing ui-screens slice 1 (hos_lock::Mailbox, port::worker_tick, HookId::MacroPanel; ui-screens resolves the
+  port.rs/open_browser collision with 4286dc8 first) — then merge work into stream/pkg4; (b) pkg6 A's `game::natives::entry_active_body(entry_ptr)`
+  (the game's active-cell index at entry+0x5918, fallback +0x4160) — then module_accessor and recorder::body_of use it (cpu_body,
+  is_primary_cpu_body, compat try_get_module_accessor follow), host test with a fake bank.
+- Then the wiring: the worker service in worker_tick (drain the LayerEvent mailbox, keyboard, character service, deferred effects, publish
+  MacroQueries, fill PlayBuffers on load); hooks read MacroQueries / PlayBuffers / CaptureBuffer only; the clip editor's P1 controls to a
+  Mailbox<ClipPress,16>; remaining hook-side calls under HookId::MacroPanel; s4-09 proves R5 0 in this layer and no keyboard stall.
+- Next yoga turn: requeue at the end when the wiring builds.
