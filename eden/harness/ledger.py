@@ -61,9 +61,16 @@ def owner_of(rest):
 
 
 def hosts_of(rest, release=False):
-    named = {m.lower() for m in ANY.findall(rest)}
     if release:
-        return frozenset(named) or ALL
+        return frozenset(m.lower() for m in ANY.findall(rest)) or ALL
+    # Historical claims include explicit non-use and references to a separately
+    # claimed run. Those clauses describe other ownership, not this claim.
+    # Remove only the evidenced forms, retaining every affirmative host mention
+    # elsewhere (including real multi-host claims). Releases remain conservative.
+    rest = re.sub(r"\b(?:surface|yoga|ally)\s+not used\b", "", rest, flags=re.I)
+    rest = re.sub(r"\bmy Eden run\s+[\w-]+\s+is on (?:the )?(?:surface|yoga|ally)\b",
+                  "", rest, flags=re.I)
+    named = {m.lower() for m in ANY.findall(rest)}
     return frozenset(m.lower() for m in ON.findall(rest)) or frozenset(named) or ALL
 
 

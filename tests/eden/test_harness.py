@@ -63,6 +63,22 @@ def p(**kw):
 
 
 class LedgerParse(unittest.TestCase):
+    def test_unused_host_is_not_claimed(self):
+        text = ("2026-10-29 19:55Z CLAIMED: Claude tangent ssbu-refresh-clock-t2 "
+                "Surface :61 run a11 only (E4 RNG draw replays), profile copy profiles/a. Yoga not used.\n"
+                "2026-10-29 20:10Z RELEASED: Claude tangent ssbu-refresh-clock-t2 Surface run a11 done.\n")
+        for host in ("surface", "yoga", "ally"):
+            self.assertEqual(ledger.open_claims(text, host, now=NOW), ([], []))
+
+    def test_reference_to_separately_owned_run_is_not_a_second_claim(self):
+        text = ("2026-11-02 07:24Z CLAIMED: Claude 0caa72b8/wire-eden solo run w-01 on Yoga\n"
+                "2026-11-02 07:28Z CLAIMED: Claude 0caa72b8/wire Switch builds on the Surface "
+                "(compile only, no Eden on the Surface; my Eden run w-01 is on the Yoga), about 3 min\n"
+                "2026-11-02 07:31Z RELEASED: Claude 0caa72b8/wire Surface builds done\n")
+        self.assertEqual(ledger.open_claims(text, "surface", now=NOW), ([], []))
+        self.assertEqual([c.owner for c in ledger.open_claims(text, "yoga", now=NOW)[0]],
+                         ["Claude 0caa72b8/wire-eden"])
+
     def test_stamps_with_and_without_seconds_and_every_agent(self):
         events = ledger.parse(LEDGER)
         self.assertEqual(len(events), 13)

@@ -2,6 +2,8 @@
 
 ## Astra lead admission correction, 2026-11-02
 
+Second correction (after 664eda5), requested by primary's 14:5xZ handoff: claim host extraction counted the explicit `Yoga not used` clause and the reference `my Eden run w-01 is on the Yoga` as new Yoga ownership. Remove only those evidenced descriptive forms before extracting claim hosts; preserve actual multi-host claims and release behavior. Two new real-ledger regressions failed before the fix; all 54 tests pass after (0.099 s, scope run-p2817348-i15394472, 512M/30s). Fresh full ledger at scope run-p2818529-i15380240: Yoga/Ally no open claims, Surface pkg6 01a19cb7 claimed. Primary appended canonical Terra source12 release. No foreign release or age-based bypass by lead. Ally smoke remains open.
+
 Lead `01a19c96-0e78-7293-a76c-6f46a70be468`, live Astra medium; playbook ae87443 read fully. Starting head `6ce55ef256748bef59ab544c5e5e12bd60d25994`, clean. No other worker requested for harness. This is a Python-only admission fix; no compile, Eden, ledger mutation, profile or card access.
 
 Root cause: `busy()` discarded the aged half of `open_claims()`, and CLI `open` exited 0 for those claims. A foreign claim without RELEASED became invisible to admission after 12 hours, contrary to the shared stream rules. Both lists now block; age is reporting only. Matching RELEASED still clears the claim. Docs corrected, including the unsubmitted playbook proposal; the playbook repository is unchanged.
