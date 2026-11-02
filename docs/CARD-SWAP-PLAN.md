@@ -88,7 +88,7 @@ The swap places only `libtraining_rooms.nro` and `developer.ini`; the clean room
    `migration.json` is absent, whatever else exists (ledger row C1). Host tests (package 3, S3-5): an import with
    only `developer.ini` present runs completely and writes `settings.json` and `migration.json`; `developer.ini`
    is left byte-identical; the Developer page reads on.
-3. **After an undo to the Training Modpack: nothing is carried back (recommendation; operator decision U1).** The
+3. **After an undo to the Training Modpack: nothing is carried back; final (operator decision U1, 2026-11-02).** The
    fork's folder is exactly as it was at the swap (the import only reads it), so the fork resumes from that state.
    What was recorded under `TrainingRooms/` stays there; if the clean room is installed again, `migration.json`
    exists, so it does not re-import and its own data is kept. The files are shape-compatible (setting ids,

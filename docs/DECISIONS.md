@@ -411,3 +411,14 @@ affected spec (its *Open questions* answer and §9 test-provenance rows) and the
 
 **Answered 2026-11-02 (~02:4xZ):** Q5 and B11 as recommended; the SDI ×2.0 stretch, the Developer page (N1) and the
 delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage grid. Nothing in this list is open.
+
+## Answered 2026-11-02 (~10:4xZ, the operator via the primary)
+
+| # | Decision | Answer |
+| --- | --- | --- |
+| HB1 | Hitbox Visualization: also draw hurtboxes? (the approved proposal showed them; SPEC-core-06 did not) | **(a) also draw hurtboxes (yellow)**, as the approved proposal shows; the per-frame cost is measured before shipping; SPEC-core-06 and the help text updated |
+| U1 | After an undo to the Training Modpack, carry clean-room data back? | **No carry-back** (as recommended); final in `docs/CARD-SWAP-PLAN.md` |
+| D-DELAY-REROLL | Ledge / throw / pummel **delays** changed while the CPU hangs or holds a grab | **A, keep**: the delay rolled at the start of the hang / grab stands; the next event uses the new value (both trees; the fork's current behaviour). B11's option re-roll is unchanged |
+| L1 | Deluxe plugin SDK licence | **MIT, copyright "intpa"**: the operator licenses the SDK repo (covers earlier revisions incl. `a63bc8c`); the clean room then carries the SDK as the fork uses it and enables the Deluxe Plugins page row |
+| FW1 | Ally Eden rigs and the Windows firewall prompt | agents may add an inbound **Block** rule (Windows Defender Firewall) for each rig `eden.exe` path they create (Training rows need no inbound network); never Allow rules; never answer the prompt itself; each rule recorded in the rig notes |
+| F6 | First-boot group-build hitch (~0.1 s first-use setup on the game thread; Kirby-first 91–109 ms) | **fix in both trees**: a fork worker root-causes it on M5q and ships M5r; the clean room carries the fix (fix-ledger row F6) |
