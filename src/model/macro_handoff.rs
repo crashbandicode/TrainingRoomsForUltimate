@@ -490,6 +490,16 @@ mod tests {
     }
 
     #[test]
+    fn preview_close_cancelling_queued_play_retires_when_drain_becomes_idle() {
+        let retirement = super::PreviewRetirement::new();
+        retirement.request_close();
+        assert_eq!(retirement.stop(true), None, "queued Play counts as occupied at posting");
+        // Newest Stop supersedes Play; no native session was started by drain.
+        assert_eq!(retirement.stop(false), Some(false));
+        assert!(retirement.finish(), "retirement was delivered exactly once");
+    }
+
+    #[test]
     fn preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus() {
         let retirement = super::PreviewRetirement::new();
         let parked = MacroQueries { clip_editor_open: true, replay_loading: true,

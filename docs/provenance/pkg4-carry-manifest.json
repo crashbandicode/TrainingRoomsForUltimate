@@ -1312,7 +1312,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "1c3673c8cffd8427c9eed6fb130e25881f745c6e19f687d3d04b47cd79060d50",
+   "dest_sha256": "cc5c18d4169f71c1b278b439cba445210c1bd62619ec615acb1b55653f2a311f",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -1508,6 +1508,11 @@
      "old": "pub fn request_stop() {\n    if occupied() {\n        if !STOP_QUEUED.swap(true, Ordering::AcqRel) { post_request(Request::Stop); }\n    } else {\n        save_states::finish_preview_restore(RETIREMENT.finish());\n    }\n}",
      "new": "pub fn request_stop() {\n    if let Some(keep) = RETIREMENT.stop(occupied()) {\n        save_states::finish_preview_restore(keep);\n    } else if !STOP_QUEUED.swap(true, Ordering::AcqRel) {\n        post_request(Request::Stop);\n    }\n}",
      "reason": "Use the host-tested stop/retirement decision: active cleanup must finish before consuming a close, idle close does not consult stale UI focus."
+    },
+    {
+     "old": "        Some(Request::Stop) => STATUS.store(0, Ordering::Relaxed),",
+     "new": "        Some(Request::Stop) => {\n            save_states::finish_preview_restore(RETIREMENT.finish());\n            STATUS.store(0, Ordering::Relaxed);\n        },",
+     "reason": "Close can supersede a queued Play before a native session starts. Consume the explicit close intent in the idle Stop branch after draining requests, preserving ordinary Stop anchor retention."
     }
    ]
   },

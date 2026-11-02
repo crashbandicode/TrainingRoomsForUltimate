@@ -220,7 +220,10 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
             if let Err(error) = save_states::request_preview_restore(false) { fail(error); }
             else { println!("[ClipPreview] restore_stop"); }
         }
-        Some(Request::Stop) => STATUS.store(0, Ordering::Relaxed),
+        Some(Request::Stop) => {
+            save_states::finish_preview_restore(RETIREMENT.finish());
+            STATUS.store(0, Ordering::Relaxed);
+        },
         None => {}
     }
 }
