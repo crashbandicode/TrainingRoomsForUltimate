@@ -74,7 +74,12 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(panes) = panes.as_ref() else { return };
 
     if !help.is_null() {
-        PAUSE_ACTIVE.store((pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5, Ordering::Release);
+        let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
+        if PAUSE_ACTIVE.swap(active, Ordering::AcqRel) != active {
+            // The native Training menu opened or closed: it owns P1's input while it is open and the
+            // delay queue is emptied at the edge (SPEC-input-03 section 5.1, review R2 of package 1).
+            crate::runtime::features::input_delay::pause_flag(active);
+        }
     }
     let open = OPEN.load(Ordering::Acquire);
     let mut alpha = 255;
