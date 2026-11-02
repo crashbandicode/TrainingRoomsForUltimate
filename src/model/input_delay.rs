@@ -81,6 +81,9 @@ pub enum Clear {
     SaveStateLoad,
     /// Training was reset with L+R+A or by the game (decision B8; the reset hub's last step).
     TrainingReset,
+    /// The game's own pause began or ended (SPEC-input-03 §5.1, question 3): whatever was queued
+    /// before the pause, and whatever the pause menu's input produced, never reaches gameplay.
+    NativePause,
 }
 
 /// The delay queue.

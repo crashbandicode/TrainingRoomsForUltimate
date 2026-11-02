@@ -17,6 +17,8 @@ pub mod factory;
 pub mod guard;
 #[path = "model/hook_stats.rs"]
 pub mod hook_stats;
+#[path = "model/input_adapter.rs"]
+pub mod input_adapter;
 #[path = "model/input_delay.rs"]
 pub mod input_delay;
 #[path = "model/install_line.rs"]
@@ -33,6 +35,8 @@ pub mod settings;
 pub mod settings_file;
 #[path = "model/sites.rs"]
 pub mod sites;
+#[path = "model/sites_pause.rs"]
+pub mod sites_pause;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
 #[path = "model/store.rs"]

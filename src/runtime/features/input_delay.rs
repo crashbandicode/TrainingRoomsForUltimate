@@ -10,12 +10,17 @@ use std::cell::Cell;
 use parking_lot::Mutex;
 use skyline::hooks::InlineCtx;
 
-use crate::model::input_delay::{self, Clear, DelayQueue, MappedInputs};
+use crate::model::input_adapter::InputAdapter;
+use crate::model::input_delay::{self, Clear, MappedInputs};
 use crate::model::sites;
 use crate::runtime::alloc::{HookId, HookScope};
+#[cfg(feature = "diag")]
+use crate::runtime::diag_log::diagnostic;
 use crate::runtime::{game, published};
 
-static QUEUE: Mutex<DelayQueue> = Mutex::new(DelayQueue::new());
+/// The delay queue, the owner-mask rules and the pause trace (`model::input_adapter`): the hooks only
+/// call its methods, so the host tests drive the same code.
+static ADAPTER: Mutex<InputAdapter> = Mutex::new(InputAdapter::new());
 
 thread_local! {
     /// The out record and slot of the mapping call in progress on this thread, noted before the call
@@ -48,9 +53,17 @@ fn apply() {
         return;
     }
     let out = out as *mut MappedInputs;
-    let mut queue = QUEUE.lock();
+    let mut adapter = ADAPTER.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.
-    unsafe { *out = queue.poll(published::input_delay(), published::input_owners(), *out) };
+    let (record, check) = adapter.poll(&published::INPUT_OWNERS, published::input_delay(), unsafe { *out });
+    // SAFETY: as above.
+    unsafe { *out = record };
+    #[cfg(feature = "diag")]
+    if let Some(check) = check {
+        diagnostic(format_args!("[TrainingRooms] pause_owner resume_checked delay={} leaked={}", check.delay, check.leaked));
+    }
+    #[cfg(not(feature = "diag"))]
+    let _ = check;
 }
 
 /// Caller A, at the loop increment the call returns to.
@@ -70,5 +83,32 @@ pub unsafe fn caller_b_apply(_ctx: &mut InlineCtx) {
 /// Empty the queue: the reset hub (decision B8) and, from package 3, every save-state load. Returns
 /// how many queued records were dropped.
 pub fn clear(why: Clear) -> usize {
-    QUEUE.lock().clear(why)
+    ADAPTER.lock().clear(why)
+}
+
+/// The game's pause began (the hook at `StatePause`'s enter): take over P1's input and empty the queue.
+pub fn pause_begin() {
+    let dropped = ADAPTER.lock().pause_begin(&published::INPUT_OWNERS);
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!(
+        "[TrainingRooms] pause_owner begin queue_dropped={dropped} owners={:#04x}",
+        published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
+    ));
+    #[cfg(not(feature = "diag"))]
+    let _ = dropped;
+}
+
+/// The game's pause ended (the hook at `StatePause`'s exit): release P1's input.
+pub fn pause_end() {
+    let report = ADAPTER.lock().pause_end(&published::INPUT_OWNERS, published::input_delay());
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!(
+        "[TrainingRooms] pause_owner end queued_at_begin={} owned_polls={} owned_non_neutral={} owners={:#04x}",
+        report.queued_at_begin,
+        report.owned_polls,
+        report.owned_non_neutral,
+        published::INPUT_OWNERS.load(std::sync::atomic::Ordering::Acquire)
+    ));
+    #[cfg(not(feature = "diag"))]
+    let _ = report;
 }

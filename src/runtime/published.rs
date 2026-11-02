@@ -5,8 +5,6 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-use crate::model::input_delay::Owners;
-
 use crate::model::settings::Snapshot;
 
 static INPUT_DELAY: AtomicU8 = AtomicU8::new(0);
@@ -42,14 +40,12 @@ pub fn set_developer_page(on: bool) {
 }
 
 /// What other than gameplay owns P1's input right now (`Owners` bits). The packages that own those
-/// states set and clear their bit: the plugin menu and modal panels (package 5), the named stop chord
-/// and the replay editor (package 4), the native waiting-room UI (package 6), the game's pause menu.
-/// The input-delay hook reads it on every poll.
+/// states set and clear their bit with `model::input_adapter::{take, release}`: the plugin menu and
+/// modal panels (package 5), the named stop chord and the replay editor (package 4), the native
+/// waiting-room UI (package 6). The game's own pause is set and released by the two `StatePause` hooks
+/// (`features::pause_owner`, via `InputAdapter::pause_begin` / `pause_end`). The input-delay adapter
+/// reads the mask on every poll.
 pub static INPUT_OWNERS: AtomicU8 = AtomicU8::new(0);
-
-pub fn input_owners() -> Owners {
-    Owners::from_bits(INPUT_OWNERS.load(Ordering::Acquire))
-}
 
 /// Set while the hot-swap engine replaces a fighter (package 6); the reset hub does not run then.
 pub static HOT_SWAP_IN_PROGRESS: AtomicBool = AtomicBool::new(false);

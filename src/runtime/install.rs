@@ -11,7 +11,7 @@ use crate::model::install_line::InstallLine;
 use crate::model::storage::{self, FixedPath};
 
 pub fn write(line: &InstallLine<'_>) {
-    let mut buffer = FixedPath::<2048>::new();
+    let mut buffer = FixedPath::<4096>::new();
     // A line that does not fit is cut, not dropped.
     let _ = write!(buffer, "{line}");
     let text = buffer.as_str();

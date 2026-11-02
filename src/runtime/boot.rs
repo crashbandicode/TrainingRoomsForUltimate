@@ -16,12 +16,13 @@ use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, Se
 use crate::model::settings::{self, Settings};
 use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
+use crate::model::sites_pause;
 use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
+use crate::runtime::features::{cpu, input_delay, lra_reset, pause_owner, reset_hub, stage_hazards as hazards};
 use crate::runtime::{clock, game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
@@ -86,6 +87,10 @@ pub fn run() {
             site.slot_outcome(game::read_slot_target(site.offset))
         };
     }
+    let mut found_pause = [GuardOutcome::Stock; sites_pause::SITES.len()];
+    for (slot, site) in found_pause.iter_mut().zip(sites_pause::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
+    }
     let usable = |site: &sites::Site| {
         SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
     };
@@ -128,10 +133,15 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    let mut written_pause = [Written::Skipped; sites_pause::SITES.len()];
+    let pause_on = install_pause_owner(&found_pause, &mut written_pause);
 
     // 6. The install line.
-    let reports: [SiteReport; SITE_COUNT] =
-        std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
+    let mut reports: Vec<SiteReport> =
+        (0..SITE_COUNT).map(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] }).collect();
+    reports.extend(
+        sites_pause::SITES.iter().enumerate().map(|(i, site)| SiteReport { site: site.name, found: found_pause[i], written: written_pause[i] }),
+    );
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
@@ -142,6 +152,7 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
+        FeatureReport { feature: Feature::PauseOwner.name(), installed: pause_on },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -210,6 +221,23 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
         }
     }
     (true, defence, ledge, tech, shield)
+}
+
+/// The native pause as an input owner (review R2): both hooks of `StatePause` (begin and end) or neither,
+/// so the owner bit is never raised without a hook that releases it. Returns whether they were installed.
+fn install_pause_owner(found: &[GuardOutcome], written: &mut [Written]) -> bool {
+    for (slot, outcome) in written.iter_mut().zip(found) {
+        if outcome.usable() {
+            *slot = Written::Checked;
+        }
+    }
+    if !found.iter().all(|outcome| outcome.usable()) {
+        return false;
+    }
+    skyline::install_hook!(pause_owner::pause_enter);
+    skyline::install_hook!(pause_owner::pause_exit);
+    written.fill(Written::Near);
+    true
 }
 
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.
