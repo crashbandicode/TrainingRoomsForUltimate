@@ -178,13 +178,13 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
 /// manually selected exact Mii is already a match even without a replay receipt.
 pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     current.is_some_and(|kind| target.ready(kind as u32,
-        crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE)))
+        crate::runtime::macros::identity::current_configuration()))
 }
 fn exact_target_ready(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     let Some(kind)=current else{return false;};
     if target.configuration().is_none() {return target.ready(kind as u32,None);}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    {crate::runtime::roster::character_roster::mii_replay::named_ready(target,kind as u32)}
+    {crate::runtime::macros::identity::named_ready(target)}
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     {false}
 }
@@ -1274,7 +1274,7 @@ pub fn service_character() {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
-        if let Some(reason)=target.and_then(crate::runtime::roster::character_roster::mii_replay::named_refusal) {
+        if let Some(reason)=target.and_then(crate::runtime::macros::identity::named_refusal) {
             let revision=selection_revision();
             if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {notify(reason);}
             return;
@@ -1286,7 +1286,7 @@ pub fn service_character() {
     {
         let target=lock_read(&UI).loaded_target();
         if let Some(target)=target {
-            crate::runtime::roster::character_roster::mii_replay::reacknowledge_named(target);
+            crate::runtime::macros::identity::reacknowledge_named(target);
         }
     }
     submit_loaded_character();

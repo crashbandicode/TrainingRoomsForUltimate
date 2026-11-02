@@ -104,11 +104,11 @@ struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     resolving:Option<std::sync::mpsc::Receiver<Result<Configuration,String>>> }
 pub(crate) fn selection_revision()->u64 {SELECTION_REVISION.load(Ordering::Acquire)}
 fn target_ready(target:Target,current:Option<i32>)->bool {
-    let Some(kind)=current else {return false;};
+    let Some(_kind)=current else {return false;};
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    { crate::runtime::roster::character_roster::mii_replay::ready(target,kind as u32) }
+    { crate::runtime::macros::identity::clip_ready(target) }
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    {target.ready(kind as u32,None)}
+    {target.ready(_kind as u32,None)}
 }
 use crate::model::macro_handoff::{VaultArchive as Capture, VaultEvent};
 static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
@@ -623,7 +623,7 @@ pub fn service_reload() {
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};
         #[cfg(feature="mii-ordinary-cpu-alpha")]
-        if let Some(reason)=target.and_then(|target|crate::runtime::roster::character_roster::mii_replay::refusal(target,pending.revision)) {
+        if let Some(reason)=target.and_then(|target|crate::runtime::macros::identity::clip_refusal(target,pending.revision)) {
             failure=Some(reason.into());
         }
         let grounded_idle=crate::runtime::ui::facts::fact_cpu_status()==Some(*FIGHTER_STATUS_KIND_WAIT)

@@ -4,6 +4,32 @@
 
 ## QUESTIONS
 
+- **Pkg6-owned remaining shared replay job lock17:2xZ:** mii_replay::resolve (called by pkg4 worker)
+  allocates a channel and pushes VecDeque under mii_replay::STATE; native mii_replay::service also locks
+  that STATE. current_mii_configuration/ready/refusal reads are being bridged in pkg4, but this existing
+  job broker needs pkg6's allocation-free service handoff (same class as catalog fix). Please assign its
+  exact owned integration slice; do not move resolve's channel allocation onto the native callback.
+  Also retain existing committed(miis) background import semantics and cancellation/disconnection.
+
+- **Cross-owner identity query audit17:2xZ:** current pkg4 worker load_context/observe_loaded/publish_queries
+  still call character_roster::current_mii_configuration and mii_replay::{named_ready,ready,*refusal};
+  these read mii_ordinary_cpu::STATE, which native service also locks. busy() is InstallGate atomic.
+  This is a real shared-lock path outside the existing hook_locks table, not a scanner exception.
+  Plan: copy exact configuration/readiness/refusal results at pkg4's existing game service boundaries
+  into a session+selection+target-tagged publication; worker requests contain Copy Target only.
+  Keep pkg6 as sole identity/loader provider, no worker native reads, no change to pkg6 state APIs.
+  Do not accept the pending narrower scanner gate as proof this newly identified path is fixed.
+
+- **Preview core handoff17:1xZ:** current006bd88 macros::save_states adapter in mod.rs:45 still owns the
+  Err stub. Game-side replay_preview::start_context() returns Copy StartState only while Starting/Playing;
+  request_preview_restore(true) is called after SESSION has that start, false after phase becomes Stopping.
+  StartState carries kind/costume/facing/situation/status/speed_x/speed_y, no stage position; clip ReplayFrame
+  x/y is used by portable extraction/placement. Existing recorder's preview buffers contain copied inputs,
+  never worker-owned Vecs. Lead state-core should define temporary pair snapshot/restore at its single
+  native owner; pkg4 will wire this adapter after exact authorization. No new preview native provider.
+  finish_preview_restore is called after stop restore completes; end_preview_restore on session retirement.
+  No stub acceptance and no early return from stream work.
+
 - **Off-to-On binding defect16:4xZ / narrow Q7 interface fix:** writer::request_replay_capture only updated
   CAPTURE_ENABLED + file slot. Live hooks read replay_store::TOGGLE; the initial runtime census found request_choice
   only in feature-gated capture_plugin (deluxe-sdk absent from defaults). Thus resident hook installation
@@ -93,6 +119,8 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Dirty identity bridge: one outstanding Copy query/reply to existing roster provider from CPU callback; worker session/selection/target checks and reack intent mailbox. Carry42 regenerated; not compiled. Queued006bd88 test and staged source remain unchanged.
+- Frozen006bd88 staged to Yoga gate/target-gate and src/target; archive e65c3a05678dc8651e04e1e6dc5ef3ac8efd30950d806b4e4dad5e7dacd13444. Both locks-006bd88 and diag-006bd88 wrappers prepared, but ONLY hook_locks queued END (behind pkg6/UI). No active claim.
 - 17:16Z Yoga hook_locks2330a7a failed at compilation, zero tests ran; claim RELEASED immediately,
   own queue line removed. Raw locks-2330a7a.log/.exit retained. Exact error:
   error[E0308]: mismatched types, tests/hook_locks.rs:165:13 and168:13,

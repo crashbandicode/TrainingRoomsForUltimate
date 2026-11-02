@@ -19,6 +19,7 @@ pub(crate) mod diag;
 pub(crate) mod live_replay;
 pub(crate) mod named_macros;
 pub(crate) mod port;
+pub(crate) mod identity;
 pub(crate) mod replay_preview;
 pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
@@ -157,6 +158,7 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
                 step(32);
                 diag::frame_done();
             }
+            identity::service();
             named_macros::service_character_request();
             replay_capture::service_reload_request();
             port::slots::service_slot_request();

@@ -125,6 +125,7 @@ static RELOAD_FRAME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64
 pub(crate) fn worker_tick() {
     worker_events();
     if !super::ready() { return; }
+    super::identity::worker_tick();
     slots::worker_slot_tick();
     #[cfg(feature = "diag")]
     super::diag::run_pending();

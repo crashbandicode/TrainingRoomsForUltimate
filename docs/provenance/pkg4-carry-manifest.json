@@ -480,7 +480,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "4eafe23901fe72a2cc87b3e05cda0538194b39b6e39a7ae895981f44febfe36e",
+   "dest_sha256": "fb2dde5f7e08c9782eaa2acd7bf18c2e5e2822bcb2943e07bb4bf8a04966f149",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -915,6 +915,26 @@
      "old": "pub fn diag_export_slot(slot: usize) {\n    export_record_slot(Some(slot));\n}",
      "new": "pub fn diag_export_slot(slot: usize) {\n    if practice_ready() {\n        crate::runtime::macros::port::slots::export_diag(slot);\n    } else {\n        crate::runtime::macros::diag::slot_export_complete(false);\n    }\n}",
      "reason": "Design C: diagnostic export uses the same practice gate and asynchronous slot mailbox, reports refusal to its worker-owned pending name"
+    },
+    {
+     "old": "current.is_some_and(|kind| target.ready(kind as u32,\n        crate::runtime::roster::character_roster::current_mii_configuration(CPU_ROLE)))",
+     "new": "current.is_some_and(|kind| target.ready(kind as u32,\n        crate::runtime::macros::identity::current_configuration()))",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "crate::runtime::roster::character_roster::mii_replay::named_ready(target,kind as u32)",
+     "new": "crate::runtime::macros::identity::named_ready(target)",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "target.and_then(crate::runtime::roster::character_roster::mii_replay::named_refusal)",
+     "new": "target.and_then(crate::runtime::macros::identity::named_refusal)",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "crate::runtime::roster::character_roster::mii_replay::reacknowledge_named(target);",
+     "new": "crate::runtime::macros::identity::reacknowledge_named(target);",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
     }
    ]
   },
@@ -942,7 +962,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "4a61c170360bba99e7263bc2f86c43686bc94fdce928d0da3f3035857caa1197",
+   "dest_sha256": "4878c421a36df58dcc8bd3c175d6ec1badd09de1865f32743d7bc2b501c14330",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1138,6 +1158,21 @@
      "new": "VAULT_HOOK.lock()",
      "reason": "Use the non-poisoning static callback lock for VAULT_HOOK; preserve every protected access.",
      "count": 3
+    },
+    {
+     "old": "crate::runtime::roster::character_roster::mii_replay::ready(target,kind as u32)",
+     "new": "crate::runtime::macros::identity::clip_ready(target)",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "crate::runtime::roster::character_roster::mii_replay::refusal(target,pending.revision)",
+     "new": "crate::runtime::macros::identity::clip_refusal(target,pending.revision)",
+     "reason": "Design C: worker consumes session/selection/target-tagged Copy identity facts; only existing game callback enters roster state, retaining the sole native provider."
+    },
+    {
+     "old": "fn target_ready(target:Target,current:Option<i32>)->bool {\n    let Some(kind)=current else {return false;};\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    { crate::runtime::macros::identity::clip_ready(target) }\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    {target.ready(kind as u32,None)}\n}",
+     "new": "fn target_ready(target:Target,current:Option<i32>)->bool {\n    let Some(_kind)=current else {return false;};\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    { crate::runtime::macros::identity::clip_ready(target) }\n    #[cfg(not(feature=\"mii-ordinary-cpu-alpha\"))]\n    {target.ready(_kind as u32,None)}\n}",
+     "reason": "Keep the fallback kind binding explicit when the exact identity query is compiled for Mii support."
     }
    ]
   },
