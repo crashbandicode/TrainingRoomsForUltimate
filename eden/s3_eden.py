@@ -79,6 +79,8 @@ def open_claims():
         m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
         if m:
             elsewhere = bool(re.search(r"Ally|Surface|dreamland|ubuntu-surface", line)) and "Yoga" not in line
+            if m.group(1) == "RELEASED" and "continues under" in line:
+                continue  # the owner still holds the host under its next claim
             state[m.group(2)] = m.group(1) == "CLAIMED" and not elsewhere
     return [k for k, v in state.items() if v and k != OWNER]
 

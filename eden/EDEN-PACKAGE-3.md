@@ -39,10 +39,23 @@ Evidence: `eden/runs/s3-03` to `s3-07` (`diag.log`, `events.log`, `run.json`, `m
 `shots/`). The Kirby and Sora load-time silences showed `se_passed=0` in every run (spec open question 4 holds
 on these rows; Sora's jingle was not exercised).
 
-## Run s3-08 (first-boot import on a copy of the fork folder)
+## Runs s3-08 to s3-10 (first-boot import on a copy of the fork folder, release NRO)
 
-See the section below once run: fork-folder fixture built by `/tmp/pkg3-fork-fixture.ps1` (real
-`training_modpack_menu.conf` with the retired `character_item`, a ported fork-written `save_states.json`,
-`button_config.ini`, `replay_capture.ini`, `mii-presets.json`, `setups/`, `macros/`, `replay_captures/cap-1.bin` and
-a staging folder `.cap-2.smd-12345.tmp`, a trace file that is not imported), `developer.ini` = `developer_page=on`
-plus one LF, release NRO.
+NRO release `aefbcad56be10d8fa16c39b3ae2be7e9a2a874b3984235f1788489d4a2685948` (13be87c) with the pilot and the tile
+cursor; no `settings.json` or `save_states.json` placed, `developer.ini` = `developer_page=on` plus one LF placed in
+`TrainingRooms/` (as the card swap does), the fork folder `TrainingModpack/` in the profile replaced by a fixture:
+`training_modpack_menu.conf` (the real one), `training_modpack.toml` (legacy, not imported), a ported fork-written
+`save_states.json`, `button_config.ini`, `replay_capture.ini`, `mii-presets.json`, `setups/one.json`,
+`macros/one.json`, `replay_captures/cap-1.bin`, a staging folder `replay_captures/.cap-2.smd-12345.tmp/part`, and a
+fork trace file `practice-trace-1.log` (not imported).
+
+| Run | What | Result |
+| --- | --- | --- |
+| s3-08 | first attempt | not run: the harness wrote CLAIMED while the foreign `m5qo1` claim was open and the GPU lock refused; released at once (process slip, see IMPLEMENTATION-PROGRESS-pkg3.md) |
+| s3-09 | fixture as above (character item setting None) | **Pass**: install line `migration=done captures=running skipped_staging=1 result=installed`; `migration.json` `result=done`, `converted_item_snapshots=0`; `check-migration.py verify` `MIGRATION CHECK PASS` (fork folder unchanged, every planned file present with the planned bytes and the receipt hashes, the staging folder not copied and counted, nothing from the not-imported list, `developer.ini` untouched and not taken as the marker). Scan 0 matches. |
+| s3-10 | same, with the conf's `character_item` = Player 1st Var. and a `save_states.json` whose player records are Daisy without a snapshot | **Pass**: `converted_item_snapshots=5`; the copied `save_states.json` has the Smile Turnip snapshot (`choice 2, variation 0`) on the five player records and none on the CPU records; the fork's own file is unchanged; `verify` PASS. Scan 0 matches. |
+
+Evidence: `eden/runs/s3-09`, `s3-10` (`rooms/`, `fork-after/`, `verify-report.json`, `diag.log`, `events.log`,
+`run.json`, `memory.peak`; gitignored). Not run: the I/O-error and interrupted-background cases, which are covered by the
+13 filesystem host tests (`tests/migration_run.rs`).
+
