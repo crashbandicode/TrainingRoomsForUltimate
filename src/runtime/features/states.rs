@@ -389,6 +389,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             if raw.entry == 0 && !nana {
                 diagnostic(format_args!("[TrainingRooms] state item entry=0 {:?}", state_restore::item_snapshot(accessor, &ids)));
             }
+            diagnostic(format_args!(
+                "[TrainingRooms] state charge entry={} {:?}",
+                raw.entry,
+                charge::read(&ids, raw.kind, &Fields(accessor, &ids))
+            ));
         }
         if raw.entry == 1 && !nana {
             DUMP.store(false, Ordering::Release);
