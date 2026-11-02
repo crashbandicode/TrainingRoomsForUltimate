@@ -95,6 +95,14 @@ Rules for every copy:
    (rule 2) would keep; a leftover `.part` is overwritten on the next run.
 4. Any read or write error skips that one file (`reason=io:<code>`) and the
    import continues; the result is `partial`.
+4a. **Absent is not unreadable (review R2-8, 2026-11-02).** Only `NotFound` means a
+   path is absent. A present path that cannot be enumerated, stat-ed or typed
+   (a directory that cannot be opened, an entry whose metadata fails, a source
+   that is not a folder, an unreadable settings file) is reported with its path
+   and the error (`[Migration] cannot list <path>: io:<code> (...)`), makes the
+   result `partial`, and **withholds the marker**: the other paths are still
+   imported, the install line says `migration=partial`, and
+   the next boot imports again (rule 2 keeps what was copied).
 5. Write `migration.json` last: `{ "source": "sd:/ultimate/TrainingModpack",
    "at": <tick>, "plugin": "<version>", "result": "done|partial|none",
    "files": [ { "from", "to", "bytes", "sha256", "result" } … ],
