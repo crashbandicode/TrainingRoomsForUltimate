@@ -21,8 +21,11 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize
 use parking_lot::Mutex;
 
 use crate::model::cpu::defence::SdiAnswer;
+use crate::model::cpu::command::CmdFacts;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
-use crate::model::cpu::shield::ButtonAnswer;
+use crate::model::cpu::shield::{ButtonAnswer, OosFacts};
+use crate::model::cpu::tech::{is_tech_situation, TechChange, TechRequest};
+use crate::model::cpu::status;
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::cpu::ids::{self, Table, C, UNRESOLVED};
@@ -32,12 +35,13 @@ use crate::model::cpu::state::Cpu;
 use crate::model::cpu::status::Situation;
 use crate::model::lra_reset::{self, HubStep};
 use crate::model::settings::Snapshot;
-use crate::model::sites;
+use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{recorder, reset_hub};
 use crate::runtime::game::{self, natives};
+use crate::runtime::published;
 
 /// The CPU behaviours' state; `None` until `init`.
 static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
@@ -56,6 +60,34 @@ static CLATTER_EFFECT_ATTRIBUTES: AtomicU32 = AtomicU32::new(0);
 static STATUS_LAY_DOWN: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static WORK_CURSOR_OFFSET: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static QUAKE_KIND_NONE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_VECOR_X: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_VECOR_Y: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE_WALL: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_PASSIVE_CEIL: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CONT_ESCAPE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// `phx::Hash40` of `just_shield_off`, the parry animation.
+static PARRY_MOTION: AtomicU64 = AtomicU64::new(0);
+static CAT1: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static CAT2: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static BUTTON_JUMP: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static BUTTON_FLICK_JUMP: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CONT_DASH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_CATCH_DASH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_ATTACK_AIR: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_THROW_HI: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_INVALID_CATCH: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static WORK_RESERVE_DIVE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static KINETIC_GRAVITY: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static EFFECT_CONCLUDE: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// `phx::Hash40` of `dash`, `just_shield_off` (already above) and `sys_smash_flash_s`.
+static DASH_MOTION: AtomicU64 = AtomicU64::new(0);
+static FLASH_EFFECT: AtomicU64 = AtomicU64::new(0);
+/// The mash hooks and natives were installed.
+static TERM_ESCAPE_AIR: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_GUARD_ON: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TERM_DOWN_STAND: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static MASH_ON: AtomicBool = AtomicBool::new(false);
 static BUTTON_GUARD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static BUTTON_GUARD_HOLD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of `common`, `shield_dec1` and `shield_recovery1` (the parameter hook compares them).
@@ -66,6 +98,10 @@ static TECH_ON: AtomicBool = AtomicBool::new(false);
 static TECH_EFFECTS: [AtomicU64; 5] = [const { AtomicU64::new(0) }; 5];
 /// The player entry's last seen x (an `f32`'s bits), for the In / Out rule.
 static PLAYER_X: AtomicU32 = AtomicU32::new(0);
+static PLAYER_Y: AtomicU32 = AtomicU32::new(0);
+static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
+/// The player entry has been seen this session (its position is valid for the distance triggers).
+static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
 
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
 static LOBBY: AtomicBool = AtomicBool::new(false);
@@ -88,7 +124,10 @@ mod counts {
     pub const TRANSITION_TERM: usize = 5;
     pub const MOTION_CHANGE: usize = 6;
     pub const QUAKE_POS: usize = 7;
-    static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+    pub const COMMAND_FLAG: usize = 8;
+    pub const AIR_KIND: usize = 9;
+    pub const STICK_DIR: usize = 10;
+    static COUNTS: [AtomicU32; 11] = [const { AtomicU32::new(0) }; 11];
     /// One line per this many primary-body frames.
     const REPORT_EVERY: u32 = 600;
 
@@ -103,7 +142,7 @@ mod counts {
         }
         let take = |i: usize| COUNTS[i].swap(0, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={}",
+            "[TrainingRooms] cpu_hook_counts frames={} sdi={} stick_x={} stick_y={} clatter_start={} transition_term={} motion_change={} quake_pos={} command_flag={} air_kind={} stick_dir={} heap_allocations={}",
             take(FRAME),
             take(SDI),
             take(STICK_X),
@@ -111,7 +150,11 @@ mod counts {
             take(CLATTER_START),
             take(TRANSITION_TERM),
             take(MOTION_CHANGE),
-            take(QUAKE_POS)
+            take(QUAKE_POS),
+            take(COMMAND_FLAG),
+            take(AIR_KIND),
+            take(STICK_DIR),
+            crate::runtime::alloc::hook_allocations()
         ));
     }
 }
@@ -125,6 +168,76 @@ mod counts_index {
     pub const TRANSITION_TERM: usize = 5;
     pub const MOTION_CHANGE: usize = 6;
     pub const QUAKE_POS: usize = 7;
+    pub const COMMAND_FLAG: usize = 8;
+    pub const AIR_KIND: usize = 9;
+    pub const STICK_DIR: usize = 10;
+}
+
+/// One diag-build line for an answer a behaviour gave (the shipped build compiles the arguments away).
+/// The line is formatted on the caller's stack into the fixed ring: nothing allocates.
+macro_rules! cpu_event {
+    ($($arg:tt)*) => {{
+        #[cfg(feature = "diag")]
+        {
+            diagnostic(format_args!("[TrainingRooms] cpu_event {}", format_args!($($arg)*)));
+        }
+    }};
+}
+
+/// Diag build: log an answer only when it differs from the last one logged for the same hook and body, so a
+/// per-frame hook costs one line per change. `None` (the hook gave no answer) re-arms the line.
+macro_rules! cpu_event_on_change {
+    ($hook:expr, $body:expr, $value:expr, $($arg:tt)*) => {{
+        #[cfg(feature = "diag")]
+        {
+            if seen($hook, $body, $value) {
+                cpu_event!($($arg)*);
+            }
+        }
+    }};
+}
+
+/// Diag build: the hook gave no answer for this body; the next answer is logged again.
+macro_rules! cpu_event_rearm {
+    ($hook:expr, $body:expr) => {{
+        #[cfg(feature = "diag")]
+        {
+            let _ = seen($hook, $body, None);
+        }
+    }};
+}
+
+/// The hooks that log on change (an index into `LAST_SEEN`).
+#[cfg(feature = "diag")]
+mod ev {
+    pub const AIRDODGE: usize = 0;
+    pub const SDI_NONE: usize = 1;
+    pub const TECH: usize = 2;
+    pub const CMD1: usize = 4;
+    pub const CMD2: usize = 5;
+    pub const AIR_KIND: usize = 6;
+    pub const STICK_DIR: usize = 7;
+    pub const CROUCH: usize = 8;
+    pub const GUARD_ON: usize = 9;
+    pub const GUARD_OFF: usize = 10;
+    pub const FULL_HOP: usize = 11;
+    pub const TILT: usize = 12;
+    pub const SHIELD_PARAM: usize = 13;
+    pub const CLIMB_DENIED: usize = 14;
+    pub const STATUS: usize = 15;
+    pub const ROLE: usize = 16;
+    pub const COUNT: usize = 17;
+}
+
+#[cfg(feature = "diag")]
+static LAST_SEEN: [[AtomicU64; 16]; ev::COUNT] = [const { [const { AtomicU64::new(u64::MAX) }; 16] }; ev::COUNT];
+
+/// True when `value` is an answer and differs from the one logged last for (`hook`, `body`).
+#[cfg(feature = "diag")]
+fn seen(hook: usize, body: usize, value: Option<u64>) -> bool {
+    let new = value.unwrap_or(u64::MAX);
+    let old = LAST_SEEN[hook][body & 15].swap(new, Ordering::Relaxed);
+    value.is_some() && old != new
 }
 
 #[cfg(feature = "diag")]
@@ -161,6 +274,18 @@ pub fn set_lobby(on: bool) {
 /// One step of the Training reset hub (`reset_hub::run`), for every body.
 pub fn hub_step(step: HubStep) {
     with(|cpu| cpu.hub_step(step));
+}
+
+fn player_pos() -> (f32, f32, f32) {
+    (
+        f32::from_bits(PLAYER_X.load(Ordering::Relaxed)),
+        f32::from_bits(PLAYER_Y.load(Ordering::Relaxed)),
+        f32::from_bits(PLAYER_Z.load(Ordering::Relaxed)),
+    )
+}
+
+fn player_pos_valid() -> bool {
+    PLAYER_VALID.load(Ordering::Relaxed)
 }
 
 fn player_x() -> f32 {
@@ -228,6 +353,30 @@ fn ensure_consts() -> bool {
     TERM_CLIFF_ATTACK.store(table.get(C::TermContCliffAttack), Ordering::Release);
     FLAG_CATCH_CLIFF.store(table.get(C::WorkFlagCatchCliff), Ordering::Release);
     FLAG_DISABLE_PENALTY.store(table.get(C::WorkFlagDisableEscapePenalty), Ordering::Release);
+    WORK_VECOR_X.store(table.get(C::WorkFloatVecorCorrectStickX), Ordering::Release);
+    WORK_VECOR_Y.store(table.get(C::WorkFloatVecorCorrectStickY), Ordering::Release);
+    TERM_PASSIVE.store(table.get(C::TermPassive), Ordering::Release);
+    TERM_PASSIVE_WALL.store(table.get(C::TermPassiveWall), Ordering::Release);
+    TERM_PASSIVE_CEIL.store(table.get(C::TermPassiveCeil), Ordering::Release);
+    TERM_CONT_ESCAPE.store(table.get(C::TermContEscape), Ordering::Release);
+    PARRY_MOTION.store(hash40("just_shield_off"), Ordering::Release);
+    TERM_ESCAPE_AIR.store(table.get(C::TermContEscapeAir), Ordering::Release);
+    TERM_GUARD_ON.store(table.get(C::TermContGuardOn), Ordering::Release);
+    TERM_DOWN_STAND.store(table.get(C::TermDownStand), Ordering::Release);
+    CAT1.store(table.get(C::CatCommand1), Ordering::Release);
+    CAT2.store(table.get(C::CatCommand2), Ordering::Release);
+    BUTTON_JUMP.store(table.get(C::ButtonJump), Ordering::Release);
+    BUTTON_FLICK_JUMP.store(table.get(C::ButtonFlickJump), Ordering::Release);
+    TERM_CONT_DASH.store(table.get(C::TermContDash), Ordering::Release);
+    TERM_CATCH_DASH.store(table.get(C::TermContCatchDash), Ordering::Release);
+    TERM_ATTACK_AIR.store(table.get(C::TermContAttackAir), Ordering::Release);
+    TERM_THROW_HI.store(table.get(C::TermContThrowHi), Ordering::Release);
+    WORK_INVALID_CATCH.store(table.get(C::WorkIntInvalidCatchFrame), Ordering::Release);
+    WORK_RESERVE_DIVE.store(table.get(C::WorkFlagReserveDive), Ordering::Release);
+    KINETIC_GRAVITY.store(table.get(C::KineticGravity), Ordering::Release);
+    EFFECT_CONCLUDE.store(table.get(C::EffectConcludeStatus), Ordering::Release);
+    DASH_MOTION.store(hash40("dash"), Ordering::Release);
+    FLASH_EFFECT.store(hash40("sys_smash_flash_s"), Ordering::Release);
     BUTTON_GUARD.store(table.get(C::ButtonGuard), Ordering::Release);
     BUTTON_GUARD_HOLD.store(table.get(C::ButtonGuardHold), Ordering::Release);
     for (slot, name) in PARAM_HASHES.iter().zip(["common", "shield_dec1", "shield_recovery1"]) {
@@ -249,6 +398,23 @@ fn ensure_consts() -> bool {
             let _ = std::fmt::Write::write_fmt(&mut names, format_args!("{name} "));
         }
         diagnostic(format_args!("[TrainingRooms] cpu constants missing={missing}: {}", names.as_str()));
+    }
+    #[cfg(feature = "diag")]
+    {
+        // The resolved table by name, so a log's status, term and work ids can be read by name.
+        let mut line = FixedPath::<700>::new();
+        let mut count = 0;
+        for (name, value) in table.resolved_entries() {
+            let _ = std::fmt::Write::write_fmt(&mut line, format_args!("{name}={value} "));
+            count += 1;
+            if count % 6 == 0 {
+                diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
+                line = FixedPath::new();
+            }
+        }
+        if count % 6 != 0 {
+            diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
+        }
     }
     with(|cpu| cpu.ids = table);
     CONSTS_READY.store(true, Ordering::Release);
@@ -300,11 +466,21 @@ unsafe fn fighter_frame(fighter: usize) {
     if accessor == 0 || !lra_reset::entry_id_valid(entry) {
         return;
     }
-    let training = game::is_training_mode();
+    // The shared scene wrapper (pkg6 D4): native Training or an active lobby practice, never during a hot swap.
+    let scene_now = crate::runtime::scene::current();
+    let training = scene_now.is_some();
     if entry == 0 {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
+            if MASH_ON.load(Ordering::Acquire) {
+                frame_advantage(accessor);
+            }
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
+            if MASH_ON.load(Ordering::Acquire) {
+                PLAYER_Y.store(natives::pos_y(accessor).to_bits(), Ordering::Relaxed);
+                PLAYER_Z.store(natives::pos_z(accessor).to_bits(), Ordering::Relaxed);
+                PLAYER_VALID.store(true, Ordering::Relaxed);
+            }
         }
         return;
     }
@@ -322,8 +498,8 @@ unsafe fn fighter_frame(fighter: usize) {
         }
         return;
     }
-    let lobby = LOBBY.load(Ordering::Acquire);
-    let scene = if lobby { Scene::Lobby } else { Scene::Training };
+    let scene = scene_now.unwrap_or(Scene::Training);
+    let lobby = scene == Scene::Lobby;
     if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter)) {
         with(|cpu| cpu.roles.forget(accessor));
         return;
@@ -351,6 +527,16 @@ unsafe fn fighter_frame(fighter: usize) {
         (false, false)
     };
 
+    let (falling, reserve_dive) = if MASH_ON.load(Ordering::Acquire) {
+        let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
+        let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
+        (
+            gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
+            dive != UNRESOLVED && natives::is_flag(accessor, dive),
+        )
+    } else {
+        (false, false)
+    };
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = if TECH_ON.load(Ordering::Acquire) { tech_facts(accessor, status, primary) } else { TechFacts::default() };
 
@@ -366,8 +552,11 @@ unsafe fn fighter_frame(fighter: usize) {
             catch_cliff,
             cont_cliff_attack,
             tech,
+            falling,
+            reserve_dive,
         };
         cpu.roles.set(accessor, key);
+        cpu.fighters[key.index()].kind = kind;
         if primary {
             cpu.tick_clock();
             #[cfg(feature = "diag")]
@@ -377,6 +566,22 @@ unsafe fn fighter_frame(fighter: usize) {
         }
         cpu.frame(key, &facts)
     });
+    cpu_event_on_change!(
+        ev::ROLE,
+        key.index(),
+        Some(accessor as u64),
+        "role entry={} partner={} kind={kind} lobby={lobby}",
+        key.entry,
+        key.partner
+    );
+    cpu_event_on_change!(
+        ev::STATUS,
+        key.index(),
+        Some((u64::from(status as u32) << 32) | u64::from(situation as u32)),
+        "status entry={} partner={} status={status} prev={prev_status} situation={situation} motion_frame={motion_frame}",
+        key.entry,
+        key.partner
+    );
     if let Some(out) = out {
         apply(accessor, out);
     }
@@ -409,8 +614,10 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
         if flag != UNRESOLVED {
             natives::set_flag(accessor, value, flag);
         }
+        cpu_event!("stale_flag value={value} resolved={}", flag != UNRESOLVED);
     }
     if let Some(delta) = out.clatter {
+        cpu_event!("clatter delta={delta:.3} status={}", natives::status_kind(accessor));
         natives::add_clatter_time(accessor, delta);
         let attributes = CLATTER_EFFECT_ATTRIBUTES.load(Ordering::Acquire);
         if attributes != 0 {
@@ -418,25 +625,46 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
         }
     }
     if let Some(status) = out.request_status {
+        cpu_event!("request_status status={status} from={}", natives::status_kind(accessor));
         natives::change_status_request(accessor, status);
     }
+    if out.fast_fall {
+        cpu_event!("fast_fall from={}", natives::status_kind(accessor));
+        let dive = WORK_RESERVE_DIVE.load(Ordering::Acquire);
+        if dive != UNRESOLVED {
+            natives::set_flag(accessor, true, dive);
+        }
+        let attribute = EFFECT_CONCLUDE.load(Ordering::Acquire);
+        if attribute != UNRESOLVED {
+            let pos = [natives::pos_x(accessor), natives::pos_y(accessor), 0.0];
+            natives::effect_req(accessor, FLASH_EFFECT.load(Ordering::Acquire), &pos, 2.0, attribute);
+        }
+    }
     if let Some(status) = out.force_status {
+        cpu_event!("force_status status={status} from={}", natives::status_kind(accessor));
         natives::change_status_force(accessor, status);
     }
     let cursor = WORK_CURSOR_OFFSET.load(Ordering::Acquire);
     if let (Some(value), true) = (out.hide.cursor, cursor != UNRESOLVED) {
+        cpu_event!("hide cursor={value:.1}");
         natives::set_float(accessor, value, cursor);
     }
     if let Some(visible) = out.hide.model_visible {
+        cpu_event!("hide model_visible={visible}");
         natives::set_whole(accessor, visible);
     }
     if out.hide.hide_effects {
+        cpu_event!("hide effects status={}", natives::status_kind(accessor));
         for effect in &TECH_EFFECTS {
             natives::set_visible_kind(accessor, effect.load(Ordering::Acquire), false);
         }
     }
+    // A playback request goes to the recorder (package 4's `request_playback`) and to the inbox in `published`
+    // (package 2's word; nothing reads the inbox since the recorder is called directly).
     if let Some(start) = out.playback {
         recorder::request_playback(start);
+        published::CPU_PLAYBACK_REQUEST.store(start.request_word(), Ordering::Release);
+        cpu_event!("playback_request slot={} ledge={} word={:#x}", start.slot, start.ledge, start.request_word());
     }
 }
 
@@ -444,8 +672,8 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
 /// their guards (`boot`).
 pub fn install_frame() {
     let base = game::text_base();
-    ORIGINAL_FRAME.store(base + sites::CPU_ON_FRAME_OFFSET, Ordering::Release);
-    let slot = (base + sites::CPU_ON_FRAME_SLOT_OFFSET) as *mut usize;
+    ORIGINAL_FRAME.store(base + sites_pkg2::CPU_ON_FRAME_OFFSET, Ordering::Release);
+    let slot = (base + sites_pkg2::CPU_ON_FRAME_SLOT_OFFSET) as *mut usize;
     // SAFETY: the slot is a writable `.data` pointer that held the original's address.
     unsafe { slot.write_volatile(on_frame as *const () as usize) };
 }
@@ -454,7 +682,7 @@ pub fn install_frame() {
 
 /// `FighterControlModuleImpl::check_hit_stop_delay_command(accessor, out)`: the SDI answer for a CPU
 /// body (decision N9: unset means no SDI, the original is not called).
-#[skyline::hook(offset = sites::SDI_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::SDI_HOOK_OFFSET)]
 pub unsafe fn cpu_sdi_hook(accessor: usize, out: *mut [f32; 2]) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::SDI);
@@ -463,9 +691,14 @@ pub unsafe fn cpu_sdi_hook(accessor: usize, out: *mut [f32; 2]) -> u64 {
         match with(|cpu| cpu.sdi_query(key, player_x(), cpu_x)) {
             Some(SdiAnswer::Input(x, y)) => {
                 *out = [x, y];
+                cpu_event_rearm!(ev::SDI_NONE, key.index());
+                cpu_event!("sdi_input entry={} x={x:.3} y={y:.3}", key.entry);
                 return 1;
             }
-            Some(SdiAnswer::NoInput) => return 0,
+            Some(SdiAnswer::NoInput) => {
+                cpu_event_on_change!(ev::SDI_NONE, key.index(), Some(0), "sdi_none entry={}", key.entry);
+                return 0;
+            }
             Some(SdiAnswer::Native) | None => {}
         }
     }
@@ -476,11 +709,24 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
     let key = role_of(accessor)?;
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
-    with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten()
+    let answer = with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten();
+    #[cfg(feature = "diag")]
+    match answer {
+        Some((x, y)) => cpu_event_on_change!(
+            ev::AIRDODGE,
+            key.index(),
+            Some((u64::from(x.to_bits()) << 32) | u64::from(y.to_bits())),
+            "airdodge_stick entry={} x={x:.3} y={y:.3} player_x={:.1} cpu_x={cpu_x:.1}",
+            key.entry,
+            player_x()
+        ),
+        None => cpu_event_rearm!(ev::AIRDODGE, key.index()),
+    }
+    answer
 }
 
 /// `ControlModule::get_stick_x(accessor)`: the air-dodge direction out of hitstun.
-#[skyline::hook(offset = sites::STICK_X_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_X_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_X);
@@ -490,17 +736,28 @@ pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
 
 /// `ControlModule::get_stick_y(accessor)`: the same pick as x for the episode. Crouch (SPEC-cpu-06)
 /// answers after this one when it is built.
-#[skyline::hook(offset = sites::STICK_Y_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_Y_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_Y);
     let original = call_original!(accessor);
-    air_dodge_stick(accessor).map_or(original, |(_, y)| y)
+    if let Some((_, y)) = air_dodge_stick(accessor) {
+        return y;
+    }
+    // Crouch answers when the air-dodge direction does not (SPEC-cpu-06 section 4).
+    let Some(key) = role_of(accessor) else { return original };
+    let crouch = with(|cpu| cpu.crouch_stick(key)).flatten();
+    #[cfg(feature = "diag")]
+    match crouch {
+        Some(y) => cpu_event_on_change!(ev::CROUCH, key.index(), Some(u64::from(y.to_bits())), "crouch entry={} y={y:.3}", key.entry),
+        None => cpu_event_rearm!(ev::CROUCH, key.index()),
+    }
+    crouch.unwrap_or(original)
 }
 
 /// `ControlModule::start_clatter(accessor, initial, auto, manual, a, b, c, d)`: remember the manual
 /// recovery rate as the clatter step; the original always runs.
-#[skyline::hook(offset = sites::CLATTER_START_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CLATTER_START_HOOK_OFFSET)]
 pub unsafe fn cpu_clatter_start_hook(
     accessor: usize,
     initial: f32,
@@ -515,6 +772,7 @@ pub unsafe fn cpu_clatter_start_hook(
     bump(counts_index::CLATTER_START);
     if let Some(key) = role_of(accessor) {
         with(|cpu| cpu.clatter_start(key, manual_rate));
+        cpu_event!("clatter_start entry={} manual_rate={manual_rate:.3} initial={initial:.1}", key.entry);
     }
     call_original!(accessor, initial, auto_rate, manual_rate, a, b, c, d)
 }
@@ -523,7 +781,7 @@ pub unsafe fn cpu_clatter_start_hook(
 
 /// `WorkModule::is_enable_transition_term(accessor, term)`: the native automatic ledge climb is denied
 /// while a CPU body waits, delays or waits for its playback. Every other query is the original's.
-#[skyline::hook(offset = sites::TRANSITION_TERM_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)]
 pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     let _scope = HookScope::enter();
     bump(counts_index::TRANSITION_TERM);
@@ -533,7 +791,13 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     }
     let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
-    with(|cpu| cpu.ledge_transition_term(key, status, term, original)).unwrap_or(original)
+    let answer = with(|cpu| cpu.ledge_transition_term(key, status, term, original)).unwrap_or(original);
+    if answer {
+        cpu_event_rearm!(ev::CLIMB_DENIED, key.index());
+    } else {
+        cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(1), "climb_denied entry={} status={status}", key.entry);
+    }
+    answer
 }
 
 // ---- SPEC-cpu-04 hooks ----------------------------------------------------------------------------------
@@ -545,17 +809,21 @@ pub fn set_tech_on(on: bool) {
 
 /// `MotionModule::change_motion(accessor, motion, ...)`: the tech and getup animations follow the held
 /// roll directions (SPEC-cpu-04 section 5, "Motion").
-#[skyline::hook(offset = sites::MOTION_CHANGE_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::MOTION_CHANGE_HOOK_OFFSET)]
 pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f32, c: bool, d: f32, e: bool, f: bool) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::MOTION_CHANGE);
+    let asked = motion;
     let motion = role_of(accessor).and_then(|key| with(|cpu| cpu.substitute_motion(key, motion))).unwrap_or(motion);
+    if motion != asked {
+        cpu_event!("motion_substitute from={asked:#x} to={motion:#x} status={}", natives::status_kind(accessor));
+    }
     call_original!(accessor, motion, a, b, c, d, e, f)
 }
 
 /// `CameraModule::req_quake_pos(accessor, kind, pos)`: no shake for a CPU in the missed-tech status
 /// while Hide Tech Animations is On (SPEC-cpu-04 section 4).
-#[skyline::hook(offset = sites::QUAKE_POS_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::QUAKE_POS_HOOK_OFFSET)]
 pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3]) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::QUAKE_POS);
@@ -564,6 +832,7 @@ pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3
         Some(_) if none != UNRESOLVED => {
             let status = natives::status_kind(accessor);
             if with(|cpu| cpu.quake_suppressed(status)).unwrap_or(false) {
+                cpu_event!("quake_suppressed status={status} kind={kind}");
                 none
             } else {
                 kind
@@ -580,20 +849,48 @@ fn is_guard_button(button: i32) -> bool {
     button != UNRESOLVED && (button == BUTTON_GUARD.load(Ordering::Acquire) || button == BUTTON_GUARD_HOLD.load(Ordering::Acquire))
 }
 
+fn is_jump_button(button: i32) -> bool {
+    button != UNRESOLVED && (button == BUTTON_JUMP.load(Ordering::Acquire) || button == BUTTON_FLICK_JUMP.load(Ordering::Acquire))
+}
+
+/// The shield's answer for the guard buttons, else the full hop's for the jump buttons.
 fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<bool> {
-    if !is_guard_button(button) {
+    let guard = is_guard_button(button);
+    if !guard && !is_jump_button(button) {
         return None;
     }
     let key = role_of(accessor)?;
-    match with(|cpu| cpu.guard_button(key, on_query))? {
-        ButtonAnswer::Held(value) => Some(value),
-        ButtonAnswer::Original => None,
+    if guard {
+        let answer = match with(|cpu| cpu.guard_button(key, on_query))? {
+            ButtonAnswer::Held(value) => Some(value),
+            ButtonAnswer::Original => None,
+        };
+        #[cfg(feature = "diag")]
+        match answer {
+            Some(value) => cpu_event_on_change!(
+                if on_query { ev::GUARD_ON } else { ev::GUARD_OFF },
+                key.index(),
+                Some(u64::from(value)),
+                "guard_button entry={} on_query={on_query} held={value}",
+                key.entry
+            ),
+            None => cpu_event_rearm!(if on_query { ev::GUARD_ON } else { ev::GUARD_OFF }, key.index()),
+        }
+        answer
+    } else {
+        let answer = with(|cpu| cpu.full_hop_button(key, on_query)).flatten();
+        #[cfg(feature = "diag")]
+        match answer {
+            Some(value) => cpu_event_on_change!(ev::FULL_HOP, key.index(), Some(u64::from(value)), "full_hop_button entry={} on_query={on_query} held={value}", key.entry),
+            None => cpu_event_rearm!(ev::FULL_HOP, key.index()),
+        }
+        answer
     }
 }
 
 /// `ControlModule::check_button_on(accessor, button)`: the guard buttons read as held while a CPU
 /// body should hold its shield.
-#[skyline::hook(offset = sites::CHECK_BUTTON_ON_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, button);
@@ -601,7 +898,7 @@ pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
 }
 
 /// `ControlModule::check_button_off(accessor, button)`: the guard buttons do not read as released.
-#[skyline::hook(offset = sites::CHECK_BUTTON_OFF_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_off_hook(accessor: usize, button: i32) -> bool {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, button);
@@ -612,11 +909,24 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
     let key = role_of(accessor)?;
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
-    with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten()
+    let tilt = with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten();
+    #[cfg(feature = "diag")]
+    match tilt {
+        Some((x, y)) => cpu_event_on_change!(
+            ev::TILT,
+            key.index(),
+            Some((u64::from(x.to_bits()) << 32) | u64::from(y.to_bits())),
+            "shield_tilt entry={} x={x:.3} y={y:.3} player_x={:.1} cpu_x={cpu_x:.1}",
+            key.entry,
+            player_x()
+        ),
+        None => cpu_event_rearm!(ev::TILT, key.index()),
+    }
+    tilt
 }
 
 /// `ControlModule::get_stick_x_no_clamp(accessor)`: the shield tilt.
-#[skyline::hook(offset = sites::STICK_X_NO_CLAMP_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor);
@@ -624,7 +934,7 @@ pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
 }
 
 /// `ControlModule::get_stick_y_no_clamp(accessor)`: the shield tilt.
-#[skyline::hook(offset = sites::STICK_Y_NO_CLAMP_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor);
@@ -634,7 +944,7 @@ pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
 /// `WorkModule::get_param_float(accessor, kind, name)`: shield decay and regeneration for a CPU body
 /// while the decay override is active; every other parameter is the original's (the first compare
 /// is on the parameter type hash, so the common case costs two integer compares).
-#[skyline::hook(offset = sites::SHIELD_PARAM_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::SHIELD_PARAM_HOOK_OFFSET)]
 pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, kind, name);
@@ -645,5 +955,262 @@ pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f3
     if !decay && name != PARAM_HASHES[2].load(Ordering::Acquire) {
         return original;
     }
-    role_of(accessor).and_then(|key| with(|cpu| cpu.shield_param(key, decay)).flatten()).unwrap_or(original)
+    let Some(key) = role_of(accessor) else { return original };
+    let value = with(|cpu| cpu.shield_param(key, decay)).flatten();
+    #[cfg(feature = "diag")]
+    match value {
+        Some(v) => cpu_event_on_change!(
+            ev::SHIELD_PARAM,
+            key.index(),
+            Some((u64::from(decay) << 32) | u64::from(v.to_bits())),
+            "shield_param entry={} decay={decay} value={v:.4} original={original:.4}",
+            key.entry
+        ),
+        None => cpu_event_rearm!(ev::SHIELD_PARAM, key.index()),
+    }
+    value.unwrap_or(original)
+}
+
+// ---- the `common` script module's hooks (called from `cpu_common`) -------------------------------------
+
+/// The module accessor of a script object (`L2CFighterBase`): the pointer at +0x40, which the owned
+/// 13.0.5 `common` module loads from its first argument before every `lua_bind` call (checked on
+/// `correctDamageVectorCommon` and `sub_guard_cont`). A pointer that is no registered CPU body does
+/// nothing, so a wrong offset can only make the hooks inert.
+pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
+    if fighter == 0 {
+        return 0;
+    }
+    ((fighter + 0x40) as *const usize).read()
+}
+
+/// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
+pub(crate) unsafe fn di_before(accessor: usize) {
+    let Some(key) = role_of(accessor) else { return };
+    let (x, y) = (WORK_VECOR_X.load(Ordering::Acquire), WORK_VECOR_Y.load(Ordering::Acquire));
+    if x == UNRESOLVED || y == UNRESOLVED {
+        return;
+    }
+    let cpu_x = natives::pos_x(accessor);
+    if let Some(Some((vx, vy))) = with(|cpu| cpu.di_correction(key, player_x(), cpu_x)) {
+        natives::set_float(accessor, vx, x);
+        natives::set_float(accessor, vy, y);
+        cpu_event!("di entry={} x={vx:.3} y={vy:.3} player_x={:.1} cpu_x={cpu_x:.1}", key.entry, player_x());
+    }
+}
+
+/// Tech: the status a CPU body's script is about to change to, or the one to request instead. `passive`
+/// asks the script's own "is passive enabled".
+pub(crate) unsafe fn tech_request(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<i32> {
+    let key = role_of(accessor)?;
+    if !with(|cpu| is_tech_situation(&cpu.ids, requested))? {
+        return None;
+    }
+    let term = |id: &AtomicI32| {
+        let id = id.load(Ordering::Acquire);
+        id != UNRESOLVED && natives::is_enable_transition_term(accessor, id)
+    };
+    let request = TechRequest {
+        requested,
+        second_prev: natives::prev_status_kind(accessor, 1),
+        passive: term(&TERM_PASSIVE),
+        passive_wall: term(&TERM_PASSIVE_WALL),
+        passive_ceil: term(&TERM_PASSIVE_CEIL),
+        script_passive_enabled: passive(),
+    };
+    match with(|cpu| cpu.tech_status_change(key, &request))? {
+        TechChange::Status(status) => {
+            cpu_event!(
+                "tech requested={requested} answer={status} passive={} wall={} ceil={} script_passive={}",
+                request.passive,
+                request.passive_wall,
+                request.passive_ceil,
+                request.script_passive_enabled
+            );
+            Some(status)
+        }
+        TechChange::Unchanged => {
+            cpu_event_on_change!(
+                ev::TECH,
+                key.index(),
+                Some(requested as u32 as u64),
+                "tech_unchanged requested={requested} passive={} wall={} ceil={} script_passive={}",
+                request.passive,
+                request.passive_wall,
+                request.passive_ceil,
+                request.script_passive_enabled
+            );
+            None
+        }
+    }
+}
+
+/// Out of shield: after the script continuation, the dodge or roll status to change to, if any.
+pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
+    let key = role_of(accessor)?;
+    let prev = natives::prev_status_kind(accessor, 0);
+    let status_now = natives::status_kind(accessor);
+    let motion = natives::motion_kind(accessor);
+    let term = TERM_CONT_ESCAPE.load(Ordering::Acquire);
+    let cont_escape = term != UNRESOLVED && natives::is_enable_transition_term(accessor, term);
+    let parry = PARRY_MOTION.load(Ordering::Acquire);
+    let escape = with(|cpu| {
+        let facts = OosFacts {
+            left_shieldstun: cpu.ids.is(C::StatusGuardDamage, prev),
+            shielding: status::shielding(&cpu.ids, status_now),
+            in_parry: motion == parry,
+            cont_escape,
+        };
+        cpu.out_of_shield(key, &facts).escape_status
+    })
+    .flatten();
+    #[cfg(feature = "diag")]
+    if let Some(status) = escape {
+        cpu_event!("oos_escape entry={} status={status} from={status_now} prev={prev}", key.entry);
+    }
+    escape
+}
+
+// ---- SPEC-cpu-01 and SPEC-cpu-06 hooks ------------------------------------------------------------------
+
+/// Whether the mash hooks and natives are installed.
+pub fn set_mash_on(on: bool) {
+    MASH_ON.store(on, Ordering::Release);
+}
+
+unsafe fn term_on(accessor: usize, id: &AtomicI32) -> bool {
+    let id = id.load(Ordering::Acquire);
+    id != UNRESOLVED && natives::is_enable_transition_term(accessor, id)
+}
+
+/// Everything a command query reads from the game, with no lock held.
+unsafe fn command_facts(accessor: usize, key: FighterKey) -> CmdFacts {
+    let (px, py, pz) = (player_pos().0, player_pos().1, player_pos().2);
+    let (cx, cy, cz) = (natives::pos_x(accessor), natives::pos_y(accessor), natives::pos_z(accessor));
+    let distance = if player_pos_valid() { ((cx - px).powi(2) + (cy - py).powi(2) + (cz - pz).powi(2)).sqrt() } else { f32::INFINITY };
+    let invalid = WORK_INVALID_CATCH.load(Ordering::Acquire);
+    let gravity = KINETIC_GRAVITY.load(Ordering::Acquire);
+    let motion = natives::motion_kind(accessor);
+    let situation = natives::situation_kind(accessor);
+    let status = natives::status_kind(accessor);
+    let mut facts = CmdFacts {
+        status,
+        situation: crate::model::cpu::status::Situation::Other,
+        motion_frame: natives::motion_frame(accessor) as i32,
+        motion_is_dash: motion == DASH_MOTION.load(Ordering::Acquire),
+        in_parry: motion == PARRY_MOTION.load(Ordering::Acquire),
+        invalid_catch_frame: if invalid != UNRESOLVED { natives::get_int(accessor, invalid) } else { 0 },
+        cont_dash: term_on(accessor, &TERM_CONT_DASH),
+        cont_catch_dash: term_on(accessor, &TERM_CATCH_DASH),
+        cont_attack_air: term_on(accessor, &TERM_ATTACK_AIR),
+        cont_throw_hi: term_on(accessor, &TERM_THROW_HI),
+        kind: UNRESOLVED,
+        falling: gravity != UNRESOLVED && natives::sum_speed_y(accessor, gravity) < 0.0,
+        distance,
+        prev_status: natives::prev_status_kind(accessor, 0),
+    };
+    // The situation and the fighter kind are classified under the lock (they need the table).
+    with(|cpu| {
+        facts.situation = crate::model::cpu::status::Situation::of(&cpu.ids, situation);
+        facts.kind = cpu.fighters[key.index()].kind;
+    });
+    facts
+}
+
+/// `ControlModule::get_command_flag_cat(accessor, category)`: the mash's bits (category 1) or the throw
+/// bits (category 2) of a CPU body are ORed into the game's answer.
+#[skyline::hook(offset = sites_pkg2::COMMAND_FLAG_HOOK_OFFSET)]
+pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::COMMAND_FLAG);
+    let original = call_original!(accessor, category);
+    let cat2 = category == CAT2.load(Ordering::Acquire);
+    if category == UNRESOLVED || (!cat2 && category != CAT1.load(Ordering::Acquire)) {
+        return original;
+    }
+    let Some(key) = role_of(accessor) else { return original };
+    if !with(|cpu| cpu.wants_commands(key, cat2)).unwrap_or(false) {
+        return original;
+    }
+    let facts = command_facts(accessor, key);
+    let Some(out) = with(|cpu| cpu.command_flags(key, cat2, &facts)) else { return original };
+    if let Some(status) = out.request_status {
+        cpu_event!("command_request_status entry={} status={status} from={}", key.entry, natives::status_kind(accessor));
+        natives::change_status_request(accessor, status);
+    }
+    if out.stop_playback {
+        cpu_event!("playback_stop entry={}", key.entry);
+        published::CPU_STOP_PLAYBACK.store(true, Ordering::Release);
+    }
+    cpu_event_on_change!(
+        if cat2 { ev::CMD2 } else { ev::CMD1 },
+        key.index(),
+        if out.bits != 0 { Some(u64::from(out.bits)) } else { None },
+        "command_flags entry={} cat={} bits={:#x} status={}",
+        key.entry,
+        if cat2 { 2 } else { 1 },
+        out.bits,
+        natives::status_kind(accessor)
+    );
+    original | out.bits
+}
+
+/// `ControlModule::get_attack_air_kind(accessor)`: the queued aerial's kind for a CPU body.
+#[skyline::hook(offset = sites_pkg2::ATTACK_AIR_KIND_HOOK_OFFSET)]
+pub unsafe fn cpu_attack_air_kind_hook(accessor: usize) -> i32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::AIR_KIND);
+    let original = call_original!(accessor);
+    let Some(key) = role_of(accessor) else { return original };
+    let kind = with(|cpu| cpu.attack_air_kind(key)).flatten();
+    #[cfg(feature = "diag")]
+    match kind {
+        Some(k) => cpu_event_on_change!(ev::AIR_KIND, key.index(), Some(k as u32 as u64), "attack_air_kind entry={} kind={k} original={original}", key.entry),
+        None => cpu_event_rearm!(ev::AIR_KIND, key.index()),
+    }
+    kind.unwrap_or(original)
+}
+
+/// `ControlModule::get_stick_dir(accessor)`: the attack angle of a CPU body.
+#[skyline::hook(offset = sites_pkg2::STICK_DIR_HOOK_OFFSET)]
+pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
+    let _scope = HookScope::enter();
+    bump(counts_index::STICK_DIR);
+    let original = call_original!(accessor);
+    let Some(key) = role_of(accessor) else { return original };
+    let angle = with(|cpu| cpu.attack_angle(key)).flatten();
+    #[cfg(feature = "diag")]
+    match angle {
+        Some(a) => cpu_event_on_change!(ev::STICK_DIR, key.index(), Some(u64::from(a.to_bits())), "stick_dir entry={} angle={a:.3} original={original:.3}", key.entry),
+        None => cpu_event_rearm!(ev::STICK_DIR, key.index()),
+    }
+    angle.unwrap_or(original)
+}
+
+/// Whether a fighter can act now: any of the five transition terms or a cancel (SPEC-cpu-07 §3).
+unsafe fn actionable(accessor: usize) -> bool {
+    term_on(accessor, &TERM_ESCAPE_AIR)
+        || term_on(accessor, &TERM_ATTACK_AIR)
+        || term_on(accessor, &TERM_GUARD_ON)
+        || term_on(accessor, &TERM_CONT_ESCAPE)
+        || term_on(accessor, &TERM_DOWN_STAND)
+        || natives::is_enable_cancel(accessor)
+}
+
+/// Frame advantage, on the player entry's frame: reads both fighters only while the row is On.
+unsafe fn frame_advantage(player: usize) {
+    let lobby = crate::runtime::scene::current() == Some(Scene::Lobby);
+    let primary = FighterKey::new(i32::from(primary_entry(lobby)), false);
+    let Some(cpu_accessor) = primary.and_then(|key| CPU.lock().as_ref().and_then(|c| c.roles.accessor_of(key))) else { return };
+    if !with(|cpu| cpu.settings.frame_advantage && cpu.settings.mash_state.is_empty()).unwrap_or(false) {
+        // Off, or a mashing CPU: the state clears and nothing is read.
+        with(|cpu| cpu.frame_advantage(false, false));
+        return;
+    }
+    let (p, c) = (actionable(player), actionable(cpu_accessor));
+    if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
+        published::FRAME_ADVANTAGE_VALUE.store(value, Ordering::Release);
+        published::FRAME_ADVANTAGE_SEQ.fetch_add(1, Ordering::AcqRel);
+        cpu_event!("frame_advantage value={value} seq={}", published::FRAME_ADVANTAGE_SEQ.load(Ordering::Acquire));
+    }
 }

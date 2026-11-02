@@ -2,6 +2,7 @@
 
 pub mod chords;
 pub mod cpu;
+pub mod cpu_common;
 pub mod input_delay;
 pub mod input_display;
 pub mod lra_reset;

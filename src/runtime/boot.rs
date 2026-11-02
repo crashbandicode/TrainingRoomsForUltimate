@@ -24,7 +24,7 @@ use crate::model::sites_pkg4;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
-    chords, cpu, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
+    chords, cpu, cpu_common, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states,
 };
 use crate::runtime::{clock, game, import, install, published, state_boot, ui};
 
@@ -94,6 +94,8 @@ pub fn run() {
     chords::load_ini();
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_reload::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
     let state_found = state_boot::check();
@@ -150,7 +152,8 @@ pub fn run() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
-    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason) = install_cpu(&usable, &mut mark);
+    let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
     let mut state_written = [Written::Skipped; state_boot::N];
     let state_on = state_boot::install(&state_found, cpu_core_on, &mut state_written);
@@ -177,20 +180,22 @@ pub fn run() {
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
     let features = [
-        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
-        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
-        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on },
-        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on },
-        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on },
-        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on },
-        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
-        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
-        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
-        FeatureReport { feature: Feature::StateCore.name(), installed: state_on },
-        FeatureReport { feature: "chords", installed: input_delay_on },
-        FeatureReport { feature: Feature::Recording.name(), installed: recording_on },
-        FeatureReport { feature: Feature::Notices.name(), installed: notices_on },
-        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors },
+        FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
+        FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
+        FeatureReport { feature: Feature::StageHazards.name(), installed: hazards_on, reason: None },
+        FeatureReport { feature: Feature::ResetHub.name(), installed: hub_on, reason: None },
+        FeatureReport { feature: Feature::CpuCore.name(), installed: cpu_core_on, reason: None },
+        FeatureReport { feature: Feature::CpuDefence.name(), installed: cpu_defence_on, reason: None },
+        FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on, reason: None },
+        FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on, reason: None },
+        FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on, reason: None },
+        FeatureReport { feature: Feature::CpuMash.name(), installed: cpu_mash_on, reason: None },
+        FeatureReport { feature: Feature::CpuCommon.name(), installed: false, reason: cpu_common_reason },
+        FeatureReport { feature: Feature::StateCore.name(), installed: state_on, reason: None },
+        FeatureReport { feature: "chords", installed: input_delay_on, reason: None },
+        FeatureReport { feature: Feature::Recording.name(), installed: recording_on, reason: None },
+        FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
+        FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -225,9 +230,9 @@ fn load_save_states() -> SaveFile {
 /// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
 /// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
 /// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
-fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool) {
+fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>) {
     if !sites::feature_usable(Feature::CpuCore, usable) {
-        return (false, false, false, false, false);
+        return (false, false, false, false, false, Some("cpu_core_not_installed"));
     }
     cpu::install_frame();
     mark("cpu_on_frame_slot", Written::Far);
@@ -266,7 +271,30 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
             mark(name, Written::Far);
         }
     }
-    (true, defence, ledge, tech, shield)
+    // The hooks in the `common` script module install when that module loads, through the nro-load
+    // provider (`libnro_hook`); the install line names why they are not installed yet, or at all.
+    let common = if sites::feature_usable(Feature::CpuCommon, usable) {
+        cpu_common::register()
+    } else {
+        Some("site_guard_failed")
+    };
+    (true, defence, ledge, tech, shield, common)
+}
+
+/// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper
+/// reads the fall facts only once `set_mash_on` is set, before any of these hooks can fire.
+fn install_cpu_mash(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
+    if !sites::feature_usable(Feature::CpuMash, usable) {
+        return false;
+    }
+    cpu::set_mash_on(true);
+    skyline::install_hook!(cpu::cpu_command_flag_hook);
+    skyline::install_hook!(cpu::cpu_attack_air_kind_hook);
+    skyline::install_hook!(cpu::cpu_stick_dir_hook);
+    for name in ["command_flag_hook", "attack_air_kind_hook", "stick_dir_hook"] {
+        mark(name, Written::Far);
+    }
+    true
 }
 
 /// Package 4: the recorder's hook at the AI control function's epilogue (it also needs the poll hooks

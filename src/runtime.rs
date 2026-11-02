@@ -8,6 +8,8 @@ mod alloc;
 mod boot;
 mod clock;
 mod diag_log;
+#[cfg(feature = "diag")]
+mod diag_reload;
 mod features;
 mod game;
 mod hub;

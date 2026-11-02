@@ -59,7 +59,7 @@ three lines of **mixed** files (`training_mod_tui/src/containers/app.rs`: the na
 `"Player Swapping"`), besides ours-new docs. Nothing from them was used: the id came from `menu_json.rs`
 above, and the row title is the one already in MENU-DRAFT. The lead should decide whether that counts as
 opening a mixed file.
-## Package 2 (CPU behaviour), 2026-11-02
+## pkg2
 
 Nothing was carried from the fork: package 2 is clean-room code written from `specs/` and the repo docs. No file
 of the stage or the fork worktree was opened, no search ran over the stage, and nothing under `upstream-ref/` was
