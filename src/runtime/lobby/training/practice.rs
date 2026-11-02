@@ -26,6 +26,18 @@ pub unsafe fn entry(role: usize) -> Option<usize> {
     native_entry(index)
 }
 
+/// Native Training panels also hold extra CPUs. They have entry receipts for
+/// releasing that stop, but never acquire either save/record slot.
+pub unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {
+    if !enabled() || !common::is_fighter(module) { return None; }
+    let context = context()?;
+    let index = WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
+        *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    if !(0..8).contains(&index)
+        || (context == Context::Waiting && context.role(index).is_none()) { return None; }
+    native_entry(index)
+}
+
 unsafe fn native_entry(index: i32) -> Option<usize> {
     let manager = native_fields::child(crate::runtime::compat::sync::read(&common::FIGHTER_MANAGER_ADDR), 0)?;
     let entry = FighterManager::get_fighter_entry(manager as *mut app::FighterManager,

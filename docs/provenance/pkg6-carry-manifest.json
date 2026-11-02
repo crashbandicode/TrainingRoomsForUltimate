@@ -2514,7 +2514,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "117b9ea66701ff929a3848240e2a3ebcd8c71742d82fde1a7962a8d3fe6441fc",
+   "dest_sha256": "a455c1df1e9a19f7babd8a134228f6443c52226b02fc67b2bf151dfcee25d98a",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -2525,11 +2525,6 @@
      "old": "pub fn waiting() -> bool { context() == Some(Context::Waiting) }\n",
      "new": "",
      "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (pub fn waiting)"
-    },
-    {
-     "delete_from": "/// Native Training panels also hold extra CPUs.",
-     "delete_to": "unsafe fn native_entry(",
-     "reason": "deleted (lead ruling 2026-11-02, single owner): package 2's `Scene::Lobby` / `LOBBY_CPU_ENTRY` / role table and `scene::is_training()` own this behaviour; the fork function -> clean-room mapping is in docs/provenance/pkg6-carry-ledger.md section \"Deleted fork functions\" (panel_entry)"
     },
     {
      "delete_from": "pub unsafe fn visualizes(",
