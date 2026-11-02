@@ -1397,7 +1397,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "3d94b52d7b995a47e56b9fc598734511283969ef99cbec577be4a229da5b7c39",
+   "dest_sha256": "08b03fcf91211ae4314f934a96c3027255b39e581b9f243b36010981798292ff",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1406,8 +1406,18 @@
     },
     {
      "old": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> String {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name())\n        }\n        None => fighter.name().into(),\n    }\n}",
-     "new": "fn selection_label(role: Role, fighter: TrioFighter, slot: Option<usize>) -> std::borrow::Cow<'static, str> {\n    match slot {\n        Some(index) => format!(\"{}. {}\", index + 1, fighter.name()).into(),\n        None if cycle_original(role) == Some(fighter.kind()) => {\n            format!(\"0. {}\", fighter.name()).into()\n        }\n        None => fighter.name().into(),\n    }\n}",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): a direct pick (no slot) names the fighter with its static name and allocates nothing; the numbered labels still format a `String` (one per completed swap, listed for the R5 row)"
+     "new": "fn notify_args(role: Role, args: std::fmt::Arguments<'_>) {\n    let title = if role == Role::Player {\n        \"Player Character\"\n    } else {\n        \"CPU Character\"\n    };\n    training::ui::notifications::notification_args(title.into(), args, 180);\n}\n\nfn notify_selection(role: Role, fighter: TrioFighter, slot: Option<usize>) {\n    match slot {\n        Some(index) => notify_args(role, format_args!(\"{}. {}\", index + 1, fighter.name())),\n        None if cycle_original(role) == Some(fighter.kind()) => notify_args(role, format_args!(\"0. {}\", fighter.name())),\n        None => notify(role, fighter.name().into()),\n    }\n}",
+     "reason": "the numbered selection labels are written into the notice's fixed buffer (`notification_args`: the text is formatted on the stack and copied into the notice queue) instead of formatting a `String` in a game callback (review R5); a direct pick still names the fighter with its static name"
+    },
+    {
+     "old": "notify(role, selection_label(role, active.target, active.slot));",
+     "new": "notify_selection(role, active.target, active.slot);",
+     "reason": "see `notify_selection`: no `String` in the completion callback"
+    },
+    {
+     "old": "notify(role, selection_label(role, target, slot));",
+     "new": "notify_selection(role, target, slot);",
+     "reason": "see `notify_selection`: no `String` in the callback"
     }
    ]
   },
@@ -1652,7 +1662,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "aff533674bc8d341d25248614d6d47ca74be686395414c1919731a07bfe300ef",
+   "dest_sha256": "bffc2029ceea598b289abce75d948d251c36b7fcda754a4e73a65e46c2b0f428",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1666,8 +1676,8 @@
     },
     {
      "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
-     "new": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class).into());",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+     "new": "notify_args(Role::Cpu,format_args!(\"CPU {:?} choice skipped\",choice.canonical.class));",
+     "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
     }
    ]
   },
@@ -1711,7 +1721,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "483cdc24fe5d890354b2c65e976051e1ee3291077163eab5bc255d620d133154",
+   "dest_sha256": "9bdb188d599b919a74085970778361d97cfaae98d194ece6994fb62af1df30ab",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -1725,8 +1735,8 @@
     },
     {
      "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
-     "new": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class).into());",
-     "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+     "new": "notify_args(Role::Player,format_args!(\"Player {:?} choice skipped\",choice.canonical.class));",
+     "reason": "the skipped-choice text is formatted into the notice's fixed buffer (`notify_args` of `character_roster`) instead of a `String` in a game callback (review R5)"
     }
    ]
   },

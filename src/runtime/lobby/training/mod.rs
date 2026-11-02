@@ -138,6 +138,18 @@ pub(crate) mod ui {
             }
         }
 
+        /// `notification` with the text formatted on the stack (a fixed buffer, copied into the notice queue): no heap, for the
+        /// callbacks whose text has numbers or names in it.
+        pub fn notification_args(header: Cow<'static, str>, args: std::fmt::Arguments<'_>, frames: u16) {
+            use std::fmt::Write;
+            let mut text = crate::model::storage::FixedPath::<96>::new();
+            // A text that does not fit is cut at the buffer (the notice shows its first characters).
+            let _ = text.write_fmt(args);
+            if let Some(slot) = id_of(&header) {
+                notices::upsert(HEADERS[slot].0, HEADERS[slot].1, text.as_str(), frames, DEFAULT_COLOR);
+            }
+        }
+
         /// Show or update the standing notice of `header` with `body` for `frames`, kept behind every other notice.
         pub fn upsert(header: &'static str, body: impl AsRef<str>, frames: u32) {
             if let Some(slot) = id_of(header) {

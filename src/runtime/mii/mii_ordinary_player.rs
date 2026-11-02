@@ -711,7 +711,7 @@ unsafe fn begin(entry:*mut u8)->bool {
                     if let mii_cycle::Target::Saved(choice)=step.target {
                         trace!("[MiiOrdinaryPlayer] skipped unqualified cycle choice class={:?} slot={:?} reason={}",
                             choice.canonical.class,choice.slot_id,reason);
-                        notify(Role::Player,format!("Player {:?} choice skipped",choice.canonical.class).into());
+                        notify_args(Role::Player,format_args!("Player {:?} choice skipped",choice.canonical.class));
                     }
                     None
                 }
