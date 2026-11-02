@@ -29,6 +29,22 @@ unsafe impl GlobalAlloc for CountAlloc {
 static ALLOCATOR: CountAlloc = CountAlloc;
 
 #[test]
+fn activation_history_tracks_replacement_without_growing() {
+    let mut history = crate::model::body_activation::History::<(usize, u32), 12>::new();
+    COUNT.with(|count| count.set(0));
+    TRACK.with(|track| track.set(true));
+    for generation in 1..1000 {
+        let live = std::array::from_fn(|slot| (generation * 16 + slot, slot as u32));
+        history.observe(live, live[generation % live.len()]);
+        std::hint::black_box(&history);
+    }
+    TRACK.with(|track| track.set(false));
+    assert_eq!(COUNT.with(Cell::get), 0);
+    assert!(history.contains(&(999 * 16 + 3, 3)));
+    assert!(!history.contains(&(998 * 16 + 2, 2)));
+}
+
+#[test]
 fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
     use crate::engine::preload::cycle_preload_policy::merge_player_hats_first;
     use crate::engine::swap::body_bank::*;

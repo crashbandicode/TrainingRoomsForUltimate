@@ -1427,10 +1427,9 @@ struct Bank {
     pair_logged: bool,
     /// Mii identity of the window group when it is a Mii group (`R` holds it).
     identity: Option<MiiIdentity>,
-    /// Ids of every body that was the window's live member at least once (this
-    /// bank's receipt; bodies keep their id across detach/attach). Feeds the
-    /// teardown protocol's `BodyRef::activated` (WP-K evidence field).
-    activated: Vec<u32>,
+    /// Activation follows exact current body identities across detach/attach.
+    /// Retired identities cannot grow the history or mark a later reused ID.
+    activated: crate::model::body_activation::History<(usize, u32), { (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS }>,
     /// Phase B′: the construction tasks of the group whose words are in the (empty) window,
     /// settled on a later tick (`settle_construction`) or drained before a destroyer.
     construction: Option<Construction>,
@@ -1618,7 +1617,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
-        pair_logged: false, identity: None, activated: Vec::new(),
+        pair_logged: false, identity: None, activated: Default::default(),
         construction: None, tick: TickGap::default(),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
@@ -1813,7 +1812,17 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
         }
         if let Some(now) = now {
             bank.observed = Some((read(entry, 0), members.kinds()[index as usize]));
-            if !bank.activated.contains(&now[usize::from(index)].id) { bank.activated.push(now[usize::from(index)].id); }
+            let mut live = [(0usize, 0u32); (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS];
+            for (slot, body) in live[..NATIVE_MEMBERS].iter_mut().zip(now) {
+                *slot = (body.address, body.id);
+            }
+            for (group, records) in bank.groups.iter().zip(live[NATIVE_MEMBERS..].chunks_mut(NATIVE_MEMBERS)) {
+                for (slot, body) in records.iter_mut().zip(group.bodies) {
+                    *slot = (body.address, body.id);
+                }
+            }
+            let active = now[usize::from(index)];
+            bank.activated.observe(live, (active.address, active.id));
             if bank.phase == Phase::Changing && (index != bank.target || now != bank.bodies) {
                 // Native is already ready and all current children pass their
                 // full proof. Retire this operation, not the native resources.
@@ -2005,12 +2014,12 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
     // read as a Kirby with `kirby_branch_mismatch=1`).
     let window = role(owner).and_then(|role| BANKS[role].lock().unwrap().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner && descriptor(entry, bank))
-        .map(|bank| (bank.members.kinds(), bank.members.count(), bank.activated.clone())));
+        .map(|bank| (bank.members.kinds(), bank.members.count(), bank.activated)));
     let (kinds, count, activated) = match window {
         Some(window) => window,
         None => {
             let count = (read::<u32>(entry, 0x14) as usize).min(NATIVE_MEMBERS);
-            ([read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)], count, Vec::new())
+            ([read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)], count, Default::default())
         }
     };
     let mut cells = Vec::with_capacity(count);
@@ -2025,7 +2034,7 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
         let valid = fighter && own.is_some();
         let live = fields::read::<u8>(body, 0x3a) == Some(4);
         cells.push(BodyRef { id, kind: if valid { own.unwrap_or(*kind) } else { *kind }, cell: i as u8,
-            activated: live || activated.contains(&id), valid, registered: registered_kind(resource(base, owner), i) });
+            activated: live || activated.contains(&(body, id)), valid, registered: registered_kind(resource(base, owner), i) });
     }
     let contexts = graph::window_contexts(entry as usize, |context| valid_context(base, context, owner));
     let probed = contexts.len();
@@ -3412,7 +3421,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
-        let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated.clone());
+        let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
         let mut bundles = Vec::with_capacity(groups);
         // A Mii group's keys are released with its identity in `R` (the release selector
         // `0x17e8410` keys on `R+0x58` like the request did): each key-holding Mii group keeps
@@ -3430,7 +3439,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         // U18: a group is built under its own header (`copy_registry::build`), so its
                         // init registered each body under the group's own kind; the window's header at
                         // teardown time names another group's bodies.
-                        detached.bodies.push(BodyRef { id: body.id, kind: *kind, cell: i as u8, activated: activated.contains(&body.id),
+                        detached.bodies.push(BodyRef { id: body.id, kind: *kind, cell: i as u8, activated: activated.contains(&(body.address, body.id)),
                             valid: valid_parked_body(base, body, *kind, owner), registered: Some(*kind) });
                         owners.push((body.id, *group.members));
                     }
