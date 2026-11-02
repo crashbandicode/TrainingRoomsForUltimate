@@ -81,15 +81,27 @@ def ledger(line):
         f.write(f"\n{stamp()} {line}\n")
 
 
+HOST = "yoga"
+STALE_CLAIM_HOURS = 6
+
+
 def open_claims():
-    """Open claims of other owners on this host. The ledger is shared by every host's owners: a claim whose
-    line names the Surface or the Ally and not the Yoga holds another host (their own Eden, no effect here)."""
+    """Open claims of other owners that concern this host (the Yoga). The ledger is shared by every host's
+    owners. The host a claim is ON comes from its "on <host>" phrase (Surface, Yoga, Ally); a line that
+    only mentions another host in passing does not claim it, and a line without such a phrase falls back to
+    every host it names (conservative). A claim older than STALE_CLAIM_HOURS without a later RELEASED is
+    ledger noise. The Eden process check in `up` is the hard truth."""
+    import calendar
     state = {}
+    now = time.time()
     for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
-        if m:
-            elsewhere = bool(re.search(r"Surface|Ally|dreamland-ally", line)) and "Yoga" not in line
-            state[m.group(2)] = m.group(1) == "CLAIMED" and not elsewhere
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        if not m:
+            continue
+        stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
+        hosts = re.findall(r"\bon (?:the )?(surface|yoga|ally)\b", line, re.I) or re.findall(r"\b(surface|yoga|ally)\b", line, re.I)
+        concerns = not hosts or HOST in {h.lower() for h in hosts}
+        state[m.group(3)] = m.group(2) == "CLAIMED" and (now - stamped) / 3600 < STALE_CLAIM_HOURS and concerns
     return [k for k, v in state.items() if v and k != OWNER]
 
 
