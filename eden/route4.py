@@ -149,4 +149,5 @@ def main():
     print("ROUTE DONE", flush=True)
 
 
-main()
+if __name__ == "__main__":
+    main()

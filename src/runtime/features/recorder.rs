@@ -135,6 +135,16 @@ const COUNT_AI_FRAME: usize = 1;
 const COUNT_INJECT: usize = 2;
 const COUNT_NOTICE: usize = 3;
 
+/// One recorder event line (diag build only: the shipped build writes nothing per event, playbook).
+#[cfg(feature = "diag")]
+fn event(name: &str, key_a: &str, a: i64, key_b: &str, b: i64) {
+    crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] {name} {key_a}={a} {key_b}={b}"));
+}
+
+#[cfg(not(feature = "diag"))]
+#[inline(always)]
+fn event(_name: &str, _key_a: &str, _a: i64, _key_b: &str, _b: i64) {}
+
 /// Boot: the generator's seed (the plugin's own, never the game's, SPEC-input-01 question 12).
 pub fn init(seed: u64) {
     *RNG.lock() = Rng::new(seed);
@@ -348,8 +358,10 @@ unsafe fn on_ai_frame(ai: usize) {
             cpu::mash_pop(key);
         }
     }
-    if let Some(Ended::Recorded { frames, .. }) = post.ended {
-        crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] recording_complete frames={frames}"));
+    match post.ended {
+        Some(Ended::Recorded { slot, frames }) => event("recording_complete", "slot", i64::from(slot), "frames", i64::from(frames)),
+        Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "restarted", i64::from(post.restarted.is_some())),
+        None => {}
     }
     chord_step(&settings, body, facing);
 
@@ -403,7 +415,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     match result {
         Ok(started) => {
             REC.lock().note_mash_started();
-            crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] playback_mash slot={} frames={}", started.slot, started.frames));
+            event("playback_mash", "slot", i64::from(started.slot), "frames", i64::from(started.frames));
         }
         Err(refusal) => {
             // The queue would ask again every frame: drop the head and say why.
@@ -454,7 +466,7 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     let result = if ledge { REC.lock().playback_ledge(slot, facing, catch) } else { REC.lock().start_playback(slot, facing) };
     match result {
         Ok(started) => {
-            crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] playback_shortcut slot={} frames={}", started.slot, started.frames));
+            event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames));
         }
         Err(refusal) => notices::refuse(refusal.text()),
     }
@@ -486,7 +498,7 @@ unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
         speed_y: 0.0,
     };
     REC.lock().start_recording(settings, facing, start);
-    crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] record_lockout cpu_kind={kind} frames={}", settings.duration));
+    event("record_lockout", "cpu_kind", i64::from(kind), "frames", i64::from(settings.duration));
 }
 
 // ---- entry points for the other features ---------------------------------------------------------------
