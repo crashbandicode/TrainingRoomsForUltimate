@@ -143,7 +143,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     if waiting {
         // The waiting archive already has com_white16, a plain UV0 material and
         // the game's text font. Build our own flat panes from those stock templates;
-        // no Training archive, imported artwork or BNTX rewrite is needed.
+        // no Training archive or upstream artwork is used; item textures are appended below.
         layout.clone_pane(&ClonePaneSpec {
             template: "RootPane".into(), new_name: "TrModPort".into(),
             parent: Some("RootPane".into()), visible: Some(true),
