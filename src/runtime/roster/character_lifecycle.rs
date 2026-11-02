@@ -1,7 +1,7 @@
 //! Native entry lifecycle observations and ordinary Training HUD reset repair.
 //! Only hooks used by the shared single-body character loader are installed.
 
-use crate::runtime::p1::compat::common::game_mode;
+use crate::runtime::lobby::game_mode;
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use skyline::nn::ro::LookupSymbol;
 use smash::app::{self, lua_bind::*};

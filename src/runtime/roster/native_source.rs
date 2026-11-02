@@ -19,7 +19,7 @@ pub struct ReadySource {
 /// current native callback, never saved and dereferenced by a later request.
 pub unsafe fn entry(slot: u32) -> Option<*const u8> {
     if slot >= 8 || BASE.load(Ordering::Acquire) == 0 { return None; }
-    let symbol = setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 { return None; }
     let manager = std::ptr::read_volatile(symbol as *const *mut app::FighterManager);
     if !aligned(manager.cast::<u8>()) { return None; }
@@ -29,7 +29,7 @@ pub unsafe fn entry(slot: u32) -> Option<*const u8> {
 }
 
 pub unsafe fn training_cpu_quantity() -> Option<u32> {
-    if !crate::runtime::p1::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {
+    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {
         return None;
     }
     let root = std::ptr::read_volatile(
@@ -61,7 +61,7 @@ pub unsafe fn exact_waiting_layout_with(current: *const u8, slot: u32,
         return false;
     }
     let base = BASE.load(Ordering::Acquire);
-    let symbol = setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 || base == 0 { return false; }
     let manager = std::ptr::read_volatile(symbol as *const *const u8);
     if !aligned(manager) { return false; }
@@ -112,7 +112,7 @@ pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
     #[cfg(feature="mii-managed-helper-alpha")]
     if matches!(slot,2|3|5|6) && (0x48..=0x4a).contains(&kind) {
         return aligned(current) && read::<u32>(current,0xe0)==slot
-            && crate::mii_native_access::cpu::helper_ready_for_kind(BASE.load(Ordering::Acquire),current as usize,slot,kind);
+            && crate::runtime::mii::mii_native_access::cpu::helper_ready_for_kind(BASE.load(Ordering::Acquire),current as usize,slot,kind);
     }
     if (0x48..=0x4a).contains(&kind) || TrioFighter::from_kind(kind).is_none() || !aligned(current)
         || read::<u32>(current, 0xe0) != slot

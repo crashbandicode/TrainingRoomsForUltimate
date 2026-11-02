@@ -570,7 +570,7 @@ unsafe fn waiting_layout(entry: *const u8, slot: u32, backend: Backend) -> bool 
 /// waiting families the shared PracticeScene setup builds: local wireless
 /// (`0x02010000`) or Quickplay (`0x070101xx`). Arenas and every other family stay out.
 fn waiting_backend() -> Option<Backend> {
-    let mode = crate::runtime::p1::compat::common::game_mode::current()?;
+    let mode = crate::runtime::lobby::game_mode::current()?;
     Backend::scene(mode.initialized, mode.melee, mode.mode, super::lobby::active())
         .filter(|backend| backend.waiting())
 }
@@ -582,7 +582,7 @@ unsafe fn qualified_backend() -> Result<Backend, &'static str> {
     if !cfg!(feature = "managed-sources") {
         return Err("Character resource loading is not available in this scene yet");
     }
-    if crate::runtime::p1::compat::common::is_native_training_mode() {
+    if crate::runtime::compat::common::is_native_training_mode() {
         return if native_source::training_cpu_quantity() == Some(1) {
             Ok(Backend::Training)
         } else {
@@ -1052,7 +1052,7 @@ pub unsafe fn clear_hat_for_switch(body: *mut app::BattleObjectModuleAccessor)
     let Some(before) = retained_copy_kinds(body) else {
         return Err("Kirby's previous copy resources are not ready");
     };
-    let object = crate::runtime::p1::compat::common::try_get_battle_object((*body).battle_object_id)
+    let object = crate::runtime::compat::common::try_get_battle_object((*body).battle_object_id)
         .filter(|object| object.module_accessor == body)
         .ok_or("Kirby is still changing characters")?;
     let base = super::BASE.load(Ordering::Acquire);
@@ -1164,7 +1164,7 @@ unsafe fn consumer_alive(consumer: Consumer, hats: &mut [HatObservation; 2]) -> 
 /// items retain their lease until their actual native item object ends.
 pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     if !HAS_CONSUMERS.load(Ordering::Acquire) { return; }
-    if crate::runtime::p1::compat::common::try_get_module_accessor(crate::runtime::p1::compat::common::consts::FighterId::Player)
+    if crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)
         != Some(body) { return; }
     let mut state = STATE.lock().unwrap();
     let mut hats = [None; 2];
@@ -1254,7 +1254,7 @@ pub fn scene_changed() {
 /// of its diagnostics. This is not resource admission or native source ownership.
 #[cfg(any(feature = "source-owner-probe", feature = "managed-sources"))]
 pub unsafe fn legacy_training_owner_reserved(body: &mut app::BattleObjectModuleAccessor) -> bool {
-    crate::runtime::p1::compat::common::is_native_training_mode()
+    crate::runtime::compat::common::is_native_training_mode()
         && app::utility::get_category(body) == *BATTLE_OBJECT_CATEGORY_FIGHTER
         && WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == 2
 }
@@ -1625,11 +1625,11 @@ fn ready_still_requested(state: &State, index: usize) -> bool {
 /// budget so deliberately deferred acquisition cannot expire during playback.
 unsafe fn admission_blocker() -> Option<&'static str> {
     if INSTALL.active() { Some("another source install") }
-    else if !crate::runtime::p1::compat::common::is_ready_go() { Some("ready-go") }
+    else if !crate::runtime::compat::common::is_ready_go() { Some("ready-go") }
     else if super::lobby::native_ui_busy() { Some("native UI") }
     else if super::training::save_states::is_loading() { Some("save-state restore") }
     else if super::training::recording_or_playback() { Some("recording or playback") }
-    else if crate::runtime::p1::compat::replay_preview::occupied() { Some("replay preview") }
+    else if crate::runtime::compat::replay_preview::occupied() { Some("replay preview") }
     else { None }
 }
 

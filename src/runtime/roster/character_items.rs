@@ -6,10 +6,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use smash::app::{self, lua_bind::*, sv_battle_object};
 use smash::lib::lua_const::*;
 use crate::engine::items::character_items::{valid_variation, HeldItemSnapshot, ITEM_NAMES};
-use {crate::runtime::p1::compat::sync::assign, crate::runtime::p1::compat::sync::read};
+use {crate::runtime::compat::menu_app::assign, crate::runtime::compat::sync::read};
 
-use crate::runtime::p1::compat::common::{self, consts::FighterId, try_get_module_accessor};
-use crate::runtime::p1::compat::training::{self, character_specific::items::{ALL_CHAR_ITEMS, TURNIP_CHOSEN}};
+use crate::runtime::compat::common::{self, consts::FighterId, try_get_module_accessor};
+use crate::runtime::lobby::training::{self, character_specific::items::{ALL_CHAR_ITEMS, TURNIP_CHOSEN}};
 use crate::runtime::roster::character_roster::sources;
 use crate::engine::swap::source_lifetime::Holder;
 
@@ -87,7 +87,7 @@ unsafe fn permitted() -> bool {
     common::is_training_mode() && common::is_ready_go()
         && !crate::runtime::roster::character_roster::busy() && !training::lobby::native_ui_busy()
         && !training::save_states::is_loading() && !training::recording_or_playback()
-        && !crate::runtime::p1::compat::replay_preview::occupied()
+        && !crate::runtime::compat::replay_preview::occupied()
 }
 
 /// Invoked for every A press, including selecting the already-checked item.
@@ -145,7 +145,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     // A short-fuse item must not expire while the picker still consumes the
     // player's throw/save inputs. Keep the latest selection queued through the
     // menu's close guard, then grant it on the first usable gameplay callback.
-    if crate::runtime::p1::compat::common::menu::captures_input() {
+    if crate::runtime::compat::common::menu::captures_input() {
         requeue(pending);
         return;
     }

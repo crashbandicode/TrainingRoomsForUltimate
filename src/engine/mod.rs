@@ -31,3 +31,8 @@ pub mod seams;
 pub mod swap;
 #[path = "../model/stages/mod.rs"]
 pub mod stages;
+// CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
+// from tests/p1_core.rs (the playbook's by-path include).
+#[cfg(target_os = "switch")]
+#[path = "../model/p1_session/mod.rs"]
+pub mod p1_session;

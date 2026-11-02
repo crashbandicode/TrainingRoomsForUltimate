@@ -5,14 +5,14 @@ use std::sync::Mutex;
 
 use smash::app::{self, lua_bind::*};
 use smash::lib::lua_const::*;
-use training_mod_consts::MENU;
-use crate::runtime::p1::compat::sync::read;
+use crate::runtime::compat::menu::MENU;
+use crate::runtime::compat::sync::read;
 
-use crate::runtime::p1::compat::common::consts::FighterId;
-use crate::runtime::p1::compat::common::input::{Buttons, MappedInputs};
-use crate::runtime::p1::compat::common::{self, button_config, menu, try_get_module_accessor};
+use crate::runtime::compat::common::consts::FighterId;
+use crate::runtime::compat::common::input::{Buttons, MappedInputs};
+use crate::runtime::compat::common::{self, button_config, menu, try_get_module_accessor};
 use crate::engine::kirby::kirby_hat_cycle::{operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};
-use crate::runtime::p1::compat::training;
+use crate::runtime::lobby::training;
 use crate::runtime::roster::character_roster::sources::{self, Lease};
 use crate::engine::swap::source_lifetime::Holder;
 
@@ -102,7 +102,7 @@ unsafe fn permitted() -> bool {
         && !button_config::has_pending_request()
         && !training::save_states::is_loading()
         && !training::recording_or_playback()
-        && !crate::runtime::p1::compat::replay_preview::occupied()
+        && !crate::runtime::compat::replay_preview::occupied()
 }
 
 unsafe fn role_body(role: usize) -> Option<*mut app::BattleObjectModuleAccessor> {

@@ -55,7 +55,7 @@ static COPY_DIAGNOSTIC: Mutex<CopyDiagnostic> = Mutex::new(CopyDiagnostic {
 static DAMAGE_LOGS: AtomicU32 = AtomicU32::new(0);
 
 pub unsafe fn observe_copy(body: *mut app::BattleObjectModuleAccessor) {
-    if body.is_null() || !crate::runtime::p1::compat::common::is_native_training_mode() { return; }
+    if body.is_null() || !crate::runtime::compat::common::is_native_training_mode() { return; }
     let owner = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..2).contains(&owner) { return; }
     let kind = app::utility::get_kind(&mut *body);
@@ -148,10 +148,10 @@ pub fn scene_changed() {
 /// The pinned binding declares the ratio as u64, but the native export returns
 /// an f32 in s0 (ldr x8,[x0]; ldr s0,[x8,#0xf0]; ret). Use its actual ABI.
 pub unsafe fn observe_rules() {
-    if !crate::runtime::p1::compat::common::is_native_training_mode() || !crate::runtime::p1::compat::common::is_ready_go() {
+    if !crate::runtime::compat::common::is_native_training_mode() || !crate::runtime::compat::common::is_ready_go() {
         return;
     }
-    let symbol = super::setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = super::setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 { return; }
     let manager = std::ptr::read_volatile(symbol as *const *mut app::FighterManager);
     if !aligned(manager.cast::<u8>()) { return; }
@@ -183,7 +183,7 @@ pub unsafe fn reserved(body: &mut app::BattleObjectModuleAccessor) -> bool {
 }
 
 pub unsafe fn source(kind: u32) -> Option<*mut app::BattleObjectModuleAccessor> {
-    if kind != KIND || !crate::runtime::p1::compat::common::is_native_training_mode() { return None; }
+    if kind != KIND || !crate::runtime::compat::common::is_native_training_mode() { return None; }
     let entry = current_entry(OWNER)?;
     if ready_forms(entry, OWNER) != Some((Forms::starting(KIND), KIND)) { return None; }
     let id = BODY.load(Ordering::Acquire);
@@ -283,7 +283,7 @@ pub unsafe fn source_slot(kind: u32) -> Option<i32> {
         if current.is_some() { STATE.lock().unwrap().resources = current; }
         return Some(OWNER as i32);
     }
-    if kind != KIND || !crate::runtime::p1::compat::common::is_native_training_mode() { return None; }
+    if kind != KIND || !crate::runtime::compat::common::is_native_training_mode() { return None; }
     let (identity, expected) = {
         let state = STATE.lock().unwrap();
         if !state.finished || state.kind != KIND { return None; }
@@ -304,7 +304,7 @@ pub unsafe fn source_slot(kind: u32) -> Option<i32> {
 }
 
 unsafe fn current_entry(owner: u32) -> Option<*const u8> {
-    let symbol = super::setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = super::setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 { return None; }
     let manager = std::ptr::read_volatile(symbol as *const *mut app::FighterManager);
     if !aligned(manager.cast::<u8>()) { return None; }
@@ -342,7 +342,7 @@ unsafe fn inactive_body_ready(entry: *const u8, kind: u32) -> bool {
 /// queues Link on the SAME inactive helper. Test must never create an item.
 /// No native copy flags or consumer reference counts are modified here.
 pub unsafe fn request_replacement(body: *mut app::BattleObjectModuleAccessor) -> bool {
-    if !crate::runtime::p1::compat::common::is_native_training_mode()
+    if !crate::runtime::compat::common::is_native_training_mode()
         || WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) != 0
         || !WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY)
         || WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY_ON_START)
@@ -363,7 +363,7 @@ pub unsafe fn request_replacement(body: *mut app::BattleObjectModuleAccessor) ->
 /// Read-only, fresh consumer chains verified from the native copy-module
 /// constructor and copy_setup→ba4090. Saved numeric pairs are compared only.
 unsafe fn consumer_snapshot() -> Option<Consumer> {
-    let body = crate::runtime::p1::compat::common::try_get_module_accessor(crate::runtime::p1::compat::common::consts::FighterId::Player)?;
+    let body = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)?;
     if app::utility::get_kind(&mut *body) != *FIGHTER_KIND_KIRBY
         || !WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY)
         || WorkModule::get_int(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_INT_COPY_CHARA) != KIND as i32
@@ -435,12 +435,12 @@ pub unsafe fn service(entry: *mut u8) {
         }
         return;
     }
-    if !crate::runtime::p1::compat::common::is_native_training_mode() { return; }
+    if !crate::runtime::compat::common::is_native_training_mode() { return; }
     if state.finished {
         if state.replace_requested && state.kind == KIND
-            && crate::runtime::p1::compat::common::is_ready_go() && !super::menu::captures_input()
+            && crate::runtime::compat::common::is_ready_go() && !super::menu::captures_input()
             && !super::lobby::native_ui_busy() && !super::training::save_states::is_loading()
-            && !super::training::recording_or_playback() && !crate::runtime::p1::compat::replay_preview::occupied()
+            && !super::training::recording_or_playback() && !crate::runtime::compat::replay_preview::occupied()
             && cpu_quantity() == Some(1) && inactive_body_ready(entry, KIND)
         {
             let Some(install_token) = INSTALL.try_begin(false) else { return; };
@@ -528,9 +528,9 @@ pub unsafe fn service(entry: *mut u8) {
         }
         return;
     }
-    if !crate::runtime::p1::compat::common::is_ready_go() || super::menu::captures_input()
+    if !crate::runtime::compat::common::is_ready_go() || super::menu::captures_input()
         || super::lobby::native_ui_busy() || super::training::save_states::is_loading()
-        || super::training::recording_or_playback() || crate::runtime::p1::compat::replay_preview::occupied()
+        || super::training::recording_or_playback() || crate::runtime::compat::replay_preview::occupied()
         || read::<u8>(entry, 0x5920) != 0 || read::<u8>(entry, 0x5935) != 0
         || cpu_quantity() != Some(1)
         || current_entry(0).and_then(|entry| ready_forms(entry, 0)).is_none()

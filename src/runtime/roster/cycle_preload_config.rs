@@ -15,7 +15,7 @@ use training_mod_consts::cycle_preload_config::{
     store_ini, unpack, IniLoad, Publish, Unset, PATH,
 };
 use crate::engine::compat::menu::TrainingModpackMenu;
-use {crate::runtime::p1::compat::sync::assign, crate::runtime::p1::compat::sync::read};
+use {crate::runtime::compat::menu_app::assign, crate::runtime::compat::sync::read};
 
 use training_mod_consts::cycle_preload_config::Settings;
 
@@ -34,7 +34,7 @@ static UNSET: AtomicU16 = AtomicU16::new(0);
 /// again after it assigns JSON.
 pub fn init() {
     reconcile_loaded_menu();
-    crate::runtime::p1::compat::common::menu::refresh_stored_menu_on_quick_app();
+    crate::runtime::compat::common::menu::refresh_stored_menu_on_quick_app();
 }
 
 /// Cached choice. Before `init` or a menu-loader reconcile, this is closed
@@ -51,7 +51,7 @@ pub(crate) fn reconcile_loaded_menu() {
     if !settings.selectable() {
         return;
     }
-    let mut menu = read(&training_mod_consts::MENU);
+    let mut menu = read(&crate::runtime::compat::menu::MENU);
     let mut defaults = read(&training_mod_consts::DEFAULTS_MENU);
     // Keys an older INI omitted take the saved menu choice once, and the INI is
     // written with them: a menu Off is honoured exactly as after a menu apply.
@@ -86,7 +86,7 @@ pub(crate) fn reconcile_loaded_menu() {
     }
     apply_settings(&mut menu, settings);
     apply_settings(&mut defaults, settings);
-    assign(&training_mod_consts::MENU, menu);
+    assign(&crate::runtime::compat::menu::MENU, menu);
     assign(&training_mod_consts::DEFAULTS_MENU, defaults);
 }
 

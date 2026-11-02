@@ -2,7 +2,7 @@
 //! Saved addresses are identities, never authority to dereference old objects.
 //! Created entries are 7, then 6 and 5 for the extended Training candidate only.
 use super::{aligned, native_source, read, setting, BASE};
-use crate::runtime::p1::compat::common;
+use crate::runtime::compat::common;
 use skyline::hooks::InlineCtx;
 use super::native_service::ServiceEntryContext;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
@@ -868,8 +868,7 @@ pub(super) unsafe fn init(base: usize) {
 }
 
 #[cfg(feature = "managed-third-source-alpha")]
-#[path = "source_descriptor.rs"]
-mod source_descriptor;
+use crate::engine::swap::source_descriptor as source_descriptor;
 
 #[cfg(feature = "managed-third-source-alpha")]
 pub(super) mod managed {

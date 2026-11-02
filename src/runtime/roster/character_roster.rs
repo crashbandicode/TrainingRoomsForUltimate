@@ -5,16 +5,16 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}
 use std::sync::Mutex;
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
-use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingModpackMenu, crate::engine::swap::trio::TrioFighter, training_mod_consts::MENU};
-use {crate::runtime::p1::compat::sync::lock_write, crate::runtime::p1::compat::sync::read as setting};
+use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingModpackMenu, crate::engine::swap::trio::TrioFighter, crate::runtime::compat::menu::MENU};
+use {crate::runtime::compat::menu_app::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
-use crate::runtime::p1::compat::common::{
+use crate::runtime::compat::common::{
     button_config, game_mode,
     input::{Buttons, MappedInputs},
     menu,
 };
-use crate::runtime::p1::compat::training::{self, lobby};
+use crate::runtime::lobby::training::{self, lobby};
 use crate::engine::swap::character_forms::{
     configured_forms, cycle_position, next_cycle, next_from_original, EntryState, Forms,
     PresentedReceipt, Rebuild,
@@ -44,8 +44,7 @@ mod native_fighter_install;
 #[path = "native_reload_pose.rs"]
 mod native_reload_pose;
 
-#[path = "native_hud_refresh.rs"]
-mod native_hud_refresh;
+use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 
 #[path = "native_source.rs"]
 mod native_source;
@@ -89,44 +88,43 @@ pub mod mii_pool_observer;
 mod mii_origin_observer;
 
 #[cfg(feature="mii-saved-alpha")]
-#[path="mii_saved_alpha.rs"]
+#[path="../mii/mii_saved_alpha.rs"]
 pub(crate) mod mii_saved_alpha;
 #[cfg(feature="mii-saved-alpha")]
-#[path="mii_catalog_request.rs"]
+#[path="../mii/mii_catalog_request.rs"]
 pub(crate) mod mii_catalog_request;
 #[cfg(feature="mii-saved-alpha")]
-#[path="mii_backend.rs"]
+#[path="../mii/mii_backend.rs"]
 mod mii_backend;
 #[cfg(feature="mii-saved-alpha")]
-#[path="mii_saved_fingerprints.rs"]
+#[path="../mii/mii_saved_fingerprints.rs"]
 mod mii_saved_fingerprints;
 
 #[cfg(feature="mii-ordinary-player-alpha")]
-#[path="mii_ordinary_player.rs"]
+#[path="../mii/mii_ordinary_player.rs"]
 mod mii_ordinary_player;
 #[cfg(feature="mii-ordinary-cpu-alpha")]
-#[path="mii_ordinary_cpu.rs"]
+#[path="../mii/mii_ordinary_cpu.rs"]
 mod mii_ordinary_cpu;
 #[cfg(feature="mii-ordinary-cpu-alpha")]
-#[path="mii_selector_native.rs"]
+#[path="../mii/mii_selector_native.rs"]
 mod mii_selector_native;
 #[cfg(feature="mii-ldn-qualification-probe")]
-#[path="mii_ldn_qualification.rs"]
+#[path="../mii/mii_ldn_qualification.rs"]
 mod mii_ldn_qualification;
 #[cfg(feature="mii-managed-helper-alpha")]
-#[path="mii_managed_helper.rs"]
+#[path="../mii/mii_managed_helper.rs"]
 mod mii_managed_helper;
 #[cfg(feature="mii-ordinary-cpu-alpha")]
-#[path="mii_auto_init.rs"]
+#[path="../mii/mii_auto_init.rs"]
 mod mii_auto_init;
 #[cfg(feature="mii-ordinary-cpu-alpha")]
-#[path="mii_replay.rs"]
+#[path="../mii/mii_replay.rs"]
 pub(crate) mod mii_replay;
 #[cfg(feature="mii-hud-portrait-alpha")]
-#[path="mii_hud_portrait_policy.rs"]
-pub(crate) mod mii_hud_portrait_policy;
+pub(crate) use crate::engine::mii_root::mii_hud_portrait_policy as mii_hud_portrait_policy;
 #[cfg(feature="mii-hud-portrait-alpha")]
-#[path="mii_hud_portrait.rs"]
+#[path="../mii/mii_hud_portrait.rs"]
 pub(crate) mod mii_hud_portrait; // WP-P: `swap_native::presentation` reads the card slot through `slot_of_owner`
 
 /// Settled loaded Mii for a practice role. Role 0 is Player and role 1 is CPU.
@@ -912,7 +910,7 @@ unsafe fn capture_reload_pose(entry: *mut u8, owner: u32) -> Option<native_reloa
     native_reload_pose::capture(BASE.load(Ordering::Acquire), entry as usize, owner, |module| {
         let module = module as *mut BattleObjectModuleAccessor;
         let status = StatusModule::status_kind(module);
-        if !crate::runtime::p1::compat::common::is_ready_go()
+        if !crate::runtime::compat::common::is_ready_go()
             || [*FIGHTER_STATUS_KIND_DEAD, *FIGHTER_STATUS_KIND_REBIRTH,
                 *FIGHTER_STATUS_KIND_ENTRY, *FIGHTER_STATUS_KIND_STANDBY].contains(&status)
         {
@@ -1310,7 +1308,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 // fighter/script setup. Reconcile persisted Solo only once the
                 // match is active; menu changes use the same native boundary.
                 if kind == 0x4b
-                    && crate::runtime::p1::compat::common::is_ready_go()
+                    && crate::runtime::compat::common::is_ready_go()
                     && forms != requested_forms_at(&setting(&MENU), role, kind, slot)
                 {
                     queue(role, Selection::RefreshPartners);
@@ -1808,7 +1806,7 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
         return;
     }
     let base = BASE.load(Ordering::Acquire);
-    let symbol = setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     let hud_singleton = read::<usize>(base as *const u8, 0x52c3420);
     if symbol == 0 || hud_singleton == 0 {
         trace!(
@@ -1943,7 +1941,7 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
 #[cfg(feature = "diag")]
 pub(crate) unsafe fn trace_event_listeners(label: &str, event_type: u32) {
     let base = BASE.load(Ordering::Acquire);
-    let symbol = setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 {
         return;
     }
@@ -2037,7 +2035,7 @@ pub(crate) unsafe fn waiting_icon_observation(
 
 #[cfg(feature="mii-hud-portrait-alpha")]
 unsafe fn waiting_icon_source(base: usize) -> Option<(*const u8, *const u8)> {
-    let symbol = setting(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 || read::<usize>(base as *const u8, 0x52c3420) == 0 {
         return None;
     }
@@ -2496,13 +2494,13 @@ pub(crate) mod mii_reload_probe {
     }
 
     unsafe fn permitted() -> bool {
-        crate::runtime::p1::compat::common::is_native_training_mode()
-            && crate::runtime::p1::compat::common::is_ready_go()
+        crate::runtime::compat::common::is_native_training_mode()
+            && crate::runtime::compat::common::is_ready_go()
             && !menu::captures_input()
             && !INSTALL.active()
             && !training::save_states::is_loading()
             && !training::recording_or_playback()
-            && !crate::runtime::p1::compat::replay_preview::occupied()
+            && !crate::runtime::compat::replay_preview::occupied()
     }
 
     /// L3+X edge while permitted requests the one shot; the chord is consumed like the

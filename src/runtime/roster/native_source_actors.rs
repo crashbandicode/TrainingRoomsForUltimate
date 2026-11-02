@@ -6,8 +6,7 @@ use super::{aligned, inputs_for, native_source, read, Inputs, Snapshot, BASE};
 use skyline::hooks::InlineCtx;
 use std::sync::atomic::Ordering;
 
-#[path = "source_visible_forms.rs"]
-mod visible;
+use crate::engine::swap::source_visible_forms as visible;
 pub(crate) use visible::Bank as VisibleBank;
 
 pub(crate) fn supported(kind: u32) -> bool {

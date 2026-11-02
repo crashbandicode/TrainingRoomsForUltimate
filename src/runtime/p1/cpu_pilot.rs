@@ -19,17 +19,15 @@ use smash::lib::lua_const::*;
 use ssbu_cpu_pilot_core::native::{self as core_native, Native};
 use ssbu_cpu_pilot_core::{level as core_level, pad as core_pad};
 
-use crate::runtime::p1::compat::common::input::MappedInputs;
+use crate::runtime::compat::common::input::MappedInputs;
 
 #[path = "../../model/p1/mod.rs"]
 // Retain the reviewed host-test API/helpers without changing frozen core files.
 #[allow(dead_code)]
 mod pilot_core;
 use self::pilot_core::move_observer::{MoveObserver, Observation};
-#[path = "../../model/p1/menu_session.rs"]
-mod menu_session;
-#[path = "../../model/p1/stage_session.rs"]
-mod stage_session;
+use crate::engine::p1_session::menu_session as menu_session;
+use crate::engine::p1_session::stage_session as stage_session;
 
 // Publication is lock-free: menu commits may hold the App lock while on_frame
 // holds STATE and asks whether the menu captures input. Never acquire STATE here.
@@ -576,9 +574,9 @@ unsafe fn ai_process_begin(svc: usize) {
 }
 
 fn menu_busy() -> bool {
-    crate::runtime::p1::compat::common::menu::captures_input()
-        || crate::runtime::p1::compat::sync::read(&crate::runtime::p1::compat::training::ui::menu::VANILLA_MENU_ACTIVE)
-        || crate::runtime::p1::compat::replay_preview::occupied()
+    crate::runtime::compat::common::menu::captures_input()
+        || crate::runtime::compat::sync::read(&crate::runtime::p1::compat::training::ui::menu::VANILLA_MENU_ACTIVE)
+        || crate::runtime::compat::replay_preview::occupied()
         || crate::runtime::p1::compat::training::recording_or_playback()
 }
 
@@ -650,8 +648,8 @@ struct Entry {
 }
 
 unsafe fn current_scene() -> Option<Scene> {
-    let mode = crate::runtime::p1::compat::common::game_mode::current();
-    if crate::runtime::p1::compat::common::is_native_training_mode() {
+    let mode = crate::runtime::lobby::game_mode::current();
+    if crate::runtime::compat::common::is_native_training_mode() {
         return Some(Scene {
             scope: Scope::OfflineTraining,
             initialized: mode.is_some_and(|m| m.initialized),
@@ -669,7 +667,7 @@ unsafe fn current_scene() -> Option<Scene> {
 }
 
 unsafe fn manager() -> Option<*mut smash::app::FighterManager> {
-    let address = crate::runtime::p1::compat::sync::read(&crate::runtime::p1::compat::common::FIGHTER_MANAGER_ADDR);
+    let address = crate::runtime::compat::sync::read(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if address == 0 || !address.is_multiple_of(8) {
         return None;
     }
@@ -697,7 +695,7 @@ unsafe fn entry(
         return Err("current_object_missing");
     }
     if (*module).battle_object_id != boid
-        || !crate::runtime::p1::compat::common::is_fighter(&*module)
+        || !crate::runtime::compat::common::is_fighter(&*module)
         || WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) != index
     {
         return Err("entry_object_mismatch");
@@ -840,9 +838,9 @@ unsafe fn pair_diagnostic(
     let base = BASE.load(Ordering::Acquire);
     let service = ptr(base + 0x52b6fd8).and_then(|p| ptr(p));
     let legacy_player =
-        crate::runtime::p1::compat::common::try_get_module_accessor(crate::runtime::p1::compat::common::FighterId::Player)
+        crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::Player)
             .map(|p| (*p).battle_object_id);
-    let legacy_cpu = crate::runtime::p1::compat::common::try_get_module_accessor(crate::runtime::p1::compat::common::FighterId::CPU)
+    let legacy_cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
         .map(|p| (*p).battle_object_id);
     let value = json!({"read_only":true,"binding":binding,"callback_boid":callback_boid,
         "legacy_accessor_pair":{"player":legacy_player,"cpu":legacy_cpu},
@@ -1248,7 +1246,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         gate(
             &mut state,
             "scope_exit",
-            || json!({"mode":format!("{:?}",crate::runtime::p1::compat::common::game_mode::current())}),
+            || json!({"mode":format!("{:?}",crate::runtime::lobby::game_mode::current())}),
         );
         return;
     };
@@ -1256,7 +1254,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         gate(&mut state, "manager_result", || json!({"scene":scene}));
         return;
     }
-    if !crate::runtime::p1::compat::common::is_fighter(module) {
+    if !crate::runtime::compat::common::is_fighter(module) {
         return;
     }
     // Nana shares Popo's entry/controller; only the primary object owns a run.
@@ -1560,7 +1558,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             core_pad::pack(core_pad::from_ai(
                 0,
                 x,
-                if crate::runtime::p1::compat::common::is_grounded(module) {
+                if crate::runtime::compat::common::is_grounded(module) {
                     0.0
                 } else {
                     -1.0

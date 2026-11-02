@@ -19,8 +19,8 @@ const _: () = assert!(scope::GATE_COUNT <= 64, "REFUSED_LOGGED holds one bit per
 
 /// The current scope (`Match` while the scene words are unavailable).
 pub(crate) fn current() -> Scope {
-    let native_training = unsafe { crate::runtime::p1::compat::common::is_native_training_mode() };
-    match crate::runtime::p1::compat::common::game_mode::current() {
+    let native_training = unsafe { crate::runtime::compat::common::is_native_training_mode() };
+    match crate::runtime::lobby::game_mode::current() {
         Some(mode) => scope::scope_of(native_training, mode.melee, mode.mode),
         None if native_training => Scope::Training,
         None => Scope::Match,

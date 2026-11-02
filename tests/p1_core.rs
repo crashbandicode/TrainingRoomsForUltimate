@@ -7,9 +7,9 @@
 mod pilot_core;
 
 #[allow(dead_code)]
-#[path = "../src/model/p1/menu_session.rs"]
+#[path = "../src/model/p1_session/menu_session.rs"]
 mod menu_session;
 
 #[allow(dead_code)]
-#[path = "../src/model/p1/stage_session.rs"]
+#[path = "../src/model/p1_session/stage_session.rs"]
 mod stage_session;

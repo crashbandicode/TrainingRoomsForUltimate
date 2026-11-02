@@ -169,7 +169,7 @@ pub fn start() {
                 let now = now_ms();
                 // Revision 33: housekeeping off the game threads — release inflated layout archives
                 // the game finished copying (training::ui).
-                crate::runtime::p1::compat::training::ui::release_stale_archives(now);
+                crate::runtime::lobby::training::ui::release_stale_archives(now);
                 if TRACE_ENABLED {
                     beat += 1;
                     let probes: Vec<String> = PROBES.iter().map(|probe| probe.summary(now)).collect();
@@ -177,7 +177,7 @@ pub fn start() {
                         "[Heartbeat] n={} up={}s mode={:?} {} {}",
                         beat,
                         now.saturating_sub(started) / 1000,
-                        crate::runtime::p1::compat::common::game_mode::current(),
+                        crate::runtime::lobby::game_mode::current(),
                         probes.join(" "),
                         crate::engine::compat::logging::ring_stats()
                     ));

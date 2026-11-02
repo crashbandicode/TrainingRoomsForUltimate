@@ -784,7 +784,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let mut result = BuiltFighters::default();
     if settings.slots == 0 || !settings.fighters || settings.bank_members < 2 { return result; }
-    let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
+    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     // Read roster metadata before BANKS; never acquire a roster lock inside it.
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];
     for (role, state) in BANKS.iter().enumerate() {
@@ -825,7 +825,7 @@ pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
         || settings.bank_members < 2 { return false; }
     let forms = if kind == 0x4b && solo { Forms::solo_popo() } else { Forms::starting(kind) };
     let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
-    let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
+    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     if super::original_kind(logical_role) == Some(kind)
         && super::requested_forms_at(&menu, logical_role, kind, None) == forms
         && !(settings.original_bank_enabled() && original_bankable(kind)) { return false; }
@@ -894,7 +894,7 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     // Once planned, preserve the other role's fair share as well.
     let planned_other = usize::from(ROLE_BUDGET[1 - role].load(Ordering::Acquire)).max(other);
     let budget = budget.min(pool.saturating_sub(planned_other + (other_total - other)));
-    let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
+    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     let (lane, count) = window_lane(&menu, role, upcoming);
     members_for(&settings, target, &lane[..count], budget)
 }
@@ -3236,7 +3236,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // WP-E row `native_body_bank::group_prefetch` (U14): a prefetch starts acquiring native map keys;
             // outside Training and waiting rooms it does not start and the group stays Planned, as for
             // every deferral above (nothing acquired yet, no INSTALL taken).
-            if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
+            if !crate::runtime::roster::swap_native::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
             let Some(token) = super::INSTALL.try_begin(false) else { return; };
             // Every acquisition goes through the ledger (WP4): a token per kind, the pair rule or
             // the construction tail as its recipe, the object kind owned; a refusal (a live consumer,

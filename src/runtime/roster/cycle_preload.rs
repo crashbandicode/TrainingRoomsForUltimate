@@ -196,7 +196,7 @@ fn reset_status() {
         paused_polls: 0,
         desired: [None; MAX_TARGETS],
     };
-    crate::runtime::p1::compat::training::ui::notifications::clear_notification(STATUS_HEADER);
+    crate::runtime::lobby::training::ui::notifications::clear_notification(STATUS_HEADER);
 }
 
 /// `desired` is the freshly merged plan, or `None` to reuse the last one. `blocked` is the
@@ -234,7 +234,7 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
 
 fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, scheduler_blocked: bool) {
     use crate::engine::preload::cycle_preload_policy::Progress;
-    use crate::runtime::p1::compat::training::ui::notifications::{clear_notification, is_queued, take_delivered, upsert};
+    use crate::runtime::lobby::training::ui::notifications::{clear_notification, is_queued, take_delivered, upsert};
     let mut status = STATUS.lock().unwrap();
     status.paused_polls = if now.progress() == Progress::Paused {
         status.paused_polls.saturating_add(1)
@@ -373,7 +373,7 @@ pub(crate) fn mixed_targets(
     } else {
         menu.cpu_roster.fighters()
     };
-    let preferences = crate::runtime::p1::compat::common::menu::mii_preferences();
+    let preferences = crate::runtime::compat::common::menu::mii_preferences();
     let qualify = |step: mii_cycle::Step| match step.target {
         mii_cycle::Target::Fighter(kind) => Some(Target::fighter(kind)),
         mii_cycle::Target::Original => Some(match original {
@@ -430,8 +430,8 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     if settings.slots == 0 && !settings.measurements {
         return;
     }
-    if crate::runtime::p1::compat::training::practice::role(body) != Some(0)
-        || !crate::runtime::p1::compat::common::try_get_module_accessor(crate::runtime::p1::compat::common::consts::FighterId::Player)
+    if crate::runtime::lobby::training::practice::role(body) != Some(0)
+        || !crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)
             .is_some_and(|current| std::ptr::eq(current, body))
     {
         return;
@@ -446,15 +446,15 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     if !POLL.fetch_add(1, Ordering::Relaxed).is_multiple_of(60) {
         return;
     }
-    if !crate::runtime::p1::compat::common::is_ready_go() || crate::runtime::p1::compat::common::menu::captures_input() {
+    if !crate::runtime::compat::common::is_ready_go() || crate::runtime::compat::common::menu::captures_input() {
         return;
     }
     // The UI gates defer every load and are visible operations. `preload_blocked` also holds
     // speculation behind the preloader's own helper and hat loads, which never pause the notice.
-    let ui_blocked = crate::runtime::p1::compat::training::lobby::native_ui_busy()
-        || crate::runtime::p1::compat::training::save_states::is_loading()
-        || crate::runtime::p1::compat::training::recording_or_playback()
-        || crate::runtime::p1::compat::replay_preview::occupied();
+    let ui_blocked = crate::runtime::lobby::training::lobby::native_ui_busy()
+        || crate::runtime::lobby::training::save_states::is_loading()
+        || crate::runtime::lobby::training::recording_or_playback()
+        || crate::runtime::compat::replay_preview::occupied();
     if ui_blocked || crate::runtime::roster::character_roster::preload_blocked() {
         poll_status(true, ui_blocked || crate::runtime::roster::character_roster::notice_blocked(), None);
         return;
@@ -497,7 +497,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
         return;
     }
     let epoch = crate::runtime::roster::character_roster::sources::preload_epoch();
-    let menu = crate::runtime::p1::compat::sync::read(&training_mod_consts::MENU);
+    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     let mut lanes = [[None; MAX_TARGETS]; 4];
     if settings.hats {
         lanes[0] = crate::runtime::roster::kirby_hats::preload_targets(&menu, 0);
