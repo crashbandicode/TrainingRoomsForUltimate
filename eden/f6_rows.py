@@ -54,6 +54,14 @@ def settings(out):
     print(out, len(CATALOG), "catalog entries")
 
 
+def native_complete(line, role):
+    # The exact-owner adapters also own ordinary native reloads in this build.
+    # Their ready event follows physical readiness, publication and lease release.
+    adapter = "MiiOrdinaryPlayer" if role == 0 else "MiiOrdinaryCpu"
+    return (f"[CharacterRoster] complete owner={role}" in line or
+            (f"[{adapter}] ready ticket=" in line and "released=true" in line))
+
+
 def laps(args):
     bootstrap = getattr(args, "bootstrap", False)
     # Use the shared, reviewed harness; do not start or claim an instance here.
@@ -86,7 +94,7 @@ def laps(args):
         deadline = time.time() + cap
         while time.time() < deadline:
             for line in read()[start:]:
-                if needle in line:
+                if (needle(line) if callable(needle) else needle in line):
                     return line
             time.sleep(1.0)
         return None
@@ -98,6 +106,10 @@ def laps(args):
             return f"shot failed: {exc}"
 
     start = 0
+    if args.native_reload and not any(
+            "[CyclePreload] loaded slots=0 " in line and "bank_members=0 group_swap=false" in line
+            for line in read()):
+        raise SystemExit("GATE FAIL: native baseline preload/bank Off was not observed; no cycle inputs sent")
     if not args.native_reload and not bootstrap:
         ready = wait_for(start, "[GroupSwap] prefetched", args.settle)
         if ready is None:
@@ -112,7 +124,8 @@ def laps(args):
             session.press("zl,right" if role == 0 else "zl,left", 200)
             queued = wait_for(m, f"[CharacterRoster] queued owner={role}", 8)
             completion = "[CharacterRoster] complete" if args.native_reload else "[BodyBank] ready"
-            done = wait_for(m, f"{completion} owner={role}", 20)
+            done = wait_for(m, (lambda line: native_complete(line, role)) if args.native_reload
+                            else f"{completion} owner={role}", 20)
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
             rec = {"phase": "bootstrap" if bootstrap else "lap", "role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,

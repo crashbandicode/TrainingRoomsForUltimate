@@ -14,12 +14,15 @@ spec.loader.exec_module(rows)
 
 
 class Rows(unittest.TestCase):
-    def run_rows(self, native, complete, prefetch=True, bootstrap=False, observed=True):
+    def run_rows(self, native, complete, prefetch=True, bootstrap=False, observed=True, native_off=True):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "route.py").touch()
             diag = root / "practice-diagnostics.log"
             diag.write_text("[GroupSwap] prefetched\n" if prefetch else "")
+            if native and native_off:
+                with diag.open("a") as stream:
+                    stream.write("[CyclePreload] loaded slots=0 fighters=true bank_members=0 group_swap=false\n")
             if bootstrap and observed:
                 with diag.open("a") as stream:
                     stream.write("[CharacterRoster] observed owner=0\n[CharacterRoster] observed owner=1\n")
@@ -89,6 +92,18 @@ class Rows(unittest.TestCase):
         self.assertEqual(len(presses), 2)
         self.assertEqual(len(records), 2)
         self.assertTrue(all("[CharacterRoster] complete owner=0" in row["done"] for row in records))
+
+    def test_native_baseline_refuses_unproved_off_configuration(self):
+        presses, records, error = self.run_rows(True, True, native_off=False)
+        self.assertEqual((presses, records), ([], []))
+        self.assertIn("Off was not observed", error)
+
+    def test_native_owner_ready_requires_matching_role_and_released_lease(self):
+        line = "536782616 #307 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 2, entry: 76769632256, sequence: 1 } target=0x2d index=0 resource=[00] released=true saved_files_written=false"
+        self.assertTrue(rows.native_complete(line, 0))
+        self.assertFalse(rows.native_complete(line, 1))
+        self.assertFalse(rows.native_complete(line.replace("released=true", "released=false"), 0))
+        self.assertFalse(rows.native_complete(line.replace("] ready ticket=", "] bank ready ticket="), 0))
 
 
 if __name__ == "__main__":
