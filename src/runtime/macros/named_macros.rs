@@ -399,6 +399,12 @@ pub fn clip_foreground() -> bool {
 pub fn naming_pending() -> bool { NAME_JOB.lock().unwrap().is_some() }
 
 fn request_native_name() {
+    // Diag build: the software keyboard is a modal library applet; a headless Eden run opens it only when `diag-keyboard.on` exists in the data
+    // folder (the keyboard row answers it through Eden's control API); otherwise the rows confirm the name with `diag_confirm_name`.
+    #[cfg(feature = "diag")]
+    if !std::path::Path::new("sd:/ultimate/TrainingRooms/diag-keyboard.on").exists() {
+        return;
+    }
     if suspended() || crate::runtime::mii::native_keyboard::busy() || naming_pending() { return; }
     let values = {
         let ui = lock_read(&UI);
@@ -1476,4 +1482,10 @@ fn training_mod_macros_max_frames() -> usize {
 pub fn diag_confirm_name(name: &str) {
     let effect = lock_write(&UI).confirm_native_name(name.to_owned());
     apply_effect(effect);
+}
+
+/// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).
+#[cfg(feature = "diag")]
+pub fn diag_export_slot(slot: usize) {
+    export_record_slot(Some(slot));
 }

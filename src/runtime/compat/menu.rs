@@ -1,10 +1,9 @@
 //! The typed menu view behind the carried code's `MENU` global (decision D1).
 //!
-//! The settings live as rows in the clean room (`model::settings::Settings`); package 5's commit path publishes them and
-//! calls [`apply`] with the committed settings (so does boot, once they are loaded). [`apply`] parses the typed view (the rows and
-//! the kept keys of the menu object) and the top-level kept keys the carried engines read (`stage_preferences`,
-//! `mii_preferences`) once, on the committing thread; a hook or tick reads the stored
-//! copy with `read(&MENU)` and allocates nothing. Before the first [`apply`] the factory values are what a reader gets.
+//! The settings live as rows in the clean room (`model::settings::Settings`); `published::publish` feeds the rows into the typed
+//! view through [`apply_snapshot`] (boot, every commit, the diag reload: the one path), and [`apply_kept`] adds what a `Snapshot` does not
+//! carry (the saved defaults and the kept keys `stage_preferences`, `mii_preferences`) once, on the committing thread; a hook or tick reads
+//! the stored copy with `read(&MENU)` and allocates nothing. Before the first publish the factory values are what a reader gets.
 //!
 //! The carried engines also change the menu: the roster cycle records the fighter it swapped to, the preload INI overlays its keys.
 //! `assign(&MENU, menu)` and the guard of `lock_write(&MENU)` store the changed typed view and write the rows and kept keys that
@@ -17,7 +16,7 @@ use parking_lot::{Mutex, RwLock};
 use crate::engine::compat::menu::{TrainingModpackMenu, BASE_MENU};
 use crate::engine::mii::selection::Preferences as MiiPreferences;
 use crate::engine::stages::stage_menu::Preferences as StagePreferences;
-use crate::model::settings::Settings;
+use crate::model::settings::{Settings, Snapshot};
 use crate::runtime::compat::sync::{Assignable, Lockable, Readable};
 
 struct Current {
@@ -137,17 +136,29 @@ fn kept<T: serde::de::DeserializeOwned + Default>(settings: &Settings, key: &str
     settings.extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
 }
 
-/// Publish the committed settings to the carried engines (called after they are published, from the commit path and boot).
-pub fn apply(settings: &Settings) {
-    let next = Current {
-        menu: TrainingModpackMenu::from_snapshot(&settings.menu),
+/// The settings-only part of the typed view, after `published::publish` fed the rows: the saved defaults and the two kept keys
+/// (`stage_preferences`, `mii_preferences`), which a `Snapshot` does not carry. Called after the publish at boot, at every commit and
+/// by the diag reload; the menu rows themselves reach `MENU` only through [`apply_snapshot`] (one path).
+pub fn apply_kept(settings: &Settings) {
+    let mut current = CURRENT.write();
+    let menu = current.take().map_or_else(|| TrainingModpackMenu::from_snapshot(&settings.menu), |c| c.menu);
+    *current = Some(Current {
+        menu,
         defaults: TrainingModpackMenu::from_snapshot(&settings.defaults),
         stage: kept(settings, "stage_preferences"),
         mii: kept(settings, "mii_preferences"),
-    };
-    *CURRENT.write() = Some(next);
+    });
 }
 
+/// The typed menu view of a published snapshot (`published::publish`: boot, every commit, the diag reload): the one path that feeds the
+/// rows the carried code reads (Macro Source, Ask before switching fighter, the Solo Popo and preload rows) into `MENU`. The saved
+/// defaults and the kept stage and Mii preferences stay as they were ([`apply_kept`] refreshes them).
+pub fn apply_snapshot(menu: &Snapshot) {
+    let mut current = CURRENT.write();
+    let (defaults, stage, mii) =
+        current.take().map_or_else(|| (BASE_MENU, StagePreferences::default(), MiiPreferences::default()), |c| (c.defaults, c.stage, c.mii));
+    *current = Some(Current { menu: TrainingModpackMenu::from_snapshot(menu), defaults, stage, mii });
+}
 /// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
 pub fn stage_preferences() -> StagePreferences {
     CURRENT.read().as_ref().map_or_else(StagePreferences::default, |current| current.stage)

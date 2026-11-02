@@ -138,9 +138,14 @@ fn clip_of(name: &str, number: i32) -> Option<ClipAction> {
     })
 }
 
-/// Run the pending command, if any (the CPU body's frame, the game thread).
+/// Run the pending command, if any (the CPU body's frame, the game thread). A command is an event (a save, a panel step): its allocations
+/// are the per-load kind of the hook counter (hook_stats::per_load), apart from the steady-state ones that must stay 0.
 pub(crate) fn run_pending() {
     let Some(command) = PENDING.lock().take() else { return };
+    crate::model::hook_stats::per_load(|| run(command));
+}
+
+fn run(command: Command) {
     let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
     match command.kind {
         SAVE_SLOT => {

@@ -76,3 +76,22 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 | Eden: claim/release, one per host, profile copy, waits gated, console scan, run.json/memory.peak kept, profile restored | pass | `eden/EDEN-PACKAGE-4.md` |
 | Workarounds | none shipped; open decisions: status names (SPEC-input-02 question 1), `CONT_SPECIAL_S` placeholder (kept by the lead's ruling for parity) |
 | Slip | seven builds on the Yoga beside pkg5's Eden (disclosed in `IMPLEMENTATION-PROGRESS-pkg4.md`) |
+
+## S4-4: named macros, replay store, live capture adapter, replay window (2026-11-02)
+
+| Requirement | Host test | Eden row (label) |
+| --- | --- | --- |
+| Named lockout, capture from frame 0, buffer read-back, stop chord, named playback, mirroring, maximum length | `tests/input_named.rs` (8) | s4-04 named rows |
+| The carried macros crate and panel models keep their tests (library, recording, window, move crop, capture archive, shared capture, macro panel, clip panel) | `cargo test --lib engine::macros engine::macro_ui` | - |
+| The vendored match-data crate's own tests | `cargo test --manifest-path crates/smash-match-data/Cargo.toml` (22) | - |
+| Carried files equal the manifest, ledger generated | `tests/carry_pkg4.rs` | - |
+| Every game call of the layer is a guarded row | `tests/pkg6_smash_calls.rs`, `tests/input_sites.rs` (23 package-4 rows against the owned ELF) | install line `control_get_button=stock` ... |
+| Stick direction bits of the controller record | `tests/input04.rs` `the_button_set_reads_the_dpad_and_both_sticks_digital_directions` | - |
+| Typed menu rows fighter_prompt, macro_source | `compat::menu` test `the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots` | - |
+| HUD plan diag line is coalesced | `model::input_display::plan_log_gate_tests` (3) | R5 delta in s4-04 |
+| Save slot to library writes the slot's frames; load follows selected.txt | `named_macros` / `Library` (carried tests) | s4-04 |
+| Live capture adapter installs only on guards and capture on | seam table tests (package 6) | s4-03: `guarded live adapter ready capture=on save=entry` |
+| Replay window lists a capture and crops a macro | carried `ClipEditor` / `SharedCaptureArchive` tests | s4-04 (seeded fork capture) |
+
+Online review (read-only rules): the layer runs only in Training and the practice session (`scene::is_training`, `macros::ready`); the live capture hooks observe the game's native replay recorder
+(no write to simulated state; they do not draw or reorder checked randoms). Not yet reviewed in a two-console run (the hooks are installed only when `replay_capture.ini` says on).

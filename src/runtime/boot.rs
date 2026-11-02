@@ -111,7 +111,7 @@ pub fn run() {
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
     // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
-    crate::runtime::compat::menu::apply(&loaded);
+    crate::runtime::compat::menu::apply_kept(&loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
 

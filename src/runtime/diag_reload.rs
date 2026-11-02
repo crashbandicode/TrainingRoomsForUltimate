@@ -48,5 +48,5 @@ fn poll() {
     let rerolls = menu::rerolls_between(&old, &next);
     diagnostic(format_args!("[TrainingRooms] diag_settings_reload rerolls={rerolls:#x} issues={}", loaded.issues.len()));
     published::publish(&next, rerolls);
-    crate::runtime::compat::menu::apply(&loaded.settings);
+    crate::runtime::compat::menu::apply_kept(&loaded.settings);
 }

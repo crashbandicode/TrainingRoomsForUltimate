@@ -466,7 +466,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "248df8931ecd9702672a713c5cb4acc42c7928b50880b728d5a8690011bc2041",
+   "dest_sha256": "d9f4ca75ff8405311d72b801cd97f9ba76614a6f3082edd0eab9c038e5311a18",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -542,6 +542,15 @@
     {
      "append": "\n/// Diag build only: the keyboard's confirmed-name path without the applet (`service_keyboard` does exactly this with the typed text).\n#[cfg(feature = \"diag\")]\npub fn diag_confirm_name(name: &str) {\n    let effect = lock_write(&UI).confirm_native_name(name.to_owned());\n    apply_effect(effect);\n}\n",
      "reason": "Eden rows drive the panel through the diag request file (runtime/macros/diag.rs): the software keyboard applet is not part of what they prove"
+    },
+    {
+     "old": "fn request_native_name() {\n",
+     "new": "fn request_native_name() {\n    // Diag build: the software keyboard is a modal library applet; a headless Eden run opens it only when `diag-keyboard.on` exists in the data\n    // folder (the keyboard row answers it through Eden's control API); otherwise the rows confirm the name with `diag_confirm_name`.\n    #[cfg(feature = \"diag\")]\n    if !std::path::Path::new(\"sd:/ultimate/TrainingRooms/diag-keyboard.on\").exists() {\n        return;\n    }\n",
+     "reason": "Eden rows: the keyboard applet freezes a headless run unless a row answers it (first run froze on `NativeKeyboard begin`); with diag-keyboard.on the real applet path is exercised"
+    },
+    {
+     "append": "\n/// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).\n#[cfg(feature = \"diag\")]\npub fn diag_export_slot(slot: usize) {\n    export_record_slot(Some(slot));\n}\n",
+     "reason": "named entry point of the diag request file"
     }
    ]
   },

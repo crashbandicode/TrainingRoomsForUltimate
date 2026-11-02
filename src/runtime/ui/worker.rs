@@ -231,7 +231,7 @@ fn close(menu: &mut Menu) {
     let settings = menu.commit().clone();
     published::publish(&settings.menu, outbox.rerolls);
     // The carried engines read the typed view of the committed settings (decision D1).
-    crate::runtime::compat::menu::apply(&settings);
+    crate::runtime::compat::menu::apply_kept(&settings);
     let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
