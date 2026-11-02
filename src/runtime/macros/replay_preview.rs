@@ -1,6 +1,6 @@
 //! Native input preview, using the existing Training save-state/playback paths.
 //! UI requests carry values only. Game-object work runs on the CPU callback.
-use std::sync::{atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering}, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use smash::app::{self, BattleObjectModuleAccessor, Fighter};
 use {crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 
@@ -53,7 +53,7 @@ fn take_request() -> Option<Request> {
 }
 fn discard_requests() { let _ = take_request(); }
 
-static SESSION: Mutex<Option<Session>> = Mutex::new(None);
+static SESSION: hos_lock::Mutex<Option<Session>> = hos_lock::Mutex::new(None);
 static STATUS: AtomicU8 = AtomicU8::new(0);
 
 pub fn request_play(recording: MacroRecording, revision: u64) {
@@ -84,12 +84,12 @@ pub fn recovery_available() -> bool {
     ACTIVE.load(Ordering::Acquire) && STATUS.load(Ordering::Acquire) == 5
 }
 pub fn start_context() -> Option<StartState> {
-    SESSION.lock().unwrap().as_ref().filter(|s| matches!(s.phase, Phase::Starting | Phase::Playing))
+    SESSION.lock().as_ref().filter(|s| matches!(s.phase, Phase::Starting | Phase::Playing))
         .map(|s| s.start)
 }
 pub fn can_emit(module: &mut BattleObjectModuleAccessor) -> bool {
     !request_pending()
-        && SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Playing
+        && SESSION.lock().as_ref().is_some_and(|s| s.phase == Phase::Playing
             && s.cpu == Some((module.battle_object_id, module as *mut _ as usize)))
         && crate::runtime::macros::named_macros::hook_queries().clip_foreground
 }
@@ -111,7 +111,7 @@ pub fn needs_native_update(_module: &BattleObjectModuleAccessor) -> bool { occup
 
 pub fn clear_session() {
     discard_requests();
-    SESSION.lock().unwrap().take();
+    SESSION.lock().take();
     ACTIVE.store(false, Ordering::Release);
     save_states::end_preview_restore();
     STATUS.store(0, Ordering::Relaxed);
@@ -120,21 +120,21 @@ pub fn clear_session() {
 unsafe fn fail(message: &'static str) {
     input_record::stop_playback();
     discard_requests();
-    let was_running = SESSION.lock().unwrap().as_ref().is_some_and(|s|
+    let was_running = SESSION.lock().as_ref().is_some_and(|s|
         matches!(s.phase, Phase::Playing | Phase::Complete));
     if was_running {
         request_stop();
     } else if save_states::is_loading() {
         // A deadline is not a successful restore. Let native sleep/buff/partner
         // cleanup continue, without injection or autoplay, until reset/departure.
-        if let Some(s) = SESSION.lock().unwrap().as_mut() { s.phase = Phase::Failed; }
+        if let Some(s) = SESSION.lock().as_mut() { s.phase = Phase::Failed; }
     } else { clear_session(); }
     STATUS.store(5, Ordering::Relaxed);
     crate::runtime::macros::replay_capture::post_preview_failed(message);
 }
 
 pub fn progress(consumed: usize) {
-    let revision = SESSION.lock().unwrap().as_ref()
+    let revision = SESSION.lock().as_ref()
         .filter(|s| s.phase == Phase::Playing).map(|s| s.revision);
     if let Some(revision) = revision {
         crate::runtime::macros::replay_capture::preview_progress(revision, consumed as u32);
@@ -142,7 +142,7 @@ pub fn progress(consumed: usize) {
 }
 
 pub fn complete() {
-    if let Some(s) = SESSION.lock().unwrap().as_mut() {
+    if let Some(s) = SESSION.lock().as_mut() {
         s.phase = Phase::Complete;
         STATUS.store(3, Ordering::Relaxed);
         println!("[ClipPreview] inputs_complete revision={} frames={}", s.revision, s.playback.len);
@@ -168,7 +168,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
         clear_session();
         return;
     }
-    let replaced = SESSION.lock().unwrap().as_ref().is_some_and(|s|
+    let replaced = SESSION.lock().as_ref().is_some_and(|s|
         matches!(s.phase, Phase::Playing | Phase::Complete)
             && (s.cpu != Some((module.battle_object_id, module as *mut _ as usize))
                 || s.kind != app::utility::get_kind(module)));
@@ -179,7 +179,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
         crate::runtime::macros::replay_capture::post_preview_failed("Preview fighter changed; reset Training before retrying");
         return;
     }
-    if SESSION.lock().unwrap().as_ref().is_some_and(|s| s.phase == Phase::Playing)
+    if SESSION.lock().as_ref().is_some_and(|s| s.phase == Phase::Playing)
         && !crate::runtime::macros::named_macros::hook_queries().clip_foreground { request_stop(); }
     // A queued restore owns the native loader until completion. Keep only the
     // newest UI request, then handle it once the current restore is finished.
@@ -195,7 +195,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
             }
             input_record::stop_playback();
             ACTIVE.store(true, Ordering::Release);
-            *SESSION.lock().unwrap() = Some(Session {
+            *SESSION.lock() = Some(Session {
                 start, playback, revision, phase: Phase::Starting, waits: 0, cpu: None,
                 kind: app::utility::get_kind(module),
             });
@@ -204,7 +204,7 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
         }
         Some(Request::Stop) if occupied() => {
             input_record::stop_playback();
-            if let Some(s) = SESSION.lock().unwrap().as_mut() {
+            if let Some(s) = SESSION.lock().as_mut() {
                 s.phase = Phase::Stopping;
                 s.waits = 0;
             }
@@ -221,7 +221,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
     if !practice::enabled() || !primary_cpu(module) { return; }
     let loading = save_states::is_loading();
     let action = {
-        let mut session = SESSION.lock().unwrap();
+        let mut session = SESSION.lock();
         let Some(s) = session.as_mut() else { return };
         if s.phase == Phase::Failed {
             if loading { return; }
@@ -256,7 +256,7 @@ pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
         }
         Some(Ok(None)) => {
             discard_requests();
-            SESSION.lock().unwrap().take();
+            SESSION.lock().take();
     ACTIVE.store(false, Ordering::Release);
             save_states::finish_preview_restore();
             STATUS.store(0, Ordering::Relaxed);

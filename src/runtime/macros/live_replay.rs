@@ -19,7 +19,7 @@ use {crate::engine::macros::CaptureToggle, crate::engine::macros::LiveFrame, cra
 static BASE: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "named-input-trace")]
 static CLOCK_TRACE_LEFT: AtomicUsize = AtomicUsize::new(0);
-static CAPTURE: Mutex<Capture> = Mutex::new(Capture {
+static CAPTURE: hos_lock::Mutex<Capture> = hos_lock::Mutex::new(Capture {
     native_state: 0, epoch: 0, clock: None, pool: HookPool::new(), owner: RecordOwnership::new(),
     pending: [None; 8], saves: VecDeque::new(),
 });
@@ -254,19 +254,19 @@ impl Capture {
 
 #[skyline::hook(offset = 0x17587a0)]
 unsafe fn construct_records(interface: usize) {
-    CAPTURE.lock().unwrap().reset_pool(0);
+    CAPTURE.lock().reset_pool(0);
     original!()(interface);
 }
 
 #[skyline::hook(offset = 0x1759110)]
 unsafe fn clear_records(interface: usize) {
-    CAPTURE.lock().unwrap().reset_pool(0);
+    CAPTURE.lock().reset_pool(0);
     original!()(interface);
 }
 
 unsafe fn invalidate_owner(manager: usize) {
     if let Some(state) = borrowed_state(manager + 0x588) {
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         if capture.native_state == state { capture.reset_pool(0); }
     }
 }
@@ -289,7 +289,7 @@ unsafe fn delete_records(manager: usize) {
 #[skyline::hook(offset = 0x175ba4c, inline)]
 unsafe fn replace_record(ctx: &mut InlineCtx) {
     if let Some(native) = native(ctx.registers[0].x() as usize) {
-        CAPTURE.lock().unwrap().invalidate(native);
+        CAPTURE.lock().invalidate(native);
     }
 }
 
@@ -300,7 +300,7 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
     let Some(native) = native(state).filter(|native| native.recording) else {
         return result;
     };
-    let mut capture = CAPTURE.lock().unwrap();
+    let mut capture = CAPTURE.lock();
     if capture.native_state != state { capture.reset_pool(state); }
     capture.epoch += 1;
     capture.clock = None;
@@ -338,7 +338,7 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
 #[skyline::hook(offset = 0x17594b0)]
 unsafe fn reset_current_record(interface: usize, flags: u32) {
     if let Some(native) = borrowed_state(interface).and_then(|state| native(state)) {
-        CAPTURE.lock().unwrap().invalidate(native);
+        CAPTURE.lock().invalidate(native);
     }
     original!()(interface, flags);
 }
@@ -348,7 +348,7 @@ unsafe fn import_record(ctx: &mut InlineCtx) {
     // Validation has passed; native now clears state then appends to this slot.
     // x21 is the live state. Failed, non-mutating validation retains its capture.
     if let Some(native) = native(ctx.registers[21].x() as usize) {
-        CAPTURE.lock().unwrap().invalidate(native);
+        CAPTURE.lock().invalidate(native);
     }
 }
 
@@ -356,17 +356,17 @@ unsafe fn import_record(ctx: &mut InlineCtx) {
 // written; compare it only as a token. Inline observers do not change registers.
 #[skyline::hook(offset = 0x14f37ec, inline)]
 unsafe fn stop_recording(ctx: &mut InlineCtx) {
-    CAPTURE.lock().unwrap().stop(ctx.registers[8].x() as usize, false);
+    CAPTURE.lock().stop(ctx.registers[8].x() as usize, false);
 }
 
 #[skyline::hook(offset = 0x1503af8, inline)]
 unsafe fn stop_recording_alternate(ctx: &mut InlineCtx) {
-    CAPTURE.lock().unwrap().stop(ctx.registers[8].x() as usize, false);
+    CAPTURE.lock().stop(ctx.registers[8].x() as usize, false);
 }
 
 #[skyline::hook(offset = 0x134be18, inline)]
 unsafe fn reset_recording(ctx: &mut InlineCtx) {
-    CAPTURE.lock().unwrap().stop(ctx.registers[8].x() as usize, true);
+    CAPTURE.lock().stop(ctx.registers[8].x() as usize, true);
 }
 
 // Native's successful FRAM publication appends the complete frame buffer to the
@@ -376,7 +376,7 @@ unsafe fn reset_recording(ctx: &mut InlineCtx) {
 #[skyline::hook(offset = 0x175b1bc, inline)]
 unsafe fn publish_record_frames(ctx: &mut InlineCtx) {
     let Some(native) = native(ctx.registers[22].x() as usize) else { return };
-    let mut capture = CAPTURE.lock().unwrap();
+    let mut capture = CAPTURE.lock();
     if capture.native_state != native.state || !native.recording { return; }
     // Armed or not, only the owned record's own publication ends it (R1); a pool
     // key is absent for unarmed records and for armed ones already copied.
@@ -393,7 +393,7 @@ unsafe fn publish_record_frames(ctx: &mut InlineCtx) {
 unsafe fn serialize_frame(interface: usize) -> u32 {
     let state = borrowed_state(interface);
     let epoch = {
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         if state == Some(capture.native_state) {
             #[cfg(feature = "named-input-trace")]
             trace_clock(&capture, "serializer_enter", -1);
@@ -404,7 +404,7 @@ unsafe fn serialize_frame(interface: usize) -> u32 {
     let result = original!()(interface);
     if let (Some(state), Some(epoch)) = (state, epoch) {
         let observed = native(state);
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         if capture.epoch == epoch && capture.native_state == state {
             match observed {
                 Some(native) if native.recording && capture.owner.owns_record(state, native.index) => {
@@ -433,7 +433,7 @@ unsafe fn serialize_frame(interface: usize) -> u32 {
 #[skyline::hook(offset = 0x143cd40)]
 unsafe fn copy_record(actor: usize) {
     let epoch = {
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         capture.forget_actor(actor);
         capture.epoch
     };
@@ -450,7 +450,7 @@ unsafe fn copy_record(actor: usize) {
         crate::engine::mii::replay::HEADER_LEN);
     let miis = crate::engine::mii::replay::ReplayMiis::parse_inner(header).map_err(|error|
         println!("[ReplayCapture] Mii metadata unavailable: {error}")).ok();
-    let mut capture = CAPTURE.lock().unwrap();
+    let mut capture = CAPTURE.lock();
     // Reject any lifecycle transition during native's copy. Never look up a new
     // incarnation and attach it to payload copied before the transition.
     if capture.epoch != epoch { return; }
@@ -472,13 +472,13 @@ unsafe fn copy_record(actor: usize) {
 // through the caller's holder. This fences allocator reuse without guessing an ABI.
 #[skyline::hook(offset = 0x143e984, inline)]
 unsafe fn create_save_actor(ctx: &mut InlineCtx) {
-    CAPTURE.lock().unwrap().forget_actor(ctx.registers[0].x() as usize);
+    CAPTURE.lock().forget_actor(ctx.registers[0].x() as usize);
 }
 
 #[skyline::hook(offset = 0x143e9a0)]
 unsafe fn destroy_save_actor(holder: usize) {
     // Native clears *holder and frees the actor, path strings and copied payload.
-    CAPTURE.lock().unwrap().forget_actor(read::<usize>(holder));
+    CAPTURE.lock().forget_actor(read::<usize>(holder));
     original!()(holder);
 }
 
@@ -486,7 +486,7 @@ unsafe fn destroy_save_actor(holder: usize) {
 unsafe fn update_save_actor(actor: usize) -> u32 {
     let result = original!()(actor);
     // Native returns actor+0x108: zero while running, nonzero at terminal outcome.
-    if result != 0 { CAPTURE.lock().unwrap().forget_actor(actor); }
+    if result != 0 { CAPTURE.lock().forget_actor(actor); }
     result
 }
 
@@ -540,7 +540,7 @@ unsafe fn observe_save(actor: usize) -> Option<LiveEvent> {
     if read::<u32>(actor + 0xfc) == 0 {
         // Entry queues operation8 and resets its status; an older operation's
         // status1 must never be accepted without seeing this exact queue boundary.
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         if let Some(save) = capture.saves.iter_mut().find(|save| save.actor == actor) {
             save.queued = save.payload == read::<usize>(actor + 0x110)
                 && save.index == read::<u64>(actor + 0x190);
@@ -550,7 +550,7 @@ unsafe fn observe_save(actor: usize) -> Option<LiveEvent> {
     let status: u32 = read(actor + 0x11c);
     if status == 0 { return None; }
     let saved = {
-        let mut capture = CAPTURE.lock().unwrap();
+        let mut capture = CAPTURE.lock();
         capture.saves.iter().position(|save| save.actor == actor)
             .and_then(|index| capture.saves.remove(index))
     };
@@ -606,7 +606,7 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
+    let mut capture = CAPTURE.lock();
     capture.pending[entry as usize] = None;
     if !live_scene() { return; }
     let Some(tick) = capture.clock else { return };
@@ -633,7 +633,7 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut capture = CAPTURE.lock().unwrap();
+    let mut capture = CAPTURE.lock();
     let Some(mut pending) = capture.pending[entry as usize].take() else { return };
     #[cfg(feature = "named-input-trace")]
     trace_clock(&capture, "fighter_after", entry);
@@ -759,7 +759,7 @@ pub fn init() {
                 "[ReplayCapture] live adapter disabled: writer {}", error));
             return;
         }
-        CAPTURE.lock().unwrap().saves.reserve_exact(MAX_RETAINED_CAPTURES);
+        CAPTURE.lock().saves.reserve_exact(MAX_RETAINED_CAPTURES);
         BASE.store(base, Ordering::Release);
         skyline::install_hooks!(construct_records, clear_records, destroy_records, delete_records,
             reset_current_record, import_record, replace_record, start_recording, serialize_frame,

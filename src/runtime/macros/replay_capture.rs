@@ -30,7 +30,7 @@ static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));
 static RELOAD: Mutex<Option<Reload>> = Mutex::new(None);
 static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);
 static CLOSE_ARM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-static CLOSE_INPUT: Mutex<CloseInputGuard> = Mutex::new(CloseInputGuard::new());
+static CLOSE_INPUT: hos_lock::Mutex<CloseInputGuard> = hos_lock::Mutex::new(CloseInputGuard::new());
 #[cfg(feature = "named-input-trace")]
 static CLOSE_TRACE_LEFT: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "named-input-trace")]
@@ -118,7 +118,7 @@ struct VaultHook {
     epoch: u64, recording: bool, truncated: bool, counts: [usize; 8],
     pending: [Option<ReplayFrame>; 8],
 }
-static VAULT_HOOK: Mutex<VaultHook> = Mutex::new(VaultHook {
+static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {
     epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
 });
 static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();
@@ -778,7 +778,7 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
 
 /// Poll once per P1 mapping, including outside Training to discard stale ownership.
 pub fn owns_close_input(in_training: bool, close_held: bool) -> bool {
-    let mut guard = CLOSE_INPUT.lock().unwrap();
+    let mut guard = CLOSE_INPUT.lock();
     let frames = CLOSE_ARM.swap(0, Ordering::AcqRel);
     if frames != 0 { guard.arm(frames); }
     guard.poll(in_training, close_held)
@@ -999,7 +999,7 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
 pub unsafe fn before_frame(fighter: &mut Fighter) {
     crate::runtime::macros::live_replay::before_frame(fighter);
     if !in_replay() || !Fighter::is_ready_go() {
-        let mut hook = VAULT_HOOK.lock().unwrap();
+        let mut hook = VAULT_HOOK.lock();
         if hook.recording {
             post_vault(hook.epoch, VaultEvent::End { epoch: hook.epoch, truncated: hook.truncated });
             hook.recording = false;
@@ -1011,7 +1011,7 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut hook = VAULT_HOOK.lock().unwrap();
+    let mut hook = VAULT_HOOK.lock();
     if !hook.recording {
         hook.epoch += 1;
         hook.recording = true;
@@ -1030,7 +1030,7 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     if app::utility::get_kind(module) == *FIGHTER_KIND_NANA { return; }
     let entry = WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry) { return; }
-    let mut hook = VAULT_HOOK.lock().unwrap();
+    let mut hook = VAULT_HOOK.lock();
     if !hook.recording || hook.truncated { return; }
     let Some(mut sample) = hook.pending[entry as usize].take() else { return };
     let observed = observed_input(module);

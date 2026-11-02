@@ -93,6 +93,22 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- 17:1xZ continuation: exact model Astra medium and existing watcher verified. The first resumed MY_MODEL
+  read again lacked a memory scope; disclosed here, subsequent commands bounded. Full stack_depth.py read.
+- UI HOLD attribution follow-up: current after_layout_draw only publishes scene facts and posts ClipEvent::Draw;
+  port::worker_tick alone calls replay_capture::after_draw. Thus HOLD is already worker-owned on this branch,
+  unlike ui-12's old source. Native-only CLOSE_INPUT/VAULT_HOOK, preview SESSION and live CAPTURE still used
+  std Mutex. Carry transforms now use hos_lock static locks for these four; worker storage unchanged.
+  Carry42 passes. Compile/runtime allocation proof remains OPEN; frozen2330a7a host queue is unchanged.
+- Row driver now waits for worker command receipts/files at save/open transitions, rejects stale output
+  files, and checks all12 named-macro guard outcomes. AST parses; no live acceptance or completed s4-09
+  claim. Preview/placement/actual live Off-to-On match remain outstanding.
+- Yoga raw ledger17:07Z foreign deluxe-elite d02 owns BOTH Surface and Yoga. Shared full parser agrees;
+  no compiler started, no own claim/profile mutation. Own hook_locks2330a7a queue now head but blocked.
+- HEAD4ce6089 adds the narrow Q7 writer-to-toggle request and explicit private harness config. Yoga Switch
+  src/target now staged4ce6089, archive56528b79f6f5e82e1ff188b97aae747d3a36f0d15a27bdabacf8f36f83f11282,
+  ordered diag-4ce6089.ps1 prepared. Older8268f0f source archive retained; never compiled.
+  Host locks2330a7a remains frozen/queued; do not change its gate copy before the run. No own claim.
 - HEAD2330a7a freezes receiver-resolution fix and regression fixtures; staged into Yoga own gate/target-gate.
   Queued one cargo test --test hook_locks after pkg6/UI/slim. No claim held. Runtime syntax checks pass
   (rustfmt emit-only, no source formatting). Rust8268f0f remains staged separately in src/target for next Switch compile.

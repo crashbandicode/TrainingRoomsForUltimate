@@ -942,7 +942,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "773aa6a8e4895eebb8199949fb6ef94b89023960df6f186394ab3fc6800c4953",
+   "dest_sha256": "4a61c170360bba99e7263bc2f86c43686bc94fdce928d0da3f3035857caa1197",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1116,6 +1116,28 @@
      "old": "crate::engine::macros::ReplayTrack, ",
      "new": "",
      "reason": "Design C: ReplayTrack assembly is worker-only pure model logic in VaultArchive"
+    },
+    {
+     "old": "static CLOSE_INPUT: Mutex<CloseInputGuard> = Mutex::new(CloseInputGuard::new());",
+     "new": "static CLOSE_INPUT: hos_lock::Mutex<CloseInputGuard> = hos_lock::Mutex::new(CloseInputGuard::new());",
+     "reason": "Design C: callback-owned CLOSE_INPUT uses the static Horizon lock; no lazy standard-mutex allocation on its first native callback. Worker ownership is unchanged."
+    },
+    {
+     "old": "CLOSE_INPUT.lock().unwrap()",
+     "new": "CLOSE_INPUT.lock()",
+     "reason": "Use the non-poisoning static callback lock for CLOSE_INPUT; preserve every protected access.",
+     "count": 1
+    },
+    {
+     "old": "static VAULT_HOOK: Mutex<VaultHook> = Mutex::new(VaultHook {",
+     "new": "static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {",
+     "reason": "Design C: callback-owned VAULT_HOOK uses the static Horizon lock; no lazy standard-mutex allocation on its first native callback. Worker ownership is unchanged."
+    },
+    {
+     "old": "VAULT_HOOK.lock().unwrap()",
+     "new": "VAULT_HOOK.lock()",
+     "reason": "Use the non-poisoning static callback lock for VAULT_HOOK; preserve every protected access.",
+     "count": 3
     }
    ]
   },
@@ -1124,7 +1146,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "2140fe8745c59aacc6b1ea2948e9ea9eaf34e161235cb56171ac7367331b203a",
+   "dest_sha256": "469cd09081a0d732a9ab3291a49fed1c82bc66b1323cedaa61406f706d4f23c3",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -1263,6 +1285,22 @@
      "old": "crate::runtime::macros::replay_capture::preview_failed(\"Preview start did not settle; restoring the preview setup\");",
      "new": "crate::runtime::macros::replay_capture::post_preview_failed(\"Preview start did not settle; restoring the preview setup\");",
      "reason": "Design C: game preview progress/failure posts Copy notices; only the worker mutates or allocates editor messages"
+    },
+    {
+     "old": "static SESSION: Mutex<Option<Session>> = Mutex::new(None);",
+     "new": "static SESSION: hos_lock::Mutex<Option<Session>> = hos_lock::Mutex::new(None);",
+     "reason": "Design C: callback-owned SESSION uses the static Horizon lock; no lazy standard-mutex allocation on its first native callback. Worker ownership is unchanged."
+    },
+    {
+     "old": "SESSION.lock().unwrap()",
+     "new": "SESSION.lock()",
+     "reason": "Use the non-poisoning static callback lock for SESSION; preserve every protected access.",
+     "count": 13
+    },
+    {
+     "old": "use std::sync::{atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering}, Mutex};",
+     "new": "use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};",
+     "reason": "SESSION now uses the fully qualified static callback lock; remove its unused standard Mutex import."
     }
    ]
   },
@@ -1278,7 +1316,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "e0fa2e3d889a9acab93239f3660dca166b0ecdf999e2265f67e433800482810e",
+   "dest_sha256": "12e744275d1c59d21b55145378a98c5f8edca7da704caa4411ccc6c4048ed2ed",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1449,6 +1487,17 @@
      "old": "    MII_EVENTS.drain(|value| {\n        values.push_back(value);\n    });\n    let at = values.iter().position(|(id, _)| *id == save)?;\n    values.remove(at)?.1.owned()",
      "new": "    let lost = LOST_SERIAL.load(Ordering::Acquire);\n    values.retain(|(_, serial, _)| *serial > lost);\n    MII_EVENTS.drain(|value| {\n        if value.1 > lost { values.push_back(value); }\n    });\n    let at = values.iter().position(|(id, _, _)| *id == save)?;\n    values.remove(at)?.2.owned()",
      "reason": "Retire metadata by event-loss serial so a refused or lost commit cannot retain stale metadata indefinitely"
+    },
+    {
+     "old": "static CAPTURE: Mutex<Capture> = Mutex::new(Capture {",
+     "new": "static CAPTURE: hos_lock::Mutex<Capture> = hos_lock::Mutex::new(Capture {",
+     "reason": "Design C: callback-owned CAPTURE uses the static Horizon lock; no lazy standard-mutex allocation on its first native callback. Worker ownership is unchanged."
+    },
+    {
+     "old": "CAPTURE.lock().unwrap()",
+     "new": "CAPTURE.lock()",
+     "reason": "Use the non-poisoning static callback lock for CAPTURE; preserve every protected access.",
+     "count": 23
     }
    ]
   },
