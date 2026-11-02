@@ -168,3 +168,53 @@ The push waits until the warnings are gone (lead); what remains at each gate is 
 - Gates of `73831b8` (queued), then `stream/sync` merged first when it has commits (no lock call site edited by the integrator;
   package 6 added no new `parking_lot` use: 22 files before and after).
 - Dead-code pass plan sent to the lead (103 release / 122 diag warnings at `bf836c8`, by owner); nothing deleted that a running stream wires.
+
+## Handover (2026-11-02 ~14:05Z, operator order: the lead role moves to a Codex GPT-6 Astra lead)
+
+**Head.** `work/implementation` = `21334c0` (+ this docs commit), local only, never pushed; work tree clean; no claim held (last
+RELEASED 14:00Z), no queue line. It contains, on top of `27d84f4` (pkg2): pkg6 `98d6f5b` and `5e0fab3`, one wrapper per native
+(`2bd47c2`), diag probe features (`73831b8`, `b6c509a`), stream/sync slices 1-3 (`db12705`, `d0ad5e7`, via ui-screens `71ba1f7`), stack
+`f3b89c6` + stack2 `0e5fa23`, the install line (b2: `ff1c62c`, `1c547e6`), pkg4 `4286dc8`, u4b `02aa91e`, ui-screens slice 1 `71ba1f7`
+(reconciled with pkg4's providers + the facts rule), unused-import fix `5b471a6`.
+
+**Gate status of 21334c0.**
+- Host: cargo test 67 binaries, 9,253 passed, 0 failed (hook_locks 3/3 with one PENDING row: recorder REC, pkg4 design C);
+  clippy --all-targets -D warnings 0; --no-default-features ok; crates/smash-match-data 25/0; crates/hos-lock 20/0 (14:00Z, Surface).
+- **Not run on 21334c0:** Switch release + diag, `tools/stack_depth.py` table / budget / entry boot::run (<= 39,321 B), compliance with
+  the release NRO, Switch warning count. Last Switch numbers are at `48eebe1`: release `9c399f4b` 3,317,760 B resident, diag
+  `a3bcb55e` 3,715,072 B; warnings 107 release / 96 diag (5 of the new ones fixed since in `5b471a6` / used since `e9da9de`);
+  stack_depth at 48eebe1: budget 0 over, boot::run 43,792 B (over; stack2's fix merged since, unmeasured), 4 drifted table rows
+  (refreshed by stack2, unmeasured).
+- sloc4 (`/home/intpa/smash-training-lobby/tools/sloc4.py git <work tree> 21334c0 1`): **106,952** implementation lines (src 102,496,
+  crates 4,305, tools 151; tests excluded 28,672; host-only simulator 1,118).
+- Compliance machine rows: the four open rows (guard-checker limit `Site::EMPTY`; README GIF/build/licence, docs/media GIF,
+  HANDOFF.md -> pkg7).
+
+**Known failures / open.** R5 hook allocations (s6-05: +180-210 / 10 s without a swap; pkg6 owns the fix; push held); the hook_locks
+PENDING row (recorder REC: pkg4 design C); dead-code warnings (push held until gone; pkg4 screen entry points listed above stay until
+called); boot::run depth and the thread table to be re-measured on the next Switch build.
+
+**Merge queue, in order (none started):**
+1. pkg6 R5 fix (priority) when pkg6 gates it: stream/pkg6 head now `d517dab` (WIP F9/F11 `d7b89a4`/`03036b7` and later: ask pkg6 for the
+   gated sha). After it lands with ui-screens (already in), send pkg4 (`a93ab192186b224a5`) the work sha so design C resumes.
+2. deluxe `e4432ad` (macros/mod.rs register, features/writer.rs, boot.rs install-line field, tools/feature_matrix.py; small conflicts
+   expected). Then tell the lead to remove its worktree.
+3. hitbox (stream/hitbox head `7131dba`; confirm the gated sha with hitbox).
+4. slim (stream/slim head `cf6004d`; brings tests/size_budget.rs + size-budget.toml: from then on set the ceiling to each merged head's
+   sloc4 count and drop that stream's pending item).
+5. harness (stream/harness head `6ce55ef`; replaces the ledger helpers with one module that accepts `HH:MM:SSZ`).
+6. pbaudit `0275f27` (docs only).
+
+**Next commands** (work tree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work`; target
+`/home/intpa/smash-training-lobby/cargo-targets/trainingrooms-work`; every cargo call `CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never` under
+`systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`, one call each, after a ledger + queue check incl. the interleave
+owners imgui-nvn-sol, tm-f8-terra*, tm-f8-sol*):
+- Switch release then diag of the head (docs/BUILD.md, campaign rustup home), keep the diag
+  `aarch64-skyline-switch/release/libtraining_rooms.so`; then `python3 -I tools/stack_depth.py <so> table`, `... budget`,
+  `... entry '^training_rooms::runtime::boot::run$'` (<= 39,321 B), `python3 -I ~/ssbu-mod-playbook/tools/build/nro_size.py <nro>`,
+  `python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py <work tree> --nro <release nro>`.
+- `git merge --no-ff --no-commit <sha>`; carried files: `python3 -I tools/carry_pkg4.py verify` / `ledger` and tests/carry_pkg6.rs for
+  manifest conflicts (never edit a carried file without its manifest edit); host gates incl. `cargo test --manifest-path
+  crates/smash-match-data/Cargo.toml` and `crates/hos-lock/Cargo.toml` (delete the Cargo.lock those runs create in the crate dirs).
+- After the gates: delete `.../trainingrooms-work/debug/incremental`.
+
