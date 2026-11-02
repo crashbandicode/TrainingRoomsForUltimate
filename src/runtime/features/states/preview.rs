@@ -10,11 +10,11 @@ use crate::runtime::{features::recorder, game::natives, lobby::training::practic
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct Identity {
-    entries: [usize; 2],
-    kinds: [i32; 2],
-    stage: i32,
-    miis: [Option<Configuration>; 2],
+pub(super) struct Identity {
+    pub(super) entries: [usize; 2],
+    pub(super) kinds: [i32; 2],
+    pub(super) stage: i32,
+    pub(super) miis: [Option<Configuration>; 2],
 }
 
 static CHECKPOINT: hos_lock::Mutex<Checkpoint<Identity>> = hos_lock::Mutex::new(Checkpoint::new());
@@ -49,7 +49,7 @@ pub(super) fn service_retirement() {
     }
 }
 
-unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
+pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     if !practice::enabled() || !practice::owned() {
         return Err(NOT_READY);
     }

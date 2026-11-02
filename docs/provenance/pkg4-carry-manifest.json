@@ -485,7 +485,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "c39e231a09477d7806c27927ba52192afae4f9b8803e3386de1ffbeca4232fa1",
+   "dest_sha256": "bc9387009a1e264d19f789a71ae189a841a941ab385d3f3460ba5c8598954766",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -945,6 +945,11 @@
      "old": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),",
      "new": "        clip_foreground: clip_foreground(), naming_pending: naming_pending(),\n        clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),",
      "reason": "Preview anchor lifetime: explicit close intent survives coalesced Stop and retires only after native cleanup; parked editor and crop/export retain their anchor."
+    },
+    {
+     "old": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n",
+     "new": "pub fn waiting_scene_changed(same_lobby: bool) {\n    if !same_lobby {\n        crate::runtime::features::states::retire_setup_session();\n",
+     "reason": "Lead23:07 exact da1 Setup provider: actual new-lobby game callback retires frozen Setup epoch before worker lifecycle handoff; same-lobby interruption preserves target. Preserve Design C worker-only UI retirement and existing preview close intent."
     }
    ]
   },
