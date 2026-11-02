@@ -10,13 +10,14 @@
 //! No heap in the hook (R2-7, playbook): the two working buffers are made once at boot (`prepare`, sized from the
 //! recipe's own header: 529,300 B each) and reused for every load; the retire thread and the parked list are made there
 //! too. A load that finds no free buffer keeps the game's archive (the menu then cannot open, R2-2). The vanilla base of
-//! decision B3 is never copied: the recipe's ranges are read from the `arc:/` file in place.
+//! decision B3 is read once into the second buffer (`build_on_vanilla`: no seek on an `arc:` file), so B3 needs both buffers
+//! free: a load within the grace of the previous one keeps the game's archive.
 //!
 //! The diag build also writes the stock archive to `sd:/ultimate/TrainingRooms/stock/` so the host
 //! builder can derive the recipe from the player's own copy (never shipped in the release NRO).
 
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::Read;
 use std::sync::{Mutex, OnceLock};
 use std::thread::Thread;
 use std::time::Duration;
@@ -24,7 +25,7 @@ use std::time::Duration;
 use skyline::hooks::InlineCtx;
 
 use crate::model::archive_name;
-use crate::model::archive_recipe::{self, Stock, FINGERPRINT_BASIS};
+use crate::model::archive_recipe;
 use crate::model::archive_retire::retire_expired;
 use crate::model::hook_stats::{load_allocations, per_load, HookId, HookScope};
 use crate::model::sites_ui::UI_ARCHIVE_ALLOC_OFFSET;
@@ -174,46 +175,35 @@ fn rebuilt(stock: &[u8], size: usize) -> Option<(Vec<u8>, usize, &'static str)> 
 /// size 451,604 B, path hash40 `0x3575fbb045`, which this string reproduces).
 const VANILLA_PATH: &str = "arc:/ui/layout/info/info_training/info_training/layout.arc";
 
-/// The vanilla archive as a recipe source: fingerprinted in 4 KiB chunks, the copied ranges read in place.
-struct VanillaFile {
-    file: File,
-    len: usize,
-}
-
-impl Stock for VanillaFile {
-    fn len(&self) -> usize {
-        self.len
-    }
-
-    fn fingerprint(&mut self) -> Result<u64, &'static str> {
-        self.file.seek(SeekFrom::Start(0)).map_err(|_| "vanilla base not readable")?;
-        let mut hash = FINGERPRINT_BASIS;
-        let mut chunk = [0u8; 4096];
-        let mut left = self.len;
-        while left > 0 {
-            let want = left.min(chunk.len());
-            self.file.read_exact(&mut chunk[..want]).map_err(|_| "vanilla base not readable")?;
-            hash = archive_recipe::fingerprint_extend(hash, &chunk[..want]);
-            left -= want;
-        }
-        Ok(hash)
-    }
-
-    fn read_at(&mut self, offset: usize, out: &mut [u8]) -> Result<(), &'static str> {
-        self.file.seek(SeekFrom::Start(offset as u64)).map_err(|_| "vanilla base not readable")?;
-        self.file.read_exact(out).map_err(|_| "vanilla base not readable")
-    }
-}
-
-/// Rebuild into `out` from the vanilla file; its length when it worked.
+/// Rebuild into `out` from the vanilla file; its length when it worked. The file is read once, front to back, into a second
+/// working buffer (one `read` loop, no `seek` and no `fstat`: Eden s5-21 and s5-22 saw the game's file layer read null pointers,
+/// 128 and 430 times, after those calls on an `arc:` file). The vanilla length is the recipe's own stock length.
 fn build_on_vanilla(out: &mut Vec<u8>) -> Result<usize, &'static str> {
-    // The length is the recipe's own (the stock archive it was made for): no `fstat` on the `arc:` file (Eden s5-21 saw 128 null
-    // reads from the game's file layer after one), and a shorter file simply fails its reads.
     let len = archive_recipe::header(RECIPE)?.stock_len;
-    let file = File::open(VANILLA_PATH).map_err(|_| "vanilla base not readable")?;
-    let mut vanilla = VanillaFile { file, len };
-    archive_recipe::build_into(&mut vanilla, RECIPE, out)?;
-    Ok(len)
+    let Some(mut scratch) = take_buffer() else { return Err("no free second archive buffer") };
+    let result = read_vanilla(&mut scratch, len).and_then(|()| {
+        let mut source: &[u8] = &scratch;
+        archive_recipe::build_into(&mut source, RECIPE, out)
+    });
+    give_back(scratch);
+    result.map(|()| len)
+}
+
+/// Fill `buffer` with the first `len` bytes of the vanilla archive (it never grows: `len` is within its boot capacity).
+fn read_vanilla(buffer: &mut Vec<u8>, len: usize) -> Result<(), &'static str> {
+    if len > buffer.capacity() {
+        return Err("vanilla base larger than the boot buffer");
+    }
+    let mut file = File::open(VANILLA_PATH).map_err(|_| "vanilla base not readable")?;
+    buffer.resize(len, 0);
+    let mut filled = 0;
+    while filled < len {
+        match file.read(&mut buffer[filled..]) {
+            Ok(0) | Err(_) => return Err("vanilla base not readable"),
+            Ok(n) => filled += n,
+        }
+    }
+    Ok(())
 }
 
 /// Park the rebuilt archive until its grace is over. No allocation: the list's room and the retire thread were made at
