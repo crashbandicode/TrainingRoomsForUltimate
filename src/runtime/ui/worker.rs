@@ -376,6 +376,8 @@ fn sync_panels(s: &mut Session) {
 }
 
 /// Take the owned catalog published by package 6; never inspect a native owner from the worker.
+// Catalog construction scratch is dead before the subsequent capture-browser I/O.
+#[inline(never)]
 fn sync_mii(s: &mut Session) {
     let Some(menu) = s.menu.as_ref() else { return };
     let class = match menu.screen() {

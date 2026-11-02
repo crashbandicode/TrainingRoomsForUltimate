@@ -219,7 +219,8 @@ pub(crate) mod slots {
             buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
             rstick_x: frame.rstick_x, rstick_y: frame.rstick_y,
         }).collect();
-        let transfer = SlotTransfer::import(slot, &frames, origin).map_err(|error| error.message())?;
+        let mut transfer = SlotTransfer::export(slot);
+        transfer.fill_import(slot, &frames, origin).map_err(|error| error.message())?;
         enqueue(transfer, Completion::Import { name: recording.name.clone(), slot });
         Ok(())
     }

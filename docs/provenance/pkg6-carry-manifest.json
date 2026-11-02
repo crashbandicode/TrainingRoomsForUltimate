@@ -1117,12 +1117,70 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "9c0def1eaf158115c4ea0d3af249daaf9924b38662d910faa1b6c788d4861285",
+   "dest_sha256": "3a323f7da6cf82d9451862fa90a4a0ee00bee29277e4121a2e59f7d56caac163",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
      "new": "    let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);\n",
      "reason": "R5 / fix ledger F10: the preload planner's Player lane (the ordinary Mii owner's `mixed_targets`) built a Vec per planning step inside the fighter-frame hook scope (Eden s6-07 bisection: ~22 allocations a second with fighters preloaded, none with hats only and none with preload off); the lists are allocation-free and the Mii preferences are read in place"
+    },
+    {
+     "old": "fn matches(target: Target, live: Identity) -> bool {\n    match (target, live) {\n        (Target::Fighter(kind), Identity::Fighter(current)) => {\n            Forms::starting(kind).same_group(current)\n        }\n        (Target::Saved(choice), Identity::Saved(current)) => choice.canonical == current,\n        _ => false,\n    }\n}\n\n",
+     "new": "/// The ordered roster keeps every fighter position, but saved payloads exist\n/// only for the three real Mii classes, already deduplicated by the traversal.\nstruct CycleChoices {\n    kinds: crate::engine::compat::fixed::FixedList<u32, { crate::engine::swap::trio::CHOICES.len() }>,\n    saved: [Option<Choice>; 3],\n}\nimpl CycleChoices {\n    fn new() -> Self {\n        Self { kinds: crate::engine::compat::fixed::FixedList::new(0), saved: [None; 3] }\n    }\n    fn class_index(class: MiiClass) -> usize {\n        (class.kind() - MiiClass::Brawler.kind()) as usize\n    }\n    fn has_class(&self, class: MiiClass) -> bool {\n        self.saved[Self::class_index(class)].is_some()\n    }\n    fn has_group(&self, forms: Forms) -> bool {\n        self.kinds.iter().any(|kind| MiiClass::from_kind(*kind).is_none() && forms.same_group(*kind))\n    }\n    fn push_fighter(&mut self, kind: u32) { self.kinds.push(kind); }\n    fn push_saved(&mut self, choice: Choice) {\n        let class = choice.canonical.class;\n        if self.kinds.push(class.kind()) {\n            self.saved[Self::class_index(class)] = Some(choice);\n        }\n    }\n    fn matches_kind(&self, kind: u32, live: Identity) -> bool {\n        match (MiiClass::from_kind(kind), live) {\n            (None, Identity::Fighter(current)) => Forms::starting(kind).same_group(current),\n            (Some(class), Identity::Saved(current)) => self.saved[Self::class_index(class)]\n                .is_some_and(|choice| choice.canonical == current),\n            _ => false,\n        }\n    }\n    fn matches_at(&self, index: usize, live: Identity) -> bool {\n        self.kinds.get(index).is_some_and(|kind| self.matches_kind(*kind, live))\n    }\n    fn position(&self, live: Identity) -> Option<usize> {\n        self.kinds.iter().position(|kind| self.matches_kind(*kind, live))\n    }\n    /// Materialize only the selected result, never a roster-sized Target array.\n    fn get(&self, index: usize) -> Option<Target> {\n        let kind = *self.kinds.get(index)?;\n        match MiiClass::from_kind(kind) {\n            Some(class) => self.saved[Self::class_index(class)].map(Target::Saved),\n            None => Some(Target::Fighter(kind)),\n        }\n    }\n    fn first(&self) -> Option<Target> { self.get(0) }\n}\n\n",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "let mut choices = crate::engine::compat::fixed::FixedList::<Target, { crate::engine::swap::trio::CHOICES.len() }>::new(Target::Original);",
+     "new": "let mut choices = CycleChoices::new();",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.iter().any(\n                |target| matches!(target, Target::Saved(choice) if choice.canonical.class == class),\n            )",
+     "new": "choices.has_class(class)",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.push(Target::Saved(choice));",
+     "new": "choices.push_saved(choice);",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.iter().any(\n                    |target| matches!(target, Target::Fighter(other) if forms.same_group(*other)),\n                )",
+     "new": "choices.has_group(forms)",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "choices.push(Target::Fighter(kind));",
+     "new": "choices.push_fighter(kind);",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "            .filter(|i| {\n                choices\n                    .get(*i)\n                    .is_some_and(|target| matches(*target, identity))\n            })\n            .or_else(|| choices.iter().position(|target| matches(*target, identity))),",
+     "new": "            .filter(|i| choices.matches_at(*i, identity))\n            .or_else(|| choices.position(identity)),",
+     "count": 1,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "target: *target,",
+     "new": "target,",
+     "count": 2,
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes."
+    },
+    {
+     "old": "    use crate::engine::mii::selection::{Fallback, Source};\n\n",
+     "new": "    use crate::engine::mii::selection::{Fallback, Source};\n\n    #[test]\n    fn compact_cycle_values_keep_full_roster_capacity_in_under_two_kib() {\n        assert!(std::mem::size_of::<CycleChoices>() <= 2048);\n        let mut choices = CycleChoices::new();\n        for index in 0..crate::engine::swap::trio::CHOICES.len() {\n            choices.push_fighter(index as u32 + 0x100);\n        }\n        assert_eq!(choices.kinds.len(), crate::engine::swap::trio::CHOICES.len());\n        assert_eq!(choices.get(choices.kinds.len() - 1),\n            Some(Target::Fighter(choices.kinds.len() as u32 - 1 + 0x100)));\n    }\n\n",
+     "reason": "pkg4 exact composed planner stack root (lead21:33): retain full roster order/capacity with compact kind descriptors and one saved payload per existing deduplicated MiiClass; materialize only selected Target. Removes measured26976-byte frame without heap, behavior or stack-budget changes. Private value-size and full-capacity regression."
+    },
+    {
+     "old": "#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
+     "new": "#[cfg(all(test, not(target_os = \"switch\")))]\n#[path = \"../../../tests/support/mii_cycle_compact.rs\"]\nmod compact_regressions;\n\n#[cfg(all(test, feature = \"mii-saved-alpha\"))]\nmod tests {",
+     "reason": "pkg4 planner stack root: original independent heap-backed ring equivalence plus first/repeated allocation probes exercise this actual implementation; host-only test allocator, never shipped."
     }
    ]
   },

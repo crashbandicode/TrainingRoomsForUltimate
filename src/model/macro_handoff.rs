@@ -131,16 +131,28 @@ impl SlotTransfer {
     pub fn import(slot: usize, frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
         -> Result<Self, crate::model::recording::ImportRefusal>
     {
+        let mut transfer = Self::export(slot);
+        transfer.fill_import(slot, frames, origin)?;
+        Ok(transfer)
+    }
+
+    /// Initialize the worker-owned transfer in place, avoiding a second full
+    /// payload in Result<Self, _>. Rejections leave the existing transfer intact.
+    pub fn fill_import(&mut self, slot: usize,
+        frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
+        -> Result<(), crate::model::recording::ImportRefusal>
+    {
         use crate::model::recording::{ImportRefusal, SLOTS, SLOT_FRAMES};
         if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
         if frames.is_empty() { return Err(ImportRefusal::Empty); }
         if frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(frames.len())); }
-        let mut transfer = Self::export(slot);
-        transfer.frames[..frames.len()].copy_from_slice(frames);
-        transfer.len = frames.len() as u16;
-        transfer.origin = origin;
-        transfer.result = SlotResult::ImportRequest;
-        Ok(transfer)
+        self.slot = slot as u8;
+        self.frames.fill(crate::model::input_delay::MappedInputs::NEUTRAL);
+        self.frames[..frames.len()].copy_from_slice(frames);
+        self.len = frames.len() as u16;
+        self.origin = origin;
+        self.result = SlotResult::ImportRequest;
+        Ok(())
     }
 
     pub fn execute(&mut self, recorder: &mut crate::model::recording::Recorder) {
@@ -495,6 +507,42 @@ mod tests {
         let mut invalid = SlotTransfer::export(usize::MAX);
         invalid.execute(&mut recorder);
         assert_eq!(invalid.result, SlotResult::ExportFailed(ExportRefusal::SlotOutOfRange));
+    }
+
+    #[test]
+    fn in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length() {
+        use super::{SlotTransfer, SlotResult};
+        use crate::model::recording::{Recorder, Origin, ImportRefusal, SLOT_FRAMES, SLOTS};
+        use crate::model::input_delay::MappedInputs;
+        let frame = MappedInputs { buttons: 0x1357, lstick_x: -73, rstick_y: 91,
+            ..MappedInputs::NEUTRAL };
+        let frames = vec![frame; SLOT_FRAMES];
+        let origin = Origin { facing: -1, status: 81, ..Origin::NONE };
+        let mut transfer = SlotTransfer::export(0);
+        transfer.fill_import(SLOTS - 1, &frames, origin).unwrap();
+        let before = transfer;
+        for (slot, input, error) in [
+            (SLOTS, &frames[..], ImportRefusal::SlotOutOfRange),
+            (0, &[][..], ImportRefusal::Empty),
+        ] {
+            assert_eq!(transfer.fill_import(slot, input, Origin::NONE), Err(error));
+            assert_eq!(transfer, before, "rejection must preserve the queued value");
+        }
+        assert_eq!(transfer.fill_import(0, &vec![frame; SLOT_FRAMES + 1], Origin::NONE),
+            Err(ImportRefusal::TooLong(SLOT_FRAMES + 1)));
+        assert_eq!(transfer, before);
+        let mut recorder = Recorder::new();
+        transfer.execute(&mut recorder);
+        assert_eq!(transfer.result, SlotResult::Imported);
+        let mut exported = SlotTransfer::export(SLOTS - 1);
+        exported.execute(&mut recorder);
+        assert_eq!(exported.exported(), Some((frames.as_slice(), origin)));
+        // Reuse after a full transfer must not expose its old tail or origin.
+        transfer.fill_import(0, &[MappedInputs::NEUTRAL], Origin::NONE).unwrap();
+        transfer.execute(&mut recorder);
+        let mut short = SlotTransfer::export(0);
+        short.execute(&mut recorder);
+        assert_eq!(short.exported(), Some((&[MappedInputs::NEUTRAL][..], Origin::NONE)));
     }
 
     #[test]
