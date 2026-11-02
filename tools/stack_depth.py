@@ -170,6 +170,14 @@ def check_table(funcs, rows):
 
 HOOK_RE = re.compile(r"#\[(?:skyline::)?hook\(")
 
+# The hook budget from Eden (stream/stack, st-02..st-11, diag 5d21cf2f): the least stack room any hook or callback found at
+# entry on a thread stack was 523,536 B (HookId::Other, an 896 KiB thread; the main thread's hooks had >= 1,021,280 B), so a
+# path may use (523,536 - 16 KiB) / 1.25. Hooks seen on a fiber stack inside a heap block, whose bottom svcQueryMemory cannot
+# show, get a fixed small budget.
+THREAD_LIMIT = (523_536 - SDK_RESERVE) * 4 // 5
+FIBER_LIMIT = 16 * 1024
+FIBER_HOOKS = {"archive_alloc", "ui_pass_calculate", "on_init"}  # ui_archive, ui_pass_calculate, reset_hub sites
+
 
 def hook_names(src_root):
     """(fn name, file stem) of every `#[skyline::hook]` function under src/runtime."""
@@ -232,6 +240,22 @@ def hook_budget(funcs, hooks, limit):
 def main():
     elf, cmd = sys.argv[1], sys.argv[2]
     funcs = analyse(elf)
+    if cmd == "budget":
+        # python3 -I tools/stack_depth.py <elf> budget: every hook's / callback's deepest static path against the stack room
+        # measured at entry in Eden ([HookStack], tools/stack_table.py): (least free − 16 KiB) / 1.25 for hooks on thread stacks,
+        # FIBER_LIMIT for those that ran on a fiber stack inside a heap block (its bottom cannot be measured). Exit 1 over budget.
+        hooks = hook_names(".")
+        roots = hook_roots(funcs, hooks)
+        bad = 0
+        for addr, (name, _) in sorted(roots.items(), key=lambda kv: kv[1][0]):
+            depth = deepest(funcs, addr)[0]
+            limit = FIBER_LIMIT if name in FIBER_HOOKS else THREAD_LIMIT
+            over = depth > limit
+            bad += over
+            if over or "--all" in sys.argv:
+                print(f"{'FAIL' if over else 'ok  '} {depth:7d} / {limit:7d} {name}")
+        print(f"{len(roots)} hooks and callbacks; {bad} over budget (thread {THREAD_LIMIT} B, fiber {FIBER_LIMIT} B)")
+        sys.exit(1 if bad else 0)
     if cmd == "hooks":
         # python3 -I tools/stack_depth.py <elf> hooks [--limit N] [--deepest K]: frames over N reachable from a hook (exit 1),
         # and the K deepest hooks.

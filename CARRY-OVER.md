@@ -273,7 +273,13 @@ them from stage m5q: 262 + 42 files) and in the generated ledgers: `src/runtime/
 through `runtime::threads::spawn`, its local `STACK_BYTES` removed, the session line prints the table's size),
 `src/runtime/mii/mii_editor_bridge/mod.rs` (`Trace` is `Copy`, `Trace::EMPTY`: the trace writer's `BoxedSlot` copies it into a
 heap buffer in place; moved by value it gave `tr-trace-writer` a 59,712 B frame on 64 KiB, the Eden s4-07 / u4b-02 boot fault),
-`src/runtime/macros/replay_store.rs` (`replay-capture-save` and `mii-catalog` through `runtime::threads::spawn`). Package 1's
+`src/runtime/macros/replay_store.rs` (`replay-capture-save` and `mii-catalog` through `runtime::threads::spawn`);
+one diag `crate::runtime::threads::headroom("<site>")` line at the entry of the deep callbacks in `roster/native_service.rs`,
+`roster/character_lifecycle.rs`, `roster/native_source_capacity.rs` (two), `roster/native_body_bank.rs`,
+`mii/mii_hud_portrait.rs` (two), `mii/mii_ordinary_gate.rs` (a no-op inline in the shipped build);
+`mii/mii_ordinary_gate.rs`: `mii_ordinary_gate_decide`'s three exclusive arms are `#[inline(never)]` functions (its frame was
+20,000 B with all three inlined); `mii/mii_ordinary_cpu.rs`, `mii/mii_ordinary_player.rs`: `bank_service` and
+`mii_group_record_publication` are `#[inline(never)]` (their locals no longer sit in every `service` call's frame). Package 1's
 carried `src/runtime/diag_log.rs` (no manifest): the drain thread through `runtime::threads::spawn` and, in the diag build, the
 `[ThreadStack]` high-water report on its 10 s beat. Written here: `src/model/thread_stacks.rs`, `src/runtime/threads.rs`,
 `BoxedSlot` in `src/model/lobby/trace_slot.rs`, `tests/thread_stacks.rs`, `tools/stack_depth.py` (+ `tools/test_stack_depth.py`).

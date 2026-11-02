@@ -15,7 +15,9 @@ import sys
 
 THREAD_RE = re.compile(r"\[ThreadStack\] (high_water|exit) name=(\S+) used=(\d+) size=(\d+) free=(\d+) low=(true|false)")
 SPAWN_RE = re.compile(r"\[ThreadStack\] spawn name=(\S+) base=(0x[0-9a-f]+) size=(0x[0-9a-f]+) top=(0x[0-9a-f]+)")
-HOOK_RE = re.compile(r"\[HookStack\] site=(\S+) calls=(\d+) min_free=(\d+) stack=(0x[0-9a-f]+) base=(0x[0-9a-f]+)")
+HOOK_RE = re.compile(r"\[HookStack\] site=(\S+) calls=(\d+) min_free=(\d+) stack=(0x[0-9a-f]+) base=(0x[0-9a-f]+)(?: kind=(0x[0-9a-f]+))?")
+# A thread stack's memory state; any other region (heap) holds a fiber stack whose own bottom svcQueryMemory does not show.
+STACK_KIND = 0xb
 
 
 def collect(lines):
@@ -32,11 +34,12 @@ def collect(lines):
             continue
         m = HOOK_RE.search(line)
         if m:
-            site, calls, free, stack, _ = m.groups()
-            h = hooks.setdefault(site, {"calls": 0, "min_free": None, "stack": 0})
+            site, calls, free, stack, _, kind = m.groups()
+            h = hooks.setdefault(site, {"calls": 0, "min_free": None, "stack": 0, "kind": None})
             h["calls"] = max(h["calls"], int(calls))
             if h["min_free"] is None or int(free) < h["min_free"]:
                 h["min_free"], h["stack"] = int(free), int(stack, 16)
+                h["kind"] = int(kind, 16) if kind else None
             continue
         m = SPAWN_RE.search(line)
         if m:
@@ -50,10 +53,11 @@ def tables(threads, hooks):
     for name in sorted(threads):
         t = threads[name]
         out.append(f"| {name} | {t['size']} | {t['used']} | {t['free']} | {'yes' if t['low'] else 'no'} |")
-    out += ["", "| Hook / callback | Calls | Least free at entry (B) | Stack region (B) |", "| --- | --- | --- | --- |"]
+    out += ["", "| Hook / callback | Calls | Least free at entry (B) | Stack region (B) | Region |", "| --- | --- | --- | --- | --- |"]
     for site in sorted(hooks, key=lambda s: hooks[s]["min_free"]):
         h = hooks[site]
-        out.append(f"| {site} | {h['calls']} | {h['min_free']} | {h['stack']} |")
+        region = "?" if h["kind"] is None else ("thread stack" if h["kind"] == STACK_KIND else f"kind {h['kind']:#x}: fiber in a larger block, not a stack bound")
+        out.append(f"| {site} | {h['calls']} | {h['min_free']} | {h['stack']} | {region} |")
     return "\n".join(out)
 
 
