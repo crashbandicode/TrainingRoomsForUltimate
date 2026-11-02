@@ -60,6 +60,8 @@ pub enum Feature {
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
     CpuMash,
     CpuCommon,
+    /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
+    P1Cpu,
 }
 
 impl Feature {
@@ -85,6 +87,7 @@ impl Feature {
             Feature::Ui => "ui",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
+            Feature::P1Cpu => "p1_cpu",
         }
     }
 }

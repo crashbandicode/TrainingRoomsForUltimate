@@ -1,5 +1,5 @@
 {
- "stage": "m5o",
+ "stage": "m5q",
  "comment": "Package 6 carry manifest (tools/carry_pkg6.py). Do not edit carried files by hand: change this manifest and re-run `carry`.",
  "modules": {
   "root": {
@@ -21,7 +21,62 @@
    "hazard_manager::policy": "crate::engine::stages::waiting_hazards_policy",
    "stage_forms": "crate::engine::stages::stage_forms",
    "stage_menu": "crate::engine::stages::stage_menu",
-   "character_items": "crate::engine::items::character_items"
+   "character_items": "crate::runtime::roster::character_items",
+   "cpu_pilot::pilot": "crate::engine::p1",
+   "preload_metrics": "crate::engine::preload::preload_metrics",
+   "logging": "crate::engine::compat::logging",
+   "swap_native::seam_install": "crate::runtime::seams::seam_install",
+   "common": "crate::runtime::compat::common",
+   "training": "crate::runtime::lobby::training",
+   "replay_preview": "crate::runtime::compat::replay_preview",
+   "character_roster": "crate::runtime::roster::character_roster",
+   "swap_native::special_articles": "crate::runtime::roster::special_articles",
+   "swap_native::heap_fields": "crate::runtime::roster::heap_fields",
+   "swap_native::r_handle": "crate::runtime::roster::r_handle",
+   "swap_native::body_graph": "crate::runtime::roster::body_graph",
+   "swap_native::copy_packages": "crate::runtime::roster::copy_packages",
+   "swap_native::identity_view": "crate::runtime::roster::identity_view",
+   "swap_native::scope_gate": "crate::runtime::roster::swap_native::scope_gate",
+   "swap_native::presentation": "crate::runtime::roster::presentation",
+   "swap_native::mii_setup": "crate::runtime::roster::mii_setup",
+   "swap_native::observe": "crate::runtime::roster::observe",
+   "native_reload_pose": "crate::runtime::roster::native_reload_pose",
+   "native_source_actors": "crate::runtime::roster::native_source_actors",
+   "native_source": "crate::runtime::roster::native_source",
+   "native_gc_guard": "crate::runtime::roster::native_gc_guard",
+   "turnip_identity": "crate::runtime::roster::turnip_identity",
+   "native_service": "crate::runtime::roster::native_service",
+   "native_unlink_install": "crate::runtime::roster::native_unlink_install",
+   "character_lifecycle": "crate::runtime::roster::character_lifecycle",
+   "cycle_preload": "crate::runtime::roster::cycle_preload",
+   "cycle_preload_config": "crate::runtime::roster::cycle_preload_config",
+   "kirby_hats": "crate::runtime::roster::kirby_hats",
+   "character_sources": "crate::runtime::roster::character_sources",
+   "native_body_bank": "crate::runtime::roster::native_body_bank",
+   "native_source_capacity": "crate::runtime::roster::native_source_capacity",
+   "effect_hook_chain": "crate::runtime::roster::effect_hook_chain",
+   "practice_trace": "crate::runtime::roster::practice_trace",
+   "practice_trace_core": "crate::runtime::roster::practice_trace_core",
+   "hang_trace": "crate::runtime::roster::hang_trace",
+   "native_unlink_probe": "crate::runtime::roster::native_unlink_probe",
+   "source_owner_probe": "crate::runtime::roster::source_owner_probe",
+   "heap_metrics": "crate::runtime::roster::heap_metrics",
+   "common::game_mode": "crate::runtime::lobby::game_mode",
+   "hazard_manager": "crate::runtime::compat::hazard_manager",
+   "replay_capture": "crate::runtime::compat::replay_capture",
+   "replay_store": "crate::runtime::compat::replay_store",
+   "consts": "crate::runtime::compat::consts",
+   "mii_native_access": "crate::runtime::mii::mii_native_access",
+   "mii_identity_binding": "crate::runtime::mii::mii_identity_binding",
+   "mii_editor_bridge": "crate::runtime::mii::mii_editor_bridge",
+   "native_keyboard": "crate::runtime::mii::native_keyboard",
+   "training_stage_rotation": "crate::runtime::lobby::training_stage_rotation",
+   "practice_stage_request": "crate::runtime::lobby::practice_stage_request",
+   "practice_stage_observer": "crate::runtime::lobby::practice_stage_observer",
+   "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
+   "common::filesystem": "crate::runtime::compat::filesystem",
+   "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
+   "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT"
   },
   "consts": {
    "native_seams": "crate::engine::seams::native_seams",
@@ -52,7 +107,9 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "character_items": "crate::engine::items::character_items",
    "menu_json": "crate::engine::compat::menu_json",
-   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT"
+   "TRAINING_MODPACK_ROOT": "crate::model::storage::ROOT",
+   "FighterId": "crate::runtime::compat::consts::FighterId",
+   "MENU": "crate::runtime::compat::menu::MENU"
   },
   "tui": {
    "roster_grid": "crate::engine::swap::roster_grid",
@@ -60,7 +117,11 @@
    "stage_menu": "crate::engine::stages::stage_menu",
    "lobby_stages": "crate::engine::stages::lobby_stages",
    "lobby_stage_cycle": "crate::engine::stages::lobby_stage_cycle",
-   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS"
+   "NX_SUBMENU_COLUMNS": "crate::engine::compat::grid::NX_SUBMENU_COLUMNS",
+   "mii_menu": "crate::engine::mii_root::mii_menu",
+   "resume": "crate::engine::mii_root::resume",
+   "AppPage": "crate::runtime::compat::menu_app::AppPage",
+   "App": "crate::runtime::compat::menu_app::App"
   },
   "mii": {
    "auto_init": "crate::engine::mii::auto_init",
@@ -89,6 +150,14 @@
   "byteflags": {
    "byteflags": "crate::engine::compat::choice::byteflags",
    "count": "crate::engine::compat::choice::count"
+  },
+  "sync": {
+   "read": "crate::runtime::compat::sync::read",
+   "assign": "crate::runtime::compat::menu_app::assign",
+   "lock_write": "crate::runtime::compat::menu_app::lock_write"
+  },
+  "macros": {
+   "MAX_NAME_CHARS": "crate::engine::mii::draft::MAX_NAME_CHARS"
   }
  },
  "files": [
@@ -131,8 +200,8 @@
    "src": "training_mod_consts/src/native_seams/rows_a1.rs",
    "dest": "src/model/seams/native_seams/rows_a1.rs",
    "crate": "consts",
-   "src_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495",
-   "dest_sha256": "7070ccebea68937fff03c35b05fa52ffa765d6a798b4a11b276b1b6148d88495"
+   "src_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d",
+   "dest_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d"
   },
   {
    "src": "training_mod_consts/src/native_seams/rows_a2.rs",
@@ -447,8 +516,8 @@
    "src": "training_mod_consts/src/body_bank.rs",
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
-   "src_sha256": "7d4b5bef320e9defe1826279c55da655339b21d34369a03c608d6f557debdd9f",
-   "dest_sha256": "09f658d37f696ab267a61f331b5677778de7bb0f6eff8908e15cf0f25b08dbb5"
+   "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
+   "dest_sha256": "62820b3d682e0ce62e172dced10b0c6f644b00e8603515588d52b2e2549a122d"
   },
   {
    "src": "training_mod_consts/src/body_bank/memory.rs",
@@ -860,8 +929,8 @@
    "src": "src/cycle_preload_policy.rs",
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
-   "src_sha256": "930d1c02d7c3278190a2e5e55ed7155a4adbfc792ad753750c51a5137592678d",
-   "dest_sha256": "1d18ec99c964790c53eec5c8e4d6eec681cc74cd8b099c02ec62d01c140f4f2a"
+   "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
+   "dest_sha256": "9fcd0ab12912570dbaf9b125c936c97aaf1640ef4db2d5a39c8225a0ab01274e"
   },
   {
    "src": "src/character_memory.rs",
@@ -963,21 +1032,24 @@
    "dest": "src/model/stages/lobby_stage_cycle.rs",
    "crate": "root",
    "src_sha256": "c4a313db7890e6529419e036dbc9403a4e503f0533633438f7828df58beed3cf",
-   "dest_sha256": "78770877aaf438550213d7ede6c81606cf4f22e91696eb0f4b11545ca3749e52"
+   "dest_sha256": "89ec339a769c59f6c2a7f55100072865a126da431e5c10a2c982ea993678cf18",
+   "widen": true
   },
   {
    "src": "src/practice_stage_request_policy.rs",
    "dest": "src/model/stages/practice_stage_request_policy.rs",
    "crate": "root",
    "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-   "dest_sha256": "334962a1c9016f1000f1c9bcf7257f4a2103ee0c71c34556a663febab10727b4"
+   "dest_sha256": "2684c79324c2debe66b391a87cb729cdbb9c0f8f50a9e559c9c857ff387591b4",
+   "widen": true
   },
   {
    "src": "src/training_stage_rotation_policy.rs",
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "279498a1af78b0b9fbe5c2aa9d762ec2a07983aab4f2b79e3c34b623a03efcf4"
+   "dest_sha256": "279498a1af78b0b9fbe5c2aa9d762ec2a07983aab4f2b79e3c34b623a03efcf4",
+   "widen": true
   },
   {
    "src": "src/hazard_manager/policy.rs",
@@ -1058,6 +1130,1215 @@
      "reason": "R1 durable publish: the temporary file is flushed to storage and a failed flush fails the store before the rename retires the live file (the fork ignored the sync_all result); offered back to the fork through the fix ledger"
     }
    ]
+  },
+  {
+   "src": "src/cpu_pilot/pilot.rs",
+   "dest": "src/model/p1/mod.rs",
+   "crate": "root",
+   "src_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f",
+   "dest_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f"
+  },
+  {
+   "src": "src/cpu_pilot/config.rs",
+   "dest": "src/model/p1/config.rs",
+   "crate": "root",
+   "src_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6",
+   "dest_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6"
+  },
+  {
+   "src": "src/cpu_pilot/move_observer.rs",
+   "dest": "src/model/p1/move_observer.rs",
+   "crate": "root",
+   "src_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325",
+   "dest_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325"
+  },
+  {
+   "src": "src/cpu_pilot/move_observer_tests.rs",
+   "dest": "src/model/p1/move_observer_tests.rs",
+   "crate": "root",
+   "src_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2",
+   "dest_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2"
+  },
+  {
+   "src": "src/cpu_pilot/tests.rs",
+   "dest": "src/model/p1/tests.rs",
+   "crate": "root",
+   "src_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb",
+   "dest_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb"
+  },
+  {
+   "src": "src/cpu_pilot/examples/completed-attacks-walk-off.json",
+   "dest": "src/model/p1/examples/completed-attacks-walk-off.json",
+   "crate": "root",
+   "src_sha256": "8b0a1b85b16755d30dfe978051ad712c45732fe40f7800dbe4ccea157a825b8e",
+   "dest_sha256": "8b0a1b85b16755d30dfe978051ad712c45732fe40f7800dbe4ccea157a825b8e"
+  },
+  {
+   "src": "src/cpu_pilot/examples/fight-five-seconds-walk-off.json",
+   "dest": "src/model/p1/examples/fight-five-seconds-walk-off.json",
+   "crate": "root",
+   "src_sha256": "c51d31284ff68191efed77e566f9070d09257d1d75a433375168c6341df25b68",
+   "dest_sha256": "c51d31284ff68191efed77e566f9070d09257d1d75a433375168c6341df25b68"
+  },
+  {
+   "src": "src/cpu_pilot/examples/immediate-release.json",
+   "dest": "src/model/p1/examples/immediate-release.json",
+   "crate": "root",
+   "src_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15",
+   "dest_sha256": "82802c1f5a65658fbb092ea79af760ac4849275640fac0be99c28eb0ff328b15"
+  },
+  {
+   "src": "src/preload_metrics.rs",
+   "dest": "src/model/preload/preload_metrics.rs",
+   "crate": "root",
+   "src_sha256": "795ede5522c0ac2c16bd2c03e774f06ec9e3ba838feea46d20101926d192cfca",
+   "dest_sha256": "f87fc175bf0a3f14b1f4fdbbd418c4233f411f0568060d4e8b0c292aa69c86ef"
+  },
+  {
+   "src": "src/swap_native/seam_install.rs",
+   "dest": "src/runtime/seams/seam_install.rs",
+   "crate": "root",
+   "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
+   "dest_sha256": "15b1220b31154e9bbb313ae2ab3f7cdf6bed664682ec13833985253fdf30bf5a",
+   "edits": [
+    {
+     "old": "use crate::model;\n",
+     "new": "use crate::model::version as model;\n",
+     "reason": "the fork's `model` module held the supported version, the build id and `Hex`; here they are `model::version` (package 1), imported under the old name"
+    },
+    {
+     "delete_from": "/// The one install line (`practice-diagnostics.log` + Skyline log, shipped and diag builds).",
+     "delete_to": "/// The late report (R-A0b), on the",
+     "reason": "the fork's second install line (`report_install`) is removed: the plugin has one install line (playbook, lead ruling 2026-11-02)"
+    },
+    {
+     "old": "/// The late report (R-A0b), on the",
+     "new": "/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        let rows = native_seams::COUNT;\n        let checked = rows - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { keep: listed_as_other, with_code: other_with_code },\n            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n\n/// The late report (R-A0b), on the",
+     "reason": "`InstallFields`: the seam outcome as fields of package 1's one install line (`seams=<n> seams_stock=<n> seams_skipped=[..] ...`, the rows that fail, counts for the rest); rows checked or changed after the line stay in the tagged late line (`[TrainingSeams] late ...`)"
+    }
+   ]
+  },
+  {
+   "src": "src/swap_native/seam_drill.rs",
+   "dest": "src/runtime/seams/seam_drill.rs",
+   "crate": "root",
+   "src_sha256": "d8ba023eb0abfc27c45ed682db90ce5c694af48de2f8eada92c3caf4b5455b76",
+   "dest_sha256": "8c159948f195bfed7a859cb93d497712b47c92af6265598eddfe3483ecf5c83c"
+  },
+  {
+   "src": "src/cpu_pilot/menu_session.rs",
+   "dest": "src/model/p1_session/menu_session.rs",
+   "crate": "root",
+   "src_sha256": "327f70c40386384a06de1e06f1a646439005325fca51b609e71b71e829095982",
+   "dest_sha256": "c9c37d065a56a6bf60c4952ca87e6f2d9b4cb37180996890cf3b2f9c1b181846",
+   "widen": true
+  },
+  {
+   "src": "src/cpu_pilot/stage_session.rs",
+   "dest": "src/model/p1_session/stage_session.rs",
+   "crate": "root",
+   "src_sha256": "058be3adc1bce088239c483540ae5bf77ca4ad455467393e78eaaafac21afc67",
+   "dest_sha256": "ceba381fe6cc7e402dd8184d091b44263f94cb86fd99b54c5361ad386b893c19",
+   "widen": true
+  },
+  {
+   "src": "src/cpu_pilot.rs",
+   "dest": "src/runtime/p1/cpu_pilot.rs",
+   "crate": "root",
+   "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
+   "dest_sha256": "26beaadecd06d436c4b5a0d38db9d3cb6bb3059ba6880c709fc0a268b0f02150",
+   "edits": [
+    {
+     "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
+     "new": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n    BASE.load(Ordering::Acquire) != 0\n}\n",
+     "reason": "`installed()` added: package 1's install line reports the CPU-as-P1 feature as `p1_cpu=installed|not_installed` and needs to know whether `init` installed the hook (it returns nothing)"
+    },
+    {
+     "old": "crate::runtime::roster::character_roster::busy()",
+     "new": "crate::runtime::p1::compat::character_roster::busy()",
+     "reason": "TEMPORARY until the roster cycle is declared (`runtime::swap::character_roster` is carried but not compiled yet): the roster's busy flag is answered by `compat::character_roster` (HOT_SWAP_IN_PROGRESS); removed with the declaration commit"
+    },
+    {
+     "old": "crate::runtime::lobby::training::",
+     "new": "crate::runtime::p1::compat::training::",
+     "count": 2,
+     "reason": "TEMPORARY until the joint declaration commit: the lobby `training` facade (worker B) is carried but not declared yet, so `recording_or_playback` and the vanilla-pause flag are answered by `p1::compat::training`; removed with the declaration"
+    }
+   ]
+  },
+  {
+   "src": "src/swap_native/special_articles.rs",
+   "dest": "src/runtime/roster/special_articles.rs",
+   "crate": "root",
+   "src_sha256": "eafd06fcb6a9017204ddafca7f7a0e922c810366a11682b38e5ed187f06bd7cc",
+   "dest_sha256": "6ce81bfbc43c6158a18839e9052e236f9432bb84126ea96da8033da2da626f97"
+  },
+  {
+   "src": "src/swap_native/heap_fields.rs",
+   "dest": "src/runtime/roster/heap_fields.rs",
+   "crate": "root",
+   "src_sha256": "8d83c43a3a140b19b9fc297e6f82af469117a8c1b98738542cfb178fbbabea79",
+   "dest_sha256": "8bf4165c1a10d34ca78e8111ff5ed3e3c16f8d2591667c73fb62b0ffe8dee53d"
+  },
+  {
+   "src": "src/swap_native/r_handle.rs",
+   "dest": "src/runtime/roster/r_handle.rs",
+   "crate": "root",
+   "src_sha256": "8587dbd71d79f9fa17e0d1593bea86ab349b38b673e634a810081c9382bf7781",
+   "dest_sha256": "cea1f97d45150ea39a14fb756bcdb343c9a860f3f2af3fea2df0b3ef10f9ea7d"
+  },
+  {
+   "src": "src/swap_native/body_graph.rs",
+   "dest": "src/runtime/roster/body_graph.rs",
+   "crate": "root",
+   "src_sha256": "e701462e66e878ef1ad0b3ff491d283b77524d7b9cae4132f5b989f7feeb7a91",
+   "dest_sha256": "ce25978e4b53dfaa8fbca9820f63862795c381ec5de8ab103ecd0a5b526ee5d8"
+  },
+  {
+   "src": "src/swap_native/copy_packages.rs",
+   "dest": "src/runtime/roster/copy_packages.rs",
+   "crate": "root",
+   "src_sha256": "ba20b01f8183e5b3d3316135e502686ae28fdcb0e74c44e084aa147d12a735f8",
+   "dest_sha256": "1f5656351a2042da711fe6fd538d17f82216b5943fb1cbd1a33c66f069db345d"
+  },
+  {
+   "src": "src/swap_native/identity_view.rs",
+   "dest": "src/runtime/roster/identity_view.rs",
+   "crate": "root",
+   "src_sha256": "4bcbe662956266240085ae4d719d876653c2dda2214bfeddd6a0b48a217b0ebb",
+   "dest_sha256": "52a19b8f0b15d07fa09d8757c6145617d0a3667bb93da34bbbfc1154bb1c8a46"
+  },
+  {
+   "src": "src/swap_native/scope_gate.rs",
+   "dest": "src/runtime/roster/scope_gate.rs",
+   "crate": "root",
+   "src_sha256": "37118c1eb8dcc97cb9214a50b08dc9a8fc219fd86c3a233d195a9d456277b3ec",
+   "dest_sha256": "a346eec09b73aca86626ecd2c4e8f699f92bbf5f30d730da25ed54b3706dee6a"
+  },
+  {
+   "src": "src/swap_native/presentation.rs",
+   "dest": "src/runtime/roster/presentation.rs",
+   "crate": "root",
+   "src_sha256": "1f8ff0c722b7ba62e4b70ff6afde7d378f30ec20723cc8f541d0403004f3aa87",
+   "dest_sha256": "0ca7ef23532b73b59ef43be6ad2ecfc416f4b56ad69a7c5ffbcb62a42421e268"
+  },
+  {
+   "src": "src/swap_native/mii_setup.rs",
+   "dest": "src/runtime/roster/mii_setup.rs",
+   "crate": "root",
+   "src_sha256": "0f3c623bb1ef0a9150235dc899f0af8b295dceda7b6587a529fcfb2cb3e1c1bc",
+   "dest_sha256": "45c5aea5690df2c87ae5392a21844f7ddd10f05a2103c2a68ef1a94b505f790d"
+  },
+  {
+   "src": "src/swap_native/observe.rs",
+   "dest": "src/runtime/roster/observe.rs",
+   "crate": "root",
+   "src_sha256": "cba5ec7868f1c03d20dbd97a586115115f69cb5707ef03e856a40aa97a4770ae",
+   "dest_sha256": "606d0dce75fe26d1cfb74e7fa198a6e29c6321e8098b79a310cce4b16ea49ebb"
+  },
+  {
+   "src": "src/native_reload_pose.rs",
+   "dest": "src/runtime/roster/native_reload_pose.rs",
+   "crate": "root",
+   "src_sha256": "dd6f0ef6aa6dbc7d7f5dd1a86bcf8d4bc678ce58856bc3d760cfdb1d5c1ccd15",
+   "dest_sha256": "9ededa61f3fd42e4dea4b5697c813faf313a3f68d0799d914bf4cdf1025e6714"
+  },
+  {
+   "src": "src/native_source_actors.rs",
+   "dest": "src/runtime/roster/native_source_actors.rs",
+   "crate": "root",
+   "src_sha256": "27faf933ac59b022af5509dd2a104f6cb383214d6563bb151a147bf05fe2552e",
+   "dest_sha256": "6fee48f5b0a6db63d369806ef449a1c6e6b7427dbb4e2f53398075879d8d730f"
+  },
+  {
+   "src": "src/native_source.rs",
+   "dest": "src/runtime/roster/native_source.rs",
+   "crate": "root",
+   "src_sha256": "d2032bebfb4f473403e59ba25632d2000ba80efb17de006d9d13bff2dad4767b",
+   "dest_sha256": "fe28b0dbb5a3b96a40e91f36d00365f506cd7d98c3314707d6de11bd1c94ebb6"
+  },
+  {
+   "src": "src/native_gc_guard.rs",
+   "dest": "src/runtime/roster/native_gc_guard.rs",
+   "crate": "root",
+   "src_sha256": "214afbe59b2383868d5c0548cd034b763e5349d1c23da820004e41a6a32bb4e6",
+   "dest_sha256": "86e1960080d434b848bcfedea02890b9b3afe0c0be68f5b90676d313543b7d7f"
+  },
+  {
+   "src": "src/turnip_identity.rs",
+   "dest": "src/runtime/roster/turnip_identity.rs",
+   "crate": "root",
+   "src_sha256": "561334326aa4eb2c73c713a7cba8d9defc48e2340124f15167fc39176e88649f",
+   "dest_sha256": "ac10397577f87be7f10b3fcfd1a1a00b9f77c24457a54efb83055d8728571b58"
+  },
+  {
+   "src": "src/native_service.rs",
+   "dest": "src/runtime/roster/native_service.rs",
+   "crate": "root",
+   "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
+   "dest_sha256": "22718f1f019e6106de8ce88cf4daa53abebf8a69fa9f8f0b9d8802d2d80003ee"
+  },
+  {
+   "src": "src/native_unlink_install.rs",
+   "dest": "src/runtime/roster/native_unlink_install.rs",
+   "crate": "root",
+   "src_sha256": "f1f7f6372a6e40b707a3aef468217055a477e0d6164ab212ec9d4af23cf9ed74",
+   "dest_sha256": "8fcd4cfc2e74b9a12161e4078607a3b246f534132c48c887a2985c948f3bd247"
+  },
+  {
+   "src": "src/character_lifecycle.rs",
+   "dest": "src/runtime/roster/character_lifecycle.rs",
+   "crate": "root",
+   "src_sha256": "d3dc2989eabad2608dfa0841828103b3f8c32ce709426c57b6b9197d0a3af453",
+   "dest_sha256": "374796ae64082db4e925e88986c15829f77d243959bab34dacb3bf81e0f7d672"
+  },
+  {
+   "src": "src/character_roster.rs",
+   "dest": "src/runtime/roster/character_roster.rs",
+   "crate": "root",
+   "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
+   "dest_sha256": "6dd249eed59c841538e90b940e6ba29bac8d5c87b271a97bd4465afb8c1e841d"
+  },
+  {
+   "src": "src/cycle_preload.rs",
+   "dest": "src/runtime/roster/cycle_preload.rs",
+   "crate": "root",
+   "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
+   "dest_sha256": "b24d72292d9cb0a26d8c6aa7e6a169222dff4f7b85c92f18fb7cabd2e70d78c6"
+  },
+  {
+   "src": "src/cycle_preload_config.rs",
+   "dest": "src/runtime/roster/cycle_preload_config.rs",
+   "crate": "root",
+   "src_sha256": "c53891e68084204802add8d19aae87e0f32c37882d34a736ec63ea037e5dccb5",
+   "dest_sha256": "0b474ddec8a4995c7987f4e36f5022ca4a9557b29bfbfec2cf3c0e844493d252"
+  },
+  {
+   "src": "src/kirby_hats.rs",
+   "dest": "src/runtime/roster/kirby_hats.rs",
+   "crate": "root",
+   "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
+   "dest_sha256": "80349f7688bf24f8d9adb250c868c23a7adaf568bfa8fa5ef2667e0e90cb5833"
+  },
+  {
+   "src": "src/character_items.rs",
+   "dest": "src/runtime/roster/character_items.rs",
+   "crate": "root",
+   "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
+   "dest_sha256": "ff8314f58a70bf79d5bf4dc660865a2d193d6b1ac7c1240a250fcc556daa8541"
+  },
+  {
+   "src": "src/character_sources.rs",
+   "dest": "src/runtime/roster/character_sources.rs",
+   "crate": "root",
+   "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
+   "dest_sha256": "ede465f0f576ea58431905abf9b4f9508a5689017de87e3569d1300b6fa3e51e"
+  },
+  {
+   "src": "src/native_body_bank.rs",
+   "dest": "src/runtime/roster/native_body_bank.rs",
+   "crate": "root",
+   "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
+   "dest_sha256": "6d7cc2f29941559d2b8c3146b7c162cfe26734ba01cb5a1b2bd22beb8a3f383e"
+  },
+  {
+   "src": "src/native_source_capacity.rs",
+   "dest": "src/runtime/roster/native_source_capacity.rs",
+   "crate": "root",
+   "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
+   "dest_sha256": "09d353f9631a27b058b3869da23d167ec28fc06de6666b6331bd1cf18d897fbb"
+  },
+  {
+   "src": "src/effect_hook_chain.rs",
+   "dest": "src/runtime/roster/effect_hook_chain.rs",
+   "crate": "root",
+   "src_sha256": "100929d53a938c4e98a87a5294c1cdb61d112d94ff23058d53ee7a4a186944b9",
+   "dest_sha256": "9d2312aa6a1672c73d8c42ed70f58462f6aa72a73fac398533cb85e3a5f87b7d"
+  },
+  {
+   "src": "src/native_service.S",
+   "dest": "src/runtime/roster/native_service.S",
+   "crate": "root",
+   "src_sha256": "012175eafa0e56a58f01e95645c696c482461c430eb4ad25f08bfb0cd656dc7b",
+   "dest_sha256": "012175eafa0e56a58f01e95645c696c482461c430eb4ad25f08bfb0cd656dc7b"
+  },
+  {
+   "src": "src/practice_trace.rs",
+   "dest": "src/runtime/roster/practice_trace.rs",
+   "crate": "root",
+   "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
+   "dest_sha256": "654eced63ee07314761d4d4d368c538179788a89eb66f354e45b22bea928505c"
+  },
+  {
+   "src": "src/practice_trace_core.rs",
+   "dest": "src/runtime/roster/practice_trace_core.rs",
+   "crate": "root",
+   "src_sha256": "54d110515a0525ff44d8703e310792869ea92405c17698ee842a61b315c0e0f7",
+   "dest_sha256": "54d110515a0525ff44d8703e310792869ea92405c17698ee842a61b315c0e0f7"
+  },
+  {
+   "src": "src/hang_trace.rs",
+   "dest": "src/runtime/roster/hang_trace.rs",
+   "crate": "root",
+   "src_sha256": "5144b709285b3c2ed01d4bfa0c98e327430385e83433348b8d36c8878e97dce5",
+   "dest_sha256": "0f70e34d47b53b426b1299a92a9d7a56b75558f86ce1dfd3b25addeedf64fa99"
+  },
+  {
+   "src": "src/native_unlink_probe.rs",
+   "dest": "src/runtime/roster/native_unlink_probe.rs",
+   "crate": "root",
+   "src_sha256": "fb90a4e72ac9ddb5b0b0acd827d7ff46d19b379830c6f2826780f47ec1be8f9c",
+   "dest_sha256": "936f87d816d3ae37ec5e248e0ef07b282020843de418f7b41886715ebc631192"
+  },
+  {
+   "src": "src/source_owner_probe.rs",
+   "dest": "src/runtime/roster/source_owner_probe.rs",
+   "crate": "root",
+   "src_sha256": "511b72f076e488f101a2e0ec4aa607f8934b6dd6e5533cbdeefe534d49585239",
+   "dest_sha256": "5e5a7de953ed59a567f0a275ec5eea303cf1d3a7e571b7e369b2c297d991e9da"
+  },
+  {
+   "src": "src/heap_metrics.rs",
+   "dest": "src/runtime/roster/heap_metrics.rs",
+   "crate": "root",
+   "src_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33",
+   "dest_sha256": "3d1034938c59603cbc9ffecc696c32400f190988aea86615a4421c73a8a8af33"
+  },
+  {
+   "src": "src/common/game_mode.rs",
+   "dest": "src/runtime/lobby/game_mode.rs",
+   "crate": "root",
+   "src_sha256": "99b29598127ca8ff85c1d5658fe6f3458fd63908e382d7df699a54177bf4e571",
+   "dest_sha256": "02dcf893d9ddef153b6ba293e946d0bbeaaf8af783c9ad5c76d1551eca3b0743"
+  },
+  {
+   "src": "src/native_keyboard.rs",
+   "dest": "src/runtime/mii/native_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
+   "dest_sha256": "7665ecd33d985428c5543e94401f6cfcd60ca3cd941c42b80beb609c9b950556"
+  },
+  {
+   "src": "src/native_keyboard/inline_keyboard.rs",
+   "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
+   "dest_sha256": "0f4a8fa2fb4f59306735d854b3a8c118ca18b4a9bf98874b9df905d372c63032"
+  },
+  {
+   "src": "src/mii_identity_binding.rs",
+   "dest": "src/runtime/mii/mii_identity_binding.rs",
+   "crate": "root",
+   "src_sha256": "058d1f2097aa6ff80c832fed9d50da662cff0f87facee684b966e06ff8cf5f05",
+   "dest_sha256": "9da000621651af4a83d1f275ef5d5d02f8ff583d51629425df346d4e6e59ab43"
+  },
+  {
+   "src": "src/mii_native_access.rs",
+   "dest": "src/runtime/mii/mii_native_access.rs",
+   "crate": "root",
+   "src_sha256": "eeddc0e5ea9cecd6ae48b4f82e9f25d7e9d2538138a9e742bb6d4224b77b1731",
+   "dest_sha256": "20f928c6ee7296716416d79317574e66e5dd191a56a4aadc1420199f832e0785"
+  },
+  {
+   "src": "src/mii_native_cpu_scope.rs",
+   "dest": "src/runtime/mii/mii_native_cpu_scope.rs",
+   "crate": "root",
+   "src_sha256": "35d892a35e1de3a48e9eef8a64d217343ff5ee8a3310a1b021cf90a73a35775b",
+   "dest_sha256": "497dfa986df279f6aecc82c45488730b407a3052c08a367302ed3a8e990cb8c4"
+  },
+  {
+   "src": "src/training_stage_rotation.rs",
+   "dest": "src/runtime/lobby/training_stage_rotation.rs",
+   "crate": "root",
+   "src_sha256": "28da0ade48dbe422fe6adbe67c5412d803410ccdc0e70a0d3f374398b670c739",
+   "dest_sha256": "cc0c0b022fa01a92e69ff2a55242dc45b5eda0d3054284d4af14e90a2def280b"
+  },
+  {
+   "src": "src/mii_auto_init.rs",
+   "dest": "src/runtime/mii/mii_auto_init.rs",
+   "crate": "root",
+   "src_sha256": "93ef4e97fdb8e90947145a77aa5ce39440bf6996d832804cabe76739be9e88fb",
+   "dest_sha256": "86c472e5635c5fa8ad705ae599eb2f83b9931e2bd42fb9ab4648e245fd215779"
+  },
+  {
+   "src": "src/mii_backend.rs",
+   "dest": "src/runtime/mii/mii_backend.rs",
+   "crate": "root",
+   "src_sha256": "c8c330a103e9db5f5db5032b2550e349c549ef538ab67c55b2728ea9ff09fc89",
+   "dest_sha256": "3026d5ee1b6f8f2bcd570c3775b7c00fc8fad5ddfddb6387a4b7445aa3391e2a"
+  },
+  {
+   "src": "src/mii_catalog_request.rs",
+   "dest": "src/runtime/mii/mii_catalog_request.rs",
+   "crate": "root",
+   "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
+   "dest_sha256": "9b1dfcc620feb8b25416078e4746e1da74abc0c1a8c69bf360501510e2392d75"
+  },
+  {
+   "src": "src/mii_cpu_adapter.rs",
+   "dest": "src/runtime/mii/mii_cpu_adapter.rs",
+   "crate": "root",
+   "src_sha256": "6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2",
+   "dest_sha256": "cce7fa18a6a055902b2b40beec13017ebb7e827caaa2eed722bd4ae2eb72e030"
+  },
+  {
+   "src": "src/mii_hud_portrait.rs",
+   "dest": "src/runtime/mii/mii_hud_portrait.rs",
+   "crate": "root",
+   "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
+   "dest_sha256": "5832ced6c12f6efe582ec72f9a4258947e670c0362fab2b9e42ee366dd237210"
+  },
+  {
+   "src": "src/mii_ldn_qualification.rs",
+   "dest": "src/runtime/mii/mii_ldn_qualification.rs",
+   "crate": "root",
+   "src_sha256": "30a65caa8eddecfb43916fff091fc8e4e40dc83b93cbefccb23069455b8af2f6",
+   "dest_sha256": "dc9aa6c4546e12cdd0a7f88a93db574321e464e3c98f4583dfc6912e3daf7a8b"
+  },
+  {
+   "src": "src/mii_managed_helper.rs",
+   "dest": "src/runtime/mii/mii_managed_helper.rs",
+   "crate": "root",
+   "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
+   "dest_sha256": "3c45f087b29f10a64d432d86d8f1636488c746c6e76a9b053d1d12b9de96fa04"
+  },
+  {
+   "src": "src/mii_native_adapter.rs",
+   "dest": "src/runtime/mii/mii_native_adapter.rs",
+   "crate": "root",
+   "src_sha256": "a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9",
+   "dest_sha256": "093806ac789f81ff7e165a8a785992c859082bb42a8e98a39c733650e1f0e03b"
+  },
+  {
+   "src": "src/mii_ordinary_cpu.rs",
+   "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
+   "crate": "root",
+   "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
+   "dest_sha256": "2e058bcf2556345724339771f1b8460a505e987255161e0b9968c17cc9eaf55b",
+   "edits": [
+    {
+     "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
+     "new": "fn note(reason:impl std::fmt::Display) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "note(&format!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
+     "new": "note(format_args!(\"[MiiOrdinaryCpu] Mii group canonical before mutation: {}\",reason))",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_ordinary_cpu_native.rs",
+   "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
+   "crate": "root",
+   "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
+   "dest_sha256": "0fcfff1f44cfc25141b48cb598257292f5e923a12356b1600c07279eb74de998",
+   "edits": [
+    {
+     "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
+     "new": "super::note(format_args!(\"[MiiOrdinaryCpu] bank settle diverged",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_ordinary_gate.rs",
+   "dest": "src/runtime/mii/mii_ordinary_gate.rs",
+   "crate": "root",
+   "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
+   "dest_sha256": "ce2644f46ccf0ef9b36d16ba90051baaf6e4ba29ed471b193267836eb2d72418"
+  },
+  {
+   "src": "src/mii_ordinary_native.rs",
+   "dest": "src/runtime/mii/mii_ordinary_native.rs",
+   "crate": "root",
+   "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
+   "dest_sha256": "1cff1553d441afb726659d8c7b05fedae1dd7916039e2e68fda92c45c21fa0b5",
+   "edits": [
+    {
+     "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
+     "new": "super::note(format_args!(\"[MiiOrdinaryPlayer] bank settle diverged",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_ordinary_player.rs",
+   "dest": "src/runtime/mii/mii_ordinary_player.rs",
+   "crate": "root",
+   "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
+   "dest_sha256": "b2cda50f12540eb860590c68974dc1bf3465c48266da1964e98862050d34183e",
+   "edits": [
+    {
+     "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
+     "new": "fn note(reason:impl std::fmt::Display) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    },
+    {
+     "old": "note(&format!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
+     "new": "note(format_args!(\"[MiiOrdinaryPlayer] Mii group canonical before mutation: {}\",reason))",
+     "reason": "the diagnostic line is built by the logger's fixed buffer from `format_args!` (the fork built a `String` with `format!` first, inside the game callback; review R5, lead ruling 3 of 2026-11-02); `note` takes anything `Display`"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_replay.rs",
+   "dest": "src/runtime/mii/mii_replay.rs",
+   "crate": "root",
+   "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
+   "dest_sha256": "3c726dbe7fda2fa42d667cfa6982f800d50fa2d003cdf6bb25d78a1c8e512359"
+  },
+  {
+   "src": "src/mii_saved_alpha.rs",
+   "dest": "src/runtime/mii/mii_saved_alpha.rs",
+   "crate": "root",
+   "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
+   "dest_sha256": "9b35a7821e99ea4906b12a19e4edb1dc3c16d36cf0cd96cb3f966d6c869ca3a1"
+  },
+  {
+   "src": "src/mii_saved_fingerprints.rs",
+   "dest": "src/runtime/mii/mii_saved_fingerprints.rs",
+   "crate": "root",
+   "src_sha256": "3c3299699e107f41b78f087b9b8451284e48a496ff8f617f2f5f2e161cb0428f",
+   "dest_sha256": "faa34901752643a5fe5a0627354e933edbcf0e54739cfbecc58276729f2ca1e9"
+  },
+  {
+   "src": "src/mii_saved_native.rs",
+   "dest": "src/runtime/mii/mii_saved_native.rs",
+   "crate": "root",
+   "src_sha256": "8c2a2841660d0e08a684ac946525d63137bf672540bf1570226465db9a525ad5",
+   "dest_sha256": "d0434b8eaacdd240a02fd62a460ae0feaee054d1e52f443f12785d4d26b54a79"
+  },
+  {
+   "src": "src/mii_selector_native.rs",
+   "dest": "src/runtime/mii/mii_selector_native.rs",
+   "crate": "root",
+   "src_sha256": "d2136f80078ff37c1d2fbb91ce1f217b1b63efa160e8a81f64861c2e3304103d",
+   "dest_sha256": "ee0d2cedb3ccdaa4f0d1b2429a89f57119c3829825580fa6e19742b65ffe3eca"
+  },
+  {
+   "src": "src/mii_source_provenance.rs",
+   "dest": "src/runtime/mii/mii_source_provenance.rs",
+   "crate": "root",
+   "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
+   "dest_sha256": "9e9afda29fd99a07349c0d4f0724d6b30e714e43497ea8f1318f27edd364d12d"
+  },
+  {
+   "src": "src/mii_ordinary_gate.S",
+   "dest": "src/runtime/mii/mii_ordinary_gate.S",
+   "crate": "root",
+   "src_sha256": "86d7f95e3ae9506016095386016484061baf3c58073fa9e25825daa7f016b45d",
+   "dest_sha256": "86d7f95e3ae9506016095386016484061baf3c58073fa9e25825daa7f016b45d"
+  },
+  {
+   "src": "src/mii_editor_bridge/resume_adapter.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/resume_adapter.rs",
+   "crate": "root",
+   "src_sha256": "3c61b782426a242d53d888a67fe2fefa48f9dfd10cea9d1e322a0063dfd0e020",
+   "dest_sha256": "43af833aa121e82dda24750f5f68d537d08ad47093234a3e8549afc6a56f02c7"
+  },
+  {
+   "src": "src/mii_editor_bridge/lifecycle.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/lifecycle.rs",
+   "crate": "root",
+   "src_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1",
+   "dest_sha256": "cf29d7852e571930bcaf1f38fdb9de69929dfd7b3a9898000c58a5a28a9d62d1"
+  },
+  {
+   "src": "src/mii_editor_bridge/cosmetic_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/cosmetic_resume.rs",
+   "crate": "root",
+   "src_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31",
+   "dest_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31"
+  },
+  {
+   "src": "src/mii_editor_bridge/ldn_lifecycle.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/ldn_lifecycle.rs",
+   "crate": "root",
+   "src_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e",
+   "dest_sha256": "e014d6c7625c49745a7434a39a31c8c10f5530f4dea246497ca08c0d2f7e561e"
+  },
+  {
+   "src": "src/mii_editor_bridge/native.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/native.rs",
+   "crate": "root",
+   "src_sha256": "ed5db356207918b67e65c2bb2a9414930aa12673c36a50c3968e8f707c4bc39e",
+   "dest_sha256": "23c0efb6eba1ebfd83d3d56e3db48b1016b34b5873c5cf920d0c021449f7d0e4",
+   "edits": [
+    {
+     "old": "#[derive(Clone, serde::Serialize)]\npub(super) struct InputChange {",
+     "new": "#[derive(Clone, Copy, serde::Serialize)]\npub(super) struct InputChange {",
+     "reason": "`InputChange` is `Copy` so the fixed trace list can hold it"
+    },
+    {
+     "old": "pub(super) struct InputSnapshot([Vec<u8>; 3]);",
+     "new": "const INPUT_REGIONS: [(usize, usize); 3] = [(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)];\npub(super) struct InputSnapshot { rows: [[u8; 8 * 0x240]; 3] }",
+     "reason": "the baseline copies the three input regions into fixed rows (the largest region is 8 * 0x240 bytes) instead of three `Vec`s allocated inside a hook"
+    },
+    {
+     "old": "    pub first_changes: Vec<(usize, u8, u8)>,",
+     "new": "    pub first_changes: crate::engine::compat::fixed::FixedVec<(usize, u8, u8), 64>,",
+     "reason": "the first 64 differences are kept in a fixed list (same JSON), not a `Vec` collected inside a hook"
+    },
+    {
+     "old": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    InputSnapshot([(0x5308770, 8 * 0x1c8), (0x53095b0, 8 * 0x240), (0x530d568, 0x267)]\n        .map(|(offset, len)| std::slice::from_raw_parts((base + offset) as *const u8, len).to_vec()))\n}\n\nimpl InputSnapshot {\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        let observed = input_snapshot(base);\n        std::array::from_fn(|region| {\n            let expected = &self.0[region];\n            let actual = &observed.0[region];\n            let differences = expected.iter().zip(actual).enumerate()\n                .filter(|(_, (a, b))| a != b);\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes: differences.clone().count(),\n                first_changes: differences.take(64).map(|(i, (&a, &b))| (i, a, b)).collect(),\n            }\n        })\n    }\n}",
+     "new": "pub(super) unsafe fn input_snapshot(base: usize) -> InputSnapshot {\n    let mut rows = [[0u8; 8 * 0x240]; 3];\n    for (row, (offset, len)) in rows.iter_mut().zip(INPUT_REGIONS) {\n        row[..len].copy_from_slice(std::slice::from_raw_parts((base + offset) as *const u8, len));\n    }\n    InputSnapshot { rows }\n}\n\nimpl InputSnapshot {\n    /// Compares the baseline with the live regions in place (no second copy is made inside the hook).\n    pub unsafe fn compare(&self, base: usize) -> [InputChange; 3] {\n        std::array::from_fn(|region| {\n            let (offset, len) = INPUT_REGIONS[region];\n            let expected = &self.rows[region][..len];\n            let actual = std::slice::from_raw_parts((base + offset) as *const u8, len);\n            let mut first_changes = crate::engine::compat::fixed::FixedVec::new();\n            let mut changed_bytes = 0;\n            for (i, (&a, &b)) in expected.iter().zip(actual).enumerate() {\n                if a != b {\n                    changed_bytes += 1;\n                    first_changes.push((i, a, b));\n                }\n            }\n            InputChange {\n                region,\n                expected_hash: crate::engine::mii::inventory::fnv1a64(expected),\n                observed_hash: crate::engine::mii::inventory::fnv1a64(actual),\n                changed_bytes,\n                first_changes,\n            }\n        })\n    }\n}",
+     "reason": "`input_snapshot` fills the fixed rows and `compare` reads the live regions in place (same hashes, changed-byte count and first 64 differences; the fork copied the live regions a second time, so a byte changing between the hash and the walk can now show in one and not the other, which a private qualification diagnostic tolerates)"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_editor_bridge/connected_native.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/connected_native.rs",
+   "crate": "root",
+   "src_sha256": "df061e002c881c1a57c7219077fa97b027c123af7216c81b94ca1f7c50953839",
+   "dest_sha256": "13b1954b6646c7e13bb620d66c61b279eeb16beb68f67573d9e4b7c9467abe1b"
+  },
+  {
+   "src": "src/mii_editor_bridge/native_default.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/native_default.rs",
+   "crate": "root",
+   "src_sha256": "db28494490813b40de6cea6afd1f33a68f00a37da2475177b036d1bda4586bbd",
+   "dest_sha256": "315399804836c1b6d733facdf6fcbf511bb78b2ece51926103cb971f61ecdd1e"
+  },
+  {
+   "src": "src/mii_editor_bridge/settings_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/settings_resume.rs",
+   "crate": "root",
+   "src_sha256": "f1c4d34b2513d591adff5cd660a3a07155c219874e6b528c5d855eaa9bfea4d1",
+   "dest_sha256": "8c47d06cbcb3a27c47e71031b75ceaf47d685a76adebab063069dc47d182ab4a"
+  },
+  {
+   "src": "src/mii_editor_bridge/screen_reentry.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/screen_reentry.rs",
+   "crate": "root",
+   "src_sha256": "6bfd52bf43def84a995078e3dbbac758e5d3a1bf9db930d244caf402c2c98c31",
+   "dest_sha256": "6bfd52bf43def84a995078e3dbbac758e5d3a1bf9db930d244caf402c2c98c31"
+  },
+  {
+   "src": "src/mii_editor_bridge/editor_origin.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/editor_origin.rs",
+   "crate": "root",
+   "src_sha256": "c3530b9636eacbd7cab848235a06d45e2ce647aa77537ececf331bdc8665f420",
+   "dest_sha256": "3261a0188d5bdbf7493cbaa02106f03236ebc035845a21fdd27a771e5501b7f0"
+  },
+  {
+   "src": "src/mii_editor_bridge/fingerprints.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
+   "crate": "root",
+   "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
+   "dest_sha256": "7508c8e1b13a129027368a428aeca1a38a1409c960567880d757de70b2d08bbd"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_vm.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_vm.rs",
+   "crate": "root",
+   "src_sha256": "ada145e3ea2fe8b8c431b19cfbd6ce41264d77fa38ea345b2e13889beead6383",
+   "dest_sha256": "ada145e3ea2fe8b8c431b19cfbd6ce41264d77fa38ea345b2e13889beead6383"
+  },
+  {
+   "src": "src/mii_editor_bridge/ui_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/ui_resume.rs",
+   "crate": "root",
+   "src_sha256": "ff2007bc3608fb37f9eea716e1c311160002cc6946546c2e7f799ff86d181522",
+   "dest_sha256": "ff068ce7f858ee31dcb5c833254b853d6739575728000c490022f91d052cc1a6"
+  },
+  {
+   "src": "src/mii_editor_bridge/name_keyboard.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/name_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a",
+   "dest_sha256": "b7841b23e55e74fb1aec7cf71b437ce1c740b704b1086f4e1ea83305d521229a"
+  },
+  {
+   "src": "src/mii_editor_bridge/connected.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/connected.rs",
+   "crate": "root",
+   "src_sha256": "982b5cd8a1518d285d433808bca83f02fb5e8cae419e9996ad46ea0e9021c568",
+   "dest_sha256": "77f36932c428a56a58bfbdcaffb5c32404434dd7d3761823585c992d29ebeae5"
+  },
+  {
+   "src": "src/mii_editor_bridge/inline_keyboard.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/inline_keyboard.rs",
+   "crate": "root",
+   "src_sha256": "944bd6ac264824f1bd4f75ab5820d12d4271978178a944c3412401ded69d7f38",
+   "dest_sha256": "613d89fa1f85c7824e2fd474228420fc9073266b90aa92ec23892d6156b13600"
+  },
+  {
+   "src": "src/mii_editor_bridge/draft.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/draft.rs",
+   "crate": "root",
+   "src_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be",
+   "dest_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be"
+  },
+  {
+   "src": "src/mii_editor_bridge/specials_resume.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/specials_resume.rs",
+   "crate": "root",
+   "src_sha256": "4ea3dff7cdc733df70dc082064f477fc76e648955eef0be3d413a7b67f41512d",
+   "dest_sha256": "4ea3dff7cdc733df70dc082064f477fc76e648955eef0be3d413a7b67f41512d"
+  },
+  {
+   "src": "src/mii_editor_bridge/mod.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
+   "crate": "root",
+   "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
+   "dest_sha256": "e7826904600aade69b602e2c892962eeee43c5a5657f441f82ac6cfc08967eeb",
+   "edits": [
+    {
+     "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
+     "new": "pub(crate) struct Trace {\n    events: crate::engine::compat::fixed::FixedVec<Event, 192>,\n    input_checks: crate::engine::compat::fixed::FixedVec<(&'static str, [native::InputChange; 3]), 4>,\n}",
+     "reason": "the trace lives in fixed-capacity lists (same 192 events, 4 input checks, same JSON): the `Vec`s grew inside game hooks (review R5, lead ruling 3 of 2026-11-02)"
+    },
+    {
+     "old": "}.unwrap_or_else(|| Trace { events: Vec::with_capacity(192), input_checks: Vec::new() });",
+     "new": "}.unwrap_or_else(|| Trace { events: crate::engine::compat::fixed::FixedVec::new(), input_checks: crate::engine::compat::fixed::FixedVec::new() });",
+     "reason": "a new session's trace allocated 192 events inside the request hook; the fixed list does not allocate"
+    },
+    {
+     "old": "        if self.trace.events.len() < 192 {\n            self.trace.events.push(Event { name, phase: self.phase, values });\n            crate::runtime::compat::filesystem::write_mii_editor(Box::new(self.trace.clone()));\n        }",
+     "new": "        if self.trace.events.push(Event { name, phase: self.phase, values }) {\n            // the callback only copies the newest state into the writer's slot (coalesced, no allocation, no file I/O)\n            crate::runtime::compat::filesystem::publish_mii_editor(&self.trace);\n        }",
+     "reason": "every editor event cloned the whole trace into a `Box` inside the hook and queued a write of it; now the newest trace replaces an unwritten older one in a fixed slot that the writer thread takes (lead ruling 2 and 3 of 2026-11-02)"
+    },
+    {
+     "old": "pub(crate) fn write_trace(trace: &Trace) {",
+     "new": "pub(crate) fn write_trace(trace: &Trace) -> std::io::Result<()> {",
+     "reason": "the write reports its result to the writer thread, which keeps the state for the next turn on a failure"
+    },
+    {
+     "old": "    if let Ok(bytes) = serde_json::to_vec_pretty(trace) {\n        let path = \"sd:/ultimate/TrainingRooms/mii-editor-last.json\";\n        if let Err(error) = std::fs::write(path, bytes) {\n            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] trace write failed: {error}\"));\n        }\n    }",
+     "new": "    crate::engine::lobby::trace_slot::write_json(std::path::Path::new(\"sd:/ultimate/TrainingRooms/mii-editor-last.json\"), trace)",
+     "reason": "the trace file is written transactionally (temporary file, sync, replace; the old file stays on a failure) instead of `std::fs::write` over the live file (review R1); host tests in `engine::lobby::trace_slot` cover two loads and a failed write; offered back to the fork's fix ledger"
+    }
+   ]
+  },
+  {
+   "src": "src/mii_editor_bridge/return_gate.rs",
+   "dest": "src/runtime/mii/mii_editor_bridge/return_gate.rs",
+   "crate": "root",
+   "src_sha256": "8828460840d5d17897e634a4b03aa5a508fe38284144b9a205419c6736640c59",
+   "dest_sha256": "8828460840d5d17897e634a4b03aa5a508fe38284144b9a205419c6736640c59"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_focus.luac",
+   "crate": "root",
+   "src_sha256": "f710662343d3ccc7006d4540258172f527f7c1d14e7589f6d3de8457db453979",
+   "dest_sha256": "f710662343d3ccc7006d4540258172f527f7c1d14e7589f6d3de8457db453979"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_capture.lua",
+   "crate": "root",
+   "src_sha256": "514eb19b92ea58e523fb8aa9c7883970e5fed1c415745d99f2b2c3cf0e49e138",
+   "dest_sha256": "514eb19b92ea58e523fb8aa9c7883970e5fed1c415745d99f2b2c3cf0e49e138"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_policy.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_policy.lua",
+   "crate": "root",
+   "src_sha256": "37cb1413a2edc9d6015b32a16c24ee61c3b707e67adcaf7e407c33c04b5f7b19",
+   "dest_sha256": "37cb1413a2edc9d6015b32a16c24ee61c3b707e67adcaf7e407c33c04b5f7b19"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/manifest.json",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/manifest.json",
+   "crate": "root",
+   "src_sha256": "fadb714194e812c1d1eaf19b2475a7ab60ed54d1030c33a6f7d625c4c6f0d381",
+   "dest_sha256": "fadb714194e812c1d1eaf19b2475a7ab60ed54d1030c33a6f7d625c4c6f0d381"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_capture.lua",
+   "crate": "root",
+   "src_sha256": "1fdf5bfc72e6014c8eb021d574da8cdde685765573584fadcc84d6ea5bfec448",
+   "dest_sha256": "1fdf5bfc72e6014c8eb021d574da8cdde685765573584fadcc84d6ea5bfec448"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/open_sub.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/open_sub.lua",
+   "crate": "root",
+   "src_sha256": "ccfa18394f0fd8e6176ed1349b03a50d8cee709b31a2181a5deb9b7cf48673a6",
+   "dest_sha256": "ccfa18394f0fd8e6176ed1349b03a50d8cee709b31a2181a5deb9b7cf48673a6"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_random.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_random.luac",
+   "crate": "root",
+   "src_sha256": "e9df46fec86e4a133aff1501ed594c160d1701ef42b99d314e9f04633e41bef6",
+   "dest_sha256": "e9df46fec86e4a133aff1501ed594c160d1701ef42b99d314e9f04633e41bef6"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/pending.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/pending.lua",
+   "crate": "root",
+   "src_sha256": "413c8a5361b0cddfa7e1c9b4d4c03065f9270ece3b0fc0bdbf54914ea4295758",
+   "dest_sha256": "413c8a5361b0cddfa7e1c9b4d4c03065f9270ece3b0fc0bdbf54914ea4295758"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_focus.lua",
+   "crate": "root",
+   "src_sha256": "b5f76c6ece9fcba3e36be17ef7af89cd16b8ca50965557e83d9468d6bf4faf8b",
+   "dest_sha256": "b5f76c6ece9fcba3e36be17ef7af89cd16b8ca50965557e83d9468d6bf4faf8b"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/focus.luac",
+   "crate": "root",
+   "src_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946",
+   "dest_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/closures.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/closures.luac",
+   "crate": "root",
+   "src_sha256": "54fccd3227a1db0a97e821a6c3910331f08162b08e5d5242342e9a33675137aa",
+   "dest_sha256": "54fccd3227a1db0a97e821a6c3910331f08162b08e5d5242342e9a33675137aa"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_focus.luac",
+   "crate": "root",
+   "src_sha256": "9b632d89577ff50e2f7e05d3e46d916860fca10af3fb98911a642d59cc501b3d",
+   "dest_sha256": "9b632d89577ff50e2f7e05d3e46d916860fca10af3fb98911a642d59cc501b3d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_focus.lua",
+   "crate": "root",
+   "src_sha256": "c1b1812544a6efc9636cf01775d208eb1b2b4d8711c7480d53bedd2c9b92ff4f",
+   "dest_sha256": "c1b1812544a6efc9636cf01775d208eb1b2b4d8711c7480d53bedd2c9b92ff4f"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_random.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_random.lua",
+   "crate": "root",
+   "src_sha256": "0e6e0f5a6521490590c661e88c79cec9f80aa4af431c3ca51c493c7f947d038a",
+   "dest_sha256": "0e6e0f5a6521490590c661e88c79cec9f80aa4af431c3ca51c493c7f947d038a"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_focus.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_focus.luac",
+   "crate": "root",
+   "src_sha256": "f2527e45cfbb58c9c57c296df7ac8249a24da07c184364c0a98a492568b9b06d",
+   "dest_sha256": "f2527e45cfbb58c9c57c296df7ac8249a24da07c184364c0a98a492568b9b06d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/gear_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/gear_capture.luac",
+   "crate": "root",
+   "src_sha256": "b01941660bd3a72223f43f2e3a19df43f317af0a05ec10982795088564cc7622",
+   "dest_sha256": "b01941660bd3a72223f43f2e3a19df43f317af0a05ec10982795088564cc7622"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_policy.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_policy.luac",
+   "crate": "root",
+   "src_sha256": "122dbe55b0b2eb3dcca4e5c2796f88e3f194aceea593793531ff32b9fc7db72b",
+   "dest_sha256": "122dbe55b0b2eb3dcca4e5c2796f88e3f194aceea593793531ff32b9fc7db72b"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/sub_cursor.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/sub_cursor.luac",
+   "crate": "root",
+   "src_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946",
+   "dest_sha256": "f09cae7da9e67882953bdfb30d05995b950f98de09db567e594cf16b598cf946"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/open_sub.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/open_sub.luac",
+   "crate": "root",
+   "src_sha256": "e071a161f1d179daf96fd16434af4776d21130857e991bdf50066a171e276479",
+   "dest_sha256": "e071a161f1d179daf96fd16434af4776d21130857e991bdf50066a171e276479"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/focus.lua",
+   "crate": "root",
+   "src_sha256": "33067d644c1647b7244e5dad5cba4231cb08506ecead7be5d4d340eeedcd3832",
+   "dest_sha256": "33067d644c1647b7244e5dad5cba4231cb08506ecead7be5d4d340eeedcd3832"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/capture.lua",
+   "crate": "root",
+   "src_sha256": "d29c8c6d1eb23186ffe0949db391d32a2a302ee85331b63c2b02e8e809ca95df",
+   "dest_sha256": "d29c8c6d1eb23186ffe0949db391d32a2a302ee85331b63c2b02e8e809ca95df"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_capture.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_capture.lua",
+   "crate": "root",
+   "src_sha256": "6ebcec535f6289ae4abc23be97edd363ebf5711966aee02b371b808f277ad03d",
+   "dest_sha256": "6ebcec535f6289ae4abc23be97edd363ebf5711966aee02b371b808f277ad03d"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_focus.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_focus.lua",
+   "crate": "root",
+   "src_sha256": "029070cab093fc75174c61c113e65f3eecc99771d5ad9dec4c75a6458a0a4944",
+   "dest_sha256": "029070cab093fc75174c61c113e65f3eecc99771d5ad9dec4c75a6458a0a4944"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/closures.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/closures.lua",
+   "crate": "root",
+   "src_sha256": "c696005781374045995d413ee97eec3225a8513a3ce2ebca223044e32e3258be",
+   "dest_sha256": "c696005781374045995d413ee97eec3225a8513a3ce2ebca223044e32e3258be"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/pending.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/pending.luac",
+   "crate": "root",
+   "src_sha256": "f93bd82137fb0861a57a6e9f2249b9589cd7e2e20bd8c7fc39f416e7ae7ef447",
+   "dest_sha256": "f93bd82137fb0861a57a6e9f2249b9589cd7e2e20bd8c7fc39f416e7ae7ef447"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/settings_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/settings_capture.luac",
+   "crate": "root",
+   "src_sha256": "984a537395d78c8555b3264eacd03028241384e858bd701bfcbb8fb92da9608c",
+   "dest_sha256": "984a537395d78c8555b3264eacd03028241384e858bd701bfcbb8fb92da9608c"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/capture.luac",
+   "crate": "root",
+   "src_sha256": "616bd5fff3898b091732954ed4ecc83eed644060a5a9e988c303059b4999472a",
+   "dest_sha256": "616bd5fff3898b091732954ed4ecc83eed644060a5a9e988c303059b4999472a"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/voice_capture.luac",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/voice_capture.luac",
+   "crate": "root",
+   "src_sha256": "db9ed78708cc978e0935f703d4f309e9212686e7b937ee2951a0cfea5656b854",
+   "dest_sha256": "db9ed78708cc978e0935f703d4f309e9212686e7b937ee2951a0cfea5656b854"
+  },
+  {
+   "src": "src/mii_editor_bridge/lua_helpers/sub_cursor.lua",
+   "dest": "src/runtime/mii/mii_editor_bridge/lua_helpers/sub_cursor.lua",
+   "crate": "root",
+   "src_sha256": "56bb83190cfc0cb05f05fb4e568f146d2aa159033b1414df1d31d5afe94840f6",
+   "dest_sha256": "56bb83190cfc0cb05f05fb4e568f146d2aa159033b1414df1d31d5afe94840f6"
+  },
+  {
+   "src": "src/mii_closed_ack.rs",
+   "dest": "src/runtime/mii/mii_closed_ack.rs",
+   "crate": "root",
+   "src_sha256": "eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b",
+   "dest_sha256": "2bb3ec82b360a38e3157aed8afbe39ea1a9edbf8e78d1d2f0fb0a4ffba60d638"
+  },
+  {
+   "src": "src/practice_stage_request.rs",
+   "dest": "src/runtime/lobby/practice_stage_request.rs",
+   "crate": "root",
+   "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
+   "dest_sha256": "7d8ac84b4258ad163e41ddf42e280c44b689a5ac28a613e301d5ceeba7ef9618",
+   "edits": [
+    {
+     "old": "notification(\"Practice Stage\".into(), message, 180);",
+     "new": "notification(\"Practice Stage\".into(), message.into(), 180);",
+     "reason": "the notification facade takes `Cow<'static, str>` so static texts allocate nothing; the formatted message moves in as `Cow::Owned`"
+    }
+   ]
+  },
+  {
+   "src": "src/practice_stage_request_words.rs",
+   "dest": "src/runtime/lobby/practice_stage_request_words.rs",
+   "crate": "root",
+   "src_sha256": "33c687a9d8cf3cacf29c4ce1a37082ee6cbcf93a88a0f4d485bc63f1154f439d",
+   "dest_sha256": "33c687a9d8cf3cacf29c4ce1a37082ee6cbcf93a88a0f4d485bc63f1154f439d"
+  },
+  {
+   "src": "src/practice_stage_observer.rs",
+   "dest": "src/runtime/lobby/practice_stage_observer.rs",
+   "crate": "root",
+   "src_sha256": "7ee9680b0e147c0f3a3bd5f18a3b27acb979a1d80857ca59d92cc0718f9c94a0",
+   "dest_sha256": "93cbc092a0b7af12d896c964013c3af1ad58ad3bb4af5a691b85b06ffcf487a0"
+  },
+  {
+   "src": "src/lobby_stage_probe.rs",
+   "dest": "src/runtime/lobby/lobby_stage_probe.rs",
+   "crate": "root",
+   "src_sha256": "0b660f82e43258aaee60241bc531c29d8a35e17078a038f35b79ecd03f11dd37",
+   "dest_sha256": "f32d024769f401fe680af3dff280795d1046ec1b7ebe714b658f1cef2432e681"
+  },
+  {
+   "src": "src/training/lobby.rs",
+   "dest": "src/runtime/lobby/training/lobby.rs",
+   "crate": "root",
+   "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
+   "dest_sha256": "555f1a4673997f07fef352d6ea7726b841ce1ffad3d4b1f22f5b065252d13d77",
+   "edits": [
+    {
+     "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
+     "new": "use {crate::runtime::compat::consts::FighterId, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
+     "reason": "`Action` and `LedgeOption` are the fork's menu structs (its mixed consts crate); see the next edit"
+    },
+    {
+     "delete_from": "pub fn available_actions(mut actions: Action) -> Action {",
+     "delete_to": "/// Called before input processing and UI dispatch.",
+     "reason": "`available_actions` / `available_ledge_options` filtered the fork's menu structs (the playback choices are not offered in the waiting room); the clean-room menu model decides which rows and options a scene offers (SPEC-core-02), so they have no caller and no type to act on"
+    },
+    {
+     "old": "pub fn set_native_ui_busy(busy: bool) {\n",
+     "new": "pub fn set_native_ui_busy(busy: bool) {\n    // R2: the waiting-room native UI busy fact is one producer: the owner bit that the input-delay stage reads\n    crate::runtime::compat::common::menu::set_native_ui_owner(busy);\n",
+     "reason": "the busy fact is published as `Owners::NATIVE_UI_BUSY` in the input-owner mask through one function, so a hand-supplied owner value can never replace the producer (review R2, PACKAGE-6-PLAN section 7)"
+    },
+    {
+     "old": "            NATIVE_UI_BUSY.store(false, Ordering::Release);\n",
+     "new": "            set_native_ui_busy(false);\n",
+     "reason": "the scene departure released the busy flag by a direct store, which would leave the owner bit set (every later poll neutral); the one producer is `set_native_ui_busy` (review R2)"
+    },
+    {
+     "old": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        super::clear_session_state();\n",
+     "new": "        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state();\n",
+     "reason": "package 2's CPU role scene and the shared scene wrapper follow the lobby's activation (`cpu::set_lobby`, PACKAGE-6-PLAN section 6); the fork had no such coupling"
+    }
+   ]
+  },
+  {
+   "src": "src/training/practice.rs",
+   "dest": "src/runtime/lobby/training/practice.rs",
+   "crate": "root",
+   "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
+   "dest_sha256": "a5e2509155d7c8ce34329b5af3fce14496c6fdd15ce5b912f6c7a0de7ac485bd",
+   "edits": [
+    {
+     "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
+     "new": "    common::try_get_object_accessor(owner).is_some_and(|module|\n        module.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
+     "reason": "the fork's `try_get_battle_object` returned its `BattleObject` struct only for the `module_accessor` field; the clean room resolves the accessor of an object id directly (guarded `sv_battle_object::module_accessor` row)"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_tui/src/resume.rs",
+   "dest": "src/model/mii_root/resume.rs",
+   "crate": "tui",
+   "src_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793",
+   "dest_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793"
+  },
+  {
+   "src": "training_mod_tui/src/mii_menu.rs",
+   "dest": "src/model/mii_root/mii_menu.rs",
+   "crate": "tui",
+   "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
+   "dest_sha256": "8e72cef70c1637e753c7225eb5c012a03b5917278d28a55f9528cd170c2618ea",
+   "edits": [
+    {
+     "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
+     "new": "use crate::engine::compat::panel_view as macro_panel;",
+     "reason": "the fork's menu toolkit (`StatefulTable`, `SubMenu`, the macro panel) is not carried: the one list view the catalog fills is `compat::panel_view::View` (the same four fields)"
+    },
+    {
+     "delete_from": "pub fn launchers() -> Vec<SubMenu<'static>> {",
+     "delete_to": "/// Supplied once at menu open",
+     "reason": "`launchers` built the fork's three Mii submenu launchers; the clean-room menu table has the Mii rows (`Editor::MiiList`, SPEC-core-02)"
+    },
+    {
+     "old": "let page_size = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;",
+     "new": "let page_size = crate::model::panes::ROWS;",
+     "reason": "a page of the Mii list is as many rows as the clean-room list screen shows (package 5's `panes::ROWS`), not the fork's submenu grid"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/adapter.rs",
+   "dest": "src/model/lobby/automation/adapter.rs",
+   "crate": "root",
+   "src_sha256": "df094011e9da70957a2c7e308f5a7b761a5213b04190e7e508bfc59fe6f71940",
+   "dest_sha256": "da0ac63269277cba0494bcf716054105c586cdcd61bedff17e438aa60a234193",
+   "edits": [
+    {
+     "old": "impl Adapter {\n",
+     "new": "impl Default for Adapter {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Adapter {\n",
+     "reason": "clippy `new_without_default` on `Adapter::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/control.rs",
+   "dest": "src/model/lobby/automation/control.rs",
+   "crate": "root",
+   "src_sha256": "b32c1c5dde398e494832b1ae4f266a99368054c9c5fc2a2767fb2047797bd64f",
+   "dest_sha256": "c4802c38cd1cc345182f6cb47ece7a3fe7890e912e5aa6a996ed1a3e27d7021c",
+   "edits": [
+    {
+     "old": "impl Controls {\n",
+     "new": "impl Default for Controls {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Controls {\n",
+     "reason": "clippy `new_without_default` on `Controls::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/flow.rs",
+   "dest": "src/model/lobby/automation/flow.rs",
+   "crate": "root",
+   "src_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a",
+   "dest_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a"
+  },
+  {
+   "src": "src/automation_helper/popup.rs",
+   "dest": "src/model/lobby/automation/popup.rs",
+   "crate": "root",
+   "src_sha256": "35a9ea32b9fa302cac348caf781a556e60ef74b0fcdd45ef39b6b59e9fb3d98d",
+   "dest_sha256": "24619b0dc9762fe788fa16edb099e761f01217a09821ad95c4fa391978043014",
+   "edits": [
+    {
+     "old": "impl Popup {\n",
+     "new": "impl Default for Popup {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Popup {\n",
+     "reason": "clippy `new_without_default` on `Popup::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/pulse.rs",
+   "dest": "src/model/lobby/automation/pulse.rs",
+   "crate": "root",
+   "src_sha256": "3a4561a96f75be9cdca1705de9579c026f94039b2809350c886fefec98702563",
+   "dest_sha256": "60824c70a36487d80a640be5331593d3142850fd639ce716e09d09e18dff6a66",
+   "edits": [
+    {
+     "old": "impl Scheduler {\n",
+     "new": "impl Default for Scheduler {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Scheduler {\n",
+     "reason": "clippy `new_without_default` on `Scheduler::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    },
+    {
+     "old": "impl Slot {\n",
+     "new": "impl Default for Slot {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Slot {\n",
+     "reason": "clippy `new_without_default` on `Slot::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
+    }
+   ]
+  },
+  {
+   "src": "src/automation_helper/recording.rs",
+   "dest": "src/model/lobby/automation/recording.rs",
+   "crate": "root",
+   "src_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29",
+   "dest_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29"
+  },
+  {
+   "src": "src/automation_helper/native.rs",
+   "dest": "src/runtime/lobby/automation_helper/native.rs",
+   "crate": "root",
+   "src_sha256": "62851fc8c4e245ae4d8f73105d732b218ed1de57dece5dd93736afb74a144eb7",
+   "dest_sha256": "62b85bef9d9a32fe862ec67c4ae39efb28970c68508daccadb01d02e90c04362"
+  },
+  {
+   "src": "src/automation_helper/observer.rs",
+   "dest": "src/runtime/lobby/automation_helper/observer.rs",
+   "crate": "root",
+   "src_sha256": "dfb1910269e9a9b6d67dd7ad5f56580fbaed1ccdf60869b009c166a3e386f21a",
+   "dest_sha256": "ca08264f8cf1cf94e1d02f6787764f2fc656a19d05867df2ab71893bdd120db8"
+  },
+  {
+   "src": "src/automation_helper/plugin.rs",
+   "dest": "src/runtime/lobby/automation_helper/plugin.rs",
+   "crate": "root",
+   "src_sha256": "cf5371be7299d33769dc5ecf4b6662aab964d13165914b5552116e3483b11774",
+   "dest_sha256": "cf5ce60065242626647bc8e5a950490b0672fc8e8dba0e1b268bdb0956d3f1a9"
   }
  ]
 }

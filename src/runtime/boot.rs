@@ -12,7 +12,7 @@ use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::developer_ini;
 use crate::model::guard::GuardOutcome;
-use crate::model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
+use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::{self, Settings};
 use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
@@ -27,6 +27,7 @@ use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
     chords, cpu, cpu_common, hud_draw, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
+use crate::runtime::p1;
 use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
@@ -49,6 +50,7 @@ pub fn run() {
             verdict,
             sites: &[],
             features: &[],
+            seams: None,
             developer: None,
             settings: None,
             migration: None,
@@ -69,6 +71,8 @@ pub fn run() {
     if let Err(error) = fs::create_dir_all(storage::ROOT) {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::sync_probe::run();
     let developer = read_developer_ini();
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
@@ -189,6 +193,16 @@ pub fn run() {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
     }
 
+    // Package 6: the CPU-as-P1 fallback (Q11). It installs only while the standalone CPU pilot is absent (`ui::install` found out
+    // above) and only when the CPU core, the input hooks, the save-state natives and every game function it calls passed their guards.
+    let found6 = p1::check();
+    let p1_prerequisites = cpu_core_on
+        && input_delay_on
+        && state_on
+        && get_int_ok
+        && ["status_kind", "prev_status_kind", "pos_x", "pos_y", "damage_of", "utility_get_kind"].iter().all(|name| row_usable(name))
+        && row4_usable("fighter_manager_get_entry");
+    let (p1_on, p1_reason, written6) = p1::install(&found6, p1_prerequisites);
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
@@ -203,6 +217,7 @@ pub fn run() {
     });
     let mut reports: Vec<SiteReport> = base_reports.to_vec();
     reports.extend(ui::reports(&ui_install));
+    reports.extend(p1::reports(&found6, &written6));
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on, reason: None },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on, reason: None },
@@ -220,7 +235,9 @@ pub fn run() {
         FeatureReport { feature: Feature::Recording.name(), installed: recording_on, reason: None },
         FeatureReport { feature: Feature::Notices.name(), installed: notices_on, reason: None },
         FeatureReport { feature: Feature::Ui.name(), installed: ui_install.anchors, reason: None },
+        FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason },
     ];
+    let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),
         version: env!("CARGO_PKG_VERSION"),
@@ -229,6 +246,7 @@ pub fn run() {
         verdict,
         sites: &reports,
         features: &features,
+        seams: Some(Extra(&seam_fields)),
         developer: Some(DeveloperReport { on: developer.developer_page, reason: developer.reason.text() }),
         settings: Some(SettingsReport {
             input_delay: loaded.menu.input_delay(),

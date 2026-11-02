@@ -74,6 +74,8 @@ fn apply() {
     // SAFETY: as above.
     unsafe { *out = record };
     drop(adapter);
+    // Package 6: the CPU-as-P1 fallback writes its pad into P1's record after the delay (nothing while the pilot is present).
+    unsafe { crate::runtime::p1::input(slot as i32, out) };
     #[cfg(feature = "diag")]
     if let Some(check) = check {
         diagnostic(format_args!("[TrainingRooms] pause_owner resume_checked delay={} leaked={}", check.delay, check.leaked));

@@ -181,7 +181,7 @@ unsafe fn cpu_body() -> Option<Body> {
     body_of(i32::from(cpu::primary_entry_now()))
 }
 
-/// The first body of ntry_id (0 is P1).
+/// The first body of `entry_id (0 is P1).
 ///
 /// # Safety
 /// The package 4 natives must have passed their guards.
