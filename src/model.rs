@@ -5,6 +5,8 @@
 //! submodule file relative to `src/`, which resolves the same whether this file is the crate's own
 //! module or is included by path from a test.
 
+#[path = "model/cpu/mod.rs"]
+pub mod cpu;
 #[path = "model/developer_ini.rs"]
 pub mod developer_ini;
 #[path = "model/diag_ring.rs"]

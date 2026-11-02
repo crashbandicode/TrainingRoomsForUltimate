@@ -14,8 +14,10 @@ static LRA_RESET: AtomicBool = AtomicBool::new(true);
 static STAGE_HAZARDS: AtomicBool = AtomicBool::new(false);
 static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 
-/// Make `snapshot` the live settings.
-pub fn publish(snapshot: &Snapshot) {
+/// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
+/// B11); the first publish at boot has none.
+pub fn publish(snapshot: &Snapshot, rerolls: u8) {
+    crate::runtime::features::cpu::publish(snapshot, rerolls);
     INPUT_DELAY.store(snapshot.input_delay(), Ordering::Release);
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);
