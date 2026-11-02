@@ -217,7 +217,7 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
         let displaced = capture.owner.begin(RecordOwner { state, index: native.index, epoch });
         capture.release(displaced, "restart");
         if toggle().begin_record() {
-            let key = capture.pool.start_record(native.index);
+            let key = crate::model::hook_stats::per_load(|| capture.pool.start_record(native.index));
             capture.clock = Some(native.tick);
             #[cfg(feature = "named-input-trace")]
             CLOCK_TRACE_LEFT.store(10_000, Ordering::Relaxed);
@@ -547,7 +547,8 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
         capture.pool.seal_entry(pending.key, entry); return;
     };
     pending.sample.input = input;
-    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);
+    // A track's Vec grows by doubling: counted as a per-load allocation (hook_stats::per_load), not a steady-state one.
+    let accepted = crate::model::hook_stats::per_load(|| capture.pool.push(pending.key, entry, pending.tick, pending.sample));
     #[cfg(feature = "named-input-trace")]
     if entry == 1 && pending.tick < 600 {
         println!("[LiveCapture] sample generation={} index={} tick={} accepted={} buttons={:#x} lx={} ly={}",

@@ -148,7 +148,7 @@ fn notify(message: String) {
         crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
         return;
     }
-    crate::runtime::lobby::training::ui::notifications::notification("Clip Editor".into(), message, 180);
+    crate::runtime::macros::port::notifications::notification("Clip Editor".into(), message, 180);
 }
 
 pub fn open_editor() {
@@ -156,9 +156,9 @@ pub fn open_editor() {
 }
 
 fn open_browser(expected_revision: Option<u64>) {
-    if !crate::runtime::lobby::training::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::lobby::training::practice::acquire() }
-        || crate::runtime::lobby::training::recording_or_playback()
-        || unsafe { crate::training::save_states::is_loading() }
+    if !crate::runtime::macros::port::practice::enabled() || unsafe { !Fighter::is_ready_go() || !crate::runtime::macros::port::practice::acquire() }
+        || crate::runtime::macros::port::recording_or_playback()
+        || crate::runtime::macros::port::save_states::is_loading()
         || crate::runtime::macros::port::roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
     {
         notify("Open the replay window in idle practice".into());
@@ -196,7 +196,7 @@ fn open_browser(expected_revision: Option<u64>) {
         // interruption while that I/O was in flight.
         if expected_revision.is_some_and(|revision|
             !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::port::practice::enabled() { return; }
         *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
             revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });
     }
@@ -246,7 +246,7 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
             if !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening()) {
                 return Ok(()); // Cancel/departure owns this result; never publish it late.
             }
-            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::lobby::training::practice::enabled() {
+            if crate::runtime::macros::named_macros::suspended() || !crate::runtime::macros::port::practice::enabled() {
                 return Err("Practice changed before the capture could open".into());
             }
             let cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
@@ -368,7 +368,7 @@ pub fn browser_view() -> Option<View> {
 }
 
 pub fn browser_input(pad: Pad) {
-    let waiting = crate::runtime::lobby::training::practice::waiting();
+    let waiting = crate::runtime::macros::port::practice::waiting();
     let (effect, revision) = {
         let mut browser = BROWSER.lock().unwrap();
         let Some(browser) = browser.as_mut() else { return };
@@ -401,9 +401,9 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
 }
 
 fn capture_ready() -> bool {
-    crate::runtime::lobby::training::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
-        && unsafe { Fighter::is_ready_go() && !crate::training::save_states::is_loading() }
-        && !crate::runtime::lobby::training::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
+    crate::runtime::macros::port::practice::enabled() && !crate::runtime::macros::named_macros::suspended()
+        && unsafe { Fighter::is_ready_go() && !crate::runtime::macros::port::save_states::is_loading() }
+        && !crate::runtime::macros::port::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
 }
 
 /// The existing browser owns this short neutral-input interval. Native controller
@@ -413,18 +413,18 @@ pub fn quiescing_capture() -> bool {
     // on that hot path. Release the browser lock before querying other owners.
     let pending = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending());
     pending && !crate::runtime::macros::named_macros::suspended()
-        && crate::runtime::lobby::training::practice::waiting()
+        && crate::runtime::macros::port::practice::waiting()
 }
 
 pub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {
-    if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }
+    if !quiescing_capture() || crate::runtime::macros::port::practice::role(module) != Some(1) { return false; }
     let clean = clean_statuses().contains(&StatusModule::status_kind(module));
     BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.release_cpu(clean))
 }
 
 unsafe fn service_browser() {
     if !BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.ui.pending()) { return; }
-    let eligible = crate::runtime::lobby::training::practice::waiting() && capture_ready();
+    let eligible = crate::runtime::macros::port::practice::waiting() && capture_ready();
     let clean = eligible && crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
         .is_some_and(|cpu| clean_statuses().contains(&StatusModule::status_kind(cpu)));
     let (effect, revision) = {
@@ -494,13 +494,13 @@ pub fn cancel_reload() {
 /// cleanup must finish before handing control to the existing character loader.
 pub unsafe fn service_reload() {
     if crate::runtime::macros::named_macros::suspended() { return; }
-    if !crate::runtime::lobby::training::practice::scene_enabled() {
+    if !crate::runtime::macros::port::practice::scene_enabled() {
         let had_reload=RELOAD.lock().unwrap().take().is_some();
         if had_reload || panel_visible() || browser_visible() {close_editor_inner(had_reload);}
         return;
     }
     service_browser();
-    if crate::training::lobby::native_ui_busy() { return; }
+    if crate::runtime::macros::lobby::native_ui_busy() { return; }
     let cpu=crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU);
     let current=cpu.map(|cpu|app::utility::get_kind(&mut *cpu));
     let mut reload=RELOAD.lock().unwrap();
@@ -681,8 +681,7 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
     *HOLD.lock().unwrap() = (0, 0, false);
     if was_open || was_browsing || was_loading {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
-        crate::training::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);
-        crate::training::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);
+        crate::runtime::features::recorder::swallow_p1(15);
         CLOSE_INPUT.lock().unwrap().arm(crate::runtime::compat::common::menu::MENU_CLOSE_WAIT_FRAMES);
         #[cfg(feature = "named-input-trace")]
         {
@@ -836,7 +835,7 @@ pub fn scrub_pace() -> i32 {
 /// Called AFTER info_training draws, solely for held range-edit repeat.
 pub fn after_draw() {
     if !crate::runtime::macros::named_macros::clip_foreground()
-        || crate::runtime::macros::port::sync::read(&crate::training::ui::menu::VANILLA_MENU_ACTIVE) {
+        || crate::runtime::published::input_owners().contains(crate::model::input_delay::Owners::VANILLA_PAUSE) {
         *HOLD.lock().unwrap() = (0, 0, false);
         return;
     }

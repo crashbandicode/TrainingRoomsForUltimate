@@ -22,14 +22,14 @@
    "live_replay": "crate::runtime::macros::live_replay",
    "capture_plugin": "crate::runtime::macros::capture_plugin",
    "training::named_macros": "crate::runtime::macros::named_macros",
-   "training::practice": "crate::runtime::lobby::training::practice",
-   "training::ui::notifications": "crate::runtime::lobby::training::ui::notifications",
-   "training::recording_or_playback": "crate::runtime::lobby::training::recording_or_playback",
+   "training::practice": "crate::runtime::macros::port::practice",
+   "training::ui::notifications": "crate::runtime::macros::port::notifications",
+   "training::recording_or_playback": "crate::runtime::macros::port::recording_or_playback",
    "common": "crate::runtime::compat::common",
    "common::consts::FighterId": "crate::runtime::compat::consts::FighterId",
    "common::consts::MENU": "crate::runtime::compat::menu::MENU",
    "common::consts::OnOff": "crate::engine::compat::menu::OnOff",
-   "common::consts::MacroSource": "crate::runtime::macros::port::MacroSource",
+   "common::consts::MacroSource": "crate::engine::compat::menu::MacroSource",
    "consts": "crate::runtime::compat::consts",
    "common::game_mode": "crate::runtime::lobby::game_mode",
    "native_keyboard": "crate::runtime::mii::native_keyboard",
@@ -38,7 +38,13 @@
    "logging": "crate::runtime::diag_log",
    "native_fields": "crate::engine::seams::native_fields",
    "swap_native::seam_install": "crate::runtime::seams::seam_install",
-   "input": "crate::runtime::macros::port::input"
+   "input": "crate::runtime::macros::port::input",
+   "training::input_record": "crate::runtime::macros::port::input_record",
+   "training::save_states": "crate::runtime::macros::port::save_states",
+   "common::input": "crate::runtime::macros::port::input",
+   "common::menu": "crate::runtime::compat::common::menu",
+   "training": "crate::runtime::macros",
+   "common::consts": "crate::runtime::macros::port::consts"
   },
   "consts": {
    "mii": "crate::engine::mii",
@@ -311,7 +317,14 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "15bdc70f0aa8bc3ee4d73918068bfe18d0ac990d76dd6f827916ca9d7f47f616"
+   "dest_sha256": "f25302dd66b9d091091f63272a3f5f86bba0cccf008f645a860bc54f9c685fe6",
+   "edits": [
+    {
+     "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
+     "new": "    /// `copy_playback` into a caller-owned buffer (cleared, then filled; no allocation when its capacity suffices).\n    pub fn copy_playback_into(&self, out: &mut Vec<InputFrame>) -> Option<(f32, i32)> {\n        if !self.playback_allowed() {\n            return None;\n        }\n        let recording = &self.loaded.as_ref()?.recording;\n        if recording.frames.is_empty() {\n            return None;\n        }\n        out.clear();\n        out.extend_from_slice(&recording.frames);\n        Some((recording.start.facing, recording.start.status))\n    }\n\n    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
+     "reason": "playback start without a clone (hot-path allocation contract); the original function stays"
+    }
+   ]
   },
   {
    "src": "training_mod_tui/src/macro_panel/fighter.rs",
@@ -453,7 +466,84 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "ebbb6b0021a0cd01a1d6524c9db9da4886f86090832755b5abed9965e59d01da"
+   "dest_sha256": "248df8931ecd9702672a713c5cb4acc42c7928b50880b728d5a8690011bc2041",
+   "edits": [
+    {
+     "old": "use training_mod_sync::*;",
+     "new": "use crate::runtime::macros::port::sync::*;",
+     "reason": "the lock helpers of the fork's sync crate are port::sync (parking_lot, no allocation)"
+    },
+    {
+     "old": "use crate::runtime::macros::port::input::{Buttons, MappedInputs};",
+     "new": "use crate::runtime::macros::port::input::MappedInputs;",
+     "reason": "the clean-room mapped record keeps its buttons as a u32 (no Buttons type)"
+    },
+    {
+     "old": "buttons: input.buttons.bits(),",
+     "new": "buttons: input.buttons,",
+     "reason": "u32 buttons"
+    },
+    {
+     "old": "buttons: Buttons::from_bits_truncate(frame.buttons),",
+     "new": "buttons: frame.buttons,",
+     "reason": "u32 buttons"
+    },
+    {
+     "old": "pub unsafe fn service_restore(_module_accessor: &mut BattleObjectModuleAccessor) {",
+     "new": "pub unsafe fn service_restore() {",
+     "reason": "the clean-room recorder calls it once when both fighters finished restoring (package 3's on_state_restored); the parameter was unused"
+    },
+    {
+     "old": "        let settings = read(&MENU);\n        let action = if settings.record_trigger.contains(&training_mod_consts::RecordTrigger::SAVESTATE) {\n            1\n        } else if settings.save_state_playback.get_random() != training_mod_consts::PlaybackSlot::empty() {\n            2\n        } else { 0 };",
+     "new": "        let settings = crate::runtime::features::recorder::settings();\n        let action = if settings.trigger_save_state {\n            1\n        } else if !settings.save_state_slots.is_empty() {\n            2\n        } else { 0 };",
+     "reason": "Recording Trigger and Save State Playback are the clean-room recorder's rows (RecorderSettings), not the fork's typed menu"
+    },
+    {
+     "old": "    super::frame_counter::reset_frame_count(*menu::MENU_CLOSE_FRAME_COUNTER);\n    super::frame_counter::start_counting(*menu::MENU_CLOSE_FRAME_COUNTER);\n",
+     "new": "    crate::runtime::features::recorder::swallow_p1(15);\n",
+     "reason": "the keyboard's closing press must not become a gameplay input: the recorder's poll stage makes P1 neutral for 15 polls (the fork counted frames with its frame_counter module)"
+    },
+    {
+     "old": "&& unsafe { crate::runtime::compat::common::is_ready_go() }",
+     "new": "&& crate::runtime::compat::common::is_ready_go()",
+     "reason": "the clean-room is_ready_go is a safe guarded call"
+    },
+    {
+     "old": "assign(&super::input_record::CURRENT_LR, pose.facing);",
+     "new": "crate::runtime::features::recorder::set_current_facing(pose.facing);",
+     "reason": "the facing a restored pose sets is the recorder's current facing (SPEC-input-01 section 9: write access to the current facing)"
+    },
+    {
+     "old": "read(&super::input_record::INPUT_RECORD_FRAME)",
+     "new": "crate::runtime::features::recorder::frame()",
+     "count": 3,
+     "reason": "the recorder's frame index for the named diagnostic lines"
+    },
+    {
+     "append": "\n/// SPEC-input-01 section 9, the core's per-frame read (`has_captured_frame` and `frame_at` in one short lock, no allocation): the frame the run\n/// reads at `index` from the buffer in use, `None` while a capture has not stored it yet.\npub fn frame_for(index: usize) -> Option<MappedInputs> {\n    let motion = lock_read(&MOTION);\n    let frame = if motion.playing {\n        motion.play.get(index)\n    } else if index < motion.captured_len {\n        motion.captured.get(index)\n    } else {\n        None\n    }?;\n    Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y, rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate\n/// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).\npub fn prepare_buffers() {\n    let mut motion = lock_write(&MOTION);\n    let wanted = training_mod_macros_max_frames();\n    let (captured, played) = (motion.captured.len(), motion.play.len());\n    if motion.captured.capacity() < wanted {\n        motion.captured.reserve_exact(wanted - captured);\n    }\n    if motion.play.capacity() < wanted {\n        motion.play.reserve_exact(wanted - played);\n    }\n}\n\nfn training_mod_macros_max_frames() -> usize {\n    crate::engine::macros::MAX_FRAMES\n}\n",
+     "reason": "hot-path contract (Astra R1/R2): the control stage reads a frame without allocating, and the buffers are reserved off-hook so the fork's Vec resize in store_frame never allocates in a hook"
+    },
+    {
+     "old": "    let ui = lock_read(&UI);\n    let (facing, status, frames) = ui.copy_playback()?;\n    let info = PlaybackStart {\n        facing,\n        status,\n        len: frames.len(),\n    };\n    drop(ui);\n    let mut motion = lock_write(&MOTION);\n    motion.playing = true;\n    motion.capturing = false;\n    motion.play = frames;",
+     "new": "    let ui = lock_read(&UI);\n    let mut motion = lock_write(&MOTION);\n    let (facing, status) = ui.copy_playback_into(&mut motion.play)?;\n    let info = PlaybackStart {\n        facing,\n        status,\n        len: motion.play.len(),\n    };\n    drop(ui);\n    motion.playing = true;\n    motion.capturing = false;",
+     "reason": "copy the loaded frames into the reserved playback buffer instead of cloning a Vec (no allocation when a playback starts)"
+    },
+    {
+     "old": "    motion.start = recording.start;\n    motion.play = recording.frames;",
+     "new": "    motion.start = recording.start;\n    motion.play.clear();\n    motion.play.extend_from_slice(&recording.frames);",
+     "reason": "keep the reserved playback buffer (moving the recording's Vec in would drop it)"
+    },
+    {
+     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
+     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "count": 2,
+     "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
+    },
+    {
+     "append": "\n/// Diag build only: the keyboard's confirmed-name path without the applet (`service_keyboard` does exactly this with the typed text).\n#[cfg(feature = \"diag\")]\npub fn diag_confirm_name(name: &str) {\n    let effect = lock_write(&UI).confirm_native_name(name.to_owned());\n    apply_effect(effect);\n}\n",
+     "reason": "Eden rows drive the panel through the diag request file (runtime/macros/diag.rs): the software keyboard applet is not part of what they prove"
+    }
+   ]
   },
   {
    "src": "src/replay_store.rs",
@@ -467,14 +557,32 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "78240e9d5964cb84ed7aaa73e3fa110390054ac719531cc232ad6b349f0475c9"
+   "dest_sha256": "024fb7305eb598c0762be789fe100dae3fbe97315712149fb20af755e3e901b4",
+   "edits": [
+    {
+     "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
+     "new": "        crate::runtime::features::recorder::swallow_p1(15);\n",
+     "reason": "the editor's closing press must not reach gameplay: the recorder's poll stage makes P1 neutral for 15 polls (the fork counted with its frame_counter module)"
+    },
+    {
+     "old": "|| crate::runtime::macros::port::sync::read(&crate::runtime::macros::ui::menu::VANILLA_MENU_ACTIVE) {",
+     "new": "|| crate::runtime::published::input_owners().contains(crate::model::input_delay::Owners::VANILLA_PAUSE) {",
+     "reason": "the game's pause menu is an input owner of the clean-room mask (SPEC-input-03), not the fork's VANILLA_MENU_ACTIVE flag"
+    },
+    {
+     "old": "unsafe { crate::runtime::macros::port::save_states::is_loading() }",
+     "new": "crate::runtime::macros::port::save_states::is_loading()",
+     "count": 1,
+     "reason": "the clean-room is_loading is a safe call (package 3's flag); an unsafe block around it is a warning"
+    }
+   ]
   },
   {
    "src": "src/replay_preview.rs",
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "a7fcfc8f87cb2b4dcbf3e7dd3ff9e8f3aca21914a89e69ef0fb35c0e56e0204f"
+   "dest_sha256": "3c8437de822c275c6aa225440b172da97924afef6b4f9b3bc5acb33976aa2895"
   },
   {
    "src": "src/replay_move_start.rs",
@@ -488,7 +596,19 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "86f89a3d6fb03a6aa4e310f5e1870fef3fc717d1a540c5757fb6f0bbfc3f9e2e"
+   "dest_sha256": "e57607280e90ab6ff5b3f39157f2bcef65f587e795b39ef0affb6af57845c1b7",
+   "edits": [
+    {
+     "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
+     "new": "    // A track's Vec grows by doubling: counted as a per-load allocation (hook_stats::per_load), not a steady-state one.\n    let accepted = crate::model::hook_stats::per_load(|| capture.pool.push(pending.key, entry, pending.tick, pending.sample));",
+     "reason": "hook allocation accounting: the capture's sample store grows its track vectors (one allocation per doubling); it is reported apart from the steady-state counter that must stay 0"
+    },
+    {
+     "old": "            let key = capture.pool.start_record(native.index);",
+     "new": "            let key = crate::model::hook_stats::per_load(|| capture.pool.start_record(native.index));",
+     "reason": "hook allocation accounting: starting a record allocates its session once"
+    }
+   ]
   },
   {
    "src": "src/capture_plugin.rs",

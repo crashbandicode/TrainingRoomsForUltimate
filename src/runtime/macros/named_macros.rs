@@ -13,17 +13,17 @@ use smash::app::{lua_bind::*, utility, BattleObjectModuleAccessor, Fighter};
 use smash::lib::lua_const::*;
 use smash::phx::{Hash40, Vector2f, Vector3f};
 use {crate::engine::macros::InputFrame, crate::engine::macros::Library, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
-use training_mod_sync::*;
+use crate::runtime::macros::port::sync::*;
 use crate::engine::macro_ui::macro_panel::{
     Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi, MiiIdentity,
     NameContext, Pad, View, MACRO_KEYBOARD_TITLE, SETUP_KEYBOARD_TITLE,
 };
 
-use crate::runtime::compat::common::consts::{FighterId, MacroSource, OnOff, MENU};
-use crate::runtime::compat::common::input::{Buttons, MappedInputs};
+use crate::runtime::macros::port::consts::{FighterId, MacroSource, OnOff, MENU};
+use crate::runtime::macros::port::input::MappedInputs;
 use crate::runtime::compat::common::{menu, try_get_module_accessor};
 use super::practice;
-use crate::runtime::lobby::training::ui::notifications::notification;
+use crate::runtime::macros::port::notifications::notification;
 
 static UI: RwLock<MacroUi> = RwLock::new(MacroUi::new());
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
@@ -88,7 +88,7 @@ pub fn resume_waiting() {
 fn waiting_name_ready() -> bool {
     super::lobby::active() && practice::enabled()
         && crate::runtime::macros::port::roster::waiting_drafts_ready()
-        && unsafe { crate::runtime::compat::common::is_ready_go() }
+        && crate::runtime::compat::common::is_ready_go()
         && try_get_module_accessor(FighterId::Player).is_some()
         && try_get_module_accessor(FighterId::CPU).is_some()
 }
@@ -463,8 +463,7 @@ pub fn service_keyboard() {
         || !practice::enabled() || suspended())
     { return; }
     // The closing applet's confirm/cancel must not become a gameplay input.
-    super::frame_counter::reset_frame_count(*menu::MENU_CLOSE_FRAME_COUNTER);
-    super::frame_counter::start_counting(*menu::MENU_CLOSE_FRAME_COUNTER);
+    crate::runtime::features::recorder::swallow_p1(15);
     match result {
         crate::runtime::mii::native_keyboard::KeyboardResult::Confirmed(name) => {
             let effect = lock_write(&UI).confirm_native_name(name);
@@ -607,7 +606,7 @@ pub fn export_record_slot(slot: Option<usize>) {
         notify("Choose a Record Slot first");
         return;
     };
-    let (frames, start, mii) = match crate::training::input_record::export_named(slot) {
+    let (frames, start, mii) = match crate::runtime::macros::port::input_record::export_named(slot) {
         Ok(ready) => ready,
         Err(message) => {
             notify(message);
@@ -683,8 +682,8 @@ fn practice_ready() -> bool {
         notify("Wait for both practice fighters");
         return false;
     }
-    if crate::runtime::lobby::training::recording_or_playback()
-        || unsafe { crate::training::save_states::is_loading() }
+    if crate::runtime::macros::port::recording_or_playback()
+        || crate::runtime::macros::port::save_states::is_loading()
     {
         notify("Finish the current practice action first");
         return false;
@@ -735,7 +734,7 @@ pub fn store_frame(index: usize, input: &MappedInputs) {
         return;
     }
     let frame = InputFrame {
-        buttons: input.buttons.bits(),
+        buttons: input.buttons,
         lstick_x: input.lstick_x,
         lstick_y: input.lstick_y,
         rstick_x: input.rstick_x,
@@ -761,7 +760,7 @@ pub fn frame_at(index: usize) -> MappedInputs {
     };
     let frame = frames.get(index).copied().unwrap_or_default();
     MappedInputs {
-        buttons: Buttons::from_bits_truncate(frame.buttons),
+        buttons: frame.buttons,
         lstick_x: frame.lstick_x,
         lstick_y: frame.lstick_y,
         rstick_x: frame.rstick_x,
@@ -791,17 +790,16 @@ pub fn finish_capture(crop: bool) {
 pub fn begin_playback() -> Option<PlaybackStart> {
     observe_loaded();
     let ui = lock_read(&UI);
-    let (facing, status, frames) = ui.copy_playback()?;
+    let mut motion = lock_write(&MOTION);
+    let (facing, status) = ui.copy_playback_into(&mut motion.play)?;
     let info = PlaybackStart {
         facing,
         status,
-        len: frames.len(),
+        len: motion.play.len(),
     };
     drop(ui);
-    let mut motion = lock_write(&MOTION);
     motion.playing = true;
     motion.capturing = false;
-    motion.play = frames;
     #[cfg(feature = "named-input-trace")]
     {
         TRACE_WRITES.store(0, Ordering::Relaxed);
@@ -820,7 +818,8 @@ pub fn begin_preview(recording: MacroRecording) -> PlaybackStart {
     motion.playing = true;
     motion.capturing = false;
     motion.start = recording.start;
-    motion.play = recording.frames;
+    motion.play.clear();
+    motion.play.extend_from_slice(&recording.frames);
     PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);
     PLAYBACK_START_PENDING.store(true, Ordering::Relaxed);
     #[cfg(feature = "named-input-trace")]
@@ -913,10 +912,10 @@ pub fn begin_restore() {
     if crate::runtime::macros::replay_preview::occupied() {
         RESTORE_ACTION.store(0, Ordering::Relaxed);
     } else if source_is_named() && RESTORE_ACTION.load(Ordering::Relaxed) == 0 {
-        let settings = read(&MENU);
-        let action = if settings.record_trigger.contains(&training_mod_consts::RecordTrigger::SAVESTATE) {
+        let settings = crate::runtime::features::recorder::settings();
+        let action = if settings.trigger_save_state {
             1
-        } else if settings.save_state_playback.get_random() != training_mod_consts::PlaybackSlot::empty() {
+        } else if !settings.save_state_slots.is_empty() {
             2
         } else { 0 };
         RESTORE_ACTION.store(action, Ordering::Relaxed);
@@ -965,7 +964,7 @@ pub unsafe fn position_wait_timed_out(status: i32, target: i32) -> bool {
 
 /// Run after the CPU's restore callback. No inputs start while either fighter
 /// still has charge/buff/character restoration work pending.
-pub unsafe fn service_restore(_module_accessor: &mut BattleObjectModuleAccessor) {
+pub unsafe fn service_restore() {
     if !RESTORING.load(Ordering::Relaxed) || super::save_states::is_loading() {
         return;
     }
@@ -1060,7 +1059,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
         StatusModule::change_status_request(module_accessor, target_status, false);
         return false;
     }
-    assign(&super::input_record::CURRENT_LR, pose.facing);
+    crate::runtime::features::recorder::set_current_facing(pose.facing);
     apply_ready_speed(module_accessor, air);
     PLAYBACK_START_PENDING.store(false, Ordering::Relaxed);
     PLAYBACK_OBSERVATIONS.store(PLAYBACK_OBSERVATION_LIMIT, Ordering::Relaxed);
@@ -1089,7 +1088,7 @@ pub unsafe fn observe_playback_before(module_accessor: &mut BattleObjectModuleAc
     let start = snapshot_start(module_accessor);
     crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_playback_before next_input={} x={} y={} status={} speed_x={} speed_y={}",
-        read(&super::input_record::INPUT_RECORD_FRAME), PostureModule::pos_x(module_accessor),
+        crate::runtime::features::recorder::frame(), PostureModule::pos_x(module_accessor),
         PostureModule::pos_y(module_accessor), start.status, start.speed_x, start.speed_y
     ));
 }
@@ -1106,7 +1105,7 @@ pub unsafe fn observe_playback_start(module_accessor: &mut BattleObjectModuleAcc
         println!(
             "[NamedTrace] o run={} seq={} sample={} next={} button={:#x} sx={} sy={} ncx={} ncy={} subx={} suby={}",
             TRACE_RUN.load(Ordering::Relaxed), TRACE_WRITES.load(Ordering::Relaxed), sample,
-            read(&super::input_record::INPUT_RECORD_FRAME), ControlModule::get_button(module_accessor),
+            crate::runtime::features::recorder::frame(), ControlModule::get_button(module_accessor),
             ControlModule::get_stick_x(module_accessor), ControlModule::get_stick_y(module_accessor),
             ControlModule::get_stick_x_no_clamp(module_accessor), ControlModule::get_stick_y_no_clamp(module_accessor),
             ControlModule::get_sub_stick_x(module_accessor), ControlModule::get_sub_stick_y(module_accessor)
@@ -1118,7 +1117,7 @@ pub unsafe fn observe_playback_start(module_accessor: &mut BattleObjectModuleAcc
     let start = snapshot_start(module_accessor);
     crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] named_playback_observed sample={} next_input={} x={} y={} situation={} status={} speed_x={} speed_y={} buttons={} raw_x={} raw_y={}",
-        PLAYBACK_OBSERVATION_LIMIT + 1 - remaining, read(&super::input_record::INPUT_RECORD_FRAME),
+        PLAYBACK_OBSERVATION_LIMIT + 1 - remaining, crate::runtime::features::recorder::frame(),
         PostureModule::pos_x(module_accessor), PostureModule::pos_y(module_accessor),
         start.situation, start.status, start.speed_x, start.speed_y,
         ControlModule::get_button(module_accessor), ControlModule::get_stick_x_no_clamp(module_accessor),
@@ -1228,8 +1227,8 @@ pub fn service_character() {
     {
         return;
     }
-    if crate::runtime::lobby::training::recording_or_playback()
-        || unsafe { crate::training::save_states::is_loading() }
+    if crate::runtime::macros::port::recording_or_playback()
+        || crate::runtime::macros::port::save_states::is_loading()
     {
         return;
     }
@@ -1361,7 +1360,7 @@ fn bind_to_slot(id: &str) {
         }
     };
     let label = format!("Record Slot {}", slot + 1);
-    match crate::training::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {
+    match crate::runtime::macros::port::input_record::import_named_slot(slot, &recording.frames, recording.start, recording.mii) {
         Ok(()) => notify(&format!("Copied {} to {label}", recording.name)),
         Err(err) => notify(&err),
     }
@@ -1438,4 +1437,43 @@ pub(crate) fn fighter_label(kind: i32) -> String {
     crate::engine::swap::trio::TrioFighter::from_kind(kind as u32)
         .map(|fighter| fighter.name().to_owned())
         .unwrap_or_else(|| format!("0x{kind:X}"))
+}
+
+/// SPEC-input-01 section 9, the core's per-frame read (`has_captured_frame` and `frame_at` in one short lock, no allocation): the frame the run
+/// reads at `index` from the buffer in use, `None` while a capture has not stored it yet.
+pub fn frame_for(index: usize) -> Option<MappedInputs> {
+    let motion = lock_read(&MOTION);
+    let frame = if motion.playing {
+        motion.play.get(index)
+    } else if index < motion.captured_len {
+        motion.captured.get(index)
+    } else {
+        None
+    }?;
+    Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y, rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })
+}
+
+/// Reserve the capture and playback buffers once (`MAX_FRAMES` each), off every hook, so that `store_frame` and `begin_playback` allocate
+/// nothing when the capture runs or a macro starts. Called when Macro Source is Named Library (menu commit, boot).
+pub fn prepare_buffers() {
+    let mut motion = lock_write(&MOTION);
+    let wanted = training_mod_macros_max_frames();
+    let (captured, played) = (motion.captured.len(), motion.play.len());
+    if motion.captured.capacity() < wanted {
+        motion.captured.reserve_exact(wanted - captured);
+    }
+    if motion.play.capacity() < wanted {
+        motion.play.reserve_exact(wanted - played);
+    }
+}
+
+fn training_mod_macros_max_frames() -> usize {
+    crate::engine::macros::MAX_FRAMES
+}
+
+/// Diag build only: the keyboard's confirmed-name path without the applet (`service_keyboard` does exactly this with the typed text).
+#[cfg(feature = "diag")]
+pub fn diag_confirm_name(name: &str) {
+    let effect = lock_write(&UI).confirm_native_name(name.to_owned());
+    apply_effect(effect);
 }

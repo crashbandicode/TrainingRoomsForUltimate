@@ -4,7 +4,7 @@ use std::sync::{atomic::{AtomicU8, Ordering}, Mutex};
 use smash::app::{self, BattleObjectModuleAccessor, Fighter};
 use {crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 
-use crate::training::{input_record, save_states, practice};
+use crate::runtime::macros::{input_record, save_states, practice};
 
 enum Request { Play { recording: Box<MacroRecording>, revision: u64 }, Stop }
 #[derive(Clone, Copy, PartialEq)]

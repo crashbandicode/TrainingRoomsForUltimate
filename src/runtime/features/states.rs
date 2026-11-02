@@ -622,7 +622,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     if out.stop_playback {
         // A new load: no buff carries over.
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
-        recorder::stop();
+        recorder::on_load_request();
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
     }
     if out.pokemon_predeath {

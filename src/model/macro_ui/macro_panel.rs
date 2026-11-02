@@ -843,6 +843,20 @@ impl MacroUi {
         self.playback_frame
     }
 
+    /// `copy_playback` into a caller-owned buffer (cleared, then filled; no allocation when its capacity suffices).
+    pub fn copy_playback_into(&self, out: &mut Vec<InputFrame>) -> Option<(f32, i32)> {
+        if !self.playback_allowed() {
+            return None;
+        }
+        let recording = &self.loaded.as_ref()?.recording;
+        if recording.frames.is_empty() {
+            return None;
+        }
+        out.clear();
+        out.extend_from_slice(&recording.frames);
+        Some((recording.start.facing, recording.start.status))
+    }
+
     /// Facing, status, and frames for one playback. Empty when the fighter is not ready.
     pub fn copy_playback(&self) -> Option<(f32, i32, Vec<InputFrame>)> {
         if !self.playback_allowed() {

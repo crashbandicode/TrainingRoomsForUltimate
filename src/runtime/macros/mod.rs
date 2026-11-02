@@ -6,6 +6,114 @@
 //! This module is also the carried files' `super::`: the fork's `training` module names they reach through their parent
 //! (`practice`, `lobby`, `input_record`, `save_states`, `frame_counter`) are re-exported here.
 
+// The carried files print their event lines with `println!`: inside this module that is the plugin's diagnostics ring (no Skyline logger,
+// no allocation), by textual macro scope, so the carried text stays as it is.
+macro_rules! println {
+    ($($arg:tt)*) => {
+        $crate::runtime::diag_log::diagnostic(format_args!($($arg)*))
+    };
+}
+
+#[cfg(feature = "diag")]
+pub(crate) mod diag;
+pub(crate) mod live_replay;
+pub(crate) mod named_macros;
 pub(crate) mod port;
+pub(crate) mod replay_preview;
 pub(crate) mod replay_move_start;
+pub(crate) mod replay_capture;
 pub(crate) mod replay_store;
+
+// The fork's `training` names the carried files reach through `super::`.
+pub(crate) use port::{input_record, lobby, practice, save_states};
+
+use crate::runtime::alloc::{HookId, HookScope};
+use crate::runtime::published;
+
+/// Boot: the replay-capture preference and writer, the named library's selected macro, the capture adapter's guards and hooks (the seam
+/// installer decides; hooks only when the INI says on). Returns `(named layer ready, live capture adapter ready)`.
+pub(crate) fn install(named_source: bool) -> (bool, bool) {
+    replay_store::init();
+    named_macros::init();
+    replay_capture::init();
+    if named_source {
+        named_macros::prepare_buffers();
+    }
+    live_replay::init();
+    #[cfg(feature = "diag")]
+    diag::start();
+    (true, replay_store::toggle().is_ready())
+}
+
+/// One fighter's frame, before the game's own on-frame function (the shared per-fighter wrapper): the capture observers sample the state
+/// the game is about to advance, and the CPU body's preview and named-start observers run.
+///
+/// # Safety
+/// `fighter` is the live fighter object the game is running a frame of.
+pub(crate) unsafe fn frame_before(fighter: usize) {
+    if fighter == 0 {
+        return;
+    }
+    let _scope = HookScope::enter_hook(HookId::LiveReplay);
+    let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    live_replay::before_frame(fighter);
+    replay_capture::before_frame(fighter);
+    if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
+        if practice::primary_cpu(module) {
+            named_macros::observe_playback_before(module);
+            replay_preview::before_frame(module);
+        }
+    }
+}
+
+/// The same fighter's frame, after the game's on-frame function.
+///
+/// # Safety
+/// As `frame_before`.
+pub(crate) unsafe fn frame_after(fighter: usize) {
+    if fighter == 0 {
+        return;
+    }
+    let _scope = HookScope::enter_hook(HookId::LiveReplay);
+    let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    live_replay::after_frame(fighter);
+    replay_capture::after_frame(fighter);
+    if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
+        named_macros::hold_panel_fighter(module);
+        if practice::primary_cpu(module) {
+            named_macros::observe_playback_start(module);
+            replay_preview::after_frame(module);
+            named_macros::preview(module);
+            // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
+            named_macros::service_keyboard();
+            named_macros::service_character();
+            replay_capture::service_reload();
+            sync_owner();
+            #[cfg(feature = "diag")]
+            diag::run_pending();
+        }
+    }
+}
+
+/// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.
+fn sync_owner() {
+    use crate::model::input_delay::Owners;
+    let held = replay_capture::panel_visible() || replay_capture::browser_visible() || replay_preview::occupied();
+    if held {
+        published::INPUT_OWNERS.fetch_or(Owners::REPLAY_EDITOR.bits(), std::sync::atomic::Ordering::AcqRel);
+    } else {
+        published::INPUT_OWNERS.fetch_and(!Owners::REPLAY_EDITOR.bits(), std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
+/// P1's physical controls while the clip editor is in the foreground (the Replay Window's own controls): `out` is made neutral.
+///
+/// # Safety
+/// `controller` is the live `Controller` of the mapping call (or 0); `out` the record the game just mapped.
+pub(crate) unsafe fn on_p1_input(controller: usize, out: *mut crate::model::input_delay::MappedInputs) {
+    if controller == 0 || !named_macros::clip_foreground() {
+        return;
+    }
+    replay_capture::on_input(&port::input::Controller::read(controller));
+    *out = crate::model::input_delay::MappedInputs::NEUTRAL;
+}
