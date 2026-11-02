@@ -52,13 +52,16 @@ pub fn on_p1_poll(holder: usize) {
     let Some((buttons, style)) = (unsafe { read_record(holder) }) else { return };
     POLLS.fetch_add(1, Ordering::Relaxed);
     LAST_BUTTONS.store(buttons, Ordering::Relaxed);
+    // The INI shortcuts are detected by the chord engine from the raw controller (before it clears the Plus bits
+    // of an accepted Plus shortcut, which the adapter would no longer see); one request per poll, always taken.
+    let chord_open = chords::take_open_menu();
     let Some(mut adapter) = ADAPTER.try_lock() else { return };
     let open = OPEN.load(Ordering::Acquire);
     let closing = CLOSING.load(Ordering::Acquire);
     let allowed = !PAUSE_ACTIVE.load(Ordering::Acquire) && !closing;
     let shortcuts = chords::shortcuts();
     let step = adapter.poll(buttons, style, open, allowed, shortcuts);
-    if step.open {
+    if step.open || (chord_open && allowed && !open) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
         OPEN.store(true, Ordering::Release);

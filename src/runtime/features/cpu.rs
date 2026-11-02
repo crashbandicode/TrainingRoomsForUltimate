@@ -103,6 +103,10 @@ static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
 /// The player entry has been seen this session (its position is valid for the distance triggers).
 static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
 
+/// Diag: the save-state-loading fact the CPU last saw (logged on change).
+#[cfg(feature = "diag")]
+static LAST_SAVE_LOADING: AtomicBool = AtomicBool::new(false);
+
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
 static LOBBY: AtomicBool = AtomicBool::new(false);
 
@@ -562,6 +566,10 @@ unsafe fn fighter_frame(fighter: usize) {
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
+        #[cfg(feature = "diag")]
+        if LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
+            cpu_event!("save_loading={save_loading}");
+        }
         if primary {
             cpu.tick_clock();
             #[cfg(feature = "diag")]

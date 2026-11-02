@@ -365,6 +365,9 @@ unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
     let record = chords::consume(Request::InputRecord);
     if states::is_loading() {
         // Both chords are consumed and ignored while a save state loads (§6.4).
+        if record || playback {
+            event("chord_ignored_loading", "record", i64::from(record), "playback", i64::from(playback));
+        }
         return;
     }
     let record = record && settings.trigger_chord;
@@ -488,12 +491,20 @@ pub fn replay_capture_loading() -> bool {
 /// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
 /// recording in progress is not touched.
 pub fn interrupt_playback() {
-    if REC.lock().mode() == Mode::Playback {
-        stop();
+    let settings = *SETTINGS.lock();
+    let (stopped, state) = {
+        let mut rec = REC.lock();
+        let stopped = rec.interrupt_on_mash(&settings);
+        (stopped, rec.playback_state(false))
+    };
+    if stopped {
+        // The same bookkeeping as `stop`, and the CPU sees the playback gone before the next injection.
+        LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
+        notices::post_phase(Phase::Idle, 0);
+        cpu::set_playback(state);
         event("playback_interrupt", "mash", 1, "", 0);
     }
 }
-
 /// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset
 /// (decision B8), the named layer.
 pub fn stop() {

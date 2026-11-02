@@ -449,3 +449,25 @@ fn state01_settings_default_and_from_the_factory_snapshot() {
     assert_eq!(read.randomize, Weights([1, 0, 0, 0, 3]));
 }
 
+/// R2-4 (review R2): the loading fact is true from the acceptance of the load (before the first destructive
+/// step) to its completion, the restore is reported to the recorder exactly once, and a cancellation clears it.
+#[test]
+fn r2_4_loading_is_true_from_acceptance_to_completion_and_the_restore_is_reported_once() {
+    let mut rng = rng();
+    let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
+    assert!(!machine.is_loading());
+    let accepted = request(&mut machine, &settings(), &mut rng);
+    assert!(accepted.stop_playback, "the recorder is told to stop at acceptance");
+    assert!(machine.is_loading(), "the fact is true as soon as the load is accepted");
+    machine.cancel_all();
+    assert!(!machine.is_loading(), "a cancellation clears it");
+
+    let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
+    let (player, cpu) = run_ground_load(&mut machine, &settings(), &mut rng);
+    assert!(!machine.is_loading(), "complete");
+    let reported = [player.restored, cpu.restored].into_iter().flatten().count();
+    assert_eq!(reported, 1, "once per restore");
+    for entry in [0, 1] {
+        assert_eq!(machine.frame(&input(entry), &settings(), &mut rng).restored, None, "never again");
+    }
+}
