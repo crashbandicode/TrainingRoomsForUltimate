@@ -4,11 +4,11 @@
 //! `grid` is unconditional (the carried stage grid names it); the typed-menu adapters stay test-only with the preload engine they
 //! serve until its runtime consumer lands.
 
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 pub mod choice;
 pub mod grid;
 pub mod logging;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 pub mod menu;
-#[cfg(test)]
+#[cfg(any(test, target_os = "switch"))]
 pub mod menu_json;
