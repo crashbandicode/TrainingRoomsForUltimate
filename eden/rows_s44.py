@@ -166,7 +166,10 @@ def main():
     if body2.strip():
         try:
             d2 = json.loads(body2)
-            ok2 = len(d2["frames"]) == stop_frames
+            # Crop (the recorder row, factory on) trims the idle lead-in before the first input: the saved length is at most the stop count.
+            crop_line = line_after(m3 - 60_000, "named_recording_complete", 2) or ""
+            cropped = "crop=true" in crop_line
+            ok2 = (0 < len(d2["frames"]) <= stop_frames) if cropped and stop_frames else len(d2["frames"]) == stop_frames
             last = d2["frames"][-1]
             detail2 = f"frames={len(d2['frames'])} (stop reported {stop_frames}) last={last}"
         except Exception as error:  # noqa: BLE001

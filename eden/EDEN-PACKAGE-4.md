@@ -86,3 +86,28 @@ menu close (publish from the menu worker) and owns the root cause; s4-08 has a s
 7.15 s: one stack overflow of a 64 KiB thread (SP just below a 64 KiB stack, jump to 0); handed to the stability audit.
 Not run: a capture written after a real match (needs a VS match and the game's own replay save); the clip preview (package 3's preview restore is
 not provided); the Deluxe Plugins page row (L1).
+
+### s4-08 (2026-11-02 13:12Z-13:22Z, Yoga, solo, profile t4, display :94, muted): baseline before design C
+Build stream/pkg4 4286dc8: diag 27719bbc (run), release 1d7247b5. Plugins: cpu_pilot e3033426, tile_cursor b8313ca2. Settings boot-s48 (Macro Source Named,
+recording duration 60), seed seed-s4-03. memory.peak 6522310656 bytes; console scan 0 matches of 6082 lines. Rows 22/27 (eden/runs/s4-08/results.json):
+- pass: install line (named_macros installed, macros_port boundary, result=installed heap_allocations=0, 12 rows guarded), live adapter ready (capture on),
+  named record chord lockout, stop chord ends the capture (241 frames), library lists and loads, **named playback reaches input 0 at the restored pose with
+  no refusal** (named_playback_start x=45 y=27.09 facing=-1, then named_playback_complete; sync-01 refused every one), Copy to Record Slot 1, Save slot to
+  library (evtest = evtest2's 184 frames), Replay Window lists the seeded 12,692-frame capture, opens it in the clip editor, crops a macro into the library,
+  Fighter Mismatch prompt.
+- FAIL, row expectation: "capture saved with the captured frames" saved 184 of 241: Crop is on (factory), named_recording_complete crop=true; the crop
+  trims the idle lead-in. The row now accepts 0 < saved <= stop when crop=true.
+- FAIL, harness: keyboard applet row: the applet ran on the real path (NativeKeyboard begin, returned 0x0, consume, applied, "Saved Recording"), but Eden's
+  ui.set of line_edit_osk to "kbtest" did not reach the applet's result (it returned the default "Recording"; recording-2.json written). Also: the watchdog
+  printed "stall frames=6455 step=28" while the applet was open: service_keyboard (step 28) held the game thread during the applet (design C moves it to the worker).
+- FAIL, cross-package finding: "Switch to recorded fighter": the roster provider applied Duck Hunt (MiiOrdinaryCpu ready/completion, "CPU fighter applied"),
+  but afterwards the layer's per-CPU-body work stopped: named_service fell from ~1800 to ~1200 calls per 10 s (only the two panel holds), the diag
+  commands (run inside that block) stopped answering, and the watchdog printed "stall frames=7330 step=0" (the game itself kept running).
+  recorder::is_primary_cpu_body compares the running fighter's accessor with the CPU entry's **first body** (game::natives::entry_body,
+  ENTRY_BODY_FIELD); after package 6's body-bank swap the entry holds the group's bodies (GroupSwap bodies=3) and the first body is no longer the active
+  fighter. compat::common::try_get_module_accessor and recorder::cpu_body use the same field, so the recorder's own tint/natives would address the wrong
+  body after a swap too. Owner question for the lead (package 2's natives vs package 6's body bank).
+- FAIL, R5: every hook_stats line after the first row: steady deltas ~100-130 per 10 s, attributed: roster_preload (package 6, ~10/s, 4396 by the end),
+  and in this layer live_replay 1 (match load), recorder_poll 10 (finish_named_capture -> named_macros::finish_capture: to_vec, version String, offer_save,
+  on the stop chord), named_service 2 (match start) + 81 (the keyboard applet service). The ones in this layer are the hook-side model calls design C
+  moves to the worker; input_caller_a_note 27 / input_caller_a_apply 1 / cpu_frame 192 are at the match load (other packages).
