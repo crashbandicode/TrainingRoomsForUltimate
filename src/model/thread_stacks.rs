@@ -69,7 +69,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "settings.json read, recovery and the JSON parse, joined by the boot thread"),
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 14_192, 18_624, "Eden st-02..st-12", "states::load_file",
         "save_states.json read and parse, joined by the boot thread"),
-    row(ThreadId::StateWriter, c"tr-state-writer", 36 * KIB, 13_920, 15_408, "Eden st-02..st-12", "states::start_writer::{closure#0}",
+    row(ThreadId::StateWriter, c"tr-state-writer", 36 * KIB, 14_096, 15_408, "Eden st-02..st-12", "states::start_writer::{closure#0}",
         "save_states.json serialise and atomic replace"),
     row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_592, "Eden st-02..st-12", "states::start_diag_triggers::{closure#0}",
         "diag: request files, diag-settings.json parse, publish and apply"),
