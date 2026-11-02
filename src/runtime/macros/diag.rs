@@ -30,6 +30,16 @@ struct Command {
 
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);
 static STARTED: AtomicBool = AtomicBool::new(false);
+/// The layer's step in progress (`macros::step`) and the count of CPU-body frames the layer finished: the watchdog's two facts.
+pub(crate) static STEP: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+/// Where a settings publish of the layer is (recorder::publish 1..3, compat::menu::apply_snapshot 4..5, 0 done).
+pub(crate) static PUBLISH: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+static FRAMES: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// One CPU-body frame of the layer finished.
+pub(crate) fn frame_done() {
+    FRAMES.fetch_add(1, Ordering::Relaxed);
+}
 
 const SAVE_SLOT: u8 = 1;
 const OPEN_LIBRARY: u8 = 2;
@@ -95,8 +105,22 @@ pub(crate) fn start() {
         // The stack this thread runs on, so a fault report (an SP below a stack bottom) can be attributed to a thread.
         let here = 0u8;
         diagnostic(format_args!("[NamedMacroDiag] thread tr-macro-diag stack_size=0x10000 stack_near={:p}", &here));
+        let (mut last, mut still, mut told) = (0u64, 0u32, false);
         loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
+        // Watchdog: the layer's frames stopped while they were counting (a stalled game thread): say once where.
+        let now = FRAMES.load(Ordering::Relaxed);
+        if now != 0 && now == last {
+            still += 1;
+            if still == 10 && !told {
+                told = true;
+                diagnostic(format_args!("[NamedMacroDiag] stall frames={now} step={} publish={}", STEP.load(Ordering::Relaxed), PUBLISH.load(Ordering::Relaxed)));
+            }
+        } else {
+            still = 0;
+            told = false;
+        }
+        last = now;
         let Some(path) = FixedPath::<128>::in_root("diag-macro.req") else { continue };
         let Ok(text) = std::fs::read_to_string(path.as_str()) else { continue };
         let _ = std::fs::remove_file(path.as_str());

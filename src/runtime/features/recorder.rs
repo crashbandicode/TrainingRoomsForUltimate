@@ -164,13 +164,23 @@ pub fn settings() -> RecorderSettings {
     *SETTINGS.lock()
 }
 
+/// Diag build: the step of a settings publish (the macro layer's stall watchdog prints it).
+#[inline(always)]
+pub(crate) fn publish_step(_n: u8) {
+    #[cfg(feature = "diag")]
+    crate::runtime::macros::diag::PUBLISH.store(_n, Ordering::Relaxed);
+}
+
 /// A menu commit or the first publish.
 pub fn publish(snapshot: &Snapshot) {
+    publish_step(1);
     *SETTINGS.lock() = RecorderSettings::from_snapshot(snapshot);
     // Macro Source = Named Library: the layer's frame buffers are reserved here (the committing thread), never in a hook.
     if snapshot.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0)) {
+        publish_step(2);
         named_macros::prepare_buffers();
     }
+    publish_step(3);
 }
 
 /// The CPU runtime's constants (ready once the game's table answers).

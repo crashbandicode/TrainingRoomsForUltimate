@@ -99,14 +99,20 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    step(11);
     live_replay::before_frame(fighter);
+    step(12);
     replay_capture::before_frame(fighter);
+    step(13);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
         if practice::primary_cpu(module) {
+            step(14);
             named_macros::observe_playback_before(module);
+            step(15);
             replay_preview::before_frame(module);
         }
     }
+    step(0);
 }
 
 /// The same fighter's frame, after the game's on-frame function.
@@ -119,23 +125,47 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::LiveReplay);
     let fighter = &mut *(fighter as *mut smash::app::Fighter);
+    step(21);
     live_replay::after_frame(fighter);
+    step(22);
     replay_capture::after_frame(fighter);
     if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
+        step(23);
         named_macros::hold_panel_fighter(module);
+        step(24);
         if practice::primary_cpu(module) {
+            step(25);
             named_macros::observe_playback_start(module);
+            step(26);
             replay_preview::after_frame(module);
+            step(27);
             named_macros::preview(module);
             // Once per game frame, on the CPU body: the keyboard, the character request and the reload of the clip editor.
+            step(28);
             named_macros::service_keyboard();
+            step(29);
             named_macros::service_character();
+            step(30);
             replay_capture::service_reload();
+            step(31);
             sync_owner();
             #[cfg(feature = "diag")]
-            diag::run_pending();
+            {
+                step(32);
+                diag::run_pending();
+                diag::frame_done();
+            }
         }
     }
+    step(0);
+}
+
+/// Diag build: the step of the layer's per-fighter work in progress (0: none), so the diag thread's watchdog can say where a stalled
+/// game thread stopped (s4-07: a stall after a cross-fighter macro load).
+#[inline(always)]
+fn step(_n: u8) {
+    #[cfg(feature = "diag")]
+    diag::STEP.store(_n, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.

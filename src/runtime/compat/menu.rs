@@ -154,7 +154,9 @@ pub fn apply_kept(settings: &Settings) {
 /// rows the carried code reads (Macro Source, Ask before switching fighter, the Solo Popo and preload rows) into `MENU`. The saved
 /// defaults and the kept stage and Mii preferences stay as they were ([`apply_kept`] refreshes them).
 pub fn apply_snapshot(menu: &Snapshot) {
+    crate::runtime::features::recorder::publish_step(4);
     let mut current = CURRENT.write();
+    crate::runtime::features::recorder::publish_step(5);
     let (defaults, stage, mii) =
         current.take().map_or_else(|| (BASE_MENU, StagePreferences::default(), MiiPreferences::default()), |c| (c.defaults, c.stage, c.mii));
     *current = Some(Current { menu: TrainingModpackMenu::from_snapshot(menu), defaults, stage, mii });
