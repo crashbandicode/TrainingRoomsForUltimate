@@ -4,6 +4,7 @@ layer through the diag request file (`runtime/macros/diag.rs`) and read the resu
 file, with a cap.  Usage: rows_s44.py <label>
 """
 import base64
+import configparser
 import json
 import re
 import subprocess
@@ -101,6 +102,16 @@ def wait_file(path, predicate=lambda value: bool(value.strip()), cap=15):
     return value
 
 
+def capture_preference_on(value):
+    parser = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+    try:
+        parser.read_string(value)
+        sections = [section for section in parser.sections() if section.lower() == "capture"]
+        return len(sections) == 1 and parser.get(sections[0], "enabled").strip().lower() == "on"
+    except configparser.Error:
+        return False
+
+
 def receipt(start, text, cap=15):
     line = line_after(start, "[NamedMacroDiag] " + text, cap)
     row("diagnostic command completed: " + text, line is not None, line or "no receipt")
@@ -161,6 +172,31 @@ def ui_do(method, params, cap=6.0):
     return res
 
 
+def open_replay_editor(suffix):
+    receipt(cmd("replay_window"), "replay_window opened")
+    browser = view()
+    (OUT / f"browser-view-{suffix}.txt").write_text(browser or "")
+    row("Replay Window browser opens: " + suffix,
+        bool(browser) and "view none" not in browser, browser or "no view")
+    receipt(cmd("pad confirm"), "pad confirm")
+    deadline = time.monotonic() + 30
+    answered = False
+    status = None
+    while time.monotonic() < deadline:
+        status = line_after(cmd("status"), "[NamedMacroDiag] status", 4)
+        if status and "editor=true" in status:
+            break
+        panel = view()
+        if panel and "Fighter Mismatch" in panel and not answered:
+            (OUT / f"mismatch-view-{suffix}.txt").write_text(panel)
+            receipt(cmd("pad confirm"), "pad confirm")  # Keep current fighter
+            answered = True
+    (OUT / f"status-after-open-{suffix}.txt").write_text(status or "")
+    row("capture opens in clip editor: " + suffix,
+        status is not None and "editor=true" in status, status or "no status")
+    return status
+
+
 START = 0
 
 
@@ -187,6 +223,11 @@ def main():
             "absent" if not prior.strip() else "prior file exists; prepare a fresh seed")
     cap = line_after(0, "[ReplayCapture] guarded live adapter ready", 5)
     row("live replay adapter: guards passed and resident hooks installed", cap is not None, cap or "no ready line; " + (line_after(0, "live adapter disabled", 3) or "no disabled line either"))
+
+    initial_status = line_after(cmd("status"), "[NamedMacroDiag] status", 8)
+    row("Off-at-boot replay preference with adapter ready",
+        initial_status is not None and "capture_armed=false" in initial_status
+        and "capture_ready=true" in initial_status, initial_status or "no status")
 
     # named capture with the stop chord
     m = mark()
@@ -323,23 +364,21 @@ def main():
     lines = [x for x in lines_after(m) if "[NamedMacroDiag] capture" in x]
     (OUT / "captures.txt").write_text("\n".join(lines))
     row("Replay Window source: the seeded capture is listed by the archive", any("capture id=" in x for x in lines), "; ".join(x[-160:] for x in lines[:3]) or "none")
-    m = cmd("replay_window")
-    receipt(m, "replay_window opened")
-    line = view()
-    (OUT / "browser-view.txt").write_text(line or "")
-    row("Replay Window browser opens and lists the capture", bool(line) and "none" not in (line or "none")[:60], (line or "no view")[:300])
-    shot("replay-browser")
-    m = cmd("pad confirm")
-    time.sleep(3.0)
-    line = view()
-    (OUT / "mismatch-view.txt").write_text(line or "")
-    if line and "Fighter Mismatch" in line:
-        cmd("pad confirm")  # Keep current fighter (the roster cycle is behind the port)
-    time.sleep(6.0)
-    st = cmd("status")
-    ln = line_after(st, "[NamedMacroDiag] status", 6)
-    (OUT / "status-after-open.txt").write_text(ln or "")
-    row("capture opens in the clip editor", ln is not None and "editor=true" in ln, ln or "none")
+    open_replay_editor("preview")
+    shot("replay-editor")
+    preview_mark = cmd("clip play")
+    receipt(preview_mark, "clip play")
+    playing = line_after(preview_mark, "[ClipPreview] native_play", 30)
+    row("clip preview restores and starts native playback", playing is not None,
+        playing or "no native_play; stub/refusal cannot pass")
+    complete = line_after(preview_mark, "[ClipPreview] inputs_complete", 30)
+    row("clip preview consumes its inputs", complete is not None, complete or "no completion")
+    stop_mark = cmd("clip cancel")
+    receipt(stop_mark, "clip cancel")
+    restored = line_after(stop_mark, "[ClipPreview] restored_idle", 30)
+    row("closing clip preview restores the temporary pair", restored is not None,
+        restored or "no restored_idle")
+    open_replay_editor("crop")
     m = cmd("clip confirm")
     receipt(m, "clip confirm")
     cr = [x for x in lines_after(m)][-12:]
@@ -448,6 +487,29 @@ def main():
     row("Switch to recorded fighter: the roster cycle's provider changes the CPU to the macro's fighter", switched is not None, (switched or "cpu kind did not become " + str(dh) + "; before: " + before[-120:])[-260:])
     shot("after-fighter-switch")
 
+    # Q7 uses the existing writer diagnostic request, the same request boundary as menu close.
+    # This proves arming/persistence; a subsequent actual native match/save is still required.
+    toggle_mark = mark()
+    rc, out, err = r.remote(
+        f"[IO.File]::WriteAllText('{SD}/diag-capture.req','on')", 30)
+    row("submit existing replay preference request", rc == 0, out + err)
+    toggle_receipt = line_after(toggle_mark, "diag_request replay_capture enabled=true", 10)
+    row("replay preference request reaches the production writer", toggle_receipt is not None,
+        toggle_receipt or "no receipt")
+    armed = None
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        status = line_after(cmd("status"), "[NamedMacroDiag] status", 3)
+        if status and "capture_armed=true" in status and "capture_ready=true" in status:
+            armed = status
+            break
+    row("Off-to-On arms the already resident adapter in this boot", armed is not None, armed or "not armed")
+    preference = wait_file(f"{SD}/replay_capture.ini",
+        capture_preference_on)
+    row("On preference persisted", capture_preference_on(preference),
+        preference.strip())
+    (OUT / "replay-capture-preference.ini").write_text(preference)
+
     # hook counts and allocations
     time.sleep(4)
     lines = [x for x in read_diag() if "input_hook_counts" in x or "hook_stats" in x]
@@ -464,7 +526,7 @@ def main():
               if "[MacroHandoff]" in line and re.search(r"\bd?\w*dropped=[1-9]\d*", line)]
     row("worker handoffs lost no events", not losses, "\n".join(losses) or "no dropped-event reports")
     (OUT / "results.json").write_text(json.dumps(RESULTS, indent=1))
-    print(f"ROWS {sum(1 for x in RESULTS if x[1])}/{len(RESULTS)} pass", flush=True)
+    print(f"TRAINING SUBSET {sum(1 for x in RESULTS if x[1])}/{len(RESULTS)} pass; native match/save and final gates remain separate", flush=True)
 
 
 if __name__ == "__main__":

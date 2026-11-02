@@ -34,7 +34,7 @@
   CAPTURE_ENABLED + file slot. Live hooks read replay_store::TOGGLE; the initial runtime census found request_choice
   only in feature-gated capture_plugin (deluxe-sdk absent from defaults). Thus resident hook installation
   alone cannot make the TrainingRooms menu arm capture. Rechecked implementation-packages: Q7 is the
-  package4 SPEC-input-04 replay interface, so this necessary wiring is within the replay task (no competing
+  package4 SPEC-input-01 recording/replay interface, so this necessary wiring is within the replay task (no competing
   writer hunk was identified). Implemented only request_replay_capture's existing boundary: call the existing
   atomic request_choice alongside persistence and log its result. Preserve desired/latched-record semantics
   (Pending during a record), guard failure Unavailable and existing file-write failure semantics; no polling,
@@ -119,6 +119,14 @@ Every unverified row remains open; predecessor evidence is context, not acceptan
 ### Active implementation checkpoint
 
 ### Current working checkpoint (supersedes earlier active notes)
+- Prepared fresh /tmp/pkg4-s409-seed from the owned legacy seed:8files16349434B, manifest
+  /tmp/pkg4-s409-seed-manifest.json; replay_capture.ini explicitlyOff; no profile staged/changed.
+  Driver now requires Off+ready at entry, then existing diag-capture.req writer On receipt/armed/INI.
+  This is arming evidence only; actual native match/save remains required later in the same boot.
+- Preview rows now require actual ClipPreview native_play, inputs_complete and restored_idle after cancel,
+  then reopen for crop via bounded editor-state checks. Stub/refusal cannot pass. Unrun; requires core.
+- RELEASED17:31Z Yoga hook_locks006bd88 PASS4/0/0/0; compile1.86s test0.36s, empty PENDING/ALLOWED; ordered locks-006bd88.log/exit. New Switch diag59986e0 queued END after pkg6. No own claim or Eden/profile change. Broader replay broker shared lock remains open.
+- HEAD59986e0 identity bridge staged only into Yoga Switch src/target, tar eaeb2525174d6f12ac86239730020e4003d76fb0d08e9a3dfcae0afd2d7c83be; diag-59986e0 wrapper prepared, NOT queued yet. Host gate/target-gate remains006bd88 frozen retry, after slim release build. No own claim.
 - Dirty identity bridge: one outstanding Copy query/reply to existing roster provider from CPU callback; worker session/selection/target checks and reack intent mailbox. Carry42 regenerated; not compiled. Queued006bd88 test and staged source remain unchanged.
 - Frozen006bd88 staged to Yoga gate/target-gate and src/target; archive e65c3a05678dc8651e04e1e6dc5ef3ac8efd30950d806b4e4dad5e7dacd13444. Both locks-006bd88 and diag-006bd88 wrappers prepared, but ONLY hook_locks queued END (behind pkg6/UI). No active claim.
 - 17:16Z Yoga hook_locks2330a7a failed at compilation, zero tests ran; claim RELEASED immediately,
