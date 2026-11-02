@@ -13,7 +13,7 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
-  operator's counter, `tools/sloc.py`: no blanks, comments or tests; `third_party/` excluded) and fails above
+  primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above
   `size-budget.toml`, or when that file records a raise without the lead's approval. `cargo test` runs it
   (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch). The budget only ratchets
   down; the plan is `docs/SIZE-PLAN.md`.

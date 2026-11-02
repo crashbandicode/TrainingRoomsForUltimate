@@ -61,8 +61,10 @@ crc32/hash40 and one constant table; rebased onto `566780a` at the lead's reques
   relative-path write while editing the ledger created `docs/provenance/pkg6-carry-ledger.md` (1 byte, untracked) in
   the main work tree `TrainingRoomsForUltimate`; found at once by `git status` there and removed (status clean again).
 - Layout-only reductions ruled out; no fmt gate now. The tree is not rustfmt-formatted (444 of 508 files).
-- Three numbers per milestone (`4ad43c8`: `tools/sloc.py --test-fixed / --normalize`, `size_gate.py --normalize`):
-  at `e79019b` 106,785 as measured / 103,047 test-fixed / 131,781 rustfmt-normalized + test-fixed.
+- Three numbers per milestone (`4ad43c8`) at `e79019b`: 106,785 as measured / 103,047 test-fixed / 131,781
+  rustfmt-normalized + test-fixed. Superseded the same day: `tools/sloc.py` follows the primary's sloc4.py (sha256
+  `6dcb208c…`), `--normalize` dropped; sloc4 counts `8b73694` 106,099, stream/slim `eb8e034` 103,497; budget
+  re-based to 103,500.
 - hos-lock's two allows: pending the operator (kept in KNOWN). The practice_stage_request double init goes to pkg6.
 
 ## Gates

@@ -5,8 +5,8 @@ without dropping a feature or proven behaviour. Means: delete dead code (not hid
 tables instead of repeated arms/structs, shared abstractions for the carried engines' repeated patterns, one
 implementation per concept.
 
-Count: `python3 -I tools/sloc.py git <repo> <rev> 3` (the operator's `sloc3.py` rules; `third_party/` excluded and
-reported apart). Gate: `python3 -I tools/size_gate.py` against `size-budget.toml`, run by `cargo test`
+Count: `python3 -I tools/sloc.py git <repo> <rev> 3` (the primary's `sloc4.py` rules since 2026-11-02; `third_party/`
+excluded and reported apart). Numbers below marked sloc3 were counted before the switch. Gate: `python3 -I tools/size_gate.py` against `size-budget.toml`, run by `cargo test`
 (`tests/size_budget.rs`). "M" = measured, "E" = estimate. File:line references are at `7bb86fd`.
 
 ## 1. Where the count stands
@@ -28,8 +28,10 @@ Test-only files counted as implementation (M): `macros/library/tests.rs` 624, `n
 `macros/move_crop_continuation_tests.rs` 59, `lobby/session_lease_tests.rs` 26 = **2,908**; plus `swap/mii_cycle.rs:315`
 tests under `cfg(all(test, feature = "mii-saved-alpha"))` **755**, and `swap_model/native_model.rs` (848) under
 `cfg(any(test, feature = "simulator"))` (host-only feature). Many of these are carried, so the fork's 112,500 has
-them too: a corrected counter must be applied to both trees, or the comparison is unfair. `tools/sloc.py` keeps the
-operator's rules until the operator decides.
+them too: a corrected counter must be applied to both trees, or the comparison is unfair. **Resolved 2026-11-02:** the
+primary's `sloc4.py` counts these as tests and the simulator apart, in both trees: fork M5q 106,629, clean room
+`21334c0` 106,801, simulator 1,118 in both; target <= 90,000 at RC, stretch <= 85,300. `tools/sloc.py` follows sloc4:
+`8b73694` 106,099; stream/slim at `eb8e034` 103,497.
 
 **Never compiled but counted (M, `/tmp/slim_orphans.py`: no `mod` line or `#[path]` reaches them).**
 `runtime/lobby/automation_helper/native.rs` 425, `…/plugin.rs` 58, `runtime/mii/mii_native_adapter.rs` 218,
@@ -137,9 +139,7 @@ that remove real code are welcome. Kept below as the finding it was.
 
 **Layout finding.** The tree is not rustfmt-formatted (`cargo fmt --all -- --check -l`: 444 of 508 tracked `.rs`
 files). On a scratch `git archive` copy of `e79019b` laid out by rustfmt the count is 136,814 against 106,785 as
-committed. Until the operator rules on the method, each milestone reports three numbers
-(`python3 -I tools/size_gate.py --normalize`): as measured (gated), test-fixed, rustfmt-normalized + test-fixed.
-At `e79019b`: **106,785 / 103,047 / 131,781**. The fork must be measured the same three ways for a fair comparison.
+committed (sloc3). The `--normalize` report mode that measured this was dropped: the primary's sloc4 did not adopt it.
 
 Site rows (M): 239 rows in `sites*.rs`, 13 lines each, guard as 4 lines of 16 bytes; seam rows 5-10 lines each. One
 header line plus the 64 guard bytes on one line keeps `compliance.py`'s `guard: [0x.. ×64]` row passing (a byte string

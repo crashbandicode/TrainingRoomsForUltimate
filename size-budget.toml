@@ -1,6 +1,7 @@
 # Code-size budget of the clean room (operator goal 2026-11-02: smaller than the fork; target <= 90,000 at RC).
-# Counted by tools/sloc.py (the operator's sloc3.py rules: Rust lines without blanks, comments and tests;
-# third_party/ excluded). Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
+# Counted by tools/sloc.py (the primary's sloc4.py rules since 2026-11-02: Rust lines without blanks, comments and tests,
+# test-gated module files and host-only simulator code apart; third_party/ excluded). Entries before the sloc4 entry
+# were counted with sloc3's rules. Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
 # Append entries, never edit old ones. The last entry of a scope is its ceiling. The first ceiling of a scope and
 # every raise need approved_by (the lead); a cut needs only a reason. Plan and history: docs/SIZE-PLAN.md.
 
@@ -22,3 +23,9 @@ scope = "total"
 ceiling = 113400
 date = "2026-11-02"
 reason = "cut: three never-compiled carried files deleted (e79019b, 556 lines): 106,785 at stream/slim plus the 6,566 still pending, rounded up"
+
+[[budget]]
+scope = "total"
+ceiling = 103500
+date = "2026-11-02"
+reason = "counter corrected to sloc4, primary 2026-11-02 (tools/sloc.py is now sloc4's rules: test-gated module files and cfg(all(test, ...)) items are tests, host-only simulator code is reported apart): stream/slim at eb8e034 counts 103,497 (8b73694: 106,099), rounded up"

@@ -5,11 +5,9 @@ as "src/runtime/roster"), `ceiling`, `date` (YYYY-MM-DD), `reason` and, where ne
 of a scope is its ceiling. The first entry of a scope, and every entry that raises its scope's ceiling, must name
 the lead's approval in `approved_by`; lowering a ceiling (the ratchet) needs only a reason. Dates never go back.
 
-Prints the per-module table (depth 3) and each budgeted scope. The budget gates the as-measured count (the
-operator's rules); the test-fixed count and, with --normalize, the rustfmt-normalized + test-fixed count are printed
-for the milestone reports until the operator rules on the method. Exit status: 0 within budget, 1 over a ceiling,
-2 when the budget file breaks the rules above.
-usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N] [--normalize]"""
+Prints the per-module table (depth 3), the host-only simulator and test lines the count leaves out, and each budgeted
+scope. Exit status: 0 within budget, 1 over a ceiling, 2 when the budget file breaks the rules above.
+usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N]"""
 import argparse
 import collections
 import pathlib
@@ -64,7 +62,7 @@ def scope_count(per_file, scope):
     return sum(n for name, n in per_file.items() if name == scope or name.startswith(scope + '/'))
 
 
-def run(repo, budget_path, rev=None, depth=3, out=sys.stdout, normalize=False):
+def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
     if tomllib is None:
         print('size_gate: Python 3.11 or newer is required (tomllib)', file=out)
         return 2
@@ -74,22 +72,19 @@ def run(repo, budget_path, rev=None, depth=3, out=sys.stdout, normalize=False):
         print(f'size_gate: cannot read {budget_path}: {error}', file=out)
         return 2
     ceilings, errors = check_budget(entries)
-    items = sloc.items_git(repo, rev) if rev else sloc.items_tree(repo)
-    per_file, vendored = sloc.totals(items, 0)
+    files = sloc.files_git(repo, rev) if rev else sloc.files_tree(repo)
+    per_file, sim, tests, vendored = sloc.measure(files, 0)
     modules = collections.Counter()
     for name, n in per_file.items():
         modules[sloc.group(name, depth)] += n
     total = sum(per_file.values())
-    print(f'Implementation lines (tools/sloc.py rules) at {rev or "the working tree"}, depth {depth}:', file=out)
+    print(f'Implementation lines (tools/sloc.py, sloc4 rules) at {rev or "the working tree"}, depth {depth}:', file=out)
     for name, n in sorted(modules.items(), key=lambda kv: -kv[1]):
         print(f'  {name:44s} {n:8d}  {100 * n / max(total, 1):5.1f}%', file=out)
     print(f'  {"TOTAL":44s} {total:8d}', file=out)
+    print(f'  {"host-only simulator (not counted)":44s} {sim:8d}', file=out)
+    print(f'  {"test code excluded (files + gated items)":44s} {tests:8d}', file=out)
     print(f'  {"third_party/ (vendored, not counted)":44s} {vendored:8d}', file=out)
-    fixed = sum(sloc.totals(items, 1, test_fixed=True)[0].values())
-    print(f'  {"test-fixed (report only)":44s} {fixed:8d}', file=out)
-    if normalize:
-        norm = sum(sloc.totals(sloc.items_normalized(repo, rev or 'HEAD'), 1, test_fixed=True)[0].values())
-        print(f'  {"rustfmt-normalized + test-fixed (report only)":44s} {norm:8d}  ({rev or "HEAD"})', file=out)
     over = []
     print('Budget (size-budget.toml):', file=out)
     for scope in sorted(ceilings, key=lambda s: (s != 'total', s)):
@@ -116,11 +111,8 @@ def main(argv=None):
     parser.add_argument('--budget', default=None, help='default: <repo>/size-budget.toml')
     parser.add_argument('--rev', default=None, help='count a git revision instead of the working tree')
     parser.add_argument('--depth', type=int, default=3)
-    parser.add_argument('--normalize', action='store_true',
-                        help='also report the rustfmt-normalized, test-fixed count of --rev (default HEAD); needs rustfmt')
     args = parser.parse_args(argv)
-    return run(args.repo, args.budget or str(pathlib.Path(args.repo) / 'size-budget.toml'), args.rev, args.depth,
-               normalize=args.normalize)
+    return run(args.repo, args.budget or str(pathlib.Path(args.repo) / 'size-budget.toml'), args.rev, args.depth)
 
 
 if __name__ == '__main__':

@@ -40,8 +40,10 @@ def approved(scope, ceiling, **more):
 
 
 class Counting(unittest.TestCase):
-    def test_rules_of_the_operator_counter(self):
-        self.assertEqual(sloc.count(SOURCE), 4)
+    def test_rules_of_the_counter(self):
+        impl, sim, tests, vendored = sloc.measure({'src/a.rs': SOURCE}, 0)
+        self.assertEqual((dict(impl), sim, vendored), ({'src/a.rs': 4}, 0, 0))
+        self.assertGreater(tests, 0)
 
     def test_tests_and_vendored_code_are_not_counted(self):
         with tempfile.TemporaryDirectory() as root:
@@ -50,32 +52,20 @@ class Counting(unittest.TestCase):
                 path = pathlib.Path(root, rel)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(SOURCE)
-            ours, vendored = sloc.totals(sloc.items_tree(root), 0)
-            self.assertEqual(dict(ours), {'src/a.rs': 4, 'crates/c/src/lib.rs': 4})
+            impl, _, _, vendored = sloc.measure(sloc.files_tree(root), 0)
+            self.assertEqual(dict(impl), {'src/a.rs': 4, 'crates/c/src/lib.rs': 4})
             self.assertEqual(vendored, 4)
 
-
-class TestFixed(unittest.TestCase):
-    def test_gated_module_files_and_all_test_blocks_leave_only_in_the_fixed_count(self):
+    def test_test_modules_and_simulator_code_are_set_apart(self):
         lib = ('fn a() {}\n#[cfg(test)]\nmod tests;\n#[cfg(test)]\n#[path = "extra_tests.rs"]\nmod extra;\n'
-               '#[cfg(all(test, feature = "x"))]\nmod inline {\n    fn t() {}\n}\nmod live;\n')
-        items = [('src/lib.rs', lib), ('src/tests.rs', 'fn t() {}\n'), ('src/extra_tests.rs', 'fn u() {}\n'),
-                 ('src/live.rs', 'fn v() {}\n')]
-        self.assertEqual(sloc.test_module_files(items), {'src/tests.rs', 'src/extra_tests.rs'})
-        measured, _ = sloc.totals(items, 0)
-        fixed, _ = sloc.totals(items, 0, test_fixed=True)
-        # The operator's rule keeps the cfg(all(test, ...)) block (4 lines) and every file: lib 6 + three files.
-        self.assertEqual(dict(measured), {'src/lib.rs': 6, 'src/tests.rs': 1, 'src/extra_tests.rs': 1, 'src/live.rs': 1})
-        self.assertEqual(dict(fixed), {'src/lib.rs': 2, 'src/live.rs': 1})
-
-    def test_edition_comes_from_the_nearest_manifest(self):
-        with tempfile.TemporaryDirectory() as root:
-            root = pathlib.Path(root)
-            (root / 'crates/c/src').mkdir(parents=True)
-            (root / 'Cargo.toml').write_text('[package]\nedition = "2021"\n')
-            (root / 'crates/c/Cargo.toml').write_text('[package]\nedition = "2018"\n')
-            self.assertEqual(sloc.edition_of(root, 'crates/c/src/lib.rs'), '2018')
-            self.assertEqual(sloc.edition_of(root, 'src/lib.rs'), '2021')
+               '#[cfg(all(test, feature = "x"))]\nmod inline {\n    fn t() {}\n}\n'
+               '#[cfg(any(test, feature = "simulator"))]\nmod sim;\nmod live;\n')
+        files = {'src/lib.rs': lib, 'src/tests.rs': 'fn t() {}\n', 'src/extra_tests.rs': 'fn u() {}\n',
+                 'src/sim.rs': 'fn s() {}\n', 'src/live.rs': 'fn v() {}\n'}
+        impl, sim, tests, _ = sloc.measure(files, 0)
+        self.assertEqual(dict(impl), {'src/lib.rs': 2, 'src/live.rs': 1})
+        self.assertEqual(sim, 3)  # the gated declaration (2 lines) and sim.rs
+        self.assertGreaterEqual(tests, 2 + 4)
 
 
 class Budget(unittest.TestCase):
