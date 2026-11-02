@@ -64,5 +64,5 @@ pub fn install() {
     ORIGINAL.store(base + sites::ON_INIT_OFFSET, Ordering::Release);
     let slot = (base + sites::ON_INIT_SLOT_OFFSET) as *mut usize;
     // SAFETY: the slot is a writable `.data` pointer that held the original's address.
-    unsafe { slot.write_volatile(on_init as usize) };
+    unsafe { slot.write_volatile(on_init as *const () as usize) };
 }
