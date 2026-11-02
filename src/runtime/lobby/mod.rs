@@ -54,4 +54,7 @@ pub(crate) unsafe fn frame(fighter: usize) {
     if entry_id_valid(entry) && entry == 0 {
         training::practice::refresh();
     }
+    // Diag build: the character-item table's constants as the game resolves them (once).
+    #[cfg(feature = "diag")]
+    training::character_specific::items::dump_once();
 }
