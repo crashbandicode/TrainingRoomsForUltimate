@@ -24,7 +24,7 @@ use crate::model::cpu::defence::SdiAnswer;
 use crate::model::cpu::command::CmdFacts;
 use crate::model::cpu::facts::{FrameFacts, FrameOut, TechFacts};
 use crate::model::cpu::shield::{ButtonAnswer, OosFacts};
-use crate::model::cpu::tech::{is_tech_situation, TechChange, TechRequest};
+use crate::model::cpu::tech::{self, is_tech_situation, StageClass, TechChange, TechRequest};
 use crate::model::cpu::status;
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::ids::{self, Table, C, UNRESOLVED};
@@ -432,6 +432,8 @@ unsafe fn fighter_frame(fighter: usize) {
     let scene_now = crate::runtime::scene::current();
     let training = scene_now.is_some();
     if entry == 0 {
+        // Also outside Training: leaving it restores the game's multiplier.
+        damage_multiplier_frame(training);
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training {
             if MASH_ON.load(Ordering::Acquire) {
@@ -798,6 +800,88 @@ pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3
 }
 
 // ---- SPEC-cpu-05 hooks ----------------------------------------------------------------------------------
+
+/// The game's `CommonParams` object, captured when the game fills it from its parameter file (0 until then).
+static COMMON_PARAMS: AtomicUsize = AtomicUsize::new(0);
+
+/// Inline hook on the `mov x19, x0` of the function that fills `CommonParams`: x0 is the object.
+#[skyline::hook(offset = sites_pkg2::COMMON_PARAMS_FILL_OFFSET, inline)]
+pub unsafe fn cpu_common_params_hook(ctx: &mut skyline::hooks::InlineCtx) {
+    let _scope = HookScope::enter();
+    let params = ctx.registers[0].x() as usize;
+    COMMON_PARAMS.store(params, Ordering::Release);
+    cpu_event!("common_params object={params:#x}");
+}
+
+// ---- SPEC-cpu-04 fixed camera ---------------------------------------------------------------------------
+
+/// The camera class of the stage the game is on now.
+unsafe fn stage_class_now() -> StageClass {
+    let id = natives::stage_id();
+    tech::stage_class(id, natives::stage_form(id))
+}
+
+/// Write the fixed centre into the camera manager (`manager + 0xbd0`, three floats of the game's vector).
+unsafe fn write_camera_centre(manager: usize, centre: [f32; 3]) {
+    ((manager + sites_pkg2::CAMERA_CENTRE_FIELD) as *mut [f32; 3]).write(centre);
+}
+
+/// Inline hook right after the prologue of the camera manager's change-active-camera function (x0 the manager,
+/// w1 the requested mode): for the fixed mode in Training, the stage's centre (or the remembered default) goes
+/// into the manager before the game acts.
+#[skyline::hook(offset = sites_pkg2::CAMERA_MODE_HOOK_OFFSET, inline)]
+pub unsafe fn cpu_camera_mode_hook(ctx: &mut skyline::hooks::InlineCtx) {
+    let _scope = HookScope::enter();
+    let mode = ctx.registers[1].w() as i32;
+    if mode != tech::CAMERA_MODE_FIXED || crate::runtime::scene::current().is_none() {
+        return;
+    }
+    let manager = ctx.registers[0].x() as usize;
+    let class = stage_class_now();
+    let centre = with(|cpu| cpu.camera_mode(class, mode)).flatten();
+    cpu_event!("camera_mode mode={mode} class={class:?} stage={} write={centre:?}", natives::stage_id());
+    if let (Some(centre), true) = (centre, manager != 0) {
+        write_camera_centre(manager, centre);
+    }
+}
+
+/// The Training fixed-camera setup (`values` first field: the centre the game uses). The centre is remembered as
+/// the stage default; after the game copied it into the manager, the stage's value replaces it (Hide Tech
+/// Animations On) so the caller's own struct is never written.
+#[skyline::hook(offset = sites_pkg2::FIXED_CAMERA_SETUP_HOOK_OFFSET)]
+pub unsafe fn cpu_camera_setup_hook(unused: usize, values: *const [f32; 3]) {
+    let _scope = HookScope::enter();
+    call_original!(unused, values);
+    if values.is_null() || crate::runtime::scene::current().is_none() {
+        return;
+    }
+    let game = values.read();
+    let class = stage_class_now();
+    let centre = with(|cpu| cpu.camera_setup(class, game)).flatten();
+    cpu_event!("camera_setup game={game:?} class={class:?} stage={} write={centre:?}", natives::stage_id());
+    let slot = (game::text_base() + sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize;
+    let manager = if slot.read().is_null() { 0 } else { slot.read().read() };
+    if let (Some(centre), true) = (centre, manager != 0) {
+        write_camera_centre(manager, centre);
+    }
+}
+
+/// Once per frame (the player entry's frame): the shield damage multiplier, 0.0 while Training is active and
+/// the shield is Infinite, otherwise the game's own value, also outside Training (SPEC-cpu-05 section 4).
+unsafe fn damage_multiplier_frame(training: bool) {
+    let params = COMMON_PARAMS.load(Ordering::Acquire);
+    if params == 0 {
+        return;
+    }
+    let field = (params + sites_pkg2::SHIELD_DAMAGE_MUL_FIELD) as *mut f32;
+    let current = field.read_volatile();
+    if let Some(Some(want)) = with(|cpu| cpu.damage_multiplier(training, current)) {
+        if want != current {
+            field.write_volatile(want);
+            cpu_event!("shield_damage_mul write={want:.3} was={current:.3} training={training}");
+        }
+    }
+}
 
 fn is_guard_button(button: i32) -> bool {
     button != UNRESOLVED && (button == BUTTON_GUARD.load(Ordering::Acquire) || button == BUTTON_GUARD_HOLD.load(Ordering::Acquire))

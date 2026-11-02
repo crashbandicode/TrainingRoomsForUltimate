@@ -43,6 +43,11 @@ pub enum Feature {
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
     CpuMash,
     CpuCommon,
+    /// SPEC-cpu-05's shield damage multiplier: the game's CommonParams object, found at the moment the game fills
+    /// it from its parameter file (no provider plugin).
+    CpuShieldDamage,
+    /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
+    CpuCamera,
 }
 
 impl Feature {
@@ -60,6 +65,8 @@ impl Feature {
             Feature::CpuShield => "cpu_shield",
             Feature::CpuMash => "cpu_mash",
             Feature::CpuCommon => "cpu_common",
+            Feature::CpuShieldDamage => "cpu_shield_damage",
+            Feature::CpuCamera => "cpu_camera",
         }
     }
 }
@@ -346,7 +353,7 @@ pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
 /// must come out usable.
 pub fn feature_usable(feature: Feature, usable: impl Fn(&Site) -> bool) -> bool {
     // The CPU features read their facts through the core's natives, so they need its sites too.
-    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon).then_some(Feature::CpuCore);
+    let core = matches!(feature, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera).then_some(Feature::CpuCore);
     sites_of(feature).chain(sites_of(Feature::Training)).chain(core.into_iter().flat_map(sites_of)).all(usable)
 }
 

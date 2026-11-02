@@ -109,6 +109,8 @@ pub struct Cpu {
     pub shield_damage_cache: Option<f32>,
     /// The frame-advantage measurement (SPEC-cpu-07).
     pub advantage: FrameAdvantage,
+    /// The fixed-camera centre the game set at the last setup (SPEC-cpu-04 section 5 "Camera").
+    pub stage_default: Option<[f32; 3]>,
 }
 
 impl Cpu {
@@ -127,6 +129,7 @@ impl Cpu {
             save_loading: false,
             shield_damage_cache: None,
             advantage: FrameAdvantage::new(),
+            stage_default: None,
         }
     }
 
@@ -439,6 +442,21 @@ impl Cpu {
     }
 
     /// The multiplier to write this frame (SPEC-cpu-05 §4): the first call caches what the game has.
+    /// The game is setting the Training fixed-camera values (game_centre is the centre it passes): remember it as the
+    /// stage default and answer the centre to use instead, if any (SPEC-cpu-04 section 5 "Camera").
+    pub fn camera_setup(&mut self, class: tech::StageClass, game_centre: [f32; 3]) -> Option<[f32; 3]> {
+        self.stage_default = Some(game_centre);
+        tech::fixed_camera_centre(&self.settings, class, self.stage_default).filter(|centre| *centre != game_centre)
+    }
+
+    /// The camera mode changes: the centre to write into the camera manager first, if any (only the fixed mode).
+    pub fn camera_mode(&self, class: tech::StageClass, mode: i32) -> Option<[f32; 3]> {
+        if mode != tech::CAMERA_MODE_FIXED {
+            return None;
+        }
+        tech::fixed_camera_centre(&self.settings, class, self.stage_default)
+    }
+
     pub fn damage_multiplier(&mut self, in_training: bool, observed: f32) -> Option<f32> {
         let cached = *self.shield_damage_cache.get_or_insert(observed);
         shield::damage_multiplier(self.settings.shield_state, in_training, Some(cached))

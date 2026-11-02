@@ -125,6 +125,21 @@ pub mod natives {
         at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET)(accessor)
     }
 
+    /// `app::sv_information::stage_id()`: the native stage id, -1 when there is none.
+    pub unsafe fn stage_id() -> i32 {
+        at::<extern "C" fn() -> i32>(sites_pkg2::STAGE_ID_CALL_OFFSET)()
+    }
+
+    /// The form field of the native stage table's record for `stage_id` (0 the stage, 1 its Omega form, 2 its
+    /// Battlefield form); `None` for an id outside the table.
+    pub unsafe fn stage_form(stage_id: i32) -> Option<u32> {
+        if !(0..crate::model::cpu::tech::stage::STAGE_COUNT).contains(&stage_id) {
+            return None;
+        }
+        let record = text_base() + sites_pkg2::STAGE_TABLE_OFFSET + stage_id as usize * sites_pkg2::STAGE_RECORD_STRIDE;
+        Some(((record + sites_pkg2::STAGE_RECORD_FORM) as *const u64).read() as u32)
+    }
+
     pub unsafe fn pos_y(accessor: usize) -> f32 {
         at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET)(accessor)
     }

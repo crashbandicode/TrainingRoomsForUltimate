@@ -428,3 +428,43 @@ fn cpu04_playback_override_on() {
     assert_eq!(cpu.tech_status_change(key, &request(DOWN)), TechChange::Status(PASSIVE));
     assert_eq!(frame_in(&mut cpu, key, DOWN_WAIT).force_status, Some(DOWN_STAND));
 }
+
+#[test]
+fn cpu04_stage_class_follows_the_native_ids_and_the_record_form() {
+    use model::cpu::tech::{stage, stage_class};
+    // The stages themselves (form 0).
+    for id in [stage::BATTLEFIELD, stage::FINAL_DESTINATION, stage::SMALL_BATTLEFIELD, stage::TOWN_AND_CITY, stage::POKEMON_STADIUM_2] {
+        assert_eq!(stage_class(id, Some(0)), StageClass::Standard, "{id}");
+    }
+    assert_eq!(stage_class(stage::SMASHVILLE, Some(0)), StageClass::Smashville);
+    assert_eq!(stage_class(stage::HOLLOW_BASTION, Some(0)), StageClass::HollowBastion);
+    // Every Omega (1) and Battlefield (2) form of every stage is Standard, Smashville's and Hollow Bastion's too.
+    for (id, form) in [(96, 1), (97, 2), (362, 1), (363, 2), (1, 1), (4, 2), (500, 1)] {
+        assert_eq!(stage_class(id, Some(form)), StageClass::Standard, "{id} form {form}");
+    }
+    // Big Battlefield (2) and any other stage: the game's centre stays. An id outside the table too.
+    assert_eq!(stage_class(2, Some(0)), StageClass::Other);
+    assert_eq!(stage_class(5, Some(0)), StageClass::Other);
+    assert_eq!(stage_class(-1, None), StageClass::Other);
+    assert_eq!(stage_class(stage::STAGE_COUNT, None), StageClass::Other);
+}
+
+#[test]
+fn cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default() {
+    let game = [0.0, 40.0, 200.0];
+    // Hide Tech Animations On: the stage's value goes in, at the setup and at the mode change.
+    let (mut cpu, _) = cpu_with(&[("tech_hide", vec![1, 0])]);
+    assert_eq!(cpu.camera_setup(StageClass::Smashville, game), Some([0.0, 35.0, 350.0]));
+    assert_eq!(cpu.stage_default, Some(game), "the game's value is remembered as the stage default");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), Some([0.0, 35.0, 350.0]));
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 3), None, "only the fixed mode");
+    assert_eq!(cpu.camera_mode(StageClass::Other, 4), None, "no value for this stage: the game's stays");
+    assert_eq!(cpu.camera_setup(StageClass::Other, game), None);
+    // A game centre that already is the stage's value is not rewritten.
+    assert_eq!(cpu.camera_setup(StageClass::Standard, [0.0, 50.0, 230.0]), None);
+    // Off: the default captured at the last setup comes back at the next fixed-mode change.
+    let (mut cpu, _) = cpu_with(&[]);
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), None, "nothing captured yet");
+    assert_eq!(cpu.camera_setup(StageClass::Smashville, game), None, "Off: the setup passes through");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), Some(game));
+}

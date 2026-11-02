@@ -53,7 +53,29 @@ pub const CHECK_BUTTON_OFF_HOOK_OFFSET: usize = 0x200_1440;
 pub const STICK_X_NO_CLAMP_HOOK_OFFSET: usize = 0x200_1600;
 pub const STICK_Y_NO_CLAMP_HOOK_OFFSET: usize = 0x200_1610;
 
-pub static SITES_PKG2: [Site; 44] = [
+/// The game's `CommonParams` filler (`from_prc(this, params)`, a 70 KB function that stores each field the parameter
+/// file names into `this`): the site is its `mov x19, x0`, where x0 is the object. 13.0.5 stores `shield_damage_mul` at
+/// `this + 0x174` (`shield_dec1` at 0x16c, `shield_recovery1` at 0x170, `shield_damage_add` at 0x178). The object is
+/// allocated by the factory at main+0x736920 (0xc58 bytes); Eden confirms it is the live one (diag line
+/// `common_params`).
+pub const COMMON_PARAMS_FILL_OFFSET: usize = 0x73_6ac0;
+pub const SHIELD_DAMAGE_MUL_FIELD: usize = 0x174;
+
+/// The native stage table (SPEC-cpu-04 camera): 364 records of 72 bytes indexed by stage id.
+pub const STAGE_TABLE_OFFSET: usize = 0x454_a7e8;
+pub const STAGE_RECORD_STRIDE: usize = 72;
+/// The form field of a record: 0 the stage, 1 its Omega form, 2 its Battlefield form.
+pub const STAGE_RECORD_FORM: usize = 8;
+pub const STAGE_ID_CALL_OFFSET: usize = 0x227_ebb0;
+pub const CAMERA_MODE_HOOK_OFFSET: usize = 0x4e_e498;
+pub const FIXED_CAMERA_SETUP_HOOK_OFFSET: usize = 0x315_8e00;
+/// The camera manager: the setup function loads `**(main + 0x52b8f00)` (the spec's `0x52b6f00` is a different slot;
+/// the 64 bytes of the setup row contain the `adrp`/`ldr` that read this one) and stores the centre at `+0xbd0`
+/// (`str q0, [manager, #0xbd0]`). The mode hook gets the manager as x0.
+pub const CAMERA_MANAGER_SLOT_OFFSET: usize = 0x52b_8f00;
+pub const CAMERA_CENTRE_FIELD: usize = 0xbd0;
+
+pub static SITES_PKG2: [Site; 49] = [
     Site {
         name: "cpu_on_frame_slot",
         feature: Feature::CpuCore,
@@ -625,6 +647,71 @@ pub static SITES_PKG2: [Site; 44] = [
             0x28, 0x03, 0x00, 0xb4, 0xf3, 0x03, 0x00, 0xaa, 0x00, 0x89, 0x40, 0xf9, 0x40, 0x05, 0x00, 0xb4,
         ],
         note: "CancelModule::is_enable_cancel: one of the actionable tests of the frame-advantage measurement (SPEC-cpu-07 section 3).",
+    },
+    Site {
+        name: "common_params_fill",
+        feature: Feature::CpuShieldDamage,
+        offset: 0x736ac0,
+        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::AfterPrologue },
+        guard: [
+            0xf3, 0x03, 0x00, 0xaa, 0x1f, 0x31, 0x00, 0x71, 0x41, 0x04, 0x00, 0x54, 0x28, 0x11, 0x40, 0xb8,
+            0x0a, 0x05, 0x00, 0x71, 0xeb, 0x03, 0x00, 0x54, 0x8d, 0x02, 0x40, 0xf9, 0x28, 0x51, 0x80, 0xb8,
+            0x0e, 0x3e, 0x86, 0xd2, 0x4e, 0xbf, 0xa7, 0xf2, 0xee, 0x00, 0xc0, 0xf2, 0xeb, 0x03, 0x1f, 0x2a,
+            0xac, 0x35, 0x42, 0xa9, 0xad, 0x01, 0x08, 0x8b, 0x68, 0x00, 0x02, 0x90, 0x08, 0xed, 0x36, 0x91,
+        ],
+        note: "Inline hook on the `mov x19, x0` right after the prologue of the function that fills the game's CommonParams object from its parameter file (it stores each named field into x0; the shield fields come out at x0+0x160..0x1d4). x0 is the object SPEC-cpu-05 §4 writes `shield_damage_mul` (+0x174) through, so no provider plugin is needed (the spec's question 6, alternative a). Found by the hash constants of the field names: the fill code is the only code in the 13.0.5 main that reads the 40-bit hash of `shield_damage_mul` besides two lookup tables.",
+    },
+    Site {
+        name: "stage_id_call",
+        feature: Feature::CpuCamera,
+        offset: 0x227ebb0,
+        kind: SeamKind::Called,
+        guard: [
+            0x68, 0x85, 0x01, 0x90, 0x08, 0xed, 0x44, 0xf9, 0x28, 0x01, 0x00, 0xb4, 0x08, 0x01, 0x40, 0xf9,
+            0x09, 0x7d, 0x41, 0xb9, 0x3f, 0x05, 0x00, 0x31, 0xa0, 0x00, 0x00, 0x54, 0x00, 0xa1, 0x04, 0x91,
+            0x08, 0x95, 0x40, 0xf9, 0x01, 0x01, 0x40, 0xf9, 0x20, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x80, 0x12,
+            0xc0, 0x03, 0x5f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+        note: "app::sv_information::stage_id() (symbol _ZN3app14sv_information8stage_idEv): the current native stage id, -1 when there is none. The camera rule classifies it (SPEC-cpu-04 section 5). Called, never hooked.",
+    },
+    Site {
+        name: "stage_table",
+        feature: Feature::CpuCamera,
+        offset: STAGE_TABLE_OFFSET,
+        kind: SeamKind::Relied,
+        guard: [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xd5, 0xf6, 0xb7, 0x51, 0x0b, 0x00, 0x00, 0x00, 0xc4, 0x2b, 0xbe, 0xdc, 0x18, 0x00, 0x00, 0x00,
+            0xe0, 0xe0, 0xf0, 0x70, 0x18, 0x00, 0x00, 0x00, 0x22, 0x4a, 0x54, 0x32, 0x2e, 0x00, 0x00, 0x00,
+            0x03, 0x5c, 0x36, 0xfd, 0x24, 0x00, 0x00, 0x00, 0xa6, 0xdb, 0x27, 0x7d, 0x2f, 0x00, 0x00, 0x00,
+        ],
+        note: "The native stage table (364 records of 72 bytes, indexed by stage id): record word 0 = the id, word 1 = the form (0 the stage, 1 its Omega form, 2 its Battlefield form), word 2 = the hash40 of the stage's name. Read to classify the current stage; its first record is the guard.",
+    },
+    Site {
+        name: "camera_mode_hook",
+        feature: Feature::CpuCamera,
+        offset: 0x4ee498,
+        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::AfterPrologue },
+        guard: [
+            0x08, 0x04, 0x40, 0xb9, 0x1f, 0x01, 0x01, 0x6b, 0x20, 0x01, 0x00, 0x54, 0xf7, 0x03, 0x04, 0x2a,
+            0xf3, 0x03, 0x03, 0xaa, 0xf4, 0x03, 0x00, 0xaa, 0xf5, 0x03, 0x01, 0x2a, 0xc2, 0x00, 0x00, 0x34,
+            0x88, 0x02, 0x40, 0xb9, 0x1f, 0x01, 0x02, 0x6b, 0x6d, 0x00, 0x00, 0x54, 0xe0, 0x03, 0x1f, 0x2a,
+            0x9e, 0x00, 0x00, 0x14, 0x80, 0x0e, 0x40, 0xf9, 0x82, 0x02, 0x00, 0xb9, 0x60, 0x03, 0x00, 0xb4,
+        ],
+        note: "Inline hook right after the prologue of the camera manager's change-active-camera function (main+0x4ee480; x0 the manager, w1 the requested mode, 4 = fixed): before the manager acts, the fixed centre at manager+0xbd0 is set (SPEC-cpu-04 section 5 Camera).",
+    },
+    Site {
+        name: "fixed_camera_setup_hook",
+        feature: Feature::CpuCamera,
+        offset: 0x3158e00,
+        kind: SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry },
+        guard: [
+            0x01, 0xe4, 0x00, 0x2f, 0x20, 0x00, 0xc0, 0x3d, 0x22, 0x1c, 0xa1, 0x4e, 0x02, 0x44, 0x04, 0x6e,
+            0x08, 0x0b, 0x01, 0x90, 0x08, 0x81, 0x47, 0xf9, 0x08, 0x01, 0x40, 0xf9, 0x40, 0x04, 0x18, 0x6e,
+            0x00, 0xf5, 0x82, 0x3d, 0x29, 0x10, 0x40, 0xb9, 0x09, 0xe1, 0x0b, 0xb9, 0x20, 0x08, 0xc0, 0x3d,
+            0x01, 0x44, 0x04, 0x6e, 0x20, 0x04, 0x18, 0x6e, 0x00, 0xfd, 0x82, 0x3d, 0xc0, 0x03, 0x5f, 0xd6,
+        ],
+        note: "The Training fixed-camera setup (main+0x3158e00), a 64-byte leaf function at a 16-aligned entry that copies the values struct (x1: the centre vector first) into the camera manager at +0xbd0: the struct's centre is remembered as the stage default and, with Hide Tech Animations On, replaced by the stage's value before the original copies it (SPEC-cpu-04 section 5). The first four instructions (movi, ldr q0, two mov v2) are not position dependent, so Skyline's 16-byte far jump relocates cleanly; the function ends in ret at +0x3c.",
     },
 ];
 
