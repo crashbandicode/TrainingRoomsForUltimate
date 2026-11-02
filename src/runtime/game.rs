@@ -399,6 +399,53 @@ pub mod natives {
         }
         at::<extern "C" fn(usize) -> bool>(sites::IS_OPERATION_CPU_OFFSET).map_or_else(Default::default, |f| f(information))
     }
+
+    // ---- the hitbox visualizer's natives (SPEC-core-06 section 4; rows of `sites_hitbox`) -------------------------------
+    //
+    // Each answers nothing (0, false) until its row was granted, like the rest of this layer.
+
+    /// `app::sv_system::battle_object_module_accessor(lua_State*)`: the accessor of the object running an animation command, or 0.
+    pub unsafe fn lua_accessor(lua_state: usize) -> usize {
+        at::<extern "C" fn(usize) -> usize>(crate::model::sites_hitbox::HITBOX_ACCESSOR_OFFSET).map_or_else(Default::default, |f| f(lua_state))
+    }
+
+    /// `AttackModule::is_attack(accessor, slot, false)`.
+    pub unsafe fn attack_is_attack(accessor: usize, slot: i32) -> bool {
+        at::<extern "C" fn(usize, i32, bool) -> bool>(crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
+    }
+
+    /// `AttackModule::attack_data(accessor, slot, false)`: the slot's `AttackData` (layout in `model::hitbox::layout`), or 0.
+    pub unsafe fn attack_data(accessor: usize, slot: i32) -> usize {
+        at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
+    }
+
+    /// `EffectModule::req_follow(accessor, effect, joint, pos, zero rot, scale, follow = true, attribute, 0, 0, 0, 0, true, true)`.
+    pub unsafe fn sphere_req_follow(accessor: usize, effect: u64, joint: u64, pos: &[f32; 3], scale: f32, attribute: u32) {
+        type ReqFollow = extern "C" fn(usize, u64, u64, *const [f32; 3], *const [f32; 3], f32, bool, u32, i32, i32, i32, i32, bool, bool) -> u64;
+        let zero = [0.0f32; 3];
+        at::<ReqFollow>(crate::model::sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET)
+            .map_or_else(Default::default, |f| f(accessor, effect, joint, pos, &zero, scale, true, attribute, 0, 0, 0, 0, true, true));
+    }
+
+    /// `EffectModule::kill_kind(accessor, effect, false, true)`.
+    pub unsafe fn sphere_kill_kind(accessor: usize, effect: u64) {
+        at::<extern "C" fn(usize, u64, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, false, true))
+    }
+
+    /// `EffectModule::set_rgb_partial_last(accessor, r, g, b)`: tints the effect just requested.
+    pub unsafe fn sphere_set_rgb(accessor: usize, rgb: [f32; 3]) {
+        at::<extern "C" fn(usize, f32, f32, f32)>(crate::model::sites_hitbox::HITBOX_RGB_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rgb[0], rgb[1], rgb[2]))
+    }
+
+    /// `EffectModule::set_rate_last(accessor, rate)`.
+    pub unsafe fn sphere_set_rate(accessor: usize, rate: f32) {
+        at::<extern "C" fn(usize, f32)>(crate::model::sites_hitbox::HITBOX_RATE_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rate))
+    }
+
+    /// `MotionAnimcmdModule::set_sleep_effect(accessor, sleep)`.
+    pub unsafe fn set_sleep_effect(accessor: usize, sleep: bool) {
+        at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
+    }
 }
 
 /// The game's `app::smashball::is_training_mode()`; false when its guard did not pass.

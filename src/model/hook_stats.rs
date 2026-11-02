@@ -50,6 +50,11 @@ pub enum HookId {
     UiRegisterCalculate,
     /// Package 4 S4-4: the live replay capture's hooks (the game's native replay recorder, the save actor, the fighter frame pair).
     LiveReplay,
+    /// SPEC-core-06: the hitbox visualizer's three hooks and its per-frame pass.
+    HitboxAttack,
+    HitboxCatch,
+    HitboxRebound,
+    HitboxFrame,
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other,
@@ -84,6 +89,10 @@ impl HookId {
         HookId::UiPassCalculate,
         HookId::UiRegisterCalculate,
         HookId::LiveReplay,
+        HookId::HitboxAttack,
+        HookId::HitboxCatch,
+        HookId::HitboxRebound,
+        HookId::HitboxFrame,
         HookId::Other,
     ];
 
@@ -114,6 +123,10 @@ impl HookId {
             HookId::UiPassCalculate => "ui_pass_calculate",
             HookId::UiRegisterCalculate => "ui_register_calculate",
             HookId::LiveReplay => "live_replay",
+            HookId::HitboxAttack => "hitbox_attack",
+            HookId::HitboxCatch => "hitbox_catch",
+            HookId::HitboxRebound => "hitbox_rebound",
+            HookId::HitboxFrame => "hitbox_frame",
             HookId::Other => "other",
         }
     }

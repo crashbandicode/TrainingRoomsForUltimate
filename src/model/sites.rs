@@ -74,6 +74,9 @@ pub enum Feature {
     Roster,
     /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
     Probes,
+    /// SPEC-core-06, the hitbox visualizer: the `ATTACK` / `CATCH` animation-command hooks, the rebound hook, the attack, effect
+    /// and motion natives it draws with (`sites_hitbox.rs`). Its per-frame pass rides on the CPU core's frame wrapper.
+    Hitbox,
 }
 
 impl Feature {
@@ -105,6 +108,7 @@ impl Feature {
             Feature::P1Cpu => "p1_cpu",
             Feature::Roster => "roster",
             Feature::Probes => "probes",
+            Feature::Hitbox => "hitbox",
         }
     }
 }

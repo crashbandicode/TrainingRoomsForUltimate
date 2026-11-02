@@ -278,3 +278,12 @@ Stage m5q, manifest `docs/provenance/pkg6-carry-manifest.json` (262 files), ledg
 - Interface stubs of package 4's layer, repointed at the merge of stream/pkg4 6e7ea3f (integrator-2): manifest keys `modules.root.replay_store` and `modules.root.replay_capture` now map to `crate::runtime::macros::{replay_store, replay_capture}`, the new key `modules.root.training::named_macros` to `crate::runtime::macros::named_macros` (the lobby facade `lobby::training::named_macros` re-exports it), and `modules.macros.MAX_RETAINED_CAPTURES` to `crate::engine::macros::MAX_RETAINED_CAPTURES`. The five carried files that name them were re-written by `carry` (`mii_catalog_request`, `mii_replay`, `body_bank_probe`, `source_capacity_probe`, `source_ldn_capacity_probe`; `verify` clean); the stub bodies (`compat/replay_store.rs`, `compat/replay_capture.rs` and the inert `named_macros` module) are removed.
 - Fork lint attributes in the carried sources (to cite under D9 or fix, compliance list): `#[allow(clippy::large_enum_variant)]` in `character_roster.rs`, `mii_hud_portrait.rs`, `mii_editor_bridge/draft.rs`, `native_keyboard/inline_keyboard.rs`; `cfg_attr(..., allow(dead_code))` in `character_sources.rs`, `native_source_capacity.rs`, `native_keyboard/inline_keyboard.rs` (four).
 
+
+## hitbox (SPEC-core-06), 2026-11-02
+No file is carried (stage, path, sha256: none). Everything of the visualizer is clean-room, written from `specs/SPEC-core-06-hitbox-visualizer.md` and the owned 13.0.5 ELF
+(`docs/test-provenance/core-06.md`). Used from carried code without edits: the seam rows `hitbox_visualizer.*` of `src/model/seams/native_seams/rows_a3.rs` (`ours-new`, stage m5o
+sha256 recorded under package 6) were read for the three hook offsets and their bytes, then re-derived and re-checked against the owned ELF by `tests/core06_hitbox.rs`
+(the visualizer's own rows are `src/model/sites_hitbox.rs`; the carried seam group stays unconsumed, as before); `src/runtime/lobby/training/practice.rs::visualizes`
+(`ours-new`, package 6) is called as the lobby-practice gate. Edits to shared files, each with its reason: `Feature::Hitbox` (`sites.rs`), `HookId::Hitbox*`
+(`hook_stats.rs`), the table chain and `CROSS_NEEDS` (`capabilities.rs`, generated), the pass call in `cpu::on_frame`, one `publish` line, `game::natives` additions, boot
+(compare, install, report), `tests/capabilities.rs` (unit mapping and one boundary).
