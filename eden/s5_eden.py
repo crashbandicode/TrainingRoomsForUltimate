@@ -71,14 +71,26 @@ def ledger(line):
         f.write(f"\n{stamp()} {line}\n")
 
 
-def open_claims():
-    state = {}
-    for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.search(r"(CLAIMED|RELEASED): (\S+ \S+)", line)
-        if m:
-            state[m.group(2)] = m.group(1) == "CLAIMED"
-    return [k for k, v in state.items() if v and k != OWNER]
+HOST = "yoga"          # this harness runs ON the Yoga; the ledger names the host a claim is on
+STALE_CLAIM_HOURS = 12
 
+
+def open_claims():
+    """Open claims of other owners that concern this host (pkg6's host-aware rule, stream/pkg6 9360dfa). The host a claim is
+    ON comes from its "on <host>" phrase; a line that only mentions another host in passing does not claim it; a line with
+    no such phrase falls back to every host it names (conservative). A claim older than STALE_CLAIM_HOURS is stale noise."""
+    import calendar
+    state = {}
+    now = time.time()
+    for line in COORD.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = re.search(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z (CLAIMED|RELEASED):? (\S+ \S+)", line)
+        if not m:
+            continue
+        stamped = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
+        names = re.findall(r"\bon (?:the )?(surface|yoga|ally)\b", line, re.I) or re.findall(r"\b(surface|yoga|ally)\b", line, re.I)
+        concerns = not names or HOST in {h.lower() for h in names}
+        state[m.group(3)] = m.group(2) == "CLAIMED" and (now - stamped) / 3600 < STALE_CLAIM_HOURS and concerns
+    return [k for k, v in state.items() if v and k != OWNER]
 
 def mem_available_kib():
     return next(int(l.split()[1]) for l in Path("/proc/meminfo").read_text().splitlines()

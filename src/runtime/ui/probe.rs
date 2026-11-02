@@ -8,7 +8,7 @@
 
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::model::archive_recipe::fingerprint;
 use crate::model::hash40::hash40;
@@ -88,6 +88,11 @@ fn worker(size: usize, load: usize) {
         "ui/replace/stage/stage_1/stage_1_battlefield.bntx",
         "ui/replace_patch/stage/stage_1/stage_1_battlefields.bntx",
         "ui/message/msg_name.msbt",
+        // B3: the Training HUD layout archive (the stock one is 451,604 B, fnv 8833748e9518a461); candidate paths.
+        "ui/layout/info/info_training/layout.arc",
+        "ui/layout/menu/info_training/layout.arc",
+        "ui/layout/training/info_training/layout.arc",
+        "ui/layout/info_training/layout.arc",
         "effect/system/common/ef_common.eff",
     ] {
         probe_path(path, size, load);
@@ -105,35 +110,52 @@ fn probe_path(path: &str, size: SizeFn, load: LoadFn) {
     diagnostic(format_args!("[Probe] path={path} hash={hash:#x} arcrop_size known={known} size={reported}"));
     // U1: arcrop_load_file from this thread (a bounded read; the effect file is far too large to load whole).
     if known && reported > 0 && reported <= 4 << 20 {
+        let started = Instant::now();
         let mut buffer = vec![0u8; reported];
         let mut out = 0usize;
         let ok = load(hash, buffer.as_mut_ptr(), buffer.len(), &mut out);
         diagnostic(format_args!(
-            "[Probe] route=arcrop_load_file ok={ok} out={out} magic={} fnv={:016x}",
+            "[Probe] route=arcrop_load_file ok={ok} out={out} ms={} magic={} fnv={:016x}",
+            started.elapsed().as_millis(),
             magic_of(&buffer),
             fingerprint(&buffer[..out.min(buffer.len())])
         ));
     }
-    // U2 and the vanilla view: the two mounts through the standard file API.
+    // U2 and the vanilla view: the two mounts through the standard file API, with the time each step took (U7, V5).
     for mount in ["mods:/", "arc:/"] {
         let full = format!("{mount}{path}");
+        let opened = Instant::now();
         match std::fs::File::open(&full) {
             Ok(mut file) => {
+                let open_ms = opened.elapsed().as_millis();
                 let len = file.metadata().map(|m| m.len()).unwrap_or(0);
                 let mut head = [0u8; 8];
                 let read = file.read(&mut head).unwrap_or(0);
-                // V5: a ranged read from the middle of the file.
-                let mut ranged = 0usize;
-                if len > 0x2000 && file.seek(SeekFrom::Start(0x1000)).is_ok() {
-                    let mut chunk = [0u8; 4096];
-                    ranged = file.read(&mut chunk).unwrap_or(0);
+                // A small file is read whole and fingerprinted (the stock and the mod's bytes differ).
+                let mut whole = String::new();
+                if len > 0 && len <= 4 << 20 && file.seek(SeekFrom::Start(0)).is_ok() {
+                    let started = Instant::now();
+                    let mut bytes = Vec::with_capacity(len as usize);
+                    if file.read_to_end(&mut bytes).is_ok() {
+                        whole = format!(" whole_fnv={:016x} whole_ms={}", fingerprint(&bytes), started.elapsed().as_millis());
+                    }
+                }
+                // V5: ranged reads from the large file, timed (the DI / SDI textures are about 30-53 KB at their offsets).
+                let mut ranged = String::new();
+                if len > 0x20_0000 {
+                    for (at, size) in [(0x1000u64, 4096usize), (len / 2, 65536), (len - 65536, 65536)] {
+                        let started = Instant::now();
+                        let mut chunk = vec![0u8; size];
+                        let got = file.seek(SeekFrom::Start(at)).ok().map(|_| file.read(&mut chunk).unwrap_or(0)).unwrap_or(0);
+                        ranged.push_str(&format!(" range@{at:#x}+{size}={got}B/{}ms/fnv={:016x}", started.elapsed().as_millis(), fingerprint(&chunk[..got])));
+                    }
                 }
                 diagnostic(format_args!(
-                    "[Probe] route={mount} open=ok len={len} magic={} head_read={read} ranged_read={ranged}",
+                    "[Probe] route={mount} open=ok open_ms={open_ms} len={len} magic={} head_read={read}{whole}{ranged}",
                     magic_of(&head)
                 ));
             }
-            Err(error) => diagnostic(format_args!("[Probe] route={mount} open=err {error}")),
+            Err(error) => diagnostic(format_args!("[Probe] route={mount} open=err {error} after_ms={}", opened.elapsed().as_millis())),
         }
     }
 }

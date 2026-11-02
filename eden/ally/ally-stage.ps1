@@ -3,7 +3,7 @@
 # output folders. Refuses while eden.exe runs or without this root's CLAIM. Every NRO is checked against sha256.txt in the
 # set folder; whatever was in the plugins folder and the earlier outputs are archived under <Root>\runs\<Label>-prev, nothing is deleted.
 #   ally-stage.ps1 -Label s5-01 -Set C:\Eden\trainingrooms-pkg5\nro\release [-Settings <settings.json>]
-param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Set, [string]$Settings = '',
+param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Set, [string]$Settings = '', [string]$DeveloperIni = '', [switch]$Arc,
       [string]$Root = 'C:\Eden\trainingrooms-pkg5', [string]$Owner = 'trainingrooms-pkg5-0caa72b8-sonnet55')
 $ErrorActionPreference = 'Stop'
 if ($Label -notmatch '^s5-\d{2}$') { throw 'label' }
@@ -27,5 +27,14 @@ New-Item -ItemType Directory -Force "$U\TrainingRooms" | Out-Null
 if ($Settings) {
     Copy-Item $Settings "$U\TrainingRooms\settings.json"
     "settings.json sha256 " + (Sha "$U\TrainingRooms\settings.json").Substring(0, 16)
+}
+if ($DeveloperIni) {
+    Copy-Item $DeveloperIni "$U\TrainingRooms\developer.ini"
+    'developer.ini sha256 ' + (Sha "$U\TrainingRooms\developer.ini").Substring(0, 16)
+}
+# The ARCropolis boot: its own config folder and the mod fixture (Cosmic Destination); otherwise neither exists.
+foreach ($d in 'arcropolis', 'mods') {
+    if (Test-Path "$U\$d") { Move-Item "$U\$d" "$prev\$d" -Force }
+    if ($Arc) { Copy-Item "$Root\fixtures\$d" "$U\$d" -Recurse }
 }
 Get-ChildItem $PL -Filter *.nro | Sort-Object Name | ForEach-Object { '{0}  {1}' -f (Sha $_.FullName), $_.Name }

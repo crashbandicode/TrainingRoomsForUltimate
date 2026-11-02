@@ -88,7 +88,7 @@ def main():
     run(phase, [["sleep", 2], ["hold", ["lstick", "up"], 150, 1.0], ["button", "a", 150, 1.5]])
     wait_count(phase, TILE, "settled screen=css at=78 ", 1, 10, "Steve (tile 78)")
     run(phase, [["button", "a", 150, 1]])
-    wait_count(phase, DIAG, "cpu_event role entry=1", 1, 120, "Training: the CPU body registered")
+    wait_count(phase, DIAG, "cpu_hook_counts frames=", 1, 120, "Training: the match runs (cpu hook counts)")
     print("ROUTE DONE", flush=True)
 
 

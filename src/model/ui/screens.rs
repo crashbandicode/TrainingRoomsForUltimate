@@ -261,16 +261,15 @@ fn tile_label(kind: GridKind, n: usize, short: bool, stage: StageLabel, out: &mu
         GridKind::Stages => stage(n - 1),
     };
     if short {
-        // Docked tiles are narrow: the first 14 characters, cut at a space where there is one.
-        let mut cut = name.char_indices().nth(14).map_or(name.len(), |(i, _)| i);
-        if cut < name.len() {
-            if let Some(space) = name[..cut].rfind(' ') {
-                if space >= 6 {
-                    cut = space;
-                }
-            }
+        // Docked tiles are narrow (14 characters at the small font). A longer name is cut to 12 characters and ends in
+        // ".." so a cut is visible and two names with the same first word (Mushroom Kingdom, Mushroomy Kingdom) stay apart.
+        if name.chars().count() <= 14 {
+            let _ = out.write_str(name);
+        } else {
+            let cut = name.char_indices().nth(12).map_or(name.len(), |(i, _)| i);
+            let _ = out.write_str(name[..cut].trim_end());
+            let _ = out.write_str("..");
         }
-        let _ = out.write_str(&name[..cut]);
     } else {
         let _ = out.write_str(name);
     }
@@ -519,6 +518,25 @@ mod tests {
         let mut m = Menu::new(Settings::factory(), Env { console: mode, ..Env::default() });
         open(&mut m, title);
         m
+    }
+
+    #[test]
+    fn a_docked_label_that_is_cut_ends_in_two_dots_and_names_with_one_first_word_stay_apart() {
+        let mut a = Text::<28>::new();
+        let mut b = Text::<28>::new();
+        let mut c = Text::<28>::new();
+        tile_label(GridKind::Items, 0, true, |_| "", &mut a);
+        assert!(a.units().len() <= 14);
+        fn stage(n: usize) -> &'static str {
+            ["Mushroom Kingdom", "Mushroomy Kingdom", "Final Destination"][n]
+        }
+        tile_label(GridKind::Stages, 1, true, stage, &mut b);
+        tile_label(GridKind::Stages, 2, true, stage, &mut c);
+        assert_eq!(b.string_lossy(), "Mushroom Kin..");
+        assert_eq!(c.string_lossy(), "Mushroomy Ki..");
+        let mut d = Text::<28>::new();
+        tile_label(GridKind::Stages, 3, false, stage, &mut d);
+        assert_eq!(d.string_lossy(), "Final Destination");
     }
 
     #[test]

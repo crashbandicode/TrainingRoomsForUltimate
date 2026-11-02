@@ -149,13 +149,14 @@ pub const fn group_y(group: usize) -> f32 {
 
 // ---- direction grid geometry ---------------------------------------------------------------------------
 
-pub const CHIP_SIZE: f32 = 190.0;
-pub const CHIP_PITCH: f32 = 214.0;
+/// Three rows of chips fit the content area (the tile grid's 620 units, y 320 down to -300): the pitch is a third of it.
+pub const CHIP_SIZE: f32 = 184.0;
+pub const CHIP_PITCH: f32 = 206.0;
 
 /// Centre of the chip at grid position (column, row) as in menu::CHIP_POS (columns 0-2 relative, 3 absolute).
 pub const fn chip_xy(col: u8, row: u8) -> (f32, f32) {
     let x = -300.0 + CHIP_PITCH * col as f32 + if col == 3 { 70.0 } else { 0.0 };
-    (x, 150.0 - CHIP_PITCH * row as f32)
+    (x, 217.0 - CHIP_PITCH * row as f32)
 }
 
 // ---- names ---------------------------------------------------------------------------------------------

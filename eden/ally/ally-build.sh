@@ -62,4 +62,18 @@ gates)
   grep -h 'test result' "$out/host-test.log" | awk '{p+=$4; f+=$6} END {print "tests passed=" p " failed=" f}'
   echo gates-done
   ;;
-esac
+recipe)
+  # layout-builder (host tool, docs/BUILD.md "Layout archive recipe"): the recipe for the pane table of this tree, from the
+  # player's own stock info_training archive. Outputs info_training.tra1 and report.json into <out dir>.
+  name=$2; stock=$3; out=$4
+  work=$BASE/$name
+  target=/home/intpa/c1161-targets/$name-ally-lb
+  mkdir -p "$out" "$target"
+  env -i HOME=/home/intpa USER=intpa PATH="$TC/bin:/home/intpa/.cargo/bin:/usr/local/bin:/usr/bin:/bin" \
+    RUSTUP_HOME=$TOOLS/rustup CARGO_HOME=$TOOLS/cargo CARGO_TARGET_DIR=$target CARGO_TERM_COLOR=never \
+    RUSTUP_TOOLCHAIN=$(basename "$TC") bash -c 'cd "$0" && flock '"$LOCK"' timeout 1800 cargo build --release --manifest-path tools/layout-builder/Cargo.toml' "$work" < /dev/null > "$out/layout-builder-build.log" 2>&1
+  echo "layout-builder build exit=$?"
+  "$target/release/layout-builder" build "$stock" "$out" > "$out/layout-builder-run.log" 2>&1
+  echo "layout-builder run exit=$?"
+  sha256sum "$out/info_training.tra1" | tee "$out/tra1.sha256"
+  ;;esac
