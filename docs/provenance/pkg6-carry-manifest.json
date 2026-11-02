@@ -1211,7 +1211,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "15b1220b31154e9bbb313ae2ab3f7cdf6bed664682ec13833985253fdf30bf5a",
+   "dest_sha256": "abf12f1f3059dfc2a2366c5625fab066da60577e40f6dfc1670f311cd40a9f77",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -1227,6 +1227,21 @@
      "old": "/// The late report (R-A0b), on the",
      "new": "/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        let rows = native_seams::COUNT;\n        let checked = rows - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { keep: listed_as_other, with_code: other_with_code },\n            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n\n/// The late report (R-A0b), on the",
      "reason": "`InstallFields`: the seam outcome as fields of package 1's one install line (`seams=<n> seams_stock=<n> seams_skipped=[..] ...`, the rows that fail, counts for the rest); rows checked or changed after the line stay in the tagged late line (`[TrainingSeams] late ...`)"
+    },
+    {
+     "delete_from": "/// Non-`main` rows as `[label:code,\u2026]`, for the install line (`images=`).",
+     "delete_to": "/// Rows whose recorded bits satisfy `keep`",
+     "reason": "removed (no caller in the clean room): `ImageLabels` was a field of the fork's own install line; the clean room has one install line (package 1's, `InstallFields` shortened to counts and failing rows)"
+    },
+    {
+     "delete_from": "/// `[group,\u2026]`, for the install line",
+     "delete_to": "struct Missing;",
+     "reason": "removed (no caller in the clean room): `Groups` was a field of the fork's own install line (`authoritative=`), see `ImageLabels`"
+    },
+    {
+     "old": "/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function\n/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`\n/// row names `label` (`cpu_pilot.ai_think` \u2192 `needle.set_cpu_controls`), so that row can tell our own\n/// far jump from another plugin's. Atomics only.\npub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {\n    let replacement = replacement as usize;\n    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {\n        return;\n    }\n    let Some((index, _)) = native_seams::find_site(label) else {\n        return;\n    };\n    for (slot, target) in OWN_HOOKS.iter() {\n        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {\n            Ok(_) => {}\n            Err(held) if held == index + 1 => {}\n            Err(_) => continue,\n        }\n        target.store(replacement, Ordering::Release);\n        return;\n    }\n}\n",
+     "new": "",
+     "reason": "removed (no caller in the clean room): `own_hook_installed` served `Sharing::OwnHook` rows whose hook the fork installed through its `install_admitted!` macro; the clean room installs its hooks through its own site rows and the carried code never calls it"
     }
    ]
   },
@@ -1370,7 +1385,14 @@
    "dest": "src/runtime/roster/turnip_identity.rs",
    "crate": "root",
    "src_sha256": "561334326aa4eb2c73c713a7cba8d9defc48e2340124f15167fc39176e88649f",
-   "dest_sha256": "ac10397577f87be7f10b3fcfd1a1a00b9f77c24457a54efb83055d8728571b58"
+   "dest_sha256": "810764597d3ebaba2d32abc102961b287f4298bdbd0fe368fd881ca09d99090d",
+   "edits": [
+    {
+     "delete_from": "pub fn on_unload(",
+     "delete_to": "fn image_current(",
+     "reason": "`on_unload` removed: the nro-load provider (`libnro_hook`) has no unload callback, so nothing can call it; a stale item image is refused by the per-read ITEM_CODE check of `held_face` (its own contract) and by the generation counter at the next `on_load`"
+    }
+   ]
   },
   {
    "src": "src/native_service.rs",
@@ -1398,7 +1420,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "08b03fcf91211ae4314f934a96c3027255b39e581b9f243b36010981798292ff",
+   "dest_sha256": "134f449376e9cf43e244e1fce66386975a27082d86f728e8df5ff7a7da98c6b0",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1419,6 +1441,12 @@
      "old": "notify(role, selection_label(role, target, slot));",
      "new": "notify_selection(role, target, slot);",
      "reason": "see `notify_selection`: no `String` in the callback"
+    },
+    {
+     "old": "unsafe { training::save_states::is_loading() }",
+     "new": "training::save_states::is_loading()",
+     "count": 2,
+     "reason": "the lobby facade's `save_states::is_loading` is a safe function (package 3's fact): the fork's `unsafe` blocks around it are unnecessary (an `unused_unsafe` warning)"
     }
    ]
   },

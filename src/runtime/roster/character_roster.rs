@@ -645,7 +645,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         Some("Wait for the character swap to finish")
     } else if training::recording_or_playback() {
         Some("Finish recording or playback before swapping")
-    } else if unsafe { training::save_states::is_loading() } {
+    } else if training::save_states::is_loading() {
         Some("Wait for the save-state restore to finish")
     } else if lobby::native_ui_busy() {
         Some("Close the current game menu before swapping")
@@ -729,7 +729,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 pub fn cpu_reload_ready() -> bool {
     if busy()
         || training::recording_or_playback()
-        || unsafe { training::save_states::is_loading() }
+        || training::save_states::is_loading()
         || lobby::native_ui_busy()
         || button_config::has_pending_request()
         || menu::captures_input()

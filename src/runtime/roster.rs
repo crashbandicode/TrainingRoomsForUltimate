@@ -10,19 +10,37 @@
 
 pub(crate) mod character_items;
 pub(crate) mod character_lifecycle;
+// Carried, not declared (no clean-room consumer, single owner): `effect_hook_chain` (the fork's chaining of the shared EffectModule
+// entries: packages 2-4 hook those themselves), `heap_metrics` and `heap_fields` (the fork's counting allocator and its install-line
+// fields: package 1's `runtime::alloc` is the allocator and counts the allocations of hook scopes, `hook_stats` reports them).
 pub(crate) mod character_roster;
 pub(crate) mod cycle_preload;
 pub(crate) mod cycle_preload_config;
-pub(crate) mod effect_hook_chain;
+#[cfg(feature = "hang-trace")]
 pub(crate) mod hang_trace;
-pub(crate) mod heap_fields;
-#[cfg(feature = "plugin-heap-meter")]
-pub(crate) mod heap_metrics;
+/// Without the `hang-trace` diag feature the four probes the carried callbacks hit are no-ops (the fork's disabled build: "Disabled
+/// builds leave hook probes inactive"); the tracing code itself is only compiled with the feature.
+#[cfg(not(feature = "hang-trace"))]
+pub(crate) mod hang_trace {
+    pub struct Probe;
+
+    impl Probe {
+        #[inline(always)]
+        pub fn hit(&self) {}
+    }
+
+    pub static ROSTER_SERVICE: Probe = Probe;
+    pub static ALLOCATION: Probe = Probe;
+    pub static RELOAD: Probe = Probe;
+    pub static DESTROY: Probe = Probe;
+}
 pub(crate) mod kirby_hats;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
+#[cfg(feature = "native-unlink-probe")]
 pub(crate) mod native_unlink_probe;
 pub(crate) mod practice_trace;
+#[cfg(feature = "console-practice-trace")]
 pub(crate) mod practice_trace_core;
 pub(crate) mod scope_gate;
 pub(crate) mod turnip_identity;
@@ -100,12 +118,36 @@ pub(crate) unsafe fn handle_operator_input(out: *mut crate::model::input_delay::
     *out = record.into();
 }
 
+/// The nro-load provider's registration function (`libnro_hook`, docs/HOOK-SHARING.md): one pointer-sized argument, the callback.
+type AddNroLoadHook = extern "C" fn(usize);
+
+/// The turnip identity read needs the loaded `item` module's image (every read re-checks its code, `held_face`): ask the provider to
+/// tell us when it loads. Without the provider nothing registers and a turnip is saved as unsupported (the item engine's rule).
+fn register_nro_load() {
+    let mut address = 0usize;
+    // SAFETY: the name is a NUL-terminated literal; the loader writes one address.
+    unsafe { skyline::nn::ro::LookupSymbol(&mut address, b"add_nro_load_hook\0".as_ptr()) };
+    if address == 0 {
+        crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] turnip identity: no nro-load provider"));
+        return;
+    }
+    // SAFETY: the provider exports `add_nro_load_hook(callback)`.
+    let add: AddNroLoadHook = unsafe { std::mem::transmute(address) };
+    add(on_nro_load as *const () as usize);
+}
+
+extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
+    // SAFETY: called by the provider with the loader's own NRO record.
+    unsafe { turnip_identity::on_load(info) };
+}
+
 /// Start the cycle, in the order the fork's `main` did: the preload cache first (the INI is read once, before anything asks for a
 /// snapshot), the trace recorder, the native patches (unlink guard, Lua GC guard), the lifecycle observations and last the roster
 /// itself, whose `init` installs the service callback, the sources, the body bank and the Mii gates. Each file checks its own seam
 /// rows through `seams::seam_install::gate` and installs nothing when they are refused. Called once from boot, before the install
 /// line.
 pub(crate) fn init() {
+    register_nro_load();
     cycle_preload_config::init();
     practice_trace::init();
     native_unlink_install::init();
