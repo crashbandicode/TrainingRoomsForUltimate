@@ -235,3 +235,4 @@ SMD/hos-lock tests, Switch release/diag, size and seam Eden gates.
 Roster/Mii refactors require pkg6 baseline rows and integrated fixes.
 READY remains absent. All final acceptance criteria remain open; no operator blocker identified.
 
+First compile also materialized the missing smash-match-data-oracle dev-dependency entry in Cargo.lock; reviewed and committed with no version changes.

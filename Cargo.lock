@@ -264,6 +264,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "smash-match-data-oracle"
+version = "0.1.0"
+dependencies = [
+ "smash-match-data",
+]
+
+[[package]]
 name = "ssbu-cpu-pilot-core"
 version = "0.1.1"
 source = "git+https://git.syntaxbyexample.com/intpa/ssbu-cpu-pilot?rev=8b03e3bffea8a156628f76cd9ca31c346f52ac70#8b03e3bffea8a156628f76cd9ca31c346f52ac70"
@@ -301,6 +308,7 @@ dependencies = [
  "skyline",
  "skyline_smash",
  "smash-match-data",
+ "smash-match-data-oracle",
  "ssbu-cpu-pilot-core",
 ]
 
