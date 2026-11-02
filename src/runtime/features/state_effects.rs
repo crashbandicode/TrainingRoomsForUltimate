@@ -19,7 +19,7 @@ unsafe fn follow(accessor: usize, ids: &Table, effect: &str, joint: u64, pos: [f
     let rot = n::Vector3f { x: rot[0], y: rot[1], z: rot[2] };
     let made = n::effect_req_follow(accessor, hash40(effect), joint, &pos, &rot, attribute, lifetime);
     if let Some(slot) = handle.and_then(|c| id(ids, c)) {
-        n::work_set_int(accessor, made as i32, slot);
+        natives::set_int(accessor, made as i32, slot);
     }
 }
 
@@ -32,7 +32,7 @@ pub unsafe fn run_charge(accessor: usize, fighter: usize, ids: &Table, plan: &Pl
         match step {
             Step::SetInt(c, value) => {
                 if let Some(slot) = id(ids, c) {
-                    n::work_set_int(accessor, value, slot);
+                    natives::set_int(accessor, value, slot);
                 }
             }
             Step::SetFloat(c, value) => {
@@ -63,7 +63,7 @@ pub unsafe fn run_charge(accessor: usize, fighter: usize, ids: &Table, plan: &Pl
                 let zero = n::Vector3f { x: 0.0, y: 0.0, z: 0.0 };
                 let made = n::effect_req_follow(accessor, effect, joint, &zero, &zero, 0, lifetime);
                 if let Some(slot) = handle.and_then(|c| id(ids, c)) {
-                    n::work_set_int(accessor, made as i32, slot);
+                    natives::set_int(accessor, made as i32, slot);
                 }
             }
             Step::SheikNeedles(count) => {
@@ -114,8 +114,9 @@ pub fn buff_kind(ids: &Table, kind: i32) -> Option<BuffKind> {
 /// Execute one `ApplyBuff` frame's answer.
 ///
 /// # Safety
-/// The buff sites passed their guards; `accessor` / `fighter` are a live fighter's.
-pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table, out: &BuffOut) {
+/// The buff sites passed their guards; `accessor` is a live fighter's module accessor (every buff native takes it, Cloud's limit
+/// gauge too since 1076ddc).
+pub unsafe fn run_buff(accessor: usize, entry: i32, ids: &Table, out: &BuffOut) {
     silence(accessor, ids);
     if let Some(spell) = out.hero_cast {
         let command = match spell {
@@ -125,9 +126,9 @@ pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table,
             Spell::Bounce => C::HeroSpellBounce,
         };
         if let (Some(slot), Some(value), Some(status)) = (id(ids, C::HeroDecideCommand), id(ids, command), id(ids, C::HeroStatusSpecialLwStart)) {
-            n::work_set_int(accessor, value, slot);
+            natives::set_int(accessor, value, slot);
             // `true` blocks shielding out of the cast.
-            n::status_force(accessor, status, true);
+            natives::change_status_force(accessor, status, true);
         }
     }
     if out.add_limit {
@@ -158,8 +159,8 @@ pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table,
         };
         let seconds = natives::get_param_float(accessor, hash40("param_special_lw"), hash40(param));
         if let (Some(count_id), Some(level_id), Some(level_value)) = (id(ids, C::WarioGassCount), id(ids, C::WarioGassLevel), id(ids, level_c)) {
-            n::work_set_int(accessor, (seconds * 60.0) as i32, count_id);
-            n::work_set_int(accessor, level_value, level_id);
+            natives::set_int(accessor, (seconds * 60.0) as i32, count_id);
+            natives::set_int(accessor, level_value, level_id);
         }
     }
     if let Some(art) = out.shulk_write {
@@ -177,15 +178,15 @@ pub unsafe fn run_buff(accessor: usize, fighter: usize, entry: i32, ids: &Table,
             id(ids, C::ShulkSelectFlag),
             id(ids, C::ShulkStatusAction),
         ) {
-            n::work_set_int(accessor, art_value, type_id);
-            n::work_set_int(accessor, 29, timer);
+            natives::set_int(accessor, art_value, type_id);
+            natives::set_int(accessor, 29, timer);
             n::work_on_flag(accessor, flag);
-            n::status_force(accessor, status, true);
+            natives::change_status_force(accessor, status, true);
         }
     }
     if out.wii_force {
         if let Some(status) = id(ids, C::WiiFitStatusSuccess) {
-            n::status_force(accessor, status, false);
+            natives::change_status_force(accessor, status, false);
         }
     }
     if let Some(rate) = out.motion_rate {
@@ -211,15 +212,15 @@ unsafe fn min_min_dragon(accessor: usize, ids: &Table) {
     if let (Some(slot), Some(flag), Some(handle_slot), Some(part)) =
         (id(ids, C::MinMinArmBigFrame), id(ids, C::MinMinDragonizeL), id(ids, C::MinMinReinforceHandle), id(ids, C::MinMinPartDragon))
     {
-        n::work_set_int(accessor, big, slot);
+        natives::set_int(accessor, big, slot);
         n::work_on_flag(accessor, flag);
-        let old = n::work_get_int(accessor, handle_slot);
+        let old = natives::get_int(accessor, handle_slot);
         if old != 0 {
             n::effect_kill(accessor, old as u32);
         }
-        let handle = n::effect_req(accessor, 0x12600df9d4);
+        let handle = natives::effect_req(accessor, 0x12600df9d4, &[0.0; 3], &[0.0; 3], 1.0, (0, -1, false, 0));
         n::effect_set_scale_one(accessor, handle as u32);
-        n::work_set_int(accessor, handle as i32, handle_slot);
+        natives::set_int(accessor, handle as i32, handle_slot);
         n::motion_add_partial_dragon(accessor, part, 0xc86296416);
     }
 }

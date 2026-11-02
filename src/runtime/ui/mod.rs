@@ -22,7 +22,7 @@ pub mod registry;
 pub mod state;
 pub mod texture;
 pub mod thumbs;
-#[cfg(feature = "diag")]
+#[cfg(feature = "texture-probe")]
 pub mod texture_probe;
 pub mod tick;
 pub mod view;

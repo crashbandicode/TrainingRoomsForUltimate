@@ -67,10 +67,10 @@ pub(crate) fn recording_or_playback() -> bool {
 
 /// The fork's `save_states` module, as far as the lobby reads it.
 pub(crate) mod save_states {
-    /// The stage id the game holds now (package 3's guarded native).
+    /// The stage id the game holds now (the guarded native, `game::natives::stage_id`; -1 when there is none).
     pub fn stage_id() -> i32 {
         // SAFETY: a guarded called function with no arguments.
-        unsafe { crate::runtime::state_natives::stage_id() }
+        unsafe { crate::runtime::game::natives::stage_id() }
     }
 
     /// A save state is loading (package 3's fact, `features::states::is_loading`).
@@ -122,6 +122,18 @@ pub(crate) mod ui {
         pub fn notification(header: Cow<'static, str>, body: Cow<'static, str>, frames: u16) {
             if let Some(slot) = id_of(&header) {
                 notices::upsert(HEADERS[slot].0, HEADERS[slot].1, &body, frames, DEFAULT_COLOR);
+            }
+        }
+
+        /// `notification` with the text formatted on the stack (a fixed buffer, copied into the notice queue): no heap, for the
+        /// callbacks whose text has numbers or names in it.
+        pub fn notification_args(header: Cow<'static, str>, args: std::fmt::Arguments<'_>, frames: u16) {
+            use std::fmt::Write;
+            let mut text = crate::model::storage::FixedPath::<96>::new();
+            // A text that does not fit is cut at the buffer (the notice shows its first characters).
+            let _ = text.write_fmt(args);
+            if let Some(slot) = id_of(&header) {
+                notices::upsert(HEADERS[slot].0, HEADERS[slot].1, text.as_str(), frames, DEFAULT_COLOR);
             }
         }
 

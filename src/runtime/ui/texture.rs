@@ -17,7 +17,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::nn::ui2d::Pane;
 
 use crate::model::guard::GuardOutcome;

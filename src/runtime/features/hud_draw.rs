@@ -13,7 +13,7 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 use std::fmt::Write;
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 
 use skyline::nn::ui2d::{Layout, Pane};
 

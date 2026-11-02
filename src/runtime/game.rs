@@ -224,11 +224,11 @@ pub mod natives {
         at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::KINETIC_SUM_SPEED_Y_OFFSET).map_or_else(Default::default, |f| f(accessor, energy))
     }
 
-    /// `EffectModule::req(accessor, effect, pos, rot, scale, 0, 0, true, attribute)`.
-    pub unsafe fn effect_req(accessor: usize, effect: u64, pos: &[f32; 3], scale: f32, attribute: i32) {
+    /// `EffectModule::req(accessor, effect, pos, rot, scale, tail.0, tail.1, tail.2, tail.3)`: `tail` is the native's last four
+    /// arguments in the symbol's order (`u32, i32, bool, i32`). The effect handle, 0 when the row was not granted.
+    pub unsafe fn effect_req(accessor: usize, effect: u64, pos: &[f32; 3], rot: &[f32; 3], scale: f32, tail: (u32, i32, bool, i32)) -> u64 {
         type Req = extern "C" fn(usize, u64, *const [f32; 3], *const [f32; 3], f32, u32, i32, bool, i32) -> u64;
-        let zero = [0.0f32; 3];
-        at::<Req>(sites_pkg2::EFFECT_REQ_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, pos, &zero, scale, 0, 0, true, attribute));
+        at::<Req>(sites_pkg2::EFFECT_REQ_OFFSET).map_or_else(Default::default, |f| f(accessor, effect, pos, rot, scale, tail.0, tail.1, tail.2, tail.3))
     }
 
     pub unsafe fn pos_x(accessor: usize) -> f32 {
@@ -254,9 +254,10 @@ pub mod natives {
         at::<extern "C" fn(usize, i32) -> bool>(sites_pkg2::TRANSITION_TERM_HOOK_OFFSET).map_or_else(Default::default, |f| f(accessor, term))
     }
 
-    /// `StatusModule::change_status_force(accessor, status, true)`.
-    pub unsafe fn change_status_force(accessor: usize, status: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_FORCE_OFFSET).map_or_else(Default::default, |f| f(accessor, status, true))
+    /// `StatusModule::change_status_force(accessor, status, block)` (the CPU behaviours pass `true`; the save states' buffs need
+    /// `false` for Wii Fit).
+    pub unsafe fn change_status_force(accessor: usize, status: i32, block: bool) {
+        at::<extern "C" fn(usize, i32, bool)>(sites_pkg2::CHANGE_STATUS_FORCE_OFFSET).map_or_else(Default::default, |f| f(accessor, status, block))
     }
 
     pub unsafe fn set_whole(accessor: usize, visible: bool) {
@@ -315,7 +316,7 @@ pub mod natives {
     }
 
     /// `WorkModule::set_int(accessor, value, id)`.
-    pub unsafe fn set_int(accessor: usize, id: i32, value: i32) {
+    pub unsafe fn set_int(accessor: usize, value: i32, id: i32) {
         at::<extern "C" fn(usize, i32, i32)>(sites_pkg4::WORK_SET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 

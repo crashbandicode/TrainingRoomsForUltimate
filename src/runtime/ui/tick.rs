@@ -5,7 +5,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::input_delay::Owners;
@@ -135,6 +135,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         thumbs::hide();
         chips::hide();
     }
+    // The texture helper's Eden proof (feature `texture-probe`): binds a few stage textures to menu tiles and photographs them.
+    #[cfg(feature = "texture-probe")]
+    crate::runtime::ui::texture_probe::tick(panes);
     if thumbs::run(panes) {
         FRAME_SEQ.fetch_add(1, Ordering::Release);
     }

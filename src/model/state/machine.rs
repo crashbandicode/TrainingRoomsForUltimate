@@ -91,7 +91,8 @@ pub struct FrameIn {
     pub entry: i32,
     /// This body is Nana (the Ice Climbers' second body: shares Popo's record).
     pub nana: bool,
-    /// This body is Popo.
+    /// This body is Popo and Nana exists (the runtime reports `false` for a Popo that Solo Popo left without a Nana: there is no
+    /// second body to hand the record to).
     pub popo: bool,
     pub kind: i32,
     /// Dead in the sense of SPEC-state-01 §3 (including the Pokémon switching frame).

@@ -174,28 +174,6 @@ fn authoritative(seam: &Site) -> bool {
     AUTHORITATIVE.contains(&seam.group)
 }
 
-/// A replace hook went in (`training::seams::install_admitted!`): `replacement` is the function
-/// address Skyline's far jump at the hook's entry now targets. Kept only when a `Sharing::OwnHook`
-/// row names `label` (`cpu_pilot.ai_think` → `needle.set_cpu_controls`), so that row can tell our own
-/// far jump from another plugin's. Atomics only.
-pub(crate) fn own_hook_installed(label: &'static str, replacement: *const ()) {
-    let replacement = replacement as usize;
-    if replacement == 0 || !native_seams::OWN_HOOK_PAIRS.iter().any(|(_, hook)| *hook == label) {
-        return;
-    }
-    let Some((index, _)) = native_seams::find_site(label) else {
-        return;
-    };
-    for (slot, target) in OWN_HOOKS.iter() {
-        match slot.compare_exchange(0, index + 1, Ordering::AcqRel, Ordering::Acquire) {
-            Ok(_) => {}
-            Err(held) if held == index + 1 => {}
-            Err(_) => continue,
-        }
-        target.store(replacement, Ordering::Release);
-        return;
-    }
-}
 
 /// The registered replacement address of the hook an `OwnHook` row names (`None`: not installed).
 fn own_target(seam: &Site) -> Option<u64> {
@@ -422,22 +400,6 @@ pub(crate) fn site_image(label: &'static str, text_base: Option<usize>, legacy: 
     legacy
 }
 
-/// Non-`main` rows as `[label:code,…]`, for the install line (`images=`).
-struct ImageLabels;
-
-impl fmt::Display for ImageLabels {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[")?;
-        for (index, seam) in native_seams::IMAGE_SITES.iter().enumerate() {
-            if index > 0 {
-                f.write_str(",")?;
-            }
-            write!(f, "{}:{}", seam.label, code_name(IMAGE_OUTCOMES[index].load(Ordering::Relaxed)))?;
-        }
-        f.write_str("]")
-    }
-}
-
 /// Rows whose recorded bits satisfy `keep`, as `[label,…]`, each `label:code` where `with_code` holds.
 struct Labels {
     keep: fn(u8) -> bool,
@@ -461,23 +423,6 @@ impl fmt::Display for Labels {
             if (self.with_code)(bits) {
                 write!(f, ":{}", code_name(bits))?;
             }
-        }
-        f.write_str("]")
-    }
-}
-
-/// `[group,…]`, for the install line (`authoritative=`: the groups whose `main` outcome decides;
-/// `authoritative_images=`: the groups whose image-row outcome decides).
-struct Groups(&'static [&'static str]);
-
-impl fmt::Display for Groups {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[")?;
-        for (n, group) in self.0.iter().enumerate() {
-            if n > 0 {
-                f.write_str(",")?;
-            }
-            f.write_str(group)?;
         }
         f.write_str("]")
     }
@@ -512,12 +457,12 @@ impl fmt::Display for Missing {
 
 /// The diagnostic build's hook-sharing drill fields (` foreign=<mode> <site>=<entry>/<outcome> …`,
 /// `super::seam_drill`); nothing in other builds.
-#[cfg(feature = "diag")]
+#[cfg(feature = "seam-drill")]
 use super::seam_drill::InstallFields as DrillFields;
-#[cfg(not(feature = "diag"))]
+#[cfg(not(feature = "seam-drill"))]
 struct DrillFields;
 
-#[cfg(not(feature = "diag"))]
+#[cfg(not(feature = "seam-drill"))]
 impl fmt::Display for DrillFields {
     fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         Ok(())
@@ -525,7 +470,7 @@ impl fmt::Display for DrillFields {
 }
 
 /// The current bits of a `main` row (the diagnostic drill reads its sites' outcomes).
-#[cfg(feature = "diag")]
+#[cfg(feature = "seam-drill")]
 pub(crate) fn bits_of(label: &str) -> Option<u8> {
     native_seams::find_site(label).and_then(|(index, _)| OUTCOMES.get(index)).map(|slot| slot.load(Ordering::Relaxed))
 }
@@ -573,6 +518,9 @@ impl fmt::Display for InstallFields {
 /// were checked or changed after the install line, once they settle (`native_seams::report::pass`).
 /// Returns at once while nothing is pending. Snapshots live on this thread's stack.
 pub(crate) fn report_late() {
+    // The drill's stand-in run counts (rate-limited to once a second by the drill itself).
+    #[cfg(feature = "seam-drill")]
+    super::seam_drill::report_counts(crate::runtime::clock::uptime_ms());
     if !BOOTED.load(Ordering::Acquire) || !LATE_ACTIVE.swap(false, Ordering::AcqRel) {
         return;
     }
