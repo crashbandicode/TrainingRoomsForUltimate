@@ -15,7 +15,8 @@ worked from the stream rules and the u4 doc without having read the playbook; th
   textures are built in place by the particle system and registered with `0x35b9360`, the function the UI texture builder uses.
 - Helper: `model::effect_texture` (walk, colours), `model::effect_chips` (layer pick, placement, page plan), `runtime::ui::effect_texture`,
   `runtime::ui::chips` (the DI / SDI grid page), `texture::load_resident`; 10 rows in `sites_u4b.rs`.
-- Eden u4b-01, u4b-02: see the doc. u4b-03 (chips in the menu): open.
+- Eden u4b-01, u4b-02, u4b-03 (chips in the menu, 4 open/close cycles): see the doc.
+- Merged work/implementation 27d84f4, 97648b8 (stream/sync), 566780a; chips page state in atomic words (no lock on the UI thread).
 
 ## Checklist (docs/CHECKLIST.md at ae87443). Stream scope: the u4b files; project-level rows are named as such.
 
@@ -24,8 +25,8 @@ worked from the stream rules and the u4 doc without having read the playbook; th
 | cdylib only | M | pass | compliance.py (Cargo.toml) |
 | release profile, skyline =0.6.0, toolchain 1.98.1 | M | pass | compliance.py |
 | pure logic in model with host tests; runtime switch-only | M | pass | `src/model/effect_texture.rs` (9 tests), `effect_chips.rs` (5), `tests/u4b_sites.rs` (8), screens tests (2); `cargo test` 8505 passed, 0 failed (Surface, 11:20Z, e0f48e8) |
-| gates: test, clippy -D warnings, no-default-features, release, diag | M | partial | Yoga 11:31-11:35Z: clippy clean at the clippy-fix head, no-default-features exit 0, release `436f4d88` and diag `32c95978` built at e0f48e8 (before two test-only clippy fixes and `is_multiple_of`); a rebuild at the final head is open |
-| no heap in hooks | M | pass | u4b-02 `[EffTex]` lines: allocation count 31 before and after each build/bind/release cycle (counting allocator); u4b-03 delta 0 open |
+| gates: test, clippy -D warnings, no-default-features, release, diag | M | pass | head 23249ff: `cargo test` 8706 passed, 0 failed (Surface); Yoga 12:58-13:00Z: clippy `--all-targets -D warnings` exit 0, `--no-default-features` exit 0, release `a564bcb720042bdef22cbc1cedda7ebd150336366435913923590178813ab075` (nro_size: resident 2,977,792 B), diag `5b1d89cac11ca371577c24d2c290da25c828eb10178fc19c0809ba0de604c939` |
+| no heap in hooks | M | pass (u4b path) | u4b-02: 31 before and after each cycle; u4b-03: the chip path adds 0 (347 across DI bind, drop, SDI bind). The tree grows elsewhere (menu open +30-40, menu closed about 10/s): reported to the lead, not the u4b path |
 | fixed buffers, no plugin-heap use in the page | M | pass | `chips.rs`, `effect_texture.rs`: fixed arrays, the game's allocator makes the UI texture |
 | root cause fixed, no workaround | M | pass | the fixes were the entry hash (folder, not file) and the unaligned byte read: both root causes; no guard/skip added |
 | version guard | M | pass | project install line (`game=13.0.5`), unchanged |
@@ -34,17 +35,17 @@ worked from the stream rules and the u4 doc without having read the playbook; th
 | hook sharing / chaining | C | N/A | u4b hooks nothing: one called function (`0x35b9360`) and relied windows; a Called row tolerates other plugins' hooks |
 | hook after the prologue or call instead | M | pass | calls only |
 | no diag code in the shipped NRO | M | pass | compliance.py: no diag markers in the release NRO; `survey`/`describe` are `cfg(feature = "diag")` |
-| shipped NRO writes only its install line | M | pass | u4b adds `[Chips]` lines through `hook_stats::per_load` (once per grid open; the shipped ring admits only its tags) |
+| shipped NRO writes only its install line | M | pass | u4b adds `[Chips]` lines through `hook_stats::per_load` (once per grid open; the shipped ring admits only its tags); compliance.py: no diag markers in a564bcb7 |
 | online rows | C | N/A | the chips draw in the offline Training menu only; no simulated state is read or written |
-| Eden claim written and released | M | pass | ledger lines 09:53Z/10:14Z (u4b-01), 11:00Z/11:08Z (u4b-02); compile claims 09:52Z (released by the lead as orphaned 10:34Z), 10:59/11:00Z, 11:02/11:04Z, 11:31/11:35Z |
+| Eden claim written and released | M | pass | ledger lines 09:53Z/10:14Z (u4b-01), 11:00Z/11:08Z (u4b-02), 13:00Z/13:04Z (u4b-03); compile claims 12:58/13:00Z, 09:52Z (released by the lead as orphaned 10:34Z), 10:59/11:00Z, 11:02/11:04Z, 11:31/11:35Z |
 | one Eden per host, MemAvailable >= 10 GiB, not profile a or :61 | M | pass | own profile `u4b`, display `:95`, `run.json` mem_available 22.5 GB |
 | profile hard-linked copy | M | pass | `tr_eden.py prep` (hard-linked copy of profiles/b) |
 | copies linked/copied correctly | M | pass | `tr_eden.py prep` |
-| disk: own target per copy, df >= 40 GB | M | pass | Surface `cargo-targets/trainingrooms-u4b(-sw)`, Yoga `trainingrooms-build-u4b/target(-host)`; df 187-258 GB free |
+| disk: own target per copy, df >= 40 GB, products deleted | M | pass | Surface `cargo-targets/trainingrooms-u4b`, Yoga `trainingrooms-build-u4b/target(-host)`; df 187-258 GB free; CARGO_INCREMENTAL=0 from 13:0xZ. Deleted 13:06Z: `cargo-targets/trainingrooms-u4b-sw` (0.3 GB, the Surface Switch target, builds moved to the Yoga), Yoga `target-host/debug/incremental` (4.6 GB) and the Switch `incremental` (4 KB); the lead deleted `trainingrooms-u4b/debug/incremental` (11.9 GB) |
 | waits gated on a log line or screenshot | M | pass | `route_u4b.py` gates (install line, menu, SSS, tiles, CSS, training scene) |
 | failed precondition aborted and retried | M | pass | u4b-01 first route aborted at the install gate, retried; game restarted in the same session |
 | profile restored, host released | M | pass | `tr_eden.py down` (plugins restored, RELEASED) |
-| console.log searched; run.json, memory.peak kept | M | pass | u4b-02: one boot-time `Unmapped Write64 ...b80` + execute-at-0 per boot at ~3.5 s, also in pkg4 s4-07 (no u4b code); outside the plugin's u4b activity window; owned by the stack stream (lead) |
+| console.log searched; run.json, memory.peak kept | M | pass | u4b-03: the same boot fault only (7.27 s), memory.peak 6.60 GB, files under `eden/runs/u4b-03/`; u4b-02: one boot-time `Unmapped Write64 ...b80` + execute-at-0 per boot at ~3.5 s, also in pkg4 s4-07 (no u4b code); outside the plugin's u4b activity window; owned by the stack stream (lead) |
 | every local command under memory/time guard | M | partial | cargo and Eden under systemd-run/timeout; small ssh/scp/ledger commands were not |
 | evidence doc | M | pass | `docs/U4B-RESIDENT-EFFECT-TEXTURE.md` (labels, NRO hashes, log lines) |
 | numbers from tested scripts | C | N/A | the doc cites log lines and texture sizes, no computed numbers |
