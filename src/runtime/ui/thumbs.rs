@@ -6,9 +6,9 @@
 //!
 //! Runs on the UI job thread inside the layout tick (`tick::tick`), where `texture` requires its calls. Never allocates
 //! (fixed slots, a stack path buffer). A layout destroyed or re-registered while textures are bound drops them without
-//! touching the panes (`lose_layout`): the panes are gone, the textures are released at once.
+//! touching the panes (`lose_layout`); textures still observe the same GPU retirement grace.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use hos_lock::Mutex;
 
@@ -37,6 +37,8 @@ struct State {
     count: usize,
     /// A stage grid is on screen.
     active: bool,
+    roster: bool,
+    cpu: bool,
     /// The page signature the slots were requested for (`u32::MAX` = none).
     requested: u32,
     sig: u32,
@@ -47,13 +49,15 @@ static STATE: Mutex<State> = Mutex::new(State {
     want: [u16::MAX; p::TILES],
     count: 0,
     active: false,
+    roster: false,
+    cpu: false,
     requested: u32::MAX,
     sig: 0,
     slots: [Slot::Idle; p::TILES],
 });
 
-/// Bit `i` set: tile `i` shows its picture (the view reads it).
-pub static BOUND: AtomicU64 = AtomicU64::new(0);
+/// One flag per pane: the roster has more than 64 tiles.
+static BOUND: [AtomicBool; p::TILES] = [const { AtomicBool::new(false) }; p::TILES];
 
 /// One log line (the page-level events are once per page, counted as per-load, not steady-state, allocations).
 fn log(args: core::fmt::Arguments<'_>) {
@@ -62,13 +66,15 @@ fn log(args: core::fmt::Arguments<'_>) {
 
 /// Whether tile `i` shows a picture now.
 pub fn is_bound(i: usize) -> bool {
-    BOUND.load(Ordering::Acquire) & (1 << i) != 0
+    BOUND.get(i).is_some_and(|flag| flag.load(Ordering::Acquire))
 }
 
 /// The frame the menu drew: a stage grid asks for its page's thumbnails, anything else for none.
 pub fn note_frame(frame: &Frame) {
     let Some(mut s) = STATE.try_lock() else { return };
-    s.active = frame.view == crate::model::frame::View::Tiles && frame.tile_stage_grid;
+    s.active = frame.view == crate::model::frame::View::Tiles && (frame.tile_stage_grid || frame.tile_roster_grid);
+    s.roster = frame.tile_roster_grid;
+    s.cpu = frame.tile_cpu;
     s.count = usize::from(frame.tile_count).min(p::TILES);
     s.sig = frame.tile_sig;
     s.want = frame.tile_n;
@@ -110,7 +116,7 @@ pub unsafe fn run(panes: &Panes) -> bool {
                     match t.poll() {
                         Readiness::Ready if !pane.is_null() && texture::bind(pane, &t) => {
                             s.slots[i] = Slot::Bound { texture: t };
-                            BOUND.fetch_or(1 << i, Ordering::AcqRel);
+                            BOUND[i].store(true, Ordering::Release);
                             changed = true;
                         }
                         Readiness::Ready => {
@@ -136,7 +142,6 @@ pub unsafe fn run(panes: &Panes) -> bool {
             log(format_args!("[Thumbs] bound={bound} loading={loading} failed={failed} retire_waiting={} allocations={}", texture::retired_waiting(), crate::runtime::alloc::hook_allocations()));
         }
     }
-    texture::tick();
     changed
 }
 
@@ -145,10 +150,15 @@ unsafe fn request(s: &mut State) {
     s.requested = s.sig;
     for i in 0..s.count {
         let mut buffer = [0u8; 96];
-        let slot = stage_id(s.want[i])
-            .and_then(|id| stage_textures::path_into(id, &mut buffer))
-            .and_then(|len| core::str::from_utf8(&buffer[..len]).ok())
-            .and_then(|path| texture::load(texture::path_hash(path)));
+        let hash = if s.roster {
+            (s.want[i] != u16::MAX).then(|| crate::runtime::roster::character_roster::menu_portrait_hash(u32::from(s.want[i]), s.cpu)).flatten()
+        } else {
+            stage_id(s.want[i])
+                .and_then(|id| stage_textures::path_into(id, &mut buffer))
+                .and_then(|len| core::str::from_utf8(&buffer[..len]).ok())
+                .map(texture::path_hash)
+        };
+        let slot = hash.and_then(|hash| texture::load(hash));
         s.slots[i] = match slot {
             Some(texture) => Slot::Loading { texture, frames: 0 },
             None => Slot::Failed,
@@ -158,7 +168,10 @@ unsafe fn request(s: &mut State) {
 
 /// Unbind what is bound (when the panes still exist) and retire every texture the slots hold. True when a picture was on screen.
 unsafe fn release_all(s: &mut State, panes: Option<&Panes>) -> bool {
-    let shown = BOUND.swap(0, Ordering::AcqRel) != 0;
+    let mut shown = false;
+    for flag in &BOUND {
+        shown |= flag.swap(false, Ordering::AcqRel);
+    }
     for i in 0..p::TILES {
         match core::mem::replace(&mut s.slots[i], Slot::Idle) {
             Slot::Bound { texture: t } => {
@@ -167,10 +180,8 @@ unsafe fn release_all(s: &mut State, panes: Option<&Panes>) -> bool {
                     if !pane.is_null() {
                         texture::unbind(pane);
                     }
-                    if !texture::retire(t) {
-                        texture::release(t);
-                    }
-                } else {
+                }
+                if !texture::retire(t) {
                     texture::release(t);
                 }
             }

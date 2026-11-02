@@ -37,8 +37,8 @@ static SERVICE_SLOT_ADDRESS: AtomicUsize = AtomicUsize::new(0);
 static FRAME: AtomicU64 = AtomicU64::new(0);
 
 /// Frames a retired texture waits after it was unbound.
-pub const RETIRE_DELAY_FRAMES: u64 = 8;
-const RETIRE_SLOTS: usize = 64;
+pub use facts::RETIRE_DELAY_FRAMES;
+use facts::RETIRE_SLOTS;
 static RETIRED: Mutex<RetireQueue<Texture, RETIRE_SLOTS>> = Mutex::new(RetireQueue::new(RETIRE_DELAY_FRAMES));
 
 /// One reference to the game's UI texture: the shared pointer's holder and control block.

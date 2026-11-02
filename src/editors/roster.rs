@@ -161,8 +161,13 @@ impl RosterEditor {
     /// Write the tiles' labels (name with the rank, the pick or the All mark) and the role on the second help line.
     pub fn decorate(&self, frame: &mut Frame, values: &[u8], solo: bool) {
         let kinds = kinds();
+        frame.tile_roster_grid = true;
+        frame.tile_cpu = self.grid.role() == Role::Cpu;
+        frame.tile_sig = 0x8000_0000 | u32::from(frame.tile_cpu);
         for cell in 0..CELLS.min(frame.tiles.len()) {
             let Some(info) = self.grid.info(cell) else { continue };
+            frame.tile_n[cell] = info.kind().and_then(|kind| u16::try_from(kind).ok()).unwrap_or(u16::MAX);
+            frame.tile_sig = frame.tile_sig.wrapping_mul(16777619) ^ u32::from(frame.tile_n[cell]);
             let mut label = Text::<28>::new();
             match info.content {
                 CellContent::All => {

@@ -156,12 +156,13 @@ struct Session {
     refusal: Option<&'static str>,
     /// The open roster grid's editor (role, previewed forms), kept across presses.
     roster: Option<crate::editors::roster::RosterEditor>,
+    mii: Option<crate::editors::mii::MiiList>,
 }
 
 impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
-        self.phase != Phase::Menu
+        self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
     }
 }
 
@@ -198,6 +199,8 @@ fn handle(code: u8, s: &mut Session) {
         s.menu = None;
         s.panel = None;
         s.refusal = None;
+        s.roster = None;
+        s.mii = None;
         if s.phase == Phase::Clip {
             EXT_SHOWN.store(false, Ordering::Release);
         }
@@ -213,6 +216,8 @@ fn handle(code: u8, s: &mut Session) {
         }
         s.panel = None;
         s.refusal = None;
+        s.roster = None;
+        s.mii = None;
         if s.phase == Phase::Panel {
             s.phase = Phase::Menu;
         }
@@ -234,6 +239,10 @@ fn handle(code: u8, s: &mut Session) {
         if panel {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
             external::press_panel(button);
+        } else if matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))) && button != Button::B {
+            if let Some(list) = s.mii.as_mut() {
+                list.press(button, m);
+            }
         } else {
             m.press(button);
             if let Some(item) = m.take_give_item() {
@@ -265,6 +274,9 @@ fn sync_panels(s: &mut Session) {
         return;
     }
     let open = OPEN.load(Ordering::Acquire);
+    if open {
+        sync_mii(s);
+    }
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
             Some(Screen::External(editor)) if external::is_layer_panel(*editor) => Some(*editor),
@@ -317,6 +329,36 @@ fn sync_panels(s: &mut Session) {
     }
     if open || s.phase == Phase::Clip {
         publish_frame(s);
+    }
+}
+
+/// Take the owned catalog published by package 6; never inspect a native owner from the worker.
+fn sync_mii(s: &mut Session) {
+    let Some(menu) = s.menu.as_ref() else { return };
+    let class = match menu.screen() {
+        Some(Screen::External(Editor::MiiList(class))) => Some(*class),
+        _ => None,
+    };
+    if s.mii.is_none() {
+        let incoming = {
+            let mut app = crate::runtime::ui::menu_app::QUICK_MENU_APP.lock();
+            app.follow_open();
+            let qualified = app.ordinary_cpu_qualified();
+            app.take_catalog().map(|catalog| (catalog, qualified))
+        };
+        if let Some(((snapshot, epoch, context), qualified)) = incoming {
+            if let Ok(snapshot) = snapshot.downcast::<crate::engine::mii::inventory::Snapshot>() {
+                let context = context.and_then(|c| c.downcast::<crate::engine::mii_root::mii_menu::Context>().ok()).map(|c| *c);
+                s.mii = crate::editors::mii::MiiList::new(*snapshot, context, epoch, menu);
+                #[cfg(feature = "mii-ordinary-cpu-alpha")]
+                if let Some(list) = s.mii.as_mut() { list.qualify_cpu(qualified); }
+                #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
+                let _ = qualified;
+            }
+        }
+    }
+    if let Some(list) = s.mii.as_mut() {
+        if let Some(class) = class { list.open(class); } else { list.leave(); }
     }
 }
 /// A, X or Y on the Lobby Stages grid: the stage editor applies it to the menu's kept values; a Direct pick is requested from the
@@ -372,6 +414,14 @@ fn publish_frame(s: &Session) {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = external::panel_view_now() else { return };
         panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+    } else if matches!(menu.screen(), Some(Screen::External(Editor::MiiList(_)))) {
+        if let Some(list) = s.mii.as_ref() {
+            list.frame(menu, &mut next);
+        } else {
+            frame_of(menu, &mut next, stage_label);
+            next.help = [crate::model::frame::Text::new(); 2];
+            let _ = core::fmt::Write::write_str(&mut next.help[0], "Reading saved and replay Miis…");
+        }
     } else {
         frame_of(menu, &mut next, stage_label);
         if let Some(Screen::Grid { layout, page, cell }) = menu.screen().copied() {

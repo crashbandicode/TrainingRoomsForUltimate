@@ -140,7 +140,7 @@ unsafe fn request(panes: &Panes, visual: ChipVisual) {
     ));
 }
 
-/// Unbind the pointers (when the panes still exist) and retire the texture; with no panes (the layout is gone) release it at once.
+/// Unbind the pointers when the panes still exist; layout loss retains the same GPU retirement grace.
 unsafe fn drop_layer(panes: Option<&Panes>) {
     LAYER.store(0, Ordering::Release);
     HELD.store(m::held_code(Held::Nothing), Ordering::Release);
@@ -160,8 +160,10 @@ unsafe fn drop_layer(panes: Option<&Panes>) {
             log(format_args!("[Chips] dropped (retired) waiting={}", texture::retired_waiting()));
         }
         None => {
-            texture::release(t);
-            log(format_args!("[Chips] dropped with the layout (released)"));
+            if !texture::retire(t) {
+                texture::release(t);
+            }
+            log(format_args!("[Chips] dropped with the layout (retired)"));
         }
     }
 }

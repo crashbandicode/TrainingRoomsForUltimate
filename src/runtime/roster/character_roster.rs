@@ -2250,8 +2250,6 @@ unsafe fn preload_waiting_icons(context: *const u8) {
         return;
     };
     let base = BASE.load(Ordering::Acquire);
-    let icon_hash: unsafe extern "C" fn(u64, u32, u32) -> u64 =
-        std::mem::transmute(base + 0x3238a70);
     let request: unsafe extern "C" fn(*const u8, *const u64, i64, u32) =
         std::mem::transmute(base + 0x323c4e0);
     // F-HUD-c: the icons a swap will bind, at the CPU entry's costume. Its row is final here: the waiting entry
@@ -2262,7 +2260,7 @@ unsafe fn preload_waiting_icons(context: *const u8) {
     let mut count = 0;
     for fighter in TrioFighter::available() {
         let costume = model::waiting_icon_costume(fighter.kind(), cpu_costume);
-        let hash = icon_hash(fighter_kind_hash(base, fighter.kind()), costume, 0);
+        let hash = fighter_picture_hash(base, fighter.kind(), costume, 0);
         if hash & 0xffffffffff != 0 {
             request(
                 loader,
@@ -2274,6 +2272,24 @@ unsafe fn preload_waiting_icons(context: *const u8) {
         }
     }
     trace!("[CharacterRoster] waiting icon preload requested={} costume={} loader=0x{:x}; native load barrier retained", count, cpu_costume, loader as usize);
+}
+
+/// Native UI key builder shared by waiting-icon preloads and menu portraits.
+unsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u32) -> u64 {
+    let key: unsafe extern "C" fn(u64, u32, u32) -> u64 = std::mem::transmute(base + 0x3238a70);
+    key(fighter_kind_hash(base, kind), costume, picture)
+}
+
+/// The active role's costume portrait, queried on the UI job thread. The native
+/// builder supplies patch paths, names and regional costume remapping.
+pub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {
+    let base = BASE.load(Ordering::Acquire);
+    if base == 0 || !crate::runtime::game::granted(0x3238a70)
+        || !crate::runtime::game::granted(0x138c9b0) { return None; }
+    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };
+    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));
+    let hash = fighter_picture_hash(base, kind, costume, 1);
+    (hash & 0xffffffffff != 0).then_some(hash)
 }
 
 // Both icon paths use this roster module's published, verified text base.

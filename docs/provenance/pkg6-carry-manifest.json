@@ -1467,7 +1467,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "b6e87644158008db9fdd398a5673be8c97cea968c47a888a3a362a508b86b3aa",
+   "dest_sha256": "87c4e3831f1c83ac1873bca049d351ff8114da1aa74f62f0b7957ea675167120",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -1494,6 +1494,21 @@
      "new": "training::save_states::is_loading()",
      "count": 2,
      "reason": "the lobby facade's `save_states::is_loading` is a safe function (package 3's fact): the fork's `unsafe` blocks around it are unnecessary (an `unused_unsafe` warning)"
+    },
+    {
+     "old": "    let icon_hash: unsafe extern \"C\" fn(u64, u32, u32) -> u64 =\n        std::mem::transmute(base + 0x3238a70);\n",
+     "new": "",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "let hash = icon_hash(fighter_kind_hash(base, fighter.kind()), costume, 0);",
+     "new": "let hash = fighter_picture_hash(base, fighter.kind(), costume, 0);",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
+    },
+    {
+     "old": "// Both icon paths use this roster module's published, verified text base.",
+     "new": "/// Native UI key builder shared by waiting-icon preloads and menu portraits.\nunsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u32) -> u64 {\n    let key: unsafe extern \"C\" fn(u64, u32, u32) -> u64 = std::mem::transmute(base + 0x3238a70);\n    key(fighter_kind_hash(base, kind), costume, picture)\n}\n\n/// The active role's costume portrait, queried on the UI job thread. The native\n/// builder supplies patch paths, names and regional costume remapping.\npub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 || !crate::runtime::game::granted(0x3238a70)\n        || !crate::runtime::game::granted(0x138c9b0) { return None; }\n    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };\n    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));\n    let hash = fighter_picture_hash(base, kind, costume, 1);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}\n\n// Both icon paths use this roster module's published, verified text base.",
+     "reason": "ui-screens: share the guarded native costume-aware UI picture key builder with u4 portraits; keep all native reads on the UI job thread, no baked names or second provider"
     }
    ]
   },
@@ -2560,7 +2575,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "8e72cef70c1637e753c7225eb5c012a03b5917278d28a55f9528cd170c2618ea",
+   "dest_sha256": "7b153123829166de77efc9878adb732fb96e94bc779ab6ab854a688841a2b609",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -2576,6 +2591,56 @@
      "old": "let page_size = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;",
      "new": "let page_size = crate::model::panes::ROWS;",
      "reason": "a page of the Mii list is as many rows as the clean-room list screen shows (package 5's `panes::ROWS`), not the fork's submenu grid"
+    },
+    {
+     "old": "    role: Option<Role>,\n    cursor: usize,",
+     "new": "    role: Option<Role>,\n    list_mode: bool,\n    cursor: usize,",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            role: None,\n            cursor: 0,",
+     "new": "            role: None,\n            list_mode: false,\n            cursor: 0,",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "        self.class = class;\n        self.role = None;",
+     "new": "        self.class = class;\n        self.list_mode = false;\n        self.role = None;",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "    pub fn step(&mut self, delta: isize) {",
+     "new": "    /// The approved class list: saved/replay entries and Add New, with one active role.\n    pub fn open_list(&mut self, class: MiiClass, preferences: &Preferences) {\n        self.open_class(class);\n        self.list_mode = true;\n        self.set_list_role(Role::Player, preferences);\n    }\n\n    fn set_list_role(&mut self, role: Role, preferences: &Preferences) {\n        self.role = Some(role);\n        self.rows = selection::dropdown(&self.snapshot, preferences, role, self.class, self.context.original);\n        self.cursor = if self.editor_only { self.rows.len() } else {\n            self.rows.iter().position(|row| row.selected).unwrap_or(0)\n        };\n    }\n\n    pub fn switch_list_role(&mut self, preferences: &Preferences) {\n        if self.list_mode && !self.editor_only {\n            let role = if self.role == Some(Role::Player) { Role::Cpu } else { Role::Player };\n            self.set_list_role(role, preferences);\n        }\n    }\n\n    pub fn step(&mut self, delta: isize) {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "let count = if self.role.is_some() { self.rows.len() } else { 3 };",
+     "new": "let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode) } else { 3 };",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "        if self.role.is_some() || self.cursor != 2 || !self.snapshot.is_complete() {",
+     "new": "        let add_new = if self.list_mode { self.cursor == self.rows.len() } else { self.role.is_none() && self.cursor == 2 };\n        if !add_new || !self.snapshot.is_complete() {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "                    self.role = None;\n                    self.cursor = usize::from(role == Role::Cpu);\n                    self.rows.clear();",
+     "new": "                    if self.list_mode {\n                        self.set_list_role(role, preferences);\n                    } else {\n                        self.role = None;\n                        self.cursor = usize::from(role == Role::Cpu);\n                        self.rows.clear();\n                    }",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "    pub fn back(&mut self) -> bool {\n",
+     "new": "    pub fn back(&mut self) -> bool {\n        if self.list_mode { return false; }\n",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            let labels = visible.clone().map(|(index, row)| {",
+     "new": "            let mut labels: Vec<String> = visible.clone().map(|(index, row)| {",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
+    },
+    {
+     "old": "            let disabled = visible.map(|(_, row)| row.greyed).collect();",
+     "new": "            let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();\n            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {\n                labels.push(\"Add New\u2026\".into());\n                disabled.push(!cfg!(feature = \"mii-editor-alpha\") || !self.snapshot.is_complete());\n            }",
+     "reason": "ui-screens: reuse the owned catalog policy for the approved single Mii list with ZR role switching and an Add New row"
     }
    ]
   },

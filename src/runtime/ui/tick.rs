@@ -21,6 +21,7 @@ use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
 
 const INFO_TRAINING: &[u8] = b"info_training";
+const INFO_WAITING: &[u8] = b"info_waiting";
 
 struct Resolved {
     layout: usize,
@@ -60,7 +61,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(name) = registry::layout_name(layout) else { return };
     hud::run(layout, name);
     hud::hud_rule(layout, name);
-    if name != INFO_TRAINING {
+    let waiting = name == INFO_WAITING;
+    if name != INFO_TRAINING && !waiting {
         return;
     }
     // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
@@ -69,14 +71,17 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         INVALIDATE.store(true, Ordering::Release);
         REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
     }
-    if !game::is_training_mode() {
-        renderer_lost("not in Training");
+    let lobby = crate::runtime::lobby::training::lobby::requested();
+    if (waiting && !lobby) || (!waiting && !game::is_training_mode()) {
+        renderer_lost("practice layout inactive");
         return;
     }
     TICKS.fetch_add(1, Ordering::Relaxed);
+    // One retirement clock for thumbnails, chips and the optional diagnostic probe.
+    crate::runtime::ui::texture::tick();
     let Some(mut r) = RESOLVED.try_lock() else { return };
     if r.layout != layout as usize || INVALIDATE.swap(false, Ordering::AcqRel) {
-        resolve(&mut r, layout);
+        resolve(&mut r, layout, waiting);
     }
     let r = &mut *r;
     let Resolved { panes, status_r, help, drawn_seq, shown, .. } = r;
@@ -86,9 +91,16 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         return;
     };
     LAYOUT_READY.store(true, Ordering::Release);
+    crate::runtime::lobby::training::lobby::set_ui_ready(waiting);
     POLLS_AT_TICK.store(crate::runtime::ui::input::POLLS.load(Ordering::Relaxed), Ordering::Release);
 
-    if !help.is_null() {
+    if waiting {
+        // The existing popup provider explicitly treats missing manager state as unknown.
+        let busy = help.is_null() || pane::pos_x(*help) != -540.0
+            || crate::runtime::lobby::game_mode::popup_busy().unwrap_or(true);
+        crate::runtime::lobby::training::lobby::set_native_ui_busy(busy);
+        PAUSE_ACTIVE.store(busy, Ordering::Release);
+    } else if !help.is_null() {
         let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
         if PAUSE_ACTIVE.swap(active, Ordering::AcqRel) != active {
             // The native Training menu opened or closed: it owns P1's input while it is open and the
@@ -167,6 +179,7 @@ fn log(args: core::fmt::Arguments<'_>) {
 
 /// The layout cannot draw the menu now: drop the readiness and, if the menu owns Player 1's input, give it back.
 fn renderer_lost(reason: &str) {
+    crate::runtime::lobby::training::lobby::set_ui_ready(false);
     // SAFETY: on the UI job thread; the textures are released without touching a pane.
     unsafe {
         thumbs::lose_layout();
@@ -181,7 +194,7 @@ fn renderer_lost(reason: &str) {
     }
 }
 
-unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
+unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     // The panes the thumbnails were bound to are about to be replaced: drop the textures first.
     thumbs::lose_layout();
     chips::lose_layout();
@@ -191,24 +204,26 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout) {
     r.help = core::ptr::null_mut();
     r.drawn_seq = 0;
     r.shown = false;
+    let layout_name = if waiting { "info_waiting" } else { "info_training" };
     let root = (*layout).root_pane;
     let total = pane::count(root);
     r.status_r = pane::find(root, b"status_R");
-    r.help = pane::find(root, b"L_staying_help");
+    r.help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
+    let menu_root = if waiting { pane::find(root, b"TrModPort") } else { root };
     let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
     let mut missing = 0;
-    let container = pane::find(root, p::ROOT.as_bytes());
+    let container = pane::find(menu_root, p::ROOT.as_bytes());
     for (index, slot) in all.iter_mut().enumerate() {
         *slot = if index == p::IDX_MENU { container } else { pane::find(container, p::name_of(index).as_bytes()) };
         missing += usize::from(slot.is_null());
     }
     if container.is_null() {
-        log(format_args!("[Ui] layout=info_training panes_absent total={total} (stock layout)"));
+        log(format_args!("[Ui] layout={layout_name} panes_absent total={total} (stock layout)"));
         return;
     }
     let capacity = if all[p::row_label_index(0)].is_null() { 0 } else { pane::text_capacity(all[p::row_label_index(0)]) };
     log(format_args!(
-        "[Ui] layout=info_training resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
+        "[Ui] layout={layout_name} resolved total={total} holders={} menu_panes={} missing={missing} text_capacity={capacity} help={} status_r={}",
         registry::holders().len(),
         p::MENU_COUNT,
         !r.help.is_null(),
