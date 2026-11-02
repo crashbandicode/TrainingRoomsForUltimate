@@ -7,3 +7,5 @@ pub mod automation;
 pub mod notice_ids;
 pub mod practice_policy;
 pub mod trace_slot;
+#[cfg(test)]
+mod session_lease_tests;

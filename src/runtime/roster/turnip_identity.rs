@@ -53,16 +53,6 @@ const ITEM_SEAMS: &[&str] = &["turnip.item_peach_agent", "turnip.item_daisy_agen
     "turnip.item_daisy_selection+0x40", "turnip.item_daisy_selection+0x80", "turnip.item_peach_consumer",
     "turnip.item_peach_consumer+0x40", "turnip.item_daisy_consumer", "turnip.item_daisy_consumer+0x40"];
 
-pub fn on_unload(nro: &skyline::nro::NroInfo<'_>) {
-    // The unloading ModuleObject/image may already be unmapped. Do not read it.
-    let object = nro.module.ModuleObject as usize;
-    let mut state = IMAGE.lock().unwrap();
-    if state.current.is_some_and(|image| image.object == object) {
-        state.current = None;
-        state.generation = state.generation.wrapping_add(1);
-    }
-}
-
 fn image_current(image: Image) -> bool { IMAGE.lock().unwrap().current == Some(image) }
 
 unsafe fn image_header(image: Image) -> bool {

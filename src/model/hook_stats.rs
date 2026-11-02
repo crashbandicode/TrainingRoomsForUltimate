@@ -140,12 +140,16 @@ thread_local! {
     static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
     /// Nesting depth of uncounted sections on this thread.
     static UNCOUNTED_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// The innermost hook on this thread, as its HookId index + 1 (0: none): the hook a counted allocation is charged to.
+    static INNER: Cell<usize> = const { Cell::new(0) };
 }
 
 static HOOK_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 /// Allocations of the one-per-load kind inside a hook (per_load), counted apart from the steady-state ones.
 static LOAD_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ENTRIES: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
+/// Steady-state hook allocations by the innermost hook that made them (the diag hook_stats line's lloc_by=).
+static ALLOC_BY: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
 
 fn in_hook() -> bool {
     HOOK_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false)
@@ -166,36 +170,138 @@ fn count_allocation() {
             LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         } else {
             HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            let inner = INNER.try_with(Cell::get).unwrap_or(0);
+            if let Some(slot) = inner.checked_sub(1).and_then(|i| ALLOC_BY.get(i)) {
+                slot.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 }
 
-/// The counting allocator: forwards to the system allocator, counts the calls made inside a hook.
+/// The byte meter of the diag heap features (`plugin-heap-meter`, `console-practice-trace`): this NRO's requested Rust allocation
+/// sizes only (live, peak, total, call count, largest request); native game heaps, allocator metadata and other plugins are
+/// excluded. It lives in the one global allocator of the plugin so that the diag features read these counters instead of each
+/// declaring an allocator of their own (a crate has one `#[global_allocator]`). Counters are relaxed and a snapshot is not atomic
+/// across fields; a realloc's temporary copy is outside the meter. The shipped build compiles the counters away: `grow`, `shrink`
+/// and `moved` are empty and the allocator is byte-for-byte the hook counter it was.
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+mod heap {
+    use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering::Relaxed};
+
+    static LIVE: AtomicIsize = AtomicIsize::new(0);
+    static PEAK: AtomicIsize = AtomicIsize::new(0);
+    static TOTAL: AtomicUsize = AtomicUsize::new(0);
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    static LARGEST: AtomicUsize = AtomicUsize::new(0);
+
+    #[inline]
+    pub(super) fn grow(size: usize) {
+        let live = LIVE.fetch_add(size as isize, Relaxed) + size as isize;
+        PEAK.fetch_max(live, Relaxed);
+        TOTAL.fetch_add(size, Relaxed);
+        CALLS.fetch_add(1, Relaxed);
+        LARGEST.fetch_max(size, Relaxed);
+    }
+
+    #[inline]
+    pub(super) fn shrink(size: usize) {
+        LIVE.fetch_sub(size as isize, Relaxed);
+    }
+
+    /// A moved realloc briefly holds both blocks; counting only the new size understates that copy's instantaneous peak by the old
+    /// size (acceptable for sparse profiling, as the fork's meter did).
+    #[inline]
+    pub(super) fn moved(old: usize, new: usize) {
+        shrink(old);
+        grow(new);
+    }
+
+    pub(super) fn snapshot() -> super::HeapBytes {
+        super::HeapBytes {
+            live: LIVE.load(Relaxed),
+            peak: PEAK.load(Relaxed),
+            total: TOTAL.load(Relaxed),
+            calls: CALLS.load(Relaxed),
+            largest: LARGEST.load(Relaxed),
+        }
+    }
+}
+
+#[cfg(not(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace")))]
+mod heap {
+    #[inline(always)]
+    pub(super) fn grow(_size: usize) {}
+    #[inline(always)]
+    pub(super) fn shrink(_size: usize) {}
+    #[inline(always)]
+    pub(super) fn moved(_old: usize, _new: usize) {}
+}
+
+/// What the byte meter has counted since boot.
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HeapBytes {
+    /// Bytes allocated and not yet freed.
+    pub live: isize,
+    /// The highest `live` seen.
+    pub peak: isize,
+    /// Every requested byte, freed or not.
+    pub total: usize,
+    /// Allocation calls (an allocation that moved on realloc counts once more).
+    pub calls: usize,
+    /// The largest single request.
+    pub largest: usize,
+}
+
+/// Read the byte meter (the diag heap features and tests; a shipped build has no meter).
+#[cfg(any(test, feature = "plugin-heap-meter", feature = "console-practice-trace"))]
+pub fn heap_bytes() -> HeapBytes {
+    heap::snapshot()
+}
+
+/// The counting allocator: forwards to the system allocator, counts the calls made inside a hook and (diag heap features only) the
+/// bytes this NRO requested.
 pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         count_allocation();
-        System.alloc(layout)
+        let pointer = System.alloc(layout);
+        if !pointer.is_null() {
+            heap::grow(layout.size());
+        }
+        pointer
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         count_allocation();
-        System.alloc_zeroed(layout)
+        let pointer = System.alloc_zeroed(layout);
+        if !pointer.is_null() {
+            heap::grow(layout.size());
+        }
+        pointer
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
+        System.dealloc(ptr, layout);
+        heap::shrink(layout.size());
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         count_allocation();
-        System.realloc(ptr, layout, new_size)
+        let moved = System.realloc(ptr, layout, new_size);
+        if !moved.is_null() {
+            heap::moved(layout.size(), new_size);
+        }
+        moved
     }
 }
 
-/// Marks the current thread as running hook code until dropped, and counts one invocation.
-pub struct HookScope;
+/// Marks the current thread as running hook code until dropped, and counts one invocation. It also makes its hook the innermost one,
+/// the hook its allocations are charged to, until dropped.
+pub struct HookScope {
+    previous: usize,
+}
 
 impl HookScope {
     /// A hook without a name of its own (counted under `HookId::Other`).
@@ -207,13 +313,15 @@ impl HookScope {
     pub fn enter_hook(id: HookId) -> Self {
         ENTRIES[id as usize].fetch_add(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
-        HookScope
+        let previous = INNER.try_with(|inner| inner.replace(id as usize + 1)).unwrap_or(0);
+        HookScope { previous }
     }
 }
 
 impl Drop for HookScope {
     fn drop(&mut self) {
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
+        let _ = INNER.try_with(|inner| inner.set(self.previous));
     }
 }
 
@@ -261,6 +369,8 @@ pub fn per_load<R>(work: impl FnOnce() -> R) -> R {
 pub struct Snapshot {
     pub allocations: u64,
     pub entries: [u64; HOOK_COUNT],
+    /// Steady-state allocations by the innermost hook that made them.
+    pub alloc_by: [u64; HOOK_COUNT],
 }
 
 /// Read the live counters.
@@ -269,7 +379,11 @@ pub fn snapshot() -> Snapshot {
     for (slot, counter) in entries.iter_mut().zip(&ENTRIES) {
         *slot = counter.load(Ordering::Relaxed);
     }
-    Snapshot { allocations: hook_allocations(), entries }
+    let mut alloc_by = [0u64; HOOK_COUNT];
+    for (slot, counter) in alloc_by.iter_mut().zip(&ALLOC_BY) {
+        *slot = counter.load(Ordering::Relaxed);
+    }
+    Snapshot { allocations: hook_allocations(), entries, alloc_by }
 }
 
 /// One report: the counters now and what changed since the previous report.
@@ -303,6 +417,15 @@ impl Display for Observation {
         if !any {
             f.write_str("none")?;
         }
+        // Which hook made the allocations (only when there were any): the attribution the R5 gate needs when delta is not 0.
+        let mut first = true;
+        for id in HookId::ALL {
+            let n = self.now.alloc_by[id as usize];
+            if n > 0 {
+                write!(f, "{}{}:{}", if first { " alloc_by=" } else { "," }, id.name(), n)?;
+                first = false;
+            }
+        }
         Ok(())
     }
 }
@@ -322,7 +445,7 @@ impl Default for Observer {
 
 impl Observer {
     pub const fn new() -> Self {
-        Self { last: Snapshot { allocations: 0, entries: [0; HOOK_COUNT] } }
+        Self { last: Snapshot { allocations: 0, entries: [0; HOOK_COUNT], alloc_by: [0; HOOK_COUNT] } }
     }
 
     /// Compare `now` with the previous report.
@@ -365,7 +488,7 @@ mod tests {
     #[test]
     fn a_quiet_sample_reports_nothing_and_an_active_one_reports_once() {
         let mut observer = Observer::new();
-        let quiet = Snapshot { allocations: 0, entries: [0; HOOK_COUNT] };
+        let quiet = Snapshot { allocations: 0, entries: [0; HOOK_COUNT], alloc_by: [0; HOOK_COUNT] };
         assert!(observer.observe(quiet).is_none());
         let mut busy = quiet;
         busy.entries[HookId::ResetCheck as usize] = 3;

@@ -14,7 +14,11 @@
 | hb-03 | diag `19c74e53` (`64d439f`: persistent spheres by handle) | idle, walk, shield (ZR, L), grab (R) in slow motion, KO, menu | both fighters' hurtboxes visible (Steve 19, Luigi 23; `121958-idle.png`); `failed=0` on every line; held 42 (max 54 with a hitbox); idle pass 225–231 ticks avg (12 µs), 715 at the start, max 19,984 when spawning; shield: our 19 spheres killed by handle, the red shield bubble alone (`shield-zr`); grab boxes now visible at the tether (`122115-grab-2.png`) but re-issued `CATCH` id 0 piled up (8→10→12 held): fixed after the run (one sphere per key); the KO blast and confetti (game effects) all appear with 54 held (`ko-*.png`); menu: Display & Controls › Hitbox Visualization shows the new help "On: hitboxes, grab boxes and hurtboxes are drawn." and toggles to OFF; closing the menu froze the game (`game_fps 0`), the known integrated-tree menu-close hang (owner ui-screens), recorded, not this stream's; install line 9,574 B complete (`hitbox=installed result=installed heap_allocations=0`); console 0 matches |
 
 Open rows (hb-04 / hb-05, queued): Ridley + Steve with the grab-key fix (persistent count against headroom), a jab that connects (hit spark),
-a smash charge (its glint is an animation-command effect, put to sleep by the spec while On), the setting Off from boot (no game call), cost re-check.
+the setting Off from boot (no game call), cost re-check.
+
+By design (not a regression): while the setting is On, the fighter's animation-command effects are asleep (SPEC-core-06 §2 and §5 step 5,
+`MotionAnimcmdModule::set_sleep_effect(true)` outside the grab, tread and `DOWN` statuses): a smash attack's charge glint, dust and the other
+script effects do not show, as upstream; the KO blast, the shield bubble and hit sparks come from the game's own systems, not the script.
 
 Allocation note: every run shows hook allocations once during the scene load (hb-01 7+15, hb-02 and hb-03 31), in the window where the CPU core
 resolves its constants and the diag build dumps `cpu_ids`; `delta=0` on every later line while the pass runs 120 times a second. The visualizer's

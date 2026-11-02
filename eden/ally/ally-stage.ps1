@@ -2,11 +2,13 @@
 # Stage one boot on the owned Ally root (runs ON the Ally, MSI PowerShell 7): the plugin set, the settings, fresh plugin
 # output folders. Refuses while eden.exe runs or without this root's CLAIM. Every NRO is checked against sha256.txt in the
 # set folder; whatever was in the plugins folder and the earlier outputs are archived under <Root>\runs\<Label>-prev, nothing is deleted.
-#   ally-stage.ps1 -Label s5-01 -Set C:\Eden\trainingrooms-pkg5\nro\release [-Settings <settings.json>]
+#   ally-stage.ps1 -Label s2-01|s5-01 -Set <root>\tr-<stream>\nro\release -Root <root> -Owner <owner text> [-Settings <settings.json>]
+# Restart rules 2026-11-02: on the Ally only the lent rig C:\Eden\c1162-w5-ally may run (owned roots make Windows prompt for the
+# firewall); there, follow the rig's stage_a.ps1 discipline (its CLAIM set to the owner while staged, restore and verify after the run).
 param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Set, [string]$Settings = '', [string]$DeveloperIni = '', [switch]$Arc, [string]$ExtraMods = '',
-      [string]$Root = 'C:\Eden\trainingrooms-pkg5', [string]$Owner = 'trainingrooms-pkg5-0caa72b8-sonnet55')
+      [Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Owner)
 $ErrorActionPreference = 'Stop'
-if ($Label -notmatch '^s5-\d{2}$') { throw 'label' }
+if ($Label -notmatch '^s[25]-\d{2}$') { throw 'label' }
 if (Get-Process eden -ErrorAction SilentlyContinue) { throw 'eden.exe is running' }
 if ((Get-Content "$Root\CLAIM" -Raw).Trim() -ne $Owner) { throw 'not my claim' }
 $SD = "$Root\profile\user\sdmc"; $PL = "$SD\atmosphere\contents\01006A800016E000\romfs\skyline\plugins"; $U = "$SD\ultimate"

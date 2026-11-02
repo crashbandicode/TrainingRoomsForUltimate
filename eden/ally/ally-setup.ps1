@@ -1,13 +1,15 @@
 #requires -Version 7.0
 # TrainingRooms Ally Eden rig: build an OWNED root with its own profile copy from the portable Eden profile of another
 # owned rig (read-only source: nothing in it is written). Runs ON the Ally with MSI PowerShell 7:
-#   pwsh.exe -NoLogo -NoProfile -NonInteractive -File ally-setup.ps1 [-Root C:\Eden\trainingrooms-pkg5]
+#   pwsh.exe -NoLogo -NoProfile -NonInteractive -File ally-setup.ps1 -Root C:\Eden\<stream> -Owner <owner text>
+# Restart rules 2026-11-02: an owned root has no firewall rule, so its first eden.exe launch makes Windows prompt; TrainingRooms
+# runs ONLY the lent rig C:\Eden\c1162-w5-ally on the Ally (inbound Block rule). Never launch an owned root, never answer the
+# prompt, never create firewall rules (operator-level). Kept for the layout the adapters and ally-stage.ps1 share.
 # Result: <Root>\runner (copy of the Windows port's helper modules), <Root>\profile (portable Eden: the exe and Qt files
 # are copies; user\nand\user\Contents and user\nand\system are NTFS hard links, byte-identical and never written; saves,
 # keys, config, cache are copies), <Root>\profile\user\sdmc (Skyline's stock exefs and an empty plugins folder),
 # <Root>\CLAIM, <Root>\macros. The qt-config points at this root and is muted (volume=0, persisted) and offline.
-param([string]$Root = 'C:\Eden\trainingrooms-pkg5', [string]$SourceRoot = 'C:\Eden\c1162-w5-ally',
-      [string]$Owner = 'trainingrooms-pkg5-0caa72b8-sonnet55')
+param([Parameter(Mandatory)][string]$Root, [string]$SourceRoot = 'C:\Eden\c1162-w5-ally', [Parameter(Mandatory)][string]$Owner)
 $ErrorActionPreference = 'Stop'
 $EDEN_SHA = '45af318c93cbc00a2794421ee884ffbcb9dbec75bbdbdeef27af30d61cd2cbad'
 $SUBSDK9 = '9959ecb13eab6db81a07cee04a789b1905fd605409fc84efeb7ec43da7e29280'

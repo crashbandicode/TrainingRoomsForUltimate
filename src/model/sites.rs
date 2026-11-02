@@ -77,6 +77,11 @@ pub enum Feature {
     /// SPEC-core-06, the hitbox visualizer: the `ATTACK` / `CATCH` animation-command hooks, the rebound hook, the attack, effect
     /// and motion natives it draws with (`sites_hitbox.rs`). Its per-frame pass rides on the CPU core's frame wrapper.
     Hitbox,
+    /// SPEC-cpu-05's shield damage multiplier: the game's CommonParams object, found at the moment the game fills
+    /// it from its parameter file (no provider plugin).
+    CpuShieldDamage,
+    /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
+    CpuCamera,
 }
 
 impl Feature {
@@ -109,6 +114,8 @@ impl Feature {
             Feature::Roster => "roster",
             Feature::Probes => "probes",
             Feature::Hitbox => "hitbox",
+            Feature::CpuShieldDamage => "cpu_shield_damage",
+            Feature::CpuCamera => "cpu_camera",
         }
     }
 }

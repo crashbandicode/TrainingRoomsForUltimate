@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Compile every cargo feature of the plugin (decision D11: every feature in the table must build).
+
+The feature table of `Cargo.toml` is the source: this lists (and, with `--run`, compiles) a set of feature combinations:
+
+  set `core`   default; no default features; default + diag; every feature; the three heap/allocator features alone and together
+               (`console-practice-trace`, `native-unlink-probe`, `plugin-heap-meter`: the fork gave each its own global allocator;
+               the plugin has one, `tests/pkg6_features.rs::the_plugin_has_one_global_allocator`)
+  set `each`   every feature of the table on top of the default features
+  set `alone`  every feature of the table by itself with `--no-default-features` (the feature's own `requires` closure only)
+  set `all`    core + each + alone
+
+`--mode host` runs `cargo check` (the pure model and the host tests' view of the features); `--mode switch` runs
+`cargo skyline check` (the runtime and the carried Switch-only game code, the target every probe feature is for). The command prefix
+(the host's memory and time guard, the campaign rustup home) is yours: `--runner "systemd-run --user --scope -p MemoryMax=6G
+/usr/bin/timeout 1800"`; `--cargo` names the cargo (or cargo-skyline) executable. One cargo call each, `CARGO_TERM_COLOR=never`.
+
+    python3 -I tools/feature_matrix.py --list                       # print the combinations, run nothing
+    python3 -I tools/feature_matrix.py --run --mode switch --set core --cargo <cargo-skyline> --runner "..."
+    python3 -I tools/feature_matrix.py --run --mode host --set all   # exit code 1 when any combination fails to build
+
+Never run it beside another stream's Eden on the same host (docs/BUILD.md; the stream rules): check builds are builds.
+"""
+import argparse
+import os
+import shlex
+import subprocess
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def read_features(manifest_text):
+    """The `[features]` table of Cargo.toml as {name: [requires]} (one-line entries, as `tests/pkg6_features.rs` parses them)."""
+    table, inside = {}, False
+    for line in manifest_text.splitlines():
+        if line.startswith("["):
+            inside = line.strip() == "[features]"
+            continue
+        line = line.strip()
+        if not inside or not line or line.startswith("#"):
+            continue
+        name, value = line.split("=", 1)
+        value = value.strip()
+        if not (value.startswith("[") and value.endswith("]")):
+            raise SystemExit(f"feature table line is not one-line: {line}")
+        table[name.strip()] = [d.strip().strip('"') for d in value[1:-1].split(",") if d.strip()]
+    return table
+
+
+CORE = [
+    ("default", []),
+    ("no-default-features", ["--no-default-features"]),
+    ("default+diag", ["--features", "diag"]),
+    ("all-features", ["--all-features"]),
+    ("trace", ["--features", "diag,console-practice-trace"]),
+    ("swap-trace", ["--features", "diag,console-swap-trace"]),
+    ("unlink-probe", ["--features", "diag,native-unlink-probe"]),
+    ("heap-meter", ["--features", "diag,plugin-heap-meter"]),
+    ("trace+unlink+meter", ["--features", "diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"]),
+    ("hang-trace", ["--features", "diag,hang-trace"]),
+]
+
+
+def combinations(table, which):
+    out = []
+    if which in ("core", "all"):
+        out += CORE
+    if which in ("each", "all"):
+        out += [(f"default+{name}", ["--features", name]) for name in sorted(table)]
+    if which in ("alone", "all"):
+        out += [(f"alone:{name}", ["--no-default-features", "--features", name]) for name in sorted(table)]
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--set", choices=["core", "each", "alone", "all"], default="core")
+    ap.add_argument("--mode", choices=["host", "switch"], default="host")
+    ap.add_argument("--list", action="store_true", help="print the combinations and run nothing")
+    ap.add_argument("--run", action="store_true", help="compile each combination (cargo check)")
+    ap.add_argument("--runner", default="", help="command prefix, e.g. the systemd-run memory guard")
+    ap.add_argument("--cargo", default="cargo", help="cargo (host) or the cargo-skyline executable (switch)")
+    ap.add_argument("--only", default="", help="substring filter on the combination label")
+    ap.add_argument("--root", default=ROOT)
+    args = ap.parse_args()
+    with open(os.path.join(args.root, "Cargo.toml"), encoding="utf-8") as f:
+        table = read_features(f.read())
+    for name, deps in table.items():
+        for dep in deps:
+            if dep not in table:
+                raise SystemExit(f"feature {name} requires undeclared {dep}")
+    combos = [c for c in combinations(table, args.set) if args.only in c[0]]
+    if args.list or not args.run:
+        for label, flags in combos:
+            print(label, " ".join(flags))
+        print(f"{len(combos)} combinations over {len(table)} features", file=sys.stderr)
+        return 0
+    env = dict(os.environ, CARGO_TERM_COLOR="never", CARGO_TERM_HYPERLINKS="false")
+    base = shlex.split(args.runner) + [args.cargo] + (["skyline", "check"] if args.mode == "switch" else ["check"])
+    failed = []
+    for label, flags in combos:
+        started = time.time()
+        proc = subprocess.run(base + flags, cwd=args.root, env=env, capture_output=True, text=True)
+        tail = (proc.stdout + proc.stderr).strip().splitlines()[-6:]
+        status = "ok" if proc.returncode == 0 else "FAIL"
+        print(f"{status:4} {time.time() - started:6.1f}s {args.mode} {label}", flush=True)
+        if proc.returncode != 0:
+            failed.append(label)
+            print("\n".join("     " + line for line in tail), flush=True)
+    print(f"{len(combos) - len(failed)}/{len(combos)} combinations build" + (f"; failed: {', '.join(failed)}" if failed else ""))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

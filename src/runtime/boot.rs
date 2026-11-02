@@ -67,6 +67,10 @@ pub fn run() {
         diag_log::flush();
         return;
     }
+    // The hook-sharing drill (feature `seam-drill`): with `foreign=` in diag.txt it hooks its sites as a plugin that does not share
+    // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::before();
 
     // 2. Panic policy (decision B2): log it, no pop-up. `panic = "abort"` then ends the process.
     std::panic::set_hook(Box::new(|info| {
@@ -80,6 +84,9 @@ pub fn run() {
     }
     #[cfg(feature = "diag")]
     crate::runtime::sync_probe::run();
+    // Diag build: the kernel arbiter the plugin's locks wait in answers as its source says (hos-lock README).
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!("[Sync] arbiter self_test {}", hos_lock::horizon::self_test()));
     let developer = read_developer_ini();
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
@@ -218,7 +225,7 @@ pub fn run() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
-    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason) = install_cpu(&usable, &mut mark);
+    let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
     // predicate, the shared natives' rows) must have passed as a whole.
@@ -312,6 +319,8 @@ pub fn run() {
         report(Feature::CpuTech, cpu_tech_on, None),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
+        report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),
+        report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
         FeatureReport { feature: Feature::Hitbox.name(), installed: hitbox_on, reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"), site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) } },
@@ -327,6 +336,8 @@ pub fn run() {
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
+    #[cfg(feature = "seam-drill")]
+    crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -389,9 +400,9 @@ fn load_save_states() -> SaveFile {
 /// then each feature's hooks when all of its sites (and the core's) are usable. Returns whether the
 /// core, SPEC-cpu-02's hooks, SPEC-cpu-03's hook and SPEC-cpu-04's hooks and SPEC-cpu-05's hooks were installed. The DI hook lives in the `common`
 /// script module and is not installed (its 64-byte guard cannot be taken yet, see the report).
-fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>) {
+fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> (bool, bool, bool, bool, bool, Option<&'static str>, bool, bool) {
     if !sites::feature_usable(Feature::CpuCore, usable) {
-        return (false, false, false, false, false, Some("cpu_core_not_installed"));
+        return (false, false, false, false, false, Some("cpu_core_not_installed"), false, false);
     }
     cpu::install_frame();
     mark("cpu_on_frame_slot", Written::Far);
@@ -439,7 +450,21 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     } else {
         Some("site_guard_failed")
     };
-    (true, defence, ledge, tech, shield, common)
+    // The game's CommonParams object, for the shield damage multiplier (SPEC-cpu-05 section 4).
+    let shield_damage = sites::feature_usable(Feature::CpuShieldDamage, usable);
+    if shield_damage {
+        skyline::install_hook!(cpu::cpu_common_params_hook);
+        mark("common_params_fill", Written::Near);
+    }
+    // The fixed camera (SPEC-cpu-04 section 5): the stage id, the stage table and the two camera hooks.
+    let camera = sites::feature_usable(Feature::CpuCamera, usable);
+    if camera {
+        skyline::install_hook!(cpu::cpu_camera_mode_hook);
+        skyline::install_hook!(cpu::cpu_camera_setup_hook);
+        mark("camera_mode_hook", Written::Near);
+        mark("fixed_camera_setup_hook", Written::Far);
+    }
+    (true, defence, ledge, tech, shield, common, shield_damage, camera)
 }
 
 /// SPEC-cpu-01 and SPEC-cpu-06: the command-flag, aerial-kind and attack-angle hooks. The frame wrapper

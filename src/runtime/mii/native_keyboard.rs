@@ -16,7 +16,7 @@ pub(crate) mod inline_keyboard;
 use std::ffi::CString;
 use std::mem::{self, MaybeUninit};
 
-use parking_lot::Mutex;
+use hos_lock::Mutex;
 use skyline::nn::swkbd::{
     get_required_work_buffer_size, make_preset_default, set_header_text, set_initial_text_utf8,
     ShowKeyboardArg, ShowKeyboardString,
