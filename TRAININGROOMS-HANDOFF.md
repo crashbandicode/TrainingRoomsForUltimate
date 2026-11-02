@@ -47,7 +47,12 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
   172,032 B resident, diag `82f60e24…` 270,336 B resident (`nro_size.py`). Card-site scan of the 2026-11-01 MTP
   preflight copy: only the fork's NRO touches our hook sites. `compliance.py`: 4 rows read only `src/*.rs`
   (playbook tool limit, reported), README GIF / build line / HANDOFF rows wait for the RC.
-- Running: package-1 Eden rows (three boots, batched), tester worker; output `eden/EDEN-PACKAGE-1.md` in the worktree.
+- Eden (Yoga, tr101–tr110): all package-1 rows pass after root fixes D1–D4 (diagnostics file, Switch tick,
+  install-line semantics, diag `hub_run`) and the input hook's move to caller-side sites (`e20416a`: note/apply at
+  `0x17546e0`/`0x1754720` and `0x175523c`/`0x1755254`; the epilogue `0x1751ce8` is the CPU pilot's `fim_exit`).
+  Pilot v0.2.1 coexists in both load orders (tr108/tr109). Current NROs: release `26a5fef0…`, diag `4792c91a…`.
+- READY (`e8dbcc9`): push request with the summary picture sent to the primary (`TRAININGROOMS-STATUS.md`). Not
+  pushed. Next: packages 2–4 in parallel streams after the order or meanwhile on the same local branch.
 
 ### Addendum 2026-11-02 (operator order via the primary): card swap and fixes in both trees
 
@@ -62,9 +67,10 @@ Updated 2026-11-01 (after the first push) by the lead (Claude agent `aa0f7d3da07
 
 | # | Found in | Defect | Fork fix (stage / commit) | Carried file(s) | Clean room | Offered back to the fork |
 | --- | --- | --- | --- | --- | --- | --- |
-| F1 | fork, C116.2 console (W19 triage, `c1162/c1162-console-triage/`) | Kirby hats notice stuck at "Paused 2/3" | pending (triage running; no `TRIAGE.md` yet) | `src/cycle_preload*.rs`, `training_mod_consts/src/{body_bank,notice_queue}.rs`, `src/native_body_bank.rs` (package 6) | not yet carried; take the fixed stage | n/a |
-| F2 | fork, C116.2 console | hat cycle falls back to the 3 s canonical Reload | pending (the primary's first read: designed `KirbyPark` fallback for a hat-holding Kirby, operator decision 2026-11-01) | Kirby hat / swap files (package 6) | not yet carried | n/a |
-| F3 | fork, C116.2 console | multi-second freezes (candidates: group prefetch holding INSTALL 3.88 s, a group build 1.01 s) | pending | swap engine, cycle preload (package 6) | not yet carried | n/a |
+| F1 | fork, C116.2 console (W19, `c1162/c1162-console-triage/TRIAGE.md` Q1) | "Paused 2/3": the notice maps Waiting (unstarted, nothing owed) to Paused when blocked, and its `blocked` counts the preloader's own speculative-helper / hat INSTALL tokens; the 3rd item is the CPU's retired bank | operator 2026-11-02: name the role ("Loaded 2/3 · swap the CPU to load 1 more"); Paused only when a load is truly deferred; the notice's blocked input excludes speculative-helper / hat INSTALL tokens. W19 patching the fork (stage pending) | `src/cycle_preload.rs`, `src/cycle_preload_policy.rs`, `src/character_roster.rs`, `src/character_sources.rs`, `src/native_install.rs`, `src/native_body_bank.rs`, `training_mod_consts/src/body_bank.rs` (package 6; none carried yet) | carry from W19's patched stage when the primary points to it | n/a |
+| F2 | fork, C116.2 console (TRIAGE Q2) | hat cycle used the ~3 s canonical Reload: hats were not preloaded first while P1 is Kirby | operator 2026-11-02: hats first while P1 is Kirby (`cycle_preload_policy::merge`); W19 patching the fork | `src/cycle_preload_policy.rs`, `src/cycle_preload.rs` (package 6) | carry from W19's patched stage | n/a |
+| F3 | fork, C116.2 console (TRIAGE Q3) | ~1 s whole-game freeze on the first switch into a prefetched, unbuilt group (synchronous build on the game thread, `native_body_bank.rs` group build) | operator 2026-11-02: investigate a background / at-a-pause build; W20 investigating, no change yet | `src/native_body_bank.rs`, `src/cycle_preload*.rs` (package 6) | waits for W20 | n/a |
+| F4 | decision B11 (operator 2026-11-02), both trees | ledge options (and throw options) ignore a menu change while the CPU already hangs on the ledge / holds a grab | W19, fork next build M5p (pending) | – (ledge/throw are upstream-origin: clean-room spec path, not carry-over) | `SPEC-cpu-03` / `SPEC-cpu-06` re-roll on change; menu model emits the re-roll event (package 1), CPU package 2 consumes it | n/a (fork implements it itself) |
 | C1 | clean room (decisions) | the first-boot import must ignore a pre-installed `developer.ini` (only `migration.json` marks it done) | n/a (fork has no import) | – | `SPEC-core-08` requirement + host test | n/a |
 
 Rule: every fork fix to a carried file gets a row and lands in the clean room when that file is carried (or at

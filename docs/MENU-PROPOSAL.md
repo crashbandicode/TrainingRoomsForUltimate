@@ -1,17 +1,19 @@
-# TrainingRooms menu — proposal v10 (approved with the operator's answers)
+# TrainingRooms menu — proposal v11 (every question answered)
 
-Proposal v10, 2026-11-01. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 9: every item, option list and default, taken from the shipped C116.1 menu definition and the operator's answers). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). The operator approved the proposal on 2026-11-01 with the answers below, and implementation may begin.
+Proposal v11, 2026-11-02. Source of truth: [`MENU-DRAFT.md`](../MENU-DRAFT.md) (draft 9: every item, option list and default, taken from the shipped C116.1 menu definition and the operator's answers). Screens below are rendered mockups in the in-game overlay look (1280×720, `tools/render_menu_mockup.py`, files in [`menu-mockup/`](menu-mockup/)). The operator approved the proposal on 2026-11-01 and answered the remaining items on 2026-11-02; nothing is open, and implementation may begin.
 
 **Every decision, one picture each, with the answer or the recommendation: [`DECISIONS.md`](DECISIONS.md)** (menu questions 1–18 below, plus the import, behaviour and product choices from the specs).
 
-**What changed from v9 (the operator's answers, 2026-11-01):**
+**What changed from v10 (the operator's last answers, 2026-11-02):** question 5 is answered (the menu opens on the last page used; the very first open ever shows CPU). B11 is answered: a changed ledge option or throw option re-rolls at once, in both trees. The SDI streak length (×2.0) and the Developer page are confirmed, and so is the delay popup (the three slot sets keep the checklist only). The paging rule now covers the **stage grid** too: docked, 5 × 8 tiles per page, three pages (All + 117 = 118 tiles: 40, 40, 38) with short names; handheld, 4 × 4, eight pages, with full names. Screens: updated [12 stage grid, docked](menu-mockup/12-stage-grid.png); new [22 stage grid, handheld](menu-mockup/22-stage-grid-handheld.png). Nothing remains open or to confirm.
+
+**v10 (the operator's answers, 2026-11-01; still standing):**
 
 - **New rows.** *Respawn invincibility* (toggle, Off) on Saves, after *Auto-load on death*; *Settings override playback* (advanced toggle, Off) in Recording › Playback; a sixth page, **Developer**, hidden unless `developer.ini` has `developer_page=on`, with *Preload Samples* (moved from *Loading*) and the rebuilt developer-only rows.
 - **Rows removed or changed.** *Item on load (older saves)* is gone (the first-boot import converts older saves once). *Menu shortcut 1 / 2* are editable (they open the chord editor and the menu writes `button_config.ini`). The seven delay rows (Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset, Reaction Time) offer a checklist **and** a min–max range in one popup, one at a time.
-- **Grids.** The item grid is one 5 × 8 page when docked and three 4 × 4 pages in handheld mode; the stage grid stays 4 × 4. The SDI chips draw the spark's longer white streaks.
+- **Grids.** The item grid is one 5 × 8 page when docked and three 4 × 4 pages in handheld mode; (v11: the stage grid follows the same rule). The SDI chips draw the spark's longer white streaks (×2.0).
 - **Behaviour, no new row.** SDI not set means no SDI; a playing recording wins over the CPU settings unless the new advanced row is On; a changed SDI Direction or Shield Tilt applies at the next CPU frame; the import also copies `replay_captures/` in full and both INI files.
 - **Screens.** Updated: [02 Saves](menu-mockup/02-saves.png), [03 Recording](menu-mockup/03-recording.png), [05 Display & Controls](menu-mockup/05-display-controls.png), [11 item grid, docked](menu-mockup/11-item-grid.png); new: [18 item grid, handheld](menu-mockup/18-item-grid-handheld.png), [19 delay popup](menu-mockup/19-delay-popup.png), [20 Developer page](menu-mockup/20-developer.png).
-- **Decisions** (the last section) now lists the answers and what is still open: question 5, B11, and two confirmations.
+- **Decisions** (the last section) lists the answers.
 
 **v9 (new evidence, still standing; was "What changed from v8"):** the **SDI spark is captured**: a white spiky burst with a ring outline on the CPU's head, pointing along the SDI vector (Up: a crown of spikes above the head; In: the same shape lying sideways). The DI streak is confirmed to turn with the DI-corrected launch. The **DI and SDI chips** on 01, 09, 16 and the new **SDI grid (17)** are now **renders made from the game's own effect file**, one still per effect turned to each direction. The chip sheet shows crops of the real captures beside them as the check. New **question 18**: in the fork, a changed SDI Direction applies only at the next Training reset, and the menu does not say so. Facts: `specs/SPEC-core-07-assets-inventory.md` §4.6, `specs/SPEC-cpu-02` question 9; sources: `menu-mockup/index.md`.
 
@@ -131,7 +133,7 @@ Pick the situation in the dropdown (13: ledge getups, tech, clatter, tumble, hit
 
 ![Delay popup](menu-mockup/19-delay-popup.png)
 
-The seven delay rows (Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset, Reaction Time) open one popup with two controls over the same values: the checklist of today's semantics (the CPU picks one ticked value, weighted) and a min–max range (the CPU picks any step value from min to max, uniform). A ticked checklist greys the range, a set range greys the checklist, and `Y` clears the active one. A saved file without a range loads as a checklist, so existing settings keep their meaning. The three slot sets (Randomize Slots, Button slots, Save-state slots) keep the checklist only; this is one of the two confirmations still to ask.
+The seven delay rows (Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset, Reaction Time) open one popup with two controls over the same values: the checklist of today's semantics (the CPU picks one ticked value, weighted) and a min–max range (the CPU picks any step value from min to max, uniform). A ticked checklist greys the range, a set range greys the checklist, and `Y` clears the active one. A saved file without a range loads as a checklist, so existing settings keep their meaning. The three slot sets (Randomize Slots, Button slots, Save-state slots) keep the checklist only (confirmed 2026-11-02).
 
 ## Page 2 · Saves
 
@@ -193,13 +195,17 @@ Docked (question 14, B): one page of 5 × 8 tiles holds all 38 items, with short
 
 ![Give item grid, handheld](menu-mockup/18-item-grid-handheld.png)
 
-Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 tiles (16, 16 and 6 items) with the full names; `L` / `R` page. The stage grid below keeps its 4 × 4 paging; that is the second confirmation still to ask.
+Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 tiles (16, 16 and 6 items) with the full names; `L` / `R` page. The stage grid below follows the same rule (v11).
 
 ### Sub-screen · Lobby Stages (stage grid)
 
-![Lobby Stages grid](menu-mockup/12-stage-grid.png)
+![Lobby Stages grid, docked](menu-mockup/12-stage-grid.png)
 
-4 × 4 thumbnails per page, 8 pages for All + 117 stages; *All (listed order)* is the first tile. Red badges number the rotation order, the tag at the top right is the form (`N` normal, `Ω` omega, `BF` battlefield), `Y` cycles it on the focused stage. Training Stage Rotation uses this order. In the plugin each thumbnail is the stage's own game UI texture, read when the page opens, so a stage mod's picture shows (a stage that cannot be read shows a text tile, like *Waiting Room*); nothing is baked. The mockup shows captures of the stock thumbnails from the fork's own stage grid in their place, and the All icon from the same capture.
+Docked (v11, question 14 B extended to stages): 5 × 8 thumbnails per page with short names, 3 pages for All + 117 = 118 tiles (40, 40 and 38); `L` / `R` page. Handheld (the console's operation mode when the grid opens): 4 × 4 per page, 8 pages, full names.
+
+![Lobby Stages grid, handheld](menu-mockup/22-stage-grid-handheld.png)
+
+*All (listed order)* is the first tile. Red badges number the rotation order, the tag at the top right is the form (`N` normal, `Ω` omega, `BF` battlefield), `Y` cycles it on the focused stage. Training Stage Rotation uses this order. In the plugin each thumbnail is the stage's own game UI texture, read when the page opens, so a stage mod's picture shows (a stage that cannot be read shows a text tile, like *Waiting Room*); nothing is baked. The mockup shows captures of the stock thumbnails from the fork's own stage grid in their place, and the All icon from the same capture.
 
 ### Sub-screen · Swap groups
 
@@ -249,14 +255,15 @@ What the plugin shows while you play, unchanged in meaning from the fork unless 
 
 ## Decisions
 
-Illustrated, with options, recommendation, cost and the answer: [`DECISIONS.md`](DECISIONS.md). The operator answered on 2026-11-01 (late evening ET); the numbering is unchanged.
+Illustrated, with options, recommendation, cost and the answer: [`DECISIONS.md`](DECISIONS.md). The operator answered on 2026-11-01 (late evening ET) and 2026-11-02; the numbering is unchanged.
 
-### Answered 2026-11-01
+### Answered 2026-11-01 (question 5 and the paging of stages: 2026-11-02)
 
 1. **Pages:** five, as recommended, plus the hidden Developer page (question 8).
 2. **Dropdown input:** as recommended (`◂`/`▸` cycle in place; `A` opens the list).
-3. **Random-among-a-set delays:** both. The seven delay rows offer the checklist and a min–max range in one popup, one at a time; using one greys the other, and `Y` clears the active one.
+3. **Random-among-a-set delays:** both. The seven delay rows offer the checklist and a min–max range in one popup, one at a time; using one greys the other, and `Y` clears the active one. The slot sets keep the checklist only (confirmed 2026-11-02).
 4. **Sub-screens** for Situation overrides, Button chords and Swap groups: as recommended.
+5. **First page on open:** the last page used (answered 2026-11-02); the very first open ever shows CPU.
 6. **Item on load (older saves):** dropped; the first-boot import converts older saves once.
 7. **Replay capture in the menu:** as recommended (add the toggle).
 8. **Preload Samples:** a hidden Developer page (shipped, enabled by `developer.ini`, enabled on the operator's own card), instead of the diag build.
@@ -265,19 +272,18 @@ Illustrated, with options, recommendation, cost and the answer: [`DECISIONS.md`]
 11. **P1 CPU fallback when the pilot plugin is absent:** as recommended (the two fallback rows).
 12. **Direction grid weights:** as recommended (weight digit on a selected chip).
 13. ~~**Grid picture source**~~ — *answered (v5):* stage thumbnails are read at run time from each stage's own game UI texture, so stage mods show, and are never baked or committed (SPEC-core-07 §4.5). The item grid uses the fork's own 38 item icons.
-14. **Grid paging:** denser items (option B): docked, one page of 5 × 8; handheld, three pages of 4 × 4. The stage grid keeps 4 × 4 (to confirm).
+14. **Grid paging:** denser items (option B): docked, one page of 5 × 8; handheld, three pages of 4 × 4. The stages follow the same rule (answered 2026-11-02): docked, three pages of 5 × 8 (40, 40, 38); handheld, eight pages of 4 × 4.
 15. **Mii rows:** as recommended (busts where they exist).
 16. **Fighter portraits and mods:** as recommended (read at run time, text tile as the fallback).
-17. **DI / SDI visual:** as recommended (DI and SDI chips only), with the SDI spark's white streaks drawn longer.
+17. **DI / SDI visual:** as recommended (DI and SDI chips only), with the SDI spark's white streaks drawn longer (×2.0, confirmed 2026-11-02).
 18. **When a CPU setting change takes effect:** follow the fork (option A): a changed SDI Direction or Shield Tilt applies at the next CPU frame.
 
 The other decisions on the page [`DECISIONS.md`](DECISIONS.md) were answered too: S1 (import details: as recommended, except that `replay_captures/` is imported in full), S2 (corrupt settings file: keep a copy, load field by field), B1 (plugin name `training_rooms`), B2 (log a panic, no pop-up), B3 (inject another mod's HUD layout anyway), B4 (CPU settings on the CPU only; recording refused while an AI drives P1), B5 (the recording wins by default; the advanced row *Settings override playback* restores upstream's rule), B6 (one state per fighter), B7 (In / Out toward the opponent everywhere), B8 (the behaviour batch is accepted, except that SDI not set means no SDI and the respawn line becomes the *Respawn invincibility* toggle), B9 (upstream developer-only code lives on the Developer page; `parking_lot` is used directly), B10 (reuse the README GIFs that show no menu).
 
-### Still open
+### Answered 2026-11-02 (nothing is open)
 
-- **Question 5, first page on open:** the last page used (today's behaviour) or always CPU? Not answered; the working default is the last page used.
-- **B11, ledge options changed while the CPU is already on the ledge** (also true of the fork): re-roll on a menu change, like SDI, or apply on the next ledge grab? Not answered; the working default is the recommendation (re-roll on change).
-- **Confirmation (question 3):** the three slot sets (Randomize Slots, Button slots, Save-state slots) keep the checklist only, because a range of slots is a run of ticks. Is that right?
-- **Confirmation (question 14):** the stage grid keeps 4 × 4 paging; the denser choice was about the items. Is that right?
+- **Question 5, first page on open:** as recommended; the last page used, and the very first open ever shows CPU.
+- **B11, ledge options changed while the CPU is already on the ledge** (also true of the fork): re-roll on a menu change, like SDI, for the ledge options and the throw options, in both trees; the fork gets it in its next build.
+- **Confirmed:** the three slot sets (Randomize Slots, Button slots, Save-state slots) keep the checklist only; the Developer page; the SDI streak length (×2.0).
 
 Answered earlier: license holder = handle; storage root = `sd:/ultimate/TrainingRooms/`; grids and item / stage visuals reused where they fit; direction grid for DI / SDI; the portrait grid shows the real fighter icons in the review screens; Kirby Hats, Solo Popo and character items use a placeholder until their final icons are designed (v4); the item grid uses the fork's own item icons and the stage grid reads each stage's game UI texture at run time, so stage mods show (question 13, v5); the screens carry no origin tags (v6); the DI and SDI chips show the game's own DI / SDI visual, read at run time (v7).

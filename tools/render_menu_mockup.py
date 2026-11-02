@@ -992,11 +992,61 @@ def render_delay_popup():
     return c
 
 
-def render_stage_grid():
+def tile_stage_dense(c, x, y, w, h, name, rank=None, form=None, cursor=False, n=None):
+    """Docked tile (same geometry as the docked item grid): thumbnail left, short name, rotation badge, form tag. `n` is
+    the tile number for a text placeholder (no capture exists for that stage in this mock)."""
+    c.rect(x, y, x + w, y + h, fill=TILE_HI if cursor else TILE, outline=SEL if cursor else LINE, width=3 if cursor else 1, radius=6)
+    if name == "ALL":
+        c.image("captures/stages/all.png", x + 6, y + 4, x + 66, y + h - 4)
+        c.text(x + 74, y + h / 2 - 8, "All", "xs", FG)
+        return
+    if n is not None:  # text placeholder: dashed picture box and a muted label
+        c.rect(x + 6, y + 4, x + 66, y + h - 4, outline=LINE, radius=4)
+        c.text(x + 36, y + h / 2 - 7, "text", "tiny", MUTED, "m")
+        c.text(x + 74, y + h / 2 - 8, f"Stage {n}", "xs", MUTED)
+        return
+    if name == "Waiting Room":  # a text tile in the fork's grid as well
+        c.rect(x + 6, y + 4, x + 66, y + h - 4, outline=LINE, radius=4)
+        c.text(x + 36, y + h / 2 - 7, "WR", "tiny", FG, "m")
+    else:
+        c.image(f"captures/stages/{slug(name)}.png", x + 6, y + 4, x + 66, y + h - 4)
+    room = 13 if form else 17  # short names: the form tag takes the right-hand end of the tile
+    c.text(x + 74, y + h / 2 - 8, name if len(name) <= room else name[:room - 1] + "…", "xs", FG)
+    if rank is not None:
+        c.circle(x + 14, y + 12, 8, fill=P1)
+        c.text(x + 14, y + 6, str(rank), "tiny", FG, "m")
+    if form:
+        c.rect(x + w - 36, y + 6, x + w - 6, y + 22, fill=HILITE, radius=4)
+        c.text(x + w - 21, y + 7, form, "xxs", OURS, "m")
+
+
+def render_stage_grid(handheld=False):
+    """Lobby Stages grid (N5 extended to stages). Docked: 5 x 8 tiles per page, short names, three pages (40, 40, 38 of
+    All + 117 = 118). Handheld: 4 x 4 per page as the fork, full names, eight pages. This is page 1 in both."""
     c = Canvas()
     frame(c, ["Fighters & Stages"], 0, "A adds the stage to the rotation order, Y cycles its form (Normal / Omega / Battlefield), L/R pages.",
           "Fighters & Stages  >  Stages  >  Lobby Stages")
-    c.text(W - 60, 100, "page 1 / 8   (All + 117 stages)", "s", MUTED, "r")
+    label = "page 1 of 8   (All + 117 stages)" if handheld else "page 1 of 3   (All + 117 stages)"
+    c.text(W - 60, 100, label, "s", MUTED, "r")
+    if handheld:
+        tx = W - 60 - c.textlength(label, "s") - 90
+        c.rect(tx, 98, tx + 78, 120, fill=HILITE, outline=ADV, radius=5)
+        c.text(tx + 39, 101, "handheld", "xs", ADV, "m")
+    else:
+        tw, th, px, py = 228, 48, 236, 54
+        x0, y0 = 48 + (W - 96 - 5 * px + 8) / 2, 136
+        cells = ["ALL"] + STAGES  # 16 tiles with a capture; tiles 17-40 are text placeholders
+        for i in range(40):
+            col, row = i % 5, i // 5
+            if i < len(cells):
+                rank, form = STAGE_ORDER.get(cells[i], (None, None))
+                tile_stage_dense(c, x0 + col * px, y0 + row * py, tw, th, cells[i], rank, form, cursor=(cells[i] == "Small Battlefield"))
+            else:
+                tile_stage_dense(c, x0 + col * px, y0 + row * py, tw, th, "", n=i + 1)
+        c.text(x0, y0 + 8 * py + 2, "Cursor: Small Battlefield — 3rd in the rotation, Normal form   (Ω omega, BF battlefield form)", "xs", FG)
+        c.text(x0, y0 + 8 * py + 22, "Docked: 5 x 8 per page, short names, pages of 40, 40 and 38. Tiles 17-40 are text placeholders: "
+               "the mock has captures for the first 16 only.", "xs", MUTED)
+        return c
     tw, th, px, py = 272, 100, 290, 108
     x0, y0 = 48 + (W - 96 - 4 * px + 18) / 2, 136
     cells = ["ALL"] + STAGES
@@ -1250,8 +1300,9 @@ def main():
          "absolute Left/Right and weights"),
         ("10-character-grid", lambda: render_roster_grid(False), "sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges"),
         ("11-item-grid", render_item_grid, "sub-screen Give item, docked: one page of 5x8 tiles (38 used) with short names and the fork's own item icons, page 1 of 1"),
-        ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time "
-         "each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures"),
+        ("12-stage-grid", render_stage_grid, "sub-screen Lobby Stages, docked: 5x8 tiles per page (the docked item grid's geometry), All first, "
+         "order badges and form tags, short names, page 1 of 3 (40, 40, 38 of All + 117); tiles 17-40 are text placeholders (the mock has "
+         "captures for the first 16 only); at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures"),
         ("13-kirby-hats-grid", lambda: render_roster_grid(True), "sub-screen Kirby Hats: the same portrait grid as a two-role hat order"),
         ("14-fighters-extras", lambda: render_page(3, 1), "page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)"),
         ("15-fighters-stage-rows", lambda: render_page(3, 2), "page Fighters & Stages (Stages group: stage order preview)"),
@@ -1267,6 +1318,8 @@ def main():
          "Preload Samples (moved from Loading), Reload developer config, Debug hooks"),
         ("21-sdi-stretch-compare", render_sdi_stretch_compare, "review sheet: SDI Up and In chips at 60 and 30 px for the v9 render "
          "and four stretches along the SDI vector (x1.17, x1.4, x1.7, x2.0), beside the captured Up and In crops at the same size"),
+        ("22-stage-grid-handheld", lambda: render_stage_grid(True), "sub-screen Lobby Stages, handheld: 4x4 tiles per page as the fork, full "
+         "names, All, order badges and form tags, page 1 of 8, with a small handheld tag"),
     ]
     for name, fn, what in screens:
         fn().save(name)

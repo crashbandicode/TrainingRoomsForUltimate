@@ -16,7 +16,7 @@ working default until they are. The new requirements the answers add are collect
 | Q2 | Dropdown input | Left / Right cycle in place; A opens the list | **as recommended** |
 | Q3 | Random-among-a-set delays | keep the checklists | **both:** checklist and min–max range; using one disables the other |
 | Q4 | Overrides, chords, swap groups | one editor row each | **as recommended** |
-| Q5 | First page on open | the last page used | **open** (working default: the last page used) |
+| Q5 | First page on open | the last page used | **as recommended** (2026-11-02): the last page used; the first open ever shows CPU |
 | Q6 | Item on load (older saves) | keep the row for now | **drop the row;** the import converts older saves once |
 | Q7 | Replay capture in the menu | add the toggle | **as recommended** |
 | Q8 | Preload Samples | diag build only | **Developer page:** hidden unless an INI enables it (the operator's own INI enables it) |
@@ -24,10 +24,10 @@ working default until they are. The new requirements the answers add are collect
 | Q10 | Help text | two-line panel | **as recommended** |
 | Q11 | P1 CPU fallback without the pilot | fallback rows, as drawn | **as recommended** |
 | Q12 | Direction grid weights | weight digit on the chip | **as recommended** |
-| Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) | **B: denser, all items on one page; in handheld mode three pages** |
+| Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) | **B: denser, items and stages** (stages added 2026-11-02); in handheld mode 4 × 4 pages |
 | Q15 | Mii rows | list with the bust where one exists | **as recommended** |
 | Q16 | Fighter portraits and mods | read at run time, like stages | **as recommended** |
-| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only | **as recommended;** the SDI spark's white streaks drawn longer, closer to a match |
+| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only | **as recommended;** the SDI spark's white streaks drawn longer, closer to a match (×2.0 confirmed 2026-11-02) |
 | Q18 | When a CPU setting change takes effect | follow the fork: apply at the next CPU frame | **as recommended (A)** |
 | S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed | **as recommended, except item 3:** `replay_captures/` is imported in full (it is the Replay Window's crop source) |
 | S2 | Corrupt settings file | keep a copy, load field by field | **as recommended** |
@@ -41,7 +41,7 @@ working default until they are. The new requirements the answers add are collect
 | B8 | Behaviour changes from the fork | accept the batch | **as recommended, except:** SDI not set means no SDI (the fork's rule stays); the respawn line becomes a toggle |
 | B9 | Upstream developer-only code | drop it from the shipped build | **Developer page** (with Q8): shipped, hidden unless the INI enables it |
 | B10 | README media | reuse the GIFs that show no menu | **as recommended** |
-| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI | **open** (working default: the recommendation) |
+| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI | **as recommended** (2026-11-02): re-roll on menu change, in both trees (the fork gets it in its next build) |
 
 ## Menu
 
@@ -87,6 +87,8 @@ Should the menu open on the last page used (today's behaviour) or always on CPU?
 Cost: none; this is today's behaviour.
 
 ![Q5 first page](decisions/05-first-page.png)
+
+**Decided 2026-11-02: the last page used;** the very first open (no saved page yet) shows CPU.
 
 ### Q6 · Item on load (older saves)
 
@@ -163,7 +165,7 @@ Cost: L / R to reach items 33–38.
 
 ![Q14 paging](decisions/14-grid-paging.png)
 
-**Decided 2026-11-01: B, denser, with a handheld rule.** Docked: all 38 items on one page. Handheld: three pages. The stage grid keeps 4 × 4 (Q14's B was about the items; to confirm) (N5).
+**Decided 2026-11-01: B, denser, with a handheld rule.** Docked: all 38 items on one page. Handheld: three pages. Stages (operator, 2026-11-02): the denser paging applies to the stage grid too (N5).
 
 ### Q15 · Mii rows
 
@@ -364,6 +366,8 @@ moment the row changes; the fork keeps (b) until it gets the same change. Source
 
 ![B11 ledge change](decisions/B11-ledge-change.png)
 
+**Decided 2026-11-02: (a), re-roll on menu change,** for the ledge options and the throw options, in both trees. The fork gets it in its next build; the clean room implements it from `SPEC-cpu-03` / `SPEC-cpu-06` in package 2.
+
 ## Already answered (not repeated above)
 
 | Item | Answer | Where |
@@ -396,14 +400,14 @@ affected spec (its *Open questions* answer and §9 test-provenance rows) and the
 | --- | --- | --- | --- |
 | N1 | **Developer page.** A sixth page, *Developer*, after Display & Controls. It is hidden, and its rows do nothing, unless `sd:/ultimate/TrainingRooms/developer.ini` has `developer_page=on` (read at boot; missing file or any other value = hidden). It holds Preload Samples (Q8, moved from *Loading*) and the developer-only rows of B9, rebuilt from `SPEC-core-01`'s description of them. They ship in the normal build, so capturing or testing them needs no diag build; the playbook's `diag` feature keeps only the Eden stand-ins. The operator's card and the Eden test profiles carry `developer_page=on`. | `SPEC-core-01`, `SPEC-core-02`, `SPEC-core-08` | `20-developer.png` |
 | N2 | **Respawn invincibility** (toggle, default Off = the fork: instant respawn, no invincibility). On: after a natural death in Training the fighter (P1 or CPU) respawns with the game's own respawn invincibility and, where the game's own respawn path can be used, on the respawn platform as in a match. Greyed while *Auto-load on death* is On (a save state is loaded instead). If the platform cannot be had through the game's own path, that limit goes to the operator before it ships. | Saves › Save states, after *Auto-load on death*; `SPEC-state-01` | `02-saves.png` |
-| N3 | **Delay rows: checklist and range** (Q3). Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset and Reaction Time open one popup with both controls. A ticked checklist greys the range; a set range (any step value from min to max, uniform) greys the checklist; Y clears the active one. Saved files without a range load as checklists. The three slot sets keep the checklist only (a range of slots is a run of ticks; to confirm). | `SPEC-core-02`, `SPEC-cpu-01`/`-03`/`-05`/`-06` | `19-delay-popup.png` |
+| N3 | **Delay rows: checklist and range** (Q3). Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset and Reaction Time open one popup with both controls. A ticked checklist greys the range; a set range (any step value from min to max, uniform) greys the checklist; Y clears the active one. Saved files without a range load as checklists. The three slot sets keep the checklist only (confirmed 2026-11-02). | `SPEC-core-02`, `SPEC-cpu-01`/`-03`/`-05`/`-06` | `19-delay-popup.png` |
 | N4 | **Settings override playback** (toggle, *advanced*, default Off). Off: a playing recording wins over DI, SDI, air-dodge, tech and throw settings (B5). On: those settings override the recording, as upstream does. | Recording › Playback; `SPEC-cpu-02`/`-04`/`-06`, `SPEC-input-01` | `03-recording.png` |
-| N5 | **Item grid paging** (Q14). Docked: one page, 5 × 8 tiles (38 used), short names. Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 (16, 16, 6) with full names. Stages unchanged (4 × 4). | `SPEC-core-03`; item grid (carried over) | `11-item-grid.png`, `18-item-grid-handheld.png` |
+| N5 | **Item grid paging** (Q14). Docked: one page, 5 × 8 tiles (38 used), short names. Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 (16, 16, 6) with full names. Stages (2026-11-02): docked 5 × 8 tiles per page (All + 117 = 118 tiles, three pages: 40, 40, 38) with short names; handheld 4 × 4 (eight pages), as the fork. Same tile geometry as the item grid. | `SPEC-core-03`; item grid (carried over) | `11-item-grid.png`, `18-item-grid-handheld.png`, `12-stage-grid.png`, `22-stage-grid-handheld.png` |
 | N6 | **Item on load dropped** (Q6). The first-boot import writes the item snapshot of each save that has none, from the old setting, once; the row and its setting are gone. | `SPEC-core-08`, `SPEC-state-04` | `02-saves.png` |
 | N7 | **Editable menu shortcuts** (Q9 B). *Menu shortcut 1 / 2* open the chord editor; a change applies at once and is written to `button_config.ini`, the file of record. The permanent `B + D-pad Up` stays fixed. | Display & Controls › Controls; `SPEC-input-04` | `05-display-controls.png` |
 | N8 | **Import all replay captures** (S1 item 3). `replay_captures/` is copied in full to the new root on first boot, without blocking the boot; the originals stay. | `SPEC-core-08` | `S1-import-details.png` (as drawn, item 3 changed) |
 | N9 | **SDI not set = no SDI** (B8). With no SDI Direction chip selected, the CPU does not SDI, as in the fork. | `SPEC-cpu-02` | – |
 | N10 | **SDI chip streaks longer** (Q17). The SDI chips draw the spark's white streaks longer, closer to a match. | `SPEC-core-07` §4.6 | screens `01`, `16`, `17` |
 
-Still to confirm with the operator (each with a picture in the status for the primary): Q5 and B11 (not answered),
-N3's slot sets, N5's stage grid.
+**Answered 2026-11-02 (~02:4xZ):** Q5 and B11 as recommended; the SDI ×2.0 stretch, the Developer page (N1) and the
+delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage grid. Nothing in this list is open.

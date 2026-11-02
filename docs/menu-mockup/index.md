@@ -15,7 +15,7 @@ Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along 
 - `09-direction-grid.png` / `.svg` — sub-screen DI Direction: the 3x3 direction grid of DI streak chips with absolute Left/Right and weights
 - `10-character-grid.png` / `.svg` — sub-screen Character Cycles: the fork's 13x7 portrait grid with P1 (red) and CPU (blue) order badges
 - `11-item-grid.png` / `.svg` — sub-screen Give item, docked: one page of 5x8 tiles (38 used) with short names and the fork's own item icons, page 1 of 1
-- `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages: 4x4 stage page with All, order badges and form tags; at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures
+- `12-stage-grid.png` / `.svg` — sub-screen Lobby Stages, docked: 5x8 tiles per page (the docked item grid's geometry), All first, order badges and form tags, short names, page 1 of 3 (40, 40, 38 of All + 117); tiles 17-40 are text placeholders (the mock has captures for the first 16 only); at run time each thumbnail is the stage's own game UI texture (a stage mod's picture shows), here stock captures
 - `13-kirby-hats-grid.png` / `.svg` — sub-screen Kirby Hats: the same portrait grid as a two-role hat order
 - `14-fighters-extras.png` / `.svg` — page Fighters & Stages (Extras group: Kirby Hats and Give item placeholders, Mii lists)
 - `15-fighters-stage-rows.png` / `.svg` — page Fighters & Stages (Stages group: stage order preview)
@@ -25,6 +25,7 @@ Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along 
 - `19-delay-popup.png` / `.svg` — popup Aerial Delay with both controls, two states: (a) checklist active (0, 5, 10 ticked), range greyed; (b) range 0 - 10 active, checklist greyed; Y clears the active one
 - `20-developer.png` / `.svg` — sixth page Developer, hidden unless developer.ini has developer_page=on: Preload Samples (moved from Loading), Reload developer config, Debug hooks
 - `21-sdi-stretch-compare.png` / `.svg` — review sheet: SDI Up and In chips at 60 and 30 px for the v9 render and four stretches along the SDI vector (x1.17, x1.4, x1.7, x2.0), beside the captured Up and In crops at the same size
+- `22-stage-grid-handheld.png` / `.svg` — sub-screen Lobby Stages, handheld: 4x4 tiles per page as the fork, full names, All, order badges and form tags, page 1 of 8, with a small handheld tag
 
 ## Image sources (review mockup only, not shipped artwork)
 

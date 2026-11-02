@@ -113,7 +113,7 @@ The three held values are "not set" sentinels until rolled; the throw delay is a
 
 ### Setting changes
 
-Live; held rolls persist until their next roll point.
+Live; held rolls persist until their next roll point. **Exception (B11, decided 2026-11-02):** when the menu changes the Throw Options row, the held throw case is cleared at once and step 3 rolls it again from the new set during the same hold (the held throw delay and pummel delay stay).
 
 ## 6. Edge cases and interactions
 
@@ -153,6 +153,7 @@ Nothing is written. Settings live in the menu JSON.
 | Throw: case/delays once per grab; None does nothing; pummel timing; throw bits on category 2; mash after throw | `cpu06_throw_state_machine` | `cpu-06-uthrow-delay-30-pummel-10`, `cpu-06-throw-none` | `evidence/cpu-06/throw.md` |
 | Per-fighter state (Ice Climbers) | `cpu06_per_fighter_state` | `cpu-06-ice-climbers-grab` | `evidence/cpu-06/ic.md` |
 | **N3** Aerial, Fast Fall, Throw and Pummel delay ranges: a set range is picked uniformly where the checklist is picked today; a checklist stays a weighted pick; the two are exclusive; a set Pummel Delay range counts as a selection (pummelling on); a file with no range loads as a checklist | `cpu06_aerial_delay_range_pick`, `cpu06_fast_fall_delay_range_pick`, `cpu06_throw_delay_range_pick`, `cpu06_pummel_delay_range_pick`, `cpu06_delay_rows_exclusive_and_legacy_load` | `cpu-06-aerial-range-5-15`, `cpu-06-throw-range-20-40`, `cpu-06-pummel-range-on` | `evidence/cpu-06/delay-range.md` |
+| **B11** Changing Throw Options while the CPU holds someone clears the held throw case and re-rolls from the new set during the same hold; the held delays are unchanged | `cpu06_throw_options_change_rerolls_held_case` | `cpu-06-throw-change-while-holding` | `evidence/cpu-06/throw.md` |
 | **N4 / B5** Throws yield to playback by default (the throw rule checks playback); with *Settings override playback* On the throw settings override the recording | `cpu06_throw_yields_to_playback`, `cpu06_throw_playback_override_on` | `cpu-06-throw-during-playback-off`, `cpu-06-throw-during-playback-on` | `evidence/cpu-06/playback.md` |
 
 ## 10. Open questions
@@ -165,4 +166,4 @@ Nothing is written. Settings live in the menu JSON.
 6. **Cargo throws.** Donkey Kong's cargo hold is not driven. Follow-up with Eden evidence if wanted.
 7. **Throws during playback.** The throw rule does not check playback. Recommendation: yield to playback like the other rules (decide with SPEC-cpu-02 question 7). **Decided 2026-11-01 (B5, N4): the recording wins by default,** with the advanced row *Settings override playback* (default Off) restoring the upstream rule (§6).
 8. **Full Hop default True.** With the default a mash `JUMP` is always a full hop; confirm the default for the redesigned menu. **Decided 2026-11-01 (B8 batch, kept line): Yes, as the fork has it.**
-9. **Throw option changed while the CPU already holds someone (B11, open).** The throw case is held once per grab, so a CPU already holding a fighter ignores a newly selected throw until the next grab; this is the same question as SPEC-cpu-03 question 6 (re-roll on menu change, or apply on the next grab). **Open: not answered 2026-11-01.** Working default: re-roll on change (the recommendation).
+9. **Throw option changed while the CPU already holds someone (B11).** The throw case is held once per grab, so a CPU already holding a fighter ignored a newly selected throw until the next grab; this is the same question as SPEC-cpu-03 question 6. **Decided 2026-11-02 (B11, option (a)): re-roll on menu change.** When the menu changes the Throw Options row, the held throw case is cleared at once and rolled again from the new set at the next frame of the same hold (§5 throw rule); the held throw delay and the pummel timing are not touched. Both trees; the fork gets it in its next build.
