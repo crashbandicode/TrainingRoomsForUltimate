@@ -152,14 +152,17 @@ fn state05_kirby_charge_table() {
     work.ints.insert(id(C::OlimarBeforePreVariation), 1);
 
     // No copy ability: only the flag, no fields, nothing to write.
-    let none = charge::read_kirby(&ids, false, kind(C::KindSamus), &work);
+    let (none, none_copy) = charge::read_kirby(&ids, false, kind(C::KindSamus), &work);
     assert_eq!(none, Charge { has_charge: Some(false), ..Charge::default() });
-    assert!(charge::plan_kirby(&ids, &none).is_empty());
+    assert_eq!(none_copy, None);
+    assert!(charge::plan_kirby(&ids, &none, None).is_empty());
 
-    // Samus: the shot count and the flag and copied kind; 112 shows the flash on handr.
-    let samus = charge::read_kirby(&ids, true, kind(C::KindSamus), &work);
+    // Samus: the shot count and the flag and copied kind; 112 shows the flash on handr. Samus has no
+    // flag of her own, so no `copy_charge`.
+    let (samus, samus_copy) = charge::read_kirby(&ids, true, kind(C::KindSamus), &work);
     assert_eq!((samus.int_x, samus.int_z, samus.has_charge), (Some(112), Some(kind(C::KindSamus)), Some(true)));
-    let steps: Vec<Step> = charge::plan_kirby(&ids, &samus).iter().collect();
+    assert_eq!(samus_copy, None);
+    let steps: Vec<Step> = charge::plan_kirby(&ids, &samus, None).iter().collect();
     assert_eq!(steps[0], Step::SetInt(C::SamusShotCount, 112));
     assert_eq!(steps[1], Step::Visual(Op::ChargeMax));
     match steps[2] {
@@ -169,11 +172,21 @@ fn state05_kirby_charge_table() {
         other => panic!("unexpected {other:?}"),
     }
 
-    // Mewtwo: the two counters (never his own flag: Kirby's flag is the hat), the raw effects at 120.
-    let mewtwo = charge::read_kirby(&ids, true, kind(C::KindMewtwo), &work);
+    // Mewtwo: the two counters, the raw effects at 120. Kirby's `has_charge` is the hat; Mewtwo's own HAD flag
+    // is saved apart in `copy_charge` and written back from it.
+    let (mewtwo, mewtwo_copy) = charge::read_kirby(&ids, true, kind(C::KindMewtwo), &work);
     assert_eq!((mewtwo.int_x, mewtwo.int_y, mewtwo.has_charge, mewtwo.int_z), (Some(40), Some(120), Some(true), Some(kind(C::KindMewtwo))));
-    let steps: Vec<Step> = charge::plan_kirby(&ids, &mewtwo).iter().collect();
-    assert!(!steps.iter().any(|s| matches!(s, Step::SetFlag(..))));
+    assert_eq!(mewtwo_copy, Some(Charge { has_charge: Some(true), ..Charge::default() }));
+    let steps: Vec<Step> = charge::plan_kirby(&ids, &mewtwo, mewtwo_copy.as_ref()).iter().collect();
+    assert!(steps.contains(&Step::SetFlag(C::MewtwoHad, true)));
+    // An older record has no `copy_charge`: the flag is not written.
+    let older: Vec<Step> = charge::plan_kirby(&ids, &mewtwo, None).iter().collect();
+    assert!(!older.iter().any(|s| matches!(s, Step::SetFlag(..))));
+    // A flag read as false is saved and written as false.
+    let mut no_had = Mock::default();
+    no_had.ints.insert(id(C::MewtwoCharge), 40);
+    let (_, off_copy) = charge::read_kirby(&ids, true, kind(C::KindMewtwo), &no_had);
+    assert_eq!(off_copy, Some(Charge { has_charge: Some(false), ..Charge::default() }));
     let raws: Vec<(u64, u64)> = steps
         .iter()
         .filter_map(|s| match s {
@@ -184,28 +197,28 @@ fn state05_kirby_charge_table() {
     assert_eq!(raws, vec![(0x1ac6d446d8, 0x5e008fd84), (0x1ac6d446d8, 0x51a07c0e7)]);
 
     // Robin: the thunder kind alone; 3 shows the Levin flash.
-    let robin = charge::read_kirby(&ids, true, kind(C::KindRobin), &work);
+    let (robin, _) = charge::read_kirby(&ids, true, kind(C::KindRobin), &work);
     assert_eq!((robin.int_x, robin.robin), (Some(3), None));
-    let steps: Vec<Step> = charge::plan_kirby(&ids, &robin).iter().collect();
+    let steps: Vec<Step> = charge::plan_kirby(&ids, &robin, None).iter().collect();
     assert_eq!(steps[0], Step::SetInt(C::RobinThunderKind, 3));
     assert!(steps.iter().any(|s| matches!(s, Step::Visual(Op::FollowRaw { effect: 0x12db3e4172, joint: 0x5eb263e0d, lifetime: -1, .. }))));
 
     // R.O.B.: one float; Olimar: the two colour ints; no troops manager.
-    let rob = charge::read_kirby(&ids, true, kind(C::KindRob), &work);
+    let (rob, _) = charge::read_kirby(&ids, true, kind(C::KindRob), &work);
     assert_eq!((rob.float_x, rob.float_y, rob.float_z), (Some(0.75), None, None));
-    let olimar = charge::read_kirby(&ids, true, kind(C::KindOlimar), &work);
+    let (olimar, _) = charge::read_kirby(&ids, true, kind(C::KindOlimar), &work);
     assert_eq!((olimar.int_x, olimar.int_y, olimar.int_z), (Some(2), Some(1), Some(kind(C::KindOlimar))));
-    let steps: Vec<Step> = charge::plan_kirby(&ids, &olimar).iter().collect();
+    let steps: Vec<Step> = charge::plan_kirby(&ids, &olimar, None).iter().collect();
     assert_eq!(steps, vec![Step::SetInt(C::OlimarPreVariation, 2), Step::SetInt(C::OlimarBeforePreVariation, 1)]);
 
     // A fighter without a Kirby entry (Mario) has the flag and the kind only.
-    let mario = charge::read_kirby(&ids, true, kind(C::KindMario), &work);
-    assert_eq!((mario.int_x, mario.int_z), (None, Some(kind(C::KindMario))));
-    assert!(charge::plan_kirby(&ids, &mario).is_empty());
+    let (mario, mario_copy) = charge::read_kirby(&ids, true, kind(C::KindMario), &work);
+    assert_eq!((mario.int_x, mario.int_z, mario_copy), (None, Some(kind(C::KindMario)), None));
+    assert!(charge::plan_kirby(&ids, &mario, None).is_empty());
     // A fighter that shares its own entry: Squirtle's 45 shows the flash.
     let mut work = Mock::default();
     work.ints.insert(id(C::SquirtleCharge), 45);
-    let squirtle = charge::read_kirby(&ids, true, kind(C::KindPokemonSquirtle), &work);
-    let steps: Vec<Step> = charge::plan_kirby(&ids, &squirtle).iter().collect();
+    let (squirtle, _) = charge::read_kirby(&ids, true, kind(C::KindPokemonSquirtle), &work);
+    let steps: Vec<Step> = charge::plan_kirby(&ids, &squirtle, None).iter().collect();
     assert_eq!(steps, vec![Step::SetInt(C::SquirtleCharge, 45), Step::Visual(Op::ChargeMax)]);
 }

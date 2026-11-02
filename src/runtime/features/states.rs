@@ -922,6 +922,20 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
     let Some(role) = Role::of_entry(raw.entry) else { return };
     let accessor = raw.accessor;
     let ids = with(|s| s.ids.clone());
+    let (charge, copy_charge) = ids
+        .as_ref()
+        .map(|ids| {
+            let fields = Fields(accessor, ids);
+            if ids.is(C::KindKirby, raw.kind) {
+                // §5.2 step 1: the copy flag and the copied fighter's kind, then its charge values; the
+                // copied fighter's own flag goes to `copy_charge`.
+                let has_copy = natives::is_flag(accessor, ids.get(C::KirbyFlagCopy));
+                charge::read_kirby(ids, has_copy, n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
+            } else {
+                (charge::read(ids, raw.kind, &fields), None)
+            }
+        })
+        .unwrap_or_default();
     let state = SavedState {
         x: natives::pos_x(accessor),
         y: n::pos_y(accessor),
@@ -930,19 +944,8 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
-        charge: ids
-            .as_ref()
-            .map(|ids| {
-                let fields = Fields(accessor, ids);
-                if ids.is(C::KindKirby, raw.kind) {
-                    // §5.2 step 1: the copy flag and the copied fighter's kind, then its charge values.
-                    let has_copy = natives::is_flag(accessor, ids.get(C::KirbyFlagCopy));
-                    charge::read_kirby(ids, has_copy, n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
-                } else {
-                    charge::read(ids, raw.kind, &fields)
-                }
-            })
-            .unwrap_or_default(),
+        charge,
+        copy_charge,
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
         held_item: ids.as_ref().filter(|_| role == Role::Player).map(|ids| state_restore::item_snapshot(accessor, ids)),
@@ -1309,7 +1312,7 @@ unsafe fn kirby_copy_started(fighter: usize) {
     let Some((ids, plan)) = with(|s| {
         let slot = s.machine.current_slot(&s.settings);
         let record = s.machine.record(role, slot);
-        (s.ids.clone(), charge::plan_kirby(&s.ids, &record.charge))
+        (s.ids.clone(), charge::plan_kirby(&s.ids, &record.charge, record.copy_charge.as_ref()))
     }) else {
         return;
     };

@@ -109,6 +109,7 @@ impl FighterSetup {
             held_item: self.held_item,
             saved_stage: stage,
             mii: self.mii.clone(),
+            copy_charge: None,
         }
     }
 

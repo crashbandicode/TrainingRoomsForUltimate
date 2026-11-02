@@ -69,6 +69,7 @@ fn captured(saved_stage: Option<i32>) -> SavedState {
         held_item: Some(HeldItem::Item { choice: 25, variation: 7, lifetime: 500, lifetime_max: 1400, fuse: -1, fuse_max: 0 }),
         saved_stage,
         mii: None,
+        copy_charge: None,
     }
 }
 
@@ -142,6 +143,43 @@ fn state01_legacy_shaped_json_loads_with_defaults() {
     );
     let rewritten = file.to_pretty();
     assert_eq!(SaveFile::parse(rewritten.as_bytes()).unwrap(), file);
+}
+
+/// SPEC-state-05 §4.2 (lead ruling 2026-11-02): Kirby's copied fighter's own flag lives in an optional
+/// `copy_charge` object, written only when present.
+#[test]
+fn state05_copy_charge_round_trip_absent_and_fork_files() {
+    let kirby = SavedState {
+        fighter_kind: 6,
+        charge: Charge { int_x: Some(40), int_y: Some(120), int_z: Some(0x28), has_charge: Some(true), ..Charge::default() },
+        copy_charge: Some(Charge { has_charge: Some(true), ..Charge::default() }),
+        ..SavedState::never_saved()
+    };
+    let mut file = SaveFile::default();
+    file.player[1] = kirby.clone();
+    // The other records, a Kirby without a copy included, carry no key at all (not `null`).
+    file.player[2] = SavedState { fighter_kind: 6, charge: Charge { has_charge: Some(false), ..Charge::default() }, ..SavedState::never_saved() };
+    let text = file.to_pretty();
+    assert_eq!(text.matches("copy_charge").count(), 1, "{text}");
+    let back = SaveFile::parse(text.as_bytes()).expect("parses back");
+    assert_eq!(back, file);
+    assert_eq!(back.player[1].copy_charge, Some(Charge { has_charge: Some(true), ..Charge::default() }));
+    assert_eq!(back.player[2].copy_charge, None);
+    // A second write of what was read is byte-identical.
+    assert_eq!(back.to_pretty(), text);
+
+    // A fork-written record has no such key: it reads as none and rewrites without one.
+    let fork = r#"{"player": [{"x": 1.0, "y": 2.0, "percent": 0.0, "lr": 1.0, "situation_kind": 0, "state": "NoAction",
+        "fighter_kind": 6, "charge": {"int_z": 40, "has_charge": true}, "steve_state": null, "held_item": null,
+        "saved_stage": null, "mii": null}], "cpu": []}"#;
+    let file = SaveFile::parse(fork.as_bytes()).expect("fork-written record");
+    assert_eq!(file.player[0].copy_charge, None);
+    assert!(!file.to_pretty().contains("copy_charge"));
+    // A damaged value (not an object) is no copy charge, and the neighbours survive.
+    let damaged = fork.replace("\"mii\": null", "\"mii\": null, \"copy_charge\": 5");
+    let file = SaveFile::parse(damaged.as_bytes()).expect("damaged copy_charge");
+    assert_eq!(file.player[0].copy_charge, None);
+    assert_eq!(file.player[0].x, 1.0);
 }
 
 fn saved_fixtures() -> Vec<PathBuf> {

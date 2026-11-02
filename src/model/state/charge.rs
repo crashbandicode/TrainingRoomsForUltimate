@@ -282,8 +282,8 @@ const fn kirby_follow_raw(effect: u64, joint: u64, lifetime: i32, handle: Option
 }
 
 /// Kirby's own copied-ability table (SPEC-state-05 §4.2) for the fighters whose copied charge differs from
-/// the fighter's own: other joints and effects, fewer fields. Kirby's single `has_charge` slot says whether
-/// he has a copy ability, so none of these entries has a flag field.
+/// the fighter's own: other joints and effects, fewer fields. Kirby's `has_charge` slot says whether he has a
+/// copy ability, so the copied fighter's own flag (HAD, pull/throw) lives in the record's `copy_charge`.
 static KIRBY_ENTRIES: [Entry; 8] = [
     Entry {
         kinds: &[C::KindSamus],
@@ -312,7 +312,7 @@ static KIRBY_ENTRIES: [Entry; 8] = [
     },
     Entry {
         kinds: &[C::KindMewtwo],
-        fields: &[int(Slot::IntX, C::MewtwoCharge), int(Slot::IntY, C::MewtwoPrevCharge)],
+        fields: &[int(Slot::IntX, C::MewtwoCharge), int(Slot::IntY, C::MewtwoPrevCharge), flag(C::MewtwoHad)],
         rules: &[Rule {
             when: When::IntIs(Slot::IntY, 120),
             ops: &[
@@ -325,7 +325,7 @@ static KIRBY_ENTRIES: [Entry; 8] = [
     },
     Entry {
         kinds: &[C::KindLucario],
-        fields: &[int(Slot::IntX, C::LucarioCharge), int(Slot::IntY, C::LucarioPrevCharge)],
+        fields: &[int(Slot::IntX, C::LucarioCharge), int(Slot::IntY, C::LucarioPrevCharge), flag(C::LucarioHad)],
         rules: &[Rule {
             when: When::IntIs(Slot::IntY, 90),
             ops: &[
@@ -346,7 +346,7 @@ static KIRBY_ENTRIES: [Entry; 8] = [
     Entry { kinds: &[C::KindRob], fields: &[float(Slot::FloatX, C::RobBeam)], rules: &[], special: Special::None },
     Entry {
         kinds: &[C::KindPacMan],
-        fields: &[int(Slot::IntX, C::PacManRank)],
+        fields: &[int(Slot::IntX, C::PacManRank), flag(C::PacManPullThrow)],
         rules: &[Rule { when: When::IntIs(Slot::IntX, 12), ops: &[Op::ChargeMax] }],
         special: Special::PacMan,
     },
@@ -395,11 +395,13 @@ pub fn read(ids: &Table, kind: i32, work: &dyn Work) -> Charge {
     }
 }
 
-/// What a Save reads for a Kirby (SPEC-state-05 §5.2 step 1): `has_charge` says whether he has a copy
-/// ability, `int_z` is the copied fighter kind, and the copied fighter's charge values follow (§4.2). Kirby's
-/// single `has_charge` slot is the copy flag, so the copied fighter's own flags are not saved.
-pub fn read_kirby(ids: &Table, has_copy: bool, copied: i32, work: &dyn Work) -> Charge {
-    let mut charge = match has_copy.then(|| kirby_entry_for(ids, copied)).flatten() {
+/// What a Save reads for a Kirby (SPEC-state-05 §5.2 step 1): the record's `charge` (`has_charge` is whether
+/// he has a copy ability, `int_z` the copied fighter kind, then the copied fighter's counters, §4.2) and,
+/// when he has a copy, the record's `copy_charge`: the copied fighter's own flag (HAD, pull/throw) in
+/// `has_charge`, present only for the copied fighters that have one.
+pub fn read_kirby(ids: &Table, has_copy: bool, copied: i32, work: &dyn Work) -> (Charge, Option<Charge>) {
+    let entry = has_copy.then(|| kirby_entry_for(ids, copied)).flatten();
+    let mut charge = match entry {
         Some(entry) => read_entry(ids, entry, work, true),
         None => Charge::default(),
     };
@@ -407,7 +409,11 @@ pub fn read_kirby(ids: &Table, has_copy: bool, copied: i32, work: &dyn Work) -> 
     if has_copy {
         charge.int_z = Some(copied);
     }
-    charge
+    let copy_charge = entry.and_then(|entry| {
+        let flag = entry.fields.iter().find(|f| f.slot == Slot::Has)?;
+        ids.resolved(flag.work).then(|| Charge { has_charge: Some(work.get_flag(ids.get(flag.work))), ..Charge::default() })
+    });
+    (charge, copy_charge)
 }
 
 fn read_entry(ids: &Table, entry: &'static Entry, work: &dyn Work, skip_flags: bool) -> Charge {
@@ -556,10 +562,14 @@ pub fn plan_write(ids: &Table, kind: i32, charge: &Charge) -> Plan {
 
 /// The copied charge a Kirby gets when his copy starts (SPEC-state-05 §5.2 step 4): the record's `int_z`
 /// kind is the copied fighter; a record without a hat, or whose copied fighter has no entry, writes nothing.
-pub fn plan_kirby(ids: &Table, charge: &Charge) -> Plan {
+/// The copied fighter's own flag comes from `copy_charge` (absent in an older record: the flag is not written).
+pub fn plan_kirby(ids: &Table, charge: &Charge, copy_charge: Option<&Charge>) -> Plan {
     let Some(copied) = charge.int_z.filter(|_| charge.has_charge == Some(true)) else { return Plan::default() };
     match kirby_entry_for(ids, copied) {
-        Some(entry) => plan_entry(entry, charge),
+        Some(entry) => {
+            let merged = Charge { has_charge: copy_charge.and_then(|c| c.has_charge), ..*charge };
+            plan_entry(entry, &merged)
+        }
         None => Plan::default(),
     }
 }
