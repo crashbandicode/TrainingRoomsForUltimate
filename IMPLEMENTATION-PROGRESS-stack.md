@@ -97,6 +97,24 @@ the Mii editor `Trace` (FixedVec<Event,192> + input checks, about 11 KB) is move
   heartbeat's 10 s beat when it grows, `exit` lines for returning threads, the boot thread across `boot::run`.
 - `tools/stack_depth.py <elf> table`: each row against the diag ELF (exit 1 on a shortfall); `tools/test_stack_depth.py`.
 
+## Eden st-NN (Yoga, lead-granted slot 2026-11-02 ~11:52Z)
+
+Build: 6541f2d diag `5d21cf2f…` (static nn::os stacks, lock-free diag registry) + tile cursor `b8313ca2…` + CPU pilot
+`e3033426…`; profile `/home/intpa/trainingrooms-eden-st/profiles/y` (hard-linked copy of ssbu-desync-1029/profiles/b), muted
+(core.volume 0 set and saved through the control API before `game.load`), display :99.
+
+| Label | Kind | Result |
+| --- | --- | --- |
+| st-01 | cold | not booted: my solo.ps1 claim-check edit read `$Matches` after a second `-match` (fixed); no claim, no Eden |
+| st-02 | cold | boot clean (install line, every `[ThreadStack] spawn` + `high_water`, console scan 0); the driver's report gate waited for a second heartbeat line that is only written when the mark grows (fixed: gate on `hook_stats`) |
+| st-03..st-05 | cold | pass, console scan 0 |
+
+First numbers (st-02): the boot thread is Skyline's, **64 KiB** (`spawn name=boot … size=0x10000`), and boot used
+38,160 B (static 37,520 B: `run_inner` 26,624 B with two 8,040 B `Settings` copies). `tr-trace-writer` peaks at 1,696 B
+(was ≥ 61,968 B). `[HookStack]`: the pipeline ticks run on the main thread (1 MiB region, ~1 MB free at entry);
+`ui_archive` / `ui_pass_calculate` run on a stack inside a 156 MB heap block (a fiber), where svcQueryMemory cannot
+bound the stack: such sites are marked by `kind=` from the next build and are not read as stack room.
+
 ## State
 
 | Step | Result |

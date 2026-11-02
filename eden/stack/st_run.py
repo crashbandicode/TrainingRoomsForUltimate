@@ -103,19 +103,17 @@ def wait_line(read, needle, cap, what, after=0):
     raise RuntimeError(f"GATE FAIL {what}: no line with {needle!r}")
 
 
-def wait_reports(count, cap=60):
-    """Wait until the heartbeat has written `count` more `[ThreadStack] high_water name=tr-heartbeat` lines (10 s beat)."""
-    start = sum("high_water name=tr-heartbeat" in x for x in diag_lines())
-    deadline = time.time() + cap
+def wait_reports(count, cap=None):
+    """Wait for `count` more heartbeat beats: the 10 s `hook_stats` line, after which the same tick writes the stack report
+    (`[ThreadStack] high_water` lines appear only when a mark grew, so they cannot be counted)."""
+    start = sum("[TrainingRooms] hook_stats" in x for x in diag_lines())
+    deadline = time.time() + (cap or 12 * count + 20)
     while time.time() < deadline:
-        if sum("high_water name=tr-heartbeat" in x for x in diag_lines()) >= start + count:
-            return
-        # the heartbeat logs only when the mark grows; after the first line, wait one beat per report
-        if start > 0:
-            time.sleep(11 * count)
+        if sum("[TrainingRooms] hook_stats" in x for x in diag_lines()) >= start + count:
+            time.sleep(1)
             return
         time.sleep(2)
-    raise RuntimeError("no heartbeat stack report")
+    raise RuntimeError("no heartbeat beat")
 
 
 def solo(action, label, nros=()):
@@ -203,6 +201,11 @@ def busy(label):
     settings = json.dumps({"menu": {"recording_duration": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}})
     request("diag-settings-next.json", settings)
     wait_line(diag_lines, "diag_settings_reload", 20, "tr-diag-reload published", after=n)
+    # Recording: the numbered record chord (ZR + Down; Macro Source is numbered by default).
+    n = len(diag_lines())
+    press(label, "zr,down", 150)
+    wait_line(diag_lines, "record_lockout", 15, "record chord: lockout", after=n)
+    wait_line(diag_lines, "recording_complete", 30, "recording complete", after=n)
     wait_reports(1)
     # Menu open/close last (the close hang is stream/sync's known defect; a hang there is told apart by fault lines).
     n = len(diag_lines())

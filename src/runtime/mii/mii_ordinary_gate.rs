@@ -123,8 +123,17 @@ unsafe fn r68_on_continuation(payload:Option<([u8;0x70],bool)>,selected:usize) {
 #[no_mangle]
 unsafe extern "C" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {
     crate::runtime::threads::headroom("mii_ordinary_gate_decide");
+    // stream/stack: each arm is its own frame (inline(never)), so the callback's stack holds only the arm that runs.
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    if super::super::mii_ordinary_cpu::tracked(entry) {
+    if super::super::mii_ordinary_cpu::tracked(entry) {return decide_cpu(entry,selected,native_sp);}
+    #[cfg(feature="mii-managed-helper-alpha")]
+    if super::super::mii_managed_helper::tracked(entry) {return decide_helper(entry,selected,native_sp);}
+    decide_player(entry,selected,native_sp)
+}
+#[cfg(feature="mii-ordinary-cpu-alpha")]
+#[inline(never)]
+unsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {
+    {
         let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);
         let payload=if valid_stack {super::super::mii_ordinary_cpu::mii_payload_descriptor(entry)} else {None};
         let installed=r68_before_prequeue(payload,selected);
@@ -140,8 +149,11 @@ unsafe extern "C" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_
             REFUSE.load(Ordering::Acquire)
         };
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
-    if super::super::mii_managed_helper::tracked(entry) {
+}
+#[cfg(feature="mii-managed-helper-alpha")]
+#[inline(never)]
+unsafe fn decide_helper(entry:usize,selected:usize,native_sp:usize)->usize {
+    {
         let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);
         return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {
             CONTINUE.load(Ordering::Acquire)
@@ -150,6 +162,9 @@ unsafe extern "C" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_
             REFUSE.load(Ordering::Acquire)
         };
     }
+}
+#[inline(never)]
+unsafe fn decide_player(entry:usize,selected:usize,native_sp:usize)->usize {
     if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}
     let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);
     let payload=if valid_stack {super::mii_payload_descriptor(entry)} else {None};

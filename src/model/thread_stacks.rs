@@ -126,6 +126,13 @@ pub const fn of(id: ThreadId) -> &'static ThreadStack {
 /// sized for the largest of them (`runtime::threads` refuses a second start while the stack is in use).
 pub const BOOT_LOADERS: [ThreadId; 3] = [ThreadId::Import, ThreadId::SettingsLoad, ThreadId::StateLoad];
 
+/// The last user of the boot loaders' stack: a detached thread started at the end of boot (after the loaders and the
+/// install line), which keeps the stack until it ends; nothing starts on that stack after it.
+pub const BOOT_STACK_LAST: ThreadId = ThreadId::ImportCaptures;
+
+/// Every thread on the boot stack: the joined loaders, then `BOOT_STACK_LAST`.
+pub const BOOT_STACK: [ThreadId; 4] = [ThreadId::Import, ThreadId::SettingsLoad, ThreadId::StateLoad, ThreadId::ImportCaptures];
+
 /// The threads that are joined (the boot thread waits for them); every other thread runs for the session or ends on its own.
 pub const fn joined(id: ThreadId) -> bool {
     matches!(id, ThreadId::Import | ThreadId::SettingsLoad | ThreadId::StateLoad)

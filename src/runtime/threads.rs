@@ -2,7 +2,8 @@
 //! from `model::thread_stacks::THREADS`, with a static thread object, created through the SDK (`nn::os::CreateThread`,
 //! `SetThreadNamePointer`, `StartThread`) as the playbook's plugins do (CHECKLIST: "a writer thread on a static stack";
 //! gsp-visualizer, ssbu-gnw-judge-log). Nothing is allocated for a stack or a name. The boot loaders (`BOOT_LOADERS`, joined
-//! one after another) share one stack; a start while a stack is in use is refused (`ErrorKind::ResourceBusy`).
+//! one after another) share one stack, and the import's captures (`BOOT_STACK_LAST`) take it at the end of boot; a start
+//! while a stack is in use is refused (`ErrorKind::ResourceBusy`).
 //!
 //! Diag builds also measure each thread. At its start the region holding its stack is read with `svcQueryMemory` at the
 //! stack pointer (the SDK maps the static array into the stack region; the array itself is not readable meanwhile), logged
@@ -104,13 +105,12 @@ mod imp {
 
     slots! {
         HEARTBEAT = [Heartbeat];
-        BOOT_LOADERS = [Import, SettingsLoad, StateLoad];
+        BOOT_STACK = [Import, SettingsLoad, StateLoad, ImportCaptures];
         STATE_WRITER = [StateWriter];
         #[cfg(feature = "diag")] STATE_DIAG = [StateDiag];
         INI_WRITER = [IniWriter];
         TRACE_WRITER = [TraceWriter];
         #[cfg(feature = "diag")] DIAG_RELOAD = [DiagReload];
-        IMPORT_CAPTURES = [ImportCaptures];
         MENU = [Menu];
         ARCHIVE = [Archive];
         #[cfg(feature = "diag")] PROBE = [Probe];
@@ -422,6 +422,9 @@ mod diag {
         min_free: AtomicUsize,
         base: AtomicUsize,
         stack: AtomicUsize,
+        /// The region's memory state (0xb: a thread stack; another value, e.g. heap, means a fiber stack inside a larger
+        /// block, whose own bottom the region does not show).
+        kind: AtomicU32,
         reported: AtomicUsize,
     }
 
@@ -434,6 +437,7 @@ mod diag {
             min_free: AtomicUsize::new(usize::MAX),
             base: AtomicUsize::new(0),
             stack: AtomicUsize::new(0),
+            kind: AtomicU32::new(0),
             reported: AtomicUsize::new(usize::MAX),
         }
     }; HEAD_SLOTS];
@@ -468,11 +472,11 @@ mod diag {
         let Some(head) = found else { return };
         head.calls.fetch_add(1, Ordering::Relaxed);
         let (base, stack) = (head.base.load(Ordering::Relaxed), head.stack.load(Ordering::Relaxed));
-        let (base, stack) = if base <= here && here < base + stack {
-            (base, stack)
+        let (base, stack, kind) = if base <= here && here < base + stack {
+            (base, stack, head.kind.load(Ordering::Relaxed))
         } else {
             match region(here) {
-                Some((base, size, _)) => (base, size),
+                Some(found) => found,
                 None => return,
             }
         };
@@ -480,6 +484,7 @@ mod diag {
         if free < head.min_free.fetch_min(free, Ordering::AcqRel) {
             head.base.store(base, Ordering::Relaxed);
             head.stack.store(stack, Ordering::Relaxed);
+            head.kind.store(kind, Ordering::Relaxed);
         }
     }
 
@@ -509,10 +514,11 @@ mod diag {
                 // SAFETY: `key`/`len` are a `&'static str` a probe registered.
                 let site = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(key, len)) };
                 diagnostic(format_args!(
-                    "[HookStack] site={site} calls={} min_free={min} stack={:#x} base={:#x}",
+                    "[HookStack] site={site} calls={} min_free={min} stack={:#x} base={:#x} kind={:#x}",
                     head.calls.load(Ordering::Relaxed),
                     head.stack.load(Ordering::Relaxed),
-                    head.base.load(Ordering::Relaxed)
+                    head.base.load(Ordering::Relaxed),
+                    head.kind.load(Ordering::Relaxed)
                 ));
             }
         }

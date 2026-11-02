@@ -1715,7 +1715,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "aff533674bc8d341d25248614d6d47ca74be686395414c1919731a07bfe300ef",
+   "dest_sha256": "c4026a1a569f9af78d9415c5c90200c6154efd7724419582aaaae08621e10efa",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -1731,6 +1731,16 @@
      "old": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class));",
      "new": "notify(Role::Cpu,format!(\"CPU {:?} choice skipped\",choice.canonical.class).into());",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },
@@ -1753,12 +1763,22 @@
    "dest": "src/runtime/mii/mii_ordinary_gate.rs",
    "crate": "root",
    "src_sha256": "b95b5e0f54f7300c5e02539dc0ada183682c4a1c2df4c261453461071e0e1138",
-   "dest_sha256": "a173c7a5b9aa12c2689339b4fcf66eaaeb17d85b076f2f49290155f3471fb718",
+   "dest_sha256": "1e1016ded06643d45936e7360d56dc9d11f344753b0858385b0ae53341ebebd1",
    "edits": [
     {
      "old": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n",
      "new": "unsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n",
      "reason": "stream/stack: diag hook-entry stack room (`[HookStack]` lines; a no-op in the shipped build), to size the game thread stacks this callback's large frames run on"
+    },
+    {
+     "old": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {\n        let valid_stack",
+     "new": "#[no_mangle]\nunsafe extern \"C\" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {\n    crate::runtime::threads::headroom(\"mii_ordinary_gate_decide\");\n    // stream/stack: each arm is its own frame (inline(never)), so the callback's stack holds only the arm that runs.\n    #[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n    if super::super::mii_ordinary_cpu::tracked(entry) {return decide_cpu(entry,selected,native_sp);}\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {return decide_helper(entry,selected,native_sp);}\n    decide_player(entry,selected,native_sp)\n}\n#[cfg(feature=\"mii-ordinary-cpu-alpha\")]\n#[inline(never)]\nunsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change"
+    },
+    {
+     "old": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    #[cfg(feature=\"mii-managed-helper-alpha\")]\n    if super::super::mii_managed_helper::tracked(entry) {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "new": "            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[cfg(feature=\"mii-managed-helper-alpha\")]\n#[inline(never)]\nunsafe fn decide_helper(entry:usize,selected:usize,native_sp:usize)->usize {\n    {\n        let valid_stack=native_sp.is_multiple_of(16) && super::native::span(native_sp,0xf0,false);\n        return if valid_stack && super::super::mii_managed_helper::prequeue(entry,selected) {\n            CONTINUE.load(Ordering::Acquire)\n        } else {\n            super::super::mii_managed_helper::refuse(entry,\"prequeue refused; native epilogue selected\");\n            REFUSE.load(Ordering::Acquire)\n        };\n    }\n}\n#[inline(never)]\nunsafe fn decide_player(entry:usize,selected:usize,native_sp:usize)->usize {\n    if !super::tracked(entry) {return CONTINUE.load(Ordering::Acquire);}",
+     "reason": "stream/stack: the gate callback's three exclusive arms (CPU, managed helper, player) are #[inline(never)] functions, so the callback's frame holds only the arm that runs (it was 20,000 B with all three inlined); no behaviour change (the helper and player arms)"
     }
    ]
   },
@@ -1781,7 +1801,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "483cdc24fe5d890354b2c65e976051e1ee3291077163eab5bc255d620d133154",
+   "dest_sha256": "4c104dcc8e93ecac7b18ecdabfe819516fbe6126e2ce06688d16932fceb4833d",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -1797,6 +1817,16 @@
      "old": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class));",
      "new": "notify(Role::Player,format!(\"Player {:?} choice skipped\",choice.canonical.class).into());",
      "reason": "the notice text is a `Cow<'static, str>` (the notification facade takes one): the skipped-choice text still formats a `String` (a refusal path, listed for the R5 row)"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's\nunsafe fn bank_service(entry:*mut u8,b:BankTrack) {",
+     "reason": "stream/stack: bank_service is #[inline(never)], so its locals no longer sit in the native service callback's `service` frame on every call; no behaviour change"
+    },
+    {
+     "old": "#[cfg(feature=\"native-body-bank-alpha\")]\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8) {",
+     "reason": "stream/stack: mii_group_record_publication is #[inline(never)] (its own frame, not `service`'s); no behaviour change"
     }
    ]
   },

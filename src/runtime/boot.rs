@@ -99,7 +99,7 @@ fn run_inner() {
     published::set_developer_page(developer.developer_page);
     // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
     // background).
-    let migration = import::start();
+    let (migration, captures) = import::start();
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
@@ -127,7 +127,7 @@ fn run_inner() {
     recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
     // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
-    crate::runtime::compat::menu::apply_kept(&loaded);
+    crate::runtime::compat::menu::apply_kept(&*loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
 
@@ -246,7 +246,7 @@ fn run_inner() {
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
-        ui::install(&loaded, input_delay_on)
+        ui::install(&*loaded, input_delay_on)
     } else {
         diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
         ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found }
@@ -352,6 +352,10 @@ fn run_inner() {
     };
     install::write(&line);
     diag_log::flush();
+    // The import's captures run last, on the boot loaders' static stack (free once they and the install line are done).
+    if let Some(pending) = captures {
+        import::start_background(pending);
+    }
 }
 
 /// Diag builds: `diag-poison.txt` (names separated by blanks, commas or lines) marks those rows foreign before any
@@ -543,8 +547,11 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
 /// cleanly (the original kept as `settings.invalid-<n>.json`, the sanitized settings written to the
 /// active path before the original is retired), is `model::settings_file::load`; this only runs it and
 /// logs its notes.
-fn load_settings() -> Settings {
-    crate::runtime::threads::run_joined(ThreadId::SettingsLoad, load_settings_inner).unwrap_or_else(|_| load_settings_inner())
+/// The settings come back boxed (stream/stack): `Settings` is about 8 KB, and moved by value it took two 8 KB slots of the boot
+/// frame on Skyline's 64 KiB thread.
+fn load_settings() -> Box<Settings> {
+    crate::runtime::threads::run_joined(ThreadId::SettingsLoad, || Box::new(load_settings_inner()))
+        .unwrap_or_else(|_| Box::new(load_settings_inner()))
 }
 
 fn load_settings_inner() -> Settings {

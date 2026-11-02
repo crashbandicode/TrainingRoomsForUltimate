@@ -134,13 +134,30 @@ fn every_thread_has_one_static_stack_from_the_table() {
     for row in &THREADS {
         assert_eq!(seen[row.id as usize], 1, "{}: {} static stacks", row.name, seen[row.id as usize]);
     }
-    let loaders: Vec<String> = thread_stacks::BOOT_LOADERS.iter().map(|id| format!("{id:?}")).collect();
-    assert_eq!(shared, [loaders.join(",")], "only the boot loaders share a stack");
+    // Only the boot stack is shared: the joined loaders, one after another, then its one detached last user.
+    let boot: Vec<String> = thread_stacks::BOOT_STACK.iter().map(|id| format!("{id:?}")).collect();
+    assert_eq!(shared, [boot.join(",")], "only the boot stack is shared");
+    let (last, loaders) = thread_stacks::BOOT_STACK.split_last().unwrap();
+    assert_eq!(*last, thread_stacks::BOOT_STACK_LAST);
+    assert!(!thread_stacks::joined(*last), "the last user is the one detached thread on the boot stack");
+    assert_eq!(loaders, thread_stacks::BOOT_LOADERS);
     for id in thread_stacks::BOOT_LOADERS {
-        assert!(thread_stacks::joined(id), "{id:?} shares a stack, so it must be joined");
+        assert!(thread_stacks::joined(id), "{id:?} shares a stack before the last user, so it must be joined");
     }
-    assert!(block.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>") || text.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>"));
-    assert_eq!(thread_stacks::slot_bytes(&thread_stacks::BOOT_LOADERS), THREADS.iter().filter(|r| thread_stacks::joined(r.id)).map(|r| r.bytes).max().unwrap());
+    assert!(text.contains("Slot<{ thread_stacks::slot_bytes(&[$(ThreadId::$id),+]) }>"), "slot sizes come from the table");
+    assert_eq!(
+        thread_stacks::slot_bytes(&thread_stacks::BOOT_STACK),
+        thread_stacks::BOOT_STACK.iter().map(|id| thread_stacks::of(*id).bytes).max().unwrap()
+    );
+}
+
+/// The boot stack's last user starts after the install line (boot's last step), so no joined loader can find it busy.
+#[test]
+fn the_captures_start_after_the_install_line() {
+    let boot = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/boot.rs")).unwrap();
+    let write = boot.rfind("install::write(&line);").expect("install line");
+    let captures = boot.rfind("import::start_background(").expect("captures start");
+    assert!(captures > write, "the captures start after the install line");
 }
 
 #[test]

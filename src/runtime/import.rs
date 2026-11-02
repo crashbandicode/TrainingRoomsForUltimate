@@ -19,9 +19,10 @@ fn roots() -> Roots<'static> {
     Roots { source: Path::new(storage::FORK_ROOT), dest: Path::new(storage::ROOT) }
 }
 
-/// Run the blocking part now and start the background part. Returns the install line's `migration=`
-/// words (`done captures=running skipped_staging=3`, `skipped`, `none`, …).
-pub fn start() -> FixedPath<96> {
+/// Run the blocking part now. Returns the install line's `migration=` words (`done captures=running skipped_staging=3`,
+/// `skipped`, `none`, …) and the background part, which `start_background` runs once boot is done (stream/stack: on the
+/// boot loaders' static stack, which is free by then).
+pub fn start() -> (FixedPath<96>, Option<Blocking>) {
     let blocking = crate::runtime::threads::run_joined(crate::model::thread_stacks::ThreadId::Import, || {
         run_blocking(roots(), clock::uptime_ms(), env!("CARGO_PKG_VERSION"), &mut |line| diagnostic(format_args!("{line}")))
     });
@@ -29,7 +30,7 @@ pub fn start() -> FixedPath<96> {
         Ok(stage) => stage,
         _ => {
             diagnostic(format_args!("[Migration] the import thread did not run"));
-            return words("skipped", None, 0);
+            return (words("skipped", None, 0), None);
         }
     };
     let word = status_word(&stage);
@@ -43,25 +44,25 @@ pub fn start() -> FixedPath<96> {
             // the next boot runs it again.
             let withheld = blocking.marker_withheld();
             if blocking.pending_captures() > 0 {
-                spawn_background(blocking);
-                words(word, Some("running"), staging)
+                (words(word, Some("running"), staging), Some(blocking))
             } else if withheld {
-                words(word, Some("incomplete"), staging)
+                (words(word, Some("incomplete"), staging), None)
             } else {
-                words(word, Some("done"), staging)
+                (words(word, Some("done"), staging), None)
             }
         }
         Stage::NoSource { marker } => {
             if let Err(error) = marker {
                 diagnostic(format_args!("[Migration] marker not written ({error})"));
             }
-            words(word, None, 0)
+            (words(word, None, 0), None)
         }
-        Stage::MarkerPresent => words(word, None, 0),
+        Stage::MarkerPresent => (words(word, None, 0), None),
     }
 }
 
-fn spawn_background(blocking: Blocking) {
+/// The captures (boot's last step, after the install line): on the boot loaders' stack, which nothing uses after them.
+pub fn start_background(blocking: Blocking) {
     let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::ImportCaptures, move || {
         let (receipt, marker) = run_background(roots(), blocking, &mut |line| diagnostic(format_args!("{line}")));
         match marker {
