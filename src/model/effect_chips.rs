@@ -208,6 +208,17 @@ mod tests {
     }
 
     #[test]
+    fn equal_layer_ratios_keep_the_first_sampler_zero_picture() {
+        let candidates = [
+            Candidate { sampler: 1, width: 1, height: 1000 },
+            Candidate { sampler: 0, width: 64, height: 128 },
+            Candidate { sampler: 0, width: 128, height: 256 },
+        ];
+        assert_eq!(pick_layer(ChipVisual::Di, &candidates), Some(1));
+        assert_eq!(pick_layer(ChipVisual::Sdi, &candidates), Some(1));
+    }
+
+    #[test]
     fn the_layer_runs_from_the_centre_along_the_direction() {
         let p = place(ChipVisual::Di, 90.0, 100.0, 50.0, 184.0, 64, 256);
         let reach = REACH * 184.0;
