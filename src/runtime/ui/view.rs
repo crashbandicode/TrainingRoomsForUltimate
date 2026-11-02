@@ -43,6 +43,15 @@ impl Panes {
         pane::set_text_color(pane, p::linear(color));
     }
 
+    /// Position and width of a text pane (the row panes serve the list and the direction grid's panel).
+    unsafe fn place(&self, index: usize, x: f32, y: f32, w: f32) {
+        let pane = self.all[index];
+        if !pane.is_null() {
+            pane::set_pos(pane, x, y);
+            pane::set_width(pane, w);
+        }
+    }
+
     unsafe fn at(&self, index: usize, x: f32, y: f32) {
         let pane = self.all[index];
         if !pane.is_null() {
@@ -99,13 +108,20 @@ impl Panes {
         let list = frame.view == View::List;
         self.draw_chips(frame);
         self.draw_tiles(frame);
-        // Rows.
+        // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
+        let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; p::ROWS] };
         for i in 0..p::ROWS {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
+                self.place(p::row_label_index(i), p::ROW_LEFT + p::ROW_LABEL_W / 2.0, p::row_y(i), p::ROW_LABEL_W);
+                self.place(p::row_value_index(i), p::ROW_RIGHT - p::ROW_VALUE_W / 2.0, p::row_y(i) - p::VALUE_DROP, p::ROW_VALUE_W);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
                 self.text(p::row_value_index(i), row.value.units(), tone_color(row.value_tone));
-                self.at(p::row_value_index(i), p::ROW_RIGHT - p::ROW_VALUE_W / 2.0, p::row_y(i) - p::VALUE_DROP);
+            } else if let Some((name, weight, tone)) = panel[i] {
+                self.place(p::row_label_index(i), PANEL_X + PANEL_NAME_W / 2.0, p::row_y(i), PANEL_NAME_W);
+                self.place(p::row_value_index(i), PANEL_X + PANEL_NAME_W + PANEL_WEIGHT_W / 2.0, p::row_y(i) - p::VALUE_DROP, PANEL_WEIGHT_W);
+                self.text(p::row_label_index(i), name.units(), tone_color(tone));
+                self.text(p::row_value_index(i), weight.units(), tone_color(tone));
             } else {
                 self.text(p::row_label_index(i), &[], p::TEXT);
                 self.text(p::row_value_index(i), &[], p::TEXT);
@@ -123,6 +139,43 @@ impl Panes {
         self.text(p::IDX_HELP + 1, frame.help[1].units(), p::TEXT);
         self.text(p::IDX_HINT, frame.hint.units(), p::TEXT_DIM);
     }
+}
+
+/// Where the "Selected (weight)" panel of the direction grids sits: right of the chips (they end at x = 480).
+const PANEL_X: f32 = 560.0;
+const PANEL_NAME_W: f32 = 240.0;
+const PANEL_WEIGHT_W: f32 = 110.0;
+
+type PanelLine = Option<(crate::model::frame::Text<24>, crate::model::frame::Text<8>, Tone)>;
+
+/// The panel's lines (mockup 09): a header, then each chip with a weight in chip order, `xN` at the right;
+/// "none selected" while the grid is empty.
+fn selected_panel(frame: &Frame) -> [PanelLine; p::ROWS] {
+    use core::fmt::Write;
+    let mut lines: [PanelLine; p::ROWS] = [None; p::ROWS];
+    let mut put = |at: usize, name: &str, weight: Option<u8>, tone: Tone| {
+        if let Some(slot) = lines.get_mut(at) {
+            let mut n = crate::model::frame::Text::<24>::new();
+            let mut w = crate::model::frame::Text::<8>::new();
+            let _ = n.write_str(name);
+            if let Some(weight) = weight {
+                let _ = write!(w, "x{weight}");
+            }
+            *slot = Some((n, w, tone));
+        }
+    };
+    put(0, "Selected (weight)", None, Tone::Normal);
+    let mut next = 1;
+    for (i, weight) in frame.chip_weights.iter().enumerate().take(p::CHIPS) {
+        if *weight != 0 {
+            put(next, DIRECTIONS[i], Some(*weight), Tone::On);
+            next += 1;
+        }
+    }
+    if next == 1 {
+        put(1, "none selected", None, Tone::Dim);
+    }
+    lines
 }
 /// Where a chip's pointer stub sits and how far it is turned: the direction each chip stands for, in degrees
 /// (counter-clockwise from the right; In / Out are the screen's left / right here, the menu mirrors them

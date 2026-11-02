@@ -60,22 +60,46 @@ unsafe fn archive_alloc(ctx: &mut InlineCtx) {
     }
     #[cfg(feature = "diag")]
     dump_stock(stock);
-    match archive_recipe::build(stock, RECIPE) {
-        Ok(built) => {
-            let (pointer, len) = (built.as_ptr() as u64, built.len() as u64);
-            park(built);
-            ctx.registers[21].set_x(pointer);
-            ctx.registers[1].set_x(len);
-            ctx.registers[23].set_x(len);
-            ctx.registers[24].set_x(len);
-            diagnostic(format_args!("[LayoutArchive] handed out info_training bytes={len} stock={size}"));
-        }
+    let (built, base, via) = match archive_recipe::build(stock, RECIPE) {
+        Ok(built) => (built, size, "stock"),
         Err(reason) => {
-            diagnostic(format_args!("[LayoutArchive] stock info_training kept: {reason} (layout_arc=skipped)"));
+            // B3 (decided 2026-11-01): another mod replaced the Training layout archive. Inject anyway on the vanilla
+            // archive, read through ARCropolis's `arc:/` view (the vanilla view, SPEC-core-07 U2); the other mod's Training
+            // HUD does not show while this plugin is installed.
+            match vanilla_base().map(|vanilla| (archive_recipe::build(&vanilla, RECIPE), vanilla.len())) {
+                Some((Ok(built), len)) => {
+                    diagnostic(format_args!("[LayoutArchive] stock info_training differs ({reason}); injected on the vanilla archive read through arc:/ bytes={len} (layout=other-mod)"));
+                    (built, len, "vanilla")
+                }
+                other => {
+                    let why = match other {
+                        Some((Err(error), _)) => format!("vanilla base refused: {error}"),
+                        _ => "vanilla base not readable".to_string(),
+                    };
+                    diagnostic(format_args!("[LayoutArchive] stock info_training kept: {reason}; {why} (layout_arc=skipped)"));
+                    return;
+                }
+            }
         }
-    }
+    };
+    let (pointer, len) = (built.as_ptr() as u64, built.len() as u64);
+    park(built);
+    ctx.registers[21].set_x(pointer);
+    ctx.registers[1].set_x(len);
+    ctx.registers[23].set_x(len);
+    ctx.registers[24].set_x(len);
+    diagnostic(format_args!("[LayoutArchive] handed out info_training bytes={len} stock={base} base={via}"));
 }
 
+/// The archive path of the Training HUD layout (found 2026-11-02 from `data.arc`: the one `layout.arc` entry of the stock
+/// size 451,604 B, path hash40 `0x3575fbb045`, which this string reproduces).
+const VANILLA_PATH: &str = "arc:/ui/layout/info/info_training/info_training/layout.arc";
+
+/// The vanilla Training layout archive (bounded: a layout archive is about 450 KB).
+fn vanilla_base() -> Option<Vec<u8>> {
+    let bytes = std::fs::read(VANILLA_PATH).ok()?;
+    (MIN_STOCK_BYTES..=MAX_STOCK_BYTES).contains(&bytes.len()).then_some(bytes)
+}
 fn park(bytes: Vec<u8>) {
     if let Ok(mut parked) = PARKED.lock() {
         parked.push(Parked { handed_out_ms: clock::uptime_ms(), bytes });

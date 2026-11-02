@@ -3,7 +3,7 @@
 # output folders. Refuses while eden.exe runs or without this root's CLAIM. Every NRO is checked against sha256.txt in the
 # set folder; whatever was in the plugins folder and the earlier outputs are archived under <Root>\runs\<Label>-prev, nothing is deleted.
 #   ally-stage.ps1 -Label s5-01 -Set C:\Eden\trainingrooms-pkg5\nro\release [-Settings <settings.json>]
-param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Set, [string]$Settings = '', [string]$DeveloperIni = '', [switch]$Arc,
+param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Set, [string]$Settings = '', [string]$DeveloperIni = '', [switch]$Arc, [string]$ExtraMods = '',
       [string]$Root = 'C:\Eden\trainingrooms-pkg5', [string]$Owner = 'trainingrooms-pkg5-0caa72b8-sonnet55')
 $ErrorActionPreference = 'Stop'
 if ($Label -notmatch '^s5-\d{2}$') { throw 'label' }
@@ -37,4 +37,5 @@ foreach ($d in 'arcropolis', 'mods') {
     if (Test-Path "$U\$d") { Move-Item "$U\$d" "$prev\$d" -Force }
     if ($Arc) { Copy-Item "$Root\fixtures\$d" "$U\$d" -Recurse }
 }
+if ($Arc -and $ExtraMods) { Copy-Item "$Root\fixtures\$ExtraMods\*" "$U\mods" -Recurse; 'extra mods: ' + $ExtraMods }
 Get-ChildItem $PL -Filter *.nro | Sort-Object Name | ForEach-Object { '{0}  {1}' -f (Sha $_.FullName), $_.Name }

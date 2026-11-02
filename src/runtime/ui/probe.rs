@@ -88,11 +88,8 @@ fn worker(size: usize, load: usize) {
         "ui/replace/stage/stage_1/stage_1_battlefield.bntx",
         "ui/replace_patch/stage/stage_1/stage_1_battlefields.bntx",
         "ui/message/msg_name.msbt",
-        // B3: the Training HUD layout archive (the stock one is 451,604 B, fnv 8833748e9518a461); candidate paths.
-        "ui/layout/info/info_training/layout.arc",
-        "ui/layout/menu/info_training/layout.arc",
-        "ui/layout/training/info_training/layout.arc",
-        "ui/layout/info_training/layout.arc",
+        // B3: the Training HUD layout archive (stock 451,604 B, fnv 8833748e9518a461; path from data.arc, hash40 0x3575fbb045).
+        "ui/layout/info/info_training/info_training/layout.arc",
         "effect/system/common/ef_common.eff",
     ] {
         probe_path(path, size, load);
