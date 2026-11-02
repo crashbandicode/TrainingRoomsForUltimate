@@ -197,12 +197,12 @@ def prep(label, nros, settings, diag_txt, sd_files=()):
         receipt["settings"] = (out / "settings.json").read_text(encoding="utf-8")
     if diag_txt:
         shutil.copyfile(diag_txt, out / "diag.txt")
+        receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
     receipt["sd_files"] = {}
     for spec, rel in zip(sd_files, extra):  # <src>:<path under sdmc>, a real copy
         (PROFILE / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(spec.partition(":")[0], PROFILE / rel)
         receipt["sd_files"][str(rel)] = digest(PROFILE / rel)
-        receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / f"PREP-{label}.json").write_text(json.dumps(receipt, indent=2) + "\n")
     return receipt
