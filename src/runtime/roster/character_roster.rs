@@ -3,6 +3,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use hos_lock::Mutex as OwnerMutex;
 
 use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingModpackMenu, crate::engine::swap::trio::TrioFighter, crate::runtime::compat::menu::MENU};
@@ -168,8 +169,8 @@ static SOLO_ACTIVE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(f
 /// Set by `allow_portrait` when native reset rebuilt a role's Mii publication. Value-only:
 /// that role's next service callback revalidates the receipt and body, then republishes.
 static REBUILT: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
-static STATES: [Mutex<State>; 2] = [Mutex::new(State::empty()), Mutex::new(State::empty())];
-static WAITING_MEMORY: Mutex<WaitingSession<WaitingValue>> = Mutex::new(WaitingSession::empty());
+static STATES: [OwnerMutex<State>; 2] = [OwnerMutex::new(State::empty()), OwnerMutex::new(State::empty())];
+static WAITING_MEMORY: OwnerMutex<WaitingSession<WaitingValue>> = OwnerMutex::new(WaitingSession::empty());
 type WaitingValue=crate::engine::mii::remembered::Value<TrioFighter,Forms>;
 
 /// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.
@@ -184,7 +185,7 @@ pub(crate) enum PortraitIntent {
 #[cfg(feature="mii-saved-alpha")]
 fn remember_owned(role:Role,generation:u64,kind:u32,forms:Forms,
     configuration:Option<crate::engine::mii::lifetime::Configuration>,cursor:Option<usize>,original:bool) {
-    let mut memory=WAITING_MEMORY.lock().unwrap();
+    let mut memory=WAITING_MEMORY.lock();
     if !mii_backend::current().is_some_and(|l|l.waiting())
         || mii_saved_alpha::current_generation(role as u32)!=generation {return;}
     if let Some(fighter)=TrioFighter::from_kind(kind) {
@@ -216,7 +217,7 @@ fn restore_owned(role:Role,value:WaitingValue)->bool {
 fn observe_mii_origin(role:Role,generation:u64,kind:u32,forms:Forms,
     configuration:Option<crate::engine::mii::lifetime::Configuration>) {
     let (Some(configuration),Some(fighter))=(configuration,TrioFighter::from_kind(kind)) else{return;};
-    let mut memory=WAITING_MEMORY.lock().unwrap();
+    let mut memory=WAITING_MEMORY.lock();
     if !mii_backend::current().is_some_and(|l|l.waiting())
         || mii_saved_alpha::current_generation(role as u32)!=generation {return;}
     // observe preserves a same-lobby remembered choice; a fresh room clears both roles.
@@ -251,7 +252,7 @@ impl Role {
     }
 }
 
-fn state_for(role: Role) -> &'static Mutex<State> {
+fn state_for(role: Role) -> &'static OwnerMutex<State> {
     &STATES[role as usize]
 }
 
@@ -358,7 +359,7 @@ pub(crate) fn preload_blocked() -> bool {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
     if INSTALL.active() || crate::runtime::roster::kirby_hats::preload_pending()
-        || STATES.iter().any(|s| {let s=s.lock().unwrap();
+        || STATES.iter().any(|s| {let s=s.lock();
             s.pending.is_some() || s.active.is_some()}) {return true;}
     #[cfg(feature="mii-ordinary-player-alpha")]
     if mii_ordinary_player::preload_pending() {return true;}
@@ -375,7 +376,7 @@ pub(crate) fn notice_blocked() -> bool {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
     if INSTALL.suspends_practice()
-        || STATES.iter().any(|s| {let s=s.lock().unwrap();
+        || STATES.iter().any(|s| {let s=s.lock();
             s.pending.is_some() || s.active.is_some()}) {return true;}
     #[cfg(feature="mii-ordinary-player-alpha")]
     if mii_ordinary_player::preload_pending() {return true;}
@@ -396,7 +397,7 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     if role==Role::Cpu {
         if let Some(targets)=mii_ordinary_cpu::preload_targets(menu) {return targets;}
     }
-    let (mut current,mut cursor)={let s=state_for(role).lock().unwrap();
+    let (mut current,mut cursor)={let s=state_for(role).lock();
         let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
     let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
     for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}
@@ -416,16 +417,16 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
 /// Mii transitions, instead of acting on a briefly ready CSS body after return.
 pub fn waiting_choice_settled(role: usize) -> bool {
     if busy() { return false; }
-    if STATES[role].lock().unwrap().observed.is_none_or(|(_, kind)| kind != 6) {
+    if STATES[role].lock().observed.is_none_or(|(_, kind)| kind != 6) {
         return false;
     }
     // The other role's automatic replacement would cancel a newly queued hat.
     // Wait for both, without nesting roster/memory locks into hat acquisition.
     if STATES.iter().any(|state| {
-        let state = state.lock().unwrap();
+        let state = state.lock();
         state.pending.is_some() || state.active.is_some()
     }) { return false; }
-    let memory = WAITING_MEMORY.lock().unwrap();
+    let memory = WAITING_MEMORY.lock();
     !memory.restoration_pending([Role::Player.enabled(), Role::Cpu.enabled()])
 }
 
@@ -436,10 +437,10 @@ pub fn waiting_drafts_ready() -> bool {
     if busy() { return false; }
     if !cfg!(feature = "waiting-roster-reload") { return true; }
     if STATES.iter().any(|state| {
-        let state = state.lock().unwrap();
+        let state = state.lock();
         state.observed.is_none() || state.pending.is_some() || state.active.is_some()
     }) { return false; }
-    !WAITING_MEMORY.lock().unwrap()
+    !WAITING_MEMORY.lock()
         .restoration_pending([Role::Player.enabled(), Role::Cpu.enabled()])
 }
 
@@ -594,7 +595,7 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
     }
     for role in [Role::Player, Role::Cpu] {
         if roster(previous, role) != roster(&current, role) {
-            let mut state = state_for(role).lock().unwrap();
+            let mut state = state_for(role).lock();
             state.revision = state.revision.wrapping_add(1);
             // A numbered fighter keeps its slot intent through an edit (Ice Climbers can be
             // both slot 0 and numbered). A removed entry keeps a stale hint: the
@@ -693,14 +694,14 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
         return;
     }
-    let mut state = state_for(role).lock().unwrap();
+    let mut state = state_for(role).lock();
     // The callback's restore peek may race a manual request. The role lock also
     // protects manual enqueue/cancellation: never overwrite newer explicit intent.
     if restoring
         && (state.pending.is_some()
             || state.active.is_some()
             || !matches!(selection, Selection::Direct(target)
-                if WAITING_MEMORY.lock().unwrap().restore_target(role as usize).is_some_and(|v|!v.owned && v.fighter==target)))
+                if WAITING_MEMORY.lock().restore_target(role as usize).is_some_and(|v|!v.owned && v.fighter==target)))
     {
         return;
     }
@@ -724,7 +725,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         restoring,
     });
     if scope.waiting() && !restoring && !matches!(selection, Selection::RefreshPartners) {
-        WAITING_MEMORY.lock().unwrap().manual_request(role as usize);
+        WAITING_MEMORY.lock().manual_request(role as usize);
     }
     trace!(
         "[CharacterRoster] queued owner={} entry=0x{:x} epoch={} selection={:?}",
@@ -746,7 +747,7 @@ pub fn cpu_reload_ready() -> bool {
     {
         return false;
     }
-    let state = state_for(Role::Cpu).lock().unwrap();
+    let state = state_for(Role::Cpu).lock();
     state.pending.is_none() && state.observed.is_some() && scope(Role::Cpu).is_some()
 }
 
@@ -757,11 +758,11 @@ pub fn request_cpu_kind(kind: u32) -> bool {
         notify(Role::Cpu, "Named macro fighter is not available".into());
         return false;
     };
-    if state_for(Role::Cpu).lock().unwrap().pending.is_some() {
+    if state_for(Role::Cpu).lock().pending.is_some() {
         return false;
     }
     queue(Role::Cpu, Selection::Direct(fighter));
-    state_for(Role::Cpu).lock().unwrap().pending.is_some_and(
+    state_for(Role::Cpu).lock().pending.is_some_and(
         |request| matches!(request.selection, Selection::Direct(target) if target == fighter),
     )
 }
@@ -873,7 +874,6 @@ pub fn scene_changed(mode: game_mode::Mode) {
     mii_reload_probe::scene_changed();
     let same_lobby = WAITING_MEMORY
         .lock()
-        .unwrap()
         .scene_changed(mode.initialized, mode.melee, mode.mode);
     crate::runtime::roster::kirby_hats::scene_changed(same_lobby);
     training::named_macros::waiting_scene_changed(same_lobby);
@@ -882,7 +882,7 @@ pub fn scene_changed(mode: game_mode::Mode) {
     for role in [Role::Player, Role::Cpu] {
         ORIGINAL_KINDS[role as usize].store(u32::MAX, Ordering::Release);
         SOLO_ACTIVE[role as usize].store(false, Ordering::Release);
-        let mut state = state_for(role).lock().unwrap();
+        let mut state = state_for(role).lock();
         state.epoch = state.epoch.wrapping_add(1);
         state.pending = None;
         state.cursor = None;
@@ -1071,7 +1071,7 @@ pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, k
 pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
     native_source::training_cpu_quantity() == Some(1)
         && STATES.iter().all(|state| {
-            let state = state.lock().unwrap();
+            let state = state.lock();
             state.active.is_none() && state.pending.is_none() && state.loaded.is_none()
         })
 }
@@ -1146,7 +1146,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     if mii_reload_probe::service(entry, owner, role, _caller_lr) {
         return;
     }
-    let active = state_for(role).lock().unwrap().active;
+    let active = state_for(role).lock().active;
     if let Some(mut active) = active {
         if active.entry != entry as usize || active.scope.owner != owner {
             return;
@@ -1173,7 +1173,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             && read::<u32>(entry, 0x18) == active.target.kind()
             && read::<u8>(entry, 0x5918) == 0
         {
-            let mut state = state_for(role).lock().unwrap();
+            let mut state = state_for(role).lock();
             if state.epoch != active.epoch
                 || state.active.map(|current| current.install) != Some(active.install)
             {
@@ -1189,7 +1189,6 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             if active.scope.waiting() {
                 WAITING_MEMORY
                     .lock()
-                    .unwrap()
                     .commit(role as usize, WaitingValue::ordinary(active.target,active.forms,active.slot));
             }
             drop(state);
@@ -1224,7 +1223,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 && ready_forms(entry, owner) == Some((active.forms, active.target.kind()))
                 && read::<u8>(entry, 0x5918) == 0
             {
-                let mut state = state_for(role).lock().unwrap();
+                let mut state = state_for(role).lock();
                 if state.active.map(|current| current.install) == Some(active.install) {
                     state.active = None;
                     drop(state);
@@ -1236,7 +1235,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             if active.ticks == 600 {
                 trace!("[CharacterRoster] reload stalled owner={} phase=0x{:x} departed={}; no forced native advance", owner, phase, active.departed);
             }
-            let mut state = state_for(role).lock().unwrap();
+            let mut state = state_for(role).lock();
             if let Some(current) = state.active.as_mut() {
                 if current.entry == active.entry && current.epoch == active.epoch {
                     // Preserve a scene-change cancellation from another callback.
@@ -1250,7 +1249,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     if INSTALL.active() {
         return;
     } // Serialize player and CPU resource mutations.
-    let request = state_for(role).lock().unwrap().pending;
+    let request = state_for(role).lock().pending;
     let Some(mut request) = request else {
         // Display the live fighter in the picker, including the initial CSS choice.
         // This permits choosing the same menu fighter again after a cycle.
@@ -1261,7 +1260,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 return;
             };
             if let Some(fighter) = TrioFighter::from_kind(kind) {
-                let mut state = state_for(role).lock().unwrap();
+                let mut state = state_for(role).lock();
                 // A new same-owner preview can coexist with a departing entry
                 // before the mode changes. Keep the identity acquired for this
                 // scene until its destructor or scene invalidation releases it.
@@ -1311,7 +1310,6 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         && !exact_origin_pending
                         && WAITING_MEMORY
                             .lock()
-                            .unwrap()
                             .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));
                     if fresh_lobby {
                         trace!("[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices");
@@ -1332,13 +1330,13 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                     return;
                 }
                 if current_scope.waiting() && role.enabled() {
-                    let target = WAITING_MEMORY.lock().unwrap().restore_target(role as usize);
+                    let target = WAITING_MEMORY.lock().restore_target(role as usize);
                     if let Some(target) = target {
                         if restore_owned(role,target) {return;}
                         if target.fighter.kind() == kind && target.forms==forms {
-                            WAITING_MEMORY.lock().unwrap().commit(role as usize, target);
+                            WAITING_MEMORY.lock().commit(role as usize, target);
                             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, kind);
-                            state_for(role).lock().unwrap().cursor=target.cursor;
+                            state_for(role).lock().cursor=target.cursor;
                             role.sync_selection(target.fighter);
                         } else {
                             queue_request(role, Selection::Direct(target.fighter), true);
@@ -1352,7 +1350,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     if request.scope.owner != owner || request.entry != entry as usize {
         return;
     }
-    let mut state = state_for(role).lock().unwrap();
+    let mut state = state_for(role).lock();
     if request.epoch != state.epoch
         || scope(role) != Some(request.scope)
         || (!role.enabled() && !matches!(request.selection, Selection::RefreshPartners))
@@ -1414,13 +1412,13 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             (target, slot)
         }
     };
-    let remembered=if request.restoring {WAITING_MEMORY.lock().unwrap().restore_target(role as usize)}else{None};
+    let remembered=if request.restoring {WAITING_MEMORY.lock().restore_target(role as usize)}else{None};
     let slot=remembered.map_or(slot,|v|v.cursor);
     let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);
     if ready_forms(entry, owner) == Some((forms, target.kind())) {
         state.cursor = slot;
         if request.scope.waiting() {
-            WAITING_MEMORY.lock().unwrap().commit(role as usize, WaitingValue::ordinary(target,forms,slot));
+            WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));
         }
         drop(state);
         if request.scope.waiting() {
@@ -1539,7 +1537,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
     crate::runtime::mii::mii_identity_probe::forget(entry);
     #[cfg(feature = "mii-identical-reload-probe")]
     mii_reload_probe::on_destroy(entry);
-    let mut state = state_for(role).lock().unwrap();
+    let mut state = state_for(role).lock();
     let practice_departure = role == Role::Player
         && (state
             .observed
@@ -1559,7 +1557,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
                     && a.scope.waiting()
             }))
     {
-        WAITING_MEMORY.lock().unwrap().player_departed();
+        WAITING_MEMORY.lock().player_departed();
     }
     if state.pending.is_some_and(|r| r.entry == entry as usize) {
         trace!(
@@ -1650,7 +1648,7 @@ unsafe fn publish_mii_presentation(
     {
         return;
     }
-    let mut state = state_for(role).lock().unwrap();
+    let mut state = state_for(role).lock();
     if mii_saved_alpha::current_generation(logical as u32) != generation
         || state.active.is_some()
         || state.pending.is_some()
@@ -1728,7 +1726,7 @@ pub unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64, entry: *const u
         return;
     }
     let rebuild = {
-        let state = state_for(role).lock().unwrap();
+        let state = state_for(role).lock();
         state
             .presented
             .rebuild(state.loaded, entry as usize, ctx.registers[0].x() as u32)
@@ -1764,7 +1762,7 @@ unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
     }
     let Some(live) = ready_kind(entry, owner) else { return; };
     let rebuild = {
-        let state = state_for(role).lock().unwrap();
+        let state = state_for(role).lock();
         // Temporary loading and a coexisting preview entry must not consume the
         // visible owner's notification. Its publication or destruction retires it.
         if state.active.is_some() || state.pending.is_some()
@@ -2656,7 +2654,7 @@ pub(crate) mod mii_reload_probe {
             return false;
         };
         {
-            let state = state_for(role).lock().unwrap();
+            let state = state_for(role).lock();
             if state.active.is_some() || state.pending.is_some() {
                 return false;
             }

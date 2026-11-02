@@ -63,6 +63,7 @@
 //!   leak rather than corrupt (`retire_groups` since GROUP-SWAP-IMPL §4.1).
 
 use crate::engine::swap::body_bank::KIRBY;
+use crate::engine::compat::fixed::FixedList;
 
 /// Pad-manager route slots: `S->+0x98` holds sixteen 0x20-byte route objects
 /// (`0x311db0` ticks slots `i` and `i+8` for entries 0..7).
@@ -202,6 +203,108 @@ impl DestroyPlan {
     pub fn is_empty(&self) -> bool { self.steps.is_empty() && self.skipped.is_empty() }
 }
 
+/// The attached window has no mod-owned destruction or key releases. Its entire
+/// action set is bounded by the probed route table plus the separate Nana word.
+#[derive(Clone, Copy, Debug)]
+pub struct AttachedPlan {
+    pub routes: FixedList<RouteRef, { PAD_SLOTS + 1 }>,
+    pub kirby_cells: usize,
+    pub kirby_misplaced: usize,
+    pub kirby_branch_mismatch: usize,
+}
+
+pub fn attached_plan(owner: u32, cells: &[BodyRef], contexts: &[ContextRef], consumers: &NativeConsumers) -> AttachedPlan {
+    let mut routes = FixedList::<RouteRef, { PAD_SLOTS + 1 }>::new(RouteRef { slot: 0, controller: 0 });
+    for route in matching_routes(owner, contexts, consumers) {
+        if !routes.iter().any(|old| old.slot == route.slot) { routes.push(route); }
+    }
+    let [kirby_cells, kirby_misplaced, kirby_branch_mismatch] = kirby_counts(cells);
+    AttachedPlan { routes, kirby_cells, kirby_misplaced, kirby_branch_mismatch }
+}
+
+fn matching_routes<'a>(owner: u32, contexts: &'a [ContextRef], consumers: &'a NativeConsumers)
+    -> impl Iterator<Item = RouteRef> + 'a {
+    let nana = consumers.nana_owner_plus_8.and_then(|controller| {
+        let slot = owner.saturating_add(8);
+        (slot < PAD_SLOTS as u32).then_some(RouteRef { slot: slot as u8, controller })
+    });
+    consumers.pad_routes.iter().flatten().copied().chain(nana).filter(move |route| {
+        route.controller != 0 && unique_contexts(contexts)
+            .any(|context| context.valid && context.controller == route.controller)
+    })
+}
+
+fn kirby_counts(bodies: &[BodyRef]) -> [usize; 3] {
+    let mut counts = [0; 3];
+    for body in bodies.iter().filter(|body| body.valid) {
+        counts[0] += usize::from(body.kind == KIRBY);
+        counts[1] += usize::from(body.misplaced_kirby());
+        counts[2] += usize::from(body.kirby_branch_mismatch());
+    }
+    counts
+}
+
+/// Borrowed value receipts for a detached native group. No pointer is followed
+/// while planning; the caller has already captured and validated these records.
+#[derive(Clone, Copy)]
+pub struct DetachedView<'a> {
+    pub owner: u32,
+    pub bodies: &'a [BodyRef],
+    pub contexts: &'a [ContextRef],
+    pub dispatch: Option<DispatcherRef>,
+    pub records: Option<RecordsRef>,
+    pub held_kinds: &'a [u32],
+}
+
+pub struct DetachedPlan<'a> {
+    pub groups: &'a [DetachedView<'a>],
+    pub consumers: &'a NativeConsumers,
+}
+
+impl DetachedPlan<'_> {
+    /// All non-key actions in finalize order. The one aggregate key release
+    /// follows this iterator; `keys` supplies its first-occurrence ordering.
+    pub fn steps(&self) -> impl Iterator<Item = DestroyStep> + '_ {
+        let routes = self.groups.iter().flat_map(|g| matching_routes(g.owner, g.contexts, self.consumers))
+            .scan([false; 256], |seen, route| {
+                let first = !std::mem::replace(&mut seen[usize::from(route.slot)], true);
+                Some(first.then_some(DestroyStep::ReleasePadRoute { slot: route.slot, controller: route.controller }))
+            }).flatten();
+        let bodies = self.groups.iter().flat_map(|g| g.bodies.iter()).filter(|b| b.valid)
+            .map(|b| DestroyStep::DestroyBody { id: b.id });
+        let contexts = self.groups.iter().flat_map(|g| unique_contexts(g.contexts)).filter(|c| c.valid)
+            .map(|c| DestroyStep::FreeContext { ctx: c.ctx });
+        let dispatchers = self.groups.iter().filter_map(|g| g.dispatch).filter(|d| d.valid)
+            .map(|d| DestroyStep::DestroyDispatchers { arrays: d.arrays });
+        let records = self.groups.iter().filter_map(|g| g.records).filter(|r| r.valid)
+            .map(|r| DestroyStep::DestroyRecords { records: r.records });
+        routes.chain(bodies).chain(contexts).chain(dispatchers).chain(records)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = u32> + '_ {
+        let all = self.groups.iter().flat_map(|g| g.held_kinds.iter().copied());
+        all.clone().enumerate().filter_map(move |(i, key)|
+            (!all.clone().take(i).any(|prior| prior == key)).then_some(key))
+    }
+
+    pub fn skipped(&self) -> impl Iterator<Item = Skipped> + '_ {
+        self.groups.iter().flat_map(|g| {
+            unique_contexts(g.contexts).filter(|c| !c.valid).map(|c| Skipped::Context(c.ctx))
+                .chain(g.bodies.iter().filter(|b| !b.valid).map(|b| Skipped::Body(b.id)))
+                .chain(g.dispatch.filter(|d| !d.valid).map(|d| Skipped::Dispatchers(d.arrays)))
+                .chain(g.records.filter(|r| !r.valid).map(|r| Skipped::Records(r.records)))
+        })
+    }
+
+    pub fn kirby_counts(&self) -> [usize; 3] {
+        self.groups.iter().fold([0; 3], |mut total, group| {
+            let counts = kirby_counts(group.bodies);
+            for i in 0..3 { total[i] += counts[i]; }
+            total
+        })
+    }
+}
+
 /// Phase buckets of one or more bundles, merged in finalize's order.
 #[derive(Default)]
 struct Phases {
@@ -223,55 +326,41 @@ impl Phases {
         if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }
     }
 
-    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).
-    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {
-        for route in consumers.pad_routes.iter().flatten() {
-            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }
-        }
-        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.
-        if let Some(controller) = consumers.nana_owner_plus_8 {
-            let slot = owner.saturating_add(8);
-            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }
-        }
+    /// Every route slot naming a validated context's controller is cleared
+    /// first (D-PTA1c), without allocating a separate controller list.
+    fn routes_for(&mut self, owner: u32, contexts: &[ContextRef], consumers: &NativeConsumers) {
+        for route in matching_routes(owner, contexts, consumers) { self.route(route.slot, route.controller); }
     }
 
     /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the
     /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby
     /// paired with the outgoing Mario body and Mario's header word reported a false mismatch).
     fn kirby(&mut self, bodies: &[BodyRef]) {
-        for body in bodies.iter().filter(|b| b.valid) {
-            if body.kind == KIRBY { self.kirby_cells += 1; }
-            if body.misplaced_kirby() { self.kirby_misplaced += 1; }
-            if body.kirby_branch_mismatch() { self.kirby_branch_mismatch += 1; }
-        }
+        let counts = kirby_counts(bodies);
+        self.kirby_cells += counts[0];
+        self.kirby_misplaced += counts[1];
+        self.kirby_branch_mismatch += counts[2];
     }
 
-    fn contexts_of(&mut self, contexts: &[ContextRef], free: bool) -> Vec<usize> {
-        let mut controllers = Vec::new();
-        let mut seen: Vec<usize> = Vec::new();
-        for context in contexts {
-            if context.ctx == 0 || seen.contains(&context.ctx) { continue; }
-            seen.push(context.ctx);
+    fn detached_contexts(&mut self, contexts: &[ContextRef]) {
+        for context in unique_contexts(contexts) {
             if !context.valid {
-                if free { self.skipped.push(Skipped::Context(context.ctx)); }
+                self.skipped.push(Skipped::Context(context.ctx));
                 continue;
             }
-            if context.controller != 0 { controllers.push(context.controller); }
-            if free { self.contexts.push(context.ctx); }
+            self.contexts.push(context.ctx);
         }
-        controllers
     }
 
     fn attached(&mut self, group: &AttachedGroup, consumers: &NativeConsumers) {
-        let controllers = self.contexts_of(&group.contexts, false);
-        self.routes_for(group.owner, &controllers, consumers);
+        self.routes_for(group.owner, &group.contexts, consumers);
         self.kirby(&group.cells);
         self.attached = Attached::NativeRetiring;
     }
 
     fn detached(&mut self, group: &DetachedGroup, consumers: &NativeConsumers) {
-        let controllers = self.contexts_of(&group.contexts, true);
-        self.routes_for(group.owner, &controllers, consumers);
+        self.detached_contexts(&group.contexts);
+        self.routes_for(group.owner, &group.contexts, consumers);
         self.kirby(&group.bodies);
         for body in &group.bodies {
             if body.valid { self.bodies.push(body.id); } else { self.skipped.push(Skipped::Body(body.id)); }
@@ -298,6 +387,15 @@ impl Phases {
         DestroyPlan { steps, skipped: self.skipped, attached: self.attached, kirby_cells: self.kirby_cells,
             kirby_misplaced: self.kirby_misplaced, kirby_branch_mismatch: self.kirby_branch_mismatch }
     }
+}
+
+/// Native context aliases use the first occurrence, including its validation
+/// result. A later duplicate cannot upgrade an earlier refused context.
+fn unique_contexts(contexts: &[ContextRef]) -> impl Iterator<Item = &ContextRef> {
+    contexts.iter().enumerate().filter_map(|(index, context)| {
+        (context.ctx != 0 && !contexts[..index].iter().any(|prior| prior.ctx == context.ctx))
+            .then_some(context)
+    })
 }
 
 /// The plan for one bundle: an attached window yields its route releases plus

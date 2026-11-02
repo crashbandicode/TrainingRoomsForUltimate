@@ -1,6 +1,6 @@
 //! Item selection runs on P1's native callback. Persist values, not game pointers.
 use std::convert::TryFrom;
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use smash::app::{self, lua_bind::*, sv_battle_object};
@@ -31,7 +31,7 @@ static HAS_PENDING: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "source-capacity-probe")]
 pub(crate) fn capacity_probe_idle() -> bool {
-    PENDING.lock().unwrap().is_none() && !HAS_PENDING.load(Ordering::Acquire)
+    PENDING.lock().is_none() && !HAS_PENDING.load(Ordering::Acquire)
 }
 
 macro_rules! power_functions {
@@ -95,7 +95,7 @@ pub unsafe fn request(choice: usize) {
     // before this callback submits the latest selection.
     sources::cancel(2);
     if let Some(body) = try_get_module_accessor(FighterId::Player) {
-        let mut pending = PENDING.lock().unwrap();
+        let mut pending = PENDING.lock();
         *pending = Some(Pending { body: (*body).battle_object_id, choice, saved: None, age: 0,
             #[cfg(feature = "managed-third-source-alpha")]
             capacity_polls: 0,
@@ -108,7 +108,7 @@ pub unsafe fn request(choice: usize) {
 }
 
 pub fn cancel_pending() {
-    let mut pending = PENDING.lock().unwrap();
+    let mut pending = PENDING.lock();
     *pending = None;
     HAS_PENDING.store(false, Ordering::Release);
     sources::cancel(2);
@@ -120,7 +120,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     if !common::is_training_mode() { cancel_pending(); return; }
     if try_get_module_accessor(FighterId::Player) != Some(body) { return; }
     let pending = {
-        let mut pending = PENDING.lock().unwrap();
+        let mut pending = PENDING.lock();
         HAS_PENDING.store(false, Ordering::Release);
         pending.take()
     };
@@ -197,7 +197,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 }
 
 fn requeue(request: Pending) {
-    let mut pending = PENDING.lock().unwrap();
+    let mut pending = PENDING.lock();
     if pending.is_none() { *pending = Some(request); }
     HAS_PENDING.store(true, Ordering::Release);
 }

@@ -227,7 +227,7 @@ unsafe fn permitted() -> bool {
         && !menu::captures_input() && !INSTALL.active() && !training::save_states::is_loading()
         && !training::recording_or_playback() && !crate::runtime::compat::replay_preview::occupied()
         && [Role::Player, Role::Cpu].iter().all(|&role| {
-            let state = state_for(role).lock().unwrap();
+            let state = state_for(role).lock();
             state.active.is_none() && state.pending.is_none()
         })
 }

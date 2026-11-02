@@ -162,9 +162,9 @@ use crate::engine::seams::native_fields as fields;
 use skyline::hooks::InlineCtx;
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
-use std::sync::Mutex;
+use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
-    count_extra_groups, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
+    count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Members, Phase, Special,
@@ -178,11 +178,12 @@ use crate::engine::preload::cycle_preload_config::Settings;
 use crate::engine::swap::character_forms::{EntryState, Forms};
 use crate::engine::mii::lifetime::Configuration;
 use crate::engine::swap::swap_model::{capabilities, form_class, group_serves, previous_cell_index};
-use crate::engine::swap::swap_model::lifecycle::{destroy_plan_many, AttachedGroup, BodyRef, Bundle, DestroyStep, DetachedGroup, DispatcherRef, RecordsRef};
+use crate::engine::swap::swap_model::lifecycle::{attached_plan, BodyRef, ContextRef, DetachedPlan, DetachedView, DispatcherRef, RecordsRef};
+use crate::engine::compat::fixed::{DebugIter, FixedList, FixedVec};
 use crate::engine::swap::swap_model::copy_registry::{self, RegistryOps};
 use crate::engine::swap::swap_model::fallback::{self, Disposition, Fallback};
 use crate::engine::swap::swap_model::request_bit::{End as LeaseEnd, Lease};
-use crate::engine::swap::swap_model::ledger::{native_window_requests, GroupId, Holder, LedgerRefusal, ReleaseRecipe, Role as LedgerRole};
+use crate::engine::swap::swap_model::ledger::{native_window_requests_fixed as native_window_requests, GroupId, Holder, LedgerRefusal, ReleaseRecipe, Role as LedgerRole};
 use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules};
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
@@ -204,6 +205,9 @@ static SPECIAL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Phase B′ fingerprints (the asynchronous construction path) and the functor vtable slot passed.
 static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
+// Filled before the hooks are enabled; each role moves its storage into its
+// first bank and retains it through every subsequent native bank lifetime.
+static BANK_STORAGE: [Mutex<Option<BankStorage>>; 2] = [Mutex::new(None), Mutex::new(None)];
 static RESERVED: AtomicU8 = AtomicU8::new(0);
 static ROLE_BUDGET: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 // Display targets are not resource reservations: canonical-only original
@@ -474,7 +478,7 @@ fn mii_identity_for(bank: &Bank, lane: &[Option<crate::runtime::roster::cycle_pr
 /// its prefetch registered this hat (`HatPublication::validate_bank`).
 pub(super) fn reachable_mii_group(owner: u32, kind: u32) -> Option<(MiiIdentity, Configuration)> {
     let role = role(owner)?;
-    BANKS[role].lock().unwrap().as_ref().and_then(|bank| bank.groups.iter()
+    BANKS[role].lock().as_ref().and_then(|bank| bank.groups.iter()
         .find(|g| g.state.reachable() && g.members.special() == Special::Mii && g.members.index_of(kind).is_some())
         .and_then(|g| g.identity.zip(g.configuration)))
 }
@@ -489,7 +493,7 @@ pub(super) fn reachable_mii_group(owner: u32, kind: u32) -> Option<(MiiIdentity,
 pub(super) fn mii_setup_admitted(entry: usize, owner: u32, kind: u32) -> Result<(), &'static str> {
     let role = role(owner).ok_or("Mii setup: owner has no bank role")?;
     let (alias, identity, c) = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let bank = state.as_ref().filter(|b| b.owner == owner && !b.departed).ok_or("Mii setup: bank absent")?;
         let (identity, c) = bank.groups.iter()
             .find(|g| g.state.reachable() && g.members.special() == Special::Mii && g.members.index_of(kind).is_some())
@@ -507,7 +511,7 @@ pub(super) fn mii_setup_admitted(entry: usize, owner: u32, kind: u32) -> Result<
 /// (G, its own receipt adopts them) before the bank prefetches the group.
 pub(super) fn pending_mii_publication(owner: u32) -> Option<(usize, MiiIdentity, Configuration)> {
     let role = role(owner)?;
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     let bank = state.as_ref().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed
         && b.swap.is_none() && b.prefetch.is_none())?;
     bank.groups.iter().enumerate().find_map(|(i, g)| {
@@ -528,7 +532,7 @@ pub(super) fn pending_mii_publication(owner: u32) -> Option<(usize, MiiIdentity,
 pub(super) fn mii_charinfo_published(owner: u32, group: usize, identity: MiiIdentity, outcome: Result<(), PublishRefusal>) -> Option<&'static str> {
     let role = role(owner)?;
     let (failed, note) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let bank = state.as_mut().filter(|b| b.owner == owner)?;
         let g = bank.groups.get_mut(group).filter(|g| g.state == GroupState::Planned && g.identity == Some(identity))?;
         match outcome {
@@ -610,8 +614,10 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // (Pyra, PT, IC, the Miis) must not give its share to helper sources, which stay resident for the scene
             // (Yoga swoff2 steps 79-97).
             if !grouped && lane.iter().any(Option::is_some) {
-                let roster = if role == 0 { menu.player_roster.fighters() } else { menu.cpu_roster.fighters() };
-                let cycle: Vec<u32> = roster.iter().map(|fighter| fighter.kind()).collect();
+                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }
+                    else { menu.cpu_roster.fighters_excluding_fixed(None) };
+                let mut cycle = crate::engine::swap::ordered_roster::KindList::new(0);
+                for fighter in roster.iter() { cycle.push(fighter.kind()); }
                 // The `window_lane` rule: a cycle `0x4b` is a member only as this role's Solo Popo.
                 let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
                 let solo = canonical_original(menu, role) != Some(POPO)
@@ -669,8 +675,11 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // never "the first cells" with cell 0 taken as the active fighter.
             let (kinds, count) = members.logical_kinds();
             let extras = if members.is_pair_lead() { count } else { *value };
-            let shown: Vec<u32> = std::iter::once(target)
-                .chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)).collect();
+            let mut shown = crate::engine::compat::fixed::FixedList::<u32, { NATIVE_MEMBERS + 1 }>::new(0);
+            for kind in std::iter::once(target)
+                .chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)) {
+                shown.push(kind);
+            }
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&shown, target, originals[role])
         });
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
@@ -685,7 +694,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     RESERVED.store(helper_reserved.min(usize::from(u8::MAX)) as u8, Ordering::Release);
     // A planned kind alone is not a loaded body. This is a value receipt from
     // the current native callbacks; no pointer is followed on the planner thread.
-    std::array::from_fn(|role| BANKS[role].lock().unwrap().as_ref()
+    std::array::from_fn(|role| BANKS[role].lock().as_ref()
         // This filter reserves occupied native resources, not UI readiness.
         // A failed/lapsed receipt still owns its cells until native retirement.
         .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
@@ -709,14 +718,16 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     };
     let special = special_policy(settings);
     let mut windows = [None; 2];
-    let mut existing: [Vec<Members>; 2] = [Vec::new(), Vec::new()];
+    let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
     for role in 0..2 {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         if let Some(bank) = state.as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
             windows[role] = Some(*bank.members);
             alias[role] = bank.alias;
-            existing[role] = bank.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| *g.members).collect();
+            for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
+                existing[role].push(*group.members);
+            }
         }
     }
     // A lane's Ice Climbers entry is a group candidate only when the role's
@@ -725,9 +736,10 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // switch that admits it: the normal pair for a pair group (`pair_groups`),
     // Solo Popo for a Solo-led ordinary group (`solo_popo_groups`); the pair
     // group wins when both are on.
-    let upcoming: [Vec<u32>; 2] = std::array::from_fn(|role| {
+    let upcoming: [_; 2] = std::array::from_fn(|role| {
+        let mut kinds = crate::engine::compat::fixed::FixedList::<u32, { crate::runtime::roster::cycle_preload::MAX_TARGETS }>::new(0);
         let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
-        lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
+        for kind in lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
             // Configured targets stay canonical, except a lane Mii under the Mii-group policy.
             .filter(|(_, t)| t.configuration.is_none() || (special.mii && (0x48..=0x4a).contains(&t.kind)))
             .filter(|(i, t)| t.kind != POPO
@@ -736,13 +748,14 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     if special.pair { form == Forms::starting(POPO) }
                     else { policy.solo_popo_groups && form == Forms::solo_popo() }
                 }))
-            .map(|(_, t)| t.kind).collect()
+            .map(|(_, t)| t.kind) { kinds.push(kind); }
+        kinds
     });
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
         originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), hats_wanted, pool_free, special });
     let mut bodies = 0usize;
     for role in 0..2 {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) else { continue; };
         for members in planned[role].iter().flatten() {
             if bank.groups.len() >= MAX_EXTRA_GROUPS { break; }
@@ -756,13 +769,13 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     }
                 }
             } else { None };
-            bank.groups.push(Group::planned_with(*members, identity));
+            bank.groups.plan(*members, identity);
             trace!("[GroupSwap] plan owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} pool={}/{} reserve={} hats={} alias={:#x} identity={:?}",
                 bank.owner, bank.groups.len() - 1, &members.kinds()[..members.count()], members.special(), members.count(),
                 settings.ready_fighters, live, capacity, POOL_RESERVE, hats_wanted, alias[role],
                 identity.map(|(i, _)| (i.index, i.tokens)));
         }
-        let counts = count_extra_groups(&bank.groups.iter().map(|g| (*g.members, g.state)).collect::<Vec<_>>());
+        let counts = count_extra_groups_iter(bank.groups.iter().map(|g| (*g.members, g.state)));
         targets[role] = counts.planned;
         let role_bodies: usize = bank.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum();
         GROUP_BODIES[role].store(role_bodies.min(usize::from(u8::MAX)) as u8, Ordering::Release);
@@ -789,13 +802,13 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
-        let counts = match state.lock().unwrap().as_ref()
+        let counts = match state.lock().as_ref()
             .filter(|bank| bank.phase != Phase::Retired && !bank.departed) {
             Some(bank) => {
                 let (kinds, count) = bank.members.logical_kinds();
                 let active = bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind);
                 let extra = reusable_extras(&kinds[..count], active, originals[role]);
-                let groups = count_extra_groups(&bank.groups.iter().map(|g| (*g.members, g.state)).collect::<Vec<_>>());
+                let groups = count_extra_groups_iter(bank.groups.iter().map(|g| (*g.members, g.state)));
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }
                     else { WindowStatus::Busy };
@@ -833,7 +846,7 @@ pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
     // The same rule as `plan()`/`switch()` (WP-I): the holding window or group serves the kind in
     // the requested form (`group_serves`), so a parked pair-lead window reads as ready for the
     // pair and never for Solo. Every window can be left warm (a one-member one by its self-commit).
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.phase == Phase::Ready && !bank.departed && !bank.failed
             && bank.observed.is_some_and(|(_, active)| active != kind)
             && (group_serves(*bank.members, kind, forms).is_some()
@@ -844,7 +857,7 @@ pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
 /// A kind held by any of this role's groups (window or extra): helper look-ahead
 /// must not duplicate it.
 pub(crate) fn group_member(role: usize, kind: u32) -> bool {
-    role < BANKS.len() && BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    role < BANKS.len() && BANKS[role].lock().as_ref().is_some_and(|bank|
         !bank.departed && bank.groups.iter().any(|g| g.state.counts_bodies() && g.members.index_of(kind).is_some()))
 }
 
@@ -856,7 +869,7 @@ pub(crate) fn group_member(role: usize, kind: u32) -> bool {
 /// its native domain (`GroupExchange::permits`); a refusal here fails both roles'
 /// walks, since the Player walk checks every physical owner (C118 D5).
 pub(super) unsafe fn group_header(entry: usize, owner: u32, resource: usize) -> Option<bool> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref().filter(|b| b.entry == entry && b.owner == owner)?;
     let exchange = bank.exchange?;
     Some(ready_group_owner(entry as *const u8, bank)
@@ -868,7 +881,7 @@ pub(super) unsafe fn group_header(entry: usize, owner: u32, resource: usize) -> 
 pub(super) unsafe fn group_rebaseline(entry: usize, owner: u32, epoch: u64,
     before: &[u8; 0x70], after: &[u8; 0x70]) -> bool {
     let Some(role) = role(owner) else { return false; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     let Some(bank) = state.as_ref().filter(|b| b.entry == entry && b.owner == owner) else { return false; };
     bank.exchange.is_some_and(|exchange| ready_group_owner(entry as *const u8, bank)
         .is_some_and(|now| now.epoch == epoch && now.descriptor == *after && exchange.rebaseline(before, now)))
@@ -1024,7 +1037,7 @@ pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], 
             // the live entry (an Original request carries the origin descriptor):
             // the request takes the Reload path below; name the bytes for triage.
             if let Some(current) = fields::read::<[u8; 0x70]>(entry as usize, 0) {
-                let differing: Vec<usize> = (0..0x70).filter(|i| current[*i] != physical.bytes()[*i]).collect();
+                let differing = DebugIter((0..0x70).filter(|i| current[*i] != physical.bytes()[*i]));
                 trace!("[BodyBank] reuse declined owner={} kind={:#x} reason=descriptor bytes differ at {:x?}; Reload path",
                     owner, target, differing);
             }
@@ -1137,7 +1150,7 @@ fn occupancy_of(bank: &Bank, role: usize, copy: Option<u32>) -> Occupancy {
     let mut kinds = KindOccupancy::default();
     kinds.live[role] = bank.observed.map(|(_, kind)| kind);
     for kind in bank.members.kinds().iter().take(bank.members.count()) { kinds.parked[role].insert(*kind); }
-    for group in &bank.groups {
+    for group in bank.groups.iter() {
         if group.state == GroupState::Built {
             for kind in group.members.kinds().iter().take(group.members.count()) { kinds.parked[role].insert(*kind); }
         }
@@ -1152,7 +1165,7 @@ fn occupancy_of(bank: &Bank, role: usize, copy: Option<u32>) -> Occupancy {
 
 /// [`occupancy_of`] for the role's current bank (takes and releases the bank lock).
 fn occupancy_snapshot(role: usize, copy: Option<u32>) -> Occupancy {
-    BANKS[role].lock().unwrap().as_ref().map_or_else(Occupancy::default, |bank| occupancy_of(bank, role, copy))
+    BANKS[role].lock().as_ref().map_or_else(Occupancy::default, |bank| occupancy_of(bank, role, copy))
 }
 
 /// Release the prefetch keys the ledger holds for `group` (`None` = every group), restricted to
@@ -1173,7 +1186,7 @@ unsafe fn release_group_keys(base: usize, role: usize, group: Option<usize>, kin
 
 /// The Mii identity a detached group carries (`None` for every other group).
 fn group_identity(role: usize, group: usize) -> Option<MiiIdentity> {
-    BANKS[role].lock().unwrap().as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.identity)
+    BANKS[role].lock().as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.identity)
 }
 
 /// [`release_group_keys`] for one group, with that group's Mii identity in `r` while its keys go
@@ -1224,7 +1237,7 @@ fn member_recipe(members: Members, kind: u32) -> ReleaseRecipe {
 /// prefetch is in flight for this role.
 fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     let Some(role) = role(owner) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.swap.is_none() && bank.prefetch.is_none() && !bank.departed
             && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()))
 }
@@ -1234,7 +1247,7 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
 fn group_identity_matches(owner: u32, kind: u32, descriptor: &[u8; 0x70]) -> bool {
     let Some(role) = role(owner) else { return false; };
     let Some(wanted) = MiiIdentity::from_descriptor(descriptor) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.groups.iter().any(|g| g.state.reachable() && g.members.index_of(kind).is_some() && g.identity == Some(wanted)))
 }
 
@@ -1295,6 +1308,10 @@ struct Window {
 struct Group {
     // Immutable heap storage lent to the table hooks while this group is in the window.
     members: Box<Members>,
+    data: GroupData,
+}
+
+struct GroupData {
     state: GroupState,
     /// Saved window fields while built and detached.
     saved: Option<Window>,
@@ -1318,14 +1335,56 @@ struct Group {
     publish: PublishAttempts,
 }
 
-impl Group {
-    fn planned_with(members: Members, identity: Option<(MiiIdentity, Configuration)>) -> Self {
+impl GroupData {
+    fn planned(identity: Option<(MiiIdentity, Configuration)>) -> Self {
         let (identity, configuration) = identity.map_or((None, None), |(i, c)| (Some(i), Some(c)));
-        Self { members: Box::new(members), state: GroupState::Planned, saved: None,
+        Self { state: GroupState::Planned, saved: None,
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new() }
     }
+}
+
+impl std::ops::Deref for Group {
+    type Target = GroupData;
+    fn deref(&self) -> &GroupData { &self.data }
+}
+impl std::ops::DerefMut for Group {
+    fn deref_mut(&mut self) -> &mut GroupData { &mut self.data }
+}
+
+/// Exactly the existing native extra-group slots, allocated at boot. Clearing
+/// a bank retires its records without freeing tables borrowed by native hooks.
+struct Groups {
+    slots: Box<[Group; MAX_EXTRA_GROUPS]>,
+    len: usize,
+}
+impl Groups {
+    fn new() -> Self {
+        Self { slots: Box::new(std::array::from_fn(|_| Group {
+            members: Box::new(Members::pair_group()), data: GroupData::planned(None),
+        })), len: 0 }
+    }
+    fn clear(&mut self) { self.len = 0; }
+    fn plan(&mut self, members: Members, identity: Option<(MiiIdentity, Configuration)>) {
+        // The caller holds BANKS and has proved len < MAX_EXTRA_GROUPS.
+        let group = &mut self.slots[self.len];
+        *group.members = members;
+        group.data = GroupData::planned(identity);
+        self.len += 1;
+    }
+}
+impl std::ops::Deref for Groups {
+    type Target = [Group];
+    fn deref(&self) -> &[Group] { &self.slots[..self.len] }
+}
+impl std::ops::DerefMut for Groups {
+    fn deref_mut(&mut self) -> &mut [Group] { &mut self.slots[..self.len] }
+}
+
+struct BankStorage { members: Box<Members>, groups: Groups }
+impl BankStorage {
+    fn new() -> Self { Self { members: Box::new(Members::pair_group()), groups: Groups::new() } }
 }
 
 /// A cross-group request committed in-window; executed at the acknowledgement seam.
@@ -1355,7 +1414,7 @@ struct Bank {
     // consumes this as a refusal, never as successful completion.
     failed: bool,
     /// Extra groups beyond the window (group swap).
-    groups: Vec<Group>,
+    groups: Groups,
     /// Resource owner `R` seen when this window became Ready; identity only.
     alias: usize,
     /// Pinned at the verified exchange, never refreshed from arbitrary live state.
@@ -1369,10 +1428,9 @@ struct Bank {
     pair_logged: bool,
     /// Mii identity of the window group when it is a Mii group (`R` holds it).
     identity: Option<MiiIdentity>,
-    /// Ids of every body that was the window's live member at least once (this
-    /// bank's receipt; bodies keep their id across detach/attach). Feeds the
-    /// teardown protocol's `BodyRef::activated` (WP-K evidence field).
-    activated: Vec<u32>,
+    /// Activation follows exact current body identities across detach/attach.
+    /// Retired identities cannot grow the history or mark a later reused ID.
+    activated: crate::model::body_activation::History<(usize, u32), { (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS }>,
     /// Phase B′: the construction tasks of the group whose words are in the (empty) window,
     /// settled on a later tick (`settle_construction`) or drained before a destroyer.
     construction: Option<Construction>,
@@ -1471,7 +1529,7 @@ unsafe fn ready_group_owner(entry: *const u8, bank: &Bank) -> Option<GroupOwner>
 /// Does not infer ownership from flags4. Only an owned immutable descriptor plus
 /// a current complete body receipt admits a bank to shared readiness readers.
 pub(crate) unsafe fn ready_members(entry: *const u8, owner: u32) -> Option<Members> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref()?;
     if bank.owner != owner || bank.phase != Phase::Ready || !descriptor(entry, bank) {
         return None;
@@ -1505,7 +1563,7 @@ unsafe fn pair_lead_owner(entry: *const u8) -> Option<u32> {
 unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
     if !aligned(entry) { return None; }
     let owner = read::<u32>(entry, 0xe0);
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     state.as_ref().filter(|bank| bank.members.is_pair() && descriptor(entry, bank)).map(|bank| (owner, *bank.members))
 }
 
@@ -1515,7 +1573,7 @@ unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
 /// receipt, so a native CPU Behavior change keeps the active member's identity
 /// for the next cycle instead of falling back to the group's first kind.
 pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> Option<u32> {
-    let state = BANKS[role(owner)?].lock().unwrap();
+    let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref()?;
     if bank.entry != entry || bank.owner != owner || bank.departed || bank.phase != Phase::Ready {
         return None;
@@ -1530,7 +1588,7 @@ pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> 
 /// No timeout, address alone, or partly constructed entry makes a refusal.
 pub(super) fn failed(entry: *const u8, owner: u32) -> bool {
     let Some(role) = role(owner) else { return false; };
-    BANKS[role].lock().unwrap().as_ref().is_some_and(|bank|
+    BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.entry == entry as usize && bank.owner == owner && bank.failed)
 }
 
@@ -1542,19 +1600,25 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         || super::ready_forms(entry, owner).is_none() { return false; }
     // The incoming Reload destroys only the window; detached groups go first.
     before_reload(entry);
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     // Reload is asynchronous. Even if the outgoing canonical descriptor still
     // looks ready, do not replace storage borrowed by an in-flight constructor.
     if state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Building | Phase::Changing)) {
         return false;
     }
+    let mut storage = match state.take() {
+        Some(bank) => BankStorage { members: bank.members, groups: bank.groups },
+        None => BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"),
+    };
+    *storage.members = members;
+    storage.groups.clear();
     *state = Some(Bank {
         entry: entry as usize, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
-        members: Box::new(members), phase: Phase::Building,
+        members: storage.members, phase: Phase::Building,
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
-        groups: Vec::new(), alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
-        pair_logged: false, identity: None, activated: Vec::new(),
+        groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
+        pair_logged: false, identity: None, activated: Default::default(),
         construction: None, tick: TickGap::default(),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
@@ -1600,14 +1664,16 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     // refuses a group request below, as before; the window's own live member decides the copy.
     let copy = live_kirby_copy_kind(entry, owner, members);
     let drain = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref() else { return false; };
         let target_group = bank.groups.iter().position(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some());
         let kirby_target = !capabilities(form_class(kind, forms)).prefetch_while_live;
         let pair_target = target_group.is_some_and(|g| bank.groups[g].state == GroupState::Prefetched
             && pair_resource_references(*bank.groups[g].members).is_some());
-        let holders: Vec<usize> = bank.groups.iter().enumerate()
-            .filter(|(i, g)| g.state == GroupState::Prefetched && Some(*i) != target_group).map(|(i, _)| i).collect();
+        let mut holders = crate::engine::compat::fixed::FixedList::<usize, MAX_EXTRA_GROUPS>::new(0);
+        for (i, g) in bank.groups.iter().enumerate() {
+            if g.state == GroupState::Prefetched && Some(i) != target_group { holders.push(i); }
+        }
         ((kirby_target || pair_target) && !holders.is_empty() && bank.prefetch.is_none() && bank.alias != 0)
             .then(|| (holders, occupancy_of(bank, role, copy), bank.alias,
                 if kirby_target { "Kirby target (drain before live)" } else { "pair build needs an exclusive reset batch" }))
@@ -1615,9 +1681,9 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     if let Some((holders, occupancy, alias, why)) = drain {
         let base = BASE.load(Ordering::Acquire);
         if resource(base, owner) == Some(alias) && resource_ready(alias) {
-            for group in holders {
+            for group in holders.iter().copied() {
                 let (released, kept) = release_group_keys_of(base, role, alias, group, &occupancy, owner, why);
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 let Some(bank) = state.as_mut() else { return false; };
                 let Some(g) = bank.groups.get_mut(group) else { continue; };
                 g.state = GroupState::Planned;
@@ -1630,7 +1696,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
             }
         }
     }
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return false; };
     if bank.departed || bank.phase != Phase::Ready || !descriptor(entry, bank) { return false; }
     let (target, swap) = match group_serves(members, kind, forms) {
@@ -1703,7 +1769,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
 }
 
 unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return Action::None; };
     if bank.owner != owner || bank.entry != entry as usize || bank.phase == Phase::Retired {
         return Action::None;
@@ -1749,7 +1815,17 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
         }
         if let Some(now) = now {
             bank.observed = Some((read(entry, 0), members.kinds()[index as usize]));
-            if !bank.activated.contains(&now[usize::from(index)].id) { bank.activated.push(now[usize::from(index)].id); }
+            let mut live = [(0usize, 0u32); (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS];
+            for (slot, body) in live[..NATIVE_MEMBERS].iter_mut().zip(now) {
+                *slot = (body.address, body.id);
+            }
+            for (group, records) in bank.groups.iter().zip(live[NATIVE_MEMBERS..].chunks_mut(NATIVE_MEMBERS)) {
+                for (slot, body) in records.iter_mut().zip(group.bodies) {
+                    *slot = (body.address, body.id);
+                }
+            }
+            let active = now[usize::from(index)];
+            bank.activated.observe(live, (active.address, active.id));
             if bank.phase == Phase::Changing && (index != bank.target || now != bank.bodies) {
                 // Native is already ready and all current children pass their
                 // full proof. Retire this operation, not the native resources.
@@ -1910,18 +1986,70 @@ unsafe fn registered_kind(r: Option<usize>, cell: usize) -> Option<u32> {
 /// K15 (`swap_model::copy_packages`): the member sets this bank may register, as descriptor words:
 /// the attached window and every group that holds keys or bodies. While no group does, nothing:
 /// the window's registration stays native's own.
-fn copy_package_sets(bank: &Bank) -> Vec<[u32; NATIVE_MEMBERS]> {
+type CopyPackageSets = crate::engine::swap::swap_model::copy_packages::PackageSets;
+
+/// One native group's value-only teardown receipt. Bounds are its three cells,
+/// three context words, and those members plus the special-object prefetch key.
+#[derive(Clone, Copy)]
+struct DetachedSnapshot {
+    owner: u32,
+    bodies: FixedList<BodyRef, NATIVE_MEMBERS>,
+    contexts: FixedList<ContextRef, NATIVE_MEMBERS>,
+    dispatch: Option<DispatcherRef>,
+    records: Option<RecordsRef>,
+    held_kinds: FixedList<u32, { NATIVE_MEMBERS + 1 }>,
+}
+impl DetachedSnapshot {
+    fn new(owner: u32) -> Self {
+        Self { owner,
+            bodies: FixedList::new(BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None }),
+            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false }),
+            dispatch: None, records: None, held_kinds: FixedList::new(0) }
+    }
+    fn view(&self) -> DetachedView<'_> {
+        DetachedView { owner: self.owner, bodies: &self.bodies, contexts: &self.contexts,
+            dispatch: self.dispatch, records: self.records, held_kinds: &self.held_kinds }
+    }
+}
+
+fn detached_keys(plan: &DetachedPlan<'_>) -> FixedList<u32, { MAX_EXTRA_GROUPS * (NATIVE_MEMBERS + 1) }> {
+    let mut keys = FixedList::new(0);
+    for key in plan.keys() { keys.push(key); }
+    keys
+}
+
+enum DispatchNote { Destroyed(bool, [usize; 2]), Leaked([usize; 2]) }
+impl std::fmt::Display for DispatchNote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Destroyed(destroyed, arrays) => write!(f, "dispatch_destroyed={} arrays={:x?}", destroyed, arrays),
+            Self::Leaked(dispatch) => write!(f, "dispatch_leaked={:x?}", dispatch),
+        }
+    }
+}
+
+struct MemberSets<'a>(&'a [Members]);
+impl std::fmt::Debug for MemberSets<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut list = f.debug_list();
+        for members in self.0 { list.entry(&&members.kinds()[..members.count()]); }
+        list.finish()
+    }
+}
+
+fn copy_package_sets(bank: &Bank) -> CopyPackageSets {
     let words = |members: Members| {
         let mut words = [u32::MAX; NATIVE_MEMBERS];
         let count = members.count().min(NATIVE_MEMBERS);
         words[..count].copy_from_slice(&members.kinds()[..count]);
         words
     };
-    let groups: Vec<[u32; NATIVE_MEMBERS]> = bank.groups.iter()
-        .filter(|g| g.state.holds_keys() || g.state == GroupState::Built)
-        .map(|g| words(*g.members)).collect();
-    if groups.is_empty() { return Vec::new(); }
-    std::iter::once(words(*bank.members)).chain(groups).collect()
+    let mut sets = CopyPackageSets::new([u32::MAX; NATIVE_MEMBERS]);
+    for group in bank.groups.iter().filter(|g| g.state.holds_keys() || g.state == GroupState::Built) {
+        if sets.is_empty() { sets.push(words(*bank.members)); }
+        sets.push(words(*group.members));
+    }
+    sets
 }
 
 /// The attached-window arm of the teardown protocol (`swap_model::lifecycle`, Astra §5
@@ -1939,17 +2067,18 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
     // before `reload_at_pose` runs this teardown, while the outgoing window's bodies are still in
     // the cells (Eden M4b `m4b2` #85/#86: the bank's `[6, 5, 7]` over the canonical Mario body
     // read as a Kirby with `kirby_branch_mismatch=1`).
-    let window = role(owner).and_then(|role| BANKS[role].lock().unwrap().as_ref()
+    let window = role(owner).and_then(|role| BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner && descriptor(entry, bank))
-        .map(|bank| (bank.members.kinds(), bank.members.count(), bank.activated.clone())));
+        .map(|bank| (bank.members.kinds(), bank.members.count(), bank.activated)));
     let (kinds, count, activated) = match window {
         Some(window) => window,
         None => {
             let count = (read::<u32>(entry, 0x14) as usize).min(NATIVE_MEMBERS);
-            ([read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)], count, Vec::new())
+            ([read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)], count, Default::default())
         }
     };
-    let mut cells = Vec::with_capacity(count);
+    let mut cells = crate::engine::compat::fixed::FixedList::<BodyRef, NATIVE_MEMBERS>::new(
+        BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None });
     for (i, kind) in kinds.iter().enumerate().take(count) {
         let Some(body) = fields::child(entry as usize, 0x4160 + i * 8) else { continue; };
         let id = fields::read::<u32>(body, 8).unwrap_or(0);
@@ -1961,15 +2090,14 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
         let valid = fighter && own.is_some();
         let live = fields::read::<u8>(body, 0x3a) == Some(4);
         cells.push(BodyRef { id, kind: if valid { own.unwrap_or(*kind) } else { *kind }, cell: i as u8,
-            activated: live || activated.contains(&id), valid, registered: registered_kind(resource(base, owner), i) });
+            activated: live || activated.contains(&(body, id)), valid, registered: registered_kind(resource(base, owner), i) });
     }
     let contexts = graph::window_contexts(entry as usize, |context| valid_context(base, context, owner));
     let probed = contexts.len();
-    let bundle = Bundle::Attached(AttachedGroup { owner, cells, contexts });
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(std::slice::from_ref(&bundle), &consumers);
-    if !always && plan.steps.is_empty() && plan.kirby_misplaced == 0 { return; }
-    let receipt = graph::execute(base, &plan, owner, reason, &mut |_: &[u32]| (0usize, 0usize));
+    let plan = attached_plan(owner, &cells, &contexts, &consumers);
+    if !always && plan.routes.is_empty() && plan.kirby_misplaced == 0 { return; }
+    let receipt = graph::execute_attached(base, &plan, owner, reason);
     if receipt.routes_cleared != 0 {
         trace!("[GroupSwap] pad route released owner={} reason={} contexts={} cleared={}", owner, reason, probed, receipt.routes_cleared);
     }
@@ -2234,13 +2362,13 @@ unsafe fn current_holder_valid(base: usize, entry: usize, owner: u32) -> bool {
 unsafe fn exchange_articles(base: usize, role: usize, entry: usize, owner: u32, prepared: Prepared, activates: bool) {
     let group = match prepared { Prepared::Warm { group, .. } | Prepared::Build { group, .. } => group };
     let outgoing = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         state.as_ref().and_then(|bank| bank.groups.get(group)).and_then(|g| g.saved).map(|w| (w.flags, w.records[0]))
     };
     if let Some((flags, holder)) = outgoing {
         let valid = holder != 0 && valid_special_object(base, holder, owner);
         if articles::retire_saved(base, owner, flags, holder, valid, "detach") {
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             if let Some(saved) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)).and_then(|g| g.saved.as_mut()) {
                 saved.records[1] = 0;
             }
@@ -2431,7 +2559,7 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
     let base = BASE.load(Ordering::Acquire);
     let now = now_us();
     let construction = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let Some(c) = bank.construction.as_mut() else { return; };
         c.ticks = c.ticks.saturating_add(1);
@@ -2473,7 +2601,7 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
     use construction_task as task;
     let base = BASE.load(Ordering::Acquire);
     let construction = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         match bank.construction.take() { Some(construction) => construction, None => return }
     };
@@ -2531,7 +2659,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     // copy relations load Kirby's hat models (`0x17f06a0`); their packages must be resident first, as
     // native's completion and its holders wait guarantee (`swap_model::copy_packages`). No bank lock
     // is held across the native calls.
-    let copies = BANKS[role].lock().unwrap().as_ref().filter(|bank| bank.swap.is_some())
+    let copies = BANKS[role].lock().as_ref().filter(|bank| bank.swap.is_some())
         .map(|bank| (copy_package_sets(bank), bank.alias));
     let copies_resident = match copies {
         Some((sets, alias)) if alias != 0 && resource(base, owner) == Some(alias) =>
@@ -2539,7 +2667,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         _ => true,
     };
     let (prepared, before, alias) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let Some(swap) = bank.swap else { return; };
         let before = group_owner(entry, bank).filter(|now| match bank.exchange {
@@ -2602,7 +2730,9 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             return;
         }
         let mut saved_x = save_window(entry as usize);
-        let x_members = std::mem::replace(&mut bank.members, Box::new(*bank.groups[swap.group].members));
+        // Both tables already own stable storage. Exchange their owners instead
+        // of allocating a duplicate target table inside this native callback.
+        std::mem::swap(&mut bank.members, &mut bank.groups[swap.group].members);
         let target_members = *bank.members;
         // The Mii identity follows the window: `R` holds the window group's identity
         // (MII-GROUPS-DESIGN §3.3). When a Mii moves in or out, save the words the
@@ -2621,7 +2751,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
-                group.members = x_members; group.bodies = x_bodies; group.saved = Some(saved_x);
+                group.bodies = x_bodies; group.saved = Some(saved_x);
                 trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
                     &group.members.kinds()[..group.members.count()], x_bodies);
                 restore_window(entry as usize, &y);
@@ -2645,7 +2775,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             }
             (GroupState::Prefetched, None) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, [Body::default(); NATIVE_MEMBERS]);
-                group.members = x_members; group.bodies = x_bodies; group.saved = Some(saved_x); group.state = GroupState::Built;
+                group.bodies = x_bodies; group.saved = Some(saved_x); group.state = GroupState::Built;
                 trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
                     &group.members.kinds()[..group.members.count()], x_bodies);
                 clear_window(entry as usize);
@@ -2702,7 +2832,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             (found, saved) => {
                 // Inconsistent record: put the table back and refuse this swap. A permanent
                 // failure: a Prefetched record returns its keys first (U20, `swap_model::fallback`).
-                bank.members = x_members;
+                std::mem::swap(&mut bank.members, &mut group.members);
                 group.saved = saved;
                 group.identity = target_identity;
                 bank.identity = x_identity;
@@ -2771,7 +2901,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             match start_async_construction(base, entry, owner, members) {
                 Ok((tasks, setup_done)) => {
                     let queued_us = now_us();
-                    let mut state = BANKS[role].lock().unwrap();
+                    let mut state = BANKS[role].lock();
                     match state.as_mut() {
                         Some(bank) => {
                             bank.construction = Some(Construction {
@@ -2824,7 +2954,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     let elapsed = now_us().saturating_sub(started);
     // Verify under the lock; roll back on any failure.
     let rollback = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let members = *bank.members;
         let (group, member, via, ok) = match prepared {
@@ -2938,10 +3068,10 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     // member — through the one teardown protocol (routes, bodies, contexts,
     // dispatcher arrays, records, then the unbuilt members' keys; finalize's order).
     let (bundle, alias, records, current) = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref() else { return; };
         let members = *bank.members;
-        let mut detached = DetachedGroup { owner, ..Default::default() };
+        let mut detached = DetachedSnapshot::new(owner);
         let mut records = [0usize; 3];
         let mut current = [0usize; 2];
         if matches!(prepared, Prepared::Build { .. }) {
@@ -2957,7 +3087,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
                     // A constructed body released its own kind's keys at construction
                     // end (§1.2); a member that never constructed still holds them.
                     None => detached.held_kinds.push(kind),
-                }
+                };
             }
             for i in 0..NATIVE_MEMBERS {
                 if let Some(context) = fields::child(entry as usize, 0x4188 + i * 8) {
@@ -2979,10 +3109,12 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             }
             if let Some(kind) = members.object_kind() { detached.held_kinds.push(kind); }
         }
-        (Bundle::Detached(detached), bank.alias, records, current)
+        (detached, bank.alias, records, current)
     };
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(std::slice::from_ref(&bundle), &consumers);
+    let views = [bundle.view()];
+    let plan = DetachedPlan { groups: &views, consumers: &consumers };
+    let keys = detached_keys(&plan);
     // The ledger (WP4): a constructed body released its own kind's keys at construction end
     // (§1.2), so its token is settled; a member that never constructed still holds its prefetch
     // keys, and the object kind never has a tail. The plan's key step returns those tokens through
@@ -2991,28 +3123,28 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     // state 7. A Mii group's identity is still in `R` here: the bodies are unloaded and these keys
     // are released under it; the window's words return below.
     let alias_ok = alias != 0 && resource(base, owner) == Some(alias);
-    let built: Vec<u32> = bundle.bodies().iter().map(|body| body.kind).collect();
+    let mut built = FixedList::<u32, NATIVE_MEMBERS>::new(0);
+    for body in bundle.bodies.iter() { built.push(body.kind); }
     if alias_ok && !built.is_empty() { r_handle::construction_settled(ledger_role(role), group, &built); }
     let releasable = alias_ok && fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0;
     let mut release = |kinds: &[u32]| {
         if !releasable { return (0, kinds.len()); }
         release_group_keys(base, role, Some(group), Some(kinds), &Occupancy::default(), owner, "build rollback")
     };
-    let receipt = graph::execute(base, &plan, owner, "swap rollback", &mut release);
+    let receipt = graph::execute(base, &plan, &keys, owner, "swap rollback", &mut release, &mut |_| {});
     let map_after = if releasable { fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64) } else { -1 };
     // A failed warm swap leaks the unverified group's arrays with its bodies (logged).
     let dispatch_note = match prepared {
-        Prepared::Build { .. } => format!("dispatch_destroyed={} arrays={:x?}", receipt.dispatchers == 1, current),
-        Prepared::Warm { dispatch, .. } => format!("dispatch_leaked={:x?}", dispatch),
+        Prepared::Build { .. } => DispatchNote::Destroyed(receipt.dispatchers == 1, current),
+        Prepared::Warm { dispatch, .. } => DispatchNote::Leaked(dispatch),
     };
     let (failed, restored) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
-        let target = std::mem::replace(&mut bank.members, Box::new(Members::new(&[0, 1]).unwrap()));
         let target_identity = bank.identity;
         let record = &mut bank.groups[group];
         let Some(x) = record.saved.take() else { return; };
-        bank.members = std::mem::replace(&mut record.members, target);
+        std::mem::swap(&mut bank.members, &mut record.members);
         let failed = *record.members;
         bank.bodies = std::mem::replace(&mut record.bodies, [Body::default(); NATIVE_MEMBERS]);
         record.state = GroupState::Failed;
@@ -3034,7 +3166,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
             .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
         trace!("[GroupSwap] fallback owner={} group={} reason=verification failed; destroyed={} contexts={} routes={} records={:x?} keys_released={:x?} map_after={} skipped={} {}; window restored, member {} activates",
-            owner, group, receipt.bodies, receipt.contexts, receipt.routes_cleared, records, plan.keys(), map_after, receipt.skipped, dispatch_note, via);
+            owner, group, receipt.bodies, receipt.contexts, receipt.routes_cleared, records, &*keys, map_after, receipt.skipped, dispatch_note, via);
         (failed, *bank.members)
     };
     // U18: whatever the failed group still registers leaves (its destroyed bodies' unloads already
@@ -3060,9 +3192,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a
     // group holds keys or bodies, so they are resident before any registration; release them when
     // no group does or the bank retired (`swap_native::copy_packages`). Outside a swap only.
-    let copy_sets = BANKS[role].lock().unwrap().as_ref()
+    let copy_sets = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.swap.is_none())
-        .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) } else { Vec::new() }, bank.alias));
+        .map(|bank| (if bank.phase == Phase::Ready && !bank.departed { copy_package_sets(bank) }
+            else { CopyPackageSets::new([u32::MAX; NATIVE_MEMBERS]) }, bank.alias));
     if let Some((sets, alias)) = copy_sets {
         if sets.is_empty() || (alias != 0 && resource(base, owner) == Some(alias)) {
             crate::runtime::roster::copy_packages::sync(base, role, owner, alias, &sets, "tick");
@@ -3076,7 +3209,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
         Release(usize, Members, Members, usize), Idle }
     let step = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
             && !bank.departed && bank.swap.is_none()) else { return; };
         let live = bank.members.ready_live(snapshot(entry)).map(|(_, kind)| kind);
@@ -3114,7 +3247,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let copy = live_kirby_copy_kind(entry, owner, window);
             let (kinds, count) = members.prefetch_kinds();
             if copy.is_some_and(|kind| kinds[..count].contains(&kind)) {
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                     if !g.kirby_logged {
                         g.kirby_logged = true;
@@ -3126,7 +3259,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             }
             let occupancy = occupancy_snapshot(role, copy);
             let (released, kept) = release_group_keys_of(base, role, r, group, &occupancy, owner, "live Kirby");
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { return; };
             let Some(g) = bank.groups.get_mut(group) else { return; };
             g.state = GroupState::Planned;
@@ -3154,7 +3287,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     release_group_keys_of(base, role, r, group, &occupancy, owner, "prefetch failed");
                 }
             }
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { return; };
             bank.groups[group].state = outcome;
             bank.prefetch = None;
@@ -3198,7 +3331,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             match decision.admission {
                 Admission::Admit => {}
                 Admission::Defer => {
-                    let mut state = BANKS[role].lock().unwrap();
+                    let mut state = BANKS[role].lock();
                     if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                         if !g.memory_logged {
                             g.memory_logged = true;
@@ -3222,7 +3355,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // Only a running task
             // or an unloaded handle defers the prefetch.
             if !resource_ready(r) {
-                let mut state = BANKS[role].lock().unwrap();
+                let mut state = BANKS[role].lock();
                 if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
                     if !g.busy_logged {
                         g.busy_logged = true;
@@ -3273,7 +3406,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 super::finish_install(token, "group prefetch refused by the ledger");
                 return;
             }
-            let mut state = BANKS[role].lock().unwrap();
+            let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { super::finish_install(token, "group prefetch bank vanished"); return; };
             bank.groups[group].state = GroupState::Prefetching;
             bank.groups[group].since_us = now;
@@ -3291,7 +3424,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
 /// (`body_bank::memory::outstanding`): a prefetch in flight its whole cost, a prefetched group its build. A built
 /// group's bodies are in the headroom. Takes each role's bank lock in turn; never call it with a bank lock held.
 pub(super) fn group_outstanding() -> u64 {
-    BANKS.iter().map(|state| state.lock().unwrap().as_ref().map_or(0, |bank| bank.groups.iter()
+    BANKS.iter().map(|state| state.lock().as_ref().map_or(0, |bank| bank.groups.iter()
         .map(|g| memory::outstanding(g.state, memory::group_cost(&g.members.kinds()[..g.members.count()])))
         .fold(0u64, u64::saturating_add)))
         .fold(0u64, u64::saturating_add)
@@ -3310,7 +3443,7 @@ fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Opti
 }
 
 fn fail_group(role: usize, group: usize, _reason: &str) {
-    let mut state = BANKS[role].lock().unwrap();
+    let mut state = BANKS[role].lock();
     if let Some(bank) = state.as_mut() {
         if let Some(g) = bank.groups.get_mut(group) { g.state = GroupState::Failed; }
         GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
@@ -3337,24 +3470,24 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // Phase B′: a construction in flight settles into the window first, so native's destroyer finds its bodies.
     drain_construction(entry, owner, role, reason);
     // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
-    let window = BANKS[role].lock().unwrap().as_ref()
+    let window = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
     // U18: each detached body's group, for the per-group header during the destroys.
-    let mut owners: Vec<(u32, Members)> = Vec::new();
+    let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
     let (mut bundles, identities, token, alias, groups) = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
-        let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated.clone());
-        let mut bundles = Vec::with_capacity(groups);
+        let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
+        let mut bundles = FixedList::<DetachedSnapshot, MAX_EXTRA_GROUPS>::new(DetachedSnapshot::new(owner));
         // A Mii group's keys are released with its identity in `R` (the release selector
         // `0x17e8410` keys on `R+0x58` like the request did): each key-holding Mii group keeps
         // its index (the ledger's group of its tokens) and identity.
-        let mut identities: Vec<(usize, MiiIdentity)> = Vec::new();
-        for (index, group) in bank.groups.drain(..).enumerate() {
-            let mut detached = DetachedGroup { owner, ..Default::default() };
+        let mut identities = FixedVec::<(usize, MiiIdentity), MAX_EXTRA_GROUPS>::new();
+        for (index, group) in bank.groups.iter().enumerate() {
+            let mut detached = DetachedSnapshot::new(owner);
             match (group.state, group.saved) {
                 (GroupState::Built, Some(saved)) => {
                     for (i, kind) in group.members.kinds().iter().enumerate().take(group.members.count()) {
@@ -3365,7 +3498,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         // U18: a group is built under its own header (`copy_registry::build`), so its
                         // init registered each body under the group's own kind; the window's header at
                         // teardown time names another group's bodies.
-                        detached.bodies.push(BodyRef { id: body.id, kind: *kind, cell: i as u8, activated: activated.contains(&body.id),
+                        detached.bodies.push(BodyRef { id: body.id, kind: *kind, cell: i as u8, activated: activated.contains(&(body.address, body.id)),
                             valid: valid_parked_body(base, body, *kind, owner), registered: Some(*kind) });
                         owners.push((body.id, *group.members));
                     }
@@ -3381,13 +3514,14 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                 }
                 (state, _) if state.holds_keys() => {
                     let (kinds, count) = group.members.prefetch_kinds();
-                    detached.held_kinds.extend(kinds[..count].iter().copied());
+                    for kind in kinds[..count].iter().copied() { detached.held_kinds.push(kind); }
                     if let Some(identity) = group.identity { identities.push((index, identity)); }
                 }
                 _ => {}
             }
-            bundles.push(Bundle::Detached(detached));
+            bundles.push(detached);
         }
+        bank.groups.clear();
         bank.swap = None;
         bank.swap_started = None;
         GROUP_BODIES[role].store(0, Ordering::Release);
@@ -3398,23 +3532,21 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let alias_ok = alias != 0 && resource(base, owner) == Some(alias);
     let mut unreachable = 0usize;
     if !alias_ok {
-        for bundle in &mut bundles {
-            if let Bundle::Detached(group) = bundle {
-                unreachable += group.bodies.len() + group.held_kinds.len();
-                group.bodies.clear();
-                group.held_kinds.clear();
-            }
+        for group in bundles.iter_mut() {
+            unreachable += group.bodies.len() + group.held_kinds.len();
+            group.bodies.clear();
+            group.held_kinds.clear();
         }
     }
     // U18: detached bodies hold no registration but unload over the cells the window's registrations
     // occupy: the window leaves the registry, each group is destroyed under its own header, then the
     // window registers again (`copy_registry::teardown_begin/group/end`). Without the registry the
     // bodies are left (this function's rule: leak rather than corrupt).
-    let has_bodies = bundles.iter().any(|b| matches!(b, Bundle::Detached(group) if !group.bodies.is_empty()));
+    let has_bodies = bundles.iter().any(|group| !group.bodies.is_empty());
     let mut registry = if has_bodies { NativeRegistry::new(base, alias, owner).zip(window) } else { None };
     if has_bodies && registry.is_none() {
-        for bundle in &mut bundles {
-            if let Bundle::Detached(group) = bundle { unreachable += group.bodies.len(); group.bodies.clear(); }
+        for group in bundles.iter_mut() {
+            unreachable += group.bodies.len(); group.bodies.clear();
         }
         trace!("[Registry] teardown owner={} reason={} registry unreadable; detached bodies left", owner, reason);
     }
@@ -3424,7 +3556,11 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         (before, registry.cells())
     });
     let consumers = graph::probe_consumers(base, owner);
-    let plan = destroy_plan_many(&bundles, &consumers);
+    let mut views = FixedList::<DetachedView<'_>, MAX_EXTRA_GROUPS>::new(DetachedView {
+        owner, bodies: &[], contexts: &[], dispatch: None, records: None, held_kinds: &[] });
+    for bundle in bundles.iter() { views.push(bundle.view()); }
+    let plan = DetachedPlan { groups: &views, consumers: &consumers };
+    let keys = detached_keys(&plan);
     // The plan's key step (DEFECT #2's per-key release on every teardown reason, row 15) hands
     // every token the ledger still holds for this role — these groups' unconsumed prefetches and a
     // window whose build never settled — back through `r_handle::release` (WP4: the orphan `0x1338`
@@ -3434,7 +3570,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let occupancy = occupancy_snapshot(role, copy);
     let mut release = |_: &[u32]| {
         let mut outcome = (0usize, 0usize);
-        for (group, identity) in &identities {
+        for (group, identity) in identities.iter() {
             let mut one = (0usize, 0usize);
             with_mii_identity(alias, Some(*identity), || {
                 one = release_group_keys(base, role, Some(*group), None, &occupancy, owner, reason);
@@ -3448,28 +3584,27 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // U18: each group's own header right before its first body, the window's before any later step.
     let mut current: Option<Members> = None;
     let receipt = {
-        let mut before_step = |step: &DestroyStep| {
+        let mut before_step = |body: Option<u32>| {
             let Some((registry, window)) = registry.as_mut() else { return; };
-            let wanted = match step {
-                DestroyStep::DestroyBody { id } => owners.iter().find(|(body, _)| body == id).map(|(_, group)| *group),
-                _ => Some(*window),
+            let wanted = match body {
+                Some(id) => owners.iter().find(|(body, _)| *body == id).map(|(_, group)| *group),
+                None => Some(*window),
             };
             if let Some(members) = wanted.filter(|m| current != Some(*m)) {
                 copy_registry::teardown_group(registry, members);
                 current = Some(members);
             }
         };
-        graph::execute_with(base, &plan, owner, reason, &mut release, &mut before_step)
+        graph::execute(base, &plan, &keys, owner, reason, &mut release, &mut before_step)
     };
     if let (Some((registry, window)), Some((before, emptied))) = (registry.as_mut(), cells) {
         copy_registry::teardown_end(registry, *window);
-        let mut detached: Vec<Vec<u32>> = Vec::new();
-        for (_, group) in &owners {
-            let kinds = group.kinds()[..group.count()].to_vec();
-            if !detached.contains(&kinds) { detached.push(kinds); }
+        let mut detached = FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group());
+        for (_, group) in owners.iter() {
+            if !detached.iter().any(|m| m.kinds()[..m.count()] == group.kinds()[..group.count()]) { detached.push(*group); }
         }
         trace!("[Registry] teardown owner={} reason={} window={:x?} detached={:x?} cells={:x?}->{:x?}->{:x?} header={:x?} r4c={:#x} task_pending={}",
-            owner, reason, &window.kinds()[..window.count()], detached, before, emptied, registry.cells(), registry.header(),
+            owner, reason, &window.kinds()[..window.count()], MemberSets(&detached), before, emptied, registry.cells(), registry.header(),
             fields::read::<u32>(alias, 0x4c).unwrap_or(0), task_pending(alias));
     }
     if let Some(token) = token { super::finish_install(token, "group prefetch retired"); }
@@ -3515,7 +3650,7 @@ pub(super) unsafe fn before_reload(entry: *const u8) {
 unsafe fn pair_teardown(entry: *const u8, reason: &str) {
     let Some(owner) = pair_lead_owner(entry) else { return; };
     {
-        let state = BANKS[role(owner).unwrap_or(0)].lock().unwrap();
+        let state = BANKS[role(owner).unwrap_or(0)].lock();
         if !state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Ready | Phase::Changing)) { return; }
     }
     let flags = read::<u8>(entry, 0x591f);
@@ -3539,7 +3674,7 @@ pub(super) fn scene_changed() {
     for value in &ROLE_BUDGET { value.store(0, Ordering::Release); }
     for value in &PLANNED_TARGETS { value.store(0, Ordering::Release); }
     for state in &BANKS {
-        if let Some(bank) = state.lock().unwrap().as_mut() { bank.departed = true; }
+        if let Some(bank) = state.lock().as_mut() { bank.departed = true; }
     }
     for role in 0..2 { r_handle::reset(ledger_role(role), "scene changed"); }
     // The scene loop resets every holder, G68 included: the copy holdings end without native calls.
@@ -3548,7 +3683,7 @@ pub(super) fn scene_changed() {
 
 pub(super) fn on_destroy(entry: *const u8) {
     for (role, state) in BANKS.iter().enumerate() {
-        if let Some(bank) = state.lock().unwrap().as_mut() {
+        if let Some(bank) = state.lock().as_mut() {
             if bank.entry == entry as usize {
                 bank.phase = Phase::Retired; bank.departed = true;
                 bank.exchange = None;
@@ -3574,7 +3709,7 @@ unsafe fn prepare_models(entry: *mut u8) {
     original!()(entry);
     if !aligned(entry) { return; }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
         // A pair-lead window (or pair group) is always constructed with the pair
         // active (cell 0): bit 1 as vanilla `654dc0` set it for two actors, plus
@@ -3712,7 +3847,7 @@ unsafe fn table(ctx: &mut InlineCtx, register: usize) {
     let entry = ctx.registers[19].x() as *const u8;
     if !aligned(entry) { return; }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
-    let state = BANKS[role].lock().unwrap();
+    let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
         ctx.registers[register].set_x(bank.members.table().as_ptr() as u64);
     }
@@ -3735,7 +3870,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
     // Copy values before native calls. The resource worker never borrows a
     // table pointer or holds a Rust lock while native acquisition runs.
     let members = {
-        let state = BANKS[role].lock().unwrap();
+        let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.owner == owner && bank.phase != Phase::Retired) else { return; };
         *bank.members
     };
@@ -3761,17 +3896,17 @@ unsafe fn prepare_resources(resource: *mut u8) {
     if empty_before { r_handle::settle_stale_on_empty(lrole, "configure on an empty R"); }
     r_handle::record_native(lrole, &native_window_requests(members.kinds(), flags));
     let occupancy = Occupancy::default();
-    let mut supplemental: Vec<u32> = Vec::new();
+    let mut supplemental = FixedList::<u32, NATIVE_MEMBERS>::new(0);
     for kind in members.kinds().iter().take(members.count()) {
         match r_handle::acquire(base, lrole, r_handle::WINDOW, *kind, Holder::Build(GroupId(u8::MAX)),
             member_recipe(members, *kind), &occupancy) {
-            Ok(()) => supplemental.push(*kind),
+            Ok(()) => { supplemental.push(*kind); }
             Err(LedgerRefusal::AlreadyHeld { .. }) => {}
             Err(other) => trace!("[Ledger] window acquisition refused owner={} kind={:#x} reason={:?}", owner, kind, other),
         }
     }
     trace!("[BodyBank] resource owner={} alias={:p} supplemental={:x?} native={:x?} flags r48={} r7d={} r7f={}",
-        owner, resource, supplemental, native_window_requests(members.kinds(), flags).iter().map(|r| r.kind).collect::<Vec<_>>(),
+        owner, resource, &*supplemental, DebugIter(native_window_requests(members.kinds(), flags).iter().map(|r| r.kind)),
         flags.r48, flags.r7d, flags.r7f);
     // Pair rule: the construction tail `0x60de60-0x60deb8` decrements `R+0x50` for
     // every body of an entry whose cells 0/1 are `[0x4b, 0x4c]` and resets the whole
@@ -3788,7 +3923,7 @@ unsafe fn prepare_resources(resource: *mut u8) {
             Ok(before) => trace!("[IcPair] resource owner={} alias={:p} refs {}->{} kinds={:x?} flags={:#x}",
                 owner, resource, before, references, members.kinds(), read::<u32>(resource, 0x4c)),
             Err(others) => trace!("[IcPair] resource owner={} alias={:p} refs NOT written: other batches {:?} hold keys on R",
-                owner, resource, others.iter().map(|b| b.0).collect::<Vec<_>>()),
+                owner, resource, DebugIter(others.iter().map(|b| b.0))),
         }
     }
 }
@@ -3853,6 +3988,10 @@ pub(super) unsafe fn install(base: usize) {
     if !gate(SEAM_GROUP, BANK_SEAMS, legacy) {
         if legacy { trace!("[BodyBank] seam guard refused; disabled"); }
         return;
+    }
+    for storage in &BANK_STORAGE {
+        let mut storage = storage.lock();
+        if storage.is_none() { *storage = Some(BankStorage::new()); }
     }
     skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);
     ENABLED.store(true, Ordering::Release);
