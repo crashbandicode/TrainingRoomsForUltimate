@@ -11,6 +11,7 @@ mod diag_log;
 mod features;
 mod game;
 mod hub;
+mod import;
 mod install;
 mod published;
 mod state_boot;

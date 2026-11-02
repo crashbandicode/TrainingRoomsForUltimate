@@ -89,3 +89,37 @@ pub fn convert_file(file: &mut SaveFile, index: usize) -> usize {
     }
     converted
 }
+
+/// The same conversion on a parsed `save_states.json` (the import changes the copy's JSON without
+/// rewriting the rest of the fork's file through the typed reader). Returns how many player records
+/// got a snapshot; records with any `held_item` that is not `null`, never-saved records, and every
+/// CPU-role record are left alone.
+pub fn convert_json(value: &mut Value, index: usize) -> usize {
+    let cpu_kinds: Vec<i64> = value
+        .get("cpu")
+        .and_then(Value::as_array)
+        .map(|records| records.iter().map(|r| r.get("fighter_kind").and_then(Value::as_i64).unwrap_or(-1)).collect())
+        .unwrap_or_default();
+    let Some(players) = value.get_mut("player").and_then(Value::as_array_mut) else { return 0 };
+    let mut converted = 0;
+    for (slot, record) in players.iter_mut().enumerate() {
+        let Some(object) = record.as_object_mut() else { continue };
+        if object.get("held_item").is_some_and(|item| !item.is_null()) {
+            continue;
+        }
+        let kind = object.get("fighter_kind").and_then(Value::as_i64).unwrap_or(-1);
+        let cpu_kind = cpu_kinds.get(slot).copied().unwrap_or(-1);
+        let (Ok(kind), Ok(cpu_kind)) = (i32::try_from(kind), i32::try_from(cpu_kind)) else { continue };
+        if let Some(HeldItem::Item { choice, variation, lifetime, lifetime_max, fuse, fuse_max }) = snapshot_for(index, kind, cpu_kind) {
+            object.insert(
+                "held_item".to_owned(),
+                serde_json::json!({
+                    "state": "item", "choice": choice, "variation": variation, "lifetime": lifetime,
+                    "lifetime_max": lifetime_max, "fuse": fuse, "fuse_max": fuse_max
+                }),
+            );
+            converted += 1;
+        }
+    }
+    converted
+}

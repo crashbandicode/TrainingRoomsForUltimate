@@ -4,7 +4,7 @@ CSS (Steve) -> Training. Every wait is gated on a log line or a screenshot match
 reference screenshot of the same screen from boot 1 (tr101), with a cap; on a miss it stops and
 leaves the last screenshot (never presses on onto a screen it has not seen).
 
-Usage: route_local.py <label>   (run with /usr/bin/python3 -I eden/route_local.py tr102)
+Usage: route_s3.py <label> [<comma-separated tile-cursor steps for P1>]   (run with /usr/bin/python3 -I eden/route_s3.py s3-01). Package-3 copy of route_local.py.
 """
 import base64
 import json
@@ -106,6 +106,9 @@ def play_segment(label, path, cap=90):
     call(label, "input.reset")
 
 
+P1_STEPS = sys.argv[2].split(",") if len(sys.argv) > 2 and sys.argv[2] else []
+
+
 def main():
     label = sys.argv[1]
     events = f"{PROFILE_SD}/TrainingRooms/events.log"
@@ -142,6 +145,9 @@ def main():
     wait_match(label, "css.png", (55, 50, 1225, 420), 12, 40, "character select")
     press(label, "lstick,up")
     time.sleep(1)
+    for step in P1_STEPS:  # extra tile-cursor steps from the first-row tile (78 = Steve), e.g. left left down
+        press(label, f"lstick,{step}")
+        time.sleep(0.7)
     press(label, "a")
     wait_match(label, "ready.png", (40, 40, 1240, 330), 25, 25, "ready to fight")
     press(label, "a")

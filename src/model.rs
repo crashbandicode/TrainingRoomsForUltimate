@@ -25,8 +25,12 @@ pub mod lra_reset;
 pub mod menu;
 #[path = "model/migration.rs"]
 pub mod migration;
+#[path = "model/migration_run.rs"]
+pub mod migration_run;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/sha256.rs"]
+pub mod sha256;
 #[path = "model/sites.rs"]
 pub mod sites;
 #[path = "model/sites_pkg3.rs"]

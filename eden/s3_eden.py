@@ -91,7 +91,7 @@ def eden_processes():
     return [l for l in out.splitlines() if "pgrep" not in l]
 
 
-def prep(label, nros, settings, diag_txt):
+def prep(label, nros, settings, diag_txt, states=None):
     receipt = {"label": label, "time": time.time(), "source": str(SOURCE), "profile": str(PROFILE),
                "set_aside": [], "archived": []}
     assert SOURCE.name != "a" and SOURCE.is_dir()
@@ -154,6 +154,9 @@ def prep(label, nros, settings, diag_txt):
     if settings:
         shutil.copyfile(settings, out / "settings.json")  # a real file, never a link
         receipt["settings"] = (out / "settings.json").read_text(encoding="utf-8")
+    if states:
+        shutil.copyfile(states, out / "save_states.json")  # a real file, never a link
+        receipt["save_states"] = (out / "save_states.json").read_text(encoding="utf-8")[:2000]
     if diag_txt:
         shutil.copyfile(diag_txt, out / "diag.txt")
         receipt["diag_txt"] = Path(diag_txt).read_text(encoding="utf-8")
@@ -246,8 +249,8 @@ def up(args):
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
-        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
-                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
+        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.save_states).items()
+                                  if k in ("plugins", "set_aside", "archived", "settings", "diag_txt", "save_states")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
                         "-Action", "Start", "-Unit", f"trp3-{label}-display", "-Socket", f"wayland-trp3-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
@@ -375,13 +378,15 @@ def main():
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
+    p.add_argument("--save-states")
     p.set_defaults(fn=up)
     p = sub.add_parser("prep")  # profile copy only: touches nothing but this tool's own work root
     p.add_argument("label", type=label_ok)
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
-    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt))))
+    p.add_argument("--save-states")
+    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt, a.save_states))))
     p = sub.add_parser("down")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=down)

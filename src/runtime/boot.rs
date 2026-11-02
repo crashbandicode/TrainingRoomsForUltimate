@@ -23,7 +23,7 @@ use crate::runtime::diag_log::{self, diagnostic};
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards, states};
-use crate::runtime::{clock, game, install, published, state_boot};
+use crate::runtime::{clock, game, import, install, published, state_boot};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -65,6 +65,9 @@ pub fn run() {
         diagnostic(format_args!("[TrainingRooms] data folder unavailable: {error}"));
     }
     published::set_developer_page(read_developer_ini().developer_page);
+    // SPEC-core-08: the fork's data is imported before the settings load (the captures go on in the
+    // background).
+    let migration = import::start();
     let loaded = load_settings();
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
@@ -176,7 +179,7 @@ pub fn run() {
             lra_reset: loaded.menu.lra_reset(),
             stage_hazards: loaded.menu.stage_hazards(),
         }),
-        migration: None,
+        migration: Some(migration.as_str()),
         heap_allocations: Some(hook_allocations()),
     };
     install::write(&line);
