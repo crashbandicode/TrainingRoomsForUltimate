@@ -195,3 +195,8 @@ tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, t
   B3 stack path + archive-hook allocation; stream/sync's uncommitted `tests/hook_locks.rs` filter refinement is superseded by this branch's.
 - Own tools added since the playbook record: `eden/lent/rows_sync01(b).py`, `rows_sync02c.py`, `rows_ui10.py` (row drivers on the Ally lent
   rig; playbook drivers are Yoga-local), `ally-build.sh` modes `hoslock`/`hooklocks` (single-crate / single-test re-runs inside a claim).
+
+## 2026-11-02 13:52Z roster grid: pane-table cost measured (Ally WSL layout-builder over the stock archive)
+- 40 tiles: target 529,300 B, recipe 55,540 B (reproduces the committed `assets/info_training.tra1`, sha 225fdfd0). 88 tiles: target 549,780 B, recipe 64,700 B.
+- Resident delta at 88: archive +20,480 x 2 boot buffers = +40,960; recipe .rodata +9,160; Frame +~2.9 KB x 4 static copies = +~11.7 KB; total ~+61.8 KB (> 40 KB: lead decides; options (a) paged on 40 tiles 0 KB, (b) 88 tiles, (c) 88 with tile text out of Frame ~54 KB). Nothing committed for it.
+
