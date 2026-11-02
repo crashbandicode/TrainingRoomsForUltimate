@@ -140,6 +140,30 @@ constants! {
     EffectNoJointScale = "EFFECT_SUB_ATTRIBUTE_NO_JOINT_SCALE",
     EffectFollow = "EFFECT_SUB_ATTRIBUTE_FOLLOW",
     EffectConcludeStatus = "EFFECT_SUB_ATTRIBUTE_CONCLUDE_STATUS",
+    // Package 4 (SPEC-input-01 §3, §5.4): the recorder's starting-status to transition-term table, the
+    // Shulk dial exception, the ledge rest timer and the colour-blend model colour type.
+    StatusAttackAir = "FIGHTER_STATUS_KIND_ATTACK_AIR",
+    StatusEscapeAir = "FIGHTER_STATUS_KIND_ESCAPE_AIR",
+    StatusEscapeAirSlide = "FIGHTER_STATUS_KIND_ESCAPE_AIR_SLIDE",
+    StatusSpecialHi = "FIGHTER_STATUS_KIND_SPECIAL_HI",
+    StatusJumpSquat = "FIGHTER_STATUS_KIND_JUMP_SQUAT",
+    StatusJumpAerial = "FIGHTER_STATUS_KIND_JUMP_AERIAL",
+    StatusCatch = "FIGHTER_STATUS_KIND_CATCH",
+    TermContAttackAir = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ATTACK_AIR",
+    TermContEscapeAir = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_AIR",
+    TermContSpecialHi = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_SPECIAL_HI",
+    TermContJumpSquat = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_JUMP_SQUAT",
+    TermContJumpAerial = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_JUMP_AERIAL",
+    TermContEscape = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE",
+    TermContEscapeF = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_F",
+    TermContCatch = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_CATCH",
+    TermContSpecialS = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_SPECIAL_S",
+    KindShulk = "FIGHTER_KIND_SHULK",
+    WorkIntEntryId = "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID",
+    WorkIntColor = "FIGHTER_INSTANCE_WORK_ID_INT_COLOR",
+    WorkFlagShulkDial = "FIGHTER_SHULK_INSTANCE_WORK_ID_FLAG_SPECIAL_N_CIRCLE_MENU",
+    WorkIntCliffRestTime = "FIGHTER_STATUS_CLIFF_WORK_INT_CATCH_REST_TIME",
+    ModelColorBlend = "MODEL_COLOR_TYPE_COLOR_BLEND",
 }
 
 /// Number of constants.
