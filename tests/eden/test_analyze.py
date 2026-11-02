@@ -133,6 +133,20 @@ class ScanTests(unittest.TestCase):
         log = ["a", "Core: PANIC at x", "b", "HW.Memory Unmapped Read32 @ 0x0000000000000008", "c", "Process Aborted", "CRASH"]
         self.assertEqual([n for n, _ in tr_eden.scan_lines(log)], [2, 4, 6, 7])
 
+class HarnessConfigTests(unittest.TestCase):
+    """A stream that shares the Yoga deploys `tr_eden.py` with its own config beside it."""
+
+    def test_default_labels_are_package_ones_and_the_r1fix_config_has_its_own(self):
+        import re
+        self.assertEqual(tr_eden.label_ok("tr101"), "tr101")
+        with self.assertRaises(AssertionError):
+            tr_eden.label_ok("r1-01")
+        cfg = json.loads((ROOT / "eden" / "tr_eden.r1fix.config.json").read_text())
+        self.assertTrue(re.fullmatch(cfg["label_re"], "r1-01") and not re.fullmatch(cfg["label_re"], "tr101"))
+        self.assertNotIn(cfg["display"], (":61", ":93", ":95"))
+        self.assertTrue(cfg["root"].endswith("trainingrooms-eden-r1") and cfg["profile"] != "a")
+
+
 class HookStatsGateTests(unittest.TestCase):
     """`eden/hook_stats.py`: a lane passes only with nonzero hook coverage and a zero allocation delta."""
 

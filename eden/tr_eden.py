@@ -27,9 +27,19 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path("/home/intpa/trainingrooms-eden-p1")
+# A stream that shares the Yoga uses its own work root, profile, owner id, display and label pattern: it
+# deploys this file with a `tr_eden.config.json` beside it (see `tr_eden.r1fix.config.json`). Without
+# the file the values are package 1's.
+_CFG = {}
+if Path(__file__).with_name("tr_eden.config.json").exists():
+    _CFG = json.loads(Path(__file__).with_name("tr_eden.config.json").read_text(encoding="utf-8"))
+ROOT = Path(_CFG.get("root", "/home/intpa/trainingrooms-eden-p1"))
 SOURCE = Path("/home/intpa/ssbu-desync-1029/profiles/b")
-PROFILE = ROOT / "profiles" / "t1"
+PROFILE = ROOT / "profiles" / _CFG.get("profile", "t1")
+LABEL_RE = _CFG.get("label_re", r"tr\d{3}")
+UNIT = _CFG.get("unit", "trp1")
+ASIDE = _CFG.get("aside", "plugins-set-aside-trainingrooms-p1")
+DESC = _CFG.get("desc", "package-1")
 APP = Path("/home/intpa/Applications/Eden-GIF/current/Eden.AppImage")
 RUNTIME = Path("/home/intpa/elite-rematch-work/eden-lan-runtime")
 RUNTIME_SHA = "ee3c2e953a0b87541c29eb8918ce0354489035296ac5eaf060b3444d06a8bbcb"
@@ -37,8 +47,8 @@ COORD = Path("/tmp/deluxe-surface-1007/OWNER-COORDINATION.md")
 HELPER = "/home/intpa/eden-nso-autolan/live-tools/display-rootful.ps1"
 GAME = ("/home/intpa/Games/Roms/Switch/Super Smash Bros. Ultimate "
         "[01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci")
-OWNER = "Claude 0caa72b8/pkg1-eden"
-DISPLAY = ":93"
+OWNER = _CFG.get("owner", "Claude 0caa72b8/pkg1-eden")
+DISPLAY = _CFG.get("display", ":93")
 READ_ONLY = ["user/nand/user/Contents", "user/nand/system/Contents", "user/firmware"]
 PLUGINS = Path("user/sdmc/atmosphere/contents/01006A800016E000/romfs/skyline/plugins")
 OUTPUT = Path("user/sdmc/ultimate/TrainingRooms")
@@ -54,7 +64,7 @@ def digest(path):
 
 
 def label_ok(label):
-    assert re.fullmatch(r"tr\d{3}", label), f"bad label: {label}"
+    assert re.fullmatch(LABEL_RE, label), f"bad label: {label}"
     return label
 
 
@@ -91,7 +101,7 @@ def eden_processes():
     return [l for l in out.splitlines() if "pgrep" not in l]
 
 
-def prep(label, nros, settings, diag_txt):
+def prep(label, nros, settings, diag_txt, keep_data=False, developer_ini=None):
     receipt = {"label": label, "time": time.time(), "source": str(SOURCE), "profile": str(PROFILE),
                "set_aside": [], "archived": []}
     assert SOURCE.name != "a" and SOURCE.is_dir()
@@ -129,7 +139,7 @@ def prep(label, nros, settings, diag_txt):
     assert "volume=0" in config.splitlines(), "config lacks volume=0"
     plugins = PROFILE / PLUGINS
     plugins.mkdir(parents=True, exist_ok=True)
-    aside = plugins.parent / "plugins-set-aside-trainingrooms-p1"
+    aside = plugins.parent / ASIDE
     aside.mkdir(exist_ok=True)
     for path in sorted(plugins.glob("*.nro")):
         target = aside / f"{path.stem}.{label}-{int(time.time())}.nro"
@@ -144,13 +154,20 @@ def prep(label, nros, settings, diag_txt):
     assert not any("training_modpack" in p.name for p in plugins.glob("*.nro")), "fork NRO present"
     for rel in (OUTPUT, Path("user/sdmc/ultimate/ssbu-tile-cursor"), Path("user/sdmc/ultimate/ssbu-cpu-pilot")):
         previous = PROFILE / rel
+        if keep_data and rel == OUTPUT:
+            continue  # the next boot reads what the previous boot left (a copy is kept in the run receipt)
         if previous.exists():
             archived = previous.with_name(f"{previous.name}.before-{label}")
             assert not archived.exists(), f"archive exists: {archived}"
             previous.replace(archived)
             receipt["archived"].append(str(archived))
     out = PROFILE / OUTPUT
-    out.mkdir(parents=True)
+    out.mkdir(parents=True, exist_ok=keep_data)
+    if keep_data:
+        receipt["kept_data"] = {p.name: digest(p) for p in sorted(out.iterdir()) if p.is_file()}
+    if developer_ini is not None:
+        (out / "developer.ini").write_bytes(Path(developer_ini).read_bytes())  # a real file, never a link
+        receipt["developer_ini_sha256"] = digest(out / "developer.ini")
     if settings:
         shutil.copyfile(settings, out / "settings.json")  # a real file, never a link
         receipt["settings"] = (out / "settings.json").read_text(encoding="utf-8")
@@ -242,22 +259,22 @@ def up(args):
         print(json.dumps({"active_claims": busy}))
         sys.exit(3)
     nro_hashes = {n.partition(":")[2] or Path(n).name: digest(n.partition(":")[0]) for n in args.nro}
-    ledger(f"CLAIMED: {OWNER} TrainingRooms package-1 Eden rows (clean-room plugin boot/delay/hazard/reset), "
+    ledger(f"CLAIMED: {OWNER} TrainingRooms {DESC} Eden rows, "
            f"solo run {label} on Yoga, display {DISPLAY}, own profile {PROFILE} (copy of "
            f"ssbu-desync-1029/profiles/b), plugins {nro_hashes}. No LAN. No physical Switch writes.")
     try:
-        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt).items()
+        print("prep", json.dumps({k: v for k, v in prep(label, args.nro, args.settings, args.diag_txt, args.keep_data, args.developer_ini).items()
                                   if k in ("plugins", "set_aside", "archived", "settings", "diag_txt")}))
         subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
-                        "-Action", "Start", "-Unit", f"trp1-{label}-display", "-Socket", f"wayland-trp1-{label}",
+                        "-Action", "Start", "-Unit", f"{UNIT}-{label}-display", "-Socket", f"wayland-{UNIT}-{label}",
                         "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"],
                        check=True, stdout=subprocess.DEVNULL)
-        subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit=trp1-{label}-gpu-lock",
+        subprocess.run(["/usr/bin/systemd-run", "--user", "--quiet", f"--unit={UNIT}-{label}-gpu-lock",
                         "--property=RuntimeMaxSec=3600", "--property=TimeoutStopSec=5", "/usr/bin/flock",
                         "--nonblock", "/tmp/opencode/yoga-gpu-reservation.lock", "/usr/bin/sleep", "3600"],
                        check=True)
         time.sleep(1)
-        active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"trp1-{label}-gpu-lock"],
+        active = subprocess.run(["/usr/bin/systemctl", "--user", "is-active", f"{UNIT}-{label}-gpu-lock"],
                                 capture_output=True, text=True).stdout.strip()
         assert active == "active", "Yoga GPU lock is held by someone else"
         print("launch", json.dumps(launch(label)))
@@ -308,13 +325,13 @@ def down(args, failed=False):
         note = {"pid": pid, "alive": alive(), "state": s.get("state"), "reason": s.get("reason"),
                 "exit_code": s.get("exit_code")}
     subprocess.run(["/usr/bin/pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", HELPER,
-                    "-Action", "Stop", "-Unit", f"trp1-{label}-display", "-Socket", f"wayland-trp1-{label}",
+                    "-Action", "Stop", "-Unit", f"{UNIT}-{label}-display", "-Socket", f"wayland-{UNIT}-{label}",
                     "-XDisplay", DISPLAY, "-MaxRuntimeSeconds", "3600"], check=False,
                    stdout=subprocess.DEVNULL)
-    subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"trp1-{label}-gpu-lock"], check=False,
+    subprocess.run(["/usr/bin/systemctl", "--user", "stop", f"{UNIT}-{label}-gpu-lock"], check=False,
                    stderr=subprocess.DEVNULL)
     left = eden_processes()
-    ledger(f"RELEASED: {OWNER} TrainingRooms package-1 Eden run {label} stopped on the Yoga (display {DISPLAY} "
+    ledger(f"RELEASED: {OWNER} TrainingRooms {DESC} Eden run {label} stopped on the Yoga (display {DISPLAY} "
            f"and GPU lock stopped; Eden processes left: {len(left)}); profile {PROFILE} retained. "
            f"No physical Switch writes.")
     print("down", json.dumps({"label": label, "failed_up": failed, **note, "left": left}))
@@ -339,7 +356,7 @@ def restore(args):
     """Put the profile copy back to source b's plugin set: originals come back from the set-aside folder
     (matched by sha256), this tool's NROs are removed, nothing is deleted until the set matches."""
     sk = PROFILE / PLUGINS.parent
-    plugins, aside = PROFILE / PLUGINS, sk / "plugins-set-aside-trainingrooms-p1"
+    plugins, aside = PROFILE / PLUGINS, sk / ASIDE
     src_plugins = SOURCE / PLUGINS
     want = {p.name: digest(p) for p in src_plugins.glob("*.nro")}
     have = {p.name: digest(p) for p in plugins.glob("*.nro")}
@@ -375,13 +392,17 @@ def main():
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
+    p.add_argument("--keep-data", action="store_true")
+    p.add_argument("--developer-ini")
     p.set_defaults(fn=up)
     p = sub.add_parser("prep")  # profile copy only: touches nothing but this tool's own work root
     p.add_argument("label", type=label_ok)
     p.add_argument("--nro", action="append", default=[])
     p.add_argument("--settings")
     p.add_argument("--diag-txt")
-    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt))))
+    p.add_argument("--keep-data", action="store_true")
+    p.add_argument("--developer-ini")
+    p.set_defaults(fn=lambda a: print(json.dumps(prep(a.label, a.nro, a.settings, a.diag_txt, a.keep_data, a.developer_ini))))
     p = sub.add_parser("down")
     p.add_argument("label", type=label_ok)
     p.set_defaults(fn=down)

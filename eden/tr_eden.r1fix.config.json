@@ -1,0 +1,10 @@
+{
+ "root": "/home/intpa/trainingrooms-eden-r1",
+ "profile": "r1",
+ "owner": "Claude 0caa72b8/r1fix-eden",
+ "display": ":97",
+ "label_re": "r1-\\d{2}",
+ "unit": "trr1",
+ "aside": "plugins-set-aside-trainingrooms-r1",
+ "desc": "R1-fix (settings recovery, developer.ini, pause owner, hook stats)"
+}
