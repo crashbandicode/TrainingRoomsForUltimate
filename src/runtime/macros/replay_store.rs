@@ -81,7 +81,7 @@ pub fn seed_enabled() -> bool {
 /// Whether the Deluxe host may rewrite the INI (see
 /// `CaptureSettings::persistence_compatible`); otherwise the row is session-only.
 /// Only the `deluxe-sdk` registration reads it; the verdict is logged regardless.
-#[cfg_attr(not(feature = "deluxe-sdk"), allow(dead_code))]
+#[cfg(feature = "deluxe-sdk")]
 pub fn persistence_compatible() -> bool {
     PERSISTENCE_COMPATIBLE.load(Ordering::Acquire)
 }

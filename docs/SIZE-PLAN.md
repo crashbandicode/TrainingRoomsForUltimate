@@ -264,3 +264,13 @@ the `Recorder`; golden files pin the published bytes for outside readers. Count 
 5. Macros after the pkg4 wiring (s4-01..04, WIRE).
 6. Roster and Mii refactors only after package 6's Eden sets A/B/D exist as a baseline (no clean-room row exercises
    the roster cycle or Mii today), then R-ID, R-PC, R-MII1 and set D after each slice.
+
+## Capacity probe retirement — 1c0104e (2026-11-02)
+
+Approved capacity/lifecycle experiments and eight empty aliases retired through pkg6 manifest transforms. Raw sloc4 is101224 (simulator1118 excluded), down3126 from104350 and5728 from authorized baseebfcb98=106952. Budget105600 retains4318pending merge allowance; no counting rule change.
+
+Operator sloc-fmt.ps1 on git1c0104e: rustfmt1.9.0-stable48a229cea, zero failures; src125979+crates3434+tools167=129580. Excluding tools:129413, down3928 from133341 and6656 from normalized base136069. Fork reference131081 excludingtools; next-version15% reduction goal still pending. This is an RC ratchet contribution, not completion of next-version target.
+
+## Served Mii probes and helper scopes (2026-11-02)
+
+Raw sloc4:98,956 (src95,449/crates3,356/tools151); simulator1,118 excluded, tests28,416 excluded. This slice removes2,268 implementation lines after capacity1c0104e. Six Mii experiment files/seven features retired, shared native helpers and exact-write-set regression retained; twelve dead-code suppressions removed through consumer feature/test scopes, with no new suppression. Two stage service module names now describe shipped behavior; historical seam metadata remains. Budget103,300 =98,956+4,318pending rounded up, down from105,600. Normalized measurement and host/Switch gates pending; shared runtime failures remain open.

@@ -811,8 +811,8 @@ pub(super) mod managed {
     /// Registered creations as the one value Mii owner checks may accept. An
     /// inconsistent registry (order or claim/owner) yields no extras, so any live
     /// created entry stays unknown and every Mii shape check refuses it.
-    #[cfg_attr(not(all(feature = "mii-saved-alpha",
-        any(feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha"))), allow(dead_code))]
+    #[cfg(all(feature = "mii-saved-alpha",
+        any(feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha")))]
     pub(crate) fn owned_extras() -> crate::engine::preload::cycle_preload_capacity::Extras {
         use crate::engine::mii::capacity::{Extras, Roots};
         let created = created();

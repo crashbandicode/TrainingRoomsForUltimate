@@ -368,3 +368,18 @@ Not carried: probe served (pkg6 confirmation, 2026-11-02). The source-capacity e
 | src/runtime/roster/source_lifecycle_probe.rs | src/source_lifecycle_probe.rs | 3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2 |
 
 Cargo also retires eight empty diagnostic aliases: console-map-probe, archive-poison-probe, kirby-resource-probe, lobby-stage-probe, practice-stage-observer, stage-asset-probe, mii-preview-observer and mii-quit-observer. The ten source-capacity features and source-lifecycle-probe are removed with their experiments. Product lobby-stage/practice-stage features remain. The matrix drops only the two exclusions belonging to deleted experiments. Texture-probe remains pending UI proof, as do all unresolved diagnostic tools.
+
+### Slim served Mii experiments and helper scopes (2026-11-02)
+
+Removed seven diagnostic features: `mii-identity-probe`, `mii-saved-file-probe`, `mii-fullconfig-probe`, `mii-native-adapter-probe`, `mii-cpu-adapter-probe`, `mii-identical-reload-probe`, `mii-special-change-probe`. Shared native access, saved/ordinary behavior and the existing exact write-set regression remain. Every carried change is a manifest transform; native helper predicates follow the real feature consumers, with test-only APIs retained under test. No lint suppression added.
+
+| Retired source | Source SHA256 | Former destination | Reason |
+| --- | --- | --- | --- |
+| src/mii_identity_probe.rs | 239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c | src/runtime/mii/mii_identity_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_saved_file_probe.rs | f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126 | src/runtime/mii/mii_saved_file_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_fullconfig_probe.rs | 3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e | src/runtime/mii/mii_fullconfig_probe.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_native_adapter.rs | a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9 | src/runtime/mii/mii_native_adapter.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_cpu_adapter.rs | 6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2 | src/runtime/mii/mii_cpu_adapter.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+| src/mii_closed_ack.rs | eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b | src/runtime/mii/mii_closed_ack.rs | not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained |
+
+The shipped stage services are renamed lobby_stage_probe.rs -> lobby_stage.rs and practice_stage_observer.rs -> practice_stage.rs through destination/module-map transforms. Historical seam group strings, guards and behavior stay unchanged; lobby declarations and the notice-header test use the new paths.

@@ -39,7 +39,7 @@ mod tests {
         let dir = root.join("lobby");
         let mut files = vec![
             dir.join("practice_stage_request.rs"),
-            dir.join("practice_stage_observer.rs"),
+            dir.join("practice_stage.rs"),
             root.join("mii/mii_editor_bridge/mod.rs"),
         ];
         files.extend(["lobby.rs", "practice.rs"].map(|name| dir.join("training").join(name)));

@@ -875,7 +875,7 @@ pub fn retain_hat(lease: Lease, body: u32) {
 /// Value receipt for the body-bank departure gate: a Kirby with such a lease is
 /// not parked, because a parked copy source lease is unqualified. Takes the
 /// source lock briefly; never call while holding the bank lock.
-#[cfg_attr(not(feature = "native-body-bank-alpha"), allow(dead_code))] // Its only caller is the body bank.
+#[cfg(feature = "native-body-bank-alpha")] // Its only caller is the body bank.
 pub fn hat_lease_on_body(body: u32) -> bool {
     STATE.lock().unwrap().leases.iter().flatten()
         .any(|live| matches!(live.consumer, Consumer::Hat { body: id, .. } if id == body))

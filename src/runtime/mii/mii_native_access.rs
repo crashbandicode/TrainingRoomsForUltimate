@@ -1,16 +1,16 @@
 //! Shared native saved-original primitives. No hook, request, file IO or diagnostic dispatch.
 //! The caller establishes current native service/INSTALL authority. Stored integers are identities.
 use crate::engine::seams::native_fields;
-#[cfg(any(feature = "mii-cpu-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 use skyline::hooks::{getRegionAddress, Region};
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 use crate::engine::mii::lifetime::Binding;
 use crate::engine::mii::lifetime::Tokens as ValueTokens;
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 use crate::engine::mii::native_values::{self as values, RecordUpdate};
 #[cfg(feature = "mii-saved-alpha")]
 pub(crate) const CHARINFO_LEN: usize = 88;
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const POOL_HOLDER: usize = 0x593b6a0;
 pub(crate) const OWNER_TABLE: usize = 0x5324680;
 pub(crate) const UI_DB: usize = 0x532f730;
@@ -18,16 +18,16 @@ pub(crate) const OUTFIT_TABLE: usize = 0x248;
 pub(crate) const HAT_TABLE: usize = 0x238;
 pub(crate) const OUTFIT_ROW: usize = 0x3282b70;
 pub(crate) const HAT_ROW: usize = 0x32870b0;
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const LOCK: usize = 0x39c19c0;
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const UNLOCK: usize = 0x39c19d0;
 // Required fields are qualified by the current callback/PoolLock and the
 // binding/owner checks below. Never use these aliases to bypass a failed bind.
 pub(crate) use crate::engine::seams::native_fields::{
     object as aligned, read_unchecked as rd, write_unchecked as wr,
 };
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Context {
     pub(crate) binding: Binding,
@@ -123,21 +123,8 @@ pub(crate) unsafe fn lookup_row_id(
 
 /// Raw rederivation only: no manager lookup, native callback, logging, allocation or Rust mutex.
 /// With locked_g=Some, verify the current holder still names that mutex before reading its vector.
-#[cfg(feature = "mii-native-adapter-probe")]
-pub(crate) unsafe fn context(
-    base: usize,
-    fe: usize,
-    e: usize,
-    locked_g: Option<usize>,
-    thread: usize,
-    owner: u32,
-    epoch: u64,
-) -> Result<Context, &'static str> {
-    context_for_kind(base, fe, e, locked_g, thread, (owner, epoch), 0x49)
-}
-
 /// Class comes from the current saved-row binding; never changes the native kind/index.
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn context_for_kind(
     base: usize, fe: usize, e: usize, locked_g: Option<usize>,
     thread: usize, owner_epoch: (u32, u64), kind: u32,
@@ -161,7 +148,7 @@ pub(crate) unsafe fn context_for_kind(
         return Err("adapter: current row/entry identity changed");
     }
     let binding = Binding {
-        // Caller owns the generation; diagnostic wrappers deliberately use zero.
+        // Caller owns the generation.
         epoch,
         owner,
         entry: fe,
@@ -176,7 +163,7 @@ pub(crate) unsafe fn context_for_kind(
     Ok(Context { binding, thread })
 }
 
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn tokens(t: Tokens) -> ValueTokens {
     ValueTokens {
         outfit: t.outfit,
@@ -197,12 +184,12 @@ impl From<ValueTokens> for Tokens {
         }
     }
 }
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) struct PoolLock {
     pub(crate) g: usize,
     unlock: unsafe extern "C" fn(usize),
 }
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 impl PoolLock {
     pub(crate) unsafe fn acquire(base: usize, g: usize) -> Self {
         let lock: unsafe extern "C" fn(usize) = std::mem::transmute(base + LOCK);
@@ -211,20 +198,64 @@ impl PoolLock {
         Self { g, unlock }
     }
 }
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 impl Drop for PoolLock {
     fn drop(&mut self) {
         unsafe { (self.unlock)(self.g) }
     }
 }
-/// The single CharInfo write primitive used by diagnostic and alpha adapters. All validation
+/// The single CharInfo write primitive used by saved adapters. All validation
 /// must precede this call. Native shared_ptr bytes +58..68 are deliberately untouched.
-#[cfg(any(feature = "mii-native-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn copy_update(record: usize, update: &RecordUpdate) {
     for (offset, byte) in update.charinfo().iter().enumerate() {
         wr(record, offset, *byte);
     }
 }
-#[cfg(any(feature = "mii-cpu-adapter-probe", feature = "mii-saved-alpha"))]
+#[cfg(feature = "mii-saved-alpha")]
 #[path = "mii_native_cpu_scope.rs"]
 pub(crate) mod cpu;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_tokens_touches_exactly_the_documented_offsets() {
+        let mut e = vec![0xAAu8; 0x260];
+        let mut fe = vec![0xBBu8; 0x100];
+        let mut d = vec![0xCCu8; 0x3a0];
+        let mut o = vec![0xDDu8; 0xa0];
+        let tokens = Tokens { outfit: 0x29, hat: 0x7, colour: 5, voice: 37, specials: [0, 1, 2, 1] };
+        unsafe {
+            write_tokens(
+                &Targets { e: e.as_mut_ptr() as usize, fe: fe.as_mut_ptr() as usize, d: d.as_mut_ptr() as usize, o: o.as_mut_ptr() as usize },
+                tokens,
+            );
+        }
+        let mut xe = vec![0xAAu8; 0x260];
+        xe[0x1aa..0x1ac].copy_from_slice(&0x29u16.to_le_bytes());
+        xe[0x1ae..0x1b0].copy_from_slice(&5u16.to_le_bytes());
+        xe[0x1b0..0x1b2].copy_from_slice(&37u16.to_le_bytes());
+        xe[0x1b2..0x1b6].copy_from_slice(&[0, 1, 2, 1]);
+        assert_eq!(e, xe, "E: outfit, colour, voice, specials only (hat E+0x1ac untouched)");
+        let mut xfe = vec![0xBBu8; 0x100];
+        xfe[0x48..0x4a].copy_from_slice(&0x29u16.to_le_bytes());
+        xfe[0x4c..0x4e].copy_from_slice(&5u16.to_le_bytes());
+        xfe[0x4e..0x50].copy_from_slice(&37u16.to_le_bytes());
+        assert_eq!(fe, xfe, "FE: +0x48, +0x4c, +0x4e only (record index +0x46 and hat +0x4a untouched)");
+        let mut xd = vec![0xCCu8; 0x3a0];
+        xd[0x74..0x76].copy_from_slice(&0x29u16.to_le_bytes());
+        xd[0x78..0x7a].copy_from_slice(&5u16.to_le_bytes());
+        for (i, s) in [0u32, 1, 2, 1].iter().enumerate() {
+            xd[0x390 + i * 4..0x394 + i * 4].copy_from_slice(&s.to_le_bytes());
+        }
+        assert_eq!(d, xd, "D: +0x74, +0x78, +0x390..0x39c only");
+        assert_eq!(d[0x7a..0x7c], [0xCC, 0xCC], "D+0x7a is not a voice mirror and is never written");
+        let mut xo = vec![0xDDu8; 0xa0];
+        xo[0x6c..0x70].copy_from_slice(&0x29u32.to_le_bytes());
+        xo[0x74..0x78].copy_from_slice(&5u32.to_le_bytes());
+        xo[0x78..0x7c].copy_from_slice(&37u32.to_le_bytes());
+        assert_eq!(o, xo, "O: +0x6c, +0x74, +0x78 only (hat +0x70, flags +0x7c.., textures +0x90.. untouched)");
+    }
+}

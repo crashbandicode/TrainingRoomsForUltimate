@@ -125,7 +125,7 @@ unsafe fn stage_update(ctx: &mut InlineCtx) {
     };
     let in_scope = mode.initialized
         && (crate::runtime::compat::common::is_native_training_mode()
-            || crate::runtime::lobby::lobby_stage_probe::qualified_waiting(mode.mode, mode.melee));
+            || crate::runtime::lobby::lobby_stage::qualified_waiting(mode.mode, mode.melee));
     if !in_scope {
         #[cfg(feature = "practice-stage-request-alpha")]
         crate::runtime::lobby::practice_stage_request::depart();

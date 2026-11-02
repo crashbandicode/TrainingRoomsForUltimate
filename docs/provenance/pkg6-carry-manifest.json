@@ -72,8 +72,8 @@
    "native_keyboard": "crate::runtime::mii::native_keyboard",
    "training_stage_rotation": "crate::runtime::lobby::training_stage_rotation",
    "practice_stage_request": "crate::runtime::lobby::practice_stage_request",
-   "practice_stage_observer": "crate::runtime::lobby::practice_stage_observer",
-   "lobby_stage_probe": "crate::runtime::lobby::lobby_stage_probe",
+   "practice_stage_observer": "crate::runtime::lobby::practice_stage",
+   "lobby_stage_probe": "crate::runtime::lobby::lobby_stage",
    "common::filesystem": "crate::runtime::compat::filesystem",
    "common::menu::QUICK_MENU_APP": "crate::runtime::compat::menu_app::QUICK_MENU_APP",
    "common::menu::MENU_RECEIVED_INPUT": "crate::runtime::compat::menu_app::MENU_RECEIVED_INPUT",
@@ -1606,21 +1606,51 @@
    "dest": "src/model/p1/mod.rs",
    "crate": "root",
    "src_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f",
-   "dest_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f"
+   "dest_sha256": "884bfed2072b7cfea4a409bccc7f68fac823bfa45ab764faed425c2135496bde",
+   "edits": [
+    {
+     "old": "/// Original draft encoder retained, unverified against native input at runtime.\npub fn encode(buttons: u32, stick_x: f32, stick_y: f32) -> u64 {\n    let axis = |value: f32| -> u8 {\n        let units = if value.is_finite() {\n            (value * 120.0).round().clamp(-120.0, 120.0)\n        } else {\n            0.0\n        };\n        (units as i8) as u8\n    };\n    u64::from(buttons) | (u64::from(axis(stick_x)) << 32) | (u64::from(axis(stick_y)) << 40)\n}\n\n/// Existing walk-off proposal: nearer edge, then down/out in air. Native\n/// ledge/drop-through behavior remains root-owned and runtime-unverified.\npub fn walk_off(p1_x: f32, left_edge: f32, right_edge: f32, grounded: bool) -> u64 {\n    let out = if (right_edge - p1_x) <= (p1_x - left_edge) {\n        1.0\n    } else {\n        -1.0\n    };\n    encode(0, out, if grounded { 0.0 } else { -1.0 })\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "Delete uncalled and untested draft encode/walk_off proposals; native pilot uses ssbu_cpu_pilot_core pad primitives and its existing direction logic."
+    }
+   ]
   },
   {
    "src": "src/cpu_pilot/config.rs",
    "dest": "src/model/p1/config.rs",
    "crate": "root",
    "src_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6",
-   "dest_sha256": "95fe12d7bf4ea95b9594976af6fc517773845447cc92a832573807c20cd030d6"
+   "dest_sha256": "0ceaab1c2583a6a0f4b9980a555a5acd118ee1a95b60e1623c18dfaa6ff43ef5",
+   "edits": [
+    {
+     "old": "pub fn from_json(input:",
+     "new": "#[cfg(test)]\npub fn from_json(input:",
+     "count": 1,
+     "reason": "JSON fixture convenience is called only by retained host tests; runtime deserializes JsonConfig then invokes TryFrom."
+    }
+   ]
   },
   {
    "src": "src/cpu_pilot/move_observer.rs",
    "dest": "src/model/p1/move_observer.rs",
    "crate": "root",
    "src_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325",
-   "dest_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325"
+   "dest_sha256": "b3cdaf8954d0c3e02cca4f81e23415e192bdef0d4c1396c01292c178a3af4a17",
+   "edits": [
+    {
+     "old": "    pub fn active_family(",
+     "new": "    #[cfg(test)]\n    pub fn active_family(",
+     "count": 1,
+     "reason": "Scope host-test inspection/reset helper to tests; native observer uses default and step, unchanged."
+    },
+    {
+     "old": "    pub fn reset(",
+     "new": "    #[cfg(test)]\n    pub fn reset(",
+     "count": 1,
+     "reason": "Scope host-test inspection/reset helper to tests; native observer uses default and step, unchanged."
+    }
+   ]
   },
   {
    "src": "src/cpu_pilot/move_observer_tests.rs",
@@ -1746,7 +1776,7 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "36af83e1cd6bfceaffa875a8589b90fd03295db6172bfdc7754179a907e81f33",
+   "dest_sha256": "7d4bafd3d244520a06f9991c98b5dbeb132279661e52d72cdf1ba9fd1592333a",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
@@ -1767,6 +1797,12 @@
      "old": "    // stream; THINKING brackets it for the input recorder.\n    THINKING.store(true, Ordering::Release);\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n    THINKING.store(false, Ordering::Release);\n",
      "new": "    // stream.\n    let decision = core_native::think(BASE.load(Ordering::Relaxed), n, &mut run.random);\n",
      "reason": "the bracket's only reader is removed (see the first edit)"
+    },
+    {
+     "old": "// Retain the reviewed host-test API/helpers without changing frozen core files.\n#[allow(dead_code)]\n",
+     "new": "",
+     "count": 1,
+     "reason": "Remove broad module suppression after scoping test-only helpers and deleting uncalled draft encoders; native pilot still uses shared core_pad."
     }
    ]
   },
@@ -1947,7 +1983,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "dae3e402ce488daab6951351a5c90c162cd1f9cd6f8a5d1177668daa38006537",
+   "dest_sha256": "c27d67b63cea2c8a7111de6a3b75511cf200079a38f674c61caf78d57cf4d06b",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -2070,6 +2106,90 @@
      "new": "",
      "count": 1,
      "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "/// Development-only one-shot identical-descriptor reload of P1's native Mii in Training.\n/// It observes whether a same-kind state-3 cycle re-creates the body and re-runs the native\n/// Mii resource rebuild. No descriptor byte, record, saved entry or information block is\n/// written, except that `mii-special-change-probe` writes the neutral special of the bound saved\n/// row and information block, and `mii-fullconfig-probe` writes the full alternate configuration\n/// (`crate::runtime::mii::mii_fullconfig_probe`, shot 1) and restores it (shot 2) on the same live entry.\n/// The install token is held until native completion or entry destruction.\n#[cfg(feature = \"mii-identical-reload-probe\")]\npub(crate) mod mii_reload_probe {\n    use super::*;\n    #[cfg(feature = \"mii-cpu-adapter-probe\")]\n    use crate::runtime::mii::mii_fullconfig_probe::{ack, ack_phase};\n\n    const ARM_FILE: &str = \"sd:/ultimate/TrainingRooms/mii_probe.arm\";\n    /// Second arm file required by the special-change variant; both must exist.\n    const CHANGE_ARM_FILE: &str = \"sd:/ultimate/TrainingRooms/mii_special_probe.arm\";\n    const CHANGE: bool = cfg!(feature = \"mii-special-change-probe\");\n    /// Full-configuration variant: both shots go through `crate::runtime::mii::mii_fullconfig_probe::step`.\n    const FULL: bool = cfg!(feature = \"mii-fullconfig-probe\");\n    const TARGET_OWNER: u32 = if cfg!(feature = \"mii-cpu-adapter-probe\") { 1 } else { 0 };\n    /// Identical reload: one shot. Special change: shot 1 changes, shot 2 restores.\n    const MAX_SHOTS: usize = if CHANGE || FULL { 2 } else { 1 };\n\n    #[derive(Clone, Copy, Debug)]\n    struct Track {\n        token: InstallToken,\n        entry: usize,\n        kind: u32,\n        ticks: usize,\n        phase: u32,\n        saw_reload: bool,\n        departed: bool,\n    }\n\n    static ARMED: AtomicBool = AtomicBool::new(false);\n    static FIRED: AtomicBool = AtomicBool::new(false);\n    static SHOTS: AtomicUsize = AtomicUsize::new(0);\n\n    /// Shot-1 record. `fe` is the live entry's identity only: it is compared with callback\n    /// arguments and never dereferenced. `original` held equal `E+0x1b2..` and `D+0x390..` values.\n    #[derive(Clone, Copy, Debug)]\n    struct ChangeState {\n        fe: usize,\n        id: u32,\n        e: usize,\n        original: [u8; 4],\n        written: u8,\n        changed: bool,\n    }\n\n    impl ChangeState {\n        /// Saved-row specials expected while shot 1 is in effect.\n        fn changed_tuple(&self) -> [u8; 4] {\n            [self.written, self.original[1], self.original[2], self.original[3]]\n        }\n    }\n    static ORIGINAL: Mutex<Option<ChangeState>> = Mutex::new(None);\n    static REQUESTED: AtomicBool = AtomicBool::new(false);\n    static HELD: AtomicBool = AtomicBool::new(false);\n    static TRACK: Mutex<Option<Track>> = Mutex::new(None);\n\n    pub fn init() {\n        let armed = std::path::Path::new(ARM_FILE).exists()\n            && (!CHANGE || std::path::Path::new(CHANGE_ARM_FILE).exists());\n        // Third arm file and the fingerprint-gated hook installation of the full-configuration probe.\n        #[cfg(feature = \"mii-fullconfig-probe\")]\n        let armed = armed && crate::runtime::mii::mii_fullconfig_probe::armed();\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        let armed = armed && ack::init();\n        ARMED.store(armed, Ordering::Relaxed);\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        trace!(\"[MiiCpuAdapter] armed={} target_owner=1 native_training_only=true ordinary_observation_once=true old_p1_mutation_disabled=true\", armed);\n        trace!(\"[MiiReloadProbe] armed={} arm_file={} change={} change_arm_file={} full={} max_shots={}\",\n            armed, ARM_FILE, CHANGE, CHANGE_ARM_FILE, FULL, MAX_SHOTS);\n    }\n\n    unsafe fn permitted() -> bool {\n        crate::runtime::compat::common::is_native_training_mode()\n            && crate::runtime::compat::common::is_ready_go()\n            && !menu::captures_input()\n            && !INSTALL.active()\n            && !training::save_states::is_loading()\n            && !training::recording_or_playback()\n            && !crate::runtime::compat::replay_preview::occupied()\n    }\n\n    /// L3+X edge while permitted requests the one shot; the chord is consumed like the\n    /// item-state probe does. Both features cannot be enabled together (lib.rs guard).\n    pub unsafe fn handle_input(out: &mut MappedInputs, click: bool, x: bool) {\n        let held = click && x;\n        let was_held = HELD.swap(held, Ordering::Relaxed);\n        if !held || !permitted() {\n            return;\n        }\n        *out = MappedInputs::empty();\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        if !ack::inputs_enabled() { return; }\n        if held && !was_held && ARMED.load(Ordering::Relaxed) && !FIRED.load(Ordering::Relaxed)\n            && SHOTS.load(Ordering::Relaxed) < MAX_SHOTS\n        {\n            REQUESTED.store(true, Ordering::Relaxed);\n            trace!(\"[MiiReloadProbe] requested; waiting for a ready native Mii entry for owner {}\", TARGET_OWNER);\n        }\n    }\n\n    unsafe fn info_block(entry: *const u8) -> (u16, u8, u16) {\n        let d = read::<*const u8>(entry, 0xf8);\n        if aligned(d) {\n            (read::<u16>(d, 0x72), read::<u8>(d, 0x94), read::<u16>(entry, 0x46))\n        } else {\n            (u16::MAX, u8::MAX, read::<u16>(entry, 0x46))\n        }\n    }\n\n    /// Runs inside the native service callback with the live entry. Returns true while this\n    /// probe owns the entry's reload so the roster path leaves that tick alone.\n    pub(super) unsafe fn service(entry: *mut u8, owner: u32, role: Role, _service_entry_lr: usize) -> bool {\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        if owner == 0 && ARMED.load(Ordering::Relaxed)\n            && crate::runtime::mii::mii_fullconfig_probe::cpu_ordinary_pending() && permitted()\n        {\n            crate::runtime::mii::mii_fullconfig_probe::observe_cpu_ordinary(entry);\n        }\n        let tracked = *TRACK.lock().unwrap();\n        if let Some(mut track) = tracked {\n            if track.entry != entry as usize {\n                return false;\n            }\n            track.ticks += 1;\n            let phase = u32::from(read::<u8>(entry, 0x5920))\n                | (u32::from(read::<u8>(entry, 0x591c)) << 8)\n                | (u32::from(read::<u8>(entry, 0x5935)) << 16);\n            if phase & 255 == 3 {\n                track.saw_reload = true;\n            }\n            if phase != track.phase {\n                track.phase = phase;\n                trace!(\n                    \"[MiiReloadProbe] phase owner={} outer={} loader={} guard={} tick={}\",\n                    owner, phase & 255, (phase >> 8) & 255, phase >> 16, track.ticks\n                );\n            }\n            if track.saw_reload\n                && ready_single_mii(entry, owner) == Some(track.kind)\n                && read::<u8>(entry, 0x5918) == 0\n            {\n                let body = read::<*const u8>(entry, 0x4160);\n                let body_id = read::<u32>(body, 8);\n                let (d72, d94, fe46) = info_block(entry);\n                trace!(\n                    \"[MiiReloadProbe] complete owner={} kind=0x{:x} ticks={} body_id=0x{:x} fe46=0x{:x} d72=0x{:x} d94={}\",\n                    owner, track.kind, track.ticks, body_id, fe46, d72, d94\n                );\n                #[cfg(feature = \"mii-fullconfig-probe\")]\n                crate::runtime::mii::mii_fullconfig_probe::on_complete(entry, _service_entry_lr);\n                #[cfg(not(feature = \"mii-cpu-adapter-probe\"))]\n                finish_install(track.token, \"identical reload probe complete\");\n                #[cfg(feature = \"mii-cpu-adapter-probe\")]\n                let finished = finish_install(track.token, \"identical reload probe complete\");\n                *TRACK.lock().unwrap() = None;\n                #[cfg(feature = \"mii-cpu-adapter-probe\")]\n                ack::complete(ack_phase(), serde_json::json!({\"owner\":owner,\"kind\":track.kind,\n                    \"entry\":ack::hex(entry as usize),\"ticks\":track.ticks,\"saw_reload\":track.saw_reload,\n                    \"departed\":track.departed,\"body_id\":body_id,\n                    \"fe46\":fe46,\"d72\":d72,\"d94\":d94}), finished, INSTALL.active());\n                return true;\n            }\n            if track.ticks == 600 {\n                #[cfg(feature = \"mii-cpu-adapter-probe\")]\n                ack::terminal(ack::STALLED, ack_phase(), \"native_reload_stalled\",\n                    serde_json::json!({\"entry\":ack::hex(entry as usize),\"ticks\":track.ticks,\n                        \"native_phase\":phase,\"departed\":track.departed,\"install_active\":INSTALL.active()}));\n                trace!(\n                    \"[MiiReloadProbe] stalled owner={} phase=0x{:x} departed={}; token retained until native completion or destruction\",\n                    owner, phase, track.departed\n                );\n            }\n            // Preserve a departure recorded by the scene callback while this\n            // service tick observed the native loader.\n            if let Some(current) = TRACK.lock().unwrap().as_mut() {\n                if current.entry == track.entry && current.token == track.token {\n                    current.ticks = track.ticks;\n                    current.phase = track.phase;\n                    current.saw_reload = track.saw_reload;\n                }\n            }\n            return true;\n        }\n        let target_role = if TARGET_OWNER == 0 { Role::Player } else { Role::Cpu };\n        if !REQUESTED.load(Ordering::Relaxed) || owner != TARGET_OWNER || role != target_role {\n            return false;\n        }\n        // Native Training only; the waiting room and LDN scopes are out of this probe's scope.\n        if scope(role).is_none_or(|s| s.waiting()) || !permitted() {\n            return false;\n        }\n        let Some(kind) = ready_single_mii(entry, owner) else {\n            return false;\n        };\n        {\n            let state = state_for(role).lock().unwrap();\n            if state.active.is_some() || state.pending.is_some() {\n                return false;\n            }\n        }\n        let Some(token) = INSTALL.try_begin(true) else {\n            return false;\n        };\n        REQUESTED.store(false, Ordering::Relaxed);\n        if CHANGE {\n            // Writes exactly u8 E+0x1b2 and u32 D+0x390 (shot 1: (n+1)%3; shot 2: originals) after the\n            // table-based binding verified the row. Nothing else is written. Failure releases the\n            // token immediately because no install was issued.\n            if !change_step(entry) {\n                finish_install(token, \"special change probe refused (binding or shot state)\");\n                return false;\n            }\n        }\n        // Full configuration: shot 0 applies the alternate saved configuration, shot 1 restores the\n        // captured one. Both run before the descriptor copy below so the copy carries the written\n        // tokens. A refusal writes nothing and releases the token (no install was issued).\n        #[cfg(feature = \"mii-fullconfig-probe\")]\n        if !crate::runtime::mii::mii_fullconfig_probe::step(entry, SHOTS.load(Ordering::Relaxed), _service_entry_lr) {\n            #[cfg(not(feature = \"mii-cpu-adapter-probe\"))]\n            finish_install(token, \"full configuration probe refused (see [MiiFullProbe] lines)\");\n            #[cfg(feature = \"mii-cpu-adapter-probe\")]\n            {\n                let finished = finish_install(token, \"full configuration probe refused (see [MiiFullProbe] lines)\");\n                ack::terminal(ack::REFUSED, (SHOTS.load(Ordering::Relaxed) + 1) as u8, \"step_refused\", serde_json::json!({\n                    \"reason\":ack::take_refusal(),\"entry\":ack::hex(entry as usize),\"writes_committed\":false,\n                    \"committed_phase\":ack_phase(),\n                    \"install_finished\":finished,\"install_active_after\":INSTALL.active()}));\n            }\n            return false;\n        }\n        let shots = SHOTS.fetch_add(1, Ordering::Relaxed) + 1;\n        if shots >= MAX_SHOTS {\n            FIRED.store(true, Ordering::Relaxed);\n        }\n        // Identical descriptor: the live 0x70-byte descriptor is copied without any change.\n        let mut descriptor = [0u64; 14];\n        std::ptr::copy_nonoverlapping(entry as *const u8, descriptor.as_mut_ptr().cast::<u8>(), 0x70);\n        let (d72, d94, fe46) = info_block(entry);\n        trace!(\n            \"[MiiReloadProbe] install owner={} entry=0x{:x} kind=0x{:x} count={} fe46=0x{:x} d72=0x{:x} d94={} body_id=0x{:x}\",\n            owner, entry as usize, kind, read::<u32>(entry, 0x14), fe46, d72, d94,\n            read::<u32>(read::<*const u8>(entry, 0x4160), 8)\n        );\n        *TRACK.lock().unwrap() = Some(Track {\n            token,\n            entry: entry as usize,\n            kind,\n            ticks: 0,\n            phase: u32::MAX,\n            saw_reload: false,\n            departed: false,\n        });\n        training::clear_session_state();\n        let install: unsafe extern \"C\" fn(*mut u8, *const u64, *const u8) =\n            std::mem::transmute(BASE.load(Ordering::Acquire) + 0x653240);\n        install(entry, descriptor.as_ptr(), [1u8, 0, 0].as_ptr());\n        true\n    }\n\n    unsafe fn row_specials(e: usize) -> [u8; 4] {\n        let e = e as *const u8;\n        [read(e, 0x1b2), read(e, 0x1b3), read(e, 0x1b4), read(e, 0x1b5)]\n    }\n\n    /// Shot 1 writes the neutral special (`E+0x1b2`, `D+0x390`) to `(n+1)%3` when all four bound\n    /// specials are within 0..=2. Shot 2 restores both on the same live entry, only while the row\n    /// still holds the shot-1 tuple. Both shots require a fresh table binding of the live callback\n    /// argument; any mismatch writes nothing.\n    unsafe fn change_step(entry: *mut u8) -> bool {\n        let Some(bound) = crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) else {\n            trace!(\"[MiiSpecialProbe] refused: live entry could not be bound to a consistent saved row\");\n            return false;\n        };\n        let d = read::<*const u8>(entry, 0xf8);\n        if !aligned(d) {\n            return false;\n        }\n        let d = d as usize;\n        let fe = entry as usize;\n        // The binding guarantees `D+0x390..` equals these values.\n        let current = row_specials(bound.e);\n        let mut original = ORIGINAL.lock().unwrap();\n        match (SHOTS.load(Ordering::Relaxed), *original) {\n            (0, None) if current.iter().all(|&n| n <= 2) => {\n                let written = (current[0] + 1) % 3;\n                std::ptr::write_volatile((bound.e + 0x1b2) as *mut u8, written);\n                std::ptr::write_volatile((d + 0x390) as *mut u32, u32::from(written));\n                *original = Some(ChangeState { fe, id: bound.id, e: bound.e, original: current, written, changed: true });\n                trace!(\"[MiiSpecialProbe] shot1 id={} fe=0x{:x} e=0x{:x} kind=0x{:x} neutral {} -> {} (E+0x1b2, D+0x390 written; identical reload follows)\",\n                    bound.id, fe, bound.e, bound.kind, current[0], written);\n                true\n            }\n            (1, Some(o)) if o.changed && o.fe == fe && o.id == bound.id && o.e == bound.e\n                && current == o.changed_tuple() =>\n            {\n                std::ptr::write_volatile((bound.e + 0x1b2) as *mut u8, o.original[0]);\n                std::ptr::write_volatile((d + 0x390) as *mut u32, u32::from(o.original[0]));\n                *original = Some(ChangeState { changed: false, ..o });\n                trace!(\"[MiiSpecialProbe] shot2 id={} fe=0x{:x} restored neutral {} (E+0x1b2, D+0x390; identical reload follows)\",\n                    bound.id, fe, o.original[0]);\n                true\n            }\n            (shot, state) => {\n                trace!(\"[MiiSpecialProbe] refused: shot={} state={:?} bound=({}, 0x{:x}) fe=0x{:x} current={:?}\",\n                    shot, state, bound.id, bound.e, fe, current);\n                false\n            }\n        }\n    }\n\n    /// The exact shot-1 entry is being destroyed: end the experiment and consume its record. A row\n    /// still holding the shot-1 tuple is restored only through a fresh table binding of this live\n    /// argument; otherwise nothing is written. `D` belongs to the dying entry and is never written.\n    unsafe fn end_change_on_destroy(entry: *const u8) {\n        let Some(o) = ORIGINAL.lock().unwrap().take_if(|o| o.fe == entry as usize) else {\n            return;\n        };\n        FIRED.store(true, Ordering::Relaxed);\n        if !o.changed {\n            trace!(\"[MiiSpecialProbe] ended on entry destruction id={} fe=0x{:x}; row already restored\", o.id, o.fe);\n            return;\n        }\n        match crate::runtime::mii::mii_identity_probe::bind_saved_entry(entry) {\n            Some(b) if b.id == o.id && b.e == o.e && row_specials(b.e) == o.changed_tuple() => {\n                std::ptr::write_volatile((o.e + 0x1b2) as *mut u8, o.original[0]);\n                trace!(\"[MiiSpecialProbe] restored E+0x1b2={} on entry destruction id={} fe=0x{:x}\",\n                    o.original[0], o.id, o.fe);\n            }\n            bound => trace!(\n                \"[MiiSpecialProbe] restore refused on entry destruction id={} fe=0x{:x} bound={:?}: saved-row ownership not re-established; E+0x1b2 not written (expected {})\",\n                o.id, o.fe, bound.map(|b| (b.id, b.e)), o.written\n            ),\n        }\n    }\n\n    /// Native destruction ends the install like the roster path: the token is finished here,\n    /// never on a tick count.\n    pub unsafe fn on_destroy(entry: *const u8) {\n        if CHANGE {\n            end_change_on_destroy(entry);\n        }\n        #[cfg(feature = \"mii-fullconfig-probe\")]\n        crate::runtime::mii::mii_fullconfig_probe::on_destroy(entry);\n        #[cfg(not(feature = \"mii-cpu-adapter-probe\"))]\n        {\n        let mut track = TRACK.lock().unwrap();\n        if track.is_some_and(|t| t.entry == entry as usize) {\n            let t = track.take().unwrap();\n            finish_install(t.token, \"identical reload probe entry destroyed\");\n            trace!(\n                \"[MiiReloadProbe] entry destroyed entry=0x{:x} ticks={} departed={} saw_reload={}\",\n                entry as usize, t.ticks, t.departed, t.saw_reload\n            );\n        }\n        }\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        {\n            let taken = {\n                let mut track = TRACK.lock().unwrap();\n                track.take_if(|t| t.entry == entry as usize)\n            };\n            if let Some(t) = taken {\n                let finished = finish_install(t.token, \"identical reload probe entry destroyed\");\n                trace!(\"[MiiReloadProbe] entry destroyed entry=0x{:x} ticks={} departed={} saw_reload={}\",\n                    entry as usize, t.ticks, t.departed, t.saw_reload);\n                ack::terminal(ack::DESTROYED, ack_phase(), \"entry_destroyed\",\n                    serde_json::json!({\"entry\":ack::hex(entry as usize),\"ticks\":t.ticks,\n                        \"departed\":t.departed,\"saw_reload\":t.saw_reload,\"install_finished\":finished,\n                        \"install_active_after\":INSTALL.active(),\"track_cleared\":true}));\n            } else if ack::observed_entry() == entry as usize {\n                ack::terminal(ack::DESTROYED, ack_phase(), \"entry_destroyed_no_pending_install\",\n                    serde_json::json!({\"entry\":ack::hex(entry as usize),\"install_active\":INSTALL.active(),\n                        \"cleanup_writes\":false}));\n            }\n        }\n    }\n\n    pub fn scene_changed() {\n        REQUESTED.store(false, Ordering::Relaxed);\n        // No live entry here: end the experiment, but never write the static row from this callback.\n        if CHANGE {\n            if let Some(o) = *ORIGINAL.lock().unwrap() {\n                FIRED.store(true, Ordering::Relaxed);\n                trace!(\"[MiiSpecialProbe] ended on scene departure id={} changed={}; restoration left to entry 0x{:x} destruction\",\n                    o.id, o.changed, o.fe);\n            }\n        }\n        #[cfg(feature = \"mii-fullconfig-probe\")]\n        crate::runtime::mii::mii_fullconfig_probe::scene_changed();\n        if let Some(t) = TRACK.lock().unwrap().as_mut() {\n            t.departed = true;\n            trace!(\"[MiiReloadProbe] scene departure during reload; native teardown owns cancellation\");\n        }\n        #[cfg(feature = \"mii-cpu-adapter-probe\")]\n        if ack::observed_entry() != 0 {\n            let tracked = *TRACK.lock().unwrap();\n            ack::terminal(ack::DEPARTED, ack_phase(), \"scene_departure\", serde_json::json!({\n                \"observed_entry\":ack::hex(ack::observed_entry()),\n                \"pending_entry\":tracked.map(|t| ack::hex(t.entry)),\n                \"install_active\":INSTALL.active(),\"cleanup_writes\":false,\n                \"entry_destroyed\":false}));\n        }\n    }\n}\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identity-probe\")]\n    crate::runtime::mii::mii_identity_probe::forget(std::ptr::null());\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identical-reload-probe\")]\n    mii_reload_probe::scene_changed();\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    feature = \"mii-identical-reload-probe\",\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identity-probe\")]\n    crate::runtime::mii::mii_identity_probe::observe_entry(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-saved-file-probe\")]\n    crate::runtime::mii::mii_saved_file_probe::on_service(entry, owner);\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identical-reload-probe\")]\n    if mii_reload_probe::service(entry, owner, role, _caller_lr) {\n        return;\n    }\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identity-probe\")]\n    crate::runtime::mii::mii_identity_probe::forget(entry);\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "    #[cfg(feature = \"mii-identical-reload-probe\")]\n    mii_reload_probe::on_destroy(entry);\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "#[cfg(any(feature = \"mii-cpu-adapter-probe\", feature = \"mii-saved-alpha\"))]",
+     "new": "#[cfg(feature = \"mii-saved-alpha\")]",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "#[cfg(any(feature = \"mii-cpu-adapter-probe\",feature=\"mii-saved-alpha\"))]",
+     "new": "#[cfg(feature=\"mii-saved-alpha\")]",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "/// Existing readiness readers only; no native calls or Rust mutexes (also used under G lock).\n#[cfg(feature = \"mii-cpu-adapter-probe\")]\npub(crate) unsafe fn mii_cpu_probe_visible_ready(entry: *const u8, owner: u32) -> bool {\n    mii_saved_cpu_visible_ready(entry, owner, 0x49)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "der installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping\", cfg!(feature = \"waiting-roster-reload\"));\n    }\n}\n\n",
+     "new": "der installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping\", cfg!(feature = \"waiting-roster-reload\"));\n    }\n}\n",
+     "count": 1,
+     "reason": "Remove blank EOF left by retired final probe module."
+    },
+    {
+     "old": "#[cfg(feature = \"mii-saved-alpha\")]\npub(crate) unsafe fn mii_saved_cpu_visible_ready",
+     "new": "/// Existing readiness readers only; no native calls or Rust mutexes (also used under G lock).\n#[cfg(feature = \"mii-saved-alpha\")]\npub(crate) unsafe fn mii_saved_cpu_visible_ready",
+     "count": 1,
+     "reason": "Retain shared readiness contract after deleting the diagnostic wrapper."
     }
    ]
   },
@@ -2238,7 +2358,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "d58e86a2e79a6c38b89727d2734656b204592da044c3ee7c0281183a8489fa66",
+   "dest_sha256": "876206adbd0cf3f62753fe337127aef122db8e9f59d829c16261d14c22ce2d91",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -2471,6 +2591,12 @@
      "new": "state.book.release(live.token);",
      "count": 1,
      "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"native-body-bank-alpha\"), allow(dead_code))] // Its only caller is the body bank.",
+     "new": "#[cfg(feature = \"native-body-bank-alpha\")] // Its only caller is the body bank.",
+     "count": 1,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
     }
    ]
   },
@@ -2493,7 +2619,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "07a2810103e45d4bf1106f3a6e9a357fd8fefe9173f7f52fa1d214aa22459b85",
+   "dest_sha256": "ff64f913efbdf7863f9482d4c9e974c27ea5cc80ed5feaf399ded26f42e24be4",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -2648,6 +2774,12 @@
      "new": "feature = \"managed-ldn-third-source-alpha\"",
      "count": 1,
      "reason": "Retire served source-lifecycle observer under conditional pkg6 approval: no shipped or test consumer; keep source-book mutation and release ordering."
+    },
+    {
+     "old": "#[cfg_attr(not(all(feature = \"mii-saved-alpha\",\n        any(feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\"))), allow(dead_code))]",
+     "new": "#[cfg(all(feature = \"mii-saved-alpha\",\n        any(feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\")))]",
+     "count": 1,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
     }
    ]
   },
@@ -2802,7 +2934,45 @@
    "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "0f4a8fa2fb4f59306735d854b3a8c118ca18b4a9bf98874b9df905d372c63032"
+   "dest_sha256": "cfffde8120f1d46dc3c13b233d99b392ebf0df1310890f8d80f0f32d8c3f94e4",
+   "edits": [
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
+     "new": "#[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn new",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn terminated",
+     "new": "#[cfg(any(test, feature = \"mii-editor-alpha\"))]\n    pub(crate) fn terminated",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub initialized",
+     "new": "#[cfg(feature = \"mii-editor-alpha\")]\n    pub initialized",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub state",
+     "new": "#[cfg(feature = \"mii-editor-alpha\")]\n    pub state",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "        let state = sdk_calc(&mut self.object);",
+     "new": "        #[cfg(feature = \"mii-editor-alpha\")]\n        let state = sdk_calc(&mut self.object);\n        #[cfg(not(feature = \"mii-editor-alpha\"))]\n        sdk_calc(&mut self.object);",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    },
+    {
+     "old": "                    initialized: self.initialized, finished: signals.finished,\n                    invalid: self.invalid, state })",
+     "new": "                    #[cfg(feature = \"mii-editor-alpha\")]\n                    initialized: self.initialized,\n                    finished: signals.finished, invalid: self.invalid,\n                    #[cfg(feature = \"mii-editor-alpha\")]\n                    state })",
+     "count": 1,
+     "reason": "Compile Mii-only keyboard result fields and constructors with their consumer; preserve native sdk_calc call and host constructor tests."
+    }
+   ]
   },
   {
    "src": "src/mii_identity_binding.rs",
@@ -2816,14 +2986,102 @@
    "dest": "src/runtime/mii/mii_native_access.rs",
    "crate": "root",
    "src_sha256": "eeddc0e5ea9cecd6ae48b4f82e9f25d7e9d2538138a9e742bb6d4224b77b1731",
-   "dest_sha256": "20f928c6ee7296716416d79317574e66e5dd191a56a4aadc1420199f832e0785"
+   "dest_sha256": "007e56d17a13d576d3e1490928d5a0be49bc2faa8aee39741b48d7754cb6b901",
+   "edits": [
+    {
+     "old": "/// Raw rederivation only: no manager lookup, native callback, logging, allocation or Rust mutex.\n/// With locked_g=Some, verify the current holder still names that mutex before reading its vector.\n#[cfg(feature = \"mii-native-adapter-probe\")]\npub(crate) unsafe fn context(\n    base: usize,\n    fe: usize,\n    e: usize,\n    locked_g: Option<usize>,\n    thread: usize,\n    owner: u32,\n    epoch: u64,\n) -> Result<Context, &'static str> {\n    context_for_kind(base, fe, e, locked_g, thread, (owner, epoch), 0x49)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "#[cfg(any(feature = \"mii-cpu-adapter-probe\", feature = \"mii-saved-alpha\"))]",
+     "new": "#[cfg(feature = \"mii-saved-alpha\")]",
+     "count": 2,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "#[cfg(any(feature = \"mii-native-adapter-probe\", feature = \"mii-saved-alpha\"))]",
+     "new": "#[cfg(feature = \"mii-saved-alpha\")]",
+     "count": 12,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "pub(crate) mod cpu;",
+     "new": "pub(crate) mod cpu;\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn write_tokens_touches_exactly_the_documented_offsets() {\n        let mut e = vec![0xAAu8; 0x260];\n        let mut fe = vec![0xBBu8; 0x100];\n        let mut d = vec![0xCCu8; 0x3a0];\n        let mut o = vec![0xDDu8; 0xa0];\n        let tokens = Tokens { outfit: 0x29, hat: 0x7, colour: 5, voice: 37, specials: [0, 1, 2, 1] };\n        unsafe {\n            write_tokens(\n                &Targets { e: e.as_mut_ptr() as usize, fe: fe.as_mut_ptr() as usize, d: d.as_mut_ptr() as usize, o: o.as_mut_ptr() as usize },\n                tokens,\n            );\n        }\n        let mut xe = vec![0xAAu8; 0x260];\n        xe[0x1aa..0x1ac].copy_from_slice(&0x29u16.to_le_bytes());\n        xe[0x1ae..0x1b0].copy_from_slice(&5u16.to_le_bytes());\n        xe[0x1b0..0x1b2].copy_from_slice(&37u16.to_le_bytes());\n        xe[0x1b2..0x1b6].copy_from_slice(&[0, 1, 2, 1]);\n        assert_eq!(e, xe, \"E: outfit, colour, voice, specials only (hat E+0x1ac untouched)\");\n        let mut xfe = vec![0xBBu8; 0x100];\n        xfe[0x48..0x4a].copy_from_slice(&0x29u16.to_le_bytes());\n        xfe[0x4c..0x4e].copy_from_slice(&5u16.to_le_bytes());\n        xfe[0x4e..0x50].copy_from_slice(&37u16.to_le_bytes());\n        assert_eq!(fe, xfe, \"FE: +0x48, +0x4c, +0x4e only (record index +0x46 and hat +0x4a untouched)\");\n        let mut xd = vec![0xCCu8; 0x3a0];\n        xd[0x74..0x76].copy_from_slice(&0x29u16.to_le_bytes());\n        xd[0x78..0x7a].copy_from_slice(&5u16.to_le_bytes());\n        for (i, s) in [0u32, 1, 2, 1].iter().enumerate() {\n            xd[0x390 + i * 4..0x394 + i * 4].copy_from_slice(&s.to_le_bytes());\n        }\n        assert_eq!(d, xd, \"D: +0x74, +0x78, +0x390..0x39c only\");\n        assert_eq!(d[0x7a..0x7c], [0xCC, 0xCC], \"D+0x7a is not a voice mirror and is never written\");\n        let mut xo = vec![0xDDu8; 0xa0];\n        xo[0x6c..0x70].copy_from_slice(&0x29u32.to_le_bytes());\n        xo[0x74..0x78].copy_from_slice(&5u32.to_le_bytes());\n        xo[0x78..0x7c].copy_from_slice(&37u32.to_le_bytes());\n        assert_eq!(o, xo, \"O: +0x6c, +0x74, +0x78 only (hat +0x70, flags +0x7c.., textures +0x90.. untouched)\");\n    }\n\n}\n",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "/// Class comes from the current saved-row binding; never changes the native kind/index.",
+     "new": "/// Raw rederivation only: no manager lookup, native callback, logging, allocation or Rust mutex.\n/// With locked_g=Some, verify the current holder still names that mutex before reading its vector.\n/// Class comes from the current saved-row binding; never changes the native kind/index.",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    },
+    {
+     "old": "// Caller owns the generation; diagnostic wrappers deliberately use zero.",
+     "new": "// Caller owns the generation.",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    },
+    {
+     "old": "/// The single CharInfo write primitive used by diagnostic and alpha adapters. All validation",
+     "new": "/// The single CharInfo write primitive used by saved adapters. All validation",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    },
+    {
+     "old": "    }\n\n}\n\n",
+     "new": "    }\n}\n",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    }
+   ]
   },
   {
    "src": "src/mii_native_cpu_scope.rs",
    "dest": "src/runtime/mii/mii_native_cpu_scope.rs",
    "crate": "root",
    "src_sha256": "35d892a35e1de3a48e9eef8a64d217343ff5ee8a3310a1b021cf90a73a35775b",
-   "dest_sha256": "497dfa986df279f6aecc82c45488730b407a3052c08a367302ed3a8e990cb8c4"
+   "dest_sha256": "3cb35dd2f125972e60de040890131483918a6a96c2df295ef5f55990842358b0",
+   "edits": [
+    {
+     "old": "/// Manager lookup and all Rust synchronization occur before taking the native G mutex.\n#[cfg(feature = \"mii-cpu-adapter-probe\")]\npub(crate) unsafe fn resolve(target: *const u8) -> Result<Live, &'static str> {\n    resolve_for_kind(target, 0x49)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "/// Exact native inactive single-form body shape, as in native_source::parked_ready, without\n/// its selectable-source catalog admission (native saved Miis are intentionally not in it).\n#[cfg(feature = \"mii-cpu-adapter-probe\")]\npub(crate) unsafe fn helper_ready(base: usize, fe: usize, id: u32) -> bool {\n    helper_ready_for_kind(base, fe, id, 0x49)\n}\n\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "#[cfg(feature = \"mii-cpu-adapter-probe\")]\npub(crate) unsafe fn snapshot(\n    entry: *const u8,\n    current: Context,\n) -> Result<Snapshot, &'static str> {\n    let live = resolve(entry)?;\n    let base = getRegionAddress(Region::Text) as usize;\n    let guard = PoolLock::acquire(base, current.binding.manager);\n    let fresh = context(\n        base,\n        entry as usize,\n        current.binding.row,\n        Some(guard.g),\n        current.thread,\n        current.binding.owner,\n        current.binding.epoch,\n    );\n    let result = match fresh {\n        Ok(fresh) if fresh == current => locked_snapshot(base, live, fresh),\n        _ => Err(\"CPU adapter: locked context changed\"),\n    };\n    drop(guard);\n    result\n}\n\n#[cfg(feature = \"mii-cpu-adapter-probe\")]\npub(crate) fn unchanged(expected: &Snapshot, current: &Snapshot) -> Result<(), &'static str> {\n    if expected.owners != current.owners {\n        return Err(\"CPU adapter: current owner associations changed\");\n    }\n    values::preserved_cpu_helpers(&expected.helpers, &current.helpers)\n        .map_err(|_| \"CPU adapter: native helper configuration/resource identity changed\")\n}\n",
+     "new": "",
+     "count": 1,
+     "reason": "not carried: Mii probe served (pkg6 confirmation, 2026-11-02); preserve shared saved/ordinary Mii access"
+    },
+    {
+     "old": "pub(crate) unsafe fn resolve_for_kind",
+     "new": "/// Manager lookup and all Rust synchronization occur before taking the native G mutex.\npub(crate) unsafe fn resolve_for_kind",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    },
+    {
+     "old": "pub(crate) unsafe fn helper_ready_for_kind",
+     "new": "/// Exact native inactive single-form body shape, as in native_source::parked_ready, without\n/// its selectable-source catalog admission (native saved Miis are intentionally not in it).\npub(crate) unsafe fn helper_ready_for_kind",
+     "count": 1,
+     "reason": "Retain shared primitive contracts after retiring wrappers and remove stale probe wording."
+    },
+    {
+     "old": " return Err(\"CPU adapter: identities changed during snapshot\");\n    }\n    Ok(Snapshot {\n        owners,\n        helpers: helpers.map(Option::unwrap),\n    })\n}\n\n",
+     "new": " return Err(\"CPU adapter: identities changed during snapshot\");\n    }\n    Ok(Snapshot {\n        owners,\n        helpers: helpers.map(Option::unwrap),\n    })\n}\n",
+     "count": 1,
+     "reason": "Remove blank EOF left by retired final probe module."
+    }
+   ]
   },
   {
    "src": "src/training_stage_rotation.rs",
@@ -2844,7 +3102,15 @@
    "dest": "src/runtime/mii/mii_backend.rs",
    "crate": "root",
    "src_sha256": "c8c330a103e9db5f5db5032b2550e349c549ef538ab67c55b2728ea9ff09fc89",
-   "dest_sha256": "3026d5ee1b6f8f2bcd570c3775b7c00fc8fad5ddfddb6387a4b7445aa3391e2a"
+   "dest_sha256": "2b21448a96a340178e7562487047376ad5ef8fc10526dc0371538668d3ee3a26",
+   "edits": [
+    {
+     "old": "#[cfg_attr(not(any(feature=\"mii-ordinary-player-alpha\",feature=\"mii-ordinary-cpu-alpha\")), allow(dead_code))]",
+     "new": "#[cfg(any(feature=\"mii-ordinary-player-alpha\",feature=\"mii-ordinary-cpu-alpha\"))]",
+     "count": 2,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
+    }
+   ]
   },
   {
    "src": "src/mii_catalog_request.rs",
@@ -2852,13 +3118,6 @@
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
    "dest_sha256": "628b44a3dd1652be29891482dd199b25404fc6c0e790ae6b648d9867cb5bb00d"
-  },
-  {
-   "src": "src/mii_cpu_adapter.rs",
-   "dest": "src/runtime/mii/mii_cpu_adapter.rs",
-   "crate": "root",
-   "src_sha256": "6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2",
-   "dest_sha256": "cce7fa18a6a055902b2b40beec13017ebb7e827caaa2eed722bd4ae2eb72e030"
   },
   {
    "src": "src/mii_hud_portrait.rs",
@@ -2892,13 +3151,6 @@
    "crate": "root",
    "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
    "dest_sha256": "3c45f087b29f10a64d432d86d8f1636488c746c6e76a9b053d1d12b9de96fa04"
-  },
-  {
-   "src": "src/mii_native_adapter.rs",
-   "dest": "src/runtime/mii/mii_native_adapter.rs",
-   "crate": "root",
-   "src_sha256": "a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9",
-   "dest_sha256": "093806ac789f81ff7e165a8a785992c859082bb42a8e98a39c733650e1f0e03b"
   },
   {
    "src": "src/mii_ordinary_cpu.rs",
@@ -3472,13 +3724,6 @@
    "dest_sha256": "56bb83190cfc0cb05f05fb4e568f146d2aa159033b1414df1d31d5afe94840f6"
   },
   {
-   "src": "src/mii_closed_ack.rs",
-   "dest": "src/runtime/mii/mii_closed_ack.rs",
-   "crate": "root",
-   "src_sha256": "eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b",
-   "dest_sha256": "2bb3ec82b360a38e3157aed8afbe39ea1a9edbf8e78d1d2f0fb0a4ffba60d638"
-  },
-  {
    "src": "src/practice_stage_request.rs",
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
@@ -3501,24 +3746,24 @@
   },
   {
    "src": "src/practice_stage_observer.rs",
-   "dest": "src/runtime/lobby/practice_stage_observer.rs",
+   "dest": "src/runtime/lobby/practice_stage.rs",
    "crate": "root",
    "src_sha256": "7ee9680b0e147c0f3a3bd5f18a3b27acb979a1d80857ca59d92cc0718f9c94a0",
-   "dest_sha256": "93cbc092a0b7af12d896c964013c3af1ad58ad3bb4af5a691b85b06ffcf487a0"
+   "dest_sha256": "ea1e7be6b369bd76b3406ffa12fc054f49bdaa4747db2bca9ba0d723b47075c7"
   },
   {
    "src": "src/lobby_stage_probe.rs",
-   "dest": "src/runtime/lobby/lobby_stage_probe.rs",
+   "dest": "src/runtime/lobby/lobby_stage.rs",
    "crate": "root",
    "src_sha256": "0b660f82e43258aaee60241bc531c29d8a35e17078a038f35b79ecd03f11dd37",
-   "dest_sha256": "f32d024769f401fe680af3dff280795d1046ec1b7ebe714b658f1cef2432e681"
+   "dest_sha256": "68bc8d3449f3e1f184fc35ae20c3097eaf881867f74cd02c86451722d39c466a"
   },
   {
    "src": "src/training/lobby.rs",
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "8cccf584eb6994ad5a65bbe10bf56660af84c79a754ee925c41d6a2d3595eefa",
+   "dest_sha256": "0826848cbc7ba7168e99e922eb09b53b8f691fb3777d0ce0ac0d7771890aabbf",
    "edits": [
     {
      "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -3730,7 +3975,21 @@
    "dest": "src/runtime/roster/native_fighter_install.rs",
    "crate": "root",
    "src_sha256": "106a7d1043e7f940521d4fb95581fa83b201b632c5bff08662db0b4debb7ef0f",
-   "dest_sha256": "106a7d1043e7f940521d4fb95581fa83b201b632c5bff08662db0b4debb7ef0f"
+   "dest_sha256": "d9c2212d4f1cd6c90412167c82515c1b8b5667f6211439f46e6e2d5434816701",
+   "edits": [
+    {
+     "old": "    #[cfg_attr(\n        not(any(\n            feature = \"mii-ordinary-player-alpha\",\n            feature = \"mii-ordinary-cpu-alpha\",\n            feature = \"mii-managed-helper-alpha\"\n        )),\n        allow(dead_code)\n    )]",
+     "new": "    #[cfg(any(test, feature = \"native-body-bank-alpha\",\n        feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\",\n        feature = \"mii-managed-helper-alpha\"))]",
+     "count": 1,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
+    },
+    {
+     "old": "    #[cfg_attr(\n        not(any(feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\")),\n        allow(dead_code)\n    )]",
+     "new": "    #[cfg(any(test, feature = \"native-body-bank-alpha\",\n        feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\"))]",
+     "count": 1,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
+    }
+   ]
   },
   {
    "src": "src/process_memory.rs",
@@ -3759,27 +4018,6 @@
    "crate": "root",
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630"
-  },
-  {
-   "src": "src/mii_identity_probe.rs",
-   "dest": "src/runtime/mii/mii_identity_probe.rs",
-   "crate": "root",
-   "src_sha256": "239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c",
-   "dest_sha256": "4b19665574211de8811fe210ecbce375ed348dcdce2863b0a449e21edd8add3e"
-  },
-  {
-   "src": "src/mii_fullconfig_probe.rs",
-   "dest": "src/runtime/mii/mii_fullconfig_probe.rs",
-   "crate": "root",
-   "src_sha256": "3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e",
-   "dest_sha256": "fb90e342ec8513684272d367289892910c654db6d926fe0ca6f6b839dcc9656c"
-  },
-  {
-   "src": "src/mii_saved_file_probe.rs",
-   "dest": "src/runtime/mii/mii_saved_file_probe.rs",
-   "crate": "root",
-   "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
-   "dest_sha256": "48cdfd978e3f3762170edc972e9d2b9c6dd91fb4e5779251207e4a450f07c10b"
   }
  ],
  "not_carried": [
@@ -3818,6 +4056,42 @@
    "src_sha256": "3c76da55af50bda1788dd55466cd858f4b7e88a3d0874d3613bd1681a9d870a2",
    "dest": "src/runtime/roster/source_lifecycle_probe.rs",
    "reason": "not carried: probe served (pkg6 confirmation, 2026-11-02); source-lifecycle observation has no shipped or tested consumer; shared ownership operations retained"
+  },
+  {
+   "src": "src/mii_identity_probe.rs",
+   "src_sha256": "239d5fbaf5ba3f9603ea8f2cb8714348d15fd3a72bdc40f51ef4a832adc5187c",
+   "dest": "src/runtime/mii/mii_identity_probe.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
+  },
+  {
+   "src": "src/mii_saved_file_probe.rs",
+   "src_sha256": "f6281e7b3d09f0e4a261ec5eec717d4e70908d06d01b9c634bb8856a964da126",
+   "dest": "src/runtime/mii/mii_saved_file_probe.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
+  },
+  {
+   "src": "src/mii_fullconfig_probe.rs",
+   "src_sha256": "3e57c55ecd72ac31dd62a7da9c032b12507d57d1847ec97006b35d4c23579b8e",
+   "dest": "src/runtime/mii/mii_fullconfig_probe.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
+  },
+  {
+   "src": "src/mii_native_adapter.rs",
+   "src_sha256": "a829b0ac0f55068fb7fa2c2e2b2624f25246fbdf2550c09dd7e592912834a5a9",
+   "dest": "src/runtime/mii/mii_native_adapter.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
+  },
+  {
+   "src": "src/mii_cpu_adapter.rs",
+   "src_sha256": "6008e0fe8cbb0e4033ea494a3d67a4e7125c712b73ff4a99836c2da80afa1be2",
+   "dest": "src/runtime/mii/mii_cpu_adapter.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
+  },
+  {
+   "src": "src/mii_closed_ack.rs",
+   "src_sha256": "eb6851a41ba1822e1afd3c6d2958af7470e69b660f9b1e2ca3b0f211daadd61b",
+   "dest": "src/runtime/mii/mii_closed_ack.rs",
+   "reason": "not carried: served Mii diagnostic experiment retired per approved slim handover; shared saved/ordinary primitives and write_tokens regression retained"
   }
  ]
 }

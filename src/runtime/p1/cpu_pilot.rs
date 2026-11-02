@@ -22,8 +22,6 @@ use ssbu_cpu_pilot_core::{level as core_level, pad as core_pad};
 use crate::runtime::compat::common::input::MappedInputs;
 
 #[path = "../../model/p1/mod.rs"]
-// Retain the reviewed host-test API/helpers without changing frozen core files.
-#[allow(dead_code)]
 mod pilot_core;
 use self::pilot_core::move_observer::{MoveObserver, Observation};
 use crate::engine::p1_session::menu_session as menu_session;

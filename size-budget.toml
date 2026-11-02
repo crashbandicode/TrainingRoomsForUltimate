@@ -53,3 +53,8 @@ scope = "total"
 ceiling = 105600
 date = "2026-11-02"
 reason = "cut: approved capacity/lifecycle probe and empty alias retirement; raw sloc4 101224 plus retained pending merge allowance4318 =105542, rounded up. Prior measured104350, slice reduction3126; no counting semantics or normalized-unit conversion."
+[[budget]]
+scope = "total"
+ceiling = 103300
+date = "2026-11-02"
+reason = "cut: approved Mii probe retirement and helper scope roots; raw sloc4 98956 plus retained pending merge allowance4318 =103274, rounded up. Previous101224, slice reduction2268; no count/layout change."

@@ -57,7 +57,7 @@ fn consume_entry(index: usize) -> Option<(Selection, u32)> {
 #[skyline::hook(offset = 0x25f7874, inline)]
 unsafe fn resource_request(ctx: &mut InlineCtx) {
     #[cfg(feature = "practice-stage")]
-    crate::runtime::lobby::practice_stage_observer::observe_resource_request(ctx);
+    crate::runtime::lobby::practice_stage::observe_resource_request(ctx);
     let Some(mode) = crate::runtime::lobby::game_mode::current() else {
         return;
     };

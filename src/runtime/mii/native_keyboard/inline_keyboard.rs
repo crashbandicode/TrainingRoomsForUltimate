@@ -29,7 +29,7 @@ pub(crate) struct Text {
 
 impl Text {
     // Keep the old Mii constructor/ten-unit contract at the compatibility path.
-    #[cfg_attr(not(feature = "mii-editor-alpha"), allow(dead_code))]
+    #[cfg(any(test, feature = "mii-editor-alpha"))]
     pub(crate) fn new(units: &[u16], cursor: usize) -> Option<Self> {
         Self::with_limit(units, cursor, Limit::Mii)
     }
@@ -54,7 +54,7 @@ impl Text {
 
     pub(crate) fn units(&self) -> &[u16] { &self.units[..self.len] }
     // Mii's native config must still receive exactly 11 units/22 bytes.
-    #[cfg_attr(not(feature = "mii-editor-alpha"), allow(dead_code))]
+    #[cfg(any(test, feature = "mii-editor-alpha"))]
     pub(crate) fn terminated(&self) -> &[u16] { &self.units[..self.limit.units() + 1] }
     pub(crate) fn cursor(&self) -> usize { self.cursor }
 }
@@ -209,11 +209,11 @@ const _: () = {
 pub(crate) struct Poll {
     pub text: Text,
     pub decision: Option<Decision>,
-    #[cfg_attr(not(feature = "mii-editor-alpha"), allow(dead_code))]
+    #[cfg(feature = "mii-editor-alpha")]
     pub initialized: bool,
     pub finished: bool,
     pub invalid: bool,
-    #[cfg_attr(not(feature = "mii-editor-alpha"), allow(dead_code))]
+    #[cfg(feature = "mii-editor-alpha")]
     pub state: i32,
 }
 
@@ -271,15 +271,21 @@ impl Keyboard {
 
     pub(crate) unsafe fn poll(&mut self) -> Option<Poll> {
         if !self.active || !self.on_owner_thread() { return None; }
+        #[cfg(feature = "mii-editor-alpha")]
         let state = sdk_calc(&mut self.object);
+        #[cfg(not(feature = "mii-editor-alpha"))]
+        sdk_calc(&mut self.object);
         let signals = std::mem::replace(&mut *SIGNALS.lock().unwrap(),
             Signals { limit: self.text.limit, ..Signals::default() });
         if let Some(text) = signals.text { self.text = text; }
         self.initialized |= signals.initialized;
         self.invalid |= signals.invalid;
         Some(Poll { text: self.text, decision: signals.decision,
-                    initialized: self.initialized, finished: signals.finished,
-                    invalid: self.invalid, state })
+                    #[cfg(feature = "mii-editor-alpha")]
+                    initialized: self.initialized,
+                    finished: signals.finished, invalid: self.invalid,
+                    #[cfg(feature = "mii-editor-alpha")]
+                    state })
     }
 
     /// Caller first copies pending values. Finalize owns its native join; never

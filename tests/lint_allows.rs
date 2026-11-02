@@ -16,18 +16,11 @@ use std::path::Path;
 const KNOWN: &[(&str, &str, usize, &str)] = &[
     ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "approved: operator 2026-11-02 14:2xZ, L2; lock_api RawMutex/RawRwLock require const INIT"),
     ("src/model/macro_ui/macro_panel.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg4 manifest), D9"),
-    ("src/runtime/macros/replay_store.rs", "dead_code", 1, "pending: carried (pkg4 manifest), only caller behind `deluxe-sdk` (off, L1)"),
-    ("src/runtime/mii/mii_backend.rs", "dead_code", 2, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
     ("src/runtime/mii/mii_editor_bridge/draft.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/mii/mii_hud_portrait.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
     ("src/runtime/mii/mii_ordinary_native.rs", "dead_code", 1, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
     ("src/runtime/mii/native_keyboard/inline_keyboard.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
-    ("src/runtime/mii/native_keyboard/inline_keyboard.rs", "dead_code", 4, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
-    ("src/runtime/p1/cpu_pilot.rs", "dead_code", 1, "pending: carried (pkg6 manifest), D9, path-included pilot core"),
     ("src/runtime/roster/character_roster.rs", "clippy::large_enum_variant", 1, "pending: carried (pkg6 manifest), D9"),
-    ("src/runtime/roster/character_sources.rs", "dead_code", 1, "pending: carried (pkg6 manifest), D9, feature-gated caller"),
-    ("src/runtime/roster/native_fighter_install.rs", "dead_code", 2, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
-    ("src/runtime/roster/native_source_capacity.rs", "dead_code", 1, "pending: carried (pkg6 manifest), D9, feature-gated callers"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<std::path::PathBuf>) {

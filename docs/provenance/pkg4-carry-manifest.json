@@ -733,7 +733,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "eb804532131f6cca282bfa061a21c3febde78b8f60cd7410b7372da1e37ce094",
+   "dest_sha256": "25eed3dc11e539d760e287f7c598a2b2256183a4626a5f4e2d8970cb0a150750",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -744,6 +744,12 @@
      "old": "let _ = std::thread::Builder::new()\n            .name(\"mii-catalog\".into())\n            .stack_size(0x20000)\n            .spawn(move || {",
      "new": "let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {",
      "reason": "stream/stack: the thread is started through runtime::threads::spawn, which takes its name and stack size from model::thread_stacks (one host-checked table for every thread, measured high-water in the diag build)"
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"deluxe-sdk\"), allow(dead_code))]",
+     "new": "#[cfg(feature = \"deluxe-sdk\")]",
+     "count": 1,
+     "reason": "Compile feature-only helper with its actual callers instead of suppressing dead code; retain test entry points."
     }
    ]
   },
