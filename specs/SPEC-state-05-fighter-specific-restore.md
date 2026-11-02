@@ -170,3 +170,5 @@ A lookup used by the mash/combo features to decide whether a fighter is "in" an 
 4. The Kirby and Sora sound silences apply to every such sound in Training, not only during loads (a real copy outside `SPECIAL_N_DRINK`, a real spell change outside neutral special). Recommendation: gate both on "loading" and verify in Eden that no load-time sound slips through; if one does, keep upstream's unconditional rule and document it.
 5. Copy-module offset `+0x17398` for the copied fighter kind is an upstream guess ("maybe, no clue" on the vtable). Recommendation: verify on the owned binary.
 6. Upstream respawns all Pikmin on every load even when the current line already matches; this costs three article spawns. Recommendation: keep (simplest correct behaviour).
+
+**Kirby copy charge (lead decision 2026-11-02).** The record's single `charge` slot holds Kirby's own state and the copy flag, so the copied fighter's own charge flags (Mewtwo, Lucario, Pac-Man …) are saved in a new optional `copy_charge` object (SPEC-state-01 §7), written only for a Kirby with a copy and restored with it. Host test `state05_copy_charge_round_trip_absent_and_fork_files`.

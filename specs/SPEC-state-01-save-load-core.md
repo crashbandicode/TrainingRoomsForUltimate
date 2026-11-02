@@ -210,6 +210,7 @@ The file is read once, lazily, on first use of the slots (upstream notes that re
 | `fighter_kind` | i32 | saved fighter kind, −1 when never saved |
 | `charge` | object | SPEC-state-02 §7: `int_x`, `int_y`, `int_z` (i32), `float_x`, `float_y`, `float_z` (f32), `has_charge` (bool), `robin_charges` (object) — every field optional; the writer emits explicit `null` for an absent field, as the fork's real files do (byte compatibility; lead correction 2026-11-02), and the reader accepts both `null` and a missing key |
 | `steve_state` | object or null | SPEC-state-05 §7 |
+| `copy_charge` | object, optional (clean room, lead decision 2026-11-02) | Kirby with a copy ability only: the copied fighter's own charge flags (Mewtwo, Lucario, Pac-Man …), same shape as `charge`; absent otherwise, so a file without a Kirby copy is byte-identical to the fork's; the fork's loader ignores the key (SPEC-state-05 §5.2) |
 | `held_item` | object, optional (fork) | `{"state": "item", choice, variation, lifetime, lifetime_max, fuse, fuse_max}` or `{"state": "empty"}` / `{"state": "unsupported"}`; absent in older saves |
 | `saved_stage` | i32, optional (fork) | stage id at capture |
 | `mii` | object, optional (fork) | exact Mii configuration; its tags are u64 and may exceed i64::MAX, which is why the format is JSON |
