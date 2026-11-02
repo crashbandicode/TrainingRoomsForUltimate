@@ -1,0 +1,10 @@
+{
+ "root": "/home/intpa/trainingrooms-eden-u4",
+ "profile": "u4",
+ "owner": "Claude 0caa72b8/u4",
+ "display": ":90",
+ "label_re": "u4-\\d{2}",
+ "unit": "tru4",
+ "aside": "plugins-set-aside-trainingrooms-u4",
+ "desc": "u4 (run-time game-file texture on a picture pane)"
+}

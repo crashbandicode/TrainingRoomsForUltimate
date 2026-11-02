@@ -7,6 +7,8 @@
 
 #[path = "model/ui/adapter.rs"]
 pub mod adapter;
+#[path = "model/ui/readiness.rs"]
+pub mod readiness;
 #[path = "model/ui/catalog.rs"]
 pub mod catalog;
 #[path = "model/archive_name.rs"]
@@ -65,6 +67,10 @@ pub mod settings;
 pub mod settings_file;
 #[path = "model/sha256.rs"]
 pub mod sha256;
+#[path = "model/sites_u4.rs"]
+pub mod sites_u4;
+#[path = "model/ui_texture.rs"]
+pub mod ui_texture;
 #[path = "model/sites_ui.rs"]
 pub mod sites_ui;
 #[path = "model/sites.rs"]
