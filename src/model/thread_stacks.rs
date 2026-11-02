@@ -63,7 +63,7 @@ const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_272, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}",
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_720, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}",
         "the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports"),
     row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed",
         "settings.json read, recovery and the JSON parse, joined by the boot thread"),
@@ -83,7 +83,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "first-boot import of the fork's files (blocking part), joined with a deadline"),
     row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}",
         "first-boot import of the fork's captures in the background"),
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 35_600, 13_488, "Eden st-02..st-12", "ui::worker::run",
+    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 13_488, "Eden st-02..st-12", "ui::worker::run",
         "the menu worker: model steps, screens, settings JSON on close"),
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_576, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#2}",
         "returns parked layout archives to the pool after their grace"),
@@ -91,7 +91,7 @@ pub const THREADS: [ThreadStack; 17] = [
         "ARCropolis mount wait and the layout file probe"),
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}",
         "diag: diag-macro.req read and parse"),
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 31_616, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}",
+    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_416, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}",
         "the replay capture archive and Mii preset writer"),
     row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::fallback_catalog::{closure#0}::{closure#0}",
         "the saved Mii catalog read for the library"),

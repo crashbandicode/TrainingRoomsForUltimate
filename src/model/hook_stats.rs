@@ -18,7 +18,10 @@
 use core::fmt::{self, Display, Formatter};
 use core::sync::atomic::{AtomicU64, Ordering};
 use std::alloc::{GlobalAlloc, Layout, System};
+#[cfg(not(target_os = "switch"))]
 use std::cell::Cell;
+#[cfg(target_os = "switch")]
+use crate::runtime::hook_tls::{HOOK_DEPTH, LOAD_DEPTH, UNCOUNTED_DEPTH, CURRENT};
 
 /// Every hook of the plugin that runs inside a `HookScope`, in the order the report prints them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -172,9 +175,9 @@ impl HookId {
     }
 }
 
+#[cfg(not(target_os = "switch"))]
 thread_local! {
-    /// Nesting depth of hooks on this thread. A const-initialised `Cell` without a destructor needs
-    /// no allocation to exist.
+    /// Host TLS oracle. Switch uses boot-reserved scalar SDK slots; its std TLS boxes allocate.
     static HOOK_DEPTH: Cell<u32> = const { Cell::new(0) };
     /// Nesting depth of per_load sections on this thread.
     static LOAD_DEPTH: Cell<u32> = const { Cell::new(0) };
@@ -210,7 +213,7 @@ fn count_allocation() {
             LOAD_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         } else {
             HOOK_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            let id = CURRENT.try_with(Cell::get).map_or(HookId::Other as usize, usize::from);
+            let id = CURRENT.try_with(|current| current.get()).map_or(HookId::Other as usize, usize::from);
             ALLOCS[id.min(HOOK_COUNT - 1)].fetch_add(1, Ordering::Relaxed);
         }
     }
