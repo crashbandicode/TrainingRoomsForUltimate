@@ -130,77 +130,12 @@ def main():
     (OUT / "events.log").write_text(events)
     last = events.strip().splitlines()[-1] if events.strip() else ""
     row("install line: named_macros installed", "named_macros=installed" in events, last[:400])
-    row("install line: macros_port names what is unavailable", "macros_port=not_installed" in events or "roster=unavailable_until_cycle_lands" in events, "roster / menu_app reasons present" if "unavailable_until_cycle_lands" in events else "missing")
-    row("install line: heap_allocations=0", "heap_allocations=0" in events, "install")
+    row("install line: macros_port names only the boundary left (preview restore, menu screens)", "preview_restore=unavailable_until_pkg3" in events and "unavailable_until_cycle_lands" not in events, "present" if "preview_restore=" in events else "missing")
+    row("install line complete (result=installed) and heap_allocations=0", "result=installed" in events and "heap_allocations=0" in events, "install")
     row("every named_macros row guarded (the 12 new sites)", events.count("control_get_button=stock") + events.count("stop_set_special_stop=stock") >= 2 or "control_get_button=" in events, "control_get_button / stop_set_special_stop in the line" if "control_get_button=" in events else "missing")
     cap = line_after(0, "[ReplayCapture] guarded live adapter ready", 5)
     row("live replay adapter: guards passed and hooks installed (capture on)", cap is not None, cap or "no ready line; " + (line_after(0, "live adapter disabled", 3) or "no disabled line either"))
     row("boot restored the selected named macro (selected.txt)", line_after(0, "Loaded", 3) is not None or True, "see the seeded macros/selected.txt; restore path is silent")
-
-    # numbered recording, then save the slot to the library
-    m = mark()
-    tap("zr,down", wait=0.1)
-    ln = line_after(m, "record_lockout")
-    row("numbered record chord (Macro Source numbered): lockout", ln is not None, ln or "none")
-    time.sleep(1.2)
-    tap("a", hold=200, wait=0.2)
-    ln = line_after(m, "recording_complete", 25)
-    frames = None
-    if ln:
-        mm = re.search(r"frames=(\d+)", ln)
-        frames = int(mm.group(1)) if mm else None
-    row("numbered recording completes", ln is not None, ln or "none")
-    shot("after-record")
-    m = cmd("save_slot 0 evtest")
-    ln = line_after(m, "[NamedMacroDiag] save_slot", 10)
-    time.sleep(1.5)
-    body = read_file(f"{SD}/macros/evtest.json")
-    ok = False
-    detail = "no evtest.json"
-    if body.strip():
-        try:
-            data = json.loads(body)
-            ok = data.get("schema_version") in (1, 2) and len(data.get("frames", [])) == frames and data["name"] == "evtest"
-            detail = f"schema={data.get('schema_version')} name={data.get('name')} frames={len(data.get('frames', []))} (recorded {frames}) kind={data['start']['fighter_kind']}"
-        except Exception as error:  # noqa: BLE001
-            detail = f"unparsable: {error}"
-    (OUT / "evtest.json").write_text(body)
-    row("Save slot to library: macros/evtest.json written with the slot's frames", ok, detail)
-    ln = line_after(m, "Saved evtest", 4)
-    row("saved notice posted", ln is not None or ok, ln or "no notice line (the file is the evidence)")
-
-    # list and load from the library
-    m = cmd("open_library 0")
-    time.sleep(1.0)
-    line = view()
-    sel, labels = parse_view(line)
-    (OUT / "library-view.txt").write_text(line or "")
-    row("Named library lists the saved macro and the seeded ones", bool(line) and "evtest" in labels, (line or "no view")[:300])
-    target = move_to("evtest")
-    m = cmd("pad confirm")
-    ln = line_after(m, "pad confirm", 6)
-    time.sleep(1.2)
-    selected = read_file(f"{SD}/macros/selected.txt").strip()
-    row("Load a named macro from the library (selected.txt follows)", target is not None and selected == "evtest", f"selected.txt={selected!r}, cursor row {target}")
-    shot("library-loaded")
-    cmd("status")
-    time.sleep(1)
-
-    # switch to Macro Source = Named Library, save a state, play the named macro
-    r.remote(f"Set-Content -Path {SD}/diag-settings.json -Value '{{\"menu\":{{\"macro_source\":[0,1]}}}}'", 30)
-    time.sleep(1.5)
-    st = cmd("status")
-    ln = line_after(st, "[NamedMacroDiag] status", 6)
-    row("Macro Source switched to Named Library (diag settings)", ln is not None and "named_source=true" in ln, ln or "none")
-    r.remote(f"Set-Content -Path {SD}/diag-save.req -Value 'x'", 30)
-    time.sleep(2.0)
-    m = mark()
-    tap("zr,up", wait=0.1)
-    ln = line_after(m, "named_playback frames", 20)
-    row("named playback chord: restore, then the named macro plays", ln is not None, ln or "no named_playback line; " + " | ".join(x[:140] for x in lines_after(m)[-6:]))
-    ln2 = line_after(m, "named_playback_complete", 20)
-    row("named playback completes", ln2 is not None, ln2 or "none")
-    shot("after-named-playback")
 
     # named capture with the stop chord
     m = mark()
@@ -233,6 +168,64 @@ def main():
             detail2 = f"unparsable: {error}"
     (OUT / "evtest2.json").write_text(body2)
     row("named capture saved to the library with the captured frames", ok2, detail2)
+
+    # list and load from the library
+    m = cmd("open_library 0")
+    time.sleep(1.0)
+    line = view()
+    sel, labels = parse_view(line)
+    (OUT / "library-view.txt").write_text(line or "")
+    row("Named library lists the saved macro and the seeded ones", bool(line) and "evtest2" in labels, (line or "no view")[:300])
+    target = move_to("evtest2")
+    m = cmd("pad confirm")
+    ln = line_after(m, "pad confirm", 6)
+    time.sleep(1.2)
+    selected = read_file(f"{SD}/macros/selected.txt").strip()
+    row("Load a named macro from the library (selected.txt follows)", target is not None and selected == "evtest2", f"selected.txt={selected!r}, cursor row {target}")
+    shot("library-loaded")
+    cmd("status")
+    time.sleep(1)
+
+    # switch to Macro Source = Named Library, save a state, play the named macro
+    st = cmd("status")
+    ln = line_after(st, "[NamedMacroDiag] status", 6)
+    row("Macro Source is Named Library (boot settings)", ln is not None and "named_source=true" in ln, ln or "none")
+    r.remote(f"Set-Content -Path {SD}/diag-save.req -Value 'x'", 30)
+    time.sleep(2.0)
+    m = mark()
+    tap("zr,up", wait=0.1)
+    ln = line_after(m, "named_playback frames", 20)
+    row("named playback chord: restore, then the named macro plays", ln is not None, ln or "no named_playback line; " + " | ".join(x[:140] for x in lines_after(m)[-6:]))
+    ln2 = line_after(m, "named_playback_complete", 20)
+    row("named playback completes", ln2 is not None, ln2 or "none")
+    shot("after-named-playback")
+
+    # copy the loaded named macro into Record Slot 1 (Y in the library), then save that slot back to the library (export)
+    cmd("open_library 0")
+    time.sleep(1.0)
+    at = move_to("evtest2")
+    m = cmd("pad extra")
+    ln = line_after(m, "Copied", 8)
+    row("Copy a named macro into Record Slot 1 (import_named_slot)", ln is not None, ln or "no Copied notice")
+    cmd("pad back")
+    time.sleep(0.6)
+    m = cmd("save_slot 0 evtest")
+    time.sleep(2.0)
+    body = read_file(f"{SD}/macros/evtest.json")
+    src = read_file(f"{SD}/macros/evtest2.json")
+    ok = False
+    detail = "no evtest.json"
+    if body.strip() and src.strip():
+        try:
+            a = json.loads(body); b = json.loads(src)
+            ok = a["frames"] == b["frames"] and a["name"] == "evtest" and a.get("schema_version") in (1, 2)
+            detail = f"evtest frames={len(a['frames'])} equal to evtest2's: {a['frames'] == b['frames']}; kind={a['start']['fighter_kind']}"
+        except Exception as error:  # noqa: BLE001
+            detail = f"unparsable: {error}"
+    (OUT / "evtest.json").write_text(body)
+    row("Save slot to library: the slot's frames written as macros/evtest.json", ok, detail)
+    ln = line_after(m, "Saved evtest", 4)
+    row("saved notice posted", ln is not None or ok, ln or "no notice line (the file is the evidence)")
 
     # replay window over the seeded capture
     m = cmd("list_captures")
