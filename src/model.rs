@@ -9,6 +9,8 @@
 pub mod cpu;
 #[path = "model/chords.rs"]
 pub mod chords;
+#[path = "model/damage_display.rs"]
+pub mod damage_display;
 #[path = "model/developer_ini.rs"]
 pub mod developer_ini;
 #[path = "model/diag_ring.rs"]
@@ -31,12 +33,16 @@ pub mod menu;
 pub mod menu_shortcuts;
 #[path = "model/migration.rs"]
 pub mod migration;
+#[path = "model/notify.rs"]
+pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
 #[path = "model/settings.rs"]
 pub mod settings;
 #[path = "model/sites.rs"]
 pub mod sites;
+#[path = "model/sites_pkg4.rs"]
+pub mod sites_pkg4;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
 #[path = "model/store.rs"]

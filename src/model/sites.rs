@@ -38,6 +38,11 @@ pub enum Feature {
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
     CpuShield,
+    /// Package 4: the input recorder (SPEC-input-01): the natives it reads and writes through and the
+    /// hook at the AI control function's epilogue.
+    Recording,
+    /// Package 4: HUD notices (SPEC-input-05): the Combo Display observers and the stale-moves toggle.
+    Notices,
 }
 
 impl Feature {
@@ -53,6 +58,8 @@ impl Feature {
             Feature::CpuLedge => "cpu_ledge",
             Feature::CpuTech => "cpu_tech",
             Feature::CpuShield => "cpu_shield",
+            Feature::Recording => "recording",
+            Feature::Notices => "notices",
         }
     }
 }

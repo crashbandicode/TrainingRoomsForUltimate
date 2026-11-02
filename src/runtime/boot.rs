@@ -20,7 +20,8 @@ use crate::model::storage::{self, FixedPath};
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
-use crate::runtime::features::{cpu, input_delay, lra_reset, reset_hub, stage_hazards as hazards};
+use crate::runtime::features::{chords, cpu, input_delay, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards};
+use crate::model::sites_pkg4;
 use crate::runtime::{clock, game, install, published};
 
 const SITE_COUNT: usize = SITES.len();
@@ -72,6 +73,9 @@ pub fn run() {
     );
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);
+    // Package 4: the shortcuts file (fail-closed, created when absent) and the recorder's generator.
+    chords::load_ini();
+    recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
@@ -82,6 +86,10 @@ pub fn run() {
         } else {
             site.slot_outcome(game::read_slot_target(site.offset))
         };
+    }
+    let mut found4 = [GuardOutcome::Stock; sites_pkg4::SITES.len()];
+    for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
+        *slot = site.outcome(&game::read_window(site.offset));
     }
     let usable = |site: &sites::Site| {
         SITES.iter().position(|s| s.name == site.name).is_some_and(|i| found[i].usable())
@@ -125,10 +133,13 @@ pub fn run() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on) = install_cpu(&usable, &mut mark);
+    let mut written4 = [Written::Skipped; sites_pkg4::SITES.len()];
+    let (recording_on, notices_on) = install_pkg4(input_delay_on, cpu_core_on, &found4, &mut written4);
 
     // 6. The install line.
-    let reports: [SiteReport; SITE_COUNT] =
-        std::array::from_fn(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] });
+    let mut reports: Vec<SiteReport> =
+        (0..SITE_COUNT).map(|i| SiteReport { site: SITES[i].name, found: found[i], written: written[i] }).collect();
+    reports.extend(sites_pkg4::SITES.iter().enumerate().map(|(i, site)| SiteReport { site: site.name, found: found4[i], written: written4[i] }));
     let features = [
         FeatureReport { feature: Feature::InputDelay.name(), installed: input_delay_on },
         FeatureReport { feature: Feature::LraReset.name(), installed: lra_on },
@@ -139,6 +150,9 @@ pub fn run() {
         FeatureReport { feature: Feature::CpuLedge.name(), installed: cpu_ledge_on },
         FeatureReport { feature: Feature::CpuTech.name(), installed: cpu_tech_on },
         FeatureReport { feature: Feature::CpuShield.name(), installed: cpu_shield_on },
+        FeatureReport { feature: "chords", installed: input_delay_on },
+        FeatureReport { feature: Feature::Recording.name(), installed: recording_on },
+        FeatureReport { feature: Feature::Notices.name(), installed: notices_on },
     ];
     let line = InstallLine {
         tick: clock::uptime_ms(),
@@ -208,6 +222,45 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     (true, defence, ledge, tech, shield)
 }
 
+/// Package 4: the recorder's hook at the AI control function's epilogue (it also needs the poll hooks
+/// that carry the chords and the P1 stage, and the CPU core's per-frame facts), and the notice
+/// observers. Every row of a feature must have passed its guard. Returns whether the recorder and the
+/// notice hooks were installed.
+fn install_pkg4(poll_ok: bool, cpu_core_on: bool, found4: &[GuardOutcome], written4: &mut [Written]) -> (bool, bool) {
+    let usable4 = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
+    for (slot, site) in written4.iter_mut().zip(sites_pkg4::SITES.iter()) {
+        if usable4(site.name) {
+            *slot = Written::Checked;
+        }
+    }
+    let mut mark = |name: &str, how: Written| {
+        if let Some(i) = sites_pkg4::SITES.iter().position(|s| s.name == name) {
+            written4[i] = how;
+        }
+    };
+    let recording = poll_ok && cpu_core_on && sites_pkg4::sites_of(Feature::Recording).all(|s| usable4(s.name));
+    if recording {
+        skyline::install_hook!(recorder::ai_epilogue);
+        mark("ai_epilogue", Written::Near);
+    }
+    // Each observer is its own site and its own pin: a mismatch leaves notices visible (SPEC-input-05 §4).
+    let combo_a = usable4("combo_display_a_pin") && usable4("combo_display_a");
+    let combo_b = usable4("combo_display_b_pin") && usable4("combo_display_b");
+    let stale = usable4("stale_moves_toggle");
+    if combo_a {
+        skyline::install_hook!(notices::combo_display_a);
+        mark("combo_display_a", Written::Near);
+    }
+    if combo_b {
+        skyline::install_hook!(notices::combo_display_b);
+        mark("combo_display_b", Written::Near);
+    }
+    if stale {
+        skyline::install_hook!(notices::stale_moves_toggle);
+        mark("stale_moves_toggle", Written::Near);
+    }
+    (recording, combo_a && combo_b && stale)
+}
 /// Stage Hazards: both a derived flag address equal to the pinned one and a usable hook site.
 fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
     let sites_ok = sites::feature_usable(Feature::StageHazards, usable);

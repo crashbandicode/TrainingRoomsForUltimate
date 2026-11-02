@@ -5,7 +5,7 @@
 
 use crate::model::input_delay::Clear;
 use crate::model::lra_reset::{self, HubStep};
-use crate::runtime::features::{cpu, input_delay};
+use crate::runtime::features::{cpu, input_delay, recorder};
 
 pub fn run(cause: Clear) {
     // How many queued input-delay records the hub dropped.
@@ -17,6 +17,8 @@ pub fn run(cause: Clear) {
         cpu::hub_step(step);
         if step == HubStep::InputDelay {
             dropped = input_delay::clear(cause);
+            // Decision B8 (SPEC-input-01 question 13): the reset stops the recorder.
+            recorder::on_reset();
         }
     });
     report(cause, dropped);
