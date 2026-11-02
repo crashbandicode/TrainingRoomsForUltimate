@@ -24,7 +24,7 @@ Spec text (SPEC-input-03 section 4 native pause row, section 5 step 0, 5.1, 6.7,
 
 - R1 `src/model/settings_file.rs` (runtime keeps `boot::load_settings`); `Store::write_synced` and
   `replace_file` are now `pub` for the reuse.
-- R2 `src/model/sites_pause.rs` (two rows, why authoritative in its module comment),
+- R2 (revised by the lead ruling): the producer is `InputAdapter::pause_flag` (`src/model/input_adapter.rs`), fed from the UI tick (`runtime/ui/tick.rs`) by `PAUSE_ACTIVE`; the first attempt (scene `StatePause` hooks) was removed after Eden showed the Training menu does not run it.
   `src/model/input_adapter.rs` (what the hooks do), `src/runtime/features/pause_owner.rs` (two inline hooks),
   `boot.rs` installs both or neither; `published::input_owners()` was removed (nothing read it any more).
 - R3 `DelayQueue::step` step 0.
