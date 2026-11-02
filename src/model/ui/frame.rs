@@ -172,6 +172,7 @@ pub struct Frame {
     /// stage grid at all, and a signature that changes when the page or the layout changes (thumbnails are requested per page).
     pub tile_n: [u16; super::panes::TILES],
     pub tile_stage_grid: bool,
+    pub tile_item_grid: bool,
     pub tile_roster_grid: bool,
     pub tile_cpu: bool,
     /// A short last row is centred under the full ones (the portrait roster's last row of 9 under 13 columns).
@@ -212,6 +213,7 @@ impl Frame {
         self.tile_focus = 0;
         self.tile_n.fill(u16::MAX);
         self.tile_stage_grid = false;
+        self.tile_item_grid = false;
         self.tile_roster_grid = false;
         self.tile_cpu = false;
         self.tile_centre_last = false;
@@ -253,6 +255,7 @@ impl Frame {
             tile_focus: 0,
             tile_n: [u16::MAX; super::panes::TILES],
             tile_stage_grid: false,
+            tile_item_grid: false,
             tile_roster_grid: false,
             tile_cpu: false,
             tile_centre_last: false,

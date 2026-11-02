@@ -11,10 +11,11 @@
 //!
 //! The pane inventory is `src/model/ui/panes.rs`, shared with the runtime. The layout is flat: one container
 //! under `RootPane` with text boxes cloned from a stock text box and flat rectangles cloned from a stock solid
-//! picture, so no texture is added and no stock texture changes.
+//! picture. The 38 provenance-recorded item icons are appended to the stock BNTX; stock textures are retained.
 
 use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
+use nx_layout_toolbox::bntx::{read_bntx, write_bntx, pipeline::{import_png_file, ImportOptions}};
 
 #[path = "../../../src/model/archive_recipe.rs"]
 #[allow(dead_code)]
@@ -152,6 +153,26 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     for spec in &specs {
         add_pane(&mut layout, spec, waiting)?;
     }
+    // These are the approved owned-game item renders, not baked fighter/stage portraits.
+    // Keep the stock archive private; the distributed recipe contains only the delta.
+    let textures = arc.position("timg/__Combined.bntx").ok_or("stock combined texture missing")?;
+    let mut bntx = read_bntx(&arc.files[textures].data).map_err(err("read stock textures"))?;
+    let options = ImportOptions { srgb: true, ..Default::default() };
+    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/item-icons");
+    for i in 0..panes::ITEM_ICONS {
+        let name = panes::name_of(panes::IDX_ITEM_ICON + i);
+        let texture = format!("tr_item_{i:02}");
+        import_png_file(&mut bntx, &texture, &assets.join(format!("icon-{i:02}.png")), &options)
+            .map_err(err("import owned item icon"))?;
+        let material_index = layout.find_pane(name.as_str()).and_then(|p| p.picture.as_ref())
+            .ok_or("item picture missing")?.material_index;
+        let template = layout.materials.get(usize::from(material_index)).ok_or("item template material missing")?.name.clone();
+        layout.add_texture_ref(&texture);
+        layout.add_material_from_template(&template, &texture, Some(&texture)).map_err(err("item material"))?;
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(texture), ..Default::default() })
+            .map_err(err("item picture material"))?;
+    }
+    arc.files[textures].data = write_bntx(&bntx).map_err(err("write item textures"))?;
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
     let target = write_arc(&arc).map_err(err("write arc"))?;
     let recipe = archive_recipe::make(&stock, &target);
@@ -171,6 +192,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         "target_fnv": format!("{:016x}", archive_recipe::fingerprint(&target)),
         "recipe_bytes": recipe.len(),
         "panes_added": specs.len() + usize::from(waiting),
+        "item_icons": panes::ITEM_ICONS,
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;

@@ -317,6 +317,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     }
     frame.tile_count = len as u8;
     frame.tile_stage_grid = layout.kind == GridKind::Stages;
+    frame.tile_item_grid = layout.kind == GridKind::Items;
     frame.tile_centre_last = matches!(layout.kind, GridKind::Roster(_));
     frame.tile_sig = ((page as u32) << 8) | u32::from(layout.cols) | (u32::from(layout.rows) << 4);
     frame.tile_focus = cell as u8;
@@ -723,6 +724,8 @@ mod tests {
         let m = open_grid(ConsoleMode::Docked, "Give item");
         let f = frame(&m);
         assert_eq!((f.view, f.tile_cols, f.tile_rows, f.tile_count), (View::Tiles, 5, 8, 38));
+        assert!(f.tile_item_grid);
+        assert_eq!(&f.tile_n[..38], &(0..38).collect::<Vec<u16>>());
         assert!(f.tiles[..38].iter().all(|t| !t.is_empty() && t.units().len() <= 14));
         let mut m = open_grid(ConsoleMode::Handheld, "Give item");
         let f = frame(&m);
@@ -731,6 +734,9 @@ mod tests {
         m.press(Button::R);
         assert_eq!(frame(&m).tile_count, 6, "the third page holds the last 6 items");
         assert!(frame(&m).crumb.string_lossy().contains("page 3 of 3"));
+        assert_eq!(&frame(&m).tile_n[..6], &[32, 33, 34, 35, 36, 37]);
+        m.press(Button::B);
+        assert!(!frame(&m).tile_item_grid, "item pictures must disappear on leaving the grid");
     }
 
     #[test]

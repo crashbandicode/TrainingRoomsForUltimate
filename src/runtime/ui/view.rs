@@ -296,6 +296,10 @@ impl Panes {
     }
 
     unsafe fn draw_tiles(&self, frame: &Frame) {
+        // One archive-owned picture per item, shared across all three handheld pages.
+        for i in 0..p::ITEM_ICONS {
+            self.hide(p::IDX_ITEM_ICON + i);
+        }
         let shown = frame.view == View::Tiles;
         let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
         let (cell_w, cell_h) = ((p::ROW_RIGHT - p::ROW_LEFT) / cols, 620.0 / rows);
@@ -315,6 +319,16 @@ impl Panes {
                 continue;
             }
             let (x, y) = centre(i);
+            if frame.tile_item_grid && usize::from(frame.tile_n[i]) < p::ITEM_ICONS {
+                self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
+                let size = 64.0_f32.min(cell_h - 12.0).min(cell_w / 3.0);
+                let left = x - cell_w / 2.0 + 10.0;
+                self.rect(p::IDX_ITEM_ICON + usize::from(frame.tile_n[i]), left + size / 2.0, y, size, size, [255; 4]);
+                let label_left = left + size + 8.0;
+                let label_w = cell_w - size - 28.0;
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_left + label_w / 2.0, y, label_w, p::TEXT);
+                continue;
+            }
             if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
                 let size = (cell_h - 28.0).min(cell_w - 12.0);
                 self.rect(p::IDX_TILE + i, x, y + 10.0, size, size, [255, 255, 255, 255]);
