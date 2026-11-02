@@ -228,3 +228,94 @@ tools/PROVENANCE.md, and the tools run or assessed: tools/check/compliance.py, t
   5. pkg4 design C lands on top (its PENDING hook_locks row must then disappear; the RC gate needs PENDING empty).
 - Blockers: none of mine. Open claims: none (Ally released 14:02Z). Queue lines: deleted. Lent rig: restored 13:32Z (`mismatches: []`),
   untouched since. Watcher `/tmp/ui-screens-watch/watch-opus.ps1` stopped.
+
+## Astra continuation checkpoint (2026-11-02)
+
+Objective: complete this stream's brief, all runtime rows and final gates, then mark READY. NOT READY.
+Exact branch/worktree: stream/ui-screens / /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-ui-screens.
+Starting and current code HEAD: 0a09ea569188d364a9f8cc1693f74c9e2fd9f653; clean at takeover. No merge or code edit yet.
+Thread: 01a19c9f-0f91-7fa3-9a01-dce8c4590865, verified exact sqlite row and latest turn_context: gpt-6-astra / medium.
+Playbook followed: ae87443cbb801472e474b3f0c20b5f9c3f5f1f77 (pull --ff-only: already up to date).
+Watcher: PID 2602023, owner Codex PID 2589234, temp script /tmp/ui-screens-model-01a19c9f-0f91-7fa3-9a01-dce8c4590865.py.
+Change sentinel: same basename .status (absent at last check). Polls exact rollout model/effort and owner liveness; 12-hour bound. Reap before yielding; verify and rearm after compaction.
+No host claims, queue entries, builds, Eden launches, profile mutations or external publication performed by this successor.
+No subdelegation: stream brief forbids it; request through lead. No clean-room boundary exposure by this successor.
+
+### Reads completed by this successor
+- Full worker brief, DELEGATION_ROUTING.md, MY_MODEL.md, STREAM-RULES, HANDOVER-ASTRA, this progress file including historical handover.
+- ssbu-mod-playbook skill, README, every docs/ file (CHECKLIST, WORKFLOW, EDEN, MACROS, TILE-CURSOR, GIFS, HOOK-SHARING), tools/PROVENANCE.md.
+- Repo BUILD, DECISIONS, implementation-packages, IMPLEMENTATION-PROGRESS, MENU-DRAFT, CARRY-OVER, specs/TEMPLATE, INDEX-core, SPEC-core-02/03/04/05/07.
+  Large output truncations were followed by targeted reads; MENU-DRAFT lines 221-250 still need checking before claiming the entire draft read.
+- Shared INTEGRATION-OPEN and EDEN-QUEUE. Parent AGENTS.md and first 90 lines of its historical TRAINING_LOBBY_HANDOFF.md (669060 bytes; not claimed fully read).
+  Parent handoff records later operator size ruling: rustfmt-normalized target >=15% under fork is NEXT-version target, not RC blocker; L2 two hos-lock allows approved. Ask lead to reconcile outdated size wording if needed.
+- Source read: src/editors/roster.rs; runtime/ui/{thumbs,archive,worker,tick}.rs; model/ui/frame.rs; model/ui_texture.rs.
+- Tools read: eden/lent/ui_lent.py and rows_ui11.py only. Their dependencies MUST be read before running. No playbook tool scripts have yet been run; read them fully first.
+- Remaining preimplementation reads: relevant input/state specs/indexes for remaining owned screens; required existing provider/model/runtime interfaces; read tools used completely.
+- No repo-level AGENTS.md found by rg --files -g AGENTS.md <worktree>; parent AGENTS applies.
+
+### Concrete findings to act on
+1. Roster grid already has 88 panes, 13x7, retained release c4205a5b / diag 1eaa4619. ui-11 unrun. Historical claims of gates are not this successor's final evidence.
+2. src/runtime/ui/thumbs.rs uses ONE AtomicU64 BOUND yet p::TILES is 88. is_bound(i) shifts 1 << i with no word indexing; roster pictures require fixing representation at root and testing cells 63/64/87. Existing active path is stage-only.
+3. RosterEditor currently uses Y to remove; approved contract is Y Solo Popo on Ice Climbers and R remove. Worker/model dispatch and hint must be checked together. No changes made.
+4. Frame has tile_n, tile_stage_grid, tile_sig; portrait source must integrate with u4 texture path, not create another provider.
+5. archive.rs already reads vanilla with direct nn::fs static NUL path (no std File open); zero-allocation runtime evidence still owed. Uses std::sync Mutex<Vec> pool/parked; inspect first-lock allocation as possible archive hook root cause rather than assuming read_vanilla is still the source. Two buffers retained. No proposed workaround coded.
+6. tick.rs handles info_training only; waiting recipe and TrModPort tick absent. Must coordinate existing lobby readiness/native busy and pkg6 single init.
+7. rows_ui11.py hook-allocation row merely checks counters parse, does NOT require delta zero. Final regression must enforce every hook delta zero plus 0 Unmapped.
+8. No shared eden/harness directory in this stream yet. Brief authorizes ONE start merge ebfcb98, not moving work branch; git diff HEAD ebfcb98 shows roster slice absent there but merger should retain branch changes. Inspect ancestry before merge.
+9. Shared queue has foreign tm-f8 and imgui lines; no admission attempted. Live Yoga ledger still unread. Queue alone never authorizes claim.
+
+### Own acceptance checklist (all pending unless explicit evidence below)
+Prior predecessor checklist stays above as historical evidence, not fresh passes.
+| Requirement | Tag | Result | Evidence / next proof |
+| --- | --- | --- | --- |
+| cdylib only and resident measurement | M | pending | inspect Cargo.toml; final release nro_size |
+| release profile, skyline pin, toolchain | M | pending | BUILD read; verify manifests |
+| pure model + host tests, Switch cfg | M | pending | final source/test review |
+| host test, clippy zero, no-default, release, diag | M | pending | no successor compile yet |
+| no hook heap incl archive and all hook deltas | M | pending | final Eden regression |
+| fixed buffers, static writer stack, stack paths | M | pending | source + runtime proof |
+| root fixes; one abstraction; approved exceptions | M | pending | audit final patch |
+| version guard | M | pending | final install line |
+| every called/hooked/relied site 64-byte guard | M | pending | final site audit |
+| card-copy site scan | M | pending | reuse scan evidence if no new sites; scan any additions |
+| hook sharing if possible collision | C | pending | determine sites first |
+| specific hook after prologue / call instead | M | pending | final site audit |
+| no diag code/strings in shipped NRO | M | pending | final compliance |
+| release writes install line only | M | pending | final release row |
+| logging plugin data exception | C | N/A: not logging product | UI stream |
+| online read-only review | C | pending | waiting-room path applicability / lead ownership |
+| replay A/B | C | pending | coordinate pkg7 applicability |
+| two-console online-only path | C | pending | waiting-room row / lead ownership |
+| claim before Up, release after Down | M | pending | no runs yet |
+| one Eden, >=10GiB, own profile/display | M | pending | admission proof |
+| hardlink identical, real copies writable | M | pending | rig receipt |
+| one target/copy, disk >=40GB, target cleanup manifest | M | pending | final manifests |
+| gated waits | M | pending | run receipts |
+| abort failed precondition, new label retry | M | pending | run records |
+| shortest adequate ruleset | M | pending | Training/lobby row evidence |
+| restore profile and release | M | pending | restore verification |
+| console scan, raw logs, run.json, memory.peak | M | pending | retained runs |
+| bounded local commands | M | pending | initial bootstrap reads were unwrapped; subsequent calls memory 1G/time30; builds need6G/1800 |
+| outputs under labels | M | pending | retained runs |
+| README paragraph, GIF, install/build/license/disclaimer | M | pending | coordinate lead repo-level deliverable |
+| dated evidence | M | pending | EDEN-UI-SCREENS update |
+| computed numbers from committed tested script | C | pending | fix allocation delta checking and grace analysis |
+| no operator quotes / claims beyond tests | M | pending | final review |
+| current handoff | M | pass | this checkpoint |
+| release version/tag/assets | C | not authorized | brief forbids release/tag |
+| tagged rebuild identity | C | N/A: no release authorized | stream only |
+| Switch install/readbacks | C | not authorized | brief forbids Switch/card/DBI/USB |
+| user owns connection/mount lifecycle | M | pass | none touched |
+| nothing pushed/tagged/card-written without order | M | pass | none performed |
+| Forgejo, commit message UTF8 file, identity | M | pending | checkpoint commit then final review |
+| exact model gate + watcher | M | pass | exact thread astra/medium, watcher above |
+| spawned workers own playbook read/compliance | M | N/A: subdelegation forbidden | no workers spawned |
+
+### Exact next actions
+- After compaction verify exact thread model/effort per MY_MODEL.md; reconcile watcher before rearming.
+- Finish outstanding required reads in bounded chunks; avoid dumping huge historical handoff.
+- Inspect start merge ancestry, preserve owned roster changes; merge only authorized ebfcb98 with UTF8 message file if useful.
+- Read current live Yoga ledger via existing transport and read existing harness/driver dependencies before any claim.
+- Queue ui-11 on Ally respecting tm-f8*/imgui interleave and 3-minute fairness; use retained hashed diag if appropriate, mute before boot, restore+release on all exits.
+- Implement portraits + Solo Popo; then Mii lists/busts and waiting archive/tick; B3 attribution/grace; coordinate pkg4/pkg6 via progress/lead.
+- Never mark READY until all done criteria, final host/Switch gates and compliance report with final release NRO are met.
