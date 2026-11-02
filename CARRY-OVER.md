@@ -59,7 +59,7 @@ three lines of **mixed** files (`training_mod_tui/src/containers/app.rs`: the na
 `"Player Swapping"`), besides ours-new docs. Nothing from them was used: the id came from `menu_json.rs`
 above, and the row title is the one already in MENU-DRAFT. The lead should decide whether that counts as
 opening a mixed file.
-## Package 2 (CPU behaviour), 2026-11-02
+## pkg2
 
 Nothing was carried from the fork: package 2 is clean-room code written from `specs/` and the repo docs. No file
 of the stage or the fork worktree was opened, no search ran over the stage, and nothing under `upstream-ref/` was
@@ -157,3 +157,42 @@ Carried `training_mod_consts/src/cycle_preload_config.rs` (ours-new, m5o `49c8a7
 - **`cycle_preload.ini` is a regenerated boot cache** (`model::preload::boot_cache::sync`): settings.json is the only source of the active choice; the INI is written from it on first boot or when stale, rejected or missing, and is never read back to change the choice (6 host tests: first boot writes the player's settings, stale cache never overrides, rejected cache regenerated, failed write keeps the old file and the active choice, malformed rows fail closed).
 - **R1 durable publish**: recorded edit to `write_new`: `sync_all` failure now fails the store before the rename (the fork ignored it). Risk to check at the first Eden boot: if the Skyline std `File::sync_all` reports an error on the console, every store would fail; the E8 first-boot row exercises it.
 - **Stages unconditional** (`7f7b5f1`): see the commit message; `model::stages::catalog` is the facade for package 5.
+| `src/model/state/held_item.rs` | `training_mod_consts/src/character_items.rs` (ours-new) | `57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf` | `ITEM_NAMES`, `valid_variation`, `HeldItemSnapshot` + `valid`, the rule of `deserialize_saved_item` (lines 5-83) | renamed `HeldItem`; no serde derive (hand-read `from_json`: damaged field -> `Unsupported`, `null` -> absent; hand-written `write_json`); the menu types `CharacterItemChoice` / `to_submenu` and the menu test are not carried. |
+| `src/model/state/record.rs` (`Charge`, `Robin`, `Steve`, `validate`) | `training_mod_consts/src/practice_setup.rs` (ours-new) | `4ec4abf8de44def3b5efc921d8123e82ad2cc1d8bc92e3d1f832254513e7d7a8` | `RobinCharges`, `ChargeState`, `SteveState` and their `validate` rules (lines 44-207) | renamed `Robin`, `Charge`, `Steve`; no serde derive (hand JSON in the fork's field order, absent options written as `null` exactly as the fork's pretty writer does); Steve's tool materials are `u32` code points (the fork's `char`); a Steve record that fails `validate` on read is dropped; the Mii identity is an opaque `serde_json::Value` kept as read (package 6 gives it a type). |
+| `tests/state01_json.rs` + `tests/fixtures/ported-json/` | `training_mod_consts/tests/json_ported_fixtures.rs`, `json_save_state_shape.rs`, `tests/fixtures/ported-json/` (ours-new) | fixtures: the five `*-save_states*.json`, five `expected-a-import/*.imported.json`, `PROVENANCE.json` (byte copies; the `*training_modpack*` updater-record fixtures are not carried) | the assertions of both test files | ported to this crate's reader and writer (the same fixtures, the same byte-for-byte rewrite check); new tests for the filesystem rules (two boots, a corrupt file, a failed write). |
+| `tools/elf_symbols.py` | written here (not carried) | | | symbol and 64-byte window lookup in the owned ELF for the site rows. |
+
+Not carried (read and judged): `src/training/setup_library.rs` (ours-new, 392 lines) is glue over the named-macro keyboard draft (package 4), lobby practice (package 6), the Mii roster (package 6) and a TUI panel; its file format `practice_setup.rs` (`SetupRecord`, `FighterSetup`, validation, the `Store` instantiation) is carried by `src/model/state/setup.rs` (see below) and the glue is re-written against this plugin's interfaces. `training_mod_consts/src/menu_json.rs` holds the menu-settings reader (the package-1 reader is already written from SPEC-core-04); it has no `save_states.json` code. The `save_states.json` reader/writer is new here because the fork's lives in the mixed `save_states.rs`, which was never opened; the shape is SPEC-state-01 §7.2 plus the fork's real files (the fixtures above).
+
+### pkg3 additions (milestones S3-1 to S3-5, SPEC-state-05)
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/state/setup.rs` | `training_mod_consts/src/practice_setup.rs` (ours-new) | `4ec4abf8de44def3b5efc921d8123e82ad2cc1d8bc92e3d1f832254513e7d7a8` | `SetupRecord`, `FighterSetup`, validation, the error type, the listing row, the `Record` impl over the shared `Store` | hand-written JSON (no serde derive); this crate's `Charge` / `Steve` / `HeldItem`; the Mii identity is an opaque value (package 6 types it); the UI glue (`setup_library.rs`) is not carried. |
+| `src/model/state/items.rs`, `src/runtime/features/state_restore.rs` (item part), `held_item.rs` | `src/character_items.rs` (ours-new) | `b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933` | the mechanism: clear the hand, `ItemModule::have_item(kind, variation)`, the turnip special-init action with its power getter, the 16 probability hooks for the face override, a source fighter required for items that need one | re-expressed against the spec's tables and this crate's site rows (guarded `main+offset` calls, no allocation in hooks); the spec's grant paths A to C are superseded by this mechanism. |
+| `src/model/state/convert.rs`, `src/model/migration_run.rs` | none (new here) | | | the N6 conversion and the first-boot import are written from SPEC-state-04 and SPEC-core-08; only the fork's folder layout and file names are known from the fixtures. |
+| `src/model/state/pokemon.rs`, the `copy_charge` field | none (new here) | | | SPEC-state-05 §5.1, §5.2 only; the new optional record field `copy_charge` is this crate's (lead ruling 2026-11-02): fork-compatible, written only when present. |
+
+## pkg4 (package 4: recording, input display, chords, notifications; stream `stream/pkg4`)
+
+Source: stage **m5o** (`.../parked-reuse175/refactor/stages/m5o/stage`, called `<stage>`). Only files whose `origin` is
+`ours-new` in `docs/provenance/provenance-files.json` were opened (`training_mod_consts/src/menu_shortcuts.rs`,
+`training_mod_macros/src/capture_settings.rs`, `training_mod_macros/src/test_util.rs` for its `TempDir`, the heads of
+`training_mod_macros/src/lib.rs` and `src/capture_plugin.rs`, and the import / dependency lines of the other
+`training_mod_macros` files to size the carry). The mixed files (`input_record.rs`, `button_config.rs`, `input_log.rs`,
+`ui/display.rs`) and everything under `upstream-ref/` were not opened; the fork's benchmark fixtures
+(`scripts/input-display-bench/fixtures/*`, upstream copies) were not opened.
+
+| Here | Fork path (stage m5o) | sha256 of the stage file | Taken | Clean-room changes (reason) |
+| --- | --- | --- | --- | --- |
+| `src/model/menu_shortcuts.rs` | `training_mod_consts/src/menu_shortcuts.rs` (ours-new) | `b19b20ac365178ff7ddba0b4801698872048de0081e8955ed4df9e87ea2e6d0d` | whole file (parse, passes, tests) | The fork's `ButtonConfig` byteflags struct is this plugin's `Chord` (`u16`, bit order of the chord rows); button-name tables (`FIELDS`, `LABELS`) replace `ButtonConfig::ALL_FIELDS/ALL_NAMES`; `DEFAULT_INI` doc line no longer says "restart" (N7, a change applies at once); `passes` also needs a non-empty chord; added `to_ini_text` (N7 writer: keeps comments and unknown lines, one line per slot), `with_slot`, `slots`, `ini_name`, `FILE_NAME`, `MAX_BYTES`; tests moved to `Chord` plus round-trip tests. |
+| `src/model/capture_settings.rs` | `training_mod_macros/src/capture_settings.rs` (ours-new) | `5357f35edcdee093075cd7e27e6c206c8a408b8a05ad46b583493213b6dc6af3` | whole file | none to the carried text except the test `TempDir` (the fork's `test_util::TempDir`, reduced, defined in the test module). Added at the end: `FILE_NAME`, `MAX_BYTES`, `to_ini_text` (the menu's Replay capture toggle, Q7: replaces the recognised line in place), `from_bytes` (fail-closed read) and their tests. |
+
+Not carried yet (S4-4, waiting on the lead's sequencing: pkg6's `training_mod_mii` first): `training_mod_macros/src/{recording,library,window,replay,live_frame,move_start,live_capture,capture_archive,capture_toggle,shared_capture,ui_anchor}.rs`,
+`src/training/named_macros.rs`, `src/replay_*.rs`, `src/live_replay.rs`, `src/capture_plugin.rs`, `src/training/ui/clip_editor.rs`,
+`training_mod_tui/src/{clip_*,macro_panel*,replay_panel,resume}.rs`. Dependencies they need (lead rulings 2026-11-02): `training_mod_mii`
+(pkg6), `smash-match-data` (vendored under `crates/`), `deluxe_plugin_sdk` (feature `deluxe-sdk`), `serde` with derive.
+`library.rs`'s generic `Store` is pkg3's `model::store`; the macro `Record` impl follows `recording.rs`.
+
+New code in this stream with no fork origin: everything else under `src/model/{recording,chords,ini_files,notify,damage_display,input_display,sites_pkg4}.rs`
+and `src/runtime/features/{recorder,chords,notices,input_display}.rs`, written from SPEC-input-01/02/04/05 and the owned 13.0.5 ELF.

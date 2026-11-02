@@ -1,0 +1,128 @@
+{
+  "purpose": "Output of toml08-experiment/port/port_save_states.py (host-side TOML -> JSON port for the JSON-only build) for the 8 real legacy TOML fixtures; expected-a-import/*.imported.json = what json-A's runtime TOML import (filesystem::write_json of the toml-0.5.11-parsed SaveStateSlots / TrainingModpackConfig::to_json) wrote for the same files, recorded by a receipted generator run.",
+  "converter": "toml08-experiment/port/port_save_states.py",
+  "converter_sha256": "fcff233cc766591801ee59831cfc5825eb3b441724b4540b94e9fc69b5c8adf6",
+  "converter_command": "/usr/bin/python3 -I port_save_states.py <fixture>.toml --output <stem>.json --check --force",
+  "converted_utc": "2026-10-31T14:14:52.149284Z",
+  "files": [
+    {
+      "ported": "console-ui84-save_states.json",
+      "sha256": "88935cd9c9b6b69ec1721690f14bbffef1101e5ac5b830831a8bb3f89b4aa898",
+      "bytes": 5644,
+      "from_legacy_fixture": "console-ui84-save_states.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-ui84/physical-configs/ultimate/TrainingModpack/save_states.toml",
+      "legacy_source_sha256": "1175889840544c4397945e36ae8603e5838945496ae3601053f53f8566af0655",
+      "origin": "physical console configs captured for console-ui84; contains a held_item table"
+    },
+    {
+      "ported": "console-ui84-training_modpack.json",
+      "sha256": "45839db456a66cfcd2073517d09bdb6d1c32f5747cafc73940559eb1f08139ca",
+      "bytes": 72,
+      "from_legacy_fixture": "console-ui84-training_modpack.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-ui84/physical-configs/ultimate/TrainingModpack/training_modpack.toml",
+      "legacy_source_sha256": "5c6313a63343022fc685609ecb01216184ed9656f9738704930a8f65c4a8f316",
+      "origin": "physical console configs captured for console-ui84"
+    },
+    {
+      "ported": "live-acceptance-33-save_states.json",
+      "sha256": "47f58519bbb5b3ddc6dbd360c4637c22922b7e145664a4cce799be1af3d7791e",
+      "bytes": 5527,
+      "from_legacy_fixture": "live-acceptance-33-save_states.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/research/named-macros/live-acceptance-33-train1/after/sdmc-1791933578122232103/ultimate/TrainingModpack/save_states.toml",
+      "legacy_source_sha256": "7dba2865042edd613a78267db4ccfa9ca087cfa20b0b23f366d43857658cc9ce",
+      "origin": "Eden sdmc after live-acceptance-33-train1"
+    },
+    {
+      "ported": "live-acceptance-33-training_modpack.json",
+      "sha256": "ce77341a301be8e0c25228ab4948c71f69c4e08b3a222b7a3f7006d4e1407c9b",
+      "bytes": 72,
+      "from_legacy_fixture": "live-acceptance-33-training_modpack.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/research/named-macros/live-acceptance-33-train1/after/sdmc-1791933578122232103/ultimate/TrainingModpack/training_modpack.toml",
+      "legacy_source_sha256": "527476ebfe010c0d11ae56126a5ab34e249c3e05280baacb2bb7cbc104f7d0dc",
+      "origin": "Eden sdmc after live-acceptance-33-train1"
+    },
+    {
+      "ported": "plan6-observer03-save_states.before.json",
+      "sha256": "5dbc9942cf19d3720508de3e218465a82a1bd2b4b7e4436377c5c0720e46501f",
+      "bytes": 5774,
+      "from_legacy_fixture": "plan6-observer03-save_states.before.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/enhancements/plan6-observer-runtime-03/save_states.before.toml",
+      "legacy_source_sha256": "caa78d16b396a402b6da7535e9f7a9e848e70f4d741672e9e6a7f59234b7defb",
+      "origin": "Eden profile save_states before plan6-observer-runtime-03; contains a held_item table"
+    },
+    {
+      "ported": "switch-before21-save_states.json",
+      "sha256": "9d2232f7cf59bcb392d827f80db531a288c11dcc77c40bcc1d6a04726c16b3bd",
+      "bytes": 5544,
+      "from_legacy_fixture": "switch-before21-save_states.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/switch-before21-complete/ultimate/TrainingModpack/save_states.toml",
+      "legacy_source_sha256": "ef43a831d2f717c7210973febd6664be5bb8bada794cb72e3b1c9be16f3a38a1",
+      "origin": "physical Switch SD backup (switch-before21-complete), written by the 0.5 toml build"
+    },
+    {
+      "ported": "switch-before21-training_modpack.json",
+      "sha256": "45839db456a66cfcd2073517d09bdb6d1c32f5747cafc73940559eb1f08139ca",
+      "bytes": 72,
+      "from_legacy_fixture": "switch-before21-training_modpack.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/switch-before21-complete/ultimate/TrainingModpack/training_modpack.toml",
+      "legacy_source_sha256": "5c6313a63343022fc685609ecb01216184ed9656f9738704930a8f65c4a8f316",
+      "origin": "physical Switch SD backup (switch-before21-complete)"
+    },
+    {
+      "ported": "yoga-mii-combined05-save_states.json",
+      "sha256": "990d3926c74581e5f56a812d4c0c6659e9f6ae71dc36c7133fc96827b216f93f",
+      "bytes": 5549,
+      "from_legacy_fixture": "yoga-mii-combined05-save_states.toml",
+      "legacy_source_path": "/home/intpa/smash-training-lobby/artifacts/enhancements/plan2-mii-yoga-combined-runtime05/remote-final/mii-combined05-backup/save_states.toml",
+      "legacy_source_sha256": "0e43b04169d2dcf476fc0d21a8f1030ea0f74316dfa845c305f54dfa05629c4d",
+      "origin": "Yoga Eden profile backup (plan2-mii-yoga-combined-runtime05)"
+    }
+  ],
+  "expected_a_import": {
+    "description": "json-A runtime import output: serde_json::to_string_pretty(&SaveStateSlots parsed by toml 0.5.11) / TrainingModpackConfig::to_json(), recorded by json-a-gen test port_expected_gen",
+    "generator_unit": "toml08-port-json-a-gen-record-import-1793456082900267814",
+    "generator_log_sha256": "1d61e8830177d3807d64cbac92a135a7fa382f93658cb27722be38c3cb4397ab",
+    "files": [
+      {
+        "file": "expected-a-import/console-ui84-save_states.imported.json",
+        "sha256": "4d6fffbd9a6de79c883960878839201c26602802365b4b87f76ff978f5afc307",
+        "bytes": 8415
+      },
+      {
+        "file": "expected-a-import/console-ui84-training_modpack.imported.json",
+        "sha256": "f6050f24e18f7c1f2e020aa1811705cfdd9467cfb1e8f3da6ee85f4e2c3ae03f",
+        "bytes": 71
+      },
+      {
+        "file": "expected-a-import/live-acceptance-33-save_states.imported.json",
+        "sha256": "0c15ebb33a76fd0c76b738ba644d7b5e33322a4989d3fe21fac3d150edfa05ea",
+        "bytes": 8380
+      },
+      {
+        "file": "expected-a-import/live-acceptance-33-training_modpack.imported.json",
+        "sha256": "089e8cdd6607e0b7e7c11cad43365e5df776ba35a6752947eb12dabacb8f230e",
+        "bytes": 71
+      },
+      {
+        "file": "expected-a-import/plan6-observer03-save_states.before.imported.json",
+        "sha256": "3571dcfc6c3d0ba948d8357ec0b026f851d64c250ab5e2c2db0dcf925551a809",
+        "bytes": 8545
+      },
+      {
+        "file": "expected-a-import/switch-before21-save_states.imported.json",
+        "sha256": "020d9ff3c4f298f53d257c588a577f3927eb1bf6f7f69be0b80ec90ffd8fb670",
+        "bytes": 8397
+      },
+      {
+        "file": "expected-a-import/switch-before21-training_modpack.imported.json",
+        "sha256": "f6050f24e18f7c1f2e020aa1811705cfdd9467cfb1e8f3da6ee85f4e2c3ae03f",
+        "bytes": 71
+      },
+      {
+        "file": "expected-a-import/yoga-mii-combined05-save_states.imported.json",
+        "sha256": "e2e90d9a7c83b128c87c41a6447cb35dccb992891177451a73f16f7467dc918d",
+        "bytes": 8373
+      }
+    ]
+  }
+}

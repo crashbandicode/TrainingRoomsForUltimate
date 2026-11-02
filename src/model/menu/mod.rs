@@ -47,7 +47,9 @@ impl Default for Env {
             pilot_present: false,
             console: ConsoleMode::Docked,
             shortcuts: [Chord::DEFAULT_SHORTCUT_1, Chord::NONE],
-            replay_capture: true,
+            // The file of record is the INI, which defaults to off when absent (lead ruling 2026-11-02);
+        // the runtime sets this from it at boot.
+        replay_capture: false,
         }
     }
 }
@@ -71,6 +73,12 @@ const REROLL_IDS: [(&str, u8); 4] = [
     ("ledge_state", reroll::LEDGE_OPTIONS),
     ("throw_state", reroll::THROW_OPTIONS),
 ];
+
+/// The re-roll bits that replacing the whole settings `old` by `new` makes (the menu sets them one row at a
+/// time in `put`; the diag build's settings reload replaces a whole snapshot, so it asks this).
+pub fn rerolls_between(old: &settings::Snapshot, new: &settings::Snapshot) -> u8 {
+    REROLL_IDS.iter().filter(|(id, _)| old.get(id) != new.get(id)).fold(0, |bits, (_, bit)| bits | bit)
+}
 
 /// What the menu asks the runtime to do. Taken with `Menu::take_outbox`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

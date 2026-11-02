@@ -106,6 +106,39 @@ asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
 | B6 per-fighter state | §10 | `cpu05_per_fighter_state` | `cpu-05-ice-climbers` | host pass |
 | Common-module hook guard; param-hook absent path logs once | §9 | - | `cpu-05-install-line` | **blocked** |
 
+## SPEC-cpu-01 (the mash run), SPEC-cpu-06 (aerials, throws, angle, fast fall, full hop, crouch), SPEC-cpu-07 (frame advantage)
+
+| Requirement | § | Host test | Eden row | Status |
+| --- | --- | --- | --- | --- |
+| Trigger priority tech > clatter > tumble > hitstun > parry > footstool > trump > landing > generic | cpu-01 §5 | `cpu01_trigger_priority` | `cpu-01-tumble-vs-hitstun` | host pass; runtime, unrun (`cpu_command_flag_hook`) |
+| Override replaces mash_state without its trigger; an empty override falls back | cpu-01 §5 | `cpu01_override_precedence` | `cpu-01-hitstun-override-only` | host pass; runtime, unrun |
+| Distance thresholds 16 / 37 / 64, infinity without a player (3-D distance from x, y, z) | cpu-01 §3 | `cpu01_distance_thresholds` | `cpu-01-distance-mid` | host pass; runtime, unrun |
+| One roll per situation entry (B8), a new one at the next entry | cpu-01 Q1 | `cpu01_one_roll_per_situation` | `cpu-01-tumble-vs-hitstun` | host pass; runtime, unrun |
+| Each action's command bits and expected status; jab only grounded; grab blocked by the invalid-catch frame; shield airborne returns 0 and stays queued | cpu-01 §5 | `cpu01_action_flags_table` | `cpu-01-mash-each-action` | host pass; runtime, unrun |
+| Dash attack: dash first, one dash frame, then the dash attack; no re-buffer while beginning it | cpu-01 §5 | `cpu01_dash_attack_sequence` | `cpu-01-dash-attack` | host pass; runtime, unrun |
+| Character-specific completion (Bowser, Kirby range; Sora and K. Rool rows are in the table) | cpu-01 §4 | `cpu01_character_specific_completion` | `cpu-01-kirby-hat-neutral-b`, `cpu-01-bowser-up-b` | host pass; runtime, unrun |
+| A menu save that empties Mash Toggles and Triggers empties the queue once | cpu-01 §5 | `cpu01_menu_disable_clears_queue` | `cpu-01-menu-disable` | host pass; runtime, unrun |
+| Reset bundle empties the queue and latch; no choice while a save state loads | cpu-01 §5 | `cpu01_reset_clears_queue` | `cpu-01-savestate-reset` | host pass |
+| Nana receives bits; an unresolved table asks for nothing | cpu-01 §6 | `cpu01_nana_and_missing_accessor` | `cpu-01-ice-climbers` | host pass |
+| Playback Mash Interrupt stops the playback and triggers again after it | cpu-01 §5 | `cpu01_playback_stops_on_a_triggered_mash`, `cpu01_playback_interrupt` | `cpu-01-playback-interrupt` | host pass; the request goes to `published::CPU_STOP_PLAYBACK` for package 4 |
+| Aerial delay counts only when CONT_ATTACK_AIR is enabled; 0 and in-ATTACK_AIR wait for nothing | cpu-06 §5 | `cpu06_aerial_delay_rules` | `cpu-06-aerial-delay-10` | host pass; runtime, unrun |
+| Falling aerial waits for negative gravity speed | cpu-06 §5 | `cpu06_falling_aerial` | `cpu-06-falling-nair` | host pass; runtime, unrun |
+| Full hop holds the jump buttons during JUMP_SQUAT only, not during playback | cpu-06 §5 | `cpu06_full_hop_hold` | `cpu-06-full-hop`, `cpu-06-short-hop` | host pass; runtime, unrun |
+| Fast fall: delay rolled at the apex, flag and flash once, only in FALL / ATTACK_AIR, not during playback | cpu-06 §5 | `cpu06_fast_fall_rules` | `cpu-06-fast-fall-delay-5` | host pass; runtime, unrun |
+| Attack angle: up and down, not on the ledge, not in playback, cleared when the queue empties (B8) | cpu-06 §5 | `cpu06_attack_angle` | `cpu-06-ftilt-up` | host pass; runtime, unrun (`cpu_stick_dir_hook`) |
+| Crouch in the six statuses only | cpu-06 §5 | `cpu06_crouch_statuses` | `cpu-06-crouch` | host pass; runtime, unrun (`cpu_stick_y_hook`; the air-dodge direction answers first) |
+| Throw: case and delays once per grab; None does nothing; pummel timing; throw bits on category 2; the mash after the throw ignores the triggers | cpu-06 §5 | `cpu06_throw_state_machine` | `cpu-06-uthrow-delay-30-pummel-10`, `cpu-06-throw-none` | host pass; runtime, unrun |
+| B11: a changed Throw Options row re-rolls the held case in the same hold | cpu-06 Q9 | `cpu06_throw_options_change_rerolls_held_case` | `cpu-06-throw-change-while-holding` | host pass; runtime, unrun |
+| B5 / N4: throws yield to a recording by default | cpu-06 §6 | `cpu06_throw_yields_to_playback` | `cpu-06-throw-during-playback-off/on` | host pass |
+| N3 ranges for the four delay rows | cpu-06 §9 | `cpu06_range_picks_and_exclusive_rows` | `cpu-06-aerial-range-5-15`, `cpu-06-throw-range-20-40`, `cpu-06-pummel-range-on` | host pass |
+| B6 per-fighter state | cpu-06 Q5 | `cpu06_per_fighter_state` | `cpu-06-ice-climbers-grab` | host pass |
+| Frame advantage sign, lock-in, one measurement per exchange, colours and text | cpu-07 §5 | `cpu07_frame_advantage_math` | `cpu-07-jab-on-shield-minus`, `cpu-07-plus-frames` | host pass; runtime, unrun (published to `published::FRAME_ADVANTAGE_*` for the UI package) |
+| No work when Off; aborted by a mash set | cpu-07 §5 | `cpu07_frame_advantage_gates` | `cpu-07-off-no-notification` | host pass |
+| The reset bundle and a session clear clear the measurement | cpu-07 §5 | `cpu07_reset_bundle_clears_the_measurement` | `cpu-07-lra-reset` | host pass |
+
+**Spec budget row (cpu-07 §8).** Counters are per fighter body (decision B6, accepted 2026-11-02): 7 counters x 16 bodies, about 450 bytes of
+state against the spec's roughly 128 bytes for one shared table; the clock still ticks once per simulation frame.
+
 ## Sites (SPEC-cpu-01..05 §4)
 
 | Requirement | § | Host test | Eden row | Status |
@@ -116,8 +149,6 @@ asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
 | Features need the core's natives; the slot row records its original | §4 | `cpu_sites_features_need_the_core`, `cpu_sites_the_frame_slot_holds_the_original_it_replaces` | - | host pass |
 | Card scan (2026-11-01 10:19 MTP preflight copy, 16 plugins): only `libtraining_modpack.nro` (the fork, never co-installed, B1) references any of the 19 offsets; `libssbu_cpu_pilot.nro` and every other plugin: no reference | playbook | `tools/build/scan-offsets.py` (output in `IMPLEMENTATION-PROGRESS.md`) | - | pass |
 
-## Not in this milestone (package 2 is in progress)
+## Not in this milestone
 
-SPEC-cpu-06 (aerials, throws, angle, fast fall, crouch; the roll points are in), SPEC-cpu-01 (per-frame triggers,
-command flags, overrides, dash attack, character completion table) and SPEC-cpu-07 (frame advantage) are the next
-milestones; their rows are listed in the specs' §9 and will be added here as they are built.
+The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md, "Still open").
