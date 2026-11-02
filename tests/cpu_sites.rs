@@ -11,6 +11,7 @@ mod model;
 
 use model::guard::{HookForm, Placement, SeamKind};
 use model::sites::{self, Feature, Site};
+use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
 const SYMBOLS: [(&str, &str); 32] = [
@@ -69,40 +70,40 @@ fn cpu_sites_are_the_symbols_they_name() {
     }
     // The constant that `sites.rs` names for each is the row's offset.
     for (name, offset) in [
-        ("cpu_on_frame_slot", sites::CPU_ON_FRAME_SLOT_OFFSET),
-        ("cpu_on_frame", sites::CPU_ON_FRAME_OFFSET),
-        ("lua_const_lookup", sites::LUA_CONST_LOOKUP_OFFSET),
-        ("status_kind", sites::STATUS_KIND_OFFSET),
-        ("prev_status_kind", sites::PREV_STATUS_KIND_OFFSET),
-        ("situation_kind", sites::SITUATION_KIND_OFFSET),
-        ("prev_situation_kind", sites::PREV_SITUATION_KIND_OFFSET),
-        ("change_status_request", sites::CHANGE_STATUS_REQUEST_OFFSET),
-        ("motion_frame", sites::MOTION_FRAME_OFFSET),
-        ("pos_x", sites::POS_X_OFFSET),
-        ("work_is_flag", sites::WORK_IS_FLAG_OFFSET),
-        ("work_set_flag", sites::WORK_SET_FLAG_OFFSET),
-        ("sdi_hook", sites::SDI_HOOK_OFFSET),
-        ("stick_x_hook", sites::STICK_X_HOOK_OFFSET),
-        ("stick_y_hook", sites::STICK_Y_HOOK_OFFSET),
-        ("clatter_start_hook", sites::CLATTER_START_HOOK_OFFSET),
-        ("add_clatter_time", sites::ADD_CLATTER_TIME_OFFSET),
-        ("effect_req_on_joint", sites::EFFECT_REQ_ON_JOINT_OFFSET),
-        ("transition_term_hook", sites::TRANSITION_TERM_HOOK_OFFSET),
-        ("change_status_force", sites::CHANGE_STATUS_FORCE_OFFSET),
-        ("visibility_set_whole", sites::VISIBILITY_SET_WHOLE_OFFSET),
-        ("effect_set_visible_kind", sites::EFFECT_SET_VISIBLE_KIND_OFFSET),
-        ("motion_end_frame", sites::MOTION_END_FRAME_OFFSET),
-        ("damage_of", sites::DAMAGE_OF_OFFSET),
-        ("work_get_float", sites::WORK_GET_FLOAT_OFFSET),
-        ("work_set_float", sites::WORK_SET_FLOAT_OFFSET),
-        ("work_get_param_float", sites::WORK_GET_PARAM_FLOAT_OFFSET),
-        ("motion_change_hook", sites::MOTION_CHANGE_HOOK_OFFSET),
-        ("quake_pos_hook", sites::QUAKE_POS_HOOK_OFFSET),
-        ("shield_param_hook", sites::SHIELD_PARAM_HOOK_OFFSET),
-        ("check_button_on_hook", sites::CHECK_BUTTON_ON_HOOK_OFFSET),
-        ("check_button_off_hook", sites::CHECK_BUTTON_OFF_HOOK_OFFSET),
-        ("stick_x_no_clamp_hook", sites::STICK_X_NO_CLAMP_HOOK_OFFSET),
-        ("stick_y_no_clamp_hook", sites::STICK_Y_NO_CLAMP_HOOK_OFFSET),
+        ("cpu_on_frame_slot", sites_pkg2::CPU_ON_FRAME_SLOT_OFFSET),
+        ("cpu_on_frame", sites_pkg2::CPU_ON_FRAME_OFFSET),
+        ("lua_const_lookup", sites_pkg2::LUA_CONST_LOOKUP_OFFSET),
+        ("status_kind", sites_pkg2::STATUS_KIND_OFFSET),
+        ("prev_status_kind", sites_pkg2::PREV_STATUS_KIND_OFFSET),
+        ("situation_kind", sites_pkg2::SITUATION_KIND_OFFSET),
+        ("prev_situation_kind", sites_pkg2::PREV_SITUATION_KIND_OFFSET),
+        ("change_status_request", sites_pkg2::CHANGE_STATUS_REQUEST_OFFSET),
+        ("motion_frame", sites_pkg2::MOTION_FRAME_OFFSET),
+        ("pos_x", sites_pkg2::POS_X_OFFSET),
+        ("work_is_flag", sites_pkg2::WORK_IS_FLAG_OFFSET),
+        ("work_set_flag", sites_pkg2::WORK_SET_FLAG_OFFSET),
+        ("sdi_hook", sites_pkg2::SDI_HOOK_OFFSET),
+        ("stick_x_hook", sites_pkg2::STICK_X_HOOK_OFFSET),
+        ("stick_y_hook", sites_pkg2::STICK_Y_HOOK_OFFSET),
+        ("clatter_start_hook", sites_pkg2::CLATTER_START_HOOK_OFFSET),
+        ("add_clatter_time", sites_pkg2::ADD_CLATTER_TIME_OFFSET),
+        ("effect_req_on_joint", sites_pkg2::EFFECT_REQ_ON_JOINT_OFFSET),
+        ("transition_term_hook", sites_pkg2::TRANSITION_TERM_HOOK_OFFSET),
+        ("change_status_force", sites_pkg2::CHANGE_STATUS_FORCE_OFFSET),
+        ("visibility_set_whole", sites_pkg2::VISIBILITY_SET_WHOLE_OFFSET),
+        ("effect_set_visible_kind", sites_pkg2::EFFECT_SET_VISIBLE_KIND_OFFSET),
+        ("motion_end_frame", sites_pkg2::MOTION_END_FRAME_OFFSET),
+        ("damage_of", sites_pkg2::DAMAGE_OF_OFFSET),
+        ("work_get_float", sites_pkg2::WORK_GET_FLOAT_OFFSET),
+        ("work_set_float", sites_pkg2::WORK_SET_FLOAT_OFFSET),
+        ("work_get_param_float", sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET),
+        ("motion_change_hook", sites_pkg2::MOTION_CHANGE_HOOK_OFFSET),
+        ("quake_pos_hook", sites_pkg2::QUAKE_POS_HOOK_OFFSET),
+        ("shield_param_hook", sites_pkg2::SHIELD_PARAM_HOOK_OFFSET),
+        ("check_button_on_hook", sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET),
+        ("check_button_off_hook", sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET),
+        ("stick_x_no_clamp_hook", sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET),
+        ("stick_y_no_clamp_hook", sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET),
     ] {
         assert_eq!(sites::find(name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -117,11 +118,11 @@ fn cpu_sites_the_frame_slot_holds_the_original_it_replaces() {
     // seam table's value) and boot compares the live slot with it (`Site::slot_outcome`) before the
     // wrapper replaces it.
     assert_eq!(owned.window(slot.offset), [0u8; 64]);
-    assert_eq!(slot.expected_slot_target(), Some(sites::CPU_ON_FRAME_OFFSET as u64));
-    assert_eq!(slot.slot_outcome(sites::CPU_ON_FRAME_OFFSET as u64), model::guard::GuardOutcome::Stock);
+    assert_eq!(slot.expected_slot_target(), Some(sites_pkg2::CPU_ON_FRAME_OFFSET as u64));
+    assert_eq!(slot.slot_outcome(sites_pkg2::CPU_ON_FRAME_OFFSET as u64), model::guard::GuardOutcome::Stock);
     assert!(!slot.slot_outcome(0x123456).usable());
     // The function the slot points at is the row the wrapper calls.
-    assert_eq!(sites::find("cpu_on_frame").map(|s| s.offset), Some(sites::CPU_ON_FRAME_OFFSET));
+    assert_eq!(sites::find("cpu_on_frame").map(|s| s.offset), Some(sites_pkg2::CPU_ON_FRAME_OFFSET));
     assert!(matches!(slot.kind, SeamKind::Hook { form: HookForm::VtableSlot, placement: Placement::Data }));
 }
 

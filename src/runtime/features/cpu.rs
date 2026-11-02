@@ -31,7 +31,7 @@ use crate::model::cpu::state::Cpu;
 use crate::model::cpu::status::Situation;
 use crate::model::lra_reset::{self, HubStep};
 use crate::model::settings::Snapshot;
-use crate::model::sites;
+use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::diag_log::diagnostic;
@@ -402,8 +402,8 @@ unsafe fn apply(accessor: usize, out: FrameOut) {
 /// their guards (`boot`).
 pub fn install_frame() {
     let base = game::text_base();
-    ORIGINAL_FRAME.store(base + sites::CPU_ON_FRAME_OFFSET, Ordering::Release);
-    let slot = (base + sites::CPU_ON_FRAME_SLOT_OFFSET) as *mut usize;
+    ORIGINAL_FRAME.store(base + sites_pkg2::CPU_ON_FRAME_OFFSET, Ordering::Release);
+    let slot = (base + sites_pkg2::CPU_ON_FRAME_SLOT_OFFSET) as *mut usize;
     // SAFETY: the slot is a writable `.data` pointer that held the original's address.
     unsafe { slot.write_volatile(on_frame as *const () as usize) };
 }
@@ -412,7 +412,7 @@ pub fn install_frame() {
 
 /// `FighterControlModuleImpl::check_hit_stop_delay_command(accessor, out)`: the SDI answer for a CPU
 /// body (decision N9: unset means no SDI, the original is not called).
-#[skyline::hook(offset = sites::SDI_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::SDI_HOOK_OFFSET)]
 pub unsafe fn cpu_sdi_hook(accessor: usize, out: *mut [f32; 2]) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::SDI);
@@ -438,7 +438,7 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
 }
 
 /// `ControlModule::get_stick_x(accessor)`: the air-dodge direction out of hitstun.
-#[skyline::hook(offset = sites::STICK_X_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_X_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_X);
@@ -448,7 +448,7 @@ pub unsafe fn cpu_stick_x_hook(accessor: usize) -> f32 {
 
 /// `ControlModule::get_stick_y(accessor)`: the same pick as x for the episode. Crouch (SPEC-cpu-06)
 /// answers after this one when it is built.
-#[skyline::hook(offset = sites::STICK_Y_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_Y_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     bump(counts_index::STICK_Y);
@@ -458,7 +458,7 @@ pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
 
 /// `ControlModule::start_clatter(accessor, initial, auto, manual, a, b, c, d)`: remember the manual
 /// recovery rate as the clatter step; the original always runs.
-#[skyline::hook(offset = sites::CLATTER_START_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CLATTER_START_HOOK_OFFSET)]
 pub unsafe fn cpu_clatter_start_hook(
     accessor: usize,
     initial: f32,
@@ -481,7 +481,7 @@ pub unsafe fn cpu_clatter_start_hook(
 
 /// `WorkModule::is_enable_transition_term(accessor, term)`: the native automatic ledge climb is denied
 /// while a CPU body waits, delays or waits for its playback. Every other query is the original's.
-#[skyline::hook(offset = sites::TRANSITION_TERM_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)]
 pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     let _scope = HookScope::enter();
     bump(counts_index::TRANSITION_TERM);
@@ -503,7 +503,7 @@ pub fn set_tech_on(on: bool) {
 
 /// `MotionModule::change_motion(accessor, motion, ...)`: the tech and getup animations follow the held
 /// roll directions (SPEC-cpu-04 section 5, "Motion").
-#[skyline::hook(offset = sites::MOTION_CHANGE_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::MOTION_CHANGE_HOOK_OFFSET)]
 pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f32, c: bool, d: f32, e: bool, f: bool) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::MOTION_CHANGE);
@@ -513,7 +513,7 @@ pub unsafe fn cpu_motion_change_hook(accessor: usize, motion: u64, a: f32, b: f3
 
 /// `CameraModule::req_quake_pos(accessor, kind, pos)`: no shake for a CPU in the missed-tech status
 /// while Hide Tech Animations is On (SPEC-cpu-04 section 4).
-#[skyline::hook(offset = sites::QUAKE_POS_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::QUAKE_POS_HOOK_OFFSET)]
 pub unsafe fn cpu_quake_pos_hook(accessor: usize, kind: i32, pos: *const [f32; 3]) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::QUAKE_POS);
@@ -551,7 +551,7 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
 
 /// `ControlModule::check_button_on(accessor, button)`: the guard buttons read as held while a CPU
 /// body should hold its shield.
-#[skyline::hook(offset = sites::CHECK_BUTTON_ON_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, button);
@@ -559,7 +559,7 @@ pub unsafe fn cpu_check_button_on_hook(accessor: usize, button: i32) -> bool {
 }
 
 /// `ControlModule::check_button_off(accessor, button)`: the guard buttons do not read as released.
-#[skyline::hook(offset = sites::CHECK_BUTTON_OFF_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::CHECK_BUTTON_OFF_HOOK_OFFSET)]
 pub unsafe fn cpu_check_button_off_hook(accessor: usize, button: i32) -> bool {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, button);
@@ -574,7 +574,7 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
 }
 
 /// `ControlModule::get_stick_x_no_clamp(accessor)`: the shield tilt.
-#[skyline::hook(offset = sites::STICK_X_NO_CLAMP_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_X_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor);
@@ -582,7 +582,7 @@ pub unsafe fn cpu_stick_x_no_clamp_hook(accessor: usize) -> f32 {
 }
 
 /// `ControlModule::get_stick_y_no_clamp(accessor)`: the shield tilt.
-#[skyline::hook(offset = sites::STICK_Y_NO_CLAMP_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET)]
 pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor);
@@ -592,7 +592,7 @@ pub unsafe fn cpu_stick_y_no_clamp_hook(accessor: usize) -> f32 {
 /// `WorkModule::get_param_float(accessor, kind, name)`: shield decay and regeneration for a CPU body
 /// while the decay override is active; every other parameter is the original's (the first compare
 /// is on the parameter type hash, so the common case costs two integer compares).
-#[skyline::hook(offset = sites::SHIELD_PARAM_HOOK_OFFSET)]
+#[skyline::hook(offset = sites_pkg2::SHIELD_PARAM_HOOK_OFFSET)]
 pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f32 {
     let _scope = HookScope::enter();
     let original = call_original!(accessor, kind, name);

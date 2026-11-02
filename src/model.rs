@@ -29,6 +29,8 @@ pub mod migration;
 pub mod settings;
 #[path = "model/sites.rs"]
 pub mod sites;
+#[path = "model/sites_pkg2.rs"]
+pub mod sites_pkg2;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
 #[path = "model/storage.rs"]
