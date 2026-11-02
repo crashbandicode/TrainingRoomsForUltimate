@@ -323,3 +323,27 @@ pub unsafe fn turnip_power(peach: bool, n: u8) -> f32 {
     let first = if peach { 0x1668D90 } else { 0x165BF40 };
     at::<extern "C" fn() -> f32>(first + 0x20 * (usize::from(n) - 1))()
 }
+
+// ---- Pokemon Trainer and Kirby ----------------------------------------------------------------------
+
+/// `LinkModule::get_parent_object_id(accessor, link)`: a Pokemon's trainer object id (or -1).
+pub unsafe fn link_parent_object_id(accessor: usize, link: i32) -> i32 {
+    at::<extern "C" fn(usize, i32) -> i32>(s::STATE_LINK_PARENT_OBJECT_ID_OFFSET)(accessor, link)
+}
+
+pub unsafe fn set_situation_kind(accessor: usize, situation: i32) {
+    at::<extern "C" fn(usize, i32, bool)>(s::STATE_SET_SITUATION_KIND_OFFSET)(accessor, situation, true)
+}
+
+pub unsafe fn article_set_rate(accessor: usize, article: i32, rate: f32) {
+    at::<extern "C" fn(usize, i32, f32)>(s::STATE_ARTICLE_SET_RATE_OFFSET)(accessor, article, rate)
+}
+
+pub unsafe fn article_hide_whole(accessor: usize, article: i32, target: i32) {
+    at::<extern "C" fn(usize, i32, bool, i32)>(s::STATE_ARTICLE_SET_VISIBILITY_WHOLE_OFFSET)(accessor, article, false, target)
+}
+
+/// `FighterSpecializer_Kirby::copy_setup(kirby, opponent entry, copied kind, true, false)`.
+pub unsafe fn kirby_copy_setup(accessor: usize, opponent_entry: i32, copied_kind: i32) {
+    at::<extern "C" fn(usize, i32, i32, bool, bool)>(s::STATE_KIRBY_COPY_SETUP_OFFSET)(accessor, opponent_entry, copied_kind, true, false)
+}

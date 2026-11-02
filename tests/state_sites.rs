@@ -57,7 +57,7 @@ fn state_sites_every_replace_hook_fits_the_far_jump() {
         .iter()
         .filter(|s| matches!(s.kind, SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }))
         .collect();
-    assert_eq!(hooks.len(), 29);
+    assert_eq!(hooks.len(), 31);
     for site in hooks {
         assert!(!site.note.is_empty(), "{}: an entry hook needs its justification", site.name);
         assert_eq!(site.offset % 16, 0, "{}", site.name);

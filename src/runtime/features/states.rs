@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
+use skyline::hooks::InlineCtx;
 
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::rng::Rng;
@@ -33,6 +34,7 @@ use crate::model::state::hooks::{self, DeathParam};
 use crate::model::state::ids::{self, Table, C, UNRESOLVED};
 use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request, Role, StatusNow, Trigger};
 use crate::model::state::persist;
+use crate::model::state::pokemon::{self, Descriptor, Kinds, KirbyKinds, PtWait, Sound, SwitchEffect};
 use crate::model::state::record::{Marker, SavedState};
 use crate::model::state::settings::StateSettings;
 use crate::model::storage::{self, FixedPath};
@@ -54,6 +56,8 @@ struct State {
     last_kinds: [i32; 2],
     /// One buff bookkeeping per record (SPEC-state-03 OQ 5): player, CPU.
     buff: [BuffState; 2],
+    /// One trainer-switch wait per record (SPEC-state-05 open question 2): player, CPU.
+    pt_wait: [PtWait; 2],
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -95,7 +99,50 @@ static MAC_PRESENT: AtomicBool = AtomicBool::new(false);
 static KO_SELECTED: AtomicBool = AtomicBool::new(false);
 static JOKER_SUMMON: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of the names the hooks compare (set once at `init`).
-static HASHES: [AtomicU64; 10] = [const { AtomicU64::new(0) }; 10];
+static HASHES: [AtomicU64; 15] = [const { AtomicU64::new(0) }; 15];
+const H_FLYING_PLATE: usize = 10;
+const H_CHANGE_LIGHT: usize = 11;
+const H_SE_CHANGE_APPEAR: usize = 12;
+const H_SE_BALL_OPEN: usize = 13;
+const H_SE_BALL_SWING: usize = 14;
+
+/// The game constants the Pokemon Trainer, Kirby and Sora rules need without the lock (hooks and the
+/// per-frame dead test read these; set once by `ensure_consts`).
+static KIDS: [AtomicI32; K_COUNT] = [const { AtomicI32::new(UNRESOLVED) }; K_COUNT];
+const K_SQUIRTLE: usize = 0;
+const K_IVYSAUR: usize = 1;
+const K_CHARIZARD: usize = 2;
+const K_WEAPON_PTRAINER: usize = 3;
+const K_WEAPON_MBALL: usize = 4;
+const K_TRAIL_N1: usize = 5;
+const K_KIRBY_DRINK: usize = 6;
+const K_PT_RUN: usize = 7;
+const K_PT_RESTART: usize = 8;
+const K_STATUS_WAIT: usize = 9;
+const K_LINK_TRAINER: usize = 10;
+const K_PT_FLAG: usize = 11;
+const K_PT_MBALL: usize = 12;
+const K_ALL_TARGET: usize = 13;
+const K_SIT_GROUND: usize = 14;
+const K_SIT_AIR: usize = 15;
+const K_COPY_ON_START: usize = 16;
+const K_COPY_FLAG: usize = 17;
+const K_COPY_CHARA: usize = 18;
+const K_STATUS_NONE: usize = 19;
+const K_COUNT: usize = 20;
+
+fn kid(index: usize) -> i32 {
+    KIDS[index].load(Ordering::Acquire)
+}
+
+fn is_pokemon_kind(kind: i32) -> bool {
+    [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD].iter().any(|k| kid(*k) == kind && kid(*k) != UNRESOLVED)
+}
+
+/// The fighter objects of the two records (accessor and entry id), refreshed every frame: Kirby's hat
+/// restore reads the opponent's.
+static FIGHTER_ACC: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
+static FIGHTER_ENTRY: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 const H_COMMON: usize = 0;
 const H_DEAD_REBIRTH_WAIT: usize = 1;
 const H_REBIRTH_MOVE: usize = 2;
@@ -190,7 +237,15 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
 /// generator seed.
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
-    *STATE.lock() = Some(State { machine: Machine::new(file), settings, rng: Rng::new(seed), ids: Table::unresolved(), last_kinds: [-1, -1], buff: [BuffState::new(); 2] });
+    *STATE.lock() = Some(State {
+        machine: Machine::new(file),
+        settings,
+        rng: Rng::new(seed),
+        ids: Table::unresolved(),
+        last_kinds: [-1, -1],
+        buff: [BuffState::new(); 2],
+        pt_wait: [PtWait::new(); 2],
+    });
     set_flags(&settings);
     for (slot, name) in HASHES.iter().zip([
         "common",
@@ -203,6 +258,11 @@ pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
         "param_mball",
         "change_fly_frame",
         "se_silent",
+        "sys_flying_plate",
+        "ptrainer_change_light",
+        "se_ptrainer_change_appear",
+        "se_ptrainer_ball_open",
+        "se_ptrainer_ball_swing",
     ]) {
         slot.store(hash40(name), Ordering::Release);
     }
@@ -252,7 +312,11 @@ pub fn cancel_pending() {
     with(|state| {
         state.machine.cancel_all();
         state.buff.iter_mut().for_each(BuffState::clear);
+        state.pt_wait.iter_mut().for_each(PtWait::clear);
     });
+    for slot in FIGHTER_ACC.iter() {
+        slot.store(0, Ordering::Release);
+    }
     LOADING.store(false, Ordering::Release);
     KILLING.store(false, Ordering::Release);
     MAC_PRESENT.store(false, Ordering::Release);
@@ -300,6 +364,30 @@ fn ensure_consts() -> bool {
     SHULK_FLASH_ID.store(table.get(C::WorkIntShulkFlash), Ordering::Release);
     JOKER_SUMMON.store(table.get(C::JokerStatusSummon), Ordering::Release);
     state_restore::set_pikmin_statuses(table.get(C::PikminStatusAttackAir), table.get(C::PikminStatusAttackHi4Landing));
+    for (slot, c) in [
+        (K_SQUIRTLE, C::KindPokemonSquirtle),
+        (K_IVYSAUR, C::KindPokemonIvysaur),
+        (K_CHARIZARD, C::KindPokemonCharizard),
+        (K_WEAPON_PTRAINER, C::WeaponPtrainer),
+        (K_WEAPON_MBALL, C::WeaponMball),
+        (K_TRAIL_N1, C::TrailStatusSpecialN1),
+        (K_KIRBY_DRINK, C::KirbyStatusDrink),
+        (K_PT_RUN, C::PtStatusRun),
+        (K_PT_RESTART, C::PtStatusRestartChange),
+        (K_STATUS_WAIT, C::StatusWait),
+        (K_LINK_TRAINER, C::LinkNoPtrainer),
+        (K_PT_FLAG, C::PtFlagEnableChange),
+        (K_PT_MBALL, C::PtArticleMball),
+        (K_ALL_TARGET, C::ArticleAllTarget),
+        (K_SIT_GROUND, C::SituationGround),
+        (K_SIT_AIR, C::SituationAir),
+        (K_COPY_ON_START, C::KirbyFlagCopyOnStart),
+        (K_COPY_FLAG, C::KirbyFlagCopy),
+        (K_COPY_CHARA, C::KirbyIntCopyChara),
+        (K_STATUS_NONE, C::StatusNone),
+    ] {
+        KIDS[slot].store(table.get(c), Ordering::Release);
+    }
     if missing > 0 {
         let mut names = FixedPath::<400>::new();
         for name in table.missing().take(8) {
@@ -399,6 +487,22 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             DUMP.store(false, Ordering::Release);
         }
     }
+    if !nana {
+        if let Some(role) = Role::of_entry(entry) {
+            FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
+            FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
+        }
+    }
+    // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
+    let switching = is_pokemon_kind(kind)
+        && pokemon::switching_frame_is_dead(
+            raw.status == kid(K_STATUS_WAIT),
+            raw.prev_status == kid(K_STATUS_NONE),
+            raw.status == kid(K_STATUS_WAIT) && raw.prev_status == kid(K_STATUS_NONE) && {
+                let trainer = state_restore::trainer_of(accessor, kid(K_LINK_TRAINER));
+                trainer != 0 && natives::status_kind(trainer) == kid(K_PT_RESTART)
+            },
+        );
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
@@ -411,7 +515,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         if ids.is(C::KindLittleMac, raw.kind) {
             MAC_PRESENT.store(true, Ordering::Release);
         }
-        let dead = ids.is(C::StatusDead, raw.status) || ids.is(C::StatusStandby, raw.status);
+        let dead = ids.is(C::StatusDead, raw.status) || ids.is(C::StatusStandby, raw.status) || switching;
         let input = FrameIn {
             entry: raw.entry,
             nana,
@@ -458,6 +562,9 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         with(|state| state.buff.iter_mut().for_each(BuffState::clear));
         state_recorder::stop();
         state_diag!("[TrainingRooms] state load_request entry={}", raw.entry);
+    }
+    if out.pokemon_predeath {
+        state_restore::pt_predeath(accessor, &pt_ids());
     }
     if out.force_dead {
         natives::change_status_force(accessor, with(|s| s.ids.get(C::StatusDead)).unwrap_or(UNRESOLVED));
@@ -607,6 +714,18 @@ unsafe fn finish(raw: &Raw, done: &Done) {
             state_restore::restore_item(accessor, &ids, item, other);
         }
     }
+    // Pokemon Trainer (SPEC-state-05 §5.1 step 4): the trainer may switch again.
+    if done.pokemon_switch {
+        state_restore::pt_raise_switch(accessor, &pt_ids());
+    }
+    // Kirby (§5.2 step 2): the saved hat comes back when the opponent is the fighter it came from.
+    if let Some(saved) = &done.charge {
+        if let (Some(role), Some(copied), Some(true)) = (Role::of_entry(raw.entry), saved.int_z, saved.has_charge) {
+            if with(|s| s.ids.is(C::KindKirby, raw.kind)).unwrap_or(false) {
+                kirby_copy(accessor, role, copied);
+            }
+        }
+    }
     state_diag!(
         "[TrainingRooms] state done damage={:?} item={} charge={} steve={} next={}",
         done.damage,
@@ -637,16 +756,90 @@ impl charge::Work for Fields<'_> {
     }
 }
 
-/// A feature's wait (SPEC-state-01 §5.4): `ApplyBuff` runs the buff step; the Pokemon switch and the
-/// Kirby copy are stepped by `state_restore` (milestone 3) and end at once until then.
+/// The game constants of the Pokemon Trainer rules, as `state_restore` takes them.
+fn pt_ids() -> state_restore::PtIds {
+    state_restore::PtIds {
+        link: kid(K_LINK_TRAINER),
+        enable_flag: kid(K_PT_FLAG),
+        mball: kid(K_PT_MBALL),
+        all_target: kid(K_ALL_TARGET),
+        run: kid(K_PT_RUN),
+        ground: kid(K_SIT_GROUND),
+        air: kid(K_SIT_AIR),
+    }
+}
+
+/// A feature's wait (SPEC-state-01 §5.4): `ApplyBuff` runs the buff step, `WaitForPokemonSwitch` the
+/// trainer's five frames (SPEC-state-05 §5.1 step 5), `WaitForCopyAbility` ends whenever Kirby's copy-start
+/// flag is clear (the copy hook consumes it and writes the charge, §5.2 steps 4 and 5).
 unsafe fn run_wait(raw: &Raw, marker: Marker) {
     let Some(role) = Role::of_entry(raw.entry) else { return };
     match marker {
         Marker::ApplyBuff => apply_buff(raw, role),
+        Marker::WaitForPokemonSwitch => pt_wait(raw, role),
+        Marker::WaitForCopyAbility => {
+            let flag = kid(K_COPY_ON_START);
+            if flag == UNRESOLVED || !natives::is_flag(raw.accessor, flag) {
+                with(|s| s.machine.finish_wait(role));
+            }
+        }
         _ => {
             with(|s| s.machine.finish_wait(role));
         }
     }
+}
+
+/// One `WaitForPokemonSwitch` frame for the Pokemon of `raw`.
+unsafe fn pt_wait(raw: &Raw, role: Role) {
+    let ids = pt_ids();
+    let trainer = state_restore::trainer_of(raw.accessor, ids.link);
+    if trainer == 0 {
+        // No trainer to wait for (the trainer left, or the link did not resolve): the switch is over.
+        with(|s| {
+            s.pt_wait[role.index()].clear();
+            s.machine.finish_wait(role);
+        });
+        return;
+    }
+    let in_run = natives::status_kind(trainer) == ids.run;
+    let airborne = natives::situation_kind(trainer) == ids.air;
+    let Some(out) = with(|s| s.pt_wait[role.index()].step(in_run, airborne)) else { return };
+    state_restore::pt_apply(trainer, &ids, &out);
+    if out.done {
+        with(|s| s.machine.finish_wait(role));
+        state_diag!("[TrainingRooms] state pt_switch_done entry={} grounded={}", raw.entry, out.ground_and_run);
+    }
+}
+
+/// Kirby's hat (SPEC-state-05 §5.2 step 2): give the copy routine the opponent's entry id and the saved kind
+/// when the opponent is the fighter the hat came from, or in its family.
+unsafe fn kirby_copy(accessor: usize, role: Role, copied: i32) {
+    let opponent = 1 - role.index();
+    let opponent_accessor = FIGHTER_ACC[opponent].load(Ordering::Acquire);
+    if opponent_accessor == 0 {
+        return;
+    }
+    let opponent_entry = FIGHTER_ENTRY[opponent].load(Ordering::Acquire);
+    let Some((opponent_kind, kinds)) = with(|s| (s.last_kinds[opponent], kirby_kinds(&s.ids))) else { return };
+    let trainer_valid = opponent_kind == kinds.none && state_restore::trainer_of(opponent_accessor, kid(K_LINK_TRAINER)) != 0;
+    let accepted = pokemon::kirby_accepts(copied, opponent_kind, trainer_valid, &kinds);
+    state_diag!("[TrainingRooms] state kirby_copy copied={} opponent_kind={} entry={} accepted={}", copied, opponent_kind, opponent_entry, accepted);
+    if accepted {
+        n::kirby_copy_setup(accessor, opponent_entry, copied);
+    }
+}
+
+fn kirby_kinds(ids: &Table) -> KirbyKinds {
+    KirbyKinds {
+        pokemon: pokemon_kinds(ids),
+        pyra: ids.get(C::KindPyra),
+        mythra: ids.get(C::KindMythra),
+        none: -1,
+    }
+}
+
+fn pokemon_kinds(ids: &Table) -> Kinds {
+    Kinds { squirtle: ids.get(C::KindPokemonSquirtle), ivysaur: ids.get(C::KindPokemonIvysaur), charizard: ids.get(C::KindPokemonCharizard) }
 }
 
 /// One `ApplyBuff` frame for the fighter of `raw` (SPEC-state-03 §5).
@@ -700,7 +893,19 @@ unsafe fn capture(raw: &Raw, nana: bool, slot: usize) {
         situation_kind: raw.situation,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
-        charge: ids.as_ref().map(|ids| charge::read(ids, raw.kind, &Fields(accessor, ids))).unwrap_or_default(),
+        charge: ids
+            .as_ref()
+            .map(|ids| {
+                let fields = Fields(accessor, ids);
+                if ids.is(C::KindKirby, raw.kind) {
+                    // §5.2 step 1: the copy flag and the copied fighter's kind, then its charge values.
+                    let has_copy = natives::is_flag(accessor, ids.get(C::KirbyFlagCopy));
+                    charge::read_kirby(ids, has_copy, n::work_get_int(accessor, ids.get(C::KirbyIntCopyChara)), &fields)
+                } else {
+                    charge::read(ids, raw.kind, &fields)
+                }
+            })
+            .unwrap_or_default(),
         steve: ids.as_ref().filter(|ids| ids.is(C::KindSteve, raw.kind)).and_then(|ids| state_restore::steve_read(accessor, ids)),
         // The player's held item (the CPU stores none).
         held_item: ids.as_ref().filter(|_| role == Role::Player).map(|ids| state_restore::item_snapshot(accessor, ids)),
@@ -827,11 +1032,56 @@ pub unsafe fn state_effect_req_hook(
 ) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::EFFECT);
+    // The Pokemon Trainer switch effects first (SPEC-state-05 §4.1), then the load rule.
+    if switch_effect_hidden(accessor, effect) {
+        return call_original!(accessor, effect, pos, rot, 0.0, a, b, c, d);
+    }
     // A buffing fighter keeps its visuals (SPEC-state-03 §5.2).
     if hooks::effect_hidden(LOADING.load(Ordering::Acquire), fighter_buffing(accessor)) && game::is_training_mode() {
         return call_original!(accessor, effect, pos, rot, 0.0, a, b, c, d);
     }
     call_original!(accessor, effect, pos, rot, size, a, b, c, d)
+}
+
+/// Whether a request is one of the trainer's switch effects on a trainer-family object, to be made size 0.
+/// The effect hash is compared first (two compares), the object's kind only for those effects.
+unsafe fn switch_effect_hidden(accessor: usize, effect: u64) -> bool {
+    let class = if effect == HASHES[H_FLYING_PLATE].load(Ordering::Acquire) {
+        SwitchEffect::FlyingPlate
+    } else if effect == HASHES[H_CHANGE_LIGHT].load(Ordering::Acquire) || effect == pokemon::CHANGE_LIGHT_RAW {
+        SwitchEffect::ChangeLight
+    } else {
+        return false;
+    };
+    if !pokemon::switch_effect_hidden(class, LOADING.load(Ordering::Acquire)) || !game::is_training_mode() {
+        return false;
+    }
+    let kind = n::object_kind(accessor);
+    kind == -1 || [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD, K_WEAPON_PTRAINER, K_WEAPON_MBALL].iter().any(|k| kid(*k) == kind)
+}
+
+/// `EffectModule::req_on_joint`: the trainer-switch size rule only (SPEC-state-05 §4.1).
+#[skyline::hook(offset = s::STATE_EFFECT_REQ_ON_JOINT_HOOK_OFFSET)]
+pub unsafe fn state_effect_req_on_joint_hook(
+    accessor: usize,
+    effect: u64,
+    joint: u64,
+    pos: *const [f32; 3],
+    rot: *const [f32; 3],
+    size: f32,
+    pos_rand: *const [f32; 3],
+    rot_rand: *const [f32; 3],
+    a: bool,
+    b: u32,
+    c: i32,
+    d: i32,
+) -> u64 {
+    let _scope = HookScope::enter();
+    bump(counts_index::EFFECT);
+    if switch_effect_hidden(accessor, effect) {
+        return call_original!(accessor, effect, joint, pos, rot, 0.0, pos_rand, rot_rand, a, b, c, d);
+    }
+    call_original!(accessor, effect, joint, pos, rot, size, pos_rand, rot_rand, a, b, c, d)
 }
 
 /// `EffectModule::req_follow`: `sys_score_aura` at size 0 while a load is in progress.
@@ -927,10 +1177,108 @@ pub unsafe fn state_req_screen_hook(accessor: usize, hash: u64, a: bool, b: bool
 pub unsafe fn state_fighter_play_se_hook(a0: usize, a1: u64, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::SOUND);
-    if any_buffing() && game::is_training_mode() {
+    if (any_buffing() || fighter_sound_silenced(a0, a1)) && game::is_training_mode() {
         return call_original!(a0, HASHES[H_SE_SILENT].load(Ordering::Acquire), a2, a3, a4, a5, a6, a7);
     }
     call_original!(a0, a1, a2, a3, a4, a5, a6, a7)
+}
+
+/// The Pokemon Trainer, Kirby and Sora sound silences (SPEC-state-05 §4.1). The hash is classified first
+/// (a few compares); the object's status is read only for the two status-dependent sounds while loading.
+unsafe fn fighter_sound_silenced(module: usize, hash: u64) -> bool {
+    let sound = if hash == HASHES[H_SE_CHANGE_APPEAR].load(Ordering::Acquire)
+        || hash == HASHES[H_SE_BALL_OPEN].load(Ordering::Acquire)
+        || hash == HASHES[H_SE_BALL_SWING].load(Ordering::Acquire)
+    {
+        Sound::TrainerSwitch
+    } else if pokemon::KIRBY_COPY_SE.contains(&hash) {
+        Sound::KirbyCopy
+    } else if hash == pokemon::SORA_SPELL_SE {
+        Sound::SoraSpell
+    } else {
+        return false;
+    };
+    let loading = LOADING.load(Ordering::Acquire);
+    if !loading {
+        return false;
+    }
+    // The sound module's owner accessor is the pointer at `+8`, as for the damage module.
+    let owner = if module == 0 { 0 } else { ((module + 8) as *const usize).read() };
+    let status = if owner == 0 { UNRESOLVED } else { natives::status_kind(owner) };
+    let (drinking, above) = match sound {
+        Sound::KirbyCopy => (status == kid(K_KIRBY_DRINK), false),
+        Sound::SoraSpell => {
+            let n1 = kid(K_TRAIL_N1);
+            (false, n1 != UNRESOLVED && status != UNRESOLVED && status >= n1)
+        }
+        _ => (false, false),
+    };
+    pokemon::sound_silenced(sound, loading, drinking, above)
+}
+
+// ---- Pokemon Trainer decide and Kirby copy (SPEC-state-05 §5.1 step 3, §5.2 step 4) ----------------------
+
+/// The inline hook at the store of the game's chosen Pokemon index: while a load runs, `w8` becomes the
+/// saved Pokemon's index (`x20 + 0x10` is the entry id; `x9` is the descriptor: count at `+0x14`, three
+/// kinds at `+0x18`, `+0x1c`, `+0x20`). Anything that does not check out leaves the register alone.
+#[skyline::hook(offset = s::STATE_POKEMON_DECIDE_OFFSET, inline)]
+pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
+    let _scope = HookScope::enter();
+    if !LOADING.load(Ordering::Acquire) || !game::is_training_mode() {
+        return;
+    }
+    let (entry_object, descriptor) = (ctx.registers[20].x() as usize, ctx.registers[9].x() as usize);
+    if entry_object == 0 || descriptor == 0 || descriptor % 8 != 0 {
+        return;
+    }
+    let entry = ((entry_object + 0x10) as *const i32).read();
+    let Some(role) = Role::of_entry(entry) else { return };
+    let Some((saved, kinds)) = with(|s| {
+        let slot = s.machine.current_slot(&s.settings);
+        (s.machine.record(role, slot).fighter_kind, pokemon_kinds(&s.ids))
+    }) else {
+        return;
+    };
+    let read = |offset: usize| ((descriptor + offset) as *const u32).read();
+    let found = Descriptor { count: read(0x14), kinds: [read(0x18), read(0x1c), read(0x20)] };
+    state_diag!("[TrainingRooms] state pt_decide entry={} saved={} descriptor={:?}", entry, saved, found);
+    if let Some(index) = pokemon::decide_index(saved, Some(found), kinds) {
+        ctx.registers[8].set_x(index as u64);
+    }
+}
+
+/// Kirby's per-frame copy routine `(param, kirby fighter)`: while a load runs, whether the copy start flag
+/// was set is remembered before the original (which clears it); if it was, the copied charge is written
+/// from the record and the wait ends.
+#[skyline::hook(offset = s::STATE_KIRBY_OPFF_OFFSET)]
+pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
+    let _scope = HookScope::enter();
+    let started = fighter != 0 && LOADING.load(Ordering::Acquire) && game::is_training_mode() && {
+        let flag = kid(K_COPY_ON_START);
+        let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
+        flag != UNRESOLVED && accessor != 0 && natives::is_flag(accessor, flag)
+    };
+    let result = call_original!(param, fighter);
+    if started {
+        kirby_copy_started(fighter);
+    }
+    result
+}
+
+unsafe fn kirby_copy_started(fighter: usize) {
+    let entry = ((fighter + FIGHTER_ENTRY_FIELD) as *const i32).read();
+    let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
+    let Some(role) = Role::of_entry(entry) else { return };
+    let Some((ids, plan)) = with(|s| {
+        let slot = s.machine.current_slot(&s.settings);
+        let record = s.machine.record(role, slot);
+        (s.ids.clone(), charge::plan_kirby(&s.ids, &record.charge))
+    }) else {
+        return;
+    };
+    state_effects::run_charge(accessor, fighter, &ids, &plan);
+    with(|s| s.machine.finish_wait(role));
+    state_diag!("[TrainingRooms] state kirby_copy_started entry={} steps={}", entry, plan.iter().count());
 }
 // ---- the slot file ----------------------------------------------------------------------------------
 

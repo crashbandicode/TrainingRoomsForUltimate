@@ -366,3 +366,84 @@ pub unsafe fn state_pikmin_autonomy_hook(weapon: usize, work: usize) -> u64 {
     }
     call_original!(weapon, work)
 }
+
+// ---- Pokemon Trainer (SPEC-state-05 §5.1) ----------------------------------------------------------
+
+/// The resolved constants of the trainer rules (any may be `UNRESOLVED`: the rule is then skipped).
+#[derive(Clone, Copy, Debug)]
+pub struct PtIds {
+    pub link: i32,
+    pub enable_flag: i32,
+    pub mball: i32,
+    pub all_target: i32,
+    pub run: i32,
+    pub ground: i32,
+    pub air: i32,
+}
+
+/// The accessor of a Pokemon's trainer (`LinkModule::get_parent_object_id` then the battle object's module
+/// accessor); 0 when the link does not resolve or the object is not active.
+///
+/// # Safety
+/// The restore sites passed their guards; `accessor` is a live fighter's.
+pub unsafe fn trainer_of(accessor: usize, link: i32) -> usize {
+    if link == UNRESOLVED {
+        return 0;
+    }
+    let id = n::link_parent_object_id(accessor, link);
+    if id < 0 {
+        return 0;
+    }
+    let id = id as u32;
+    if !n::object_is_active(id) {
+        return 0;
+    }
+    n::object_accessor(id)
+}
+
+/// The pre-death rule (KillPlayer and every WaitForAlive frame): the trainer may not switch, its animation
+/// runs at 1000x, and its Poke Ball (when it exists) runs at 1000x and is hidden.
+///
+/// # Safety
+/// As `trainer_of`.
+pub unsafe fn pt_predeath(accessor: usize, ids: &PtIds) {
+    let trainer = trainer_of(accessor, ids.link);
+    if trainer == 0 {
+        return;
+    }
+    if ids.enable_flag != UNRESOLVED {
+        n::work_off_flag(trainer, ids.enable_flag);
+    }
+    n::motion_set_rate(trainer, 1000.0);
+    if ids.mball != UNRESOLVED && n::article_is_exist(trainer, ids.mball) {
+        n::article_set_rate(trainer, ids.mball, 1000.0);
+        if ids.all_target != UNRESOLVED {
+            n::article_hide_whole(trainer, ids.mball, ids.all_target);
+        }
+    }
+}
+
+/// After placement: the trainer may switch again.
+///
+/// # Safety
+/// As `trainer_of`.
+pub unsafe fn pt_raise_switch(accessor: usize, ids: &PtIds) {
+    let trainer = trainer_of(accessor, ids.link);
+    if trainer != 0 && ids.enable_flag != UNRESOLVED {
+        n::work_on_flag(trainer, ids.enable_flag);
+    }
+}
+
+/// What one frame of the trainer wait asked for, applied to the trainer's accessor.
+///
+/// # Safety
+/// `trainer` is a live trainer weapon's accessor.
+pub unsafe fn pt_apply(trainer: usize, ids: &PtIds, out: &crate::model::state::pokemon::PtOut) {
+    if out.rate_one {
+        n::motion_set_rate(trainer, 1.0);
+    }
+    if out.ground_and_run && ids.ground != UNRESOLVED && ids.run != UNRESOLVED {
+        n::set_situation_kind(trainer, ids.ground);
+        n::status_force(trainer, ids.run, false);
+    }
+}
