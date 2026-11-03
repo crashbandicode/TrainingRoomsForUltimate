@@ -190,6 +190,8 @@ impl Effects for GameEffects {
             let tail = (true, self.attribute, 0, 0, 0, 0, true, true);
             #[cfg(feature = "diag")]
             let pool_before = stats::pool_snapshot();
+            #[cfg(feature = "diag")]
+            let limits_before = stats::emitter_limits();
             let handle = natives::effect_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, &[0.0; 3], sphere.scale, tail);
             if handle != 0 {
                 natives::sphere_set_rgb(self.accessor, sphere.tint);
@@ -197,7 +199,7 @@ impl Effects for GameEffects {
             }
             #[cfg(feature = "diag")]
             if handle == 0 {
-                stats::refused(self.accessor, sphere, pool_before);
+                stats::refused(self.accessor, sphere, pool_before, limits_before);
             }
             handle
         }
@@ -548,11 +550,20 @@ mod stats {
             ((manager + 0x19460) as *const usize).read() != 0))
     }
 
-    pub unsafe fn refused(accessor: usize, sphere: &crate::model::hitbox::Sphere, before: Option<(u32, bool)>) {
+    /// Raw native limit/count pairs from the two guarded constructor branches.
+    /// No writes and no inferred frame budget: the failed call is compared with its own entry snapshot.
+    pub unsafe fn emitter_limits() -> [i32; 4] {
+        let base = crate::runtime::game::text_base();
+        [0x5334a00, 0x5334a0c, 0x5334a04, 0x5334a14]
+            .map(|offset| ((base + offset) as *const i32).read())
+    }
+
+    pub unsafe fn refused(accessor: usize, sphere: &crate::model::hitbox::Sphere, before: Option<(u32, bool)>, limits_before: [i32; 4]) {
         if REFUSALS_REPORTED.fetch_add(1, Ordering::Relaxed) >= 8 { return; }
         let after = pool_snapshot();
+        let limits_after = emitter_limits();
         diagnostic(format_args!(
-            "[Hitbox] refused accessor={accessor:#x} key={} joint={:#x} scale={} free_head_before={before:?} free_head_after={after:?}",
+            "[Hitbox] refused accessor={accessor:#x} key={} joint={:#x} scale={} free_head_before={before:?} free_head_after={after:?} limits_before={limits_before:?} limits_after={limits_after:?}",
             sphere.key, sphere.joint, sphere.scale
         ));
     }

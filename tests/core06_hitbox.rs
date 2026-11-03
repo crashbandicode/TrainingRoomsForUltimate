@@ -801,3 +801,20 @@ fn core06_fighter_sets_and_keys() {
     assert_eq!(table.find(0x1000), None);
     assert_eq!(table.find(0), None);
 }
+
+#[test]
+fn core06_native_emitter_limits_are_distinct_from_pool_capacity() {
+    let Some(main) = common::owned_main("core06_native_emitter_limits_are_distinct_from_pool_capacity") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    assert_eq!(w(0x356cfe4), 0x9000ee4a); // global page 0x5334000
+    assert_eq!(w(0x356cfe8), 0x9128014a); // +0xa00 limit base
+    assert_eq!(w(0x356cfec), 0xb9400d49); // priority count +0xc
+    assert_eq!(w(0x356cff0), 0xb940014a); // priority limit +0
+    assert_eq!(w(0x356cff4), 0x6b0a013f); // signed count versus limit
+    assert_eq!(w(0x356d03c), 0x91281129); // normal limit base +0xa04
+    assert_eq!(w(0x356d040), 0xb940112a); // normal count base+0x10 = 0xa14
+    assert_eq!(w(0x356d044), 0xb9400129); // normal limit +0
+    assert_eq!(w(0x356d04c), 0x54fffdaa); // count >= limit refuses
+    assert_eq!(w(0x356d01c), 0x2a1f03e0); // zero result
+    assert_eq!(w(0x3563764), 0x36000360); // caller observes failed constructor
+}

@@ -16,6 +16,10 @@ CALLED = "SeamKind::Called"
 RELIED = "SeamKind::Relied"
 
 ROWS = [
+    ('hitbox_emitter_priority_limit', 0x356cfe4, RELIED,
+     'Read-only refusal attribution: compares native priority count main+0x5334a0c with limit main+0x5334a00 before constructing an effect.'),
+    ('hitbox_emitter_normal_limit', 0x356d030, RELIED,
+     'Read-only refusal attribution: compares native normal count main+0x5334a14 with limit main+0x5334a04; refusal returns zero without exhausting the free-list.'),
     ("hitbox_pool_manager", 0x44FBE4, RELIED,
      "Diagnostic refusal attribution: req_follow loads the EffectManager singleton at main+0x5334920 and its manager pointer. Read-only; no game effect capacity is changed."),
     ("hitbox_pool_free_list", 0x35636B8, RELIED,
