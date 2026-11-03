@@ -15,4 +15,4 @@ Shutdown health PASS: main-firstTERM→KILL, KillMode=mixed, Result=signal/Code2
 Harvest0segments/0gates. Final manifest dry-run READY15rows/59gates/0errors; initial14rows READY; two evidence-parser tests PASS; Python syntax PASS. All22 receipt manifests/executed project sources retained in `executed/` and raw archive.
 Reproduce: `/usr/bin/python3 -I eden/lr14-shared/review_trace.py`; `test_evidence.py`; `close_review.py <raw archive directory>`. Full raw media/lifecycle: `artifacts/trainingrooms-lead-astra4/rc8/lr14-shared/` from workspace root.
 Generic RESULTS generator overcounts project-state and reports initial manifest/last-retry timing; original generated report retained in raw archive; gap posted to Primary.
-Next: operator decides HATS fix; Primary adjudicates remaining TEARDOWN/R3 and owns phase compliance. No further boot queued; no product changes, push, tag, release, card or DBI actions.
+Next: operator decides HATS fix; Primary adjudicates remaining TEARDOWN/R3 and owns phase compliance. Watcher completed; no further boot queued; no product changes, push, tag, release, card or DBI actions.
