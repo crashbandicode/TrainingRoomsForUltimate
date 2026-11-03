@@ -466,3 +466,8 @@ entry 2 changes and hat rebuilds with charge reset; repeat with a live thrown
 item; raise CPU count and verify CPU 2 is the next rotation member. Each row
 requires no crash and zero total Unmapped in the retained full Eden console.
 This records authorization only; implementation and runtime proof are pending.
+## Developer reload processing — primary decision, 2026-11-03
+
+PRIMARY approved the asynchronous worker recommendation in TRAININGROOMS-LEAD-INBOX.md (heading approximately04:3xZ, received04:21Z). This is a primary decision, not an operator-level exception. SPEC-core-01 synchronous read per frame means one counted request per qualifying held-L+R+A P1 frame processed off-thread. The existing worker reads in bounded batches; the hook performs no filesystem I/O or heap allocation. Report requested/completed/pending/dropped counts and explicit lag/overflow diagnostics. Cancel pending work when the row or page is Off.
+
+The developer struct has no fields and no configuration effect. Actual read timing and the completed count at shutdown may differ; nothing visible changes. A dirty-bit coalescing implementation alone does not preserve the requested per-frame accounting. This resolves the policy question only; implementation, original accounting/cancellation tests, callback allocation evidence and runtime read-count proof remain required.
