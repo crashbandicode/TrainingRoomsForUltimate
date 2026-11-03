@@ -2683,7 +2683,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "65db263f40364ffdcdb43f6e59fdcdfefdc8727ee9318e666118f0dcbfd62e7d",
+   "dest_sha256": "3adb9fa694c87191bdb273069880d8c7b41ba6681666a1e7a8ecefadadcb63ed",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3065,6 +3065,11 @@
      "old": "        let Some(p) = sources::current_promoted_presentation(entry, owner) else {\n            rebuilt.store(false, Ordering::Release);\n            return;\n        };\n",
      "new": "        if sources::promoted_presentation(owner).is_none() {\n            rebuilt.store(false, Ordering::Release);\n            return;\n        }\n        // A temporarily unready native body must not consume the reset notice.\n        let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };\n",
      "reason": "Preserve existing reset-notification lifetime: only missing publication retires it; temporary native identity refusal retries without consuming the notification."
+    },
+    {
+     "old": "        // A temporarily unready native body must not consume the reset notice.\n        let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };\n        if !crate::runtime::compat::common::is_native_training_mode()\n            || p.entry != entry as usize { return; }\n",
+     "new": "        // Preserve the Training-only native-read boundary before checking the body.\n        if !crate::runtime::compat::common::is_native_training_mode() { return; }\n        // A temporarily unready native body must not consume the reset notice.\n        let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };\n        if p.entry != entry as usize { return; }\n",
+     "reason": "F9 reset republish restores the pre-existing Training-only native-read boundary before the completed promoted identity proof; preserve pending notice and missing-publication retirement."
     }
    ]
   },

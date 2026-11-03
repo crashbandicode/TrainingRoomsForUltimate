@@ -1767,10 +1767,11 @@ unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
             rebuilt.store(false, Ordering::Release);
             return;
         }
+        // Preserve the Training-only native-read boundary before checking the body.
+        if !crate::runtime::compat::common::is_native_training_mode() { return; }
         // A temporarily unready native body must not consume the reset notice.
         let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };
-        if !crate::runtime::compat::common::is_native_training_mode()
-            || p.entry != entry as usize { return; }
+        if p.entry != entry as usize { return; }
         rebuilt.store(false, Ordering::Release);
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::represent(entry, owner, p.kind);
