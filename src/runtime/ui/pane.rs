@@ -27,6 +27,26 @@ unsafe fn name_is(pane: *const Pane, name: &[u8]) -> bool {
     i == name.len()
 }
 
+/// Resolve an owned backing immediately before its text, without another tree
+/// walk. The live UI list is borrowed only for this draw; no pointer is cached.
+pub unsafe fn preceding_sibling(pane: *mut Pane, name: &[u8]) -> *mut Pane {
+    if pane.is_null() || (*pane).parent.is_null() {
+        return core::ptr::null_mut();
+    }
+    let parent = (*pane).parent;
+    let head = core::ptr::addr_of_mut!((*parent).children_list);
+    let node = core::ptr::addr_of_mut!((*pane).link);
+    let previous = (*node).prev;
+    if previous.is_null() || previous == head || previous == node || (*previous).next != node {
+        return core::ptr::null_mut();
+    }
+    let sibling = pane_of_node(previous);
+    if (*sibling).parent != parent || !name_is(sibling, name) {
+        return core::ptr::null_mut();
+    }
+    sibling
+}
+
 /// The pane called `name` below `root` (depth first), or null.
 pub unsafe fn find(root: *mut Pane, name: &[u8]) -> *mut Pane {
     let mut budget = WALK_LIMIT;

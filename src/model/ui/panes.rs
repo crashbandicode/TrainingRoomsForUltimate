@@ -228,7 +228,9 @@ pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const IDX_LOG_FRAME_BASE: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const IDX_LOG_STATUS_BASE: usize = IDX_LOG_FRAME_BASE + LOG_ROWS;
+pub const COUNT: usize = IDX_LOG_STATUS_BASE + LOG_ROWS;
 
 pub const fn log_slot(row: usize, slot: usize) -> usize {
     row * LOG_SLOTS + slot
@@ -302,6 +304,8 @@ pub const fn name_of(index: usize) -> Name {
         }
         i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => Name::indexed("ILF_", i - IDX_LOG_FRAME),
         i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => Name::indexed("ILS_", i - IDX_LOG_STATUS),
+        i if i >= IDX_LOG_FRAME_BASE && i < IDX_LOG_FRAME_BASE + LOG_ROWS => Name::indexed("ILFB_", i - IDX_LOG_FRAME_BASE),
+        i if i >= IDX_LOG_STATUS_BASE && i < IDX_LOG_STATUS_BASE + LOG_ROWS => Name::indexed("ILSB_", i - IDX_LOG_STATUS_BASE),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => Name::indexed("tr_ch_", i - IDX_CHIP),
         i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Name::indexed("tr_cl_", i - IDX_CHIP_LABEL),
@@ -401,6 +405,11 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => {
             under(text(name, [330.0, 0.0, 200.0, 48.0], Align::Left, FONT_SMALL, 48, TEXT_DIM), name_of(IDX_LOG_ROW + (i - IDX_LOG_STATUS)))
         }
+        i if i >= IDX_LOG_FRAME_BASE && i < COUNT => {
+            let text_index = if i < IDX_LOG_STATUS_BASE { IDX_LOG_FRAME + i - IDX_LOG_FRAME_BASE } else { IDX_LOG_STATUS + i - IDX_LOG_STATUS_BASE };
+            let target = spec(text_index);
+            under(rect(name, [target.x, target.y, target.w, target.h], PANEL, false), target.parent)
+        }
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),
@@ -439,7 +448,18 @@ pub const fn spec(index: usize) -> Spec {
 
 /// Every pane of the menu, in tree (draw) order: back to front.
 pub fn specs() -> Vec<Spec> {
-    (0..COUNT).map(spec).collect()
+    // Keep stable model indices while placing each backing immediately before
+    // its text in the serialized parent's child list.
+    let mut out = Vec::with_capacity(COUNT);
+    for index in 0..IDX_LOG_FRAME_BASE {
+        if (IDX_LOG_FRAME..IDX_LOG_STATUS).contains(&index) {
+            out.push(spec(IDX_LOG_FRAME_BASE + index - IDX_LOG_FRAME));
+        } else if (IDX_LOG_STATUS..IDX_LOG_FRAME_BASE).contains(&index) {
+            out.push(spec(IDX_LOG_STATUS_BASE + index - IDX_LOG_STATUS));
+        }
+        out.push(spec(index));
+    }
+    out
 }
 #[cfg(test)]
 mod tests {
@@ -476,6 +496,43 @@ mod tests {
     fn indexed_names_have_two_digits() {
         assert_eq!(name_of(tab_index(3)).as_str(), "tr_tab_03");
         assert_eq!(name_of(row_value_index(11)).as_str(), "tr_rv_11");
+    }
+
+    #[test]
+    fn input_backings_cover_only_text_and_precede_it_without_renumbering() {
+        assert_eq!(IDX_LOG_FRAME_BASE, IDX_LOG_STATUS + LOG_ROWS);
+        assert_eq!(COUNT, IDX_LOG_FRAME_BASE + 30);
+        let all = specs();
+        for row in 0..LOG_ROWS {
+            for (text_base, backing_base) in [(IDX_LOG_FRAME, IDX_LOG_FRAME_BASE), (IDX_LOG_STATUS, IDX_LOG_STATUS_BASE)] {
+                let text = spec(text_base + row);
+                let backing = spec(backing_base + row);
+                assert_eq!((backing.x,backing.y,backing.w,backing.h), (text.x,text.y,text.w,text.h));
+                assert_eq!(backing.parent, text.parent);
+                assert!(!backing.visible);
+                assert!(matches!(backing.kind, Kind::Rect { color } if color == PANEL));
+                let pos = all.iter().position(|s| s.name == text.name).unwrap();
+                assert_eq!(all[pos-1].name, backing.name);
+            }
+        }
+        let original: Vec<_> = all.iter().filter(|s| !s.name.as_str().starts_with("ILFB_") && !s.name.as_str().starts_with("ILSB_")).map(|s| s.name).collect();
+        assert_eq!(original, (0..IDX_LOG_FRAME_BASE).map(name_of).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn input_text_contrasts_on_its_opaque_panel() {
+        fn luminance(rgb: [u8; 4]) -> f64 {
+            rgb[..3].iter().zip([0.2126, 0.7152, 0.0722]).map(|(&v, weight)| {
+                let v = f64::from(v) / 255.0;
+                weight * if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+            }).sum()
+        }
+        assert_eq!(PANEL[3], 255);
+        for text in [TEXT, TEXT_DIM] {
+            let light = luminance(text);
+            assert!((light + 0.05) / (luminance(PANEL) + 0.05) >= 4.5);
+            assert!((1.0 + 0.05) / (light + 0.05) < 4.5, "original light-grid failure control");
+        }
     }
 
     #[test]

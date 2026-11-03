@@ -10,7 +10,7 @@ pub mod nn {
         pub struct PaneNode { pub prev: *mut PaneNode, pub next: *mut PaneNode }
         #[repr(C)]
         pub struct Pane {
-            pub link: PaneNode, pub children_list: PaneNode, pub name: [u8; 24],
+            pub link: PaneNode, pub parent: *mut Pane, pub children_list: PaneNode, pub name: [u8; 24],
             pub alpha: u8, pub flags: u8, pub pos_x: f32, pub pos_y: f32,
             pub size_x: f32, pub size_y: f32, pub rot_z: f32,
         }
@@ -40,6 +40,7 @@ fn tree(rows: &[(usize, &str)]) -> Vec<Pane> {
         p.children_list.next = head;
     }
     for (i, &(parent, _)) in rows.iter().enumerate().skip(1) {
+        nodes[i].parent = core::ptr::addr_of_mut!(nodes[parent]);
         let head = core::ptr::addr_of_mut!(nodes[parent].children_list);
         let link = core::ptr::addr_of_mut!(nodes[i].link);
         unsafe {
@@ -96,6 +97,34 @@ fn cyclic_sibling_list_is_bounded() {
 }
 
 #[test]
+fn text_backing_requires_exact_adjacent_owned_sibling() {
+    let rows = [(0,"RootPane"),(0,"row"),(1,"ILFB_00"),(1,"ILF_00"),(1,"ILSB_00"),(1,"ILS_00"),(0,"other")];
+    let mut nodes = tree(&rows);
+    unsafe {
+        let root = nodes.as_mut_ptr();
+        assert_eq!(pane::preceding_sibling(root.add(3), b"ILFB_00"), root.add(2));
+        assert_eq!(pane::preceding_sibling(root.add(5), b"ILSB_00"), root.add(4));
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_01").is_null());
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_0").is_null());
+        assert!(pane::preceding_sibling(root.add(2), b"row").is_null(), "sentinel is not a pane");
+        assert!(pane::preceding_sibling(core::ptr::null_mut(), b"ILFB_00").is_null());
+        nodes[3].parent = core::ptr::null_mut();
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_00").is_null());
+        nodes[3].parent = root.add(1);
+        nodes[2].parent = root.add(6);
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_00").is_null());
+        nodes[2].parent = root.add(1);
+        nodes[2].link.next = core::ptr::addr_of_mut!(nodes[5].link);
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_00").is_null());
+        nodes[2].link.next = core::ptr::addr_of_mut!(nodes[3].link);
+        nodes[3].link.prev = core::ptr::null_mut();
+        assert!(pane::preceding_sibling(root.add(3), b"ILFB_00").is_null());
+        nodes[3].link.prev = core::ptr::addr_of_mut!(nodes[3].link);
+        assert!(pane::preceding_sibling(root.add(3), b"ILF_00").is_null());
+    }
+}
+
+#[test]
 #[ignore = "requires the operator-owned expanded UI18 topology fixture in UI_PANE_FIXTURE"]
 fn actual_expanded_training_and_waiting_fixture() {
     let dir = std::env::var("UI_PANE_FIXTURE").expect("set UI_PANE_FIXTURE to the private fixture directory");
@@ -123,6 +152,33 @@ fn actual_expanded_training_and_waiting_fixture() {
                 assert!(pane::find(root,b"TrModDisp0").is_null());
                 assert!(pane::find(root,b"TrModInputLog").is_null());
                 assert!(!pane::find(root,b"TrModMenu").is_null());
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires generated UI22 topology in UI22_PANE_FIXTURE"]
+fn generated_input_backings_are_reachable_in_both_complete_trees() {
+    let dir = std::env::var("UI22_PANE_FIXTURE").expect("set UI22_PANE_FIXTURE");
+    for kind in ["training", "waiting"] {
+        let data = std::fs::read_to_string(format!("{dir}/{kind}.tsv")).unwrap();
+        let rows: Vec<_> = data.lines().map(|line| {
+            let (parent,name) = line.split_once('\t').unwrap();
+            (parent.parse::<usize>().unwrap(),name)
+        }).collect();
+        assert!(rows.len() < 4096);
+        let mut nodes = tree(&rows);
+        unsafe {
+            let root = nodes.as_mut_ptr();
+            let host = if kind == "waiting" { pane::find_child(root,b"TrModPort") } else { root };
+            let column = pane::find_child(host,b"TrModInputLog");
+            assert!(!column.is_null());
+            for row in 0..15 {
+                for (text, backing) in [("ILF_","ILFB_"),("ILS_","ILSB_")] {
+                    let target = pane::find(column,format!("{text}{row:02}").as_bytes());
+                    assert!(!pane::preceding_sibling(target,format!("{backing}{row:02}").as_bytes()).is_null());
+                }
             }
         }
     }
