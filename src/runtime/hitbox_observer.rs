@@ -1,4 +1,4 @@
-//! Diagnostic register-only observation of our synchronous req_follow call.
+//! Bounded diagnostic observation of our synchronous req_follow call.
 use crate::engine::seams::native_seams::rows_hitbox_observer;
 use crate::runtime::diag_log;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -9,6 +9,7 @@ mod policy;
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static READY: AtomicBool = AtomicBool::new(false);
 static FAILED: policy::FailureBudget = policy::FailureBudget::new();
+static POOL: policy::PoolBudget = policy::PoolBudget::new();
 static CAPTURE: policy::Capture = policy::Capture::new();
 const LIMIT: usize = policy::FAILED_LIMIT;
 
@@ -20,8 +21,13 @@ impl Request {
         let thread = unsafe { skyline::nn::os::GetCurrentThread() as usize };
         let active = READY.load(Ordering::Acquire)
             && diag_log::async_writer_ready()
-            && FAILED.available()
+            && (FAILED.available() || POOL.available())
             && CAPTURE.begin(thread);
+        if active {
+            if let Some(ordinal) = POOL.reserve() {
+                CAPTURE.observe_pool(thread, ordinal);
+            }
+        }
         Self {
             thread: if active { thread } else { 0 },
         }
@@ -30,6 +36,9 @@ impl Request {
     pub(crate) fn finish(mut self, handle: u32) {
         let snapshot = CAPTURE.finish(self.thread);
         self.thread = 0;
+        if let Some(snapshot) = &snapshot {
+            log_pool(snapshot, Some(handle));
+        }
         if handle != 0 {
             return;
         }
@@ -54,7 +63,22 @@ impl Request {
 }
 impl Drop for Request {
     fn drop(&mut self) {
-        let _ = CAPTURE.finish(self.thread);
+        if let Some(snapshot) = CAPTURE.finish(self.thread) {
+            log_pool(&snapshot, None);
+        }
+    }
+}
+
+// Capture::finish has released ownership before this asynchronous formatter.
+fn log_pool(snapshot: &policy::Snapshot, handle: Option<u32>) {
+    if let Some(pool) = &snapshot.pool {
+        if diag_log::async_writer_ready() {
+            diag_log::diagnostic(format_args!(
+                "[HitboxPool] n={} stage=AfterHelper status={} mgr={:#x} total={} free={} handle={:?} outcome={:?}",
+                pool.ordinal, pool.status as usize, pool.manager, pool.total,
+                pool.available, handle, snapshot.outcome
+            ));
+        }
     }
 }
 
@@ -89,6 +113,16 @@ unsafe fn helper_return(ctx: &mut InlineCtx) {
     };
     let _scope = crate::model::hook_stats::HookScope::enter();
     crate::runtime::threads::headroom("hitbox_observer_helper_return");
+    // Permit is checked before the injected reader can run. x19 is a manager
+    // only on this exact caller's normal paths; early resource failures are denied.
+    CAPTURE.pool_after(
+        thread,
+        ctx.sp.x() as usize,
+        relative(ctx.registers[30].x()),
+        ctx.registers[0].w(),
+        ctx.registers[19].x() as usize,
+        |address| unsafe { core::ptr::read_volatile(address as *const u32) },
+    );
     CAPTURE.helper_return(
         thread,
         ctx.sp.x() as usize,
@@ -170,7 +204,7 @@ pub(crate) fn init() {
             }) == expected
         })
     });
-    let labels: [&str; 7] = core::array::from_fn(|i| rows_hitbox_observer::ROWS[i].label);
+    let labels: [&str; 9] = core::array::from_fn(|i| rows_hitbox_observer::ROWS[i].label);
     let usable =
         crate::runtime::seams::seam_install::gate("hitbox_observer", &labels, exact && flow);
     if !exact || !flow || !usable {
@@ -189,6 +223,6 @@ pub(crate) fn init() {
     );
     READY.store(true, Ordering::Release);
     diag_log::diagnostic(format_args!(
-        "[HitboxConstructor] observer installed failed_limit={LIMIT}"
+        "[HitboxConstructor] observer installed failed_limit={LIMIT} pool_limit=80"
     ));
 }

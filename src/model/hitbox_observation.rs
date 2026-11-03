@@ -9,6 +9,49 @@ pub const HELPER_RETURN: usize = 0x356d2e0;
 const MISSING: usize = usize::MAX;
 
 pub const FAILED_LIMIT: usize = 8;
+
+pub const POOL_LIMIT: usize = 80;
+pub struct PoolBudget(AtomicUsize);
+impl PoolBudget {
+    pub const fn new() -> Self {
+        Self(AtomicUsize::new(0))
+    }
+    pub fn available(&self) -> bool {
+        self.0.load(Relaxed) < POOL_LIMIT
+    }
+    pub fn reserve(&self) -> Option<usize> {
+        self.0
+            .fetch_update(Relaxed, Relaxed, |n| {
+                (n < POOL_LIMIT).then_some(n.saturating_add(1))
+            })
+            .ok()
+            .map(|n| n + 1)
+    }
+}
+impl Default for PoolBudget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
+pub enum PoolStatus {
+    MissingHelper = 0,
+    Denied = 1,
+    AfterHelper = 2,
+    Inconsistent = 3,
+    Ambiguous = 4,
+}
+#[derive(Debug)]
+pub struct PoolSnapshot {
+    pub ordinal: usize,
+    pub status: PoolStatus,
+    // Identity token only: never dereferenced after the inline callback.
+    pub manager: usize,
+    pub total: i32,
+    pub available: i32,
+}
+
 pub struct FailureBudget(AtomicUsize);
 impl FailureBudget {
     pub const fn new() -> Self {
@@ -68,6 +111,9 @@ pub struct Capture {
     registers: [AtomicUsize; 3],
     registers_seen: AtomicBool,
     reason_ambiguous: AtomicBool,
+    pool_ordinal: AtomicUsize,
+    pool_seen: AtomicBool,
+    pool: [AtomicUsize; 4],
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -92,6 +138,7 @@ pub struct Snapshot {
     pub helper_reason: HelperReason,
     pub demand: Option<Demand>,
     pub helper_registers: Option<[usize; 3]>,
+    pub pool: Option<PoolSnapshot>,
 }
 
 impl Capture {
@@ -110,6 +157,9 @@ impl Capture {
             registers: [const { AtomicUsize::new(0) }; 3],
             registers_seen: AtomicBool::new(false),
             reason_ambiguous: AtomicBool::new(false),
+            pool_ordinal: AtomicUsize::new(0),
+            pool_seen: AtomicBool::new(false),
+            pool: [const { AtomicUsize::new(0) }; 4],
         }
     }
 
@@ -136,7 +186,69 @@ impl Capture {
         }
         self.registers_seen.store(false, Relaxed);
         self.reason_ambiguous.store(false, Relaxed);
+        self.pool_ordinal.store(0, Relaxed);
+        self.pool_seen.store(false, Relaxed);
+        for word in &self.pool {
+            word.store(0, Relaxed);
+        }
         true
+    }
+
+    pub fn observe_pool(&self, thread: usize, ordinal: usize) {
+        if self.owns(thread) && (1..=POOL_LIMIT).contains(&ordinal) {
+            self.pool_ordinal.store(ordinal, Relaxed);
+        }
+    }
+
+    /// Two reads at the existing helper return only. Exact native caller forces
+    /// w7=0; early resource failures retain the outer object in x19 and are denied.
+    /// The reader is injected so tests prove denied paths perform no reads.
+    pub fn pool_after(
+        &self,
+        thread: usize,
+        sp: usize,
+        caller: usize,
+        result: u32,
+        manager: usize,
+        mut read: impl FnMut(usize) -> u32,
+    ) {
+        if !self.owns(thread) || self.pool_ordinal.load(Relaxed) == 0 {
+            return;
+        }
+        if self.pool_seen.swap(true, Relaxed) {
+            self.pool[0].store(PoolStatus::Ambiguous as usize, Relaxed);
+            return;
+        }
+        self.pool[0].store(PoolStatus::Denied as usize, Relaxed);
+        let object = self.object.load(Relaxed);
+        if self.constructors.load(Relaxed) != 1
+            || object == 0
+            || self.ambiguous.load(Relaxed)
+            || self.reason_ambiguous.load(Relaxed)
+            || caller != HELPER_RETURN
+            || self.frame.load(Relaxed) == 0
+            || sp.checked_add(0x40) != Some(self.frame.load(Relaxed))
+            || self.helper.load(Relaxed) != MISSING
+            || self.returned.load(Relaxed) != MISSING
+            || result > 1
+            || manager == 0
+            || manager == object
+            || !manager.is_multiple_of(4)
+            || manager.checked_add(0x84).is_none()
+        {
+            return;
+        }
+        let total = read(manager + 0x70);
+        let available = read(manager + 0x80);
+        let status = if (total as i32) < 0 || (available as i32) < 0 || available > total {
+            PoolStatus::Inconsistent
+        } else {
+            PoolStatus::AfterHelper
+        };
+        self.pool[1].store(manager, Relaxed);
+        self.pool[2].store(total as usize, Relaxed);
+        self.pool[3].store(available as usize, Relaxed);
+        self.pool[0].store(status as usize, Relaxed);
     }
 
     pub fn owns(&self, thread: usize) -> bool {
@@ -318,6 +430,27 @@ impl Capture {
         } else {
             HelperReason::Unattributed
         };
+
+        let pool = (self.pool_ordinal.load(Relaxed) != 0).then(|| {
+            let status = if outcome == Outcome::Ambiguous {
+                PoolStatus::Ambiguous
+            } else {
+                match self.pool[0].load(Relaxed) {
+                    0 => PoolStatus::MissingHelper,
+                    1 => PoolStatus::Denied,
+                    2 => PoolStatus::AfterHelper,
+                    3 => PoolStatus::Inconsistent,
+                    _ => PoolStatus::Ambiguous,
+                }
+            };
+            PoolSnapshot {
+                ordinal: self.pool_ordinal.load(Relaxed),
+                status,
+                manager: self.pool[1].load(Relaxed),
+                total: self.pool[2].load(Relaxed) as u32 as i32,
+                available: self.pool[3].load(Relaxed) as u32 as i32,
+            }
+        });
         let snapshot = Snapshot {
             object: self.object.load(Relaxed),
             frame: self.frame.load(Relaxed),
@@ -327,6 +460,7 @@ impl Capture {
             helper_reason,
             demand,
             helper_registers: regs,
+            pool,
         };
         self.owner.store(0, Release);
         Some(snapshot)

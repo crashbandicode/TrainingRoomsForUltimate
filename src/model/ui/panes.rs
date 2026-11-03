@@ -346,6 +346,9 @@ pub const TEXT: [u8; 4] = [236, 238, 242, 255];
 pub const TEXT_DIM: [u8; 4] = [150, 156, 168, 255];
 pub const TEXT_ON: [u8; 4] = [110, 210, 160, 255];
 pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
+/// Notices keep their specified black/custom body colors on an opaque light panel.
+pub const NOTICE_BACKGROUND: [u8; 4] = [255, 255, 255, 255];
+pub const NOTICE_HEADER: [u8; 4] = [38, 44, 56, 255];
 
 /// `[x, y, w, h]`: a pane's place and size, the order `Spec` keeps them in.
 const fn rect(name: Name, [x, y, w, h]: [f32; 4], color: [u8; 4], visible: bool) -> Spec {
@@ -370,8 +373,8 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
-        IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
-        IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
+        IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], NOTICE_BACKGROUND, true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT => under(text(name, [0.0, 390.0, 960.0, 70.0], Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
         IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
             NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),

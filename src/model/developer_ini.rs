@@ -29,6 +29,29 @@ pub const fn effective(page_enabled: bool, stored: bool) -> bool {
     page_enabled && stored
 }
 
+/// The two stored Developer toggles, both ordered `[On, Off]` by the menu.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Control {
+    DebugHooks,
+    ReloadConfig,
+}
+
+impl Control {
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::DebugHooks => "dev_debug_hooks",
+            Self::ReloadConfig => "dev_reload_config",
+        }
+    }
+}
+
+/// Publish the displayed On choice, gated by this boot's Developer-page setting.
+/// Reading a hidden page never changes its persisted choices.
+pub fn control_enabled(snapshot: &super::settings::Snapshot, page_enabled: bool, control: Control) -> bool {
+    let stored = snapshot.get(control.id()).is_some_and(|row| row.first().is_some_and(|v| *v != 0));
+    effective(page_enabled, stored)
+}
+
 /// Why the page is shown or hidden; the install line prints `text()`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Reason {

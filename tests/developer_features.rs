@@ -7,6 +7,54 @@ mod common;
 use model::developer_reload::{qualifies, Counts, Queue, Reader};
 
 #[test]
+fn developer_published_snapshot_matches_displayed_on_off_and_hidden_page() {
+    use model::developer_ini::{control_enabled, Control};
+    use model::settings::Snapshot;
+    for control in [Control::DebugHooks, Control::ReloadConfig] {
+        let mut snapshot = Snapshot::factory();
+        assert_eq!(snapshot.get(control.id()), Some([0, 1].as_slice()));
+        assert!(!control_enabled(&snapshot, true, control), "factory Off must stay inert");
+        for (row, enabled) in [([0, 1], false), ([1, 0], true), ([0, 0], false)] {
+            snapshot.set(control.id(), &row).unwrap();
+            assert_eq!(control_enabled(&snapshot, true, control), enabled);
+            let before = snapshot.clone();
+            assert!(!control_enabled(&snapshot, false, control));
+            assert_eq!(snapshot, before, "hidden-page publication must preserve the stored choice");
+        }
+    }
+}
+
+#[test]
+fn developer_displayed_off_cancels_pending_and_inflight_reload() {
+    use model::developer_ini::{control_enabled, Control};
+    let mut snapshot = model::settings::Snapshot::factory();
+    let q = Queue::<8>::new();
+    let publish = |snapshot: &model::settings::Snapshot, page| {
+        q.set_enabled(control_enabled(snapshot, page, Control::ReloadConfig));
+    };
+    publish(&snapshot, true);
+    assert!(!q.request(), "UI20 Off negative control must not queue reads");
+    snapshot.set("dev_reload_config", &[1, 0]).unwrap();
+    publish(&snapshot, true);
+    assert!(q.request());
+    assert!(q.request());
+    let old = q.take().unwrap();
+    snapshot.set("dev_reload_config", &[0, 1]).unwrap();
+    publish(&snapshot, true);
+    assert!(!q.request());
+    assert!(!q.current(old));
+    q.finish(old);
+    assert_eq!(q.counts(false), Counts { requested: 2, dropped: 2, ..Counts::default() });
+    snapshot.set("dev_reload_config", &[1, 0]).unwrap();
+    publish(&snapshot, true);
+    assert!(q.request());
+    publish(&snapshot, false);
+    assert!(!q.request());
+    assert_eq!(q.counts(false), Counts { requested: 3, dropped: 3, ..Counts::default() });
+    assert_eq!(snapshot.get("dev_reload_config"), Some([1, 0].as_slice()));
+}
+
+#[test]
 fn developer_held_chord_counts_each_p1_poll_and_no_other_input() {
     use model::chords::bit;
     let q = Queue::<16>::new();

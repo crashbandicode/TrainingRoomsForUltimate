@@ -6,8 +6,8 @@ static REQUESTS: Queue<{ u32::MAX }> = Queue::new();
 const PATH: &str = "sd:/ultimate/TrainingRooms/dev.json";
 
 pub fn publish(snapshot: &crate::model::settings::Snapshot) {
-    let stored = snapshot.get("dev_reload_config").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
-    REQUESTS.set_enabled(crate::model::developer_ini::effective(published::developer_page(), stored));
+    use crate::model::developer_ini::{control_enabled, Control};
+    REQUESTS.set_enabled(control_enabled(snapshot, published::developer_page(), Control::ReloadConfig));
     ui::worker::wake();
 }
 

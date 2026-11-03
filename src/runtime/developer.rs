@@ -15,8 +15,8 @@ static DEBUG_ON: AtomicBool = AtomicBool::new(false);
 static KIRBY: AtomicI32 = AtomicI32::new(-1);
 
 pub fn publish(snapshot: &Snapshot) {
-    let stored = snapshot.get("dev_debug_hooks").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
-    DEBUG_ON.store(crate::model::developer_ini::effective(published::developer_page(), stored), Ordering::Release);
+    use crate::model::developer_ini::{control_enabled, Control};
+    DEBUG_ON.store(control_enabled(snapshot, published::developer_page(), Control::DebugHooks), Ordering::Release);
 }
 
 /// Before any hook writes a neighboring WorkModule window.

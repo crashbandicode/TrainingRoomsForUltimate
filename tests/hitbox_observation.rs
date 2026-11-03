@@ -297,3 +297,195 @@ fn successful_handles_do_not_spend_or_emit_and_failure_budget_is_exactly_eight()
     assert_eq!(budget.record(0), None);
     assert_eq!(budget.record(1), None);
 }
+
+use policy::{PoolBudget, PoolStatus, POOL_LIMIT};
+const MANAGER: usize = 0x80000;
+fn pool_entered() -> Capture {
+    let c = entered();
+    c.observe_pool(THREAD, 1);
+    c
+}
+fn pool_sample(c: &Capture, total: u32, free: u32) -> usize {
+    let mut reads = 0;
+    c.pool_after(THREAD, FRAME - 0x40, HELPER_RETURN, 1, MANAGER, |address| {
+        reads += 1;
+        match address {
+            x if x == MANAGER + 0x70 => total,
+            x if x == MANAGER + 0x80 => free,
+            _ => panic!("unexpected native field"),
+        }
+    });
+    reads
+}
+#[test]
+fn pool_actual_after_helper_counts_and_early_resource_paths() {
+    let c = pool_entered();
+    assert_eq!(pool_sample(&c, 800, 8), 2);
+    c.helper_return(THREAD, FRAME - 0x40, HELPER_RETURN, 1);
+    c.constructor_return(THREAD, FRAME, 1);
+    let s = c.finish(THREAD).unwrap();
+    assert!(
+        !c.owns(THREAD),
+        "logging must occur after ownership release"
+    );
+    let p = s.pool.unwrap();
+    assert_eq!(
+        (p.ordinal, p.manager, p.total, p.available),
+        (1, MANAGER, 800, 8)
+    );
+    assert_eq!(p.status, PoolStatus::AfterHelper);
+    for result in [0, 1] {
+        let c = pool_entered();
+        c.pool_after(THREAD, FRAME - 0x40, HELPER_RETURN, result, OBJECT, |_| {
+            panic!("early resource path must not read the outer object")
+        });
+        assert_eq!(
+            c.finish(THREAD).unwrap().pool.unwrap().status,
+            PoolStatus::Denied
+        );
+    }
+    let c = pool_entered();
+    c.pool_after(THREAD, FRAME - 0x40, HELPER_RETURN, 0, MANAGER, |_| 800);
+    assert_eq!(
+        c.finish(THREAD).unwrap().pool.unwrap().status,
+        PoolStatus::AfterHelper
+    );
+}
+#[test]
+fn pool_foreign_registers_bounds_and_missing_scope_never_read() {
+    for (thread, sp, lr, result, manager) in [
+        (THREAD + 1, FRAME - 0x40, HELPER_RETURN, 1, MANAGER),
+        (THREAD, FRAME - 0x50, HELPER_RETURN, 1, MANAGER),
+        (THREAD, FRAME - 0x40, HELPER_RETURN + 4, 1, MANAGER),
+        (THREAD, FRAME - 0x40, HELPER_RETURN, 2, MANAGER),
+        (THREAD, FRAME - 0x40, HELPER_RETURN, 1, 0),
+        (THREAD, FRAME - 0x40, HELPER_RETURN, 1, MANAGER + 1),
+        (THREAD, FRAME - 0x40, HELPER_RETURN, 1, usize::MAX - 3),
+        (THREAD, usize::MAX - 1, HELPER_RETURN, 1, MANAGER),
+    ] {
+        let c = pool_entered();
+        c.pool_after(thread, sp, lr, result, manager, |_| panic!("denied read"));
+        let p = c.finish(THREAD).unwrap().pool.unwrap();
+        assert_eq!(
+            p.status,
+            if thread == THREAD {
+                PoolStatus::Denied
+            } else {
+                PoolStatus::MissingHelper
+            }
+        );
+        assert_eq!(p.manager, 0);
+    }
+    let c = Capture::new();
+    c.observe_pool(THREAD, 1);
+    assert_eq!(pool_sample(&c, 800, 8), 0);
+    assert!(c.begin(THREAD));
+    c.observe_pool(THREAD, 1);
+    assert_eq!(pool_sample(&c, 800, 8), 0, "no constructor");
+    assert_eq!(
+        c.finish(THREAD).unwrap().pool.unwrap().status,
+        PoolStatus::Denied
+    );
+}
+#[test]
+fn pool_nesting_ambiguity_duplicate_and_late_reads_are_denied() {
+    for mode in 0..5 {
+        let c = pool_entered();
+        match mode {
+            0 => {
+                assert!(!c.begin(THREAD));
+            }
+            1 => c.constructor(THREAD, ENTRY_SP, OBJECT, CONSTRUCTOR_RETURN),
+            2 => c.helper_return(THREAD, FRAME - 0x40, HELPER_RETURN, 1),
+            3 => c.constructor_return(THREAD, FRAME, 1),
+            _ => c.constructor(THREAD, ENTRY_SP, OBJECT, CONSTRUCTOR_RETURN + 4),
+        }
+        assert_eq!(pool_sample(&c, 800, 8), 0);
+        assert_ne!(
+            c.finish(THREAD).unwrap().pool.unwrap().status,
+            PoolStatus::AfterHelper
+        );
+    }
+    let c = pool_entered();
+    assert_eq!(pool_sample(&c, 800, 789), 2);
+    assert_eq!(pool_sample(&c, 800, 778), 0, "duplicate never rereads");
+    assert_eq!(
+        c.finish(THREAD).unwrap().pool.unwrap().status,
+        PoolStatus::Ambiguous
+    );
+    let c = pool_entered();
+    assert_eq!(pool_sample(&c, 800, 789), 2);
+    assert!(!c.begin(THREAD));
+    assert_eq!(
+        c.finish(THREAD).unwrap().pool.unwrap().status,
+        PoolStatus::Ambiguous
+    );
+}
+#[test]
+fn pool_raw_anomalies_are_preserved_without_clamping() {
+    for (total, free) in [(800, u32::MAX), (u32::MAX, 8), (800, 801)] {
+        let c = pool_entered();
+        assert_eq!(pool_sample(&c, total, free), 2);
+        let p = c.finish(THREAD).unwrap().pool.unwrap();
+        assert_eq!(p.status, PoolStatus::Inconsistent);
+        assert_eq!((p.total, p.available), (total as i32, free as i32));
+    }
+    let c = pool_entered();
+    assert_eq!(pool_sample(&c, 0, 0), 2);
+    assert_eq!(
+        c.finish(THREAD).unwrap().pool.unwrap().status,
+        PoolStatus::AfterHelper
+    );
+}
+#[test]
+fn pool_window_reserves_missing_requests_and_preserves_failure_budget() {
+    let budget = PoolBudget::new();
+    let failed = FailureBudget::new();
+    let c = Capture::new();
+    for ordinal in 1..=POOL_LIMIT {
+        assert!(budget.available());
+        assert!(c.begin(THREAD));
+        c.observe_pool(THREAD, budget.reserve().unwrap());
+        let p = c.finish(THREAD).unwrap().pool.unwrap();
+        assert_eq!(p.ordinal, ordinal);
+        assert_eq!(p.status, PoolStatus::MissingHelper);
+    }
+    assert!(!budget.available());
+    assert_eq!(budget.reserve(), None);
+    assert_eq!(failed.record(1), None);
+    for n in 1..=8 {
+        assert_eq!(failed.record(0), Some(n));
+    }
+    assert_eq!(failed.record(0), None);
+    assert!(c.begin(THREAD));
+    c.constructor(THREAD, ENTRY_SP, OBJECT, CONSTRUCTOR_RETURN);
+    assert_eq!(pool_sample(&c, 800, 8), 0, "no reserved ordinal");
+    assert!(
+        c.finish(THREAD).unwrap().pool.is_none(),
+        "previous sample must be reset"
+    );
+}
+#[test]
+fn pool_record_bound_includes_max_fields_and_sink_prefix() {
+    for outcome in [
+        Outcome::Unobserved,
+        Outcome::Ambiguous,
+        Outcome::NotReturned,
+        Outcome::ConstructorSucceeded,
+        Outcome::HelperRejected,
+        Outcome::HandleOrEpochRejected,
+        Outcome::FinalPayloadRejected,
+        Outcome::BeforeHelper,
+    ] {
+        let line = format!(
+            "[HitboxPool] n={} stage=AfterHelper status={} mgr={:#x} total={} free={} handle={:?} outcome={:?}",
+            POOL_LIMIT, PoolStatus::Inconsistent as usize, usize::MAX,
+            i32::MIN, i32::MIN, Some(u32::MAX), outcome
+        );
+        assert!(
+            line.len() + 53 <= 256,
+            "{} bytes including prefix/reserve",
+            line.len() + 53
+        );
+    }
+}

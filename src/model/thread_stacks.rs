@@ -87,7 +87,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // first-boot import of the fork's captures in the background
     row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}"),
     // the menu worker: model steps, screens, settings JSON on close
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 27_312, "Eden st-02..st-12, f6-37/sh-01/ui18-02", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 30_848, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

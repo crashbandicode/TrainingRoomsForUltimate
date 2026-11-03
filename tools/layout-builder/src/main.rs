@@ -13,7 +13,7 @@
 //! under `RootPane` with text boxes cloned from a stock text box and flat rectangles cloned from a stock solid
 //! picture. The 38 provenance-recorded item icons are appended to the stock BNTX; stock textures are retained.
 
-use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, Material, PaneEdit, BFLYT};
+use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
 use nx_layout_toolbox::bntx::{read_bntx, write_bntx, pipeline::{import_png_file, ImportOptions}};
 
@@ -150,14 +150,17 @@ fn add_waiting_text_material(layout: &mut BFLYT) -> Result<()> {
     if layout.materials.iter().any(|m| m.name == OWNED_TEXT_MATERIAL) {
         return Err("owned text material already exists".into());
     }
-    // Same plain neutral mapping as the qualified Training text material.
-    // Stock waiting status text and its animations retain their green material.
-    layout.materials.push(Material {
-        name: OWNED_TEXT_MATERIAL.into(),
-        black_color: Color8 { r: 0, g: 0, b: 0, a: 0 },
-        white_color: Color8 { r: 252, g: 252, b: 252, a: 255 },
-        ..Default::default()
-    });
+    // Preserve the complete stock text material, including undecoded render
+    // state. Material::default erased the v8 word at +0x20 (0x08040200)
+    // in UI20's invisible text. Only our clone's name and tint may change.
+    let index = layout.find_pane("set_txt_status").and_then(|p| p.text.as_ref())
+        .ok_or("waiting text template missing")?.material_index;
+    let mut material = layout.materials.get(usize::from(index))
+        .ok_or("waiting text material missing")?.clone();
+    material.name = OWNED_TEXT_MATERIAL.into();
+    material.black_color = Color8 { r: 0, g: 0, b: 0, a: 0 };
+    material.white_color = Color8 { r: 252, g: 252, b: 252, a: 255 };
+    layout.materials.push(material);
     Ok(())
 }
 
@@ -274,6 +277,17 @@ mod tests {
             let material = &layout.materials[usize::from(text.material_index)];
             assert_eq!((material.white_color.r,material.white_color.g,material.white_color.b),(252,252,252));
             if waiting { assert_eq!(material.name,OWNED_TEXT_MATERIAL); }
+            if waiting {
+                let template = layout.find_pane("set_txt_status").unwrap().text.as_ref().unwrap();
+                let stock = &layout.materials[usize::from(template.material_index)];
+                assert_eq!(stock.flags_unknown, 0x0804_0200, "actual UI20 stock render-state word");
+                let mut expected = stock.clone();
+                expected.name = OWNED_TEXT_MATERIAL.into();
+                expected.black_color = Color8 { r: 0, g: 0, b: 0, a: 0 };
+                expected.white_color = Color8 { r: 252, g: 252, b: 252, a: 255 };
+                assert_eq!(format!("{material:?}"), format!("{expected:?}"),
+                    "all non-tint render state must survive cloning");
+            }
             assert_eq!(materials,format!("{:?}",&layout.materials[..stock_count]));
             layout.fonts.clear();
             assert_eq!(add_pane(&mut layout,&spec,waiting),Err("qualified text font missing".into()));
