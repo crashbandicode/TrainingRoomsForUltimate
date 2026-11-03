@@ -4,7 +4,7 @@ Updated 2026-11-03. **Acceptance is open; this is not a release manifest.**
 
 The integration branch is `work/implementation`, worktree
 `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work`.
-The current development source is ab13a0f96397e8fe9b89715a46f046d0006eff8f (r15), frozen before this documentation-only update. Its 1321-file archive SHA-256 is 21aa13d249792f3fbaf2207964e786624e5859a4efc987e251816050981d4890. Diagnostic NRO 0bbcfde5782d91d495dbea008b4495c332d901ec03d06b015e72fb448084cc50 and ELF 4b68ec2a3fb2d9fe25d3af71107c49b4f89b04727c7107fd7f3db2be49c7b19f passed the one diagnostic build with zero warnings and unchanged frozen inputs. Targeted host groups passed 1327/13/222/3 tests, with 2 library and 1 private-fixture test ignored. The sixteen thread tables and 145 generic callback budgets pass; explicit foreign/formatter chains and runtime acceptance are still under review. Diagnostic resident size is 6,234,112 bytes; this is not a release measurement. Final release identity, full gates and runtime evidence remain pending. Evidence: ../artifacts/trainingrooms-lead-astra4/main-r15/.
+The qualified compiled development source is ab13a0f96397e8fe9b89715a46f046d0006eff8f (r15), frozen before this documentation-only update. Its 1321-file archive SHA-256 is 21aa13d249792f3fbaf2207964e786624e5859a4efc987e251816050981d4890. Diagnostic NRO 0bbcfde5782d91d495dbea008b4495c332d901ec03d06b015e72fb448084cc50 and ELF 4b68ec2a3fb2d9fe25d3af71107c49b4f89b04727c7107fd7f3db2be49c7b19f passed the one diagnostic build with zero warnings and unchanged frozen inputs. Targeted host groups passed 1327/13/222/3 tests, with 2 library and 1 private-fixture test ignored. The sixteen thread tables and 145 generic callback budgets pass; explicit foreign/formatter chains were reviewed for bounded development admission; runtime acceptance remains open. Diagnostic resident size is 6,234,112 bytes; this is not a release measurement. Final release identity, full gates and runtime evidence remain pending. Evidence: ../artifacts/trainingrooms-lead-astra4/main-r15/.
 
 Lead: tr-lead-astra-4, Codex thread
 01a19e0c-415a-7af3-ac6e-f574318709d2.
@@ -73,11 +73,7 @@ fully restored and released. The two first-pass Ridley helper failures are
 still failures even though retries succeeded. The new demand observer is
 diagnostic evidence collection, not a capacity fix.
 
-Q15's constructor-context gap remains open. UI's next planned editor route
-must first qualify an existing saved Mii with nonzero payload, then edit it
-without saving. Add-New-Mii alone did not exercise the known saved-image
-consumer. Missing observations do not grant UI-thread constructor permission.
-Coherent file reads/provider implementation remain separate work.
+UI20 exercised the existing saved-Mii list without saving and captured six constructor calls at native19d147c. That thread matches UI registration and differs from UI pass. The positive context observation does not authorize a provider: coherent full-record reads and owned texture lifetime remain open.
 
 Other required runtime evidence includes fixed CPU rotation and native-seat
 fallback, count promotion/identity/lifetime, recording through timer completion
@@ -110,3 +106,26 @@ two-console acceptance remain explicitly open; offline checks do not replace the
 
 No push, tag, release, physical Switch/card, DBI or USB action is authorized
 by this handoff. Keep scratch and build targets on ext4. Do not use OpenCode.
+
+## Lead checkpoint 2026-11-03 07:51Z
+
+Main96da3a4 integrates the completed parked-install count-promotion marker
+root fix;6227211 adds reviewed compliance evidence only. This source is not
+yet native-qualified. Worker targeted5tests pass and lead verified1203frozen
+sources, actual executed binary/log, all8 main after-hashes and253carry files.
+Next compose reviewed UI roots, then run one targeted/native qualification.
+UI20 restored1362profile/14harness entries and released Yoga07:45. Its full
+console has0Unmapped/165zero-allocation samples, but notice contrast,
+developer toggle polarity and waiting-room text failed. Preserve black/custom
+notice text perSPEC-input-05 and correct its background; typed developer
+accessor and waiting-material root are under bounded UI work.
+Hitbox sh02 restored/released: first-pass failures positively show11emitters
+requested with8available. Stock SYS_SHIELD maps to11-root P_CmnShield;
+actual live capacity/occupancy attribution remains open, no capacity fix.
+F6 failed39 was an early unaccepted input; preserve it. Fresh41/42 share the
+bounded catalog-and-both-owner gate and retain startup cost separately.
+At07:51 worker-owned F6-41 Surface and pkg4p4c-03 Yoga are live; lead owns no
+host/runtime/compiler. Do not manipulate their profiles or repeat their jobs.
+Sync cleanup is closed;14RCblockers,10finalgates and359finalrows remain open.
+R10target retired07:49 with all3executedELFs and native/source/logs preserved;
+fresh three-host TrainingRooms cache is58,438,465,504B. R15 remains retained.
