@@ -3,6 +3,42 @@
 2026-11-03. Pending execution on the final integrated candidate. This plan does
 not turn a solo waiting-room observation into two-console or LDN acceptance.
 
+## RC reset authority — 2026-11-03
+
+This section supersedes the broader historical plan below. Required online
+acceptance is ONE R-D1 replay A/B plus ONE R-O1 LDN session, matching M5q
+online/RESULT.md. Public Quickplay matchmaking/TLS is not a separate RC gate.
+The M5q run used LAN Online OFF on both peers; do not use the older TLS-on
+preflight settings for this LDN session. Keep those observations as history.
+
+R-D1: on Yoga, use the same retained native replay for baseline and candidate,
+with the same detector binary and settings. Compare complete matching frame
+counts, every check value AND every position. M5q used1678frames; reuse that
+replay if present in the owned profile, otherwise document the exact retained
+replay before both passes. No partial prefix can pass.
+
+R-O1: Surface modded, Yoga peer, one complete native local-wireless session.
+Both leave intro and reach actual menus; frontendroom2/2 is not membership.
+Use the approved guest request AND host approval route, capture both native
+membership states, perform waiting practice swaps (ordinary group, native
+PT/Aegis, CPU Mii/pair as the mapped fixture permits), and exercise already
+working menu/SDI commit behavior. Start one short1stock1minute match and run
+through actual finish/results/departure. Both detector summaries must have
+matching endframe and desync_seen0. Observe practice teardown at departure.
+M5q online ledge-hang/grab behavior was unrun and is not an extra gate here.
+
+Use current owned parameterized controllers, fresh shared-ledger admission,
+private profile snapshots, muted cores and full restoration plus separate
+verification. Preserve foreign work. One Eden per host, no compiler beside it.
+Rehash final candidate and detector at staging; record final raw inputs/logs/
+screenshots and full-console0TOTALUnmapped/no new crash. Keep zero owned-hook
+allocations where already achieved. No new scratch hash-manifest ceremony.
+
+Read and adapt approved route semantics; never execute the historical
+foreign-owner pair scripts directly. Candidate composition and gates must
+precede runtime admission. Lead owns paired coordination; pkg4 assists with
+replay data. Final source and release/diagnostic identities remain pending.
+
 ## Changed-path source review, 2026-11-03
 
 [The r17 HUD and first-seal audit](../docs/R17-ONLINE-RELEASE-DELTA.md) binds the exact changed paths and their caller scene guards. It found identity reads before the Training check in reset republishing; source correction 2dbfe6e restores that order and is independently reviewed. Frozen r18 f1db4cb now has independent actual-ELF proof of that branch order; actual transitions remain unverified. Its first-seal enqueue-only entry also has compiled proof that it cannot enter the ordinary logger startup drain. Non-diag cfg elimination and tag filtering still require the final release-binary gate. Neither source review nor the waiting-menu development clip establishes desync, online pair, or LDN acceptance.

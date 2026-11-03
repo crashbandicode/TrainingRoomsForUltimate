@@ -1,55 +1,54 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 10:21 UTC. **RC acceptance remains open.**
+Updated 2026-11-03 10:37 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
-Integration: work/implementation at /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work, product7e760ec. Frozen r18 is f1db4cb and excludes UI22 and the pending state-destructor alternative. Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2 remains Astra medium; watcher303502 bound to182663. Verify exact model/effort after compaction.
+## Objective and source
 
-## Qualified development candidate
+RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new feature work. Deferred scope and pending exclusion boundaries: NEXT-VERSION.md.
 
-- Source f1db4cbb4355319490ecceecb26751767f0d4a1b, frozen1338files.
-- Archive a011d382fc3c32afc7f573476a61f2dda585acaec4ca1d54b2949dd75d48060c; manifest8a4753d31f0ceb3daa090a0d63be640a97589afaaa95242f18748b5ea4b3d67f.
-- Diagnostic NRO1be5790b8e0fbb9df114ed021f794655b5836042743e25e3bbdc5e61472d3085; ELF985e961299fabed8abbf72aecc41e101e33e14739ee3aecd6b369ab84241abbe.
-- Evidence: parent artifacts/trainingrooms-lead-astra4/main-r18; lead-development-qualification.json SHA0dba331d.
-- ONE native diagnostic build0warnings. File4112384+BSS2129920=6242304resident bytes, diagnostic only.
-- Fresh unique-target host repair16selectedtests PASS (runtime1, firstseal8, ring7), all1338files match r18. Original reused-target16test run remains resource-noncompliant and is not acceptance. No r18 all-target claim.
-- Generic16thread rows/0callback-budget failures PASS. Menu31280direct/32432table/30848historical within57344; TraceWriter2720table/8624historical within28672. Keep historical active write cost, not idle-only1696.
+Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Product currently7e760ec, documentation56beb14 before this reset checkpoint. This is NOT yet the frozen RC: F9/Setup/advanced workflows need reviewed disable/removal and UI22 source-only addition is deferred. Final source and NRO identities will be recorded after coherent composition, not for scratch iterations.
 
-R18 includes full sealed promoted HUD identity, reset Training-before-fresh-identity correction2dbfe6e, and first-seal enqueue-only correctionf1db4cb. Lead independently rehashed31HUD and52logger raw files plus identities and personally checked actual branches. Reset temporary unready retains the notice; value absence clears it. First-seal formatting follows ARCHIVE unlock and calls enqueue without WRITER/drain/filesystem fallback. Ordinary diagnostics retain startup fallback. Diag cfg folds away tag filtering: final release filtering proof remains owed.
+Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, Astra medium. Owner182663/watch303502; verify exact model/effort on compaction. Playbook2dee6cc fully read. Primary owns four existing Sol workers; no duplicate launches. Operator-authorized OpenCode staffing supersedes the old no-OpenCode rule.
 
-Known reset native/Skyline/plugin prefix4336; count typed conservative10704; completion85504. First-seal normal plugin path18544 longer/14880direct. These do not close higher native/indirect/recursive/panic ancestry. Actual positive callback observations and valid measured headroom remain mandatory.
+## Live state and assignments
 
-## Live coordination
+Lead owns no compile/Eden/claim. Pkg4 p4c04 stopped10:29:57, full1362profile+14harness restoration plus separate verification, Yoga released10:31. Pkg6 s6-13 stopped10:33:49, full1600profile+17harness restoration plus separate verification, Surface released10:33. Recheck canonical ledger at any admission; these are past observations.
 
-PRIMARY worker swap completed10:15: pkg6/slim are OpenCode GPT-6.1 Sol high (nvidia/nvidia-b); pkg4/UI are Codex GPT-6.1 Sol medium. Primary stopped prior workers after checking no claims; successors inspect inherited dirt because no SWAP HANDOFF was written. This explicit operator order supersedes the old no-OpenCode staffing instruction. Primary owns launches; do not duplicate workers.
+- Pkg6 Sol: proven roster/Mii/hat inventory and safe F9 disable boundary; later Surface laps/teardown/Mii/hats/release rows.
+- Pkg4 Sol: proven recording versus advanced unfinished workflow boundary, M5q truncation facts; later host gates and replay assistance.
+- UI Sol: Setup/Q15/UI22 boundary and evidence inventory; later Yoga new-UI/defaults/Developer/waiting rows.
+- Slim Sol: size recovery through deferrals, state lifecycle stays unintegrated; later Ally native/pair exclusions and pilot coexistence, size/carry/stack review.
+- Lead: review boundaries, compose candidate, online pair, final integration and acceptance. Four source-boundary returns due about10:54–10:55Z. No worker compiles before coherent plan/composition.
 
-Lead10:15:58 explicitly admitted r18 s6-13 Surface and p4c04 Yoga after successor intake and fresh normal queue/claims. Each45min includes complete stop, collection, restoration, separate verification and release; at most35min actions. No outcomes yet at this update. Lead owns no compiler, Eden or claim. Always inspect live ledger rather than treating this handoff as current resource state.
+## Kept evidence and limitations
 
-- pkg6: actual1-to2 body AND HUD first, then LRA/save-load/count3/reverse, immediate chargedhat/liveitem cutover, four exact-created identities/lifetimes and compatible R5/F11 rows. No Q15 detour.
-- pkg4: genuine Capture Off-toOn, actual timer finish/native Save, imported archive and actual first-seal facts. No speculative capture fix before observing the first rejection.
-- Slim: state-destructor1758a00 alternative preserves overlay pristine guard17545f0; source patchdbc6d60b uncompiled. Two existing named HookScopes approved10:16 around plugin observer/reset/report only, dropped before original exactly once. One fresh-target targeted host gate authorized; no standalone native/runtime.
-- UI: UI22 integrated7e760ec after independent1338source/ninefile/threeELF and20selectedtest audit. Actual recipe reconstruction preserves765/651oldpanes and174/183othermembers, adds30pictures per layout, +4096B each/+8192B bootbuffers. Audit49e8d001. Original unscoped fixture retained; acceptance uses scoped repair. Native visual/material/renderer cost and compiled HUD stack remain open; concrete measurement plan assigned10:18.
+Frozen r18 sourcef1db4cb, diagnostic NRO1be5790b/ELF985e9612, parent artifacts/trainingrooms-lead-astra4/main-r18, is development evidence only. ONE diagnostic build0warnings;16selectedhost tests, not all-target. Resident6242304bytes. UI22 is absent from r18. Earlier raw failures and receipts remain unchanged; no further intermediate manifests requested.
 
-## Retained failures and limits
+UI21-01/02 prove hidden/visible Developer, default/custom notices, actual Solo waiting menu and two-buffer retirement with full0Unmapped/0owned allocations. ui-17 proves exercised X/Y/ZR/current-default file values. ui-10/15/16 functional direction/stage/portrait/item rows have older whole-run health limitations and require final candidate repetition. Developer remains enabled by its existing opt-in. Real README GIF is9.5seconds from r16/758cee5, accurately labelled development footage; no fabricated final-candidate claim.
 
-- F9 s6-12 actualSamus body/Sonic HUD FAIL; complete57file/13324console0TOTALUnmapped/zeroallocations/full1600+17restore audited. R18 repair awaits actual runtime.
-- Pkg4 p4c03 timer ends and native Save publishes, but both tracks3600frames/truncatedtrue. Native4449 is an opaque publication counter. All original logs/archive/fullrestore retained; cause remains unknown until first-seal facts.
-- UI21-01 hidden/default notices and UI21-02 visible Developer/custom colors/waiting have scoped positive evidence, fullconsole0Unmapped/zeroallocations/fullrestore. Input-log contrast fails against light grid. UI22 is not yet native-qualified.
-- Hitbox sh03 first-pass requests73/74 fail:11emitter demand versus8free in800pool. Later successful retries are not acceptance. Exact sys_shield maps11roots before initialization; inspected parameters do not reduce demand. Operator resource-contract decision remains pending in STATUS BLOCKED. No substitution/capacity/retry/culling authorization.
-- Q15 actual saved-Mii constructor/alternate writer completion facts do not prove coherent provider memory lifetime or file publication. Provider/copy/newhook remains held.
-- F6 41Off/42On each17transactions/0TOTALUnmapped/zeroallocations/fullrestore are development evidence only. Missing41cache and nonfinal source prevent final performance acceptance; firstOn request1615ms exceeds warmedOffrepeat1486ms. Future cache wrapper verified but unrun.
-- Minimal three-plugin lanes without common-NRO provider cannot prove DI/tech/OoS. Final CPU lanes need current-boot four common guards and cpu_common=installed. Optional absent Probe is unexercised, not PASS.
-- Ordinary overlay inline1754630 was rejected by actual farpatch overwriting incoming null-branch target1754638. New lifecycle alternative must cancel before statefree, preserve already-bound immutable Saves and prove original once after lock/scope release; no event-for-event oldmanager-entry timing claim.
+F11 empty/unpublished-cell crash guard and existing zero-allocation repairs stay. Six strict f631..36 boots and72laps/12bootstrap had0TOTALUnmapped/0owned allocation; enabled-capacity f637 also passed its scoped health row. Do not remove these fixes while deferring F9/F6 enhancements.
 
-## Gates and next actions
+s6-13 partial1→2→3→2→1 body/HUD/LRA/save-load positives do not qualify complete F9. Full13856-line console0Unmapped/no panic-abort-crash, but StateWriter measured17664/36864 FAILS stack policy. Retain this actual gate failure for coherent-candidate stack disposition; do not attribute it to F9 without evidence. Cutover/exact-Mii/lifetime unrun.
 
-Current source compliance onfc7a28f exits0 with zero mandatory machine failures and29manual rows; the checker auto-selected olddist NROc4750559, so it is not currentrelease evidence. Earlier r17 checker failures/raw output remain unchanged. docs/RC-COMPLIANCE-EVIDENCE.md records all30scoped dispositions. Static test attributes are not executed counts.
+p4c04 actual CaptureOff→On, native armed, KO nativeSave/persisted; accidental movement offstage made it a KOcase, not timer evidence. p4c02 had2x382frames/nontruncated. p4c03 timer had2x3600frames/truncatedtrue, root unknown. No new capture policy fix.
 
-1. Check parent LEAD-INBOX PRIMARY REQUESTs at least every10min; report about every45min without ending work. Latestreport10:09, next~10:54.
-2. Review actual r18 runtime outcomes with complete hashes, totalconsole health, positive observations, headroom and fullrestore proof. Retain every failure.
-3. Finish Slim source/host review and UI native-cost plan; compose next coherent candidate, then integrated gates and addressed native review before admission.
-4. After roots close, final all-target tests/clippy0/no-default/release+diag, normalized size/lint/carry, full359row regression0TOTALUnmapped, replayA/B and two-console online/LDN, real final media and explicit-release compliance/review remain owed.
-5. Sync only closed;14blockers/10finalgates/359finalrows remain open. Historical E9/H286/I58/N0/F4/S2 classes are not final passes.
+## Known issues and honest M5q comparison
 
-The online plan now records current r18 boundary proof and read-only Surface LAN-runtime preflight. Use owned parameterized controllers and full snapshots, not legacy foreign-owner pair scripts. Pair staging must enable private TLS on both peers after Surface offline prep, retain mute and restore complete Qt bytes. No pair has run.
+- F9 count raise: RC intends same as M5q wrong-CPU behavior after disabling unproven promotion; final behavior must match the parity plan.
+- F11 recording after swaps: known limitation in reset scope; independent TR empty-cell access repair is an improvement, not proof all recording-after-swap paths work.
+- F6 cold swap hitches: same class as M5q. Its S RESULT explicitly fails cold20ms target (first122.9ms); no equal latency or performance improvement claimed.
+- Large-fighter first-frame hitbox refusals and F5 power-loss partial writes: retain as known issues; exact M5q comparison references still being reconciled before final README wording.
+- Timer recording truncation and input-log light-background contrast: observed TR limitations, M5q comparison UNKNOWN. Do not claim same as M5q or silently waive a regression.
 
-Authority: parent STATUS, RC-ACCEPTANCE, RC-SPEC-ROWS, LEAD-INBOX and LEAD-ASTRA-4-CHECKPOINT. No push/tag/release/card/DBI/USB. Ext4 scratch,60GB aggregate target cap and40GB disk floor apply; Ally disk hold lifted by primary, fresh admission checks remain. Retire only owned finished targets after full manifests and actual source/binary/log preservation. Operator Hitbox question blocks its dependent semantic change; continue independent work.
+No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign are deferred. Settings Profiles was an invented historical census item, not a feature to implement.
+
+## Remaining execution
+
+1. Consume parent LEAD-INBOX PRIMARY REQUESTs at least every10min; lead turn report about every45min without ending. Last10:09, next10:54.
+2. Review four boundary returns; disable/remove deferred exposed paths and compose ONE candidate. Update NEXT-VERSION exclusions and known issues. Current140243normalizedr18 exceeds136069baseline; no ceiling increase or formatting/count trick.
+3. Candidate gates: all-targethost tests, clippy all-targets -Dwarnings0, no-default build, release+diag0warnings, stack policy, normalizedsize<=136069, carry/provenance, explicit-release compliance and allmanual dispositions scoped to reset matrix. Fix genuine failures and rerun affected checks, preserving failures.
+4. Final matrix across Surface/Yoga/Ally, every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
+5. R-D1 same complete replay baseline/candidate checks ANDpositions; R-O1 actual LDN approvedjoin/membership/waiting changes/one completedmatch and detector equalendframes/desync_seen0both. R-O1 uses LANOnlineOFF per actualM5q evidence, correcting older public-TLS planning. Full profiles restored/separately verified before release.
+6. Final README/HANDOFF/compliance/GIF, RC READY, primary Astra-high review. No push/tag/release/card/DBI/USB.60GB target cap/40GB disk floor, bounded jobs, one Eden per host/no compile beside it, shared ledger/fairness remain.
+
+The historical359-row inventory is post-RC backlog; do not resume chasing every old blocker. No current candidate acceptance is inferred from this handoff.

@@ -22,29 +22,42 @@ This project was developed with the assistance of AI.
 
 ## Status
 
-Implementation and release-candidate validation are in progress. Host tests
-and Switch builds exist, but the integrated candidate has not completed its
-full runtime and online regression gates. There is no approved
-release or installation artifact yet.
+The release candidate is being narrowed to the functional regression rows that
+fork M5q passed, the already-working new UI, and one replay/online smoke.
+The final candidate has not completed its gates; there is no approved release
+or installation artifact yet.
 
-See [HANDOFF.md](HANDOFF.md) for the current acceptance state,
-[docs/implementation-packages.md](docs/implementation-packages.md) for scope,
-and [specs/](specs/) for the behavioral contracts. Individual results under
-[eden/](eden/) identify the build they tested; an older passing run does not
-validate the current candidate.
+See [HANDOFF.md](HANDOFF.md) for the current acceptance state and
+[NEXT-VERSION.md](NEXT-VERSION.md) for deferred work. The larger specification
+inventory remains a development backlog. Historical results under [eden/](eden/)
+identify their tested build and do not validate a later candidate.
 
 ## Practice tools
 
-The implemented feature set includes CPU responses and defensive options, input delay,
-save states and character-specific restoration, input recording and playback,
-named macros and clip editing, input display, and configurable shortcuts.
-The carried engines add fighter cycling, Mii configuration, CPU-as-Player-1,
-practice stages and lobby practice. Menu screens and the hitbox/hurtbox display
-are part of the same acceptance campaign.
+The retained scope includes the demonstrated Training and waiting-room menu,
+CPU options, input delay, save states, numbered recording/playback, supported
+named operations, fighter cycling, existing Mii/hat behavior and practice stages.
+The opt-in Developer page has passing hidden and visible Eden observations.
+Unproven Setup workflows, hurtboxes, expanded hot-slot budgets, F9 promotion,
+advanced preview extensions and further latency work are deferred. Their actual
+RC exclusion boundaries are being composed before final validation.
 
-These describe the intended feature set. The remaining screen, multi-CPU ownership, hitbox, first-use hitch and online
-rows are tracked in the handoff. Verified
-demonstration footage will be added after those rows pass on the candidate.
+## Known limitations under review
+
+- CPU count increases retain M5q behavior, including its wrong-CPU limitation;
+  the unfinished promotion/cutover feature is being excluded.
+- Cold fighter switches can hitch, as in M5q. Its own cold20ms target failed;
+  this RC does not promise that latency target.
+- Recording after swaps, large-fighter first-frame hitbox refusals and
+  power-loss partial writes remain known limitations. The final handoff will
+  distinguish retained M5q behavior from specific demonstrated improvements.
+- A TR timer-recording run truncated at3600frames, and input-log frame text had
+  poor contrast on a light Training background. Their M5q equivalence has not
+  been established; they are not being presented as proven inherited bugs.
+
+These are current development limitations, not a completed parity verdict.
+The empty/unpublished fighter-cell access fix and existing zero-allocation
+improvements are retained independently of deferred features.
 
 ## Waiting-menu development preview
 
