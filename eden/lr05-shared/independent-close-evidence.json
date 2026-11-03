@@ -1,0 +1,21 @@
+{
+  "phase": "down",
+  "released": true,
+  "source_equal_snapshot": true,
+  "profile_equal_snapshot": true,
+  "entries": 21410,
+  "topology": {
+    "immutable_files": 252,
+    "mutable_files": 20436,
+    "violations": []
+  },
+  "owned_open_claims": [],
+  "owned_units_pids": {
+    "eden-life-3213b8863e3a4acc9440659270c3e1f7-yoga.service": [],
+    "eden-life-3213b8863e3a4acc9440659270c3e1f7-yoga-display.service": [],
+    "eden-life-3213b8863e3a4acc9440659270c3e1f7-yoga-display-x.service": []
+  },
+  "surviving_original_identities": [],
+  "shared_lifecycle_sha256": "f64b51c37e6dd4320492c424eb31f764acd106a12ab3c1541b87ce617c33fbd3",
+  "console_bytes": 822233
+}

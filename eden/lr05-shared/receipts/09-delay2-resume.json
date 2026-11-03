@@ -1,0 +1,41 @@
+{
+  "id": "09-delay2-resume",
+  "start": "paused",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "6181f5887d585b0ff6f2e56466c46652bd0aa9304187f2bda000be5c92a0be37",
+  "started": 1793737245.7961707,
+  "results": [
+    {
+      "play": "pause-close",
+      "on": "yoga"
+    },
+    {
+      "gate": "resume",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "pause_owner end queued_at_begin=2 owned_polls=126 owned_non_neutral=0 owners=0x00"
+      }
+    },
+    {
+      "gate": "no-leak2",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "pause_owner resume_checked delay=2 leaked=0"
+      }
+    },
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/09-delay2-resume/yoga-202047Z-611018-gate-training-hud-unpaused.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr05-inputs/out/09-delay2-resume/yoga-202047Z-856170-resumed.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr05-inputs/out/09-delay2-resume/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793737247.3219233
+}

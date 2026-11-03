@@ -1,0 +1,36 @@
+{
+  "id": "08-delay2-pause",
+  "start": "training",
+  "end": "paused",
+  "evidence": [],
+  "manifest_sha256": "6181f5887d585b0ff6f2e56466c46652bd0aa9304187f2bda000be5c92a0be37",
+  "started": 1793737240.0447478,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/08-delay2-pause/yoga-202040Z-974418-gate-training-hud-unpaused.png"
+    },
+    {
+      "play": "pause-open",
+      "on": "yoga"
+    },
+    {
+      "gate": "pause",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "pause_owner begin queue_dropped=2 owners=0x10"
+      }
+    },
+    {
+      "gate": "native-pause",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/08-delay2-pause/yoga-202045Z-712061-gate-native-pause.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr05-inputs/out/08-delay2-pause/yoga-202045Z-126385-native-pause.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793737245.7953746
+}

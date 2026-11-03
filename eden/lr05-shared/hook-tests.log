@@ -1,0 +1,11 @@
+Running as unit: run-p1550532-i22495164.scope; invocation ID: 608a064d77af4b849c354ec61bc93000
+test_crossed_endpoint_pair_is_rejected_without_correction (__main__.ConvergenceTests.test_crossed_endpoint_pair_is_rejected_without_correction) ... ok
+test_input_error_releases_l3_and_never_places (__main__.ConvergenceTests.test_input_error_releases_l3_and_never_places) ... ok
+test_missing_pickup_predicate_does_not_guess (__main__.ConvergenceTests.test_missing_pickup_predicate_does_not_guess) ... ok
+test_roy_requires_down_then_left_before_placement (__main__.ConvergenceTests.test_roy_requires_down_then_left_before_placement) ... ok
+test_sonic_does_not_take_roy_down_step (__main__.ConvergenceTests.test_sonic_does_not_take_roy_down_step) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK

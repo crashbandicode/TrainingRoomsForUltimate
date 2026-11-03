@@ -1,0 +1,41 @@
+12195940684542 plugin=ssbu-tile-cursor/0.1.0 hooks=css,sss,cursor_query heap_allocations=0
+12196640588814 screen=sss tiles=116 heap_allocations=0
+12196731461918 screen=css tiles=87 heap_allocations=0
+12196764834357 step screen=css dir=up from=none to=78 token=p1 x=-576.0 y=-77.0
+12196768093326 settled screen=css at=78 hovered=78 x=-576.0 y=-77.0
+12196848330781 step screen=css dir=left from=86 to=85 token=p2 x=432.0 y=-77.0
+12196851541337 settled screen=css at=85 hovered=85 x=432.0 y=-77.0
+12196860812262 step screen=css dir=up from=85 to=74 token=p2 x=432.0 y=5.0
+12196863379477 settled screen=css at=74 hovered=74 x=432.0 y=5.0
+12196875190712 step screen=css dir=up from=74 to=61 token=p2 x=432.0 y=87.0
+12196877819901 settled screen=css at=61 hovered=61 x=432.0 y=87.0
+12196889578375 step screen=css dir=up from=61 to=48 token=p2 x=432.0 y=169.0
+12196892184892 settled screen=css at=48 hovered=48 x=432.0 y=169.0
+12196904009080 step screen=css dir=left from=48 to=47 token=p2 x=288.0 y=169.0
+12196907205441 settled screen=css at=47 hovered=47 x=288.0 y=169.0
+12196918397818 step screen=css dir=left from=47 to=46 token=p2 x=144.0 y=169.0
+12196921657428 settled screen=css at=46 hovered=46 x=144.0 y=169.0
+12196932807495 step screen=css dir=left from=46 to=45 token=p2 x=0.0 y=169.0
+12196936028366 settled screen=css at=45 hovered=45 x=0.0 y=169.0
+12196947184154 step screen=css dir=left from=45 to=44 token=p2 x=-144.0 y=169.0
+12196950419564 settled screen=css at=44 hovered=44 x=-144.0 y=169.0
+12196961592594 step screen=css dir=left from=44 to=43 token=p2 x=-288.0 y=169.0
+12196964829751 settled screen=css at=43 hovered=43 x=-288.0 y=169.0
+12196976292710 step screen=css dir=left from=43 to=42 token=p2 x=-432.0 y=169.0
+12196979568982 settled screen=css at=42 hovered=42 x=-432.0 y=169.0
+12196990712890 step screen=css dir=left from=42 to=41 token=p2 x=-576.0 y=169.0
+12196993944569 settled screen=css at=41 hovered=41 x=-576.0 y=169.0
+12197005098046 step screen=css dir=left from=41 to=40 token=p2 x=-720.0 y=169.0
+12197008364369 settled screen=css at=40 hovered=40 x=-720.0 y=169.0
+12197019507010 step screen=css dir=left from=40 to=39 token=p2 x=-864.0 y=169.0
+12197022755440 settled screen=css at=39 hovered=39 x=-864.0 y=169.0
+12197509961653 screen=css tiles=87 heap_allocations=0
+12197699860016 step screen=css dir=right from=39 to=40 token=p2 x=-720.0 y=169.0
+12197703067540 settled screen=css at=40 hovered=40 x=-720.0 y=169.0
+12197712344104 step screen=css dir=left from=40 to=39 token=p2 x=-864.0 y=169.0
+12197715550174 settled screen=css at=39 hovered=39 x=-864.0 y=169.0
+12198045057959 screen=css tiles=87 heap_allocations=0
+12198150733569 step screen=css dir=right from=39 to=40 token=p2 x=-720.0 y=169.0
+12198153940464 settled screen=css at=40 hovered=40 x=-720.0 y=169.0
+12198162867413 step screen=css dir=left from=40 to=39 token=p2 x=-864.0 y=169.0
+12198166108222 settled screen=css at=39 hovered=39 x=-864.0 y=169.0

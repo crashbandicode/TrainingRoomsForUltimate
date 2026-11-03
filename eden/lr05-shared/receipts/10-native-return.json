@@ -1,0 +1,65 @@
+{
+  "id": "10-native-return",
+  "start": "training",
+  "end": "css-return",
+  "evidence": [
+    "Native original-owner retirement only; not GroupSwap warm teardown or interrupted-build qualification."
+  ],
+  "manifest_sha256": "6181f5887d585b0ff6f2e56466c46652bd0aa9304187f2bda000be5c92a0be37",
+  "started": 1793737247.3230689,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/10-native-return/yoga-202047Z-877404-gate-training-hud-unpaused.png"
+    },
+    {
+      "play": "pause-open",
+      "on": "yoga"
+    },
+    {
+      "gate": "pause",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "pause_owner begin queue_dropped=2 owners=0x10"
+      }
+    },
+    {
+      "play": "focus-native-quit-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "quit-focus",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/10-native-return/yoga-202049Z-769021-gate-quit-focus.png"
+    },
+    {
+      "play": "confirm-native-quit-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "native-finalize-p1",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[Destroy] plan owner=0 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0"
+      }
+    },
+    {
+      "gate": "native-finalize-cpu",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[Destroy] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0"
+      }
+    },
+    {
+      "gate": "ready",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr05-inputs/out/10-native-return/yoga-202056Z-541508-gate-ready.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr05-inputs/out/10-native-return/yoga-202057Z-690301-return-replay-start.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793737257.1229408
+}
