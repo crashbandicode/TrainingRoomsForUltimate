@@ -213,11 +213,12 @@ pub(crate) fn sync_owner() {
 pub(crate) unsafe fn on_p1_input(controller: usize, out: *mut crate::model::input_delay::MappedInputs) {
     if controller == 0 || !ready() { return; }
     let input = port::input::Controller::read(controller);
-    // The close press remains ours beyond grace until its physical release.
-    let close_owned = replay_capture::owns_close_input(crate::runtime::scene::is_training(), input.current_buttons.b());
-    let queries = named_macros::hook_queries();
-    use crate::model::macro_handoff::ClipInputRoute;
-    match queries.clip_input_route(close_owned) {
+    // Query-before-guard ordering cannot miss an arm preceding a closed publish.
+    use crate::model::macro_handoff::{route_clip_input, ClipInputRoute};
+    let route = route_clip_input(named_macros::hook_queries, || {
+        replay_capture::owns_close_input(crate::runtime::scene::is_training(), input.current_buttons.b())
+    });
+    match route {
         ClipInputRoute::Pass => return,
         ClipInputRoute::Consume => {}
         // A parked editor still owns B cancellation; only the worker reads RELOAD.
