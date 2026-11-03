@@ -915,7 +915,10 @@ pub(super) mod managed {
                 || observed.kinds != forms.kinds
                 || observed.installed != u64::from(forms.count)
                 || read::<u8>(entry, 0x591f) != forms.flags
-                || native_source::ready(entry, owner, kind).is_none()
+                || (native_source::ready(entry, owner, kind).is_none()
+                    && !(scene.layout == Layout::Training
+                        && super::super::sources::training_seat_ready(entry, owner, kind)
+                        && native_source::ready_active(entry, owner, kind).is_some()))
             {
                 return None;
             }
@@ -962,6 +965,10 @@ pub(super) mod managed {
         scene: Snapshot,
         input: Inputs,
         descriptor: [u32; 28],
+    }
+
+    impl Reservation {
+        pub(crate) fn backend(self) -> Backend { self.scene.layout.backend() }
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -1399,7 +1406,7 @@ pub(super) mod managed {
         let shape = match layout {
             // Every slot 4..8 is null except an earlier registered creation, which
             // must still have exactly its registered roots and selection byte.
-            Layout::Training => scene.quantity == Some(1)
+            Layout::Training => super::super::sources::training_seats_ready(scene.quantity)
                 && (4..8).all(|owner| match registered_at(created, owner) {
                     Some(record) => roots(&scene, owner) == created_roots(record),
                     None => scene.primary[owner] == 0,
@@ -1453,7 +1460,9 @@ pub(super) mod managed {
                 {
                     return Err(Refusal::Forms { index: at });
                 }
-            } else if !native_source::parked_ready(current, owner, observed.kinds[0]) {
+            } else if !native_source::parked_ready(current, owner, observed.kinds[0])
+                && !(layout == Layout::Training
+                    && super::super::sources::training_seat_ready(current, owner, observed.kinds[0])) {
                 return Err(Refusal::Parked { index: at });
             }
             #[cfg(feature = "managed-ldn-third-source-alpha")]
@@ -1626,7 +1635,7 @@ pub(super) mod managed {
             || read::<usize>(service, 0) != reservation.scene.service_inner
             || read::<u32>(internal, 0xa0) != 4 + registered as u32
             || (reservation.scene.layout == Layout::Training
-                && native_source::training_cpu_quantity() != Some(1))
+                && !super::super::sources::training_seats_ready(native_source::training_cpu_quantity()))
             || [read::<u8>(internal, 0xea), read(internal, 0xeb)] != reservation.scene.rules
             || read::<u32>(internal, 0xf0) != reservation.scene.ratio_bits
         {
@@ -1700,18 +1709,29 @@ pub(super) mod managed {
         ParkedGroups,
     }
 
-    pub(crate) unsafe fn load_preflight(
-        ctx: &ServiceEntryContext, entry: *const u8, reservation: Reservation, previous: Option<u32>,
-    ) -> Option<Preflight> {
-        load_preflight_checked(ctx, entry, reservation, previous).ok()
-    }
-
     pub(crate) unsafe fn load_preflight_checked(
         ctx: &ServiceEntryContext,
         entry: *const u8,
         reservation: Reservation,
         previous: Option<u32>,
     ) -> Result<Preflight, LoadDecline> {
+        load_preflight_with_descriptor(ctx, entry, reservation, previous, None)
+    }
+
+    /// A prior managed load can retain exact appearance words even after its
+    /// ordinary successor stops using G. These bytes are the descriptor staged
+    /// for that SourceBook generation, not an unqualified current FE snapshot.
+    pub(crate) unsafe fn load_preflight_retained(ctx: &ServiceEntryContext,
+        entry: *const u8, reservation: Reservation, previous: u32,
+        expected: [u8; 0x70]) -> Result<Preflight, LoadDecline> {
+        load_preflight_with_descriptor(ctx, entry, reservation, Some(previous),
+            Some(std::array::from_fn(|i| u32::from_le_bytes(
+                std::array::from_fn(|j| expected[i * 4 + j])))))
+    }
+
+    unsafe fn load_preflight_with_descriptor(ctx: &ServiceEntryContext,
+        entry: *const u8, reservation: Reservation, previous: Option<u32>,
+        retained: Option<[u32; 28]>) -> Result<Preflight, LoadDecline> {
         if !owned(reservation, entry) {
             return Err(LoadDecline::Owned);
         }
@@ -1727,6 +1747,7 @@ pub(super) mod managed {
         }
         expected[0x40 / 4] &= 0x00ff_ffff; // Native install's descriptor byte43=0.
         let current_descriptor = descriptor(entry);
+        let expected = retained.unwrap_or(expected);
         if current_descriptor != expected {
             // Creation/first load and LDN keep the exact original comparison.
             // A Training replacement may retain only the pair written by native
@@ -1761,6 +1782,41 @@ pub(super) mod managed {
         if previous.is_some_and(|kind| canonical::ready(entry, slot as usize, kind).is_none()) {
             return Err(LoadDecline::Canonical);
         }
+        preflight_state(ctx, entry, reservation, previous)
+    }
+
+    /// Replacement of an exact created Mii uses its freshly revalidated full
+    /// source receipt, never a descriptor reconstructed from an ordinary origin.
+    /// The caller proves ready_checked before this call and rechecks the same
+    /// SourceBook token again before beginning the replacement.
+    #[cfg(feature="mii-managed-helper-alpha")]
+    pub(crate) unsafe fn load_preflight_created(
+        ctx: &ServiceEntryContext, entry: *const u8, reservation: Reservation,
+        receipt: super::super::mii_ordinary_player::native::helpers::CreatedReceipt,
+    ) -> Result<Preflight, LoadDecline> {
+        if !owned(reservation, entry) || receipt.source.slot() != reservation.slot as usize
+            || receipt.source.entry().0 != entry as u64 {
+            return Err(LoadDecline::Owned);
+        }
+        let kind = receipt.mii.configuration.canonical().class as u32;
+        let expected = std::array::from_fn(|i| u32::from_le_bytes(
+            std::array::from_fn(|j| receipt.mii.descriptor[i * 4 + j])));
+        if descriptor(entry) != expected { return Err(LoadDecline::Descriptor); }
+        if native_source::ready_created(entry, reservation.slot, kind, receipt.destination).is_none() {
+            return Err(LoadDecline::Parked);
+        }
+        #[cfg(feature="managed-grouped-source-alpha")]
+        if canonical::ready(entry, reservation.slot as usize, kind).is_none() {
+            return Err(LoadDecline::Canonical);
+        }
+        preflight_state(ctx, entry, reservation, Some(kind))
+    }
+
+    /// Both ordinary and exact-created replacements preserve this same complete
+    /// scene, input, original-resource and other parked-group contract.
+    unsafe fn preflight_state(ctx: &ServiceEntryContext, entry: *const u8,
+        reservation: Reservation, previous: Option<u32>) -> Result<Preflight, LoadDecline> {
+        let slot = reservation.slot;
         let scene = current_snapshot(reservation.scene.layout, ctx, entry, slot)
             .ok_or(LoadDecline::Snapshot)?;
         let input = inputs_for(slot as usize).map_err(|_| LoadDecline::Inputs)?;
@@ -1792,6 +1848,37 @@ pub(super) mod managed {
         before: Preflight,
         kind: u32,
     ) -> bool {
+        loaded_scene(ctx, entry, reservation, before, kind) && ready(reservation, entry, kind)
+    }
+
+    #[cfg(feature="mii-managed-helper-alpha")]
+    pub(crate) unsafe fn loaded_created(
+        ctx: &ServiceEntryContext, entry: *const u8, reservation: Reservation,
+        before: Preflight, kind: u32,
+        destination: crate::engine::mii::ordinary_cpu::CreatedDestination,
+    ) -> bool {
+        loaded_scene(ctx, entry, reservation, before, kind)
+            && ready_created(reservation, entry, kind, destination)
+    }
+
+    #[cfg(feature="mii-managed-helper-alpha")]
+    pub(crate) unsafe fn ready_created(
+        reservation: Reservation, entry: *const u8, kind: u32,
+        destination: crate::engine::mii::ordinary_cpu::CreatedDestination,
+    ) -> bool {
+        owned(reservation, entry)
+            && native_source::ready_created(entry, reservation.slot, kind, destination).is_some()
+            && {
+                #[cfg(feature="managed-grouped-source-alpha")]
+                { canonical::ready(entry, reservation.slot as usize, kind).is_some() }
+                #[cfg(not(feature="managed-grouped-source-alpha"))]
+                { ordinary_actor_at(entry, reservation.slot as usize, kind)
+                    .is_some_and(|(_, binding)| binding == reservation.input.records + reservation.slot as usize * 0x280) }
+            }
+    }
+
+    unsafe fn loaded_scene(ctx: &ServiceEntryContext, entry: *const u8,
+        reservation: Reservation, before: Preflight, kind: u32) -> bool {
         if !owned(reservation, entry) {
             return false;
         }
@@ -1811,7 +1898,6 @@ pub(super) mod managed {
         expected == current
             && original_resources(current) == Some(before.resources)
             && expected_input.is_some()
-            && ready(reservation, entry, kind)
     }
 
     unsafe fn load_expected_input(before: Preflight, kind: u32, input: Inputs) -> Option<Inputs> {

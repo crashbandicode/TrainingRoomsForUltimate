@@ -2,7 +2,7 @@
 use super::mii_ordinary_player::native::{self as provenance, check, helpers, Scalars};
 use super::mii_selector_native::{self as native, PublicationTarget, Snapshot};
 use super::{mii_saved_alpha, native_fighter_install, native_source, InstallToken, BASE, INSTALL};
-use crate::engine::swap::source_lifetime::{LoadToken, SourceToken};
+use crate::engine::swap::source_lifetime::{LoadToken, SourceToken, SceneEpoch};
 use std::sync::atomic::Ordering;
 use hos_lock::Mutex;
 use crate::model::reusable_snapshot::{Storage, Snapshot as SharedSnapshot};
@@ -38,7 +38,19 @@ pub(super) struct Prepared {
     descriptor: [u8; 0x70],
     configuration: Configuration,
     player_epoch: u64,
+    created_epoch: Option<SceneEpoch>,
     hat_change: bool,
+    active_reload: bool,
+}
+impl Prepared {
+    pub(super) fn created_destination(&self)->Option<policy::CreatedDestination> {self.before.created}
+    pub(super) fn descriptors(&self)->([u8;0x70],[u8;0x70]) {(self.before.descriptor,self.descriptor)}
+    /// Original row captured under G before the SourceBook replacement begins.
+    pub(super) fn original(&self)->helpers::OriginalRow {
+        let owner=self.before.owners[self.before.binding.owner as usize].unwrap();
+        helpers::OriginalRow {row:owner.row,kind:self.before.original_kind as i8,index:owner.index,
+            selector:owner.selector,control:self.before.control}
+    }
 }
 /// Called once at boot, before native hooks can admit a helper.
 pub(super) fn init_storage() {
@@ -107,13 +119,43 @@ pub(super) fn slot_eligible(slot: u32, c: Configuration) -> bool {
     let Some(hats) = super::mii_ordinary_cpu::helper_origin_hats() else { return false };
     policy::helper_slot_admission(layout, slot as usize, hats, c.tokens().hat)
 }
+/// Scheduling hint only. prepare_created still proves every native root,
+/// record claim, outgoing resource and exact source receipt before INSTALL.
+pub(super) fn created_slot_eligible(slot:u32,c:Configuration)->bool {
+    origins_captured() && super::mii_backend::current()==Some(super::mii_backend::Layout::Training)
+        && super::mii_backend::extras().entry(slot as usize).is_some()
+        && policy::supported_kind(c.canonical().class as u32) && c.tokens().hat!=u16::MAX
+}
 pub(super) unsafe fn prepare(
     entry: usize,
     slot: u32,
     c: Configuration,
 ) -> Result<Prepared, &'static str> {
+    prepare_in(entry,slot,c,None)
+}
+/// Caller holds INSTALL and has proved the exact promoted source's active
+/// native identity. Snapshot still validates all G ownership and source proofs.
+pub(super) unsafe fn prepare_reload(entry: usize, slot: u32, c: Configuration)
+    -> Result<Prepared, &'static str> {
+    check(matches!(slot, 2 | 3)
+        && super::mii_backend::current() == Some(super::mii_backend::Layout::Training),
+        "visible fixed-seat Reload requires Training CPU2/3")?;
+    let mut prepared = prepare_in(entry, slot, c, None)?;
+    prepared.active_reload = true;
+    Ok(prepared)
+}
+/// Explicit created-source entry point. Caller supplies its current SourceBook
+/// epoch; bind checks the eventual full source token under Source STATE.
+pub(super) unsafe fn prepare_created(entry:usize,slot:u32,c:Configuration,epoch:SceneEpoch)
+    ->Result<Prepared,&'static str> {
+    prepare_in(entry,slot,c,Some(epoch))
+}
+unsafe fn prepare_in(entry:usize,slot:u32,c:Configuration,created_epoch:Option<SceneEpoch>)
+    ->Result<Prepared,&'static str> {
     check(
-        super::mii_backend::current().is_some_and(|l|l.helper(slot as usize).is_some()) && origins_captured(),
+        super::mii_backend::current().is_some_and(|l| if created_epoch.is_some() {
+            l==super::mii_backend::Layout::Training && super::mii_backend::extras().entry(slot as usize)==Some(entry)
+        } else {l.helper(slot as usize).is_some()}) && origins_captured(),
         "helper original capture/slot unavailable",
     )?;
     check(
@@ -129,30 +171,34 @@ pub(super) unsafe fn prepare(
         provenance::span(row, 0x260, false),
         "helper original row span",
     )?;
-    let before = native::snapshot(
-        entry,
-        mii_saved_alpha::current_generation(1),
-        crate::runtime::mii::mii_native_access::rd::<i8>(row, 8) as u32,
-        slot as usize,
-        None,
-    )?;
+    let original_kind=crate::runtime::mii::mii_native_access::rd::<i8>(row,8) as u32;
+    let before=if created_epoch.is_some() {
+        native::snapshot_created(entry,original_kind,slot as usize)?
+    } else {native::snapshot(entry,mii_saved_alpha::current_generation(1),original_kind,slot as usize,None)?};
     if !policy::supported_kind(c.canonical().class as u32) {
         return Err("Mii class not qualified");
     }
     // The helper's own physical slot. Training is 2/3; waiting is 5/6.
-    let hat_change = policy::headgear_reload(
-        before.layout, slot as usize, before.scalars.e.hat, c.tokens().hat)?;
+    let hat_change=match before.created {
+        Some(destination)=>destination.headgear_reload(before.scalars.e.hat,c.tokens().hat)?,
+        None=>policy::headgear_reload(before.layout,slot as usize,before.scalars.e.hat,c.tokens().hat)?,
+    };
     if hat_change && !provenance::cpu_headgear_fingerprints() {
         return Err("helper headgear fingerprint mismatch");
     }
-    let descriptor = policy::staged_descriptor_in(before.layout,slot as usize, before.descriptor, Some(c))
-        .ok_or("helper selector unavailable")?;
+    let descriptor=match before.created {
+        Some(destination)=>destination.staged(before.descriptor,c),
+        None=>policy::staged_descriptor_in(before.layout,slot as usize,before.descriptor,Some(c))
+            .ok_or("helper selector unavailable")?,
+    };
     Ok(Prepared {
         before,
         descriptor,
         configuration: c,
-        player_epoch: mii_saved_alpha::current_generation(0),
+        player_epoch: if created_epoch.is_some() {0} else {mii_saved_alpha::current_generation(0)},
+        created_epoch,
         hat_change,
+        active_reload: false,
     })
 }
 /// Source STATE held, no G/registry lock. Failure retains the load and never calls native INSTALL.
@@ -170,19 +216,30 @@ pub(super) fn bind(
             && source.entry().0 == data.before.binding.entry as u64,
         "helper transaction binding changed",
     )?;
-    check(
-        data.before.binding.epoch == mii_saved_alpha::current_generation(1)
-            && data.player_epoch == mii_saved_alpha::current_generation(0),
-        "helper original generation changed",
-    )?;
+    if let Some(epoch)=data.created_epoch {
+        check(source.epoch()==epoch && data.before.created.is_some(),"created source epoch changed")?;
+        // Use the existing transaction sequence for the inert binding stamp.
+        // Full source token equality, not this number, owns the created lifetime.
+        data.before.binding.epoch=s.next;
+    } else {
+        check(data.before.binding.epoch==mii_saved_alpha::current_generation(1)
+            && data.player_epoch==mii_saved_alpha::current_generation(0),"helper original generation changed")?;
+    }
     let view = provenance::helper_snapshot_for(Some(source))?;
     for i in 0..2 {
         if Some(i) != view.ordinal(source.slot()) {
             check(
                 view.slots[i] == data.before.helpers.slots[i]
-                    && view.miis[i] == data.before.helpers.miis[i],
+                    && view.miis[i] == data.before.helpers.miis[i]
+                    && view.promoted[i] == data.before.helpers.promoted[i],
                 "foreign source projection changed",
             )?;
+        }
+    }
+    for i in 0..3 {
+        if Some(i)!=view.created_ordinal(source.slot()) {
+            check(view.created_slots[i]==data.before.helpers.created_slots[i]
+                && view.created_miis[i]==data.before.helpers.created_miis[i],"foreign created source projection changed")?;
         }
     }
     data.before.helpers = view;
@@ -206,9 +263,12 @@ pub(super) fn bind(
     Ok(())
 }
 fn current(t: &Track) -> bool {
-    INSTALL.owns(t.install)
-        && t.ticket.epoch == mii_saved_alpha::current_generation(1)
-        && t.data.player_epoch == mii_saved_alpha::current_generation(0)
+    INSTALL.owns(t.install) && match t.data.created_epoch {
+        Some(epoch)=>t.source.epoch()==epoch && t.data.before.created.is_some()
+            && provenance::check_helpers_for(t.data.before.helpers,Some(t.source)).is_ok(),
+        None=>t.ticket.epoch==mii_saved_alpha::current_generation(1)
+            && t.data.player_epoch==mii_saved_alpha::current_generation(0),
+    }
 }
 fn target(t: &Track) -> PublicationTarget<'_> {
     PublicationTarget {
@@ -224,7 +284,7 @@ fn target(t: &Track) -> PublicationTarget<'_> {
     }
 }
 pub(super) unsafe fn install(source: SourceToken) -> bool {
-    let descriptor = {
+    let (descriptor, active_reload) = {
         let s = STATE.lock();
         let Some(t) = s
             .track
@@ -233,14 +293,15 @@ pub(super) unsafe fn install(source: SourceToken) -> bool {
         else {
             return false;
         };
-        t.data.descriptor
+        (t.data.descriptor, t.data.active_reload)
     };
     let staged = native_fighter_install::Descriptor::from_bytes(&descriptor);
     native_fighter_install::install(
         BASE.load(Ordering::Acquire),
         source.entry().0 as *mut u8,
         &staged,
-        native_fighter_install::Flags::Parked,
+        if active_reload { native_fighter_install::Flags::Reload }
+        else { native_fighter_install::Flags::Parked },
     );
     true
 }
@@ -365,10 +426,15 @@ pub(super) fn refuse_completion(source: SourceToken, reason: &str) {
     ));
 }
 /// INSTALL stays held until SourceBook's Ready commit, so no writer can intervene.
-pub(super) unsafe fn completed(
+pub(super) struct Completion {
+    pub mii:helpers::MiiProof,
+    pub proof:helpers::Proof,
+    pub created:Option<helpers::CreatedReceipt>,
+}
+pub(super) unsafe fn completed_details(
     source: SourceToken,
     ticks: u16,
-) -> Result<Option<helpers::MiiProof>, &'static str> {
+) -> Result<Option<Completion>, &'static str> {
     let track = {
         let s = STATE.lock();
         let t = s.track.as_ref().ok_or("helper ticket absent")?;
@@ -378,11 +444,15 @@ pub(super) unsafe fn completed(
         )?;
         t.clone()
     };
-    if !native_source::parked_ready(
-        source.entry().0 as *const u8,
-        source.slot() as u32,
-        track.data.configuration.canonical().class as u32,
-    ) {
+    let kind=track.data.configuration.canonical().class as u32;
+    let ready=if track.data.active_reload {
+        native_source::active_identity(source.entry().0 as *const u8, source.slot() as u32, kind).is_some()
+    } else { match track.data.before.created {
+        Some(destination)=>native_source::parked_created_ready(source.entry().0 as *const u8,
+            source.slot() as u32,kind,destination),
+        None=>native_source::parked_ready(source.entry().0 as *const u8,source.slot() as u32,kind),
+    }};
+    if !ready {
         return Ok(None);
     }
     native::target_rows(track.data.configuration)?;
@@ -409,10 +479,18 @@ pub(super) unsafe fn completed(
         descriptor: completion.now.descriptor,
         record: completion.now.record,
     };
+    let owner=completion.now.owners[source.slot()].ok_or("completed source owner absent")?;
+    let native_proof=helpers::Proof {
+        original:helpers::OriginalRow {row:owner.row,kind:completion.now.original_kind as i8,
+            index:owner.index,selector:owner.selector,control:completion.now.control},
+        thread:completion.now.thread,owner,kind,
+        costume:crate::runtime::mii::mii_native_access::rd(owner.object,0x64),
+    };
+    let created=completion.now.created.map(|destination|helpers::CreatedReceipt {source,destination,mii:proof});
     drop(registry);
     drop(s);
     drop(completion);
-    Ok(Some(proof))
+    Ok(Some(Completion {mii:proof,proof:native_proof,created}))
 }
 pub(super) fn release(source: SourceToken) {
     let mut s = STATE.lock();
@@ -433,6 +511,22 @@ pub(super) unsafe fn ready(ready: crate::engine::swap::source_lifetime::ReadyTok
     ready_checked(ready, c).is_ok()
 }
 
+/// Copied capacity preflight facts only after the current source and full native
+/// G payload have been revalidated. The caller rechecks its ReadyToken before
+/// replacing the source; this snapshot is not a second lifetime authority.
+pub(super) unsafe fn created_ready_receipt(
+    ready: crate::engine::swap::source_lifetime::ReadyToken, c: Configuration,
+) -> Result<helpers::CreatedReceipt, &'static str> {
+    ready_checked(ready, c)?;
+    let view = provenance::helper_snapshot()?;
+    let i = view.created_ordinal(ready.source().slot()).ok_or("created backend differs")?;
+    let receipt = view.created_miis[i].ok_or("created receipt absent")?;
+    check(receipt.source == ready.source() && receipt.mii.configuration == c
+        && matches!(view.created_slots[i], helpers::Helper::Ready {ready: current, ..} if current == ready),
+        "created preflight source changed")?;
+    Ok(receipt)
+}
+
 /// Preserve a transient shared-installer refusal for consumers that already hold
 /// a lease. Another helper loading does not invalidate this helper's payload.
 /// Callers must retry BUSY without releasing the lease; every other failure is
@@ -443,6 +537,25 @@ pub(super) unsafe fn ready_checked(
 ) -> Result<(), &'static str> {
     let source = ready.source();
     let view = provenance::helper_snapshot()?;
+    if let Some(i)=view.created_ordinal(source.slot()) {
+        let helpers::Helper::Ready {ready:current,proof,..}=view.created_slots[i]
+            else {return Err("created source is not ready");};
+        let receipt=view.created_miis[i].ok_or("created exact payload absent")?;
+        check(current==ready && receipt.source==source && receipt.mii.configuration==c,
+            "created exact source/payload changed")?;
+        let guard=native::created_ready_snapshot(receipt.mii.binding,proof.original.kind as u32,
+            receipt.destination,view)?;
+        let now=&guard.now;
+        check(now.record==receipt.mii.record && now.descriptor==receipt.mii.descriptor
+            && now.scalars==Scalars::saved(c) && now.owners[source.slot()]==Some(proof.owner),
+            "created exact configuration changed")?;
+        let table=provenance::pointer(BASE.load(Ordering::Acquire),
+            crate::runtime::mii::mii_native_access::OWNER_TABLE,0x130,false)?;
+        provenance::created_kind(view,now.extras,source.slot(),proof.owner,
+            c.canonical().class as u32,super::mii_backend::extra_facts(table,source.slot(),
+                proof.owner.entry,proof.owner.row,proof.owner.information,proof.owner.object))?;
+        return Ok(());
+    }
     let ordinal = view.ordinal(source.slot()).ok_or("helper backend differs")?;
     let Some(helpers::Helper::Ready {
         ready: current,

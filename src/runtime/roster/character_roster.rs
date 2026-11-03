@@ -49,6 +49,8 @@ use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 
 #[path = "native_source.rs"]
 mod native_source;
+#[path = "training_count_readiness.rs"]
+mod training_count_readiness;
 #[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;
@@ -156,6 +158,7 @@ static SOLO_ACTIVE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(f
 /// Set by `allow_portrait` when native reset rebuilt a role's Mii publication. Value-only:
 /// that role's next service callback revalidates the receipt and body, then republishes.
 static REBUILT: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
+static PROMOTED_REBUILT: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 static STATES: [OwnerMutex<State>; 2] = [OwnerMutex::new(State::empty()), OwnerMutex::new(State::empty())];
 static WAITING_MEMORY: OwnerMutex<WaitingSession<WaitingValue>> = OwnerMutex::new(WaitingSession::empty());
 type WaitingValue=crate::engine::mii::remembered::Value<TrioFighter,Forms>;
@@ -369,6 +372,29 @@ pub(crate) fn notice_blocked() -> bool {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_ordinary_cpu::preload_pending() {return true;}
     false
+}
+
+/// None means unresolved current CPU ownership/catalog, not an empty rotation.
+/// The count boundary must not activate a native-default seat in that interval.
+pub(crate) fn fixed_cpu_seats(menu: &TrainingModpackMenu)
+    -> Option<[Option<crate::runtime::roster::cycle_preload::Target>; 2]> {
+    {
+        let state = state_for(Role::Cpu).lock();
+        if state.pending.is_some() || state.observed.is_none() { return None; }
+    }
+    #[cfg(feature="mii-ordinary-cpu-alpha")]
+    {
+        if mii_ordinary_cpu::preload_pending() { return None; }
+        if let Some(targets) = mii_ordinary_cpu::preload_targets(menu) {
+            return Some(crate::engine::preload::cycle_preload_policy::cpu_seats(targets));
+        }
+        if menu.cpu_roster.fighters_excluding_fixed(None).iter()
+            .any(|fighter| (0x48..=0x4a).contains(&fighter.kind()))
+            || original_kind(Role::Cpu).is_some_and(|kind| (0x48..=0x4a).contains(&kind)) {
+            return None;
+        }
+    }
+    Some(crate::engine::preload::cycle_preload_policy::cpu_seats(preload_targets(menu, 1)))
 }
 
 pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
@@ -1567,6 +1593,32 @@ unsafe fn presentation_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
     read::<u32>(entry, 0x18) == kind && read::<u8>(entry, 0x5918) == 0
 }
 
+/// Native count activation retains a managed body. Publish its independently
+/// qualified identity without changing CPU1's menu selection or saved epoch.
+unsafe fn publish_promoted_presentation(entry: *const u8, owner: u32) {
+    if !crate::runtime::compat::common::is_native_training_mode() { return; }
+    let Some(p) = sources::promoted_presentation(owner) else { return; };
+    if p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+    PROMOTED_REBUILT[(owner - 2) as usize].store(false, Ordering::Release);
+    #[cfg(feature="mii-hud-portrait-alpha")]
+    {
+        let portrait = p.configuration.map_or(PortraitIntent::NotMii, PortraitIntent::Exact);
+        if mii_hud_portrait::should_defer_hud(owner, p.kind, portrait) {
+            let accepted = mii_hud_portrait::request(entry, owner, p.generation, p.kind, portrait, true);
+            if policy_rejected_hud(accepted) {
+                mii_hud_portrait::before_refresh(entry, owner, p.kind);
+                refresh_hud(entry, owner, p.kind);
+            }
+        } else {
+            mii_hud_portrait::before_refresh(entry, owner, p.kind);
+            refresh_hud(entry, owner, p.kind);
+            mii_hud_portrait::request(entry, owner, p.generation, p.kind, portrait, false);
+        }
+    }
+    #[cfg(not(feature="mii-hud-portrait-alpha"))]
+    refresh_hud(entry, owner, p.kind);
+}
+
 /// Called only after a Mii adapter accepts its exact completion, while its
 /// current callback and INSTALL token are still owned. Publish presentation only;
 /// original CSS identity and saved configuration/preferences remain untouched.
@@ -1646,6 +1698,23 @@ fn policy_rejected_hud(accepted: bool) -> bool {
 /// publication keeps native's own rebuild and is republished on the service callback.
 /// Both native reset hooks arrive here: one short roster lock, no native calls.
 pub unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64, entry: *const u8) {
+    if matches!(entry_id, 2 | 3) {
+        let owner = entry_id as u32;
+        let rebuilt = &PROMOTED_REBUILT[(owner - 2) as usize];
+        if busy() {
+            rebuilt.store(true, Ordering::Release);
+            return;
+        }
+        if !crate::runtime::compat::common::is_native_training_mode() { return; }
+        let Some(p) = sources::promoted_presentation(owner) else { return; };
+        if p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+        if p.configuration.is_some() {
+            rebuilt.store(true, Ordering::Release);
+        } else if ctx.registers[0].x() as u32 == p.kind {
+            ctx.registers[8].set_x(0);
+        }
+        return;
+    }
     if entry_id > 1 {
         return;
     }
@@ -1687,6 +1756,22 @@ pub unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64, entry: *const u
 /// texture. Global INSTALL activity can belong to another role or a helper: defer
 /// consumption while it is busy, rather than lose this role's reset notification.
 unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
+    if matches!(owner, 2 | 3) {
+        let rebuilt = &PROMOTED_REBUILT[(owner - 2) as usize];
+        if !rebuilt.load(Ordering::Acquire) || busy() { return; }
+        let Some(p) = sources::promoted_presentation(owner) else {
+            rebuilt.store(false, Ordering::Release);
+            return;
+        };
+        if !crate::runtime::compat::common::is_native_training_mode()
+            || p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+        rebuilt.store(false, Ordering::Release);
+        #[cfg(feature="mii-hud-portrait-alpha")]
+        mii_hud_portrait::represent(entry, owner, p.kind);
+        #[cfg(not(feature="mii-hud-portrait-alpha"))]
+        refresh_hud(entry, owner, p.kind);
+        return;
+    }
     let role = match owner {
         0 => Role::Player,
         1 => Role::Cpu,
@@ -1750,7 +1835,11 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
     let current_scope = scope(role);
     let waiting_cpu = owner == 4 && current_scope.is_some_and(|s| s.owner == owner);
     let ordinary = owner <= 1 && current_scope.is_some_and(|s| s.mode == 0x04040000);
-    if !ordinary && !waiting_cpu {
+    let promoted = matches!(owner, 2 | 3)
+        && crate::runtime::compat::common::is_native_training_mode()
+        && sources::promoted_presentation(owner).is_some_and(|p|
+            p.entry == entry as usize && p.kind == kind && active_body(entry, owner, kind));
+    if !ordinary && !waiting_cpu && !promoted {
         trace!(
             "[CharacterRoster] HUD skipped: owner={} scope={:?} game={:?}",
             owner,
@@ -2371,6 +2460,7 @@ pub fn init(#[cfg(feature = "managed-third-source-alpha")] load_contract: Option
         #[cfg(feature="mii-ordinary-cpu-alpha")]
         mii_ordinary_cpu::init();
         native_service::install(base);
+        training_count_readiness::install();
         #[cfg(feature = "native-body-bank-probe")]
         body_bank_probe::install(base);
         #[cfg(feature = "native-body-bank-alpha")]

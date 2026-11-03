@@ -205,7 +205,8 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
 /// Service from Kirby's native frame callback while that body is owned by the game.
 pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     let waiting = training::lobby::active() && training::lobby::is_waiting_scene();
-    if (PENDING_ROLES.load(Ordering::Acquire) == 0 && !waiting)
+    let cutover = !body.is_null() && sources::hat_source_cutover((*body).battle_object_id);
+    if (PENDING_ROLES.load(Ordering::Acquire) == 0 && !waiting && !cutover)
         || body.is_null() || !common::is_training_mode() {
         return;
     }
@@ -216,6 +217,25 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     } else {
         return;
     };
+    if cutover && permitted() {
+        // Already-cleared requests finish their normal later-frame release.
+        // In particular, do not restart their source wait on every frame while
+        // the old lease is settling. Native cleanup runs outside both mutexes.
+        let clearing = STATES[role].lock().pending.is_some_and(|pending|
+            pending.body_id == (*body).battle_object_id && pending.cleared && !pending.started);
+        if !clearing {
+            let kind = equipped(body);
+            if sources::clear_hat_for_switch(body).is_err() { return; }
+            if let Some(kind) = kind {
+                restore(body, kind);
+                if let Some(pending) = STATES[role].lock().pending.as_mut() {
+                    pending.cleared = true;
+                    pending.restoring = false;
+                }
+            }
+            return;
+        }
+    }
     // Resolve roster ownership before the hat mutex: roster completion can clear
     // this role's memory. Never restore onto the temporary character-select body.
     let settled = waiting && common::is_ready_go()

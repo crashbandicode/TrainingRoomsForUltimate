@@ -129,6 +129,13 @@ impl Extras {
         self.roots[index].ok_or("extra registered roots unavailable")
     }
 
+    /// Compare this creation's complete registration without treating another
+    /// slot's later creation as replacement of this source's own roots.
+    pub fn same_registration(self,other:Self,slot:usize)->bool {
+        self.layout==other.layout && matches!((self.registered_roots(slot),other.registered_roots(slot)),
+            (Ok(a),Ok(b)) if a==b)
+    }
+
     /// A registered extra's current native roots must equal its registration.
     /// Raw values only; the caller reads them from current roots under its lock.
     pub fn owned_roots(

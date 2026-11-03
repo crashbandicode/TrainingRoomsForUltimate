@@ -498,3 +498,7 @@ Adopted exact Slim23ec705 code and UI d029583 existing-callback reference after 
 ## Capacity pristine verification ordering (2026-11-03)
 
 Adopted the bounded Slim 07f80c4 repair: seven appended transforms across character_roster and native_source_capacity preserve the existing main carry history. A non-copyable, base-bound proof verifies full load ranges before lifecycle hooks; activation remains after ordinary Mii validation with strict creation and seam gates. The pure helper and four original probes are clean-room. Native/runtime qualification remains pending; see docs/CAPACITY-PRISTINE-LOAD-CONTRACT.md.
+
+## pkg6 retained sources, fixed CPU seats and exact created destinations
+
+Integrated reviewed cumulative 1dd2629 composition plus 0bb452d native-owned seat admission. Seventeen existing carry rows receive append-only transforms, followed by three corrected rows. Preserved F6, pristine-load, developer measurement gating, Q15 and Hitbox observer changes. Known-empty native-owned seats require fresh exact active identities and epoch/count/entry rechecks; they grant no managed source token. All managed-generation and capacity resource proofs remain. Source only: integrated tests/native callback ABI/runtime and four-owner HUD remain pending.

@@ -28,6 +28,70 @@ fn roster_input_membership_preserves_order_without_first_or_repeat_allocations()
 #[path = "../../src/runtime/roster/observe.rs"]
 mod observed_map;
 
+#[path = "../../src/runtime/roster/training_count_readiness.rs"]
+mod training_count_readiness;
+
+// Native adapter methods are Switch-only; exercise its value projection here.
+#[allow(dead_code)]
+#[path = "../../src/runtime/mii/mii_source_provenance.rs"]
+mod mii_source_provenance;
+
+#[test]
+fn created_destination_first_and_repeated_capture_allocate_nothing() {
+    use crate::engine::mii::{ordinary_cpu::CreatedDestination, ordinary_player::Owner,
+        backend::Layout, capacity::{Extras, Roots, ExtraFacts}};
+    let owners = core::array::from_fn(|id| ([0,1,2,3,7].contains(&id)).then_some(Owner {
+        entry:0x1000+id*0x100, row:0x2000+id*0x100, information:0x3000+id*0x100,
+        object:0x4000+id*0x100, index:0, selector:id as u8, alias:0 }));
+    let kinds = core::array::from_fn(|id| owners[id].map(|_|9));
+    let extras = Extras::registered([Some(Roots {entry:0x1700,resource:0x7000,
+        alias:0x4700,selection:2,descriptor_selector:0}),None,None]).unwrap();
+    let facts = ExtraFacts {entry_owner:7,row_owner:7,descriptor_selector:0,
+        entry_index:0,information_index:0,object_index:0,entry_kind:9,object_kind:9,
+        resource:0x7000,alias_root:0x4700,selection:2};
+    let measured=AllocationCount::start();
+    for _ in 0..128 {
+        let destination=CreatedDestination::capture(Layout::Training,extras,7,&owners,&kinds,facts,8).unwrap();
+        assert_eq!(destination.record(),7);
+        assert_eq!(destination.protected(),[Some(0),Some(1),Some(2),Some(3),None,None,None,None]);
+    }
+    assert_eq!(measured.finish(),0);
+}
+
+#[test]
+fn retained_source_promotion_and_readoption_allocate_nothing_on_first_or_repeated_use() {
+    use crate::engine::swap::source_lifetime::{SourceBook, SourceKey, NativeEntry, Holder};
+    std::thread::spawn(|| {
+        let measurement = AllocationCount::start();
+        let mut book = SourceBook::<2, 4>::new();
+        let first = book.register_ready(0, book.epoch(), NativeEntry(17),
+            SourceKey { kind: 7, costume: 2 }).unwrap();
+        let second = book.register_ready(1, book.epoch(), NativeEntry(18),
+            SourceKey { kind: 9, costume: 0 }).unwrap();
+        let holder = Holder { category: 1, id: 42 };
+        let lease = book.acquire(first, holder).unwrap();
+        for _ in 0..128 {
+            let seats = [Some(first.source()), Some(second.source())];
+            let reserved = book.reserve_promotions(seats).unwrap();
+            assert_eq!(book.reserve_promotions(seats), Ok(reserved));
+            let [Some(a), Some(b)] = reserved else { panic!("both seats reserved"); };
+            assert_eq!(book.published_promotion(a), Ok(None));
+            let first_publication = book.publish_promotion(a).unwrap();
+            let second_publication = book.publish_promotion(b).unwrap();
+            assert_ne!(first_publication, second_publication);
+            assert_eq!(book.publish_promotion(a), Ok(first_publication));
+            assert_eq!(book.published_promotion(b), Ok(Some(second_publication)));
+            assert!(book.validate_lease(lease, holder));
+            assert!(book.acquire(first, holder).is_err());
+            assert_eq!(book.readopt(b), Ok(second));
+            assert_eq!(book.readopt(a), Ok(first));
+        }
+        assert!(book.release(lease));
+        let allocations = measurement.finish();
+        assert_eq!(allocations, 0);
+    }).join().unwrap();
+}
+
 #[test]
 fn const_owner_lock_first_use_and_refusal_do_not_allocate() {
     // Exercise the exact public primitive selected by the native owner states.

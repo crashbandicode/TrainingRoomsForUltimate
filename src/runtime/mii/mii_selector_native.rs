@@ -29,6 +29,8 @@ pub(crate) struct Protected {
 pub(crate) struct Snapshot {
     pub layout: super::mii_backend::Layout,
     pub helpers: helpers::View,
+    pub created: Option<policy::CreatedDestination>,
+    pub extras: crate::engine::mii::capacity::Extras,
     pub binding: Binding,
     pub thread: usize,
     pub original_kind: u32,
@@ -80,6 +82,7 @@ pub(crate) struct Map {
     pub(crate) internal: usize,
     pub(crate) entries: [usize; 8],
     pub(crate) extras: crate::engine::mii::capacity::Extras,
+    created: bool,
 }
 impl Map {
     pub(crate) fn physical(&self) -> [usize; 8] {
@@ -91,6 +94,9 @@ unsafe fn control(row: usize) -> [u8; 7] {
     [0xa, 0x6b, 0x79, 0x78, 0x19, 0x1a, 0xa7].map(|offset| rd(row, offset))
 }
 pub(crate) unsafe fn map(entry: usize, owner: usize) -> Result<Map, &'static str> {
+    map_in(entry,owner,false)
+}
+unsafe fn map_in(entry:usize,owner:usize,created:bool)->Result<Map,&'static str> {
     let layout=super::mii_backend::current().ok_or("Mii backend unavailable")?;
     let symbol = crate::runtime::compat::sync::read(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     let manager = pointer(symbol, 0, 8, false)?;
@@ -105,7 +111,8 @@ pub(crate) unsafe fn map(entry: usize, owner: usize) -> Result<Map, &'static str
     // extra is never a selector destination.
     let extras = super::mii_backend::extras();
     check(
-        layout.selector(owner) && extras.entry(owner).is_none()
+        owner<8 && (if created {layout==super::mii_backend::Layout::Training && extras.entry(owner)==Some(entry)}
+                else {layout.selector(owner) && extras.entry(owner).is_none()})
             && layout.shape_with(&physical, extras)
             && physical[owner] == entry
             && rd::<[usize; 8]>(internal, 0x20) == physical
@@ -124,14 +131,25 @@ pub(crate) unsafe fn map(entry: usize, owner: usize) -> Result<Map, &'static str
         internal,
         entries,
         extras,
+        created,
     })
 }
 pub(crate) unsafe fn pool(entry: usize, epoch: u64, owner: usize) -> Result<Binding, &'static str> {
+    pool_in(entry,epoch,owner,None)
+}
+unsafe fn pool_for(m:Map,entry:usize,epoch:u64,owner:usize)->Result<Binding,&'static str> {
+    pool_in(entry,epoch,owner,m.created.then_some(m.extras))
+}
+unsafe fn pool_in(entry:usize,epoch:u64,owner:usize,
+    created:Option<crate::engine::mii::capacity::Extras>)->Result<Binding,&'static str> {
     let base = super::BASE.load(std::sync::atomic::Ordering::Acquire);
     let holder = pointer(base, POOL_HOLDER, 8, false)?;
     let manager = pointer(holder, 0, 0x24e0, true)?;
     let layout=super::mii_backend::current().ok_or("Mii backend unavailable")?;
-    check(layout.selector(owner), "selector outside backend")?;
+    check(owner<8 && match created {
+        None=>layout.selector(owner),
+        Some(extras)=>layout==super::mii_backend::Layout::Training && extras.entry(owner)==Some(entry),
+    }, "selector outside qualified backend destination")?;
     let row = base + 0x52c5730 + owner * 0x260;
     check(
         span(row, 0x260, true) && span(entry, 0x5a88, true),
@@ -157,7 +175,7 @@ pub(crate) unsafe fn pool(entry: usize, epoch: u64, owner: usize) -> Result<Bind
     Ok(b)
 }
 pub(crate) fn same_map(a: &Snapshot, b: &Snapshot) -> bool {
-    a.layout == b.layout && a.binding == b.binding
+    a.layout == b.layout && a.binding == b.binding && a.created == b.created
         && a.thread != 0
         && a.thread == b.thread
         && a.symbol == b.symbol
@@ -184,7 +202,19 @@ pub(crate) unsafe fn current_locked(
     helpers: helpers::View,
     source: Option<SourceToken>,
 ) -> Result<Snapshot, &'static str> {
+    check(!m.created,"created destination requires its explicit phase capability")?;
+    current_locked_in(m,b,original_kind,staged,helpers,source,None)
+}
+unsafe fn current_locked_in(
+    m:Map,b:Binding,original_kind:u32,staged:Option<(&[u8;0x70],usize)>,
+    helpers:helpers::View,source:Option<SourceToken>,
+    mut created:Option<policy::CreatedDestination>,
+)->Result<Snapshot,&'static str> {
     check_helpers_for(helpers, source)?;
+    if let Some(destination)=created {
+        check(m.created && destination.registered_in(m.layout,m.extras,b.owner as usize,b.entry),
+            "created destination registration changed")?;
+    }
     check(helpers.layout==m.layout,"selector helper backend changed")?;
     let base = super::BASE.load(std::sync::atomic::Ordering::Acquire);
     check(
@@ -192,7 +222,7 @@ pub(crate) unsafe fn current_locked(
             && rd::<usize>(m.manager, 0) == m.internal
             && rd::<[usize; 8]>(m.internal, 0x20) == m.physical()
             && rd::<[usize; 8]>(m.internal, 0x60) == [0; 8]
-            && pool(b.entry, b.epoch, b.owner as usize)? == b,
+            && pool_for(m,b.entry, b.epoch, b.owner as usize)? == b,
         "CPU current map/G changed under lock",
     )?;
     let own_id = b.owner as usize;
@@ -233,14 +263,10 @@ pub(crate) unsafe fn current_locked(
         if let Some((descriptor, selected)) = staged.filter(|_| id == own_id) {
             let target_index = u16::from_le_bytes(descriptor[0x46..0x48].try_into().unwrap());
             check(
-                policy::publication_indices_in(m.layout,
-                    own_id,
-                    index,
-                    target_index,
-                    index,
-                    rd(fe, 0x46),
-                    rd(d, 0x72),
-                ) && rd::<[u8; 0x70]>(fe, 0) == *descriptor
+                (match created {
+                    Some(destination)=>destination.publication_indices(target_index,index,rd(fe,0x46),rd(d,0x72)),
+                    None=>policy::publication_indices_in(m.layout,own_id,index,target_index,index,rd(fe,0x46),rd(d,0x72)),
+                }) && rd::<[u8; 0x70]>(fe, 0) == *descriptor
                     && o == selected,
                 "CPU staged FE / before E-D or selected O mismatch",
             )?;
@@ -278,7 +304,17 @@ pub(crate) unsafe fn current_locked(
         if extra {
             // Shared exact admission with the Player0 walk; raw reads under G. A
             // protected non-destination; names the failed predicate.
-            m.extras.admit(id, &owner, super::mii_backend::extra_facts(table, id, fe, e, d, o))?;
+            let facts=super::mii_backend::extra_facts(table,id,fe,e,d,o);
+            if id==own_id {
+                match created {
+                    Some(destination)=>check(if staged.is_some() {
+                        destination.staged_owner(owner,facts,kind)
+                    } else {destination.completed_owner(owner,facts,kind)},"created destination phase changed")?,
+                    None=>m.extras.admit(id,&owner,facts)?,
+                }
+            } else {
+                super::mii_ordinary_player::native::created_kind(helpers,m.extras,id,owner,kind,facts)?;
+            }
         } else if id != own_id && m.layout.logical(id as u32).is_some() {
             let current = authority(
                 b,
@@ -320,8 +356,19 @@ pub(crate) unsafe fn current_locked(
         role_owner::claims_in_with(m.layout, m.extras, &owners, &kinds).is_some(),
         "CPU selector-owned claim conflict",
     )?;
-    let protected_indices = policy::assignment_with(m.layout, m.extras, own_id, &owners)
-        .ok_or("CPU destination/selector/owner conflict")?;
+    if m.created && created.is_none() {
+        check(staged.is_none(),"created origin cannot be captured after staging")?;
+        let owner=owners[own_id].ok_or("created owner absent")?;
+        let bytes=b.vector_end.checked_sub(b.vector_begin).ok_or("created G vector reversed")?;
+        check(bytes.is_multiple_of(values::RECORD_LEN),"created G vector size differs")?;
+        created=Some(policy::CreatedDestination::capture(m.layout,m.extras,own_id,&owners,&kinds,
+            super::mii_backend::extra_facts(table,own_id,owner.entry,owner.row,owner.information,owner.object),
+            bytes/values::RECORD_LEN).ok_or("created ordinary destination is not qualified")?);
+    }
+    let protected_indices = match created {
+        Some(destination)=>destination.protected_now(m.layout,m.extras,&owners,&kinds),
+        None=>policy::assignment_with(m.layout,m.extras,own_id,&owners),
+    }.ok_or("CPU destination/selector/owner conflict")?;
     let mut records = [None; 8];
     for (slot, index) in protected_indices.iter().enumerate() {
         if let Some(index) = index {
@@ -356,6 +403,8 @@ pub(crate) unsafe fn current_locked(
     )?;
     check_helpers_for(helpers, source)?;
     Ok(Snapshot {
+        extras:m.extras,
+        created,
         layout:m.layout,
         helpers,
         binding: b,
@@ -395,6 +444,46 @@ pub(crate) unsafe fn snapshot(
     drop(g);
     result
 }
+/// Initial read only; the resulting capability is usable only after the caller
+/// binds the full SourceBook token. Epoch0 is not CPU1 authority and is never
+/// compared to its mutable generation; created lifetime checks use SourceToken.
+#[cfg(feature="mii-managed-helper-alpha")]
+pub(crate) unsafe fn snapshot_created(entry:usize,original_kind:u32,owner:usize)
+    ->Result<Snapshot,&'static str> {
+    let helpers=helper_snapshot_for(None)?;
+    let m=map_in(entry,owner,true)?;
+    let b=pool_for(m,entry,0,owner)?;
+    let g=PoolLock::acquire(super::BASE.load(std::sync::atomic::Ordering::Acquire),b.manager);
+    let receipt=helpers.created_ordinal(owner).and_then(|i|helpers.created_miis[i]);
+    let mut now=current_locked_in(m,b,original_kind,None,helpers,None,receipt.map(|r|r.destination))?;
+    if let Some(receipt)=receipt {
+        let own=now.owners[owner].ok_or("created replacement owner absent")?;
+        let table=pointer(super::BASE.load(std::sync::atomic::Ordering::Acquire),OWNER_TABLE,0x130,false)?;
+        let facts=super::mii_backend::extra_facts(table,owner,own.entry,own.row,own.information,own.object);
+        let kind=rd::<u32>(own.entry,0x18);
+        super::mii_ordinary_player::native::created_kind(helpers,m.extras,owner,own,kind,facts)?;
+        now.created=Some(receipt.destination.reuse_completed(own,facts,kind)
+            .ok_or("created replacement lacks completed owner authority")?);
+    }
+    check_helpers_for(helpers,None)?;
+    drop(g);
+    Ok(now)
+}
+/// Revalidation of an already captured created destination, never recapture of
+/// an existing Mii. The full ready source receipt is checked by the caller.
+#[cfg(feature="mii-managed-helper-alpha")]
+pub(crate) unsafe fn created_ready_snapshot(binding:Binding,original_kind:u32,
+    destination:policy::CreatedDestination,helpers:helpers::View)
+    ->Result<CompletionGuard,&'static str> {
+    let owner=binding.owner as usize;
+    let m=map_in(binding.entry,owner,true)?;
+    let b=pool_for(m,binding.entry,binding.epoch,owner)?;
+    check(b==binding,"created ready G identity changed")?;
+    let g=PoolLock::acquire(super::BASE.load(std::sync::atomic::Ordering::Acquire),b.manager);
+    let now=current_locked_in(m,b,original_kind,None,helpers,None,Some(destination))?;
+    Ok(CompletionGuard {now,_pool:g})
+}
+
 pub(crate) unsafe fn target_rows(c: Configuration) -> Result<(), &'static str> {
     super::mii_ordinary_player::native::target_rows(c).map(|_| ())
 }
@@ -479,8 +568,8 @@ pub(crate) unsafe fn publication_in(
         target_rows(c)?;
     }
     let owner = before.binding.owner as usize;
-    let m = map(before.binding.entry, owner)?;
-    let b = pool(before.binding.entry, before.binding.epoch, owner)?;
+    let m = map_in(before.binding.entry, owner,before.created.is_some())?;
+    let b = pool_for(m,before.binding.entry, before.binding.epoch, owner)?;
     check(b == before.binding, "selector phase G identity changed")?;
     let helpers = helper_snapshot_for(source)?;
     check(
@@ -498,14 +587,7 @@ pub(crate) unsafe fn publication_in(
         PublicationPhase::Reload => Some((descriptor, selected)),
         PublicationPhase::BankSwitch { .. } => None,
     };
-    let now = current_locked(
-        m,
-        b,
-        before.original_kind,
-        staged,
-        helpers,
-        source,
-    )?;
+    let now = current_locked_in(m,b,before.original_kind,staged,helpers,source,before.created)?;
     check(
         same_map(&now, before)
             && now.protected == before.protected
@@ -578,18 +660,16 @@ pub(crate) unsafe fn publication_in(
     // words: after a group exchange the shared R keeps the window's kinds (D-PTA1). `allowed` is the
     // gate writer's receipt on the configure-skip path (U5), otherwise `None`.
     check(
-        policy::outgoing_object_matches_with(
-            before_owner,
-            before.header,
-            [t.outfit, t.hat, t.colour, t.voice],
-            policy::OutgoingObject {
-                object: selected,
-                header: observed.header,
-                index: observed.o_index,
-                tokens: observed.o_tokens,
-            },
-            allowed,
-        ),
+        match before.created {
+            Some(destination)=>allowed==ExpectedMutation::None && destination.outgoing(before.header,
+                [t.outfit,t.hat,t.colour,t.voice],policy::OutgoingObject {
+                    object:selected,header:observed.header,index:observed.o_index,tokens:observed.o_tokens,
+                },observed.initialized,observed.outstanding),
+            None=>policy::outgoing_object_matches_with(before_owner,before.header,
+                [t.outfit,t.hat,t.colour,t.voice],policy::OutgoingObject {
+                    object:selected,header:observed.header,index:observed.o_index,tokens:observed.o_tokens,
+                },allowed),
+        },
         "outgoing O identity/header/mirrors changed",
     )?;
     // The canonical Reload selects a fresh O; a bank switch keeps the live,
@@ -616,9 +696,14 @@ pub(crate) unsafe fn publication_in(
     // The canonical phase keeps the fresh-O headgear proof (the `}.validate()?;`
     // write boundary the replay185 wiring test anchors on); the bank phase proves
     // the group's prefetched hat instead (`validate_bank`).
-    match phase {
-        PublicationPhase::Reload => { policy::HatPublication { ..hat }.validate()?; }
-        PublicationPhase::BankSwitch { group_hat } => { hat.validate_bank(group_hat)?; }
+    if let Some(destination)=before.created {
+        check(phase==PublicationPhase::Reload,"created destination has no bank publication authority")?;
+        destination.validate_hat(&hat)?;
+    } else {
+        match phase {
+            PublicationPhase::Reload => { policy::HatPublication { ..hat }.validate()?; }
+            PublicationPhase::BankSwitch { group_hat } => { hat.validate_bank(group_hat)?; }
+        }
     }
     let address = values::record_address(b, b).map_err(|_| "selected G bounds")?;
     Ok(PublicationGuard {
@@ -668,8 +753,8 @@ pub(crate) unsafe fn completed(
         original_index: _,
     } = target;
     let owner = before.binding.owner as usize;
-    let m = map(before.binding.entry, owner)?;
-    let b = pool(before.binding.entry, before.binding.epoch, owner)?;
+    let m = map_in(before.binding.entry, owner,before.created.is_some())?;
+    let b = pool_for(m,before.binding.entry, before.binding.epoch, owner)?;
     check(b == before.binding, "ready G identity changed")?;
     let helpers = helper_snapshot_for(source)?;
     check(helpers == before.helpers, "ready source provenance changed")?;
@@ -677,7 +762,7 @@ pub(crate) unsafe fn completed(
         super::BASE.load(std::sync::atomic::Ordering::Acquire),
         b.manager,
     );
-    let now = current_locked(m, b, before.original_kind, None, helpers, source)?;
+    let now = current_locked_in(m, b, before.original_kind, None, helpers, source,before.created)?;
     check(
         same_map(&now, before)
             && now.protected == before.protected

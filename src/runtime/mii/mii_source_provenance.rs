@@ -1,5 +1,5 @@
 //! Value projection of SourceBook ownership; never a second source lifetime book.
-use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken};
+use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken, PromotionToken, NativeIdentity};
 #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
 use crate::engine::swap::source_lifetime::{ReadyToken, SourceKey};
 use crate::engine::mii::ordinary_player::Owner;
@@ -47,6 +47,13 @@ impl MiiProof {
             && mirrors.validate(binding.record_index,self.configuration.tokens()).is_ok()
     }
 }
+/// Receipt committed only alongside the matching SourceBook ready token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CreatedReceipt {
+    pub source:SourceToken,
+    pub destination:crate::engine::mii::ordinary_cpu::CreatedDestination,
+    pub mii:MiiProof,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Helper {
     Unmanaged,
@@ -59,17 +66,64 @@ pub(crate) struct View {
     pub layout:crate::engine::mii::backend::Layout,
     pub epoch: Option<SceneEpoch>, pub slots: [Helper; 2],
     pub miis:[Option<MiiProof>;2],
+    /// Sealed resource identity projected atomically with the source reservation.
+    /// This is not native activation completion and grants no new helper lease.
+    pub promoted:[Option<(PromotionToken,NativeIdentity)>;2],
+    /// Training creation order 7/6/5, never native helper ordinals. SourceBook
+    /// projects these tokens; this value view owns no independent lifetime.
+    pub created_slots:[Helper;3],
+    pub created_miis:[Option<CreatedReceipt>;3],
 }
 impl View {
-    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2] };
+    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],promoted:[None;2],created_slots:[Helper::Unmanaged;3],created_miis:[None;3] };
     pub fn ordinal(self,id:usize)->Option<usize> {self.layout.helper(id)}
+    pub fn created_ordinal(self,id:usize)->Option<usize> {
+        (self.layout==crate::engine::mii::backend::Layout::Training)
+            .then(||crate::engine::mii::capacity::EXTRA_SLOTS.iter().position(|slot|*slot==id)).flatten()
+    }
+    pub fn source_at(self,id:usize)->Option<Helper> {
+        self.ordinal(id).map(|i|self.slots[i])
+            .or_else(||self.created_ordinal(id).map(|i|self.created_slots[i]))
+    }
+    /// Full source token equality includes generation, even at a reused FE.
+    pub fn loading(self,token:SourceToken)->bool {
+        Some(token.epoch())==self.epoch && self.source_at(token.slot())
+            ==Some(Helper::Unavailable {token,phase:Phase::Loading})
+    }
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    pub fn accepts_created(self,id:usize,now:Proof,
+        extras:crate::engine::mii::capacity::Extras,
+        facts:crate::engine::mii::capacity::ExtraFacts,parked:bool)->bool {
+        let Some(i)=self.created_ordinal(id) else{return false;};
+        let Helper::Ready {ready,key,proof}=self.created_slots[i] else{return false;};
+        let Some(CreatedReceipt {source,destination,mii})=self.created_miis[i] else{return false;};
+        let token=ready.source();
+        source==token && Some(token.epoch())==self.epoch && token.slot()==id
+            && token.entry().0==now.owner.entry as u64 && now==proof && parked && now.thread!=0
+            && key.kind==now.kind && key.costume==now.costume
+            && destination.registered_in(self.layout,extras,id,now.owner.entry)
+            && destination.completed_owner(now.owner,facts,now.kind)
+            && mii.configuration.canonical().class as u32==key.kind
+            && mii.binding.owner as usize==id && mii.binding.entry==now.owner.entry
+            && mii.binding.row==now.owner.row && mii.binding.record_index==destination.record()
+    }
+
+
+    /// Source STATE projects actual lifecycle changes through this one leaf
+    /// operation. Replacement/departure/destruction discard exact receipts.
+    pub fn project(&mut self,epoch:SceneEpoch,slot:usize,helper:Helper) {
+        self.epoch=Some(epoch);
+        if let Some(i)=self.ordinal(slot) {
+            self.slots[i]=helper;self.miis[i]=None;self.promoted[i]=None;
+        } else if let Some(i)=self.created_ordinal(slot) {
+            self.created_slots[i]=helper;self.created_miis[i]=None;
+        }
+    }
 
     pub fn available(self) -> Result<(), &'static str> { self.available_for(None) }
     pub fn available_for(self, own:Option<SourceToken>) -> Result<(), &'static str> {
         if let Some(token)=own {
-            let ordinal=self.ordinal(token.slot()).ok_or("helper backend differs")?;
-            if Some(token.epoch())!=self.epoch
-                || self.slots[ordinal]!= (Helper::Unavailable {token,phase:Phase::Loading}) {
+            if !self.loading(token) {
                 return Err("exact managed helper transaction absent");
             }
         }
@@ -84,7 +138,44 @@ impl View {
                 _ => {}
             }
         }
+        for (_i,helper) in self.created_slots.into_iter().enumerate() {
+            if matches!(helper,Helper::Unavailable {token,phase:Phase::Loading} if Some(token)==own) {continue;}
+            if matches!(helper,Helper::Unavailable {token,phase:Phase::Loading} if Some(token.epoch())==self.epoch) {
+                return Err(BUSY);
+            }
+            // Ordinary created sources have no Mii receipt and retain the
+            // existing Extras::admit checks. They cannot authorize a Mii.
+            #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+            if self.created_miis[_i].is_some() && !matches!(helper,Helper::Ready {ready,..}
+                if Some(ready.source().epoch())==self.epoch) {return Err(NO_AUTHORITY);}
+        }
         Ok(())
+    }
+
+    /// Existing consumers may retain a promoted lifetime, but only after the
+    /// native caller proves the complete active shape and supplies its identity.
+    /// Exact G payload/token checks remain in helper_kind, under native G.
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    pub fn accepts_promoted(self,id:usize,now:Proof,active:NativeIdentity)->bool {
+        let Some(ordinal)=self.ordinal(id) else{return false;};
+        let Some((promotion,expected))=self.promoted[ordinal] else{return false;};
+        let Helper::Ready {ready,..}=self.slots[ordinal] else{return false;};
+        promotion.source()==ready.source() && expected==active
+            && active.slot as usize==id && active.entry==now.owner.entry
+            && active.kind==now.kind && active.costume==now.costume
+            && active.descriptor==now.owner.information && active.resource==now.owner.object
+            && self.accepts(id,now,true)
+    }
+
+    /// Epoch authority only, after the caller proves parked or active native
+    /// shape. CPU1 owns the parked selection epoch; a promoted lifetime owns
+    /// its exact source and active identity independently of later CPU1 edits.
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    pub fn accepts_mii_epoch(self,id:usize,now:Proof,active:Option<NativeIdentity>,cpu_epoch:u64)->bool {
+        let Some(i)=self.ordinal(id) else {return false;};
+        let Some(mii)=self.miis[i] else {return false;};
+        self.accepts(id,now,true) && (mii.binding.epoch==cpu_epoch
+            || active.is_some_and(|identity|self.accepts_promoted(id,now,identity)))
     }
 
     pub fn accepts(self, id: usize, now: Proof,
@@ -118,7 +209,7 @@ impl View {
     }
 }
 
-#[cfg(feature = "mii-managed-source-coexist-alpha")]
+#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
 impl super::Registry {
     /// Source STATE is held by the caller; registry is the leaf lock.
     pub(crate) fn source(&mut self, epoch: SceneEpoch, slot: usize, helper: Helper) {
@@ -126,6 +217,7 @@ impl super::Registry {
         // A slot that is not a helper of the current backend (e.g. a Training created
         // entry 5/6/7) never selects another layout's helper ordinals.
         if self.helpers.ordinal(slot).is_none() && self.helpers.slots==[Helper::Unmanaged;2]
+            && self.helpers.created_slots==[Helper::Unmanaged;3]
             && backend.is_none_or(|l|l.helper(slot).is_some()) {
             use crate::engine::mii::backend::Layout;
             // Both waiting families share helpers 5/6; only the current scene names the family.
@@ -133,15 +225,11 @@ impl super::Registry {
             if let Some(layout)=current.or_else(||[Layout::Training,Layout::Ldn,Layout::Quickplay]
                 .iter().copied().find(|l|l.helper(slot).is_some())) {self.helpers.layout=layout;}
         }
-        self.helpers.epoch = Some(epoch);
-        if let Some(ordinal)=self.helpers.ordinal(slot) {
-            self.helpers.slots[ordinal] = helper;
-            self.helpers.miis[ordinal]=None;
-        }
+        self.helpers.project(epoch,slot,helper);
     }
 }
 
-#[cfg(feature = "mii-managed-source-coexist-alpha")]
+#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
 pub(crate) unsafe fn observe(entry: usize, slot: u32) -> Option<Proof> {
     use crate::runtime::mii::mii_native_access::*;
     use super::{control, map, pointer, span};
@@ -183,7 +271,7 @@ pub(crate) unsafe fn observe(entry: usize, slot: u32) -> Option<Proof> {
     Some(proof)
 }
 
-#[cfg(feature = "mii-managed-source-coexist-alpha")]
+#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
 pub(crate) unsafe fn original(entry: usize, slot: u32) -> Option<OriginalRow> {
     observe(entry, slot).filter(|p| crate::engine::mii::role_owner::original_row_matches(
         p.kind, p.original.kind))
@@ -246,7 +334,7 @@ mod tests {
             thread:0x8000,owner,kind:9,costume:0};
         let load=book.begin_install(5,book.epoch(),NativeEntry(owner.entry as u64),key).unwrap();
         let loading=View {layout:crate::engine::mii::backend::Layout::Ldn,epoch:Some(book.epoch()),
-            slots:[Helper::Unavailable {token:load.source(),phase:Phase::Loading},Helper::Unmanaged],miis:[None;2]};
+            slots:[Helper::Unavailable {token:load.source(),phase:Phase::Loading},Helper::Unmanaged],miis:[None;2],..View::EMPTY};
         assert_eq!(loading.available_for(Some(load.source())),Ok(()));
         assert!(View {layout:crate::engine::mii::backend::Layout::Training,..loading}.available_for(Some(load.source())).is_err());
         let ready=book.complete(load).unwrap();
@@ -329,7 +417,7 @@ mod tests {
         let stored = View { layout: Layout::Training, epoch: Some(book.epoch()),
             slots: [Helper::Ready { ready: ready2, key: key2, proof: proof2 },
                 Helper::Ready { ready: ready3, key: key3, proof: proof3 }],
-            miis: [Some(mii), None] };
+            miis: [Some(mii), None],..View::EMPTY };
         assert_eq!(stored.available(), Ok(()));
         assert!(stored.accepts(2, proof2, true) && stored.accepts(3, proof3, true));
 
@@ -426,11 +514,57 @@ mod mii_tests {
         assert!(!View {miis:[Some(MiiProof {binding:Binding {record_index:3,..b},..mii}),None],
             ..committed}.accepts(2,proof,true));
         let lease=book.acquire(ready,Holder {category:1,id:17}).unwrap();
+        let promotion=book.promote(ready).unwrap();
+        let identity=NativeIdentity {slot:2,entry:b.entry,kind:key.kind,costume:0,
+            body_id:23,bodies:[(0xa000,23),(0,0),(0,0)],descriptor:owner.information,resource:owner.object};
+        let retained=View {promoted:[Some((promotion,identity)),None],..committed};
+        assert_eq!(book.promoted_ready(promotion),Ok(ready));
+        assert_eq!(book.leased_ready(lease,Holder {category:1,id:17}),Some(ready));
+        assert!(retained.accepts_promoted(2,proof,identity));
+        // Exercise the same epoch predicate called by native helper_kind:
+        // CPU1 changes cannot revoke a retained CPU2, but cannot authorize a
+        // stale source or a parked helper from a previous selection either.
+        assert!(committed.accepts_mii_epoch(2,proof,None,b.epoch));
+        assert!(!committed.accepts_mii_epoch(2,proof,None,b.epoch+1));
+        assert!(!committed.accepts_mii_epoch(2,proof,Some(identity),b.epoch+1));
+        for cpu_epoch in [b.epoch+1,b.epoch+2,u64::MAX] {
+            assert!(retained.accepts_mii_epoch(2,proof,Some(identity),cpu_epoch));
+            assert!(!retained.accepts_mii_epoch(2,proof,None,cpu_epoch));
+            assert!(!retained.accepts_mii_epoch(2,proof,
+                Some(NativeIdentity {body_id:24,..identity}),cpu_epoch));
+            assert!(!View {epoch:None,..retained}.accepts_mii_epoch(2,proof,Some(identity),cpu_epoch));
+        }
+        assert!(!committed.accepts_promoted(2,proof,identity),"ready alone is not a reservation");
+        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {body_id:24,..identity}));
+        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {bodies:[(0xa000,24),(0,0),(0,0)],..identity}));
+        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {descriptor:0x3300,..identity}));
+        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {resource:0x4300,..identity}));
+        assert!(!View {miis:[None;2],..retained}.accepts_promoted(2,proof,identity));
+        let measured=crate::engine::swap::mii_cycle::compact_regressions::AllocationCount::start();
+        for _ in 0..128 {assert!(retained.accepts_promoted(2,proof,identity));}
+        assert_eq!(measured.finish(),0);
+        assert_eq!(book.readopt(promotion),Ok(ready));
+        assert!(book.promoted_ready(promotion).is_err());
+        let readopted=View {promoted:[None;2],..retained};
+        assert!(!readopted.accepts_promoted(2,proof,identity));
+        assert!(readopted.accepts(2,proof,true));
+        let next_promotion=book.promote(ready).unwrap();
+        assert_ne!(next_promotion,promotion);
+        assert!(book.promoted_ready(promotion).is_err());
+        assert_eq!(book.promoted_ready(next_promotion),Ok(ready));
+        book.readopt(next_promotion).unwrap();
         assert!(book.begin_install(2,book.epoch(),NativeEntry(b.entry as u64),key).is_err());
         assert!(book.release(lease));let next=book.begin_install(2,book.epoch(),NativeEntry(b.entry as u64),key).unwrap();
         assert_ne!(next,load);assert!(view.available_for(Some(next.source())).is_err());
+        let next_ready=book.complete(next).unwrap();
+        let stale_promotion=View {slots:[Helper::Ready {ready:next_ready,key,proof},Helper::Unmanaged],..retained};
+        assert!(!stale_promotion.accepts_mii_epoch(2,proof,Some(identity),b.epoch+1));
         assert!(book.complete(load).is_err());
         let departed=View {epoch:Some(book.depart_scene().unwrap()),..committed};
         assert!(!departed.accepts(2,proof,true));
     }
 }
+
+#[cfg(test)]
+#[path="created_source_provenance_tests.rs"]
+mod created_source_provenance_tests;

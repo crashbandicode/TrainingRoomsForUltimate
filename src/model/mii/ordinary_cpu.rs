@@ -566,6 +566,14 @@ pub fn assignment_in(layout:crate::engine::mii::backend::Layout,destination:usiz
 pub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,
     destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {
     if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}
+    protected_assignment(layout, extras, destination, owners)
+}
+
+/// Same record-protection walk for an independently qualified destination.
+/// Callers must establish either the native layout selector or CreatedDestination.
+fn protected_assignment(layout:crate::engine::mii::backend::Layout,
+    extras:crate::engine::mii::capacity::Extras, destination:usize,
+    owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {
     if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {
         return None;
     }
@@ -604,6 +612,161 @@ pub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::
         protected[used]=Some(0);
     }
     Some(protected)
+}
+
+/// Captured ordinary created-entry destination, separate from Layout::selector.
+/// Values only: this never grants native access or proves a loaded Mii. The
+/// adapter must retain its INSTALL/SourceBook ticket and recheck the full native
+/// map, G bounds, descriptor and protected record bytes before publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CreatedDestination {
+    owner: Owner,
+    extras: crate::engine::mii::capacity::Extras,
+    creation_selector: u32,
+    original_kind: u32,
+    record: u16,
+    protected: [Option<u16>; 8],
+}
+impl CreatedDestination {
+    pub fn capture(
+        layout: crate::engine::mii::backend::Layout,
+        extras: crate::engine::mii::capacity::Extras,
+        slot: usize,
+        owners: &[Option<Owner>; 8],
+        kinds: &[Option<u32>; 8],
+        facts: crate::engine::mii::capacity::ExtraFacts,
+        record_count: usize,
+    ) -> Option<Self> {
+        // F9's replacement destinations belong to native Training. Waiting
+        // retains its existing two-helper contract.
+        if layout != crate::engine::mii::backend::Layout::Training { return None; }
+        let owner = *owners.get(slot)?.as_ref()?;
+        extras.admit(slot, &owner, facts).ok()?;
+        if kinds[slot] != Some(facts.entry_kind) { return None; }
+        crate::engine::mii::role_owner::claims_in_with(layout, extras, owners, kinds)?;
+        let protected = protected_assignment(layout, extras, slot, owners)?;
+        if slot >= record_count || protected.iter().flatten().any(|i| usize::from(*i) >= record_count) {
+            return None;
+        }
+        Some(Self { owner, extras, creation_selector:facts.descriptor_selector,
+            original_kind:facts.entry_kind, record: slot as u16, protected })
+    }
+    pub fn owner(self) -> Owner { self.owner }
+    pub fn record(self) -> u16 { self.record }
+    pub fn protected(self) -> [Option<u16>; 8] { self.protected }
+
+
+    /// Revalidate the exact creation registration, never just a physical slot.
+    pub fn registered_in(self, layout:crate::engine::mii::backend::Layout,
+        extras:crate::engine::mii::capacity::Extras, slot:usize, entry:usize)->bool {
+        layout==crate::engine::mii::backend::Layout::Training && self.extras.same_registration(extras,slot)
+            && slot==usize::from(self.record) && entry==self.owner.entry
+            && extras.entry(slot)==Some(entry)
+    }
+
+    /// Rewalk every current/selector claim in each phase. The caller retains
+    /// the protected bytes, not merely these indices, through publication.
+    pub fn protected_now(self, layout:crate::engine::mii::backend::Layout,
+        extras:crate::engine::mii::capacity::Extras,
+        owners:&[Option<Owner>;8], kinds:&[Option<u32>;8])->Option<[Option<u16>;8]> {
+        let slot=usize::from(self.record);
+        if !self.registered_in(layout,extras,slot,owners[slot]?.entry) {return None;}
+        crate::engine::mii::role_owner::claims_in_with(layout,extras,owners,kinds)?;
+        // The adapter captures these current indices and bytes in Snapshot.
+        // Publication/completion compare the complete Snapshot protected union;
+        // a later independent creation must not invalidate a ready receipt.
+        protected_assignment(layout,extras,slot,owners)
+    }
+
+    /// Rebase only a previously captured destination after its complete native
+    /// owner phase matches. The adapter must first verify the current exact
+    /// SourceBook receipt, G payload and native readiness; raw capture remains
+    /// ordinary-only and cannot use this as an unregistered Mii origin.
+    pub fn reuse_completed(self,now:Owner,facts:crate::engine::mii::capacity::ExtraFacts,
+        kind:u32)->Option<Self> {
+        self.completed_owner(now,facts,kind).then_some(Self {owner:now,original_kind:kind,..self})
+    }
+
+    /// Separate from the layout helper admission. A created destination has
+    /// already proved its physical row and native creation roots.
+    pub fn headgear_reload(self,before:u16,target:u16)->Result<bool,&'static str> {
+        if target==u16::MAX {return Err("invalid created headgear row");}
+        Ok(before!=target)
+    }
+
+    /// Fresh created publication retains the captured outgoing O and has no
+    /// configure-skip or bank mutation exception.
+    pub fn outgoing(self,header:[u32;5],tokens:[u16;4],now:OutgoingObject,
+        initialized:bool,outstanding:Option<u32>)->bool {
+        use crate::engine::mii::identity::{Identity,ExpectedMutation,verify};
+        let captured=Identity {object:self.owner.object,header,index:self.owner.index,
+            tokens:tokens.map(u32::from),..Identity::ZERO};
+        let observed=Identity {object:now.object,header:now.header,index:now.index,
+            tokens:now.tokens,..Identity::ZERO};
+        !initialized && outstanding==Some(0) && header[0]==u32::from(self.record)
+            && verify(&captured,&observed,ExpectedMutation::None).is_ok()
+    }
+
+    /// Created sources always carry an exact payload through a fresh native O.
+    /// No bank/retained path or origin restore is authorized by this capability.
+    pub fn validate_hat(self,hat:&HatPublication<'_>)->Result<(),&'static str> {
+        let c=hat.payload.ok_or("created publication requires exact payload")?;
+        let index=u16::from_le_bytes(hat.descriptor[0x46..0x48].try_into().unwrap());
+        let changed=self.headgear_reload(hat.before,hat.target)?;
+        if hat.layout!=crate::engine::mii::backend::Layout::Training
+            || hat.owner!=u32::from(self.record) || !hat.source || hat.initialized
+            || hat.destination_index!=self.record || index!=self.record
+            || hat.original_index!=self.owner.index || hat.opt_in!=changed
+            || (changed && !hat.fingerprints)
+            || c.tokens().hat!=hat.target
+            || u16::from_le_bytes(hat.descriptor[0x4a..0x4c].try_into().unwrap())!=hat.target
+            || u32::from_le_bytes(hat.descriptor[0x18..0x1c].try_into().unwrap())!=c.canonical().class as u32
+            || u32::from_le_bytes(hat.descriptor[4..8].try_into().unwrap())!=self.creation_selector {
+            return Err("unqualified created headgear publication");
+        }
+        Ok(())
+    }
+
+    /// Same saved payload encoding as the native selector adapter, but only
+    /// this captured destination chooses the G record. Creation word1 and
+    /// unrelated descriptor bytes remain the captured values.
+    pub fn staged(self, original: [u8; 0x70], target: Configuration) -> [u8; 0x70] {
+        let mut descriptor = crate::engine::mii::ordinary_player::staged_descriptor(original, Some(target));
+        descriptor[0x46..0x48].copy_from_slice(&self.record.to_le_bytes());
+        descriptor
+    }
+
+    pub fn publication_indices(self, target_index:u16, e:u16, fe:u16, d:u16) -> bool {
+        target_index == self.record && e == self.owner.index && d == self.owner.index && fe == self.record
+    }
+
+    fn same_roots(self, now:Owner, facts:crate::engine::mii::capacity::ExtraFacts) -> bool {
+        Owner { index:self.owner.index, ..now } == self.owner
+            && facts.entry_owner == u32::from(self.record) && facts.row_owner == u32::from(self.record)
+            && facts.descriptor_selector == self.creation_selector
+            && self.extras.owned_roots(usize::from(self.record),facts.resource,facts.alias_root,facts.selection).is_ok()
+    }
+
+    /// FE has the exact staged descriptor, while E/D/O still hold the outgoing
+    /// values. The adapter must separately prove loader6, exact descriptor,
+    /// uninitialized O, no outstanding task, and its executing source ticket.
+    pub fn staged_owner(self, now:Owner, facts:crate::engine::mii::capacity::ExtraFacts, kind:u32) -> bool {
+        self.same_roots(now,facts) && supported_kind(kind)
+            && now.index == self.owner.index
+            && facts.entry_index == self.record
+            && facts.information_index == self.owner.index && facts.object_index == self.owner.index
+            && facts.entry_kind == kind && facts.object_kind == self.original_kind
+    }
+
+    /// Published mirrors only, never load-completion or exact-payload proof.
+    /// Completion additionally checks G CharInfo/resource bytes, all tokens,
+    /// descriptor/body readiness, and unchanged protected records under G.
+    pub fn completed_owner(self, now:Owner, facts:crate::engine::mii::capacity::ExtraFacts, kind:u32) -> bool {
+        self.same_roots(now,facts) && supported_kind(kind)
+            && now.index == self.record && facts.entry_index == self.record
+            && facts.information_index == self.record && facts.object_index == self.record
+            && facts.entry_kind == kind && facts.object_kind == kind
+    }
 }
 
 pub fn staged_descriptor(original: [u8; 0x70], target: Option<Configuration>) -> [u8; 0x70] {
@@ -1180,6 +1343,78 @@ mod tests {
     }
 
     #[test]
+    fn created_destination_requires_registered_roots_and_preserves_every_other_record() {
+        use crate::engine::mii::{backend::Layout, capacity::{Extras, Roots, ExtraFacts}};
+        let mut owners = rows();
+        let extra = Owner { entry:0x1700, row:0x2700, information:0x3700,
+            object:0x4700, index:0, selector:7, alias:0 };
+        owners[7] = Some(extra);
+        let mut kinds = [None;8];
+        for slot in [0,1,2,3,7] { kinds[slot]=Some(9); }
+        // C98b creation retains descriptor word1=0 while E.selector=7.
+        let roots = Roots { entry:extra.entry, resource:0x7000, alias:extra.object,
+            selection:2, descriptor_selector:0 };
+        let extras = Extras::registered([Some(roots),None,None]).unwrap();
+        let facts = ExtraFacts { entry_owner:7, row_owner:7, descriptor_selector:0,
+            entry_index:0, information_index:0, object_index:0,
+            entry_kind:9, object_kind:9, resource:0x7000,
+            alias_root:extra.object, selection:2 };
+        let capture = |extras, owners:&[Option<Owner>;8], kinds:&[Option<u32>;8], facts, count|
+            CreatedDestination::capture(Layout::Training,extras,7,owners,kinds,facts,count);
+        let accepted = capture(extras,&owners,&kinds,facts,8).unwrap();
+        assert_eq!(accepted.owner(),extra);
+        assert_eq!(accepted.record(),7);
+        use crate::engine::mii::{inventory::MiiClass,lifetime::Tokens,native_values::RowIds};
+        let exact=Configuration::from_observed(MiiClass::Swordfighter,
+            Tokens {outfit:0,hat:0,colour:4,voice:37,specials:[1,0,0,0]},[0;88],
+            RowIds {outfit:0x1300001bfef7a5f7,hat:0x5a00000fa9efa5ea}).unwrap();
+        let mut original=[0u8;0x70]; original[0x37]=50;
+        let descriptor=accepted.staged(original,exact);
+        assert_eq!(&descriptor[4..8],&original[4..8],"preserve creation word1, not selector7");
+        assert_eq!(descriptor[0x37],50);
+        assert_eq!(u16::from_le_bytes(descriptor[0x46..0x48].try_into().unwrap()),7);
+        assert_eq!(u32::from_le_bytes(descriptor[0x18..0x1c].try_into().unwrap()),0x49);
+        let staged=ExtraFacts {entry_kind:0x49,entry_index:7,..facts};
+        assert!(accepted.staged_owner(extra,staged,0x49));
+        assert!(!accepted.staged_owner(extra,ExtraFacts {object_kind:0x49,..staged},0x49));
+        assert!(!accepted.staged_owner(extra,ExtraFacts {information_index:7,..staged},0x49));
+        let published=ExtraFacts {entry_kind:0x49,object_kind:0x49,
+            entry_index:7,information_index:7,object_index:7,..facts};
+        let live=Owner {index:7,..extra};
+        assert!(accepted.completed_owner(live,published,0x49));
+        assert!(!accepted.completed_owner(extra,published,0x49));
+        assert!(!accepted.completed_owner(live,ExtraFacts {alias_root:0x4800,..published},0x49));
+        assert!(!accepted.completed_owner(live,ExtraFacts {descriptor_selector:7,..published},0x49));
+        assert!(!accepted.completed_owner(live,published,0x48));
+        assert!(accepted.publication_indices(7,0,7,0));
+        assert!(!accepted.publication_indices(1,0,1,0));
+        assert!(!accepted.publication_indices(7,7,7,0));
+        assert!(!accepted.publication_indices(7,0,7,7));
+        assert_eq!(accepted.protected(),[Some(0),Some(1),Some(2),Some(3),None,None,None,None]);
+        // Existing selector API cannot acquire the new destination implicitly.
+        assert!(assignment_with(Layout::Training,extras,7,&owners).is_none());
+        assert!(capture(Extras::new([extra.entry,0,0]).unwrap(),&owners,&kinds,facts,8).is_none());
+        assert!(capture(extras,&owners,&kinds,ExtraFacts {descriptor_selector:7,..facts},8).is_none());
+        assert!(capture(extras,&owners,&kinds,ExtraFacts {resource:0x7008,..facts},8).is_none());
+        assert!(capture(extras,&owners,&kinds,ExtraFacts {information_index:7,..facts},8).is_none());
+        assert!(capture(extras,&owners,&kinds,facts,7).is_none());
+        for slot in 0..4 {
+            let mut changed=owners;
+            changed[slot].as_mut().unwrap().index=7;
+            assert!(capture(extras,&changed,&kinds,facts,8).is_none(),"current G7 claim must survive");
+            changed=owners; changed[slot].as_mut().unwrap().selector=7;
+            assert!(capture(extras,&changed,&kinds,facts,8).is_none(),"selector claim must survive");
+        }
+        let mut replaced=owners;replaced[7].as_mut().unwrap().entry+=8;
+        assert!(capture(extras,&replaced,&kinds,facts,8).is_none());
+        let mut aliased=owners;aliased[7].as_mut().unwrap().alias=1;
+        assert!(capture(extras,&aliased,&kinds,facts,8).is_none());
+        kinds[7]=Some(0x48);
+        assert!(capture(extras,&owners,&kinds,ExtraFacts {entry_kind:0x48,object_kind:0x48,..facts},8).is_none(),
+            "an existing Mii needs its committed lifetime proof, not ordinary recapture");
+    }
+
+    #[test]
     fn outgoing_object_uses_old_header_before_native_publication() {
         // Retained combined06 #36/#38/#39: outgoing Luigi, FE already Gunner,
         // O still [owner1, Luigi, -1, -1, 1], index0 and zero tokens. Addresses normalized.
@@ -1608,3 +1843,7 @@ mod recapture_diagnostic_tests {
         assert!(!recapture_observation_seen(seen, 9, changed, flags(true)));
     }
 }
+
+#[cfg(test)]
+#[path="created_destination_tests.rs"]
+mod created_destination_tests;

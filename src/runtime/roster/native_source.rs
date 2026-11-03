@@ -6,14 +6,7 @@ use std::sync::atomic::Ordering;
 use smash::app::{self, lua_bind::*};
 use {crate::engine::swap::character_forms::typed_record_kind, crate::engine::swap::trio::TrioFighter};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadySource {
-    pub slot: u32,
-    pub entry: usize,
-    pub kind: u32,
-    pub costume: u32,
-    pub body_id: u32,
-}
+pub use crate::engine::swap::source_lifetime::NativeIdentity as ReadySource;
 
 /// Reacquire the actual native entry. Returned accessors must be consumed in the
 /// current native callback, never saved and dereferenced by a later request.
@@ -107,6 +100,20 @@ pub(super) fn ordinary_kind(kind: u32) -> bool {
     !(0x48..=0x4a).contains(&kind) && TrioFighter::from_kind(kind).is_some() && forms.count == 1 && forms.actor_count == 1
 }
 
+/// Capability-scoped created Mii readiness. This does not replace the caller's
+/// current map/registered-roots/G payload validation. Raw reads only, including
+/// the same descriptor/body/loader checks as native helpers; safe with G held.
+#[cfg(feature="mii-managed-helper-alpha")]
+pub unsafe fn parked_created_ready(current:*const u8,slot:u32,kind:u32,
+    destination:crate::engine::mii::ordinary_cpu::CreatedDestination)->bool {
+    destination.record()==slot as u16 && slot<8
+        && destination.owner().entry==current as usize
+        && (0x48..=0x4a).contains(&kind) && aligned(current)
+        && read::<u32>(current,0xe0)==slot
+        && crate::runtime::mii::mii_native_access::cpu::helper_ready_for_kind(
+            BASE.load(Ordering::Acquire),current as usize,slot,kind)
+}
+
 /// Completion of a non-activating native install, including every form in the
 /// canonical group. Grouped parked installs still require runtime qualification.
 pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
@@ -141,6 +148,54 @@ pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
     true
 }
 
+/// Revalidate the exact parked native lifetime of an already completed source.
+/// No archive query, game call, or lock. This is NOT a load-completion proof:
+/// the caller must match a receipt sealed after full readiness/publication.
+pub(super) unsafe fn parked_identity(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
+    if !parked_ready(current, slot, kind) { return None; }
+    let owner = resource_owner(slot)?;
+    if read::<u32>(owner, 0x58) != kind { return None; }
+    Some(identity(current, slot, kind, owner))
+}
+
+/// Full canonical active-body shape, read only. A caller must still match the
+/// sealed completed lifetime and exact source reservation; phase6 alone is not
+/// promotion authority. No bank lookup, archive query, game call or Rust lock.
+pub(super) unsafe fn active_identity(current:*const u8,slot:u32,kind:u32)->Option<ReadySource> {
+    if !aligned(current) || read::<u32>(current,0xe0)!=slot {return None;}
+    let state=super::EntryState {
+        count:read(current,0x14), kinds:[read(current,0x18),read(current,0x1c),read(current,0x20)],
+        actor_count:read(current,0x28), installed:read(current,0x4150),
+        index:read(current,0x5918), previous_or_next:read(current,0x5919), pending:read(current,0x591a),
+        flags:read(current,0x591f), outer:read(current,0x5920), loader:read(current,0x591c),
+        changing:read(current,0x5934), guard:read(current,0x5935),
+    };
+    let (forms,_)=state.ready()?;
+    if forms!=Forms::starting(kind) {return None;}
+    for i in 0..forms.count as usize {
+        let body=read::<*const u8>(current,0x4160+i*8);
+        if !aligned(body) || read::<usize>(body,0)!=BASE.load(Ordering::Acquire)+0x4f80210
+            || read::<u32>(body,0xc)!=forms.kinds[i] || read::<u64>(body,0x10)!=u64::from(slot)
+            || read::<u8>(body,0x3a)!=forms.body_state(i,state.index)
+            || !aligned(read::<*const u8>(body,0x20)) {return None;}
+    }
+    let owner=resource_owner(slot)?;
+    if read::<u32>(owner,0x58)!=kind {return None;}
+    Some(identity(current,slot,kind,owner))
+}
+
+unsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {
+    let forms = Forms::starting(kind);
+    let body = read::<*const u8>(current, 0x4160);
+    ReadySource { slot, entry: current as usize, kind,
+        costume: read(owner, 0x64), body_id: read(body, 8),
+        bodies: std::array::from_fn(|i| {
+            if i >= forms.count as usize { return (0, 0); }
+            let body = read::<*const u8>(current, 0x4160 + i * 8);
+            (body as usize, read(body, 8))
+        }), descriptor: read(current, 0xf8), resource: owner as usize }
+}
+
 unsafe fn typed_ready(requested: u32, kind: u32) -> bool {
     let Some(record_kind) = typed_record_kind(requested, kind) else { return false; };
     let registry = std::ptr::read_volatile(
@@ -156,6 +211,27 @@ unsafe fn typed_ready(requested: u32, kind: u32) -> bool {
 /// Optional copy files may all be absent; native copy_setup permits that case.
 pub unsafe fn ready(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
     if !parked_ready(current, slot, kind) { return None; }
+    resources_ready(current, slot, kind)
+}
+
+/// Full resource completion for a real Reload of an already-owned visible
+/// fixed seat. The caller separately owns the current source/load generation.
+pub(super) unsafe fn ready_active(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
+    active_identity(current, slot, kind)?;
+    resources_ready(current, slot, kind)
+}
+
+/// Full created-Mii completion, including the same archive/parameter/copy-file
+/// checks as ordinary sources. Unlike parked_created_ready this calls native
+/// resource functions and must never run while native G or source STATE is held.
+#[cfg(feature="mii-managed-helper-alpha")]
+pub unsafe fn ready_created(current: *const u8, slot: u32, kind: u32,
+    destination: crate::engine::mii::ordinary_cpu::CreatedDestination) -> Option<ReadySource> {
+    if !parked_created_ready(current, slot, kind, destination) { return None; }
+    resources_ready(current, slot, kind)
+}
+
+unsafe fn resources_ready(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
     let owner = resource_owner(slot)?;
     let base = BASE.load(Ordering::Acquire);
     let archive_ready: unsafe extern "C" fn(*mut u8) -> bool =
@@ -173,14 +249,20 @@ pub unsafe fn ready(current: *const u8, slot: u32, kind: u32) -> Option<ReadySou
         lookup(&mut file, owner, kind, file_kind);
         if file != 0xffffff && directory(file) == 0xffffff { return None; }
     }
-    let body = read::<*const u8>(current, 0x4160);
-    Some(ReadySource { slot, entry: current as usize, kind,
-        costume: read(owner, 0x64), body_id: read(body, 8) })
+    Some(identity(current, slot, kind, owner))
 }
 
 /// Invoke only from this entry's native loader callback, after the caller has
 /// acquired the shared install gate and proven this source is not leased.
 pub unsafe fn install(current: *mut u8, kind: u32) {
+    install_with(current, kind, native_fighter_install::Flags::Parked);
+}
+
+pub(super) unsafe fn reload(current: *mut u8, kind: u32) {
+    install_with(current, kind, native_fighter_install::Flags::Reload);
+}
+
+unsafe fn install_with(current: *mut u8, kind: u32, flags: native_fighter_install::Flags) {
     let forms = Forms::starting(kind);
     let mut descriptor = native_fighter_install::Descriptor::copy_from(current);
     descriptor.request_group(native_fighter_install::Group {
@@ -192,6 +274,6 @@ pub unsafe fn install(current: *mut u8, kind: u32) {
         BASE.load(Ordering::Acquire),
         current,
         &descriptor,
-        native_fighter_install::Flags::Parked,
+        flags,
     );
 }

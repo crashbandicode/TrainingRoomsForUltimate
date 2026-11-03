@@ -24,10 +24,14 @@ static COMMITTED: hos_lock::Mutex<Registry> = hos_lock::Mutex::new(Registry {
     visible: [None;8], helpers: helpers::View::EMPTY,
 });
 pub(crate) fn registry()->hos_lock::MutexGuard<'static,Registry> { COMMITTED.lock() }
+/// Count reconciliation cannot wait on the registry leaf lock.
+#[cfg(feature="mii-managed-source-coexist-alpha")]
+pub(crate) fn try_registry()->Option<hos_lock::MutexGuard<'static,Registry>> { COMMITTED.try_lock() }
+
 pub(crate) fn helper_snapshot()->Result<helpers::View,&'static str> {
     let layout=super::super::mii_backend::current().ok_or("Mii backend unavailable")?;
     let mut r=registry();
-    if r.helpers.slots==[helpers::Helper::Unmanaged;2] {r.helpers.layout=layout;}
+    if r.helpers.slots==[helpers::Helper::Unmanaged;2] && r.helpers.created_slots==[helpers::Helper::Unmanaged;3] {r.helpers.layout=layout;}
     let view=r.helpers;check(view.layout==layout,"old helper backend retained")?;view.available()?;Ok(view)
 }
 pub(crate) fn helper_snapshot_for(source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<helpers::View,&'static str> {
@@ -133,10 +137,24 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
-    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {return false;}
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    let active=view.promoted[ordinal].and_then(|_|super::super::native_source::active_identity(owner.entry as *const u8,id as u32,kind));
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    let retained=active.is_some_and(|identity|view.accepts_promoted(id,now,identity));
+    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
+    let retained=false;
+    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) && !retained {return false;}
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
-        if b.epoch!=super::super::mii_saved_alpha::current_generation(1)
+        // A promoted source keeps its own sealed SourceToken/SceneEpoch and
+        // exact payload. A later CPU1 selection must not revoke that lifetime.
+        // `retained` above requires the full promotion and active native identity;
+        // ordinary parked helpers still use their existing CPU1 epoch authority.
+        #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+        let epoch_matches=view.accepts_mii_epoch(id,now,active,super::super::mii_saved_alpha::current_generation(1));
+        #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
+        let epoch_matches=b.epoch==super::super::mii_saved_alpha::current_generation(1);
+        if !epoch_matches
             || rd::<usize>(super::base(),POOL_HOLDER)!=b.holder
             || !span(b.holder,8,false) || rd::<usize>(b.holder,0)!=b.manager
             || !span(b.manager,0x24e0,false) || rd::<usize>(b.manager,0x24d0)!=b.vector_begin
@@ -145,6 +163,36 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
         if !span(at,values::RECORD_LEN,false) || !mii.matches(b,&rd(owner.entry,0),&rd(at,0),mirrors(owner)) {return false;}
     }
     true
+}
+
+/// Created Miis require their separate committed SourceBook receipt. Ordinary
+/// extras continue through the original strict admission; no generic widening.
+/// G is held; this consumes only the captured View and raw native reads.
+pub(crate) unsafe fn created_kind(view:helpers::View,extras:crate::engine::mii::capacity::Extras,
+    id:usize,owner:Owner,kind:u32,facts:crate::engine::mii::capacity::ExtraFacts)
+    ->Result<(),&'static str> {
+    if MiiClass::from_kind(kind).is_none() {return extras.admit(id,&owner,facts);}
+    #[cfg(not(feature="mii-managed-helper-alpha"))]
+    {let _=view;extras.admit(id,&owner,facts)}
+    #[cfg(feature="mii-managed-helper-alpha")]
+    {
+    let ordinal=view.created_ordinal(id).ok_or("created Mii backend differs")?;
+    let receipt=view.created_miis[ordinal].ok_or("created Mii receipt absent")?;
+    let now=helpers::Proof {original:helpers::OriginalRow {row:owner.row,
+        kind:rd(owner.row,8),index:owner.index,selector:owner.selector,control:control(owner.row)},
+        thread:skyline::nn::os::GetCurrentThread() as usize,owner,kind,costume:rd(owner.object,0x64)};
+    let parked=super::super::native_source::parked_created_ready(owner.entry as *const u8,
+        id as u32,kind,receipt.destination);
+    check(view.accepts_created(id,now,extras,facts,parked),"created Mii source/roots/readiness changed")?;
+    let b=receipt.mii.binding;
+    check(rd::<usize>(super::base(),POOL_HOLDER)==b.holder
+        && span(b.holder,8,false) && rd::<usize>(b.holder,0)==b.manager
+        && span(b.manager,0x24e0,false) && rd::<usize>(b.manager,0x24d0)==b.vector_begin
+        && rd::<usize>(b.manager,0x24d8)==b.vector_end,"created Mii G identity changed")?;
+    let at=values::record_address(b,b).map_err(|_|"created Mii record bounds")?;
+    check(span(at,values::RECORD_LEN,false)
+        && receipt.mii.matches(b,&rd(owner.entry,0),&rd(at,0),mirrors(owner)),"created Mii exact payload changed")
+    }
 }
 
 #[repr(C)]
@@ -350,7 +398,7 @@ unsafe fn current_locked(base:usize, m:Map, locked:Binding,
                 // Shared exact admission (roots, owners, object, creation descriptor
                 // word, indices, kinds, ordinary-only claim facts); raw reads under G.
                 // Never a helper ordinal or Mii owner; names the failed predicate.
-                m.extras.admit(id,&owner,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;
+                created_kind(helpers,m.extras,id,owner,kind,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;
             } else if m.layout.logical(id as u32).is_some() {
                 let current=authority(b,skyline::nn::os::GetCurrentThread() as usize,
                     [m.symbol,m.manager,m.internal],m.entries,id as u32,owner);

@@ -283,6 +283,9 @@ fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, s
 }
 
 pub(crate) fn request(role: usize, hat: bool, target: Target) {
+    if role == 1 && !hat {
+        crate::runtime::roster::character_roster::sources::invalidate_cpu_seats();
+    }
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !settings.measurements {
         return;
@@ -324,6 +327,7 @@ fn close_requests(outcome: crate::engine::preload::preload_metrics::Outcome) {
 }
 
 pub(crate) fn completed(role: usize, hat: bool, kind: u32) {
+    if role == 1 && !hat { POLL.store(0, Ordering::Relaxed); }
     let stamp = {
         let mut requests = REQUESTS.lock();
         let slot = &mut requests[role + usize::from(hat) * 2];
@@ -426,19 +430,24 @@ pub(crate) fn mixed_targets(
     targets
 }
 
-/// Called once on the visible Player's frame. Disabled costs one settings read;
-/// enabled planning is bounded to once per second, not per loader/body callback.
+/// Called once on the visible Player's frame. Planning is bounded to once per
+/// second, with an immediate refresh after a completed CPU rotation. Fixed
+/// CPU-seat intent remains live when speculative caching is disabled.
 pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
-    if settings.slots == 0 && !settings.measurements {
-        return;
-    }
     if crate::runtime::lobby::training::practice::role(body) != Some(0)
         || !crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)
             .is_some_and(|current| std::ptr::eq(current, body))
     {
         return;
     }
+    // Count changes happen in the native pause menu too. Fixed intent cannot
+    // depend on the speculative once-per-second/menu-closed polling gate.
+    let fixed = {
+        let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
+        crate::runtime::roster::character_roster::fixed_cpu_seats(&menu)
+    };
+    crate::runtime::roster::character_roster::sources::set_cpu_seats(fixed);
     let frame = FRAME.fetch_add(1, Ordering::Relaxed);
     if settings.measurements && REQUESTS.lock().iter().any(Option::is_some) {
         let busy = crate::runtime::roster::character_roster::sources::metrics().busy;
@@ -452,6 +461,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     if !crate::runtime::compat::common::is_ready_go() || crate::runtime::compat::common::menu::captures_input() {
         return;
     }
+    if settings.slots == 0 && !settings.measurements { return; }
     // The UI gates defer every load and are visible operations. `preload_blocked` also holds
     // speculation behind the preloader's own helper and hat loads, which never pause the notice.
     let ui_blocked = crate::runtime::lobby::training::lobby::native_ui_busy()
@@ -501,6 +511,9 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     }
     let epoch = crate::runtime::roster::character_roster::sources::preload_epoch();
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
+    // Keep physical seat identity before fighter_cache, bank filtering and the
+    // hat-priority merge. Exact Mii payload and PT/Pyra member order matter.
+    let cpu_rotation = crate::runtime::roster::character_roster::preload_targets(&menu, 1);
     let mut lanes = [[None; MAX_TARGETS]; 4];
     if settings.hats {
         lanes[0] = crate::runtime::roster::kirby_hats::preload_targets(&menu, 0);
@@ -509,8 +522,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     if settings.fighters {
         lanes[2] = crate::runtime::roster::character_roster::preload_targets(&menu, 0)
             .map(|t| t.map(Target::fighter_cache));
-        lanes[3] = crate::runtime::roster::character_roster::preload_targets(&menu, 1)
-            .map(|t| t.map(Target::fighter_cache));
+        lanes[3] = cpu_rotation.map(|t| t.map(Target::fighter_cache));
     }
     #[cfg(feature = "native-body-bank-alpha")]
     {

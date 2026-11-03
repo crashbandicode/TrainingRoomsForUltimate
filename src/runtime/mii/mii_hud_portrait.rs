@@ -1855,8 +1855,8 @@ unsafe fn helper_release_proof(job: &Job) -> Result<(), &'static str> {
     if entry as usize != job.helper_entry || read::<usize>(internal, 0x20 + job.helper as usize * 8) != job.helper_entry {
         return Err("helper entry identity changed");
     }
-    if !native_source::parked_ready(entry, job.helper, job.kind) {
-        return Err("helper not parked after render");
+    if !sources::portrait_native_ready(entry,lease,job.holder) {
+        return Err("helper retained native lifetime changed after render");
     }
     let ready = sources::portrait_ready(lease, job.holder).ok_or("helper source not ready after render")?;
     mii_managed_helper::ready_checked(ready, c)?;
