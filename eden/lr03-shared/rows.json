@@ -1,0 +1,1731 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "training",
+  "scope": "RC8 runnable navigation and native-pause subset. Runner PASS is execution evidence, not full RC acceptance. Retained lr02 image references are shape aids; actual lr03 checkpoints require review.",
+  "segments": {
+    "css-cpu-near-pick-frames": {
+      "file": "segments/css-cpu-near-pick-frames.edenmacro.json",
+      "start_gate": "ready",
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 4,
+          "gap_frames": 6
+        },
+        {
+          "buttons": "lstick,right",
+          "frames": 4,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 20,
+      "start": "190942 screenshot: free hand over Lucas CPU coin after recorded frame route near endpoint",
+      "end": "CPU held Sonic40 subject to exact fresh token gate",
+      "sha256": "fbefc248b19a61dc9505f945f0e3c500bfb900cb5503325dd2245933ba5f4c5b",
+      "recorded": "2026-11-03T19:10:48Z"
+    },
+    "css-return-cpu-pick-frames": {
+      "file": "segments/css-return-cpu-pick-frames.edenmacro.json",
+      "start_gate": "ready",
+      "recipe": [
+        {
+          "stick": [
+            -1,
+            0
+          ],
+          "frames": 23,
+          "gap_frames": 6
+        },
+        {
+          "stick": [
+            0,
+            1
+          ],
+          "frames": 32,
+          "gap_frames": 6
+        },
+        {
+          "buttons": "a",
+          "frames": 4,
+          "gap_frames": 6
+        },
+        {
+          "buttons": "lstick,right",
+          "frames": 4,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 30,
+      "start": "CSS return after native Training quit; Steve/Lucas selected, free P1 hand over P1 card",
+      "end": "CPU token held at Sonic40 if fresh exact p2 gate passes",
+      "sha256": "542660d5969645d356fd1c66c3f0c10844a7e34dd2084707b8628d4e8e057a59",
+      "recorded": "2026-11-03T19:09:08Z"
+    },
+    "cpu40-lucas-pick-frames": {
+      "file": "segments/cpu40-lucas-pick-frames.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "lstick,left",
+          "frames": 4,
+          "gap_frames": 6
+        },
+        {
+          "buttons": "a",
+          "frames": 4,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 20
+    },
+    "focus-native-quit-frames": {
+      "file": "segments/focus-native-quit-frames.edenmacro.json",
+      "start_gate": "native-pause",
+      "recipe": [
+        {
+          "buttons": "up",
+          "frames": 4,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 20,
+      "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46",
+      "recorded": "2026-11-03T19:07:21Z"
+    },
+    "confirm-native-quit-frames": {
+      "file": "segments/confirm-native-quit-frames.edenmacro.json",
+      "start_gate": "quit-focus",
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 4,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 20,
+      "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b",
+      "recorded": "2026-11-03T19:07:21Z"
+    },
+    "p1-next-frames": {
+      "file": "segments/p1-next-frames.edenmacro.json",
+      "start_gate": "training-hud-unpaused",
+      "recipe": [
+        {
+          "buttons": "zl,right",
+          "frames": 12,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 30,
+      "sha256": "d56e381eebfc979cfc4380a80f24af11c057990f306c4ad66b23c6e6641d6df4",
+      "recorded": "2026-11-03T19:00:05Z"
+    },
+    "cpu-next-frames": {
+      "file": "segments/cpu-next-frames.edenmacro.json",
+      "start_gate": "training-hud-unpaused",
+      "recipe": [
+        {
+          "buttons": "zl,left",
+          "frames": 12,
+          "gap_frames": 6
+        }
+      ],
+      "cap": 30,
+      "sha256": "771d9c618735334c245cbe3ea86f6753f73744aaff6841945ab9b570506f17f5",
+      "recorded": "2026-11-03T19:04:59Z"
+    },
+    "cpu74-lucas": {
+      "file": "segments/cpu74-lucas.edenmacro.json",
+      "start_gate": "cpu-held74",
+      "recipe": [
+        {
+          "buttons": "lstick,up",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,up",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        }
+      ],
+      "cap": 30,
+      "sha256": "0c1b4ceca55fbd4c41f0be6040c072b0d21b2804d814b0bc541a0d91761c3298",
+      "recorded": "2026-11-03T18:54:37Z"
+    },
+    "coin-final-pick": {
+      "file": "segments/coin-final-pick.edenmacro.json",
+      "start_gate": "steve-selected",
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            110
+          ]
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            75
+          ]
+        },
+        {
+          "buttons": "a",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        }
+      ],
+      "cap": 20,
+      "sha256": "09b8f43ee088180da07d10677b527e19cf889e127e0c29c9e318faa72caf19de",
+      "recorded": "2026-11-03T18:52:51Z"
+    },
+    "coin-pick-refine": {
+      "file": "segments/coin-pick-refine.edenmacro.json",
+      "start_gate": "steve-selected",
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            150
+          ]
+        },
+        {
+          "stick": [
+            0,
+            1,
+            100
+          ]
+        },
+        {
+          "buttons": "a",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150
+        }
+      ],
+      "cap": 20,
+      "sha256": "d5b3653f8a1186e62769558a7a7838d83b7f2c264dccb19021b63a5dbd3238fa",
+      "recorded": "2026-11-03T18:51:16Z"
+    },
+    "coin-from-banner": {
+      "file": "segments/coin-from-banner.edenmacro.json",
+      "start_gate": "steve-selected",
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            400
+          ]
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            300
+          ]
+        }
+      ],
+      "cap": 20,
+      "precondition_review": "18:48:12 current failed-gate image confirms same banner cursor position; stable selected-Steve name is the screen predicate, animated hand/banner ROI is unsuitable.",
+      "sha256": "367fc40b17eea267b4061b6bf1fb38eb1ca3f2411f2b05c5edc4bd592a258016",
+      "recorded": "2026-11-03T18:49:11Z"
+    },
+    "coin-correction-measured": {
+      "file": "segments/coin-correction-measured.edenmacro.json",
+      "start_gate": "coin-measured-start",
+      "recipe": [
+        {
+          "stick": [
+            -1,
+            0,
+            600
+          ]
+        },
+        {
+          "stick": [
+            0,
+            1,
+            400
+          ]
+        }
+      ],
+      "cap": 20,
+      "sha256": "6c5c5f1c2023df27b63e33d00f2049ed79d6ddc612b48f674b704c37bcaec7ee",
+      "recorded": "2026-11-03T18:46:27Z"
+    },
+    "coin-correction": {
+      "file": "segments/coin-correction.edenmacro.json",
+      "start_gate": "coin-recovery-start",
+      "recipe": [
+        {
+          "stick": [
+            -1,
+            0,
+            110
+          ]
+        },
+        {
+          "stick": [
+            0,
+            1,
+            75
+          ]
+        }
+      ],
+      "cap": 20,
+      "sha256": "bb7ae27342d5af44ebbf9b98be035137973afb450e8a072ee4feb6977ce89a6e",
+      "recorded": "2026-11-03T18:45:09Z"
+    },
+    "selected-steve-to-cpu-coin": {
+      "file": "segments/selected-steve-to-cpu-coin.edenmacro.json",
+      "start_gate": "steve-selected",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "lstick,up",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,right",
+          "hold": 150
+        }
+      ],
+      "sha256": "ebc61d77d0f28610f9d52aa10b0bb5c2855b7a7c5842f150bfb29df2c2d85665",
+      "recorded": "2026-11-03T18:43:49Z"
+    },
+    "smash-main": {
+      "file": "segments/smash-main.edenmacro.json",
+      "start_gate": "smash-submenu",
+      "recipe": [
+        {
+          "buttons": "b",
+          "hold": 150,
+          "gap": 1.5
+        }
+      ],
+      "cap": 20,
+      "sha256": "240feba90e10d7133254a27968c683252e0636fd5083104aa1fcfc421f368bf7",
+      "recorded": "2026-11-03T18:41:25Z"
+    },
+    "movie-title": {
+      "file": "segments/movie-title.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150,
+          "gap": 3
+        }
+      ],
+      "cap": 20,
+      "sha256": "90ae4d5dc87210140b4461d0b584b311db270652cad8f94937ef669c331c544a",
+      "recorded": "2026-11-03T18:39:04Z"
+    },
+    "title-main": {
+      "file": "segments/title-main.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150,
+          "gap": 1.5
+        }
+      ],
+      "cap": 30,
+      "sha256": "4aec26838a662da6d8b171800c30971e8cabb660bb09b864d1ec703ab602c44e",
+      "recorded": "2026-11-03T18:37:26Z"
+    },
+    "main-stage": {
+      "start_gate": "main",
+      "file": "../macros/tr-main-to-stage-select.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60
+    },
+    "stage-css": {
+      "start_gate": "stage",
+      "file": "segments/stage-css.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 30,
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "recorded": "2026-11-03T18:41:39Z"
+    },
+    "steve-hover": {
+      "start_gate": "css",
+      "file": "segments/steve-hover.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "lstick,up",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 20,
+      "sha256": "edf2fb3e2db4b65571420dbc839219a005687f7b8685bf7201f940d06d2dd414",
+      "recorded": "2026-11-03T18:41:46Z"
+    },
+    "steve-cpu-coin": {
+      "file": "segments/steve-cpu-coin.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150,
+          "gap": 0.6
+        },
+        {
+          "stick": [
+            1,
+            0,
+            565
+          ]
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            650
+          ]
+        },
+        {
+          "stick": [
+            1,
+            0,
+            250
+          ]
+        },
+        {
+          "stick": [
+            0,
+            1,
+            520
+          ]
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            130
+          ]
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            100
+          ],
+          "gap": 0.65
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            100
+          ],
+          "gap": 0.65
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            300
+          ],
+          "gap": 0.65
+        },
+        {
+          "stick": [
+            1,
+            0,
+            150
+          ],
+          "gap": 0.65
+        }
+      ],
+      "cap": 30,
+      "sha256": "e623cd52968e886b8938c3357389e4f8e6579c9af6a20589e415beb59e5c8c9e",
+      "recorded": "2026-11-03T18:41:56Z"
+    },
+    "cpu-lucas": {
+      "start_gate": "coin",
+      "file": "segments/cpu-lucas.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,up",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,up",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,up",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        },
+        {
+          "buttons": "lstick,left",
+          "hold": 150,
+          "gap": 0.7
+        }
+      ],
+      "cap": 45
+    },
+    "lucas-pick": {
+      "file": "segments/lucas-pick.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "a",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 20,
+      "sha256": "7d74e4e47ffa0a99604767a08e0188a647281926508c614ac7f42c0590991f66",
+      "recorded": "2026-11-03T18:54:38Z"
+    },
+    "enter-training": {
+      "start_gate": "ready",
+      "file": "segments/enter-training.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "plus",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 30,
+      "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+      "recorded": "2026-11-03T18:54:40Z"
+    },
+    "pause-open": {
+      "start_gate": "training-closed",
+      "file": "segments/pause-open.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "plus",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 20,
+      "sha256": "64dd73ecc545a194de80411cddb3b8cbd5e37be8e7a4e077a39a5dedee23fe24",
+      "recorded": "2026-11-03T18:54:55Z"
+    },
+    "pause-close": {
+      "start_gate": "native-pause",
+      "file": "segments/pause-close.edenmacro.json",
+      "recipe": [
+        {
+          "buttons": "b",
+          "hold": 150,
+          "gap": 1
+        }
+      ],
+      "cap": 20,
+      "sha256": "5e8ab5d918a72f8825aa47489cf0895edf975642cb915e74e6cfceed61982969",
+      "recorded": "2026-11-03T18:54:57Z"
+    }
+  },
+  "gates": {
+    "cpu-sonic40": {
+      "kind": "log",
+      "source": "tile",
+      "pattern": "step screen=css dir=right from=39 to=40 token=p2[^\\n]*",
+      "cap": 15
+    },
+    "cpu-sonic-view": {
+      "kind": "image",
+      "reference": "refs/cpu-sonic-held.png",
+      "acquire": true,
+      "roi": [
+        975,
+        545,
+        1130,
+        580
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "quit-focus": {
+      "kind": "image",
+      "reference": "refs/lr-01/142529-rc-quit-focused.png",
+      "sha256": "fad338a7e4544fc61d9b2efad6304ab247d09126dda8fbb261de8d140959b847",
+      "roi": [
+        65,
+        16,
+        275,
+        47
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "finalize-p1": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[GroupSwap\\] teardown owner=0 [^\\n]*reason=finalize",
+      "cap": 30
+    },
+    "finalize-cpu": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[GroupSwap\\] teardown owner=1 [^\\n]*reason=finalize",
+      "cap": 30
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "out/11-p1-darkpit/surface-190021Z-352526-GATE-FAILED-training-closed.png",
+      "sha256": "413504b5244e145c5715f356f085e58e451d8c8eeb3115c179da15aa19b2619d",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "scope": "Undimmed native zero digit, excluding changing faction emblem; applies only to this no-damage cycle lane."
+    },
+    "p1-hud-changed": {
+      "kind": "change",
+      "mark": "hud-before",
+      "roi": [
+        140,
+        554,
+        250,
+        655
+      ],
+      "min_diff": 8,
+      "stable": true,
+      "cap": 20
+    },
+    "cpu-hud-changed": {
+      "kind": "change",
+      "mark": "hud-before",
+      "roi": [
+        403,
+        554,
+        505,
+        655
+      ],
+      "min_diff": 8,
+      "stable": true,
+      "cap": 20
+    },
+    "p1-b": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0xb\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0xb\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "p1-1f": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x1f\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x1f\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "p1-2e": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2e\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2e\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "p1-2d": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2d\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2d\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "p1-2c": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2c\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2c\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "p1-58": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x58\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x58\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "cpu-4a": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryCpu\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x4a\\b[\\s\\S]*?\\[MiiOrdinaryCpu\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x4a\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "cpu-1": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryCpu\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x1\\b[\\s\\S]*?\\[MiiOrdinaryCpu\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x1\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "cpu-28": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryCpu\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x28\\b[\\s\\S]*?\\[MiiOrdinaryCpu\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x28\\b[^\\n]*released=true",
+      "cap": 45
+    },
+    "cpu-held74": {
+      "kind": "image",
+      "reference": "refs/lr-03/185317-cpu-token-p2.png",
+      "sha256": "f71525f031341c65ce6b98c352b54f15e7fcfa775d3ece890da90284daa3a329",
+      "roi": [
+        865,
+        545,
+        1130,
+        580
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "cpu-held": {
+      "kind": "log",
+      "source": "tile",
+      "pattern": "step screen=css dir=left [^\\n]*token=cpu[^\\n]*",
+      "cap": 10
+    },
+    "coin-banner-start": {
+      "kind": "image",
+      "reference": "out/04-steve/surface-184642Z-557268-GATE-FAILED-coin.png",
+      "sha256": "8fe7203c230e37e396e6caaf82cd3ec3810e8a8237912236d36bb0562133f2ef",
+      "roi": [
+        750,
+        215,
+        815,
+        270
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "coin-measured-start": {
+      "kind": "image",
+      "reference": "out/04-steve/surface-184524Z-479472-GATE-FAILED-coin.png",
+      "sha256": "73c7d270dd006fe1e9f181d9c905c45a5d622722861b04522dc5507294786317",
+      "roi": [
+        1050,
+        410,
+        1130,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "coin-recovery-start": {
+      "kind": "image",
+      "reference": "refs/lr-03/184423-cpu-tile-gate-failed.png",
+      "sha256": "a6becbfddf16e705033068a400807185afad61b7da8aeca6cff3a39b99ae186e",
+      "roi": [
+        1070,
+        420,
+        1150,
+        505
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "steve-selected": {
+      "kind": "image",
+      "reference": "out/04-steve/surface-184211Z-617502-GATE-FAILED-coin.png",
+      "sha256": "fdcff94acd410dbba2f000955226e917f316653ec1d31cdfdae094f7c27ed22b",
+      "roi": [
+        315,
+        545,
+        415,
+        580
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "cpu-tile": {
+      "kind": "log",
+      "source": "tile",
+      "pattern": "settled screen=css at=86 hovered=86",
+      "cap": 10
+    },
+    "smash-submenu": {
+      "kind": "image",
+      "reference": "out/01-main/surface-183937Z-021657-GATE-FAILED-main.png",
+      "sha256": "2de16a89ddd3e939126978a57eb7bb18fda6b3dfbbada42ebab338918963adb7",
+      "roi": [
+        552,
+        360,
+        710,
+        405
+      ],
+      "tolerance": 8,
+      "cap": 10
+    },
+    "training-closed": {
+      "kind": "image",
+      "reference": "refs/lr-02/161658-baseline-ready.png",
+      "sha256": "367fa151d29b04ca2667173de25619ada2bd4fa5ca04cdaef3522da8538b829f",
+      "roi": [
+        75,
+        120,
+        300,
+        190
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "native-pause": {
+      "kind": "image",
+      "reference": "refs/lr-02/172331-rc-native-quit-menu-settled.png",
+      "sha256": "57fab415023a197f2582ac8bad28f17fc16a152862596bcea493286559368ea9",
+      "roi": [
+        105,
+        142,
+        260,
+        174
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "installed": {
+      "kind": "log",
+      "source": "events",
+      "pattern": "cpu_common=installed",
+      "whole_file": true,
+      "cap": 120
+    },
+    "main": {
+      "kind": "image",
+      "reference": "refs/lr-02/160615-main-confirm.png",
+      "sha256": "1a4f52520acc1e9781d4293d89d61efb936b11cd487870a503bca69f88710827",
+      "roi": [
+        150,
+        265,
+        450,
+        335
+      ],
+      "tolerance": 8,
+      "cap": 30
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "refs/lr-02/160745-stage-confirm.png",
+      "sha256": "885bcd0e0a4a36eac489020b0171e29153c1b431c80d10d3ad25a76a61ed2a27",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 45
+    },
+    "css": {
+      "kind": "image",
+      "reference": "refs/lr-02/160923-css-confirm.png",
+      "sha256": "bb54f2af2a582720ee5d07ac1dad04446f16daae9fbe12d515aa5435bed6a433",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 8,
+      "cap": 60
+    },
+    "steve": {
+      "kind": "log",
+      "source": "tile",
+      "pattern": "settled screen=css at=78 hovered=78",
+      "cap": 15
+    },
+    "coin": {
+      "kind": "image",
+      "reference": "refs/lr-02/161505-cpu-coin-right.png",
+      "sha256": "c74205b987fb0a51385d6d347bc4b1501a605114f2ba4b4cfbb200785ca78715",
+      "roi": [
+        958,
+        358,
+        1030,
+        410
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "lucas": {
+      "kind": "log",
+      "source": "tile",
+      "pattern": "settled screen=css at=39 hovered=39",
+      "cap": 15
+    },
+    "ready": {
+      "kind": "image",
+      "reference": "refs/lr-02/161625-ready-to-fight.png",
+      "sha256": "9d3e0c0ad44b8d41cbe2fca4b9bd7da90f8f7eb961987a31d11ff83a3ef3bcfc",
+      "roi": [
+        410,
+        195,
+        600,
+        245
+      ],
+      "tolerance": 8,
+      "cap": 30
+    },
+    "p1-original": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[CharacterRoster\\] observed owner=0 [^\\n]*kind=0x58\\b",
+      "cap": 60
+    },
+    "cpu-original": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[CharacterRoster\\] observed owner=1 [^\\n]*kind=0x28\\b",
+      "cap": 30
+    },
+    "catalog": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiAutoInit\\] catalog ready;[^\\n]*",
+      "cap": 45
+    },
+    "player-owner": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryPlayer\\] catalog owner qualified; immutable origin retained",
+      "cap": 30
+    },
+    "cpu-owner": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[MiiOrdinaryCpu\\] catalog owner qualified; immutable origin retained",
+      "cap": 30
+    },
+    "pause": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "pause_owner begin [^\\n]*owners=0x10",
+      "cap": 15
+    },
+    "resume": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "pause_owner end [^\\n]*owned_non_neutral=0 owners=0x00",
+      "cap": 15
+    },
+    "no-leak": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "pause_owner resume_checked delay=2 leaked=0",
+      "cap": 15
+    }
+  },
+  "continuation": "Same lr03 boot, after seven passed rows and failed08 no-leak gate. The recorded B already returned to Training. Original row list is preserved in prior_rows and attempts/08-no-delay-leak/rows.json. Fresh09 checks only native pause ownership/release; delay-2 leak clause remains unexercised.",
+  "rows": [
+    {
+      "id": "09-pause-roundtrip",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "gate": "training-closed"
+        },
+        {
+          "play": "pause-open"
+        },
+        {
+          "gate": "pause"
+        },
+        {
+          "shot": "paused"
+        },
+        {
+          "play": "pause-close"
+        },
+        {
+          "gate": "resume"
+        },
+        {
+          "gate": "training-closed"
+        },
+        {
+          "shot": "resumed"
+        },
+        {
+          "copy": "diag"
+        },
+        {
+          "copy": "settings"
+        }
+      ],
+      "evidence": [
+        "Fresh native pause begin owners0x10/end owned_non_neutral0 owners0x00; actual pause and resumed Training media. No delay2 leak-check acceptance."
+      ]
+    },
+    {
+      "id": "10-p1-falcon",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-b"
+        },
+        {
+          "shot": "falcon"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "Fresh exact role/ticket/target/released; body/HUD review"
+      ]
+    },
+    {
+      "id": "11-p1-darkpit",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-1f"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "darkpit"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "12-p1-toonlink",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2e"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "toonlink"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "13-p1-rob",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2d"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "rob"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "14-p1-lucario",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2c"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "lucario"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "15-p1-steve",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-58"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "steve"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "16-p1-falcon-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-b"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "falcon"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "17-p1-darkpit-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-1f"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "darkpit"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "18-p1-toonlink-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2e"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "toonlink"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "19-p1-rob-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2d"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "rob"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "20-p1-lucario-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-2c"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "lucario"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "21-p1-steve-lap2",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "p1-next-frames"
+        },
+        {
+          "gate": "p1-58"
+        },
+        {
+          "gate": "p1-hud-changed"
+        },
+        {
+          "shot": "steve"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "22-cpu-gunner",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "cpu-next-frames"
+        },
+        {
+          "gate": "cpu-4a"
+        },
+        {
+          "gate": "cpu-hud-changed"
+        },
+        {
+          "shot": "gunner"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "Exact transaction and visible Gunner only; pointed saved-Mii payload identity remains unverified"
+      ]
+    },
+    {
+      "id": "23-cpu-dk",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "cpu-next-frames"
+        },
+        {
+          "gate": "cpu-1"
+        },
+        {
+          "gate": "cpu-hud-changed"
+        },
+        {
+          "shot": "dk"
+        },
+        {
+          "copy": "diag"
+        }
+      ]
+    },
+    {
+      "id": "24-cpu-lucas",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "mark": "hud-before"
+        },
+        {
+          "play": "cpu-next-frames"
+        },
+        {
+          "gate": "cpu-28"
+        },
+        {
+          "gate": "cpu-hud-changed"
+        },
+        {
+          "shot": "lucas"
+        },
+        {
+          "copy": "diag"
+        },
+        {
+          "copy": "settings"
+        }
+      ],
+      "evidence": [
+        "Original Steve/Lucas return after two P1 laps and CPU loop; independently review all checkpoints"
+      ]
+    },
+    {
+      "id": "25-warm-scene-exit",
+      "start": "training",
+      "end": "css-ready",
+      "steps": [
+        {
+          "gate": "training-hud-unpaused"
+        },
+        {
+          "play": "pause-open"
+        },
+        {
+          "gate": "pause"
+        },
+        {
+          "play": "focus-native-quit-frames"
+        },
+        {
+          "gate": "quit-focus"
+        },
+        {
+          "play": "confirm-native-quit-frames"
+        },
+        {
+          "gate": "finalize-p1"
+        },
+        {
+          "gate": "finalize-cpu"
+        },
+        {
+          "gate": "ready"
+        },
+        {
+          "shot": "css-return"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "Warm built-group finalize for both logical roles and native CSS return. NOT interrupted-build TEARDOWN3 acceptance. Next boundary re-records CPU-token route with primary's game-frame recipe support."
+      ]
+    },
+    {
+      "id": "28-training-reentry",
+      "start": "css-ready",
+      "end": "training",
+      "steps": [
+        {
+          "play": "enter-training"
+        },
+        {
+          "gate": "p1-original"
+        },
+        {
+          "gate": "cpu-original"
+        },
+        {
+          "gate": "catalog"
+        },
+        {
+          "gate": "player-owner"
+        },
+        {
+          "gate": "cpu-owner"
+        },
+        {
+          "shot": "reentry"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "Fresh native scene originals and catalog owners following warm finalize; not interrupted-build proof."
+      ]
+    }
+  ],
+  "prior_rows": [
+    {
+      "id": "01-main",
+      "start": "smash-submenu",
+      "end": "main",
+      "steps": [
+        {
+          "gate": "installed"
+        },
+        {
+          "play": "smash-main"
+        },
+        {
+          "gate": "main"
+        },
+        {
+          "shot": "main"
+        }
+      ],
+      "evidence": [
+        "current-boot installation and main checkpoint"
+      ]
+    },
+    {
+      "id": "02-stage",
+      "start": "main",
+      "end": "stage",
+      "steps": [
+        {
+          "play": "main-stage"
+        },
+        {
+          "gate": "stage"
+        },
+        {
+          "shot": "stage"
+        }
+      ],
+      "evidence": [
+        "existing recording replay and Training stage label"
+      ]
+    },
+    {
+      "id": "03-css",
+      "start": "stage",
+      "end": "css",
+      "steps": [
+        {
+          "play": "stage-css"
+        },
+        {
+          "gate": "css"
+        },
+        {
+          "shot": "css"
+        }
+      ],
+      "evidence": [
+        "actual CSS checkpoint"
+      ]
+    },
+    {
+      "id": "04-steve",
+      "start": "css",
+      "end": "cpu-held",
+      "steps": [
+        {
+          "gate": "cpu-held74"
+        },
+        {
+          "shot": "coin"
+        }
+      ],
+      "evidence": [
+        "Recovery checkpoint: actual selected Steve and held CPU Banjo tile74 independently reviewed at185317; fresh token=p2 transition retained in attempt04-token-name and live tile log. This row now verifies the reached state, not a replay-qualified complete CSS route."
+      ]
+    },
+    {
+      "id": "05-lucas",
+      "start": "cpu-held",
+      "end": "css-ready",
+      "steps": [
+        {
+          "play": "cpu74-lucas"
+        },
+        {
+          "gate": "lucas"
+        },
+        {
+          "play": "lucas-pick"
+        },
+        {
+          "gate": "ready"
+        },
+        {
+          "shot": "ready"
+        }
+      ],
+      "evidence": [
+        "fresh Lucas tile and ready CSS checkpoint"
+      ]
+    },
+    {
+      "id": "06-training",
+      "start": "css-ready",
+      "end": "training",
+      "steps": [
+        {
+          "play": "enter-training"
+        },
+        {
+          "gate": "p1-original"
+        },
+        {
+          "gate": "cpu-original"
+        },
+        {
+          "gate": "catalog"
+        },
+        {
+          "gate": "player-owner"
+        },
+        {
+          "gate": "cpu-owner"
+        },
+        {
+          "shot": "training"
+        },
+        {
+          "copy": "diag"
+        },
+        {
+          "copy": "events"
+        },
+        {
+          "copy": "settings"
+        }
+      ],
+      "evidence": [
+        "fresh original kinds, catalog and owner observations; independent ordering/body/HUD/quantity review required"
+      ]
+    },
+    {
+      "id": "07-pause",
+      "start": "training",
+      "end": "native-pause",
+      "steps": [
+        {
+          "play": "pause-open"
+        },
+        {
+          "gate": "pause"
+        },
+        {
+          "shot": "pause"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "native pause owner 0x10 and actual menu"
+      ]
+    },
+    {
+      "id": "08-resume",
+      "start": "native-pause",
+      "end": "training",
+      "steps": [
+        {
+          "play": "pause-close"
+        },
+        {
+          "gate": "resume"
+        },
+        {
+          "gate": "no-leak"
+        },
+        {
+          "shot": "resumed"
+        },
+        {
+          "copy": "diag"
+        }
+      ],
+      "evidence": [
+        "released pause ownership, no leaked input and native resumed checkpoint"
+      ]
+    }
+  ]
+}
