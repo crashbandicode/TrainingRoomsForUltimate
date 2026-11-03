@@ -236,6 +236,41 @@ pub struct CacheStatus {
     pub blocked: bool,
 }
 
+/// A copied status formatter. Creating, displaying and debugging it allocate
+/// nothing; Debug preserves the quoted text used by existing diagnostics.
+#[derive(Clone, Copy)]
+pub struct CacheText(CacheStatus);
+impl std::fmt::Display for CacheText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let fighters = self.0.fighters;
+        let (loaded, planned, failed) = (fighters.loaded(), fighters.planned, fighters.failed);
+        match self.0.progress() {
+            Progress::Hidden => return Ok(()),
+            Progress::Loading => write!(f, "Loading {}/{}", loaded, planned)?,
+            Progress::Paused => write!(f, "Paused {}/{}", loaded, planned)?,
+            Progress::Waiting if loaded == 0 && failed == 0 => return match fighters.swap_who() {
+                "" => f.write_str("Swap once to load"),
+                who => write!(f, "Swap {} once to load", who),
+            },
+            Progress::Waiting => match fighters.swap_who() {
+                "" => write!(f, "Loaded {}/{} · swap to load {} more", loaded, planned, fighters.unstarted())?,
+                who => write!(f, "Loaded {}/{} · swap {} to load {} more", loaded, planned, who, fighters.unstarted())?,
+            },
+            Progress::Partial => write!(f, "Loaded {}/{}", loaded, planned)?,
+            Progress::Done => return write!(f, "All loaded ({}/{}, {} instant)", loaded, planned, fighters.ready),
+            Progress::Ready => return write!(f, "Ready {}/{}", fighters.ready, planned),
+        }
+        if failed > 0 { write!(f, " ({} failed)", failed)?; }
+        Ok(())
+    }
+}
+impl std::fmt::Debug for CacheText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // All words are fixed literals and all substitutions are integers.
+        write!(f, "\"{}\"", self)
+    }
+}
+
 impl CacheStatus {
     pub fn new(assets: Readiness, fighters: BuiltFighters, blocked: bool) -> Self {
         Self { assets, fighters, blocked }
@@ -260,30 +295,8 @@ impl CacheStatus {
         else { Progress::Ready }
     }
 
-    pub fn text(self) -> String {
-        let fighters = self.fighters;
-        let (loaded, planned, failed) = (fighters.loaded(), fighters.planned, fighters.failed);
-        let mut text = match self.progress() {
-            Progress::Hidden => return String::new(),
-            Progress::Loading => format!("Loading {}/{}", loaded, planned),
-            Progress::Paused => format!("Paused {}/{}", loaded, planned),
-            Progress::Waiting if loaded == 0 && failed == 0 => return match fighters.swap_who() {
-                "" => "Swap once to load".to_string(),
-                who => format!("Swap {} once to load", who),
-            },
-            Progress::Waiting => match fighters.swap_who() {
-                "" => format!("Loaded {}/{} · swap to load {} more", loaded, planned, fighters.unstarted()),
-                who => format!("Loaded {}/{} · swap {} to load {} more", loaded, planned, who, fighters.unstarted()),
-            },
-            Progress::Partial => format!("Loaded {}/{}", loaded, planned),
-            Progress::Done => return format!("All loaded ({}/{}, {} instant)", loaded, planned, fighters.ready),
-            Progress::Ready => return format!("Ready {}/{}", fighters.ready, planned),
-        };
-        if failed > 0 {
-            text.push_str(&format!(" ({} failed)", failed));
-        }
-        text
-    }
+    /// Formatting is deferred into the logger/notice caller's fixed buffer.
+    pub fn text(self) -> CacheText { CacheText(self) }
 
     /// A settled result is the one worth reading; a waiting hint needs a moment; transient
     /// progress is replaced by the next change.
@@ -423,13 +436,13 @@ mod tests {
         // No window yet and no load running: not "Ready 0/3", the first swap loads them.
         let status = CacheStatus::new(assets, planned, false);
         assert_eq!(status.progress(), Progress::Waiting);
-        assert_eq!(status.text(), "Swap once to load");
+        assert_eq!(status.text().to_string(), "Swap once to load");
         let building = CacheStatus::new(assets, BuiltFighters { pending: 3, ..planned }, false);
         assert_eq!(building.progress(), Progress::Loading);
-        assert_eq!(building.text(), "Loading 0/3");
+        assert_eq!(building.text().to_string(), "Loading 0/3");
         assert!(building.announce(Some(status), 0));
         let complete = CacheStatus::new(assets, BuiltFighters { ready: 3, ..planned }, false);
-        assert_eq!(complete.text(), "Ready 3/3");
+        assert_eq!(complete.text().to_string(), "Ready 3/3");
         assert_eq!(complete.progress(), Progress::Ready);
         assert!(complete.frames() > building.frames() && complete.frames() > status.frames());
         assert!(complete.announce(Some(status), 0));
@@ -446,13 +459,13 @@ mod tests {
         let fighters = BuiltFighters { planned: 4, ready: 2, failed: 2, ..BuiltFighters::default() };
         let failed = CacheStatus::new(assets, fighters, false);
         assert_eq!(failed.progress(), Progress::Partial);
-        assert_eq!(failed.text(), "Loaded 2/4 (2 failed)");
+        assert_eq!(failed.text().to_string(), "Loaded 2/4 (2 failed)");
         let busy = CacheStatus::new(assets, BuiltFighters { planned: 2, ready: 2,
             ..BuiltFighters::default() }, true);
-        assert_eq!(busy.text(), "Ready 2/2");
+        assert_eq!(busy.text().to_string(), "Ready 2/2");
         let off = CacheStatus::new(Readiness { configured: 0, ..assets }, fighters, false);
         assert_eq!(off.progress(), Progress::Hidden);
-        assert_eq!(off.text(), "");
+        assert_eq!(off.text().to_string(), "");
         assert!(!off.announce(Some(failed), 3));
         let empty = CacheStatus::new(readiness(5, 5, false, [None::<i32>], NONE, [None; 8]),
             BuiltFighters::default(), false);
@@ -498,21 +511,21 @@ mod tests {
         // 5 planned, 2 built, 3 prefetched (reachable without a reload), nothing running.
         let done = status(fighters(5, 2, 3, 0, 0));
         assert_eq!(done.progress(), Progress::Done);
-        assert_eq!(done.text(), "All loaded (5/5, 2 instant)");
+        assert_eq!(done.text().to_string(), "All loaded (5/5, 2 instant)");
         assert_eq!(done.frames(), 180);
         // Ready is only the all-built case (C113 §6): a prefetched group is never counted built.
         let built = status(fighters(5, 5, 0, 0, 0));
-        assert_eq!((built.progress(), built.text()), (Progress::Ready, "Ready 5/5".to_string()));
+        assert_eq!((built.progress(), built.text().to_string()), (Progress::Ready, "Ready 5/5".to_string()));
         let only_prefetched = status(fighters(3, 0, 3, 0, 0));
         assert_eq!(only_prefetched.progress(), Progress::Done);
-        assert_eq!(only_prefetched.text(), "All loaded (3/3, 0 instant)");
+        assert_eq!(only_prefetched.text().to_string(), "All loaded (3/3, 0 instant)");
         // Work still owed is not done, however much is loaded.
         let running = status(fighters(5, 2, 2, 0, 1));
-        assert_eq!((running.progress(), running.text()), (Progress::Loading, "Loading 4/5".to_string()));
+        assert_eq!((running.progress(), running.text().to_string()), (Progress::Loading, "Loading 4/5".to_string()));
         assert_eq!(running.frames(), 90);
         // A failure settles the plan but is never Done or Ready.
         let partial = status(fighters(5, 2, 2, 1, 0));
-        assert_eq!((partial.progress(), partial.text()), (Progress::Partial, "Loaded 4/5 (1 failed)".to_string()));
+        assert_eq!((partial.progress(), partial.text().to_string()), (Progress::Partial, "Loaded 4/5 (1 failed)".to_string()));
         assert_eq!(partial.frames(), 180);
         // The Done notice outlasts transient progress.
         assert!(done.frames() > running.frames());
@@ -521,26 +534,26 @@ mod tests {
     #[test]
     fn before_the_first_swap_the_notice_says_to_swap_not_ready_zero() {
         let fresh = status(fighters(3, 0, 0, 0, 0));
-        assert_eq!((fresh.progress(), fresh.text()), (Progress::Waiting, "Swap once to load".to_string()));
+        assert_eq!((fresh.progress(), fresh.text().to_string()), (Progress::Waiting, "Swap once to load".to_string()));
         assert_eq!(fresh.frames(), 120);
         // One role loaded, the other's window not built yet: honest, and not Done.
         let half = status(fighters(5, 3, 0, 0, 0));
-        assert_eq!((half.progress(), half.text()),
+        assert_eq!((half.progress(), half.text().to_string()),
             (Progress::Waiting, "Loaded 3/5 · swap to load 2 more".to_string()));
         let half_prefetched = status(fighters(5, 1, 2, 0, 0));
-        assert_eq!(half_prefetched.text(), "Loaded 3/5 · swap to load 2 more");
+        assert_eq!(half_prefetched.text().to_string(), "Loaded 3/5 · swap to load 2 more");
         // Windows being built read as progress, not as a hint.
         let building = status(fighters(5, 0, 0, 0, 2));
-        assert_eq!((building.progress(), building.text()), (Progress::Loading, "Loading 0/5".to_string()));
+        assert_eq!((building.progress(), building.text().to_string()), (Progress::Loading, "Loading 0/5".to_string()));
         // A busy native UI does not pause the hint: nothing is deferred, the swap is still the user's
         // (C116.2 console: "Paused 2/3" stood for a CPU swap that nothing would ever resume).
         let blocked = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
             fighters(3, 0, 0, 0, 0), true);
-        assert_eq!((blocked.progress(), blocked.text()), (Progress::Waiting, "Swap once to load".to_string()));
+        assert_eq!((blocked.progress(), blocked.text().to_string()), (Progress::Waiting, "Swap once to load".to_string()));
         // It does pause a window that is still building.
         let deferred = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
             fighters(3, 0, 0, 0, 2), true);
-        assert_eq!((deferred.progress(), deferred.text()), (Progress::Paused, "Paused 0/3".to_string()));
+        assert_eq!((deferred.progress(), deferred.text().to_string()), (Progress::Paused, "Paused 0/3".to_string()));
     }
 
     #[test]
@@ -552,24 +565,24 @@ mod tests {
         assert_eq!(total.swap, crate::engine::swap::body_bank::SWAP_CPU);
         for blocked in [false, true] {
             let now = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])), total, blocked);
-            assert_eq!((now.progress(), now.text()),
+            assert_eq!((now.progress(), now.text().to_string()),
                 (Progress::Waiting, "Loaded 2/3 · swap the CPU to load 1 more".to_string()));
         }
         let player = status(both_roles(fighters(2, 0, 0, 0, 0), fighters(1, 1, 0, 0, 0)));
-        assert_eq!(player.text(), "Loaded 1/3 · swap P1 to load 2 more");
+        assert_eq!(player.text().to_string(), "Loaded 1/3 · swap P1 to load 2 more");
         let both = status(both_roles(fighters(2, 0, 0, 0, 0), fighters(1, 0, 0, 0, 0)));
-        assert_eq!(both.text(), "Swap both once to load");
+        assert_eq!(both.text().to_string(), "Swap both once to load");
         let first = status(both_roles(fighters(2, 0, 0, 0, 0), BuiltFighters::default()));
-        assert_eq!(first.text(), "Swap P1 once to load");
+        assert_eq!(first.text().to_string(), "Swap P1 once to load");
         let failed = status(both_roles(fighters(3, 1, 0, 1, 0), fighters(1, 0, 0, 0, 0)));
-        assert_eq!(failed.text(), "Loaded 1/4 · swap both to load 2 more (1 failed)");
+        assert_eq!(failed.text().to_string(), "Loaded 1/4 · swap both to load 2 more (1 failed)");
         // Another role now owes the swap: the text changes, so it is shown again.
         assert!(player.announce(Some(status(total)), 0));
         assert!(!player.announce(Some(player), 0));
         // A role owing a swap while the other's load is still owed reads as that load.
         let mixed = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
             both_roles(fighters(2, 0, 0, 0, 2), fighters(1, 0, 0, 0, 0)), true);
-        assert_eq!((mixed.progress(), mixed.text()), (Progress::Paused, "Paused 0/3".to_string()));
+        assert_eq!((mixed.progress(), mixed.text().to_string()), (Progress::Paused, "Paused 0/3".to_string()));
     }
 
     #[test]
@@ -631,11 +644,11 @@ mod tests {
         let total = both_roles(player, cpu);
         assert_eq!(total, player);
         let done = status(total);
-        assert_eq!((done.progress(), done.text()), (Progress::Done, "All loaded (3/3, 1 instant)".to_string()));
+        assert_eq!((done.progress(), done.text().to_string()), (Progress::Done, "All loaded (3/3, 1 instant)".to_string()));
         // The same CPU with a cycle that has not been swapped yet is waiting for that swap.
         let waiting = status(both_roles(player, fighters(2, 0, 0, 0, 0)));
         assert_eq!(waiting.progress(), Progress::Waiting);
-        assert_eq!(waiting.text(), "Loaded 3/5 · swap the CPU to load 2 more");
+        assert_eq!(waiting.text().to_string(), "Loaded 3/5 · swap the CPU to load 2 more");
         // Nothing planned anywhere stays hidden.
         assert_eq!(status(both_roles(cpu, cpu)).progress(), Progress::Hidden);
     }
@@ -682,7 +695,7 @@ mod tests {
         assert_eq!(reusable_extras(&[0x4b, 0, 1], 0, None), 2);
         let assets = readiness(5, 5, false, [Some(1), Some(2)], NONE, ready_of(&[1, 2]));
         let only_assets = CacheStatus::new(assets, BuiltFighters::default(), false);
-        assert_eq!(only_assets.text(), "");
+        assert_eq!(only_assets.text().to_string(), "");
         assert_eq!(only_assets.progress(), Progress::Hidden);
     }
 
@@ -692,18 +705,18 @@ mod tests {
         let plan = [Some(1), Some(2), None, None, None];
         let r = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2]));
         assert_eq!((r.progress, r.ready, r.planned, r.configured), (Progress::Ready, 2, 2, 5));
-        assert_eq!(r.text(), "Ready 2/2");
+        assert_eq!(r.text().to_string(), "Ready 2/2");
         let r = readiness(5, 5, false, plan, NONE, ready_of(&[2]));
         assert_eq!((r.progress, r.ready, r.planned), (Progress::Loading, 1, 2));
-        assert_eq!(r.text(), "Loading 1/2");
+        assert_eq!(r.text().to_string(), "Loading 1/2");
     }
     #[test]
     fn full_five_distinguishes_ready_two_from_ready_five() {
         let plan = [Some(1), Some(2), Some(3), Some(4), Some(5)];
         let two = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2]));
-        assert_eq!((two.progress, two.text()), (Progress::Loading, "Loading 2/5".to_string()));
+        assert_eq!((two.progress, two.text().to_string()), (Progress::Loading, "Loading 2/5".to_string()));
         let five = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2, 3, 4, 5]));
-        assert_eq!((five.progress, five.text()), (Progress::Ready, "Ready 5/5".to_string()));
+        assert_eq!((five.progress, five.text().to_string()), (Progress::Ready, "Ready 5/5".to_string()));
     }
     #[test]
     fn backend_capacity_truncates_and_is_named() {
@@ -711,9 +724,9 @@ mod tests {
         let plan = [Some(1), Some(2), Some(3), Some(4), Some(5)];
         let r = readiness(5, 2, false, plan, NONE, ready_of(&[1]));
         assert_eq!((r.planned, r.ready, r.limited()), (2, 1, true));
-        assert_eq!(r.text(), "Loading 1/2 (max 2)");
+        assert_eq!(r.text().to_string(), "Loading 1/2 (max 2)");
         let r = readiness(5, 2, false, plan, NONE, ready_of(&[1, 2, 3]));
-        assert_eq!((r.progress, r.text()), (Progress::Ready, "Ready 2/2 (max 2)".to_string()));
+        assert_eq!((r.progress, r.text().to_string()), (Progress::Ready, "Ready 2/2 (max 2)".to_string()));
         // A short plan under spare capacity is not capacity-limited.
         assert!(!readiness(5, 4, false, [Some(1), Some(2), None, None, None], NONE, [None; 8]).limited());
         // Configuration at or under capacity is not limited either.
@@ -735,11 +748,11 @@ mod tests {
         let r = readiness(3, 3, false, plan, |k| k == 2, ready_of(&[1, 2, 3]));
         assert_eq!((r.progress, r.ready, r.planned, r.failed), (Progress::Partial, 2, 3, 1));
         assert_ne!(r.progress, Progress::Ready);
-        assert_eq!(r.text(), "Partial 2/3 (1 failed)");
+        assert_eq!(r.text().to_string(), "Partial 2/3 (1 failed)");
         // Others still loading: keep Loading, with the failure visible.
         let r = readiness(3, 3, false, plan, |k| k == 2, ready_of(&[1]));
         assert_eq!((r.progress, r.ready, r.planned), (Progress::Loading, 1, 3));
-        assert_eq!(r.text(), "Loading 1/3 (1 failed)");
+        assert_eq!(r.text().to_string(), "Loading 1/3 (1 failed)");
         // A pause does not hide a settled failure.
         let r = readiness(3, 3, true, plan, |k| k == 2, ready_of(&[1, 3]));
         assert_eq!(r.progress, Progress::Partial);
@@ -749,7 +762,7 @@ mod tests {
         let plan = [Some(1), Some(2), Some(3)];
         let r = readiness(3, 3, false, plan, |_| true, ready_of(&[1, 2, 3]));
         assert_eq!((r.progress, r.ready, r.planned, r.failed), (Progress::Partial, 0, 3, 3));
-        assert_eq!(r.text(), "Partial 0/3 (3 failed)");
+        assert_eq!(r.text().to_string(), "Partial 0/3 (3 failed)");
         assert!(announce(None, r, 0));
         assert!(!announce(Some(r), r, 0));
         // A genuinely empty plan or Off is still hidden.
@@ -763,13 +776,13 @@ mod tests {
         // No qualified backend (actual match): capacity 0 even though configured.
         assert_eq!(readiness(5, 0, false, plan, NONE, ready_of(&[1, 2])).progress, Progress::Hidden);
         assert_eq!(readiness(5, 5, false, [None, None], NONE, [None; 8]).progress, Progress::Hidden);
-        assert_eq!(Readiness { progress: Progress::Hidden, ..readiness(0, 0, false, plan, NONE, [None; 8]) }.text(), "");
+        assert_eq!(Readiness { progress: Progress::Hidden, ..readiness(0, 0, false, plan, NONE, [None; 8]) }.text().to_string(), "");
     }
     #[test]
     fn blocked_pauses_incomplete_loads_but_never_unreadies() {
         let plan = [Some(1), Some(2), Some(3)];
         let r = readiness(3, 3, true, plan, NONE, ready_of(&[1]));
-        assert_eq!((r.progress, r.text()), (Progress::Paused, "Paused 1/3".to_string()));
+        assert_eq!((r.progress, r.text().to_string()), (Progress::Paused, "Paused 1/3".to_string()));
         let r = readiness(3, 3, true, plan, NONE, ready_of(&[1, 2, 3]));
         assert_eq!(r.progress, Progress::Ready);
     }
@@ -1089,7 +1102,7 @@ mod tests {
         assert_eq!(missing(view, sources, 2, true, false), None);
         let ready = readiness(5, 5, false, plan, |target| target.kind == GUNNER.kind, sources);
         assert_eq!((ready.progress, ready.ready, ready.planned, ready.failed), (Progress::Partial, 4, 5, 1));
-        assert_eq!(ready.text(), "Partial 4/5 (1 failed)");
+        assert_eq!(ready.text().to_string(), "Partial 4/5 (1 failed)");
         assert_eq!(plan[4], Some(GUNNER));
     }
 }

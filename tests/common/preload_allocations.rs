@@ -335,3 +335,37 @@ fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
         assert_eq!(groups, [Members::native_group(0x24), Members::native_group(0x5a), Members::mii_group(0x48)]);
     }
 }
+
+#[test]
+fn status_raise_and_delivery_formatting_use_no_heap_on_first_or_repeated_use() {
+    use crate::engine::preload::cycle_preload_policy::{CacheStatus, BuiltFighters, Readiness, Progress};
+    use std::fmt::Write;
+    let assets=Readiness {progress:Progress::Loading,ready:0,planned:5,configured:5,limit:5,failed:0};
+    let waiting=CacheStatus::new(assets,BuiltFighters {planned:2,swap:2,..BuiltFighters::default()},false);
+    let measured=AllocationCount::start();
+    for _ in 0..128 {
+        // ui-16 observed +3 on raise and +1 on delivery: these are the actual
+        // three status/log/notice formatting uses and the Option delivery log.
+        let mut changed=crate::model::storage::FixedPath::<96>::new();
+        write!(changed,"{:?}",waiting.text()).unwrap();
+        let mut raised=crate::model::storage::FixedPath::<96>::new();
+        write!(raised,"{:?}",waiting.text()).unwrap();
+        let mut notice=crate::model::storage::FixedPath::<96>::new();
+        write!(notice,"{}",waiting.text()).unwrap();
+        let mut delivered=crate::model::storage::FixedPath::<96>::new();
+        write!(delivered,"{:?}",Some(waiting).map(|s|s.text())).unwrap();
+        assert_eq!(changed.as_str(),"\"Swap the CPU once to load\"");
+        assert_eq!(raised.as_str(),changed.as_str());
+        assert_eq!(notice.as_str(),"Swap the CPU once to load");
+        assert_eq!(delivered.as_str(),"Some(\"Swap the CPU once to load\")");
+    }
+    assert_eq!(measured.finish(),0);
+    // Largest numeric values plus the longest waiting suffix fit the existing
+    // notification_args buffer; do not silently truncate this status text.
+    for pending in [0,1,255] { for ready in [0,1,127,255] { for failed in [0,1,127,255] {
+        let status=CacheStatus::new(assets,BuiltFighters {planned:255,ready,failed,pending,swap:3,
+            ..BuiltFighters::default()},false);
+        let mut notice=crate::model::storage::FixedPath::<96>::new();
+        write!(notice,"{}",status.text()).unwrap();
+    } } }
+}
