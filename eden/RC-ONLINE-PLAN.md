@@ -94,3 +94,49 @@ frames contain computed and recorded position checks as well as RNG checks;
 all must be compared across the complete retained replay. Full online session
 summaries and separate LDN remain required. No replay or online run is claimed
 by this inspection.
+
+## Source boundary review, 2026-11-03 08:44 UTC
+
+Scoped review against compiled product758cee5; thirteen source hashes are retained
+in private main-r16/online-source-boundary-review.json. This is a partial
+hook-by-hook review, not online acceptance or a new runtime result.
+
+The four input caller hooks are actually installed in runtime/boot.rs only
+after all InputDelay sites and scalar TLS reservation pass. P1 note calls
+lobby::update before chord handling. Input apply checks the widened scene before
+its roster/menu/delay/recorder mutations. The waiting predicate requires
+initialized mode, melee0x0d and exact local family02010000 or online0701 family;
+active also requires the live waiting UI graft. UI tick publishes readiness only
+after the expected layout and panes resolve. Scene-key departure clears that
+readiness and plugin session state; native popup ownership clears delayed input.
+These are concrete source gates, not proof of native callback ordering at every
+transition.
+
+CPU frame installation is a guarded vtable replacement; individual defence,
+ledge, tech, shield, camera and mash hooks are installed by their feature groups.
+The frame path reads scene::current before enrolling roles or applying CPU
+outputs, and clears roles on a nonpractice non-P1 frame. Several query hooks
+instead use the enrolled role registry. Therefore final transition evidence must
+cover registry retirement and callback order as well as the scene flag; their
+registration alone cannot establish online safety. Camera writes have their own
+current-scene gate. This review does not assert a demonstrated stale-role bug.
+
+CPU choice RNG is a plugin-owned SplitMix64 state in model/cpu/rng.rs. That
+specific generator does not call the native RNG. Other runtime/native paths
+remain to be reviewed, and even independent RNG does not prove equal simulated
+positions. Full retained replay A/B and paired transition/LDN evidence remain
+required. No product change, new probe or native build follows from this review.
+
+The reviewed CPU query families include SDI, X/Y stick, clatter, ledge
+transition, motion/quake, guard buttons, shield tilt/parameters, command flags,
+aerial kind and attack angle. Their native-affecting answers are role-gated;
+command flags can additionally request a native status. Shield damage writes
+the shared multiplier from the P1 frame and restores its captured value outside
+practice, so the departure regression must observe that restoration. The three
+common-module DI/tech/OoS hooks are registered through add_nro_load_hook and all
+four common-site guards. Missing provider returns no_nro_hook and installs none.
+The s6-12 three-plugin diagnostic explicitly reports that refusal. That scoped
+F9 lane cannot supply positive common-module CPU feature evidence; the final
+regression must include the qualified provider and positive installation before
+counting DI/tech/OoS rows. This is an existing coverage requirement, not an
+instruction to modify a live diagnostic profile or weaken a guard.
