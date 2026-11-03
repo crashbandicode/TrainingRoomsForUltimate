@@ -286,9 +286,10 @@ pub mod natives {
         at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 
-    /// Guarded fighter-kind query for the hidden Developer debug hook.
-    pub unsafe fn fighter_kind(accessor: usize) -> i32 {
-        at::<extern "C" fn(usize) -> i32>(sites_pkg2::UTILITY_GET_KIND_OFFSET).map_or(-1, |f| f(accessor))
+    /// One guarded utility::get_kind boundary for Developer and save-state callers.
+    /// Absence remains distinct so each consumer keeps its existing refusal default.
+    pub unsafe fn fighter_kind(accessor: usize) -> Option<i32> {
+        at::<extern "C" fn(usize) -> i32>(sites_pkg2::UTILITY_GET_KIND_OFFSET).map(|f| f(accessor))
     }
 
     /// Owned ELF 1655610: const accessor argument, inverted flag bit0 result.

@@ -52,7 +52,7 @@ unsafe fn eligible(accessor: usize) -> bool {
         KIRBY.store(value, Ordering::Release);
         kirby = value;
     }
-    game::natives::fighter_kind(accessor) == kirby
+    game::natives::fighter_kind(accessor) == Some(kirby)
 }
 
 unsafe fn observe(accessor: usize) {

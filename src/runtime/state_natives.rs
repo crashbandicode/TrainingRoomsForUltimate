@@ -255,7 +255,7 @@ pub unsafe fn sora_change_magic(fighter: usize) {
 
 /// `utility::get_kind(accessor)`: the kind of the fighter or item behind an accessor.
 pub unsafe fn object_kind(accessor: usize) -> i32 {
-    at::<extern "C" fn(usize) -> i32>(s::STATE_OBJECT_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
+    crate::runtime::game::natives::fighter_kind(accessor).unwrap_or_default()
 }
 
 // ---- Pokemon Trainer and Kirby ----------------------------------------------------------------------
