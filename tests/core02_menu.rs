@@ -1270,6 +1270,113 @@ fn core02_last_page_missing_falls_back() {
 }
 
 #[test]
+fn q5_reopen_uses_loaded_page_or_cpu_not_the_previous_visible_page() {
+    let invalid = [None, Some(serde_json::json!("developer")), Some(serde_json::json!("nowhere")),
+        Some(serde_json::json!(7)), Some(serde_json::json!(null))];
+    for previous in Page::ALL {
+        for saved in &invalid {
+            let mut original = Settings::factory();
+            original.set_last_page(previous.id());
+            let mut m = Menu::new(original, Env { developer_page: true, ..Env::default() });
+            assert_eq!(m.page(), previous);
+            let mut incoming = Settings::factory();
+            incoming.menu.set("stale_dodges", &[0, 1]).unwrap();
+            incoming.defaults.set("stale_dodges", &[0, 1]).unwrap();
+            incoming.extra.insert("foreign_config".into(), serde_json::json!({"kept": [4, 2]}));
+            if let Some(value) = saved { incoming.extra.insert("last_page".into(), value.clone()); }
+            let loaded = settings::parse(&incoming.to_json());
+            assert!(!loaded.corrupt());
+            let expected = loaded.settings.to_json();
+            m.reopen(loaded.settings, Env::default());
+            assert_eq!(m.page(), Page::Cpu, "previous={previous:?}, saved={saved:?}");
+            assert_eq!(m.settings().to_json(), expected, "fallback is not a settings rewrite");
+            assert_eq!(m.take_outbox(), Default::default(), "loading emits no user effect");
+        }
+    }
+    // Every visible saved page wins over a different old page; Developer needs the flag.
+    for developer_page in [false, true] {
+        for page in Page::ALL {
+            let mut m = menu();
+            m.press(Button::R);
+            let mut incoming = Settings::factory();
+            incoming.set_last_page(page.id());
+            m.reopen(incoming, Env { developer_page, ..Env::default() });
+            let expected = if page == Page::Developer && !developer_page { Page::Cpu } else { page };
+            assert_eq!(m.page(), expected);
+        }
+    }
+}
+
+#[test]
+fn q5_saved_developer_page_restores_in_a_fresh_process_then_continues_on_cpu() {
+    use std::{fs, process::Command, time::{SystemTime, UNIX_EPOCH}};
+    const MODE: &str = "TR_UI_Q5_PROCESS_MODE";
+    const ROOT: &str = "TR_UI_Q5_PROCESS_ROOT";
+    const NAME: &str = "q5_saved_developer_page_restores_in_a_fresh_process_then_continues_on_cpu";
+    let now = || SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    if let Ok(mode) = std::env::var(MODE) {
+        let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
+        let path = root.join("settings.json");
+        match mode.as_str() {
+            "save" => {
+                let mut s = Settings::factory();
+                s.menu.set("stale_dodges", &[0, 1]).unwrap();
+                s.defaults.set("stale_dodges", &[0, 1]).unwrap();
+                s.extra.insert("foreign_config".into(), serde_json::json!({"kept": [4, 2]}));
+                let mut m = Menu::new(s, Env { developer_page: true, ..Env::default() });
+                for _ in 0..5 { m.press(Button::R); }
+                assert_eq!(m.page(), Page::Developer);
+                m.press(Button::B);
+                assert!(m.is_closed());
+                fs::write(&path, m.serialized()).unwrap();
+                assert_eq!(settings::parse(&fs::read_to_string(&path).unwrap()).settings.last_page(), Some("developer"));
+                fs::write(root.join("saver.json"), format!("{{\"pid\":{},\"saved_after_close\":true,\"time_ns\":{}}}", std::process::id(), now())).unwrap();
+            }
+            "restore" => {
+                let loaded = settings::parse(&fs::read_to_string(&path).unwrap());
+                assert!(!loaded.corrupt());
+                assert_eq!(loaded.settings.last_page(), Some("developer"));
+                let expected = loaded.settings.to_json();
+                let mut m = menu();
+                for _ in 0..4 { m.press(Button::R); }
+                assert_eq!(m.page(), Page::DisplayControls);
+                m.reopen(loaded.settings, Env::default());
+                assert_eq!(m.page(), Page::Cpu, "a fresh process may reuse its worker Menu too");
+                assert_eq!(m.settings().to_json(), expected);
+                assert_eq!(m.take_outbox(), Default::default());
+                // Continue with actual navigation and close, replacing only the saved page.
+                m.press(Button::R);
+                assert_eq!(m.page(), Page::Saves);
+                m.press(Button::B);
+                let continued = settings::parse(&m.serialized()).settings;
+                assert_eq!(continued.last_page(), Some("saves"));
+                let mut wanted = settings::parse(&expected).settings;
+                wanted.set_last_page("saves");
+                assert_eq!(continued.to_json(), wanted.to_json());
+                fs::write(root.join("restorer.json"), format!("{{\"pid\":{},\"nondefault_restored\":true,\"continued_after_fallback\":true,\"time_ns\":{}}}", std::process::id(), now())).unwrap();
+            }
+            _ => panic!("unknown process mode"),
+        }
+        return;
+    }
+    let root = std::env::temp_dir().join(format!("tr-ui-q5-{}-{}", std::process::id(), now()));
+    fs::create_dir(&root).unwrap();
+    let exe = std::env::current_exe().unwrap();
+    let run = |mode| Command::new(&exe).args(["--exact", NAME, "--nocapture"])
+        .env(MODE, mode).env(ROOT, &root).output().unwrap();
+    let saved = run("save");
+    assert!(saved.status.success(), "saver failed: {} {}", String::from_utf8_lossy(&saved.stdout), String::from_utf8_lossy(&saved.stderr));
+    let saver_exit = now();
+    let restore_launch = now();
+    let restored = run("restore");
+    assert!(restored.status.success(), "restorer failed: {} {}", String::from_utf8_lossy(&restored.stdout), String::from_utf8_lossy(&restored.stderr));
+    println!("Q5_CONTINUATION saver_exit_ns={saver_exit} restore_launch_ns={restore_launch} saver={} restorer={}",
+        fs::read_to_string(root.join("saver.json")).unwrap(), fs::read_to_string(root.join("restorer.json")).unwrap());
+    assert!(saver_exit <= restore_launch);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn core04_last_page_roundtrip() {
     for page in Page::ALL {
         let mut s = Settings::factory();
