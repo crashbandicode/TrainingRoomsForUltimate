@@ -63,7 +63,7 @@ const KIB: usize = 1024;
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_720, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_880, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
     row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
@@ -93,7 +93,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // the replay capture archive and Mii preset writer
     row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_416, 24_400, "Eden st-02..st-12", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
-    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_856, 0, "", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
+    row(ThreadId::MiiCatalog, c"mii-catalog", 24 * KIB, 5_872, 0, "", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
 ];
