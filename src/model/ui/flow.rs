@@ -23,6 +23,8 @@ pub struct Seen {
     pub panel_visible: bool,
     /// The clip editor is up.
     pub clip_visible: bool,
+    /// The layer permits physical clip input: no mismatch/name panel or native keyboard owns it.
+    pub clip_foreground: bool,
 }
 
 /// What the worker does about it.
@@ -44,7 +46,7 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
         Phase::Menu => (Phase::Menu, Step::Nothing),
         Phase::Panel if !seen.menu_open => (Phase::Menu, Step::CloseLayer),
-        Phase::Panel if seen.clip_visible => (Phase::Clip, Step::HandOverToClip),
+        Phase::Panel if seen.clip_visible && seen.clip_foreground => (Phase::Clip, Step::HandOverToClip),
         Phase::Panel if !seen.panel_visible => (Phase::Menu, Step::PopRow),
         Phase::Panel => (Phase::Panel, Step::Nothing),
         Phase::Clip if !seen.clip_visible => (Phase::Menu, Step::HideClip),
@@ -57,7 +59,7 @@ mod tests {
     use super::*;
 
     fn seen(menu_open: bool, panel_visible: bool, clip_visible: bool) -> Seen {
-        Seen { menu_open, panel_visible, clip_visible }
+        Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible }
     }
 
     #[test]
@@ -83,6 +85,24 @@ mod tests {
         assert_eq!(next(Phase::Panel, seen(false, true, false)), (Phase::Menu, Step::CloseLayer));
         // A clip editor survives the menu closing: it is its own owner.
         assert_eq!(next(Phase::Panel, seen(false, true, true)), (Phase::Menu, Step::CloseLayer));
+    }
+
+    #[test]
+    fn mismatch_keeps_menu_input_until_the_layer_releases_it() {
+        // ui-16: the replay is loaded, but Fighter Mismatch still needs physical A/B.
+        let mismatch = Seen { clip_foreground: false, ..seen(true, true, true) };
+        assert_eq!(next(Phase::Panel, mismatch), (Phase::Panel, Step::Nothing));
+        let accepted = Seen { clip_foreground: true, ..mismatch };
+        assert_eq!(next(Phase::Panel, accepted), (Phase::Clip, Step::HandOverToClip));
+        // Canceling the pending replay instead returns to the Recording row.
+        assert_eq!(next(Phase::Panel, seen(true, false, false)), (Phase::Menu, Step::PopRow));
+    }
+
+    #[test]
+    fn keyboard_over_an_existing_clip_does_not_discard_the_clip_phase() {
+        let naming = Seen { clip_foreground: false, ..seen(false, true, true) };
+        assert_eq!(next(Phase::Clip, naming), (Phase::Clip, Step::Nothing));
+        assert_eq!(next(Phase::Clip, seen(false, true, true)), (Phase::Clip, Step::Nothing));
     }
 
     #[test]

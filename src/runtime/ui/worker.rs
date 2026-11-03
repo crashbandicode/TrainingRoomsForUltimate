@@ -375,7 +375,12 @@ fn sync_panels(s: &mut Session) {
             }
         }
     }
-    let seen = Seen { menu_open: open, panel_visible: external::panel_up() || s.setups.panel_up(), clip_visible: external::clip_up() };
+    let seen = Seen {
+        menu_open: open,
+        panel_visible: external::panel_up() || s.setups.panel_up(),
+        clip_visible: external::clip_up(),
+        clip_foreground: named_macros::clip_foreground(),
+    };
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
     match step {
