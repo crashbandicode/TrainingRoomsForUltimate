@@ -146,6 +146,26 @@ fn n7_controller_styles_keep_the_spec_logical_mapping_and_unmapped_buttons_absen
 }
 
 #[test]
+fn n7_capture_and_execution_match_the_independent_wire_oracle_for_every_style() {
+    // SPEC-input-04 §3.3 in RAW bit order; None is not a chord button.
+    let normal: [Option<u8>; 32] = [Some(8), Some(11), Some(9), Some(10), Some(2), Some(0), Some(1), Some(3),
+        Some(4), Some(5), Some(6), Some(7), Some(6), Some(7), Some(6), Some(7), Some(14), Some(15), Some(12), Some(13),
+        None, None, None, None, None, None, None, None, None, None, None, None];
+    let gc: [Option<u8>; 32] = [Some(8), Some(11), Some(9), Some(10), Some(2), Some(0), Some(1), Some(3),
+        Some(6), Some(7), None, Some(5), None, None, None, None, Some(14), Some(15), Some(12), None,
+        None, None, None, None, None, None, None, None, Some(6), Some(7), None, None];
+    for raw_style in 0..=8 {
+        let oracle = if raw_style == 7 { gc } else { normal };
+        for (raw, logical) in oracle.into_iter().enumerate() {
+            let expected = logical.map_or(0, |bit| 1u16 << bit);
+            let buttons = 1u32 << raw;
+            assert_eq!(model::adapter::logical(buttons, Style::from_raw(raw_style)), expected, "capture style={raw_style} raw={raw}");
+            assert_eq!(model::chords::logical_set(raw_style, buttons), expected, "execute style={raw_style} raw={raw}");
+        }
+    }
+}
+
+#[test]
 fn n7_existing_collision_rules_refuse_without_losing_the_preview_or_originals() {
     for (raw, other, why) in [
         ((1 << bit::B) | (1 << bit::DPAD_UP), Chord::NONE, model::ini_files::EditRefusal::Permanent),

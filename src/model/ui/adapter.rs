@@ -84,38 +84,10 @@ const fn has(buttons: u32, bit: u32) -> bool {
 /// controller type: a Pro-style L is `l`, a GameCube pad has none; R is `r`, or the GameCube's `zr`; ZL / ZR
 /// are the triggers or the Joy-Con side buttons, and on a GameCube pad its own L and R (SPEC-core-03 §3).
 pub fn logical(buttons: u32, style: Style) -> u16 {
-    let gc = style.is_gamecube();
-    let l = !gc && has(buttons, bit::L);
-    let r = if gc { has(buttons, bit::ZR) } else { has(buttons, bit::R) };
-    let zl = if gc {
-        has(buttons, bit::L) || has(buttons, bit::REAL_L)
-    } else {
-        has(buttons, bit::ZL) || has(buttons, bit::LEFT_SL) || has(buttons, bit::RIGHT_SL)
-    };
-    let zr = if gc {
-        has(buttons, bit::R) || has(buttons, bit::REAL_R)
-    } else {
-        has(buttons, bit::ZR) || has(buttons, bit::LEFT_SR) || has(buttons, bit::RIGHT_SR)
-    };
-    let flags = [
-        has(buttons, bit::A),
-        has(buttons, bit::B),
-        has(buttons, bit::X),
-        has(buttons, bit::Y),
-        l,
-        r,
-        zl,
-        zr,
-        has(buttons, bit::DPAD_UP),
-        has(buttons, bit::DPAD_DOWN),
-        has(buttons, bit::DPAD_LEFT),
-        has(buttons, bit::DPAD_RIGHT),
-        has(buttons, bit::PLUS),
-        has(buttons, bit::MINUS),
-        has(buttons, bit::STICK_L),
-        has(buttons, bit::STICK_R),
-    ];
-    flags.iter().enumerate().fold(0u16, |mask, (i, on)| mask | (u16::from(*on) << i))
+    // Capture and execution must agree (notably GameCube has no Minus).
+    // The matcher already owns the spec's physical-to-logical wire mapping.
+    let raw_style = if style.is_gamecube() { super::chords::STYLE_GAMECUBE } else { 0 };
+    super::chords::logical_set(raw_style, buttons)
 }
 
 /// The four directions (up, right, down, left) held by the d-pad, the left stick and the right stick.
