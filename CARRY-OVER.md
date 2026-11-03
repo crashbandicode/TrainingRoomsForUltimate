@@ -513,7 +513,3 @@ bytes to the existing ring without invoking that drain. No new state, capacity,
 logging policy, or stage source was added/read. The live_replay call is recorded
 as an appended exact-text pkg4 carry transformation; the runtime logger has no
 carry manifest (see its original scoped mixed-file attribution above).
-
-
-## UI22 input-log contrast (2026-11-03)
-Clean-room pane-table, pane traversal and HUD consumer changes; no carried source was modified. Thirty tight text backings reuse existing qualified solid materials, with recipes regenerated from operator-owned stock. No new fonts or textures. Host/source proof and remaining native gates: docs/UI22-INPUT-CONTRAST.md.

@@ -211,27 +211,15 @@ unsafe fn write_plan(column: *mut Pane, plan: &Plan) {
             Op::Icons { phys, icons } => write_icons(root, usize::from(phys), &icons),
             Op::Frames { phys, frames } => {
                 let target = find(root, p::IDX_LOG_FRAME + usize::from(phys));
-                let backing = pane::preceding_sibling(target, p::name_of(p::IDX_LOG_FRAME_BASE + usize::from(phys)).as_bytes());
-                if backing.is_null() {
-                    missing("frame backing");
-                    return;
-                }
-                {
+                if !target.is_null() {
                     let mut text = FixedPath::<8>::new();
                     let _ = write!(text, "{frames}");
                     set_text(target, text.as_str());
-                    pane::set_visible(backing, true);
                 }
             }
             Op::Status { phys, text } => {
                 let target = find(root, p::IDX_LOG_STATUS + usize::from(phys));
-                let backing = pane::preceding_sibling(target, p::name_of(p::IDX_LOG_STATUS_BASE + usize::from(phys)).as_bytes());
-                if backing.is_null() {
-                    missing("status backing");
-                    return;
-                }
-                {
-                    pane::set_visible(backing, !matches!(text, StatusText::Empty));
+                if !target.is_null() {
                     match text {
                         StatusText::Empty => set_text(target, ""),
                         StatusText::Id { kind, status } => {
