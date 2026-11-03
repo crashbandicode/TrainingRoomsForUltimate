@@ -68,7 +68,7 @@ pub(crate) struct View {
     pub miis:[Option<MiiProof>;2],
     /// Sealed resource identity projected atomically with the source reservation.
     /// This is not native activation completion and grants no new helper lease.
-    pub promoted:[Option<(PromotionToken,NativeIdentity)>;2],
+    pub promoted:[Option<(PromotionToken,NativeIdentity,bool)>;2],
     /// Training creation order 7/6/5/4, never native helper ordinals. SourceBook
     /// projects these tokens; this value view owns no independent lifetime.
     pub created_slots:[Helper;4],
@@ -158,7 +158,7 @@ impl View {
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     pub fn accepts_promoted(self,id:usize,now:Proof,active:NativeIdentity)->bool {
         let Some(ordinal)=self.ordinal(id) else{return false;};
-        let Some((promotion,expected))=self.promoted[ordinal] else{return false;};
+        let Some((promotion,expected,_parked_install))=self.promoted[ordinal] else{return false;};
         let Helper::Ready {ready,..}=self.slots[ordinal] else{return false;};
         promotion.source()==ready.source() && expected==active
             && active.slot as usize==id && active.entry==now.owner.entry
@@ -464,7 +464,7 @@ mod mii_tests {
     use crate::engine::mii::{inventory::{build_snapshot,RawSlot,MiiClass,TaggedId},
         lifetime::{Binding,Configuration},native_values::Mirrors};
     #[test]
-    fn helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
+    fn count_promotion_helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
         let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],
             colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),
             tag_hat:TaggedId(0x5a00000fa9efa5ea),
@@ -517,7 +517,7 @@ mod mii_tests {
         let promotion=book.promote(ready).unwrap();
         let identity=NativeIdentity {slot:2,entry:b.entry,kind:key.kind,costume:0,
             body_id:23,bodies:[(0xa000,23),(0,0),(0,0)],descriptor:owner.information,resource:owner.object};
-        let retained=View {promoted:[Some((promotion,identity)),None],..committed};
+        let retained=View {promoted:[Some((promotion,identity,true)),None],..committed};
         assert_eq!(book.promoted_ready(promotion),Ok(ready));
         assert_eq!(book.leased_ready(lease,Holder {category:1,id:17}),Some(ready));
         assert!(retained.accepts_promoted(2,proof,identity));

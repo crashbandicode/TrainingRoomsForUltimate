@@ -103,6 +103,18 @@ impl EntryState {
     /// Initial loads use ff in +5919; completed form changes use the live index.
     /// Pointer/owner/body checks remain the native callback's responsibility.
     pub fn ready(self) -> Option<(Forms, u32)> {
+        self.ready_with_install_marker(false)
+    }
+
+    /// Count activation calls native 656ee0 directly, retaining the completed
+    /// parked install's +5934 marker. Only a current, sealed promotion may use
+    /// this shape; it is not load completion or ownership authority. An active
+    /// Reload still requires ready(), including marker zero.
+    pub fn ready_count_promoted(self, parked_install: bool) -> Option<(Forms, u32)> {
+        self.ready_with_install_marker(parked_install)
+    }
+
+    fn ready_with_install_marker(self, parked_install: bool) -> Option<(Forms, u32)> {
         let forms = if self.kinds[0] == 0x4b && self.count == 1 {
             Forms::solo_popo()
         } else {
@@ -118,7 +130,7 @@ impl EntryState {
             && self.flags == forms.flags
             && self.outer == 6
             && self.loader == 14
-            && self.changing == 0
+            && (self.changing == 0 || (parked_install && self.changing == 1))
             && self.guard == 0)
             .then(|| (forms, self.kinds[self.index as usize]))
     }
@@ -464,6 +476,34 @@ mod tests {
         state.previous_or_next = 2;
         assert_eq!(state.ready().unwrap().1, 0x26);
     }
+    #[test]
+    fn count_promotion_retains_completed_parked_install_marker() {
+        // Original s6-11 #308 native count activation, not a generated fixture.
+        let observed = EntryState { count: 1, kinds: [3, u32::MAX, u32::MAX],
+            actor_count: 1, installed: 1, index: 0, previous_or_next: 0,
+            pending: 255, flags: 0, outer: 6, loader: 14, changing: 1, guard: 0 };
+        assert_eq!(observed.ready(), None, "ordinary reload contract stays strict");
+        assert_eq!(observed.ready_count_promoted(false), None);
+        assert_eq!(observed.ready_count_promoted(true), Some((Forms::starting(3), 3)));
+        assert!(EntryState { changing: 0, ..observed }.ready_count_promoted(true).is_some(),
+            "native full reset may clear the retained marker");
+        for bad in [
+            EntryState { count: 2, ..observed },
+            EntryState { kinds: [3, 2, u32::MAX], ..observed },
+            EntryState { actor_count: 2, ..observed },
+            EntryState { installed: 0, ..observed },
+            EntryState { index: 1, ..observed },
+            EntryState { previous_or_next: 1, ..observed },
+            EntryState { pending: 0, ..observed },
+            EntryState { flags: 1, ..observed },
+            EntryState { outer: 1, ..observed },
+            EntryState { outer: 3, ..observed },
+            EntryState { loader: 13, ..observed },
+            EntryState { changing: 2, ..observed },
+            EntryState { guard: 1, ..observed },
+        ] { assert_eq!(bad.ready_count_promoted(true), None, "{bad:?}"); }
+    }
+
     #[test]
     fn incomplete_or_mixed_descriptors_are_rejected() {
         let original = pyra_loaded();

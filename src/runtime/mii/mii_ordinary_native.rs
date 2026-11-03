@@ -138,7 +138,7 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    let active=view.promoted[ordinal].and_then(|_|super::super::native_source::active_identity(owner.entry as *const u8,id as u32,kind));
+    let active=view.promoted[ordinal].and_then(|(_,_,parked_install)|super::super::native_source::promoted_identity(owner.entry as *const u8,id as u32,kind,parked_install));
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let retained=active.is_some_and(|identity|view.accepts_promoted(id,now,identity));
     #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]

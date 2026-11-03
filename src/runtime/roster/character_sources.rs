@@ -524,7 +524,7 @@ pub(super) unsafe fn reserve_count_promotion(old: u32, requested: u32,
             source.promotion = reservation;
             #[cfg(feature="mii-managed-source-coexist-alpha")]
             if let Some(ordinal)=registry.helpers.ordinal(i+2) {
-                registry.helpers.promoted[ordinal]=reservation.zip(source.completed_native);
+                registry.helpers.promoted[ordinal]=reservation.zip(source.completed_native).map(|(token, identity)| (token, identity, !source.active_reload));
             }
         }
     }
@@ -611,7 +611,7 @@ unsafe fn complete_count_promotion(entry: *mut u8, slot: u32) {
         observe_promotion(entry as usize, slot, &source, "missing_sealed_identity", None);
         return;
     };
-    let actual = native_source::active_identity_detail(entry, slot, source.kind);
+    let actual = native_source::promoted_identity_detail(entry, slot, source.kind, !source.active_reload);
     if actual != Ok(expected) {
         #[cfg(feature = "diag")]
         observe_promotion(entry as usize, slot, &source, "identity_mismatch", Some(actual));
@@ -1234,7 +1234,7 @@ unsafe fn active_reload_ready(entry: *const u8, slot: u32, source: Source) -> bo
     matches!(slot, 2 | 3) && source.promotion.is_some() && source.install.is_none()
         && source.token.entry() == NativeEntry(entry as u64)
         && source.completed_native.is_some()
-        && native_source::active_identity(entry, slot, source.kind) == source.completed_native
+        && native_source::promoted_identity(entry, slot, source.kind, !source.active_reload) == source.completed_native
 }
 
 /// Outside G/STATE only. Prove a current fixed seat using its sealed completed
@@ -1249,15 +1249,15 @@ pub(super) unsafe fn retained_seat_ready(entry: *const u8, slot: u32, kind: u32)
         let ready = source.promotion.map_or_else(|| state.book.ready(slot as usize),
             |promotion| state.book.promoted_ready(promotion));
         if ready.is_err() { return false; }
-        (source.token, source.promotion, source.completed_native)
+        (source.token, source.promotion, source.completed_native, source.active_reload)
     };
     let Some(expected) = receipt.2 else { return false; };
     let parked = native_source::parked_identity(entry, slot, kind) == Some(expected);
     if !parked && (receipt.1.is_none()
-        || native_source::active_identity(entry, slot, kind) != Some(expected)) { return false; }
+        || native_source::promoted_identity(entry, slot, kind, !receipt.3) != Some(expected)) { return false; }
     let state = STATE.lock();
     state.sources[slot as usize].is_some_and(|source|
-        (source.token, source.promotion, source.completed_native) == receipt
+        (source.token, source.promotion, source.completed_native, source.active_reload) == receipt
             && source.install.is_none() && state.book.is_current(source.token.epoch())
             && state.book.phase(slot as usize) == Ok(Phase::Ready))
 }
@@ -1393,7 +1393,7 @@ pub(super) unsafe fn portrait_native_ready(entry:*const u8,lease:Lease,holder:Ho
     if source.promotion.is_none() {return portrait_render_ready(entry,lease,holder);}
     let Some(expected)=source.completed_native else{return false;};
     native_source::parked_identity(entry,lease.slot,source.kind)==Some(expected)
-        || native_source::active_identity(entry,lease.slot,source.kind)==Some(expected)
+        || native_source::promoted_identity(entry,lease.slot,source.kind,!source.active_reload)==Some(expected)
 }
 
 /// Native copy changes retain earlier kinds' object groups. Copy loss destroys
@@ -1869,7 +1869,7 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
             };
             registry.source(state.book.epoch(), index, helper);
             if let Some(ordinal) = registry.helpers.ordinal(index) {
-                registry.helpers.promoted[ordinal] = source.promotion.zip(source.completed_native);
+                registry.helpers.promoted[ordinal] = source.promotion.zip(source.completed_native).map(|(token, identity)| (token, identity, !source.active_reload));
             }
             #[cfg(feature="mii-managed-helper-alpha")]
             if matches!(helper,coexist::helpers::Helper::Ready {..}) {

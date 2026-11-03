@@ -179,6 +179,26 @@ pub(super) enum ActiveIdentityFailure {
 /// The diagnostic caller cannot use a failure as ownership or readiness proof.
 pub(super) unsafe fn active_identity_detail(current:*const u8,slot:u32,kind:u32)
     -> Result<ReadySource, ActiveIdentityFailure> {
+    active_identity_shape(current, slot, kind, false)
+}
+
+/// Read-only count-activation shape. Caller must own the current completed
+/// SourceToken/PromotionToken and compare the returned full sealed identity.
+/// parked_install is the completed transaction's purpose, never native phase
+/// alone. The full active Reload contract remains strict in active_identity.
+pub(super) unsafe fn promoted_identity_detail(current: *const u8, slot: u32,
+    kind: u32, parked_install: bool) -> Result<ReadySource, ActiveIdentityFailure> {
+    if !matches!(slot, 2 | 3) { return Err(ActiveIdentityFailure::Entry); }
+    active_identity_shape(current, slot, kind, parked_install)
+}
+
+pub(super) unsafe fn promoted_identity(current: *const u8, slot: u32,
+    kind: u32, parked_install: bool) -> Option<ReadySource> {
+    promoted_identity_detail(current, slot, kind, parked_install).ok()
+}
+
+unsafe fn active_identity_shape(current: *const u8, slot: u32, kind: u32,
+    parked_install: bool) -> Result<ReadySource, ActiveIdentityFailure> {
     use ActiveIdentityFailure as Failure;
     if !aligned(current) || read::<u32>(current,0xe0)!=slot {return Err(Failure::Entry);}
     let state=super::EntryState {
@@ -188,7 +208,7 @@ pub(super) unsafe fn active_identity_detail(current:*const u8,slot:u32,kind:u32)
         flags:read(current,0x591f), outer:read(current,0x5920), loader:read(current,0x591c),
         changing:read(current,0x5934), guard:read(current,0x5935),
     };
-    let (forms,_)=state.ready().ok_or(Failure::State(state))?;
+    let (forms,_)=state.ready_count_promoted(parked_install).ok_or(Failure::State(state))?;
     if forms!=Forms::starting(kind) {return Err(Failure::Forms);}
     for i in 0..forms.count as usize {
         let body=read::<*const u8>(current,0x4160+i*8);
