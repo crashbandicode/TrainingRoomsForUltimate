@@ -5,7 +5,7 @@ not turn a solo waiting-room observation into two-console or LDN acceptance.
 
 ## Changed-path source review, 2026-11-03
 
-[The r17 HUD and first-seal audit](../docs/R17-ONLINE-RELEASE-DELTA.md) binds the exact changed paths and their caller scene guards. It found identity reads before the Training check in reset republishing; source correction 2dbfe6e restores that order and is independently reviewed. The next native binary and actual transitions still need validation. First-seal source cfg elimination is established only for non-diag; the diagnostic logger startup fallback remains under disposition. Neither source review nor the waiting-menu development clip establishes desync, online pair, or LDN acceptance.
+[The r17 HUD and first-seal audit](../docs/R17-ONLINE-RELEASE-DELTA.md) binds the exact changed paths and their caller scene guards. It found identity reads before the Training check in reset republishing; source correction 2dbfe6e restores that order and is independently reviewed. Frozen r18 f1db4cb now has independent actual-ELF proof of that branch order; actual transitions remain unverified. Its first-seal enqueue-only entry also has compiled proof that it cannot enter the ordinary logger startup drain. Non-diag cfg elimination and tag filtering still require the final release-binary gate. Neither source review nor the waiting-menu development clip establishes desync, online pair, or LDN acceptance.
 
 ## Evidence contract
 
@@ -144,3 +144,21 @@ F9 lane cannot supply positive common-module CPU feature evidence; the final
 regression must include the qualified provider and positive installation before
 counting DI/tech/OoS rows. This is an existing coverage requirement, not an
 instruction to modify a live diagnostic profile or weaken a guard.
+
+## Surface pair preflight, 2026-11-03 10:20 UTC
+
+The Surface has the same pinned LAN runtime ee3c2e953a0b87541c29eb8918ce0354489035296ac5eaf060b3444d06a8bbcb
+(12,658,343 bytes). The current AppImage is d483c082147eb6a5838ca90b8c0988baec8f8e7bc662234215069a4746215570.
+Read-only artifact/source hashes are retained in parent-workspace
+artifacts/trainingrooms-lead-astra4/main-r18/lead-online-surface-preflight.json.
+Rehash both hosts at actual admission; this observation is not pair acceptance.
+
+The parameterized harness already forwards the pinned runtime at launch, but
+Surface prep forces LAN Online off and airplane mode on. For the admitted
+private pair, set lan_online=true, lan_online_tls=true and airplane_mode=false
+after prep and before launch, retaining volume=0. Verify those exact keys on
+both private peers and restore the original complete Qt bytes afterward.
+Use current owned per-host claims and full-profile snapshot/restore controllers.
+The playbook historical pair scripts were read as route references only: their
+foreign roots/owners and plugin-only restoration are not this run controller.
+No profile, account, service or firewall change was made by this preflight.
