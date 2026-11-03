@@ -51,6 +51,10 @@ use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 mod native_source;
 #[path = "training_count_readiness.rs"]
 mod training_count_readiness;
+
+#[cfg(feature="diag")]
+#[path = "count_diagnostics.rs"]
+mod count_diagnostics;
 #[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;

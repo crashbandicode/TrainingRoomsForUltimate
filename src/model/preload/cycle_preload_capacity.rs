@@ -6,6 +6,54 @@ use crate::engine::mii::backend::Layout;
 pub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS, SOURCE_SLOTS};
 pub const ABSENT_SLOT: u32 = 8;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallbackIdentity {
+    pub layout: Layout,
+    pub epoch: crate::engine::swap::source_lifetime::SceneEpoch,
+    pub entry: usize,
+}
+
+/// Slot four is a visible native CPU in waiting. Only a live creation receipt
+/// matching the current Training scene and callback may dispatch it as a source.
+pub fn source_callback(slot: u32, third: bool, current: Option<CallbackIdentity>,
+    registered: Option<CallbackIdentity>) -> bool {
+    matches!(slot, 2 | 3 | 5 | 6) || (third && slot == 7)
+        || (third && slot == 4 && current.is_some_and(|identity|
+            identity.layout == Layout::Training && identity.entry != 0
+                && registered == Some(identity)))
+}
+
+#[cfg(test)]
+mod callback_tests {
+    use super::*;
+    use crate::engine::swap::source_lifetime::SourceBook;
+
+    #[test]
+    fn count_promotion_dispatch_accepts_only_current_owned_training_four() {
+        let mut book = SourceBook::<1, 1>::new();
+        let current = CallbackIdentity {layout: Layout::Training, epoch: book.epoch(), entry: 0x4000};
+        assert!(source_callback(4, true, Some(current), Some(current)));
+        assert!(!source_callback(4, false, Some(current), Some(current)));
+        assert!(!source_callback(4, true, Some(current), None));
+        assert!(!source_callback(4, true, Some(current), Some(CallbackIdentity {entry: 0x5000, ..current})));
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            let waiting = CallbackIdentity {layout, ..current};
+            assert!(!source_callback(4, true, Some(waiting), Some(waiting)));
+            assert!(!source_callback(4, true, Some(waiting), Some(current)));
+        }
+        book.depart_scene().unwrap();
+        let next = CallbackIdentity {epoch: book.epoch(), ..current};
+        assert!(!source_callback(4, true, Some(next), Some(current)));
+        assert!(!source_callback(4, true, None, Some(current)));
+        assert!(!source_callback(0, true, Some(current), Some(current)));
+        let absent = CallbackIdentity {entry: 0, ..current};
+        assert!(!source_callback(4, true, Some(absent), Some(absent)));
+        for slot in [2, 3, 5, 6] { assert!(source_callback(slot, false, None, None)); }
+        assert!(source_callback(7, true, None, None));
+        assert!(!source_callback(7, false, None, None));
+    }
+}
+
 /// Potential entries, not permission to create or dereference them. Training
 /// extensions and solo waiting extensions require separate opt-in features.
 pub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)

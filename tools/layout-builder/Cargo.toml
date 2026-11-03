@@ -18,3 +18,7 @@ serde_json = "1"
 [[bin]]
 name = "layout-builder"
 path = "src/main.rs"
+
+[[test]]
+name = "ui_pane_boundary"
+path = "../../tests/ui_pane_boundary.rs"

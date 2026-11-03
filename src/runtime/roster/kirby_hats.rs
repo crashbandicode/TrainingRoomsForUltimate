@@ -171,7 +171,7 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
         return;
     }
     let settings = read(&MENU);
-    let choices = settings.ordered_kirby_hat_kinds(if role == 0 {
+    let choices = settings.ordered_kirby_hat_kinds_fixed(if role == 0 {
         crate::engine::swap::roster_grid::Role::Player
     } else {
         crate::engine::swap::roster_grid::Role::Cpu

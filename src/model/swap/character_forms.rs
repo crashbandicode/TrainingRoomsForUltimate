@@ -83,7 +83,7 @@ pub fn typed_record_kind(requested: u32, member: u32) -> Option<u32> {
     Some(if member == 0x4c { 0x4b } else { member })
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EntryState {
     pub count: u32,
     pub kinds: [u32; 3],

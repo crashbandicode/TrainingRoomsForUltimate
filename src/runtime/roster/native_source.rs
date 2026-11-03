@@ -162,7 +162,25 @@ pub(super) unsafe fn parked_identity(current: *const u8, slot: u32, kind: u32) -
 /// sealed completed lifetime and exact source reservation; phase6 alone is not
 /// promotion authority. No bank lookup, archive query, game call or Rust lock.
 pub(super) unsafe fn active_identity(current:*const u8,slot:u32,kind:u32)->Option<ReadySource> {
-    if !aligned(current) || read::<u32>(current,0xe0)!=slot {return None;}
+    active_identity_detail(current, slot, kind).ok()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ActiveIdentityFailure {
+    Entry,
+    State(super::EntryState),
+    Forms,
+    Body { index: usize, field: &'static str, actual: u64, expected: u64 },
+    Resource,
+    ResourceKind(u32),
+}
+
+/// Same strict predicate, retaining only values already read by its checks.
+/// The diagnostic caller cannot use a failure as ownership or readiness proof.
+pub(super) unsafe fn active_identity_detail(current:*const u8,slot:u32,kind:u32)
+    -> Result<ReadySource, ActiveIdentityFailure> {
+    use ActiveIdentityFailure as Failure;
+    if !aligned(current) || read::<u32>(current,0xe0)!=slot {return Err(Failure::Entry);}
     let state=super::EntryState {
         count:read(current,0x14), kinds:[read(current,0x18),read(current,0x1c),read(current,0x20)],
         actor_count:read(current,0x28), installed:read(current,0x4150),
@@ -170,18 +188,30 @@ pub(super) unsafe fn active_identity(current:*const u8,slot:u32,kind:u32)->Optio
         flags:read(current,0x591f), outer:read(current,0x5920), loader:read(current,0x591c),
         changing:read(current,0x5934), guard:read(current,0x5935),
     };
-    let (forms,_)=state.ready()?;
-    if forms!=Forms::starting(kind) {return None;}
+    let (forms,_)=state.ready().ok_or(Failure::State(state))?;
+    if forms!=Forms::starting(kind) {return Err(Failure::Forms);}
     for i in 0..forms.count as usize {
         let body=read::<*const u8>(current,0x4160+i*8);
-        if !aligned(body) || read::<usize>(body,0)!=BASE.load(Ordering::Acquire)+0x4f80210
-            || read::<u32>(body,0xc)!=forms.kinds[i] || read::<u64>(body,0x10)!=u64::from(slot)
-            || read::<u8>(body,0x3a)!=forms.body_state(i,state.index)
-            || !aligned(read::<*const u8>(body,0x20)) {return None;}
+        let failure=|field,actual,expected|Failure::Body {index:i,field,actual,expected};
+        if !aligned(body) {return Err(failure("pointer",body as u64,0));}
+        let actual=read::<usize>(body,0) as u64;
+        let expected=(BASE.load(Ordering::Acquire)+0x4f80210) as u64;
+        if actual!=expected {return Err(failure("vtable",actual,expected));}
+        let actual=u64::from(read::<u32>(body,0xc));
+        let expected=u64::from(forms.kinds[i]);
+        if actual!=expected {return Err(failure("kind",actual,expected));}
+        let actual=read::<u64>(body,0x10);
+        if actual!=u64::from(slot) {return Err(failure("owner",actual,u64::from(slot)));}
+        let actual=u64::from(read::<u8>(body,0x3a));
+        let expected=u64::from(forms.body_state(i,state.index));
+        if actual!=expected {return Err(failure("phase",actual,expected));}
+        let accessor=read::<*const u8>(body,0x20);
+        if !aligned(accessor) {return Err(failure("accessor",accessor as u64,0));}
     }
-    let owner=resource_owner(slot)?;
-    if read::<u32>(owner,0x58)!=kind {return None;}
-    Some(identity(current,slot,kind,owner))
+    let owner=resource_owner(slot).ok_or(Failure::Resource)?;
+    let owner_kind=read::<u32>(owner,0x58);
+    if owner_kind!=kind {return Err(Failure::ResourceKind(owner_kind));}
+    Ok(identity(current,slot,kind,owner))
 }
 
 unsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {

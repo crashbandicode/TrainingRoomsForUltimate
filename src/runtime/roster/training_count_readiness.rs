@@ -44,6 +44,29 @@ pub(super) fn busy(old: u32, requested: u32, helpers: [Option<Helper>; 2],
     })
 }
 
+#[cfg(all(target_os = "switch", feature = "diag"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Observation {
+    old: u32, requested: u32, manager: Option<usize>, helpers: [Option<Helper>; 2],
+    install: bool, busy: bool, reserved: Option<bool>,
+    sources: Option<super::sources::CountSources>,
+}
+
+#[cfg(all(target_os = "switch", feature = "diag"))]
+fn observe(value: Observation) {
+    if !crate::runtime::diag_log::async_writer_ready() { return; }
+    use super::count_diagnostics::{Changes, Event};
+    static CHANGES: hos_lock::Mutex<Changes<Observation>> = hos_lock::Mutex::new(Changes::new(32));
+    let event = { CHANGES.lock().observe(value) };
+    match event {
+        Event::Changed => crate::engine::compat::logging::diagnostic(format_args!(
+            "[CountPromotion] count {:?}", value)),
+        Event::Overflow => crate::engine::compat::logging::diagnostic(format_args!(
+            "[CountPromotion] count budget exhausted; subsequent outcomes unknown")),
+        Event::Quiet => {},
+    }
+}
+
 #[cfg(target_os = "switch")]
 #[skyline::hook(offset = 0x155c188, inline)]
 unsafe fn count_readiness(ctx: &mut skyline::hooks::InlineCtx) {
@@ -58,11 +81,14 @@ unsafe fn count_readiness(ctx: &mut skyline::hooks::InlineCtx) {
     let symbol = super::setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     let manager = (base != 0 && symbol == base + 0x52b94f8)
         .then(|| fields::child(symbol, 0)).flatten();
-    let blocked = if let Some(manager) = manager {
-        let current = helpers(manager);
-        busy(old, requested, current, super::INSTALL.active())
-            || !super::sources::reserve_count_promotion(old, requested, current)
-    } else { true };
+    let current = manager.map(|manager| helpers(manager)).unwrap_or([None; 2]);
+    let install = super::INSTALL.active();
+    let busy = manager.is_none() || busy(old, requested, current, install);
+    let reserved = (!busy).then(|| super::sources::reserve_count_promotion(old, requested, current));
+    let blocked = reserved != Some(true);
+    #[cfg(feature = "diag")]
+    observe(Observation { old, requested, manager, helpers: current, install, busy, reserved,
+        sources: super::sources::count_sources() });
     if blocked {
         // SUB at 184 already ran. Feed the existing saturating decrement/store
         // and subsequent signed cooldown check: store 5 and return before the
@@ -80,11 +106,15 @@ pub(super) fn install() {
         // Quiescent plugin initialization, before this module patches anything.
         unsafe { std::slice::from_raw_parts((base + row.offset) as *const u8, row.guard.len()) == row.guard }
     });
-    if cfg!(feature = "managed-sources") && crate::runtime::roster::cpu_quantity_guarded()
+    let quantity = crate::runtime::roster::cpu_quantity_guarded();
+    let gate = cfg!(feature = "managed-sources") && quantity
         && crate::runtime::seams::seam_install::gate("character_roster",
-            &["roster.count_readiness", "roster.count_inputs", "roster.count_retry", "roster.count_scan"], legacy) && legacy {
-        skyline::install_hooks!(count_readiness);
-    }
+            &["roster.count_readiness", "roster.count_inputs", "roster.count_retry", "roster.count_scan"], legacy);
+    let installed = gate && legacy;
+    if installed { skyline::install_hooks!(count_readiness); }
+    #[cfg(feature = "diag")]
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[CountPromotion] registration base={base:#x} legacy={legacy} quantity={quantity} gate={gate} installed={installed}"));
 }
 
 #[cfg(test)]

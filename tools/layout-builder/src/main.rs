@@ -13,7 +13,7 @@
 //! under `RootPane` with text boxes cloned from a stock text box and flat rectangles cloned from a stock solid
 //! picture. The 38 provenance-recorded item icons are appended to the stock BNTX; stock textures are retained.
 
-use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, PaneEdit, BFLYT};
+use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, Material, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
 use nx_layout_toolbox::bntx::{read_bntx, write_bntx, pipeline::{import_png_file, ImportOptions}};
 
@@ -31,6 +31,8 @@ const BFLYT_MEMBER: &str = "blyt/info_training.bflyt";
 const RECT_TEMPLATE: &str = "pic_bg_mode_main_00";
 /// A stock text box in the `nintendo64` font with a plain white material.
 const TEXT_TEMPLATE: &str = "set_txt_help_00";
+const TEXT_FONT: &str = "nintendo64";
+const OWNED_TEXT_MATERIAL: &str = "tr_text_neutral";
 const WAITING_PORT: panes::Name = panes::Name::new("TrModPort");
 const INFLUENCED_ALPHA: u8 = 0x02;
 /// 	xt1 flag bit 1: the buffer is 	ext_buf_bytes long even when the string in it is shorter.
@@ -57,6 +59,13 @@ fn layout_specs(waiting: bool) -> Vec<Spec> {
 }
 
 fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
+    // Resolve the font by identity in this archive, never by Training's index.
+    let text_font = if matches!(spec.kind, Kind::Text { .. }) {
+        Some(u16::try_from(layout.fonts.iter().position(|name| name == TEXT_FONT)
+            .ok_or("qualified text font missing")?).map_err(err("font index"))?)
+    } else {
+        None
+    };
     let template = match spec.kind {
         Kind::Null => "RootPane",
         Kind::Rect { .. } => if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE },
@@ -78,7 +87,13 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
             ..Default::default()
         })
         .map_err(err(name))?;
-    layout.set_pane(name, &PaneEdit::default()).map_err(err(name))?;
+    if text_font.is_some() {
+        layout.set_pane(name, &PaneEdit {
+            scale_x: Some(1.0), scale_y: Some(1.0),
+            bind_material: waiting.then(|| OWNED_TEXT_MATERIAL.into()),
+            ..Default::default()
+        }).map_err(err(name))?;
+    }
     let pane = layout.find_pane_mut(name).ok_or("pane missing")?;
     pane.flag |= INFLUENCED_ALPHA;
     match spec.kind {
@@ -95,6 +110,7 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
         }
         Kind::Text { align, font, chars, color } => {
             let text = pane.text.as_mut().ok_or("not a text box")?;
+            text.font_index = text_font.ok_or("text font missing")?;
             let (position, alignment) = match align {
                 // Origin: horizontal * 3 + vertical (centre, left, right; centre, top, bottom); lines align alike.
                 Align::Left => (3, 1),
@@ -130,6 +146,21 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
     Ok(())
 }
 
+fn add_waiting_text_material(layout: &mut BFLYT) -> Result<()> {
+    if layout.materials.iter().any(|m| m.name == OWNED_TEXT_MATERIAL) {
+        return Err("owned text material already exists".into());
+    }
+    // Same plain neutral mapping as the qualified Training text material.
+    // Stock waiting status text and its animations retain their green material.
+    layout.materials.push(Material {
+        name: OWNED_TEXT_MATERIAL.into(),
+        black_color: Color8 { r: 0, g: 0, b: 0, a: 0 },
+        white_color: Color8 { r: 252, g: 252, b: 252, a: 255 },
+        ..Default::default()
+    });
+    Ok(())
+}
+
 fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let stock = std::fs::read(stock_path).map_err(err("read stock"))?;
     let mut arc = read_arc(&stock).map_err(err("read arc"))?;
@@ -141,6 +172,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let mut layout = read_bflyt(&arc.files[index].data).map_err(err("read bflyt"))?;
     let specs = layout_specs(waiting);
     if waiting {
+        add_waiting_text_material(&mut layout)?;
         // The waiting archive already has com_white16, a plain UV0 material and
         // the game's text font. Build our own flat panes from those stock templates;
         // no Training archive or upstream artwork is used; item textures are appended below.
@@ -203,6 +235,50 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires operator-owned stock arcs in UI_STOCK_FIXTURE"]
+    fn owned_text_style_preserves_stock_and_resolves_reordered_fonts() {
+        let dir = std::env::var("UI_STOCK_FIXTURE").expect("set UI_STOCK_FIXTURE");
+        for waiting in [false, true] {
+            let kind = if waiting { "waiting" } else { "training" };
+            let stock = std::fs::read(format!("{dir}/info_{kind}.arc")).unwrap();
+            let arc = read_arc(&stock).unwrap();
+            let member = arc.position(&format!("blyt/info_{kind}.bflyt")).unwrap();
+            let mut layout = read_bflyt(&arc.files[member].data).unwrap();
+            // Original failing control: the real waiting clone inherits green
+            // mapping and half-scale even though nominal font size is correct.
+            if waiting {
+                let template = layout.find_pane("set_txt_status").unwrap();
+                assert_eq!((template.scale.x,template.scale.y),(0.5,0.52));
+                let material = &layout.materials[usize::from(template.text.as_ref().unwrap().material_index)];
+                assert_eq!((material.white_color.r,material.white_color.g,material.white_color.b),(0,184,3));
+            }
+            let before = format!("{:?}", layout.root_pane);
+            let materials = format!("{:?}", layout.materials);
+            let stock_count = layout.materials.len();
+            if waiting { add_waiting_text_material(&mut layout).unwrap(); }
+            assert_eq!(before,format!("{:?}",layout.root_pane));
+            assert_eq!(materials,format!("{:?}",&layout.materials[..stock_count]));
+            // Move the qualified font to another index in this isolated fixture.
+            let font = layout.fonts.iter().position(|f| f == TEXT_FONT).unwrap();
+            layout.fonts.swap(0,font);
+            let mut spec = panes::specs().into_iter().find(|s| matches!(s.kind,Kind::Text { .. })).unwrap();
+            spec.parent = panes::Name::new("RootPane");
+            add_pane(&mut layout,&spec,waiting).unwrap();
+            let pane = layout.find_pane(spec.name.as_str()).unwrap();
+            assert_eq!((pane.scale.x,pane.scale.y),(1.0,1.0));
+            let text = pane.text.as_ref().unwrap();
+            assert_eq!(text.font_index,0);
+            assert_eq!(layout.fonts[usize::from(text.font_index)],TEXT_FONT);
+            let material = &layout.materials[usize::from(text.material_index)];
+            assert_eq!((material.white_color.r,material.white_color.g,material.white_color.b),(252,252,252));
+            if waiting { assert_eq!(material.name,OWNED_TEXT_MATERIAL); }
+            assert_eq!(materials,format!("{:?}",&layout.materials[..stock_count]));
+            layout.fonts.clear();
+            assert_eq!(add_pane(&mut layout,&spec,waiting),Err("qualified text font missing".into()));
+        }
+    }
 
     #[test]
     fn waiting_host_contains_every_panel_without_changing_internal_parents() {

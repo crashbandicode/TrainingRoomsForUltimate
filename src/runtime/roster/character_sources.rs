@@ -452,6 +452,20 @@ fn count_target_ready(state: &State, owner: usize) -> bool {
             .map(|source| (source.kind, source.configuration)))
 }
 
+/// Diagnostic snapshot only; contention is explicitly unknown, never admission.
+#[cfg(feature = "diag")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct CountSources {
+    epoch: SceneEpoch,
+    seats: [Option<(SourceToken, Option<PromotionToken>)>; 2],
+}
+#[cfg(feature = "diag")]
+pub(super) fn count_sources() -> Option<CountSources> {
+    let state = STATE.try_lock()?;
+    Some(CountSources { epoch: state.book.epoch(), seats: std::array::from_fn(|i|
+        state.sources[i + 2].map(|source| (source.token, source.promotion))) })
+}
+
 /// Reserve managed seats before native activation, without waiting on STATE.
 /// False asks the caller to take native's existing busy retry. A reservation
 /// protects the completed resource lifetime; it publishes no visible identity.
@@ -542,34 +556,91 @@ unsafe fn readopt_count_source(entry: *mut u8, slot: u32) {
     }
 }
 
+#[cfg(feature = "diag")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PromotionObservation {
+    entry: usize, source: SourceToken, promotion: Option<PromotionToken>,
+    expected: Option<native_source::ReadySource>,
+    actual: Option<Result<native_source::ReadySource, native_source::ActiveIdentityFailure>>,
+    outcome: &'static str,
+}
+
+#[cfg(feature = "diag")]
+fn observe_promotion(entry: usize, slot: u32, source: &Source, outcome: &'static str,
+    actual: Option<Result<native_source::ReadySource, native_source::ActiveIdentityFailure>>) {
+    if !crate::runtime::diag_log::async_writer_ready() { return; }
+    use super::count_diagnostics::{Changes, Event};
+    static CHANGES: Mutex<[Changes<PromotionObservation>; 2]> =
+        Mutex::new([Changes::new(32), Changes::new(32)]);
+    let value = PromotionObservation { entry, source: source.token, promotion: source.promotion,
+        expected: source.completed_native, actual, outcome };
+    let event = { CHANGES.lock()[slot as usize - 2].observe(value) };
+    match event {
+        Event::Changed => crate::engine::compat::logging::diagnostic(format_args!(
+            "[CountPromotion] completion owner={slot} {:?}", value)),
+        Event::Overflow => crate::engine::compat::logging::diagnostic(format_args!(
+            "[CountPromotion] completion owner={slot} budget exhausted; subsequent outcomes unknown")),
+        Event::Quiet => {},
+    }
+}
+
 /// Publish a value receipt only after this callback observes the retained body
 /// actually active. Reservation at the count hook is never completion. Native
 /// and Mii G reads happen outside STATE; the final check commits the same source.
 unsafe fn complete_count_promotion(entry: *mut u8, slot: u32) {
     if !matches!(slot, 2 | 3) || INSTALL.active() { return; }
-    let (source, promotion, ready) = {
+    let (source, candidate, outcome) = {
         let state = STATE.lock();
         let Some(source) = state.sources[slot as usize] else { return; };
-        let Some(promotion) = source.promotion else { return; };
-        if source.install.is_some() || source.token.entry() != NativeEntry(entry as u64)
-            || state.book.published_promotion(promotion) != Ok(None) { return; }
-        let Ok(ready) = state.book.promoted_ready(promotion) else { return; };
-        (source, promotion, ready)
+        let (candidate, outcome) = if let Some(promotion) = source.promotion {
+            if source.install.is_some() { (None, "source_install") }
+            else if source.token.entry() != NativeEntry(entry as u64) { (None, "entry_mismatch") }
+            else if state.book.published_promotion(promotion) != Ok(None) { (None, "published_or_stale") }
+            else if let Ok(ready) = state.book.promoted_ready(promotion) { (Some((promotion, ready)), "reserved") }
+            else { (None, "not_ready") }
+        } else { (None, "no_reservation") };
+        (source, candidate, outcome)
     };
-    let Some(expected) = source.completed_native else { return; };
-    if native_source::active_identity(entry, slot, source.kind) != Some(expected) { return; }
+    #[cfg(feature = "diag")]
+    if candidate.is_none() { observe_promotion(entry as usize, slot, &source, outcome, None); }
+    #[cfg(not(feature = "diag"))]
+    let _ = outcome;
+    let Some((promotion, ready)) = candidate else { return; };
+    let Some(expected) = source.completed_native else {
+        #[cfg(feature = "diag")]
+        observe_promotion(entry as usize, slot, &source, "missing_sealed_identity", None);
+        return;
+    };
+    let actual = native_source::active_identity_detail(entry, slot, source.kind);
+    if actual != Ok(expected) {
+        #[cfg(feature = "diag")]
+        observe_promotion(entry as usize, slot, &source, "identity_mismatch", Some(actual));
+        return;
+    }
     if let Some(configuration) = source.configuration {
         #[cfg(feature="mii-managed-helper-alpha")]
-        if super::mii_managed_helper::ready_checked(ready, configuration).is_err() { return; }
+        if super::mii_managed_helper::ready_checked(ready, configuration).is_err() {
+            #[cfg(feature = "diag")]
+            observe_promotion(entry as usize, slot, &source, "mii_not_ready", Some(actual));
+            return;
+        }
         #[cfg(not(feature="mii-managed-helper-alpha"))]
-        { let _ = (ready, configuration); return; }
+        {
+            let _ = (ready, configuration);
+            #[cfg(feature = "diag")]
+            observe_promotion(entry as usize, slot, &source, "mii_feature_off", Some(actual));
+            return;
+        }
     }
     let generation = {
         let mut state = STATE.lock();
-        if INSTALL.active() || state.sources[slot as usize] != Some(source) { return; }
-        let Ok(generation) = state.book.publish_promotion(promotion) else { return; };
-        generation
+        if INSTALL.active() || state.sources[slot as usize] != Some(source) { None }
+        else { state.book.publish_promotion(promotion).ok() }
     };
+    #[cfg(feature = "diag")]
+    observe_promotion(entry as usize, slot, &source,
+        if generation.is_some() { "published" } else { "commit_recheck_refused" }, Some(actual));
+    let Some(generation) = generation else { return; };
     crate::engine::compat::logging::diagnostic(format_args!(
         "[CharacterSources] promotion active owner={slot} source={:?} presentation={generation} kind=0x{:x}",
         source.token, source.kind));
@@ -663,8 +734,25 @@ const CALLBACK_SLOTS: [u32; 4] = [2, 3, 5, 6];
 
 use crate::engine::mii::backend::Layout as Backend;
 
-fn callback_slot(slot: u32) -> bool {
-    CALLBACK_SLOTS.contains(&slot) || (cfg!(feature = "managed-third-source-alpha") && slot == 7)
+unsafe fn callback_slot(entry: *const u8, slot: u32) -> bool {
+    use crate::engine::preload::cycle_preload_capacity::source_callback;
+    let third = cfg!(feature = "managed-third-source-alpha");
+    if slot != 4 { return source_callback(slot, third, None, None); }
+    #[cfg(all(feature="managed-third-source-alpha", feature="cycle-preload-extended"))]
+    {
+        use crate::engine::preload::cycle_preload_capacity::CallbackIdentity;
+        let backend = qualified_backend().ok();
+        let state = STATE.lock();
+        let current = backend.map(|layout| CallbackIdentity {
+            layout, epoch: state.book.epoch(), entry: entry as usize,
+        });
+        let registered = reservation_for(&state, slot).map(|value| CallbackIdentity {
+            layout: value.backend(), epoch: state.book.epoch(), entry: value.entry,
+        });
+        source_callback(slot, third, current, registered)
+    }
+    #[cfg(not(all(feature="managed-third-source-alpha", feature="cycle-preload-extended")))]
+    { let _ = entry; false }
 }
 
 fn candidates(backend: Backend) -> [u32; crate::engine::preload::cycle_preload_capacity::SOURCE_SLOTS] {
@@ -2251,7 +2339,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         }
     }
     let is_capacity=is_capacity_entry(entry,slot);
-    if !cfg!(feature = "managed-sources") || !callback_slot(slot) {
+    if !cfg!(feature = "managed-sources") || !callback_slot(entry, slot) {
         return;
     }
     let index = slot as usize;

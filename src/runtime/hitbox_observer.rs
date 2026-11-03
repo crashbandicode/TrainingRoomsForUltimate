@@ -8,9 +8,9 @@ mod policy;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static READY: AtomicBool = AtomicBool::new(false);
-static FAILED: AtomicUsize = AtomicUsize::new(0);
+static FAILED: policy::FailureBudget = policy::FailureBudget::new();
 static CAPTURE: policy::Capture = policy::Capture::new();
-const LIMIT: usize = 8;
+const LIMIT: usize = policy::FAILED_LIMIT;
 
 pub(crate) struct Request {
     thread: usize,
@@ -20,7 +20,7 @@ impl Request {
         let thread = unsafe { skyline::nn::os::GetCurrentThread() as usize };
         let active = READY.load(Ordering::Acquire)
             && diag_log::async_writer_ready()
-            && FAILED.load(Ordering::Relaxed) < LIMIT
+            && FAILED.available()
             && CAPTURE.begin(thread);
         Self {
             thread: if active { thread } else { 0 },
@@ -36,17 +36,19 @@ impl Request {
         let Some(snapshot) = snapshot else {
             return;
         };
-        let Ok(ordinal) = FAILED.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
-            (n < LIMIT).then_some(n.saturating_add(1))
-        }) else {
+        let Some(ordinal) = FAILED.record(handle) else {
             return;
         };
         // Existing asynchronous diagnostic queue only; no startup filesystem fallback.
         if diag_log::async_writer_ready() {
             diag_log::diagnostic(format_args!(
                 "[HitboxConstructor] failure={} outcome={:?} object={:#x} frame={:#x} helper={:?} returned={:?}",
-                ordinal + 1, snapshot.outcome, snapshot.object, snapshot.frame,
+                ordinal, snapshot.outcome, snapshot.object, snapshot.frame,
                 snapshot.helper, snapshot.returned));
+            diag_log::diagnostic(format_args!(
+                "[HitboxHelper] failure={} reason={:?} demand={:?} registers={:x?}",
+                ordinal, snapshot.helper_reason, snapshot.demand, snapshot.helper_registers
+            ));
         }
     }
 }
@@ -93,6 +95,35 @@ unsafe fn helper_return(ctx: &mut InlineCtx) {
         relative(ctx.registers[30].x()),
         ctx.registers[0].w(),
     );
+    CAPTURE.helper_registers(
+        thread,
+        ctx.sp.x() as usize,
+        relative(ctx.registers[30].x()),
+        [
+            ctx.registers[8].x() as usize,
+            ctx.registers[9].x() as usize,
+            ctx.registers[19].x() as usize,
+        ],
+    );
+}
+#[skyline::hook(offset = 0xa5020, inline)]
+unsafe fn helper_demand(ctx: &mut InlineCtx) {
+    let Some(thread) = owner() else {
+        return;
+    };
+    let _scope = crate::model::hook_stats::HookScope::enter();
+    crate::runtime::threads::headroom("hitbox_observer_helper_demand");
+    CAPTURE.demand_rejected(
+        thread,
+        policy::Demand {
+            requested: ctx.registers[8].w() as i32,
+            available: ctx.registers[9].w() as i32,
+            output: ctx.registers[1].x() as usize,
+            manager: ctx.registers[19].x() as usize,
+            sp: ctx.sp.x() as usize,
+            caller: relative(ctx.registers[30].x()),
+        },
+    );
 }
 #[skyline::hook(offset = 0x356d970, inline)]
 unsafe fn final_phase(ctx: &mut InlineCtx) {
@@ -126,8 +157,11 @@ pub(crate) fn init() {
         .iter()
         .all(|row| bytes(row.offset, 64) == Some(row.guard.as_slice()));
     let ranges = [
+        (0x89850, 116, 0xa91708f8481d3b39u64),
         (0x356cec0, 3248, 0x4d169258c892d75bu64),
         (0xa4f60, 596, 0x5cac3e4803f744c9u64),
+        (0x89080, 668, 0x358149e0d6c282ecu64),
+        (0x93660, 44, 0x803692d6bb48c168u64),
     ];
     let flow = ranges.iter().all(|&(offset, len, expected)| {
         bytes(offset, len).is_some_and(|data| {
@@ -136,7 +170,7 @@ pub(crate) fn init() {
             }) == expected
         })
     });
-    let labels: [&str; 6] = core::array::from_fn(|i| rows_hitbox_observer::ROWS[i].label);
+    let labels: [&str; 7] = core::array::from_fn(|i| rows_hitbox_observer::ROWS[i].label);
     let usable =
         crate::runtime::seams::seam_install::gate("hitbox_observer", &labels, exact && flow);
     if !exact || !flow || !usable {
@@ -146,7 +180,13 @@ pub(crate) fn init() {
         return;
     }
     BASE.store(base, Ordering::Release);
-    skyline::install_hooks!(constructor, helper_return, final_phase, constructor_return);
+    skyline::install_hooks!(
+        constructor,
+        helper_return,
+        helper_demand,
+        final_phase,
+        constructor_return
+    );
     READY.store(true, Ordering::Release);
     diag_log::diagnostic(format_args!(
         "[HitboxConstructor] observer installed failed_limit={LIMIT}"

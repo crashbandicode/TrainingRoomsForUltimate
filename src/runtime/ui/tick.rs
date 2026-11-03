@@ -78,7 +78,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     if waiting {
         // The waiting layout can outlive a practice request. Hide its whole
         // plugin host when that request ends, even though the layout remains.
-        let host = pane::find((*layout).root_pane, b"TrModPort");
+        let host = pane::find_child((*layout).root_pane, b"TrModPort");
         if !host.is_null() {
             pane::set_visible(host, lobby);
         }
@@ -223,14 +223,14 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     let total = pane::count(root);
     r.status_r = pane::find(root, b"status_R");
     r.help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
-    let menu_root = if waiting { pane::find(root, b"TrModPort") } else { root };
+    let menu_root = if waiting { pane::find_child(root, b"TrModPort") } else { root };
     // Waiting readiness covers every hosted panel, including the notification
     // and input-log consumers (SPEC-input-02 §6), not just the menu subtree.
     let host_complete = !waiting || [p::IDX_NOTICE, p::IDX_LOG].iter()
-        .all(|&index| !pane::find(menu_root, p::name_of(index).as_bytes()).is_null());
+        .all(|&index| !pane::find_child(menu_root, p::name_of(index).as_bytes()).is_null());
     let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
     let mut missing = 0;
-    let container = pane::find(menu_root, p::ROOT.as_bytes());
+    let container = pane::find_child(menu_root, p::ROOT.as_bytes());
     for (index, slot) in all.iter_mut().enumerate() {
         *slot = if index == p::IDX_MENU { container } else { pane::find(container, p::name_of(index).as_bytes()) };
         missing += usize::from(slot.is_null());

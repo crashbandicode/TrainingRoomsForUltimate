@@ -33,6 +33,27 @@ pub unsafe fn find(root: *mut Pane, name: &[u8]) -> *mut Pane {
     find_in(root, name, &mut budget)
 }
 
+/// Resolve a plugin container at its declared parent boundary. Stock parts may
+/// contain thousands of descendants before our containers; they are not searched.
+/// The same child-list ABI and corruption bound as `find` apply.
+pub unsafe fn find_child(parent: *mut Pane, name: &[u8]) -> *mut Pane {
+    if parent.is_null() {
+        return core::ptr::null_mut();
+    }
+    let head = core::ptr::addr_of_mut!((*parent).children_list);
+    let mut node = (*head).next;
+    let mut budget = WALK_LIMIT;
+    while !node.is_null() && node != head && budget > 0 {
+        budget -= 1;
+        let child = pane_of_node(node);
+        if name_is(child, name) {
+            return child;
+        }
+        node = (*node).next;
+    }
+    core::ptr::null_mut()
+}
+
 unsafe fn find_in(pane: *mut Pane, name: &[u8], budget: &mut usize) -> *mut Pane {
     if pane.is_null() || *budget == 0 {
         return core::ptr::null_mut();

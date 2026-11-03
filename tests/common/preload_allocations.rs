@@ -2,6 +2,34 @@
 use crate::engine::swap::mii_cycle::compact_regressions::AllocationCount;
 
 #[test]
+fn kirby_shortcut_selection_preserves_order_without_allocating() {
+    use crate::engine::compat::menu::BASE_MENU;
+    use crate::engine::swap::roster_grid::Role;
+    let menu = BASE_MENU;
+    for role in [Role::Player, Role::Cpu] {
+        let control = AllocationCount::start();
+        let old = std::hint::black_box(menu.ordered_kirby_hat_kinds(role));
+        assert!(control.finish() > 0, "original shortcut allocated its choice Vec");
+        let mut old_cycle = crate::engine::kirby::kirby_hat_cycle::HatCycle::new();
+        let mut fixed_cycle = old_cycle;
+        let mut equipped = None;
+        let measured = AllocationCount::start();
+        for _ in 0..128 {
+            let choices = std::hint::black_box(menu.ordered_kirby_hat_kinds_fixed(role));
+            assert_eq!(&*choices, old.as_slice());
+            let target = fixed_cycle.target(&choices, equipped);
+            assert_eq!(target, old_cycle.target(&old, equipped));
+            if let Some(kind) = target {
+                old_cycle.commit(kind);
+                fixed_cycle.commit(kind);
+            }
+            equipped = target;
+        }
+        assert_eq!(measured.finish(), 0);
+    }
+}
+
+#[test]
 fn roster_input_membership_preserves_order_without_first_or_repeat_allocations() {
     use crate::engine::mii::inventory::MiiClass;
     use crate::engine::swap::{ordered_roster::OrderedFighterRoster, trio::TrioFighter};
@@ -30,6 +58,9 @@ mod observed_map;
 
 #[path = "../../src/runtime/roster/training_count_readiness.rs"]
 mod training_count_readiness;
+
+#[path = "../../src/runtime/roster/count_diagnostics.rs"]
+mod count_diagnostics;
 
 // Native adapter methods are Switch-only; exercise its value projection here.
 #[allow(dead_code)]
@@ -456,4 +487,29 @@ fn status_raise_and_delivery_formatting_use_no_heap_on_first_or_repeated_use() {
         let mut notice=crate::model::storage::FixedPath::<96>::new();
         write!(notice,"{}",status.text()).unwrap();
     } } }
+}
+
+#[test]
+fn count_promotion_diagnostic_owners_have_independent_allocation_free_budgets() {
+    use count_diagnostics::{Changes, Event};
+    let control = AllocationCount::start();
+    let allocated = std::hint::black_box(vec![0usize; 32]);
+    assert!(control.finish() > 0);
+    drop(allocated);
+    let measured = AllocationCount::start();
+    let mut owners = [Changes::new(2), Changes::new(2)];
+    for owner in &mut owners {
+        assert_eq!(owner.observe((0u64, [0usize; 32])), Event::Changed);
+    }
+    for _ in 0..128 {
+        for owner in &mut owners {
+            assert_eq!(owner.observe((0, [0; 32])), Event::Quiet);
+        }
+    }
+    assert_eq!(owners[0].observe((1, [1; 32])), Event::Changed);
+    assert_eq!(owners[0].observe((2, [2; 32])), Event::Overflow);
+    assert_eq!(owners[1].observe((1, [1; 32])), Event::Changed);
+    assert_eq!(owners[1].observe((2, [2; 32])), Event::Overflow);
+    for owner in &mut owners { assert_eq!(owner.observe((3, [3; 32])), Event::Quiet); }
+    assert_eq!(measured.finish(), 0);
 }

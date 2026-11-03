@@ -66,7 +66,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     if !active || layout.is_null() {
         return;
     }
-    let root = if waiting { pane::find((*layout).root_pane, b"TrModPort") } else { (*layout).root_pane };
+    let root = if waiting { pane::find_child((*layout).root_pane, b"TrModPort") } else { (*layout).root_pane };
     if root.is_null() {
         return;
     }
@@ -80,7 +80,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let (notice, column) = {
         let mut c = CONTAINERS.lock();
         if c.layout != layout as usize || c.registrations != registrations {
-            *c = Containers { layout: layout as usize, registrations, notice: find(root, p::IDX_NOTICE) as usize, column: find(root, p::IDX_LOG) as usize };
+            *c = Containers { layout: layout as usize, registrations, notice: pane::find_child(root, p::name_of(p::IDX_NOTICE).as_bytes()) as usize, column: pane::find_child(root, p::name_of(p::IDX_LOG).as_bytes()) as usize };
         }
         (c.notice as *mut Pane, c.column as *mut Pane)
     };
