@@ -196,3 +196,9 @@ Static894 guard initializers are all64 bytes; this is not proof of every live gu
 | 30 Model | Exact own thread Astra/medium and sole owner-bound watcher verified09:13; historical watcher gap not erased. |
 
 Provider gap remains separate from constructor-trigger coverage: Q15 observer contexts prove triggers, not catalog writer exclusion. CPU DI/tech/OoS requires current-boot cpu_common_load with all four guards and cpu_common=installed; absence in a minimal three-plugin lane is unexercised. Native ancestry and foreign load orders retain their limits; any Unmapped anywhere fails. No new final RC row is closed by this audit, and READY remains unset.
+
+## Main source/media increment, 2026-11-03 09:38 UTC
+
+Main fc7a28f checker exited0 with zero mandatory machine failures and29 agent rows; raw report SHA256 d80fbd0bd00a0e4ef8e7808794d8fee8e73b74eb4b0aa70cf821b11cae580a5a retained in main-r17/main-fc7a28f-source-compliance.md. README and the actual95-frame/9.5-second/1280-wide r16 waiting-menu clip now meet the mechanical media rules. Lead viewed decoded first/middle/last and verified pixel equality, exactthree afterhashes and original source identity. This is scoped development footage; input-log contrast and final release media remain open.
+
+The checker automatically inspected the historical dist/release NRO c4750559c52a431a; its identity/string rows DO NOT qualify current source, r17, or a final release. The1408 test attributes are static inventory. All30 existing explicit dispositions remain except this scoped media increment and the independently reviewed changed-path audit in R17-ONLINE-RELEASE-DELTA.md. The Training guard correction2dbfe6e has source review/full253carry proof; next binary/runtime owed. This lightweight checker lacked a separate command memory/time wrapper; the command-guard failure remains disclosed. No RC gate or final regression row is closed.
