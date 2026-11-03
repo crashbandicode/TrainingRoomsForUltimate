@@ -15,8 +15,10 @@ Observe the existing callback branches without changing their decisions:
 normal/partial stop, FRAM publication filters, serializer losing its owned recording,
 copy of a still-active record, segment continuation, and per-entry state/sample/input
 rejection. All values were already owned/read at those callbacks. The invalid-native
-FRAM case acquires the existing capture lock solely to post a diagnostic; it reads
-no additional native fields. The normal logger is the existing asynchronous fixed
+FRAM case uses only try_lock on the existing capture lock to post a diagnostic; it reads
+no additional native fields and adds no blocking acquisition. Contention skips this
+one rejection observation, so a missing line is not proof that publication ran or
+that native() accepted. The normal logger is the existing asynchronous fixed
 ring through runtime/macros/mod.rs println!, with no callback filesystem or heap.
 The helper is non-inlined so its formatting frame can be measured independently.
 
@@ -60,7 +62,7 @@ The earlier narrative saying full source byte equality was inaccurate; capture
 logic was equal. The first exact-hash editing assertion refused before mutation;
 the corrected operation verified that one-line difference.
 
-Append the15 runtime and one module transforms from this commit to the existing
+Append the16 runtime and one module transforms from this commit to the existing
 main carry rows; never replace main's manifest/ledger. Own full carry derivation
 passes42 files against stage m5q. New helper/test are original, not carried.
 Four original tests in tests/capture_completion.rs cover idle/invalid admission,

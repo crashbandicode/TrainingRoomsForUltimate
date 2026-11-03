@@ -411,7 +411,9 @@ unsafe fn reset_recording(ctx: &mut InlineCtx) {
 unsafe fn publish_record_frames(ctx: &mut InlineCtx) {
     let Some(native) = native(ctx.registers[22].x() as usize) else {
         #[cfg(feature = "diag")]
-        CAPTURE.lock().completion_note(CompletionEvent::Publish, None, 0, None);
+        if let Some(mut capture) = CAPTURE.try_lock() {
+            capture.completion_note(CompletionEvent::Publish, None, 0, None);
+        }
         return;
     };
     let mut capture = CAPTURE.lock();

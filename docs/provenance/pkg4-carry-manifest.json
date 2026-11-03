@@ -1742,7 +1742,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "e3b2895ea36cea18ec45da28ed9ac2ddfe9c46dc29318b7a2816e2b9ad4ca807",
+   "dest_sha256": "f30b23f4d804a3f507dd0664c70c58c1fb7740e0fdcb6d7af1ab3559378bed66",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -2020,6 +2020,11 @@
      "old": "    if segment as u8 == 0 {\n        // Ownership",
      "new": "    if segment as u8 == 0 {\n        #[cfg(feature = \"diag\")]\n        capture.completion_trace.clear();\n        // Ownership",
      "reason": "Clear prior diagnostic incarnation on every segment-zero start, including unarmed records."
+    },
+    {
+     "old": "        CAPTURE.lock().completion_note(CompletionEvent::Publish, None, 0, None);",
+     "new": "        if let Some(mut capture) = CAPTURE.try_lock() {\n            capture.completion_note(CompletionEvent::Publish, None, 0, None);\n        }",
+     "reason": "Diagnostic rejection must not add a blocking lock to the previous native-invalid early return; best-effort try_lock only."
     }
    ]
   },
