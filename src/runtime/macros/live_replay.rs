@@ -16,12 +16,17 @@ use skyline::hooks::{getRegionAddress, InlineCtx, Region};
 use smash::{app::{self, lua_bind::WorkModule, Fighter}, lib::lua_const::*};
 use {crate::engine::macros::CaptureToggle, crate::engine::macros::LiveFrame, crate::engine::macros::NativeRecordKey, crate::engine::macros::RecordOwner, crate::engine::macros::RecordOwnership, crate::engine::macros::MAX_RETAINED_CAPTURES};
 
+#[cfg(feature = "diag")]
+use crate::engine::macros::completion_trace::{CompletionTrace, Event as CompletionEvent};
+
 static BASE: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "named-input-trace")]
 static CLOCK_TRACE_LEFT: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE: hos_lock::Mutex<Capture> = hos_lock::Mutex::new(Capture {
     native_state: 0, epoch: 0, clock: None, pool: HookPool::new(), owner: RecordOwnership::new(),
     pending: [None; 8], saves: VecDeque::new(),
+    #[cfg(feature = "diag")]
+    completion_trace: CompletionTrace::new(),
 });
 
 struct Capture {
@@ -33,6 +38,8 @@ struct Capture {
     owner: RecordOwnership,
     pending: [Option<Pending>; 8],
     saves: VecDeque<BoundSave>,
+    #[cfg(feature = "diag")]
+    completion_trace: CompletionTrace,
 }
 
 fn toggle() -> &'static CaptureToggle { crate::runtime::macros::replay_store::toggle() }
@@ -198,6 +205,19 @@ unsafe fn borrowed_state(interface: usize) -> Option<usize> {
 }
 
 impl Capture {
+    // First transition per event/entry/incarnation through the existing async ring.
+    // No native addresses are read here.
+    #[cfg(feature = "diag")]
+    #[inline(never)]
+    fn completion_note(&mut self, event: CompletionEvent, entry: Option<u8>, flags: u8, counter: Option<u32>) {
+        if !self.completion_trace.take(event, entry) { return; }
+        let pending = self.pending.iter().enumerate().fold(0u8, |mask, (at, value)|
+            mask | (u8::from(value.is_some()) << at));
+        println!("[ReplayCaptureEnd] event={} record={:?} active={:?} entry={:?} flags={:#x} counter={:?} clock={:?} pending={:#x}",
+            event.name(), self.completion_trace.record(), self.pool.active_key(),
+            entry, flags, counter, self.clock, pending);
+    }
+
     /// Every owner release ends the toggle's latched record. A request latched
     /// during the record is reported here, on the game thread, never from the
     /// draw-thread callback (operator decision Q2).
@@ -210,6 +230,8 @@ impl Capture {
     }
 
     fn reset_pool(&mut self, state: usize) {
+        #[cfg(feature = "diag")]
+        self.completion_trace.clear();
         self.epoch += 1;
         self.clock = None;
         self.native_state = state;
@@ -233,6 +255,8 @@ impl Capture {
 
     fn stop(&mut self, state: usize, partial: bool) {
         if self.native_state != state { return; }
+        #[cfg(feature = "diag")]
+        self.completion_note(CompletionEvent::Stop, None, u8::from(partial), None);
         #[cfg(feature = "named-input-trace")]
         println!("[LiveCaptureClock] stop epoch={} counter={:?} partial={} pending={}",
             self.epoch, self.clock, partial, self.pending.iter().filter(|item| item.is_some()).count());
@@ -311,12 +335,16 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
     capture.pending = [None; 8];
     let epoch = capture.epoch;
     if segment as u8 == 0 {
+        #[cfg(feature = "diag")]
+        capture.completion_trace.clear();
         // Ownership is tracked for armed and unarmed records alike (R1). A record
         // still owned here never saw its end; report it before latching the new one.
         let displaced = capture.owner.begin(RecordOwner { state, index: native.index, epoch });
         capture.release(displaced, "restart");
         if toggle().begin_record() {
             let key = capture.pool.start_record(native.index);
+            #[cfg(feature = "diag")]
+            capture.completion_trace.begin(key.generation, key.index);
             capture.clock = Some(native.tick);
             #[cfg(feature = "named-input-trace")]
             CLOCK_TRACE_LEFT.store(10_000, Ordering::Relaxed);
@@ -333,6 +361,8 @@ unsafe fn start_recording(state: usize, segment: u32) -> u32 {
     } else {
         // The native segment clock restarts. Do not concatenate separate timelines;
         // the owned record continues under its new native index.
+        #[cfg(feature = "diag")]
+        capture.completion_note(CompletionEvent::Segment, None, 0, Some(native.tick));
         capture.pool.finish_partial();
         capture.owner.continue_segment(state, native.index, epoch);
     }
@@ -379,8 +409,19 @@ unsafe fn reset_recording(ctx: &mut InlineCtx) {
 // borrowed by this executing method; no remembered native pointer is traversed.
 #[skyline::hook(offset = 0x175b1bc, inline)]
 unsafe fn publish_record_frames(ctx: &mut InlineCtx) {
-    let Some(native) = native(ctx.registers[22].x() as usize) else { return };
+    let Some(native) = native(ctx.registers[22].x() as usize) else {
+        #[cfg(feature = "diag")]
+        CAPTURE.lock().completion_note(CompletionEvent::Publish, None, 0, None);
+        return;
+    };
     let mut capture = CAPTURE.lock();
+    #[cfg(feature = "diag")]
+    {
+        let flags = 1 | (u8::from(native.recording) << 1)
+            | (u8::from(capture.native_state == native.state) << 2)
+            | (u8::from(capture.owner.owns_record(native.state, native.index)) << 3);
+        capture.completion_note(CompletionEvent::Publish, None, flags, Some(native.tick));
+    }
     if capture.native_state != native.state || !native.recording { return; }
     // Armed or not, only the owned record's own publication ends it (R1); a pool
     // key is absent for unarmed records and for armed ones already copied.
@@ -421,6 +462,13 @@ unsafe fn serialize_frame(interface: usize) -> u32 {
                 _ => {
                     // The serializer clears state2 on native buffer exhaustion. A record
                     // this adapter never saw start is ended the same way (R1).
+                    #[cfg(feature = "diag")]
+                    {
+                        let flags = u8::from(observed.is_some())
+                            | (u8::from(observed.is_some_and(|n| n.recording)) << 1)
+                            | (u8::from(observed.is_some_and(|n| capture.owner.owns_record(state, n.index))) << 2);
+                        capture.completion_note(CompletionEvent::Serializer, None, flags, observed.map(|n| n.tick));
+                    }
                     capture.pool.finish_partial();
                     capture.pending = [None; 8];
                     let released = capture.owner.release_state(state);
@@ -461,7 +509,11 @@ unsafe fn copy_record(actor: usize) {
     let Some(key) = capture.pool.key_for_index(index as u32) else { return };
     // Copying a still-active record only captures a prefix. Never label that
     // prefix complete merely because no explicit stop callback was observed.
-    if capture.pool.active_key() == Some(key) { capture.pool.finish_partial(); }
+    if capture.pool.active_key() == Some(key) {
+        #[cfg(feature = "diag")]
+        capture.completion_note(CompletionEvent::ActiveCopy, None, 0, None);
+        capture.pool.finish_partial();
+    }
     if !capture.pool.has_samples(key) { return; }
     while capture.saves.len() >= MAX_RETAINED_CAPTURES {
         if let Some(old) = capture.saves.pop_front() { post(LiveEvent::Forget { save: old.save }); }
@@ -617,6 +669,8 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
     let Some(key) = capture.pool.active_key() else { return };
     if capture.pool.wants_sample(key, entry, tick) {
         let Some(sample) = crate::runtime::macros::replay_capture::live_state(module) else {
+            #[cfg(feature = "diag")]
+            capture.completion_note(CompletionEvent::State, Some(entry as u8), 0, Some(tick));
             capture.pool.seal_entry(key, entry);
             println!("[ReplayCapture] native state unavailable entry={}", entry);
             return;
@@ -643,8 +697,14 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     trace_clock(&capture, "fighter_after", entry);
     let stable = capture.clock == Some(pending.tick) && capture.pool.active_key() == Some(pending.key)
         && pending.body == module.battle_object_id;
-    if !stable || !live_scene() { capture.pool.seal_entry(pending.key, entry); return; }
+    if !stable || !live_scene() {
+        #[cfg(feature = "diag")]
+        capture.completion_note(CompletionEvent::Sample, Some(entry as u8), u8::from(stable), Some(pending.tick));
+        capture.pool.seal_entry(pending.key, entry); return;
+    }
     let Some(input) = crate::runtime::macros::replay_capture::observed_input(module) else {
+        #[cfg(feature = "diag")]
+        capture.completion_note(CompletionEvent::Input, Some(entry as u8), 0, Some(pending.tick));
         capture.pool.seal_entry(pending.key, entry); return;
     };
     pending.sample.input = input;

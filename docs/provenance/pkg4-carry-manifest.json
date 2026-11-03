@@ -252,8 +252,8 @@
      "reason": "slug() is private to model::store, whose own tests pin it; the observable ids are pinned by names_without_ascii... below"
     },
     {
-     "old": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro-2\");\n",
-     "new": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry-2\");\n",
+     "old": "    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"macro\");\n    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"macro-2\");\n",
+     "new": "    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"entry\");\n    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"entry-2\");\n",
      "reason": "the shared Store's id fallback is `entry` (package 3, CARRY-OVER item 5), the fork library's was `macro`"
     },
     {
@@ -273,7 +273,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "ba81ed489cb401391bd34e96350fbc70fcd1f40a7c074d4e46b675ff8f8bccae",
+   "dest_sha256": "786011be8a9129aa6bd7e197de22791c70375a097f14770dcd3c5907cd57e4f6",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -303,6 +303,11 @@
      "old": "mod capture_archive;",
      "new": "pub mod handoff;\nmod capture_archive;",
      "reason": "Keep replay-engine-dependent archive handoff in engine::macros; standalone model consumers must not acquire an engine dependency."
+    },
+    {
+     "old": "pub mod handoff;",
+     "new": "#[cfg(any(feature = \"diag\", test))]\npub mod completion_trace;\npub mod handoff;",
+     "reason": "Diag-only bounded completion observation helper; no release/runtime policy dependency."
     }
    ]
   },
@@ -404,13 +409,13 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "old": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro { frames, start, .. } => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
-     "new": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro(body) => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "old": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro { frames, start, .. } => format!(\n                        \"Fighter {} · {}f · {:.2}s. A confirms, B cancels, Y deletes.\",\n                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "new": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro(body) => format!(\n                        \"Fighter {} · {}f · {:.2}s. A confirms, B cancels, Y deletes.\",\n                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "old": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro { frames, .. } => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
-     "new": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro(body) => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "old": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro { frames, .. } => format!(\n                \"{} · {}f · {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} · {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "new": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro(body) => format!(\n                \"{} · {}f · {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} · {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
@@ -1737,7 +1742,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "9dd196d97a09e47e115a8c43ef3154757557f5db309e0a5919fd949380bec359",
+   "dest_sha256": "e3b2895ea36cea18ec45da28ed9ac2ddfe9c46dc29318b7a2816e2b9ad4ca807",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -1940,6 +1945,81 @@
      "old": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::macros::capture_plugin::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
      "new": "\npub fn init() {\n    #[cfg(feature = \"deluxe-sdk\")]\n    let registered = crate::runtime::deluxe_row::host_registered();\n    #[cfg(not(feature = \"deluxe-sdk\"))]\n    let registered = false;\n    let seed = crate::runtime::macros::replay_store::seed_enabled();\n",
      "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "static BASE: AtomicUsize",
+     "new": "#[cfg(feature = \"diag\")]\nuse crate::engine::macros::completion_trace::{CompletionTrace, Event as CompletionEvent};\n\nstatic BASE: AtomicUsize",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    pending: [None; 8], saves: VecDeque::new(),",
+     "new": "    pending: [None; 8], saves: VecDeque::new(),\n    #[cfg(feature = \"diag\")]\n    completion_trace: CompletionTrace::new(),",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    saves: VecDeque<BoundSave>,",
+     "new": "    saves: VecDeque<BoundSave>,\n    #[cfg(feature = \"diag\")]\n    completion_trace: CompletionTrace,",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "impl Capture {",
+     "new": "impl Capture {\n    // First transition per event/entry/incarnation through the existing async ring.\n    // No native addresses are read here.\n    #[cfg(feature = \"diag\")]\n    #[inline(never)]\n    fn completion_note(&mut self, event: CompletionEvent, entry: Option<u8>, flags: u8, counter: Option<u32>) {\n        if !self.completion_trace.take(event, entry) { return; }\n        let pending = self.pending.iter().enumerate().fold(0u8, |mask, (at, value)|\n            mask | (u8::from(value.is_some()) << at));\n        println!(\"[ReplayCaptureEnd] event={} record={:?} active={:?} entry={:?} flags={:#x} counter={:?} clock={:?} pending={:#x}\",\n            event.name(), self.completion_trace.record(), self.pool.active_key(),\n            entry, flags, counter, self.clock, pending);\n    }\n",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    fn reset_pool(&mut self, state: usize) {",
+     "new": "    fn reset_pool(&mut self, state: usize) {\n        #[cfg(feature = \"diag\")]\n        self.completion_trace.clear();",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "        if self.native_state != state { return; }\n        #[cfg(feature = \"named-input-trace\")]",
+     "new": "        if self.native_state != state { return; }\n        #[cfg(feature = \"diag\")]\n        self.completion_note(CompletionEvent::Stop, None, u8::from(partial), None);\n        #[cfg(feature = \"named-input-trace\")]",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "            let key = capture.pool.start_record(native.index);",
+     "new": "            let key = capture.pool.start_record(native.index);\n            #[cfg(feature = \"diag\")]\n            capture.completion_trace.begin(key.generation, key.index);",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "        capture.pool.finish_partial();\n        capture.owner.continue_segment",
+     "new": "        #[cfg(feature = \"diag\")]\n        capture.completion_note(CompletionEvent::Segment, None, 0, Some(native.tick));\n        capture.pool.finish_partial();\n        capture.owner.continue_segment",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    let Some(native) = native(ctx.registers[22].x() as usize) else { return };\n    let mut capture = CAPTURE.lock();",
+     "new": "    let Some(native) = native(ctx.registers[22].x() as usize) else {\n        #[cfg(feature = \"diag\")]\n        CAPTURE.lock().completion_note(CompletionEvent::Publish, None, 0, None);\n        return;\n    };\n    let mut capture = CAPTURE.lock();\n    #[cfg(feature = \"diag\")]\n    {\n        let flags = 1 | (u8::from(native.recording) << 1)\n            | (u8::from(capture.native_state == native.state) << 2)\n            | (u8::from(capture.owner.owns_record(native.state, native.index)) << 3);\n        capture.completion_note(CompletionEvent::Publish, None, flags, Some(native.tick));\n    }",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "                    capture.pool.finish_partial();\n                    capture.pending",
+     "new": "                    #[cfg(feature = \"diag\")]\n                    {\n                        let flags = u8::from(observed.is_some())\n                            | (u8::from(observed.is_some_and(|n| n.recording)) << 1)\n                            | (u8::from(observed.is_some_and(|n| capture.owner.owns_record(state, n.index))) << 2);\n                        capture.completion_note(CompletionEvent::Serializer, None, flags, observed.map(|n| n.tick));\n                    }\n                    capture.pool.finish_partial();\n                    capture.pending",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    if capture.pool.active_key() == Some(key) { capture.pool.finish_partial(); }",
+     "new": "    if capture.pool.active_key() == Some(key) {\n        #[cfg(feature = \"diag\")]\n        capture.completion_note(CompletionEvent::ActiveCopy, None, 0, None);\n        capture.pool.finish_partial();\n    }",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "            capture.pool.seal_entry(key, entry);\n            println!",
+     "new": "            #[cfg(feature = \"diag\")]\n            capture.completion_note(CompletionEvent::State, Some(entry as u8), 0, Some(tick));\n            capture.pool.seal_entry(key, entry);\n            println!",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    if !stable || !live_scene() { capture.pool.seal_entry(pending.key, entry); return; }",
+     "new": "    if !stable || !live_scene() {\n        #[cfg(feature = \"diag\")]\n        capture.completion_note(CompletionEvent::Sample, Some(entry as u8), u8::from(stable), Some(pending.tick));\n        capture.pool.seal_entry(pending.key, entry); return;\n    }",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "        capture.pool.seal_entry(pending.key, entry); return;\n    };",
+     "new": "        #[cfg(feature = \"diag\")]\n        capture.completion_note(CompletionEvent::Input, Some(entry as u8), 0, Some(pending.tick));\n        capture.pool.seal_entry(pending.key, entry); return;\n    };",
+     "reason": "Lead-authorized p4c-01 diag-only bounded completion observation through existing async ring; no new hooks/native reads or capture-policy change."
+    },
+    {
+     "old": "    if segment as u8 == 0 {\n        // Ownership",
+     "new": "    if segment as u8 == 0 {\n        #[cfg(feature = \"diag\")]\n        capture.completion_trace.clear();\n        // Ownership",
+     "reason": "Clear prior diagnostic incarnation on every segment-zero start, including unarmed records."
     }
    ]
   },

@@ -29,6 +29,8 @@
 //! ```
 
 
+#[cfg(any(feature = "diag", test))]
+pub mod completion_trace;
 pub mod handoff;
 mod capture_archive;
 mod capture_toggle;
