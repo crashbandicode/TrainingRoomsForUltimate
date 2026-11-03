@@ -181,6 +181,10 @@ fn notify(message: String) {
 }
 
 pub fn open_editor() {
+    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+        notify("Replay editing is unavailable in this release".into());
+        return;
+    }
     open_browser(None);
 }
 
@@ -840,6 +844,10 @@ pub fn on_pad(pad: Pad) {
 }
 
 pub fn on_action(action: ClipAction) {
+    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+        notify("Replay editing is unavailable in this release".into());
+        return;
+    }
     // A track or capture change is an explicit selection: a recorded fighter that is
     // not the settled CPU asks once, and nothing changes until it is answered.
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
