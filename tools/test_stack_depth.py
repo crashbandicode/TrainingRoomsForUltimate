@@ -3,6 +3,7 @@
 import os
 import sys
 import unittest
+import itertools
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stack_depth as sd  # noqa: E402
@@ -85,6 +86,42 @@ class StackDepth(unittest.TestCase):
         self.assertEqual(total, 0x60 + 0xe940 + 0x1010)
         self.assertEqual(path, [0x2000, 0x4000])
         self.assertEqual(sd.deepest(self.funcs, 0x6000)[0], 0x10)
+
+    def test_cycle_cut_does_not_poison_another_entry_context(self):
+        # First visiting A->C cuts C->A. Reusing that partial C suffix from
+        # R->B->C loses A's ten bytes. The old node-only memo returned1101
+        # instead of1111 in one order, and1111 in the other.
+        frames = {"R": 1, "A": 10, "B": 100, "C": 1000}
+        edges = {"R": ["A", "B"], "A": ["C"], "B": ["C"], "C": ["A"]}
+        for addresses in itertools.permutations([0x10, 0x20, 0x30, 0x40]):
+            ids = dict(zip(frames, addresses))
+            for reverse in (False, True):
+                funcs = {ids[n]: {"name": n, "frame": frames[n],
+                                  "calls": [ids[c] for c in reversed(edges[n])] if reverse
+                                  else [ids[c] for c in edges[n]]}
+                         for n in (reversed(frames) if reverse else frames)}
+                total, path = sd.deepest(funcs, ids["R"])
+                self.assertEqual(total, 1111)
+                self.assertEqual([funcs[a]["name"] for a in path], ["R", "B", "C", "A"])
+                self.assertEqual(len(path), len(set(path)))
+
+    def test_multiple_cycles_and_shared_suffix_match_path_oracle(self):
+        frames = [3, 11, 17, 29, 41, 67]
+        edges = [[1, 2], [2, 3], [1, 3], [4, 5], [3, 5], []]
+        # Independent exhaustive path enumeration, without memoization or SCCs.
+        def oracle(a, visited):
+            return frames[a] + max((oracle(c, visited | {c}) for c in edges[a]
+                                    if c not in visited), default=0)
+        expected = oracle(0, {0})
+        for reverse in (False, True):
+            funcs = {a: {"name": str(a), "frame": frames[a],
+                         "calls": list(reversed(edges[a])) if reverse else edges[a]}
+                     for a in (reversed(range(6)) if reverse else range(6))}
+            total, path = sd.deepest(funcs, 0)
+            self.assertEqual(total, expected)
+            self.assertEqual(total, sum(frames[a] for a in path))
+            self.assertEqual(len(path), len(set(path)))
+            self.assertTrue(all(b in edges[a] for a, b in zip(path, path[1:])))
 
     def test_table_check(self):
         text = '''row(ThreadId::TraceWriter, "tr-trace-writer", 64 * KIB, 0, 0, "", "compat::filesystem::init::{closure#0}"),

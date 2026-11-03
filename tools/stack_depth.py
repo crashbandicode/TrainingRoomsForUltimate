@@ -107,28 +107,83 @@ def analyse(elf):
     return link(parse(out))
 
 
+def components(funcs):
+    """Strongly connected component and local bit for each node (Kosaraju, O(V+E))."""
+    seen, finished = set(), []
+    for root in funcs:
+        if root in seen:
+            continue
+        seen.add(root)
+        stack = [(root, iter(funcs[root]["calls"]))]
+        while stack:
+            a, children = stack[-1]
+            c = next(children, None)
+            if c is None:
+                finished.append(a)
+                stack.pop()
+            elif c not in seen:
+                seen.add(c)
+                stack.append((c, iter(funcs[c]["calls"])))
+    reverse = {a: [] for a in funcs}
+    for a, f in funcs.items():
+        for c in f["calls"]:
+            reverse[c].append(a)
+    group, bit = {}, {}
+    for root in reversed(finished):
+        if root in group:
+            continue
+        group[root] = root
+        stack, members = [root], []
+        while stack:
+            a = stack.pop()
+            members.append(a)
+            for c in reverse[a]:
+                if c not in group:
+                    group[c] = root
+                    stack.append(c)
+        for i, a in enumerate(members):
+            bit[a] = 1 << i
+    return group, bit
+
+
 def deepest(funcs, root):
-    """(bytes, path) of the deepest direct-call path from `root`; recursion is cut at the repeated function."""
-    memo, onstack = {}, set()
+    """Longest simple direct-call path; still a LOWER bound on actual stack use.
+
+    A repeated function ends that path, not all future visits to that node.
+    Cache by node AND the already visited nodes in its strongly connected
+    component. Once a path leaves a component it cannot return, so ancestors
+    in other components cannot affect its suffix. This avoids context-dependent
+    cycle cuts poisoning another caller's cached result. Sorting only chooses
+    a reproducible witness when equally deep paths exist.
+
+    DAGs take O(V+E) states. A cyclic component of m nodes can require O(m*2**m)
+    states: this is an exact simple-path search, not an arbitrary cycle cap or
+    a sum of mutually exclusive paths. Recursive repetitions, indirect calls
+    and external frames remain outside this lower-bound contract.
+    """
+    group, bit = components(funcs)
+    memo = {}
+    children = {a: sorted(f["calls"], key=lambda c: (funcs[c]["name"], c)) for a, f in funcs.items()}
     sys.setrecursionlimit(100000)
 
-    def go(a):
-        if a in memo:
-            return memo[a]
-        if a in onstack:
-            return 0, []
-        onstack.add(a)
-        best, path = 0, []
-        for c in funcs[a]["calls"]:
-            d, p = go(c)
-            if d > best:
+    def go(a, visited):
+        if visited & bit[a]:
+            return 0, ()
+        key = a, visited
+        if key in memo:
+            return memo[key]
+        best, path = 0, ()
+        following = visited | bit[a]
+        for c in children[a]:
+            d, p = go(c, following if group[c] == group[a] else 0)
+            if d > best or (d == best and p and not path):
                 best, path = d, p
-        onstack.discard(a)
-        res = (funcs[a]["frame"] + best, [a] + path)
-        memo[a] = res
-        return res
+        result = funcs[a]["frame"] + best, (a,) + path
+        memo[key] = result
+        return result
 
-    return go(root)
+    depth, path = go(root, 0)
+    return depth, list(path)
 
 
 ROW_RE = re.compile(r'row\(ThreadId::(\w+),\s*c?"([^"]+)",\s*(\d+)\s*\*\s*KIB,\s*([\d_]+),\s*([\d_]+),\s*"[^"]*",\s*"([^"]+)"\s*\)(?:\.with_external\(([\d_]+)\))?')
