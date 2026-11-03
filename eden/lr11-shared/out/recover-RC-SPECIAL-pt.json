@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-SPECIAL-pt",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "8f63a8868e81bbb4cb8d9edc07d0f8dadf23f7484eabc1752da5f6be94d9896f",
+  "started": 1793743560.0179284,
+  "results": [
+    {
+      "run": "steps.py:recover",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-SPECIAL-pt",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743560.0822268
+}

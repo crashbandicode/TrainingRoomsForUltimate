@@ -1,0 +1,38 @@
+{
+  "id": "RC-BUSY",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ea7204055f7503a29003db83227df8e5223014580b0db43a03838c771fc5e302",
+  "started": 1793743684.1114511,
+  "results": [
+    {
+      "run": "steps.py:busy",
+      "on": "yoga",
+      "value": {
+        "exercised": null,
+        "attempted": true,
+        "acceptance": "review native build/input ordering; no atomic pending claim",
+        "queue_observed_host": 641730.792840589,
+        "second_press_host": [
+          641730.793591625,
+          641730.997532621
+        ],
+        "build": "641742482 #1852 [GroupSwap] build owner=0 group=0 mode=async queued=2 control=0x11e2bb97e0 setup_us=1975 us=2068; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+        "group": 0,
+        "request": "641742458 #1845 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77804224512, sequence: 22 } outgoing=0x1f target=0x2e index=0 mii=false",
+        "done": "641742911 #1877 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77804224512, sequence: 22 } target=0x2e physical=0x2e index=0 original=false mii=false resource_pair=None released=true",
+        "later": {
+          "request": "641742998 #1883 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77804224512, sequence: 23 } outgoing=0x2e target=0x2d index=0 mii=false",
+          "done": "641743040 #1894 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77804224512, sequence: 23 } target=0x2d physical=0x2e index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr11-inputs/out/RC-BUSY/yoga-220829Z-977583-busy-later.png"
+        }
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/RC-BUSY/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743709.9385817
+}

@@ -1,0 +1,14 @@
+{
+  "status": "scoped review; not whole RC acceptance",
+  "busy": {"bodies_queued":1854,"second_press_rejection":1857,"built":1862,"released":1877,"later_ready":1894,"later_visual":"normal grey ROB body and ROB HUD","first_ready_visual":"transient: first body absent and previous Dark Pit portrait; not accepted as correct settled body/HUD"},
+  "teardown": [
+    {"attempt":1,"queued":2898,"pause":2902,"built":2906,"finalize":2931,"drained":false},
+    {"attempt":2,"queued":3204,"pause":3209,"built":3213,"finalize":3238,"drained":false},
+    {"attempt":3,"queued":3518,"pause":3522,"built":3526,"finalize":3552,"drained":false}
+  ],
+  "teardown_media":"All CSS/reentry Steve+Lucas and subsequent Falcon bodies reviewed. Immediate continuation HUD portraits still Steve; not accepted as settled HUD proof.",
+  "r3": {"catch":"frames5/10 visible colored grab geometry; fresh fighter catch spheres>0 in receipt","shield":"frames5/10 visible red stock shield on P1","attack":"fresh spawned>0/zero-hurt/heap predicates passed; frames8/12/16 show action flash, isolated attack-sphere geometry not independently resolved","pause":"settled native menu No. of CPUs=1; fresh begin/end/resume leaked=0 receipt","frame_advantage":"fresh notice_draw Frame Advantage -16 during attack, actual notice visible; replacement/destroy and independent pause clauses open"},
+  "kirby":"First Kirby/Falcon/ROB/Lucario bodies reviewed. Target expectation after Game&Watch omitted Steve original; no copied-hat departure acceptance.",
+  "recording_provenance":"Original GIF hashes and recording.status are retained in out/actions.jsonl; all raw media in external final-inputs/out. Contact sheets are review aids.",
+  "evidence_limit":"Failure hooks did not copy both diagnostic generations before returning; some failed-row intermediate raw diagnostics rotated away. Failed receipts and all control actions remain retained; absence is not negative native proof. Add failure-path copies before the next batch."
+}

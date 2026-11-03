@@ -1,0 +1,25 @@
+{
+  "id": "R3-tr2-jab-x4",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "cd8b9f72dba767471bc9dcb61ac0fb57fe065a9fcc225d5aa040dc51c8f5b119",
+  "started": 1793743377.8108277,
+  "results": [
+    {
+      "run": "steps.py:r3_action",
+      "on": "yoga",
+      "value": {
+        "media": "/home/intpa/tr-lr11-inputs/out/R3-tr2-jab-x4/tr2-jab-x4.gif",
+        "review": "pending active-frame review",
+        "pass": "641411827 #286 [Hitbox] pass held=12 held_total=12 kept=0 spawned=12 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true",
+        "stats": "641416242 #353 [Hitbox] stats passes=600 with_work=600 want_hit=144 want_hurt=0 kept=96 spawned=48 killed=48 ended=0 failed=0 dropped=0 held_max=12 held_now=0 sleeps=600 restores=600 commands=0 pass_ticks_avg=567 pass_ticks_max=210023 heap_allocations=0"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/R3-tr2-jab-x4/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743386.0943458
+}

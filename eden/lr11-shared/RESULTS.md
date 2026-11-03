@@ -1,0 +1,19 @@
+# lr-11 — 2026-11-03 — RC NOT READY
+- Eden: `/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage`
+- SHA256: `6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb`; RC8 cf4bf44 / diagnostic3ca7f0c5; playbook705cc21.
+- Up22:01:55.882186Z → RELEASED22:16:34.227753Z; one boot,21PASS/11FAILED +11PASS recovery rows,0unrun (`receipt-accounting.json`).
+- Navigation PASS (`out/01-main.json` through `out/07-training.json`); every failed row deferred with same-boot gated continuation (`out/batch-end.json`).
+- NOTICE execution PASS (`out/RC-NOTICE-*.json`); complete loading-role/ready-total acceptance deferred, snapshots do not cover every transition.
+- MII FAILED (`out/failed/RC-MII.json`): ordinary saved-Mii route lacked exact bank proof; complete pointed identity remains open.
+- R3 execution PASS (`out/R3-*.json`): fresh attack/catch predicates, visible grab spheres/stock shield, native pause/resume and Frame Advantage notice; independent-pause/retirement and isolated attack-sphere visual clauses open.
+- PILOT deferred (`out/failed/RC-PILOT.json`): standdown/install observed; selected-row arm/release route unqualified, no ownership toggle attempted.
+- KIRBY-ROB FAILED (`out/failed/RC-KIRBY-ROB.json`): return sequence omitted original Steve58 before Kirby; first Kirby/ROB bodies observed, transient HUDs not accepted.
+- HATS deferred (`out/failed/RC-HATS.json`): Kirby-ready prerequisite absent after failed return; no five-hat coverage.
+- SPECIAL FAILED/deferred (`out/failed/RC-SPECIAL-*.json`): hard-coded2e/2d prefetch prerequisite did not match these fixtures; native form/partner tests unexercised.
+- BUSY native ordering PASS (`out/RC-BUSY.json`, diag#1854–1894): queued→second-press rejection→built/released→later ROB; immediate first-ready screenshot remains transient.
+- TRIO-END FAILED (`out/failed/RC-TRIO-END-*.json`): source-retired gate absent; all three recovered/reentered on this boot.
+- TEARDOWN execution PASS×3 (`out/RC-TEARDOWN-*.json`): pause during build, clean finalize/reentry/continuation; all settled before finalize, drained=[], interrupted-destruction clause OPEN.
+- Health FAILED clean-log clause:0Unmapped, shutdown SIGBUS/panic recurred (`console-scan.json`); other rows remain independently assessed.
+- Down PASS: cleanup_failures=[], restored, separate verify/snapshot_equal=true, released (`lifecycle.json`, `yoga-verify.json`); capped game.stop error retained.
+- Harvest:0segments/0gates (`harvest-result.json`); raw GIFs/all shots at provenance raw_evidence_root, reviewed sheets in `review/`.
+- Next: correct fixture-specific group/return routes and source-retirement gate, qualify Pilot route and pending-finalize coverage; batch remaining clauses again. Compliance once at Phase1 close-out.

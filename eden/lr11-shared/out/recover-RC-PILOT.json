@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-PILOT",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "77342126c2d3e2cd602cb4eb33c35f74f40278a7a2b892eef5e7e3f529011629",
+  "started": 1793743406.0940921,
+  "results": [
+    {
+      "run": "steps.py:recover",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-PILOT",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743406.1537974
+}

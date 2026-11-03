@@ -1,0 +1,12 @@
+{
+  "id": "RC-SPECIAL-ic",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "3dbcd54ef53a77e7fec16496e17b8f197bc903b1edc0d6405dc8a82318f87f2b",
+  "started": 1793743622.126976,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+  "ended": 1793743683.8829525
+}

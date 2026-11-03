@@ -1,0 +1,24 @@
+{
+  "id": "R3-tr2-shield-hold-60",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "cd8b9f72dba767471bc9dcb61ac0fb57fe065a9fcc225d5aa040dc51c8f5b119",
+  "started": 1793743394.2806547,
+  "results": [
+    {
+      "run": "steps.py:r3_action",
+      "on": "yoga",
+      "value": {
+        "media": "/home/intpa/tr-lr11-inputs/out/R3-tr2-shield-hold-60/tr2-shield-hold-60.gif",
+        "review": "pending active-frame review",
+        "open": "Native shield positive requires actual GIF review; input success is not shield acceptance"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/R3-tr2-shield-hold-60/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743402.4671981
+}

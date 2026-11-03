@@ -1,0 +1,12 @@
+{
+  "id": "RC-KIRBY-ROB",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "77342126c2d3e2cd602cb4eb33c35f74f40278a7a2b892eef5e7e3f529011629",
+  "started": 1793743406.154519,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Unexpected requested target: 641465273 #759 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 3, entry: 75943378944, sequence: 6 } outgoing=0x1c target=0x58 index=0 mii=false')",
+  "ended": 1793743432.1963172
+}

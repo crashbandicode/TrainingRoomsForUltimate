@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-HATS",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "388964cac0e4899dff9ddbe730bfcdc3c28c84bf4441c0e85dfd0a2950f5334d",
+  "started": 1793743432.570264,
+  "results": [
+    {
+      "run": "steps.py:recover",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-HATS",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743432.6304119
+}

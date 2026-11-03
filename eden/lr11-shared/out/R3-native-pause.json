@@ -1,0 +1,25 @@
+{
+  "id": "R3-native-pause",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "cd8b9f72dba767471bc9dcb61ac0fb57fe065a9fcc225d5aa040dc51c8f5b119",
+  "started": 1793743402.468075,
+  "results": [
+    {
+      "run": "steps.py:r3_pause",
+      "on": "yoga",
+      "value": {
+        "begin": "641436238 #497 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+        "end": "641438056 #499 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=110 owned_non_neutral=0 owners=0x00",
+        "resume": "641438074 #502 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0",
+        "open": "Independent pause producer and frame-advantage positive/retirement still require specific evidence"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/R3-native-pause/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743405.300071
+}

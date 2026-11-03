@@ -1,0 +1,12 @@
+{
+  "id": "RC-TRIO-END-2",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "f4098696369603599d472d3587710698b18d80bdcbc0fe6496dd8e26ba4be1e8",
+  "started": 1793743810.25251,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate lr08-source-retired on yoga did not pass within 25 s')",
+  "ended": 1793743863.4753795
+}

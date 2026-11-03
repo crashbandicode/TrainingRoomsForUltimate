@@ -1,0 +1,12 @@
+{
+  "id": "RC-PILOT",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "cd8b9f72dba767471bc9dcb61ac0fb57fe065a9fcc225d5aa040dc51c8f5b119",
+  "started": 1793743405.8923225,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Pilot standdown/install observed; selected-row arm/close/release route remains unqualified. Defer without toggling unknown ownership; next state gated Training')",
+  "ended": 1793743405.9647002
+}

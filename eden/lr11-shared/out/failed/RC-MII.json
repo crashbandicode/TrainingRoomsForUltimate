@@ -1,0 +1,12 @@
+{
+  "id": "RC-MII",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ff12638922578eea7f1be72fbc9ea602a6b7beb5ce085177ba7ff8744709e399",
+  "started": 1793743376.3609624,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Exact saved-Mii bank proof absent: 641410966 #243 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 2, entry: 77110091776, sequence: 1 } target=0x4a index=1 resource=[60, 4e, 6b, ec, 11, 00, 00, 00, 00, 0b, 22, f3, 11, 00, 00, 00] released=true saved_files_written=false')",
+  "ended": 1793743377.4404793
+}

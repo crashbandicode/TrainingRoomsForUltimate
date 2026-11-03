@@ -1,0 +1,18 @@
+{
+  "playbook": "705cc21d1503648766663e78bd5d18c74a169efd",
+  "raw_evidence_root": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr11-shared",
+  "executor_runner_sha256": "9cb369084548b4209cf24990cfaaa51d32ec07a4679fb3e1d0db2e07c51c74b0",
+  "executor_scope": "Canonical Yoga runner pinned independently; 705cc21 is the batching/write-up policy followed. Portable asset definitions avoid dependency on changed library expansion.",
+  "original_rows_sha256": "ff12638922578eea7f1be72fbc9ea602a6b7beb5ce085177ba7ff8744709e399",
+  "hook_sha256": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0",
+  "runtime_cap_s": 1200,
+  "caller_work_cap_s": 1000,
+  "compliance": "Phase1 close-out only",
+  "pilot_plugin_set": "Existing pinned Pilot e3033426 and Deluxe a8dcda24; route still requires actual qualification",
+  "open_clauses": [
+    "Mii complete pointed payload identity",
+    "SPECIAL each form/partner behavior",
+    "R3 independent pause producer/frame-advantage replacement and destruction; isolated attack-sphere visual",
+    "Pilot selected-row arm/release route"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "488404413d7cb9f9e71aeb8b921965a65cce05d34987bbd277525a244f5183ab",
+  "started": 1793743432.4162266,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('HATS deferred: current Kirby ready prerequisite absent')",
+  "ended": 1793743432.421151
+}

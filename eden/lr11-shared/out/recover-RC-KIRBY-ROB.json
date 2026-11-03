@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-KIRBY-ROB",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "488404413d7cb9f9e71aeb8b921965a65cce05d34987bbd277525a244f5183ab",
+  "started": 1793743432.357188,
+  "results": [
+    {
+      "run": "steps.py:recover",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-KIRBY-ROB",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743432.415509
+}

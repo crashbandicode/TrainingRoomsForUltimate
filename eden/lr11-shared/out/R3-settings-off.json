@@ -1,0 +1,22 @@
+{
+  "id": "R3-settings-off",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "cd8b9f72dba767471bc9dcb61ac0fb57fe065a9fcc225d5aa040dc51c8f5b119",
+  "started": 1793743405.3009772,
+  "results": [
+    {
+      "run": "steps.py:r3_settings",
+      "on": "yoga",
+      "value": {
+        "enabled": false
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/R3-settings-off/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743405.8914833
+}

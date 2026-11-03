@@ -1,0 +1,12 @@
+{
+  "id": "RC-SPECIAL-aegis",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "8f63a8868e81bbb4cb8d9edc07d0f8dadf23f7484eabc1752da5f6be94d9896f",
+  "started": 1793743560.0830865,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+  "ended": 1793743621.9352045
+}

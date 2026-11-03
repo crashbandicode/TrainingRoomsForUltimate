@@ -1,0 +1,38 @@
+{
+  "manifest": "/home/intpa/tr-lr11-inputs/rows.json",
+  "manifest_sha256": "ff12638922578eea7f1be72fbc9ea602a6b7beb5ce085177ba7ff8744709e399",
+  "rows": 32,
+  "available_segments": [
+    "main-stage",
+    "stage-css",
+    "cpu74-lucas",
+    "lucas-pick",
+    "enter-training",
+    "pause-open",
+    "pause-close",
+    "p1-next-frames",
+    "cpu-next-frames",
+    "focus-native-quit-frames",
+    "confirm-native-quit-frames",
+    "intro-cancel",
+    "steve-hover",
+    "steve-place",
+    "title-main",
+    "lr04-cpu-approach",
+    "lr04-cpu-pick",
+    "lr04-cpu85-to74",
+    "lr04-return-cpu-pick",
+    "lr04-roy-lucas",
+    "lr10-p1-short",
+    "tr2-jab-x4",
+    "tr2-grab",
+    "tr2-shield-hold-60"
+  ],
+  "missing_segments": [
+    "hat-next"
+  ],
+  "references_to_acquire": [],
+  "gates": 57,
+  "errors": [],
+  "result": "READY_TO_RECORD"
+}

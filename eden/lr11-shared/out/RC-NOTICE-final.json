@@ -1,0 +1,98 @@
+{
+  "id": "RC-NOTICE-final",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "aaf2d7e3d6a8f8ed9d656394db50fd364c6feea800f73256e7cde157356423e2",
+  "started": 1793744121.839276,
+  "results": [
+    {
+      "run": "steps.py:final",
+      "on": "yoga",
+      "value": {
+        "observed": [
+          "641955857 #2605 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "641955857 #2606 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+          "641955873 #2608 [TrainingRooms] notice_draw header=\"CPU Character\" body=\"Saved Mii applied\" color=[0, 0, 0, 255]",
+          "642025107 #2720 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+          "642025107 #2721 [PreloadStatus] raise text=\"Swap both once to load\" frames=120",
+          "642025122 #2723 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap both once to load\" color=[0, 0, 0, 255]",
+          "642044547 #2801 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+          "642044547 #2802 [PreloadStatus] raise text=\"Swap both once to load\" frames=120",
+          "642044555 #2804 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap both once to load\" color=[0, 0, 0, 255]",
+          "642046089 #2838 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642046293 #2856 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642046526 #2859 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "642046526 #2860 [PreloadStatus] wiped text=Some(\"Swap both once to load\"); raised again",
+          "642046526 #2861 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+          "642049288 #2879 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+          "642049441 #2887 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+          "642050189 #2923 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642069122 #3019 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642070256 #3053 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642089189 #3144 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642089389 #3162 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642089825 #3166 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "642089825 #3167 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+          "642092390 #3184 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+          "642092758 #3194 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+          "642093257 #3230 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642111523 #3326 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642111958 #3330 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "642111958 #3331 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+          "642113339 #3367 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642132255 #3456 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642132438 #3474 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642132792 #3479 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "642132792 #3480 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+          "642135438 #3497 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+          "642135743 #3507 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+          "642136355 #3544 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+          "642155372 #3638 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]"
+        ],
+        "open": "P1/CPU/both loading and exact ready total require full-batch review",
+        "trace_counters": {
+          "boot_error": "",
+          "file_lost": "0",
+          "output": "/home/intpa/tr-lr11-yoga-state/run-yoga/yoga.trace.jsonl",
+          "output_error": "",
+          "points": [
+            {
+              "abandoned_returns": "0",
+              "address": "0x81620240",
+              "dropped": "0",
+              "hits": "55",
+              "id": "1",
+              "matched": "55",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "55",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x653240"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x8161f4e0",
+              "dropped": "0",
+              "hits": "150",
+              "id": "2",
+              "matched": "150",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "150",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x6524e0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/RC-NOTICE-final/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793744121.9210231
+}

@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-TRIO-END-2",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "1d46c49095c8ec51b589a4bab7598b1e23a134b22f4beefd1a4a16d932c01c51",
+  "started": 1793743863.604948,
+  "results": [
+    {
+      "run": "steps.py:recover",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-TRIO-END-2",
+        "route": "css",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743900.8556366
+}

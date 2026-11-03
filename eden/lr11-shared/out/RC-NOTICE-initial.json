@@ -1,0 +1,25 @@
+{
+  "id": "RC-NOTICE-initial",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ff12638922578eea7f1be72fbc9ea602a6b7beb5ce085177ba7ff8744709e399",
+  "started": 1793743376.2879245,
+  "results": [
+    {
+      "run": "steps.py:notice",
+      "on": "yoga",
+      "value": {
+        "observed": [
+          "641409499 #196 [TrainingRooms] notice_draw header=\"TrainingRooms\" body=\"Welcome!\" color=[0, 0, 0, 255]"
+        ],
+        "open": "P1/CPU/both loading and exact ready total require full-batch review"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/RC-NOTICE-initial/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793743376.360329
+}

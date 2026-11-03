@@ -1,0 +1,37 @@
+{
+  "id": "RC-TEARDOWN-3",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "aaf2d7e3d6a8f8ed9d656394db50fd364c6feea800f73256e7cde157356423e2",
+  "started": 1793744077.9620087,
+  "results": [
+    {
+      "run": "steps.py:teardown",
+      "on": "yoga",
+      "value": {
+        "build": "642135908 #3518 [GroupSwap] build owner=0 group=0 mode=async queued=2 control=0x1180cec440 setup_us=45 us=46; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+        "teardown": "642138381 #3552 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=0 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 5))",
+        "destroyed": "642138519 #3564 [TrioBoundary] destroy entry=0x122064a000 owner=1 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })",
+        "queue_observed_host": 642124.219774041,
+        "quit_route_host": [
+          642124.220184661,
+          642132.939725195
+        ],
+        "settled_before_quit_dispatch": false,
+        "interrupted_acceptance": "review actual build/quit ordering",
+        "drained": [],
+        "continuation": {
+          "request": "642154376 #3617 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 20, entry: 77465419776, sequence: 43 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "642155359 #3636 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 20, entry: 77465419776, sequence: 43 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/tr-lr11-inputs/out/RC-TEARDOWN-3/yoga-221521Z-599773-rc-end-3-build-again.png"
+        }
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr11-inputs/out/RC-TEARDOWN-3/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793744121.8377948
+}

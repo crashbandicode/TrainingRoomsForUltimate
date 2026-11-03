@@ -1,0 +1,10 @@
+{
+  "bytes": 898748,
+  "sha256": "ef6af84736d0d38571d5b0fd244fe8ef81c64adf4e3fc9e23df67fef7d9d607f",
+  "matches": [
+    "fatal error: fault",
+    "[signal SIGBUS: bus error code=0x2 addr=0x709e00 pc=0x709e00]",
+    "panic during panic",
+    "SIGBUS: bus error"
+  ]
+}

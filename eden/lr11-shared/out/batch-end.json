@@ -1,0 +1,72 @@
+{
+  "deferred": [
+    {
+      "id": "RC-MII",
+      "cause": "RuntimeError('Exact saved-Mii bank proof absent: 641410966 #243 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 2, entry: 77110091776, sequence: 1 } target=0x4a index=1 resource=[60, 4e, 6b, ec, 11, 00, 00, 00, 00, 0b, 22, f3, 11, 00, 00, 00] released=true saved_files_written=false')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-MII.json",
+      "continuation": "recover-RC-MII"
+    },
+    {
+      "id": "RC-PILOT",
+      "cause": "RuntimeError('Pilot standdown/install observed; selected-row arm/close/release route remains unqualified. Defer without toggling unknown ownership; next state gated Training')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-PILOT.json",
+      "continuation": "recover-RC-PILOT"
+    },
+    {
+      "id": "RC-KIRBY-ROB",
+      "cause": "RuntimeError('Unexpected requested target: 641465273 #759 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 3, entry: 75943378944, sequence: 6 } outgoing=0x1c target=0x58 index=0 mii=false')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-KIRBY-ROB.json",
+      "continuation": "recover-RC-KIRBY-ROB"
+    },
+    {
+      "id": "RC-HATS",
+      "cause": "RuntimeError('HATS deferred: current Kirby ready prerequisite absent')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-HATS.json",
+      "continuation": "recover-RC-HATS"
+    },
+    {
+      "id": "RC-SPECIAL-ordinary",
+      "cause": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-SPECIAL-ordinary.json",
+      "continuation": "recover-RC-SPECIAL-ordinary"
+    },
+    {
+      "id": "RC-SPECIAL-pt",
+      "cause": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-SPECIAL-pt.json",
+      "continuation": "recover-RC-SPECIAL-pt"
+    },
+    {
+      "id": "RC-SPECIAL-aegis",
+      "cause": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-SPECIAL-aegis.json",
+      "continuation": "recover-RC-SPECIAL-aegis"
+    },
+    {
+      "id": "RC-SPECIAL-ic",
+      "cause": "RuntimeError('Missing positive evidence: \\\\[GroupSwap\\\\] prefetched owner=0 group=\\\\d+ kinds=\\\\[2e,\\\\ 2d\\\\]')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-SPECIAL-ic.json",
+      "continuation": "recover-RC-SPECIAL-ic"
+    },
+    {
+      "id": "RC-TRIO-END-1",
+      "cause": "RuntimeError('gate lr08-source-retired on yoga did not pass within 25 s')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-TRIO-END-1.json",
+      "continuation": "recover-RC-TRIO-END-1"
+    },
+    {
+      "id": "RC-TRIO-END-2",
+      "cause": "RuntimeError('gate lr08-source-retired on yoga did not pass within 25 s')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-TRIO-END-2.json",
+      "continuation": "recover-RC-TRIO-END-2"
+    },
+    {
+      "id": "RC-TRIO-END-3",
+      "cause": "RuntimeError('gate lr08-source-retired on yoga did not pass within 25 s')",
+      "receipt": "/home/intpa/tr-lr11-inputs/out/failed/RC-TRIO-END-3.json",
+      "continuation": "recover-RC-TRIO-END-3"
+    }
+  ],
+  "unrun": [],
+  "remaining_s": 194.4804910030216
+}
