@@ -1,0 +1,11 @@
+Running as unit: run-p1616775-i22578626.scope; invocation ID: ce70750d59d14f9db163b5319090c005
+test_cpu_rejects_bad_retirement_and_entry_mismatch (__main__.RetirementTests.test_cpu_rejects_bad_retirement_and_entry_mismatch) ... ok
+test_cpu_requires_every_retirement_link (__main__.RetirementTests.test_cpu_requires_every_retirement_link) ... ok
+test_no_prior_row_or_cpu_bank_substitution (__main__.RetirementTests.test_no_prior_row_or_cpu_bank_substitution) ... ok
+test_observed_native_path (__main__.RetirementTests.test_observed_native_path) ... ok
+test_source_requires_listener_and_same_owner_release (__main__.RetirementTests.test_source_requires_listener_and_same_owner_release) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.008s
+
+OK

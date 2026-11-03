@@ -1,0 +1,10 @@
+Running as unit: run-p1616776-i22590126.scope; invocation ID: e7288ec409f441f0a00344834eaab7da
+test_bad_start_never_sends_input (__main__.QuitTests.test_bad_start_never_sends_input) ... ok
+test_pause_before_quit_and_finalization_before_css (__main__.QuitTests.test_pause_before_quit_and_finalization_before_css) ... ok
+test_unclean_finalize_never_accepts_css (__main__.QuitTests.test_unclean_finalize_never_accepts_css) ... ok
+test_unverified_native_pause_never_plays_quit (__main__.QuitTests.test_unverified_native_pause_never_plays_quit) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK

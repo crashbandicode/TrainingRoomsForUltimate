@@ -1,0 +1,10 @@
+{
+  "playbook_head": "403f517a7927533290fdaaa582c519b77c12277c",
+  "runner_sha256": "a209e35c801f53d340d3a9f76269f22ff3ef2bb66212c372cd09d91c7738907b",
+  "lifecycle_sha256": "244cd9181c92fa0505a77fcabd298720e2d3ba6f171d60b35225f7e43fe628ea",
+  "hook_sha256": "95f40f34469c99ef3ec4d6cae13e28a37430e1fafe5fbc394a1a82613c206709",
+  "rows_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "library_sha256": "962a8cdacd22a0f5d7a4b32b42e7320c30b3eb0497a4598003f16c94243e3d75",
+  "source_product": "cf4bf44c104ecc96a78d382b4c0276bf33838f18",
+  "checklist": "Same lr07 checklist; native CPU retirement replaces inapplicable bank summary with positively linked entry/claim checks. Fresh admission, exact identity/manifest, fullconsole, fullrestore+separateverify, independentPID/claim audit, archive and harvest. Runtime900s/runner480s leaves cleanup margin to20min. Wait actualPkg4YogaRELEASED. No productbuild/publication/device."
+}

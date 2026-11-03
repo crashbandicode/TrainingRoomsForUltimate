@@ -1,0 +1,32 @@
+{
+  "manifest": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr08-shared/rows.json",
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "rows": 22,
+  "available_segments": [
+    "main-stage",
+    "stage-css",
+    "cpu74-lucas",
+    "lucas-pick",
+    "enter-training",
+    "pause-open",
+    "pause-close",
+    "p1-next-frames",
+    "cpu-next-frames",
+    "focus-native-quit-frames",
+    "confirm-native-quit-frames",
+    "intro-cancel",
+    "steve-hover",
+    "steve-place",
+    "title-main",
+    "lr04-cpu-approach",
+    "lr04-cpu-pick",
+    "lr04-cpu85-to74",
+    "lr04-return-cpu-pick",
+    "lr04-roy-lucas"
+  ],
+  "missing_segments": [],
+  "references_to_acquire": [],
+  "gates": 57,
+  "errors": [],
+  "result": "READY"
+}
