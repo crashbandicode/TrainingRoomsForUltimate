@@ -446,3 +446,23 @@ that configuration, present the measurements for a decision rather than
 silently lowering it. The measurement must follow resolution of the existing
 helper-path fault hold. This follow-up is not an RC blocker unless it changes
 approved behavior; no default has been changed by this documentation.
+
+### F9 live hat/item source: immediate cutover — 2026-11-03
+
+Operator decision relayed in TRAININGROOMS-LEAD-INBOX.md at 03:0xZ:
+when rotation changes the fixed target for physical entry 2 or 3, switch the
+seat immediately even when its old body supplies a live Kirby copy or thrown
+item. Do not hold the seat, stall rotation, or guess at native rebinding.
+
+Rebuild the hat through native copy_setup with the same hat kind from the new
+source when available, otherwise follow normal hat source rules. Copied charge
+and articles reset; the operator explicitly accepts that loss. Remove an item
+still in flight from the replaced body through normal native item removal.
+This supersedes the lossless migration requirement for these edge cases, not
+other identity, fixed-seat, exact-Mii or reset requirements.
+
+Acceptance remains open: charged entry-2-sourced hat, advance rotation, verify
+entry 2 changes and hat rebuilds with charge reset; repeat with a live thrown
+item; raise CPU count and verify CPU 2 is the next rotation member. Each row
+requires no crash and zero total Unmapped in the retained full Eden console.
+This records authorization only; implementation and runtime proof are pending.
