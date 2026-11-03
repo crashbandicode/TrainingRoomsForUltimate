@@ -3,7 +3,7 @@
 //! publishes each new frame for the layout tick to draw. The model allocates on input events, so that
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
@@ -18,6 +18,7 @@ use crate::model::menu::input::Button;
 use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};
 use crate::model::settings::Settings;
+use crate::model::ui_events::{Event, Packet, Ring};
 use crate::model::screens::{frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, notices, writer};
@@ -26,74 +27,34 @@ use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{external, requests};
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, OPEN};
 
-const RING: usize = 64;
-static SLOTS: [AtomicU8; RING] = [const { AtomicU8::new(0) }; RING];
-static HEAD: AtomicUsize = AtomicUsize::new(0);
-static TAIL: AtomicUsize = AtomicUsize::new(0);
+static INPUT: Ring<64> = Ring::new();
 static WORKER: OnceLock<Thread> = OnceLock::new();
-/// Events the ring had no room for (it should never be non-zero: a frame has a dozen presses at most).
+/// Complete polls/openings refused by the bounded ring; never half a physical poll.
 pub static DROPPED: AtomicU32 = AtomicU32::new(0);
 
-const EV_OPEN: u8 = 1;
-const EV_PRESS: u8 = 2;
-/// The session ended (leaving Training): drop the model, so the next opening starts a fresh one.
-const EV_RESET: u8 = 32;
-
-fn encode(button: Button) -> u8 {
-    EV_PRESS + button as u8
-}
-
-fn decode(code: u8) -> Option<Button> {
-    const ALL: [Button; 12] = [
-        Button::Up,
-        Button::Down,
-        Button::Left,
-        Button::Right,
-        Button::A,
-        Button::B,
-        Button::X,
-        Button::Y,
-        Button::L,
-        Button::R,
-        Button::ZL,
-        Button::ZR,
-    ];
-    ALL.get(usize::from(code.checked_sub(EV_PRESS)?)).copied()
-}
-
 /// Called by the input hook: no allocation, no lock.
-fn push(code: u8) {
-    let head = HEAD.load(Ordering::Relaxed);
-    if head.wrapping_sub(TAIL.load(Ordering::Acquire)) >= RING {
+fn push(generation: u32, event: Event) -> bool {
+    if !INPUT.push(generation, event) {
         DROPPED.fetch_add(1, Ordering::Relaxed);
-        return;
+        return false;
     }
-    SLOTS[head % RING].store(code, Ordering::Relaxed);
-    HEAD.store(head.wrapping_add(1), Ordering::Release);
+    true
 }
 
-fn pop() -> Option<u8> {
-    let tail = TAIL.load(Ordering::Relaxed);
-    if tail == HEAD.load(Ordering::Acquire) {
-        return None;
-    }
-    let code = SLOTS[tail % RING].load(Ordering::Relaxed);
-    TAIL.store(tail.wrapping_add(1), Ordering::Release);
-    Some(code)
-}
+pub fn input_generation() -> u32 { INPUT.generation() }
 
-pub fn push_open() {
-    push(EV_OPEN);
+pub fn push_open(generation: u32) -> bool {
+    push(generation, Event::Open)
 }
 
 /// The menu session ends: the worker drops its model (uncommitted edits go with it).
 pub fn push_reset() {
-    push(EV_RESET);
+    INPUT.reset();
     wake();
 }
 
-pub fn push_press(button: Button) {
-    push(encode(button));
+pub fn push_poll(generation: u32, packet: Packet) -> bool {
+    push(generation, Event::Poll(packet))
 }
 
 /// A typed view of the menu changed outside the menu (`compat::menu`): the worker writes it back into the settings.
@@ -148,6 +109,7 @@ fn env() -> Env {
 /// What the worker owns: the menu model and which screen has the buttons (`model::flow`).
 #[derive(Default)]
 struct Session {
+    input_generation: u32,
     menu: Option<Menu>,
     setups: super::setups::Ui,
     setup_note: Option<String>,
@@ -190,8 +152,10 @@ fn run() {
         // Retire departing layer state before accepting a new scene's panel input.
         crate::runtime::macros::port::worker_events();
         // Drain first: an event pushed before this thread registered has no unpark waiting for it.
-        while let Some(code) = pop() {
-            handle(code, &mut session);
+        sync_input_generation(&mut session);
+        while let Some((generation, event)) = INPUT.pop() {
+            sync_input_generation(&mut session);
+            if generation == session.input_generation { handle(event, &mut session); }
         }
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
@@ -211,8 +175,10 @@ fn run() {
     }
 }
 
-fn handle(code: u8, s: &mut Session) {
-    if code == EV_RESET {
+fn sync_input_generation(s: &mut Session) {
+    let generation = INPUT.generation();
+    if generation != s.input_generation {
+        s.input_generation = generation;
         s.menu = None;
         s.stage_context = None;
         s.stage_request = None;
@@ -230,9 +196,11 @@ fn handle(code: u8, s: &mut Session) {
         }
         s.phase = Phase::Menu;
         diagnostic(format_args!("[Ui] menu session cleared"));
-        return;
     }
-    if code == EV_OPEN {
+}
+
+fn handle(event: Event, s: &mut Session) {
+    if event == Event::Open {
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
         s.stage_request = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
@@ -257,7 +225,18 @@ fn handle(code: u8, s: &mut Session) {
         diagnostic(format_args!("[Ui] menu opened"));
         return;
     }
-    let Some(button) = decode(code) else { return };
+    let Event::Poll(packet) = event else { return };
+    let Some(menu) = s.menu.as_mut() else { return };
+    let buttons = packet.presses(menu);
+    for button in buttons {
+        if INPUT.generation() != s.input_generation { break; }
+        press(button, s);
+    }
+    // Release-only packets also advance capture and update its hint/preview.
+    if OPEN.load(Ordering::Acquire) { sync_panels(s); }
+}
+
+fn press(button: Button, s: &mut Session) {
     if s.menu.is_none() || !OPEN.load(Ordering::Acquire) || s.phase == Phase::Clip {
         return;
     }
@@ -310,6 +289,10 @@ fn handle(code: u8, s: &mut Session) {
         }
         m.is_closed()
     };
+    // Cancellation/close invalidates every remaining poll (and the rest of this
+    // poll), before it can publish an old editor's effect into a later opening.
+    if INPUT.generation() != s.input_generation { return; }
+    if let Some(menu) = s.menu.as_mut() { apply_shortcuts(menu); }
     if closed {
         begin_close(s,
             #[cfg(feature = "mii-editor-alpha")]
@@ -317,6 +300,20 @@ fn handle(code: u8, s: &mut Session) {
         );
     } else {
         sync_panels(s);
+    }
+}
+
+/// Editor confirmation, not whole-menu close, owns this immediate INI effect.
+fn apply_shortcuts(menu: &mut Menu) {
+    if let Some(wanted) = menu.take_button_config() {
+        for (slot, chord) in wanted.into_iter().enumerate() {
+            if chords::shortcuts()[slot] == chord { continue; }
+            if let Err(refusal) = chords::commit_shortcut(slot, chord) {
+                notices::post("Menu shortcuts", refusal.text(), 120, DEFAULT_COLOR);
+                diagnostic(format_args!("[Ui] shortcut {} refused: {}", slot + 1, refusal.text()));
+            }
+        }
+        menu.shortcuts_applied(chords::shortcuts());
     }
 }
 
@@ -655,19 +652,6 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     if outbox.changed {
         writer::request_settings(json);
     }
-    // The menu shortcuts (N7): each changed slot is checked and applied at once; the writer rewrites
-    // `button_config.ini`. A refused edit changes nothing and says why.
-    if let Some(wanted) = outbox.button_config {
-        for (slot, chord) in wanted.into_iter().enumerate() {
-            if chords::shortcuts()[slot] == chord {
-                continue;
-            }
-            if let Err(refusal) = chords::commit_shortcut(slot, chord) {
-                notices::post("Menu shortcuts", refusal.text(), 120, DEFAULT_COLOR);
-                diagnostic(format_args!("[Ui] shortcut {} refused: {}", slot + 1, refusal.text()));
-            }
-        }
-    }
     // Q7: the Replay capture toggle is live at once; the writer rewrites `replay_capture.ini`.
     if let Some(on) = outbox.replay_capture {
         writer::request_replay_capture(on);
@@ -679,6 +663,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     }
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
+    INPUT.reset();
     OPEN.store(false, Ordering::Release);
     crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);

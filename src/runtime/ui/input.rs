@@ -16,10 +16,11 @@ use crate::model::adapter::{Adapter, Style};
 use crate::runtime::features::chords;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::model::readiness;
+use crate::model::ui_events::Packet;
 use crate::runtime::ui::state::{self, OPEN};
 use crate::runtime::ui::worker;
 
-static ADAPTER: Mutex<Adapter> = Mutex::new(Adapter::new());
+static ADAPTER: Mutex<(Adapter, u32)> = Mutex::new((Adapter::new(), 0));
 /// The last record read, for the diagnostics.
 pub static LAST_BUTTONS: AtomicU32 = AtomicU32::new(0);
 pub static POLLS: AtomicU32 = AtomicU32::new(0);
@@ -39,10 +40,10 @@ unsafe fn read_record(holder: usize) -> Option<(u32, Style)> {
 }
 
 /// The session ended: the adapter forgets the held buttons and the open chord's progress. A poll in
-/// progress keeps its lock; the adapter is then reset by the next session end (it holds no other state).
+/// progress keeps its lock; the ring's generation invalidation resets it on the next poll too.
 pub fn reset_session() {
     if let Some(mut adapter) = ADAPTER.try_lock() {
-        *adapter = Adapter::new();
+        adapter.0 = Adapter::new();
     }
 }
 
@@ -55,10 +56,18 @@ pub fn on_p1_poll(holder: usize) {
     let Some((buttons, style)) = (unsafe { read_record(holder) }) else { return };
     POLLS.fetch_add(1, Ordering::Relaxed);
     LAST_BUTTONS.store(buttons, Ordering::Relaxed);
-    // The INI shortcuts are detected by the chord engine from the raw controller (before it clears the Plus bits
-    // of an accepted Plus shortcut, which the adapter would no longer see); one request per poll, always taken.
+    // Consume any pending request from the chord engine. The adapter also sees
+    // this poll's raw permanent/INI chords before modal Plus suppression below.
     let chord_open = chords::take_open_menu();
-    let Some(mut adapter) = ADAPTER.try_lock() else { return };
+    let Some(mut state) = ADAPTER.try_lock() else { return };
+    let generation = worker::input_generation();
+    if state.1 != generation {
+        *state = (Adapter::new(), generation);
+        // A held confirmation/opening edge from the old session is not new
+        // input. Observe its release before accepting another physical edge.
+        state.0.resync(buttons, style);
+    }
+    let adapter = &mut state.0;
     let facts = state::readiness_facts(POLLS.load(Ordering::Relaxed));
     if readiness::must_release(facts) {
         // The renderer is gone (guard failed, archive refused, layout lost): never trap Player 1's input.
@@ -75,16 +84,17 @@ pub fn on_p1_poll(holder: usize) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
         OPEN.store(true, Ordering::Release);
-        worker::push_open();
+        if !worker::push_open(generation) {
+            state::release_menu();
+        }
         worker::wake();
         return;
     }
-    let mut any = false;
-    for button in step.presses() {
-        worker::push_press(button);
-        any = true;
-    }
-    if any {
+    if open && (step.changed || step.presses().next().is_some()) {
+        if !worker::push_poll(generation, Packet::from_step(&step)) {
+            // A missing held/release edge cannot confirm a partial chord.
+            state::release_menu();
+        }
         worker::wake();
     }
 }

@@ -190,6 +190,16 @@ pub enum ChordTarget {
     Shortcut(u8),
 }
 
+/// Separate physical capture from preview controls, so A/B/X/Y are capturable.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChordCapture {
+    #[default]
+    Preview,
+    /// The arming X and every button already held with it must first be released.
+    Release,
+    Buttons(Chord),
+}
+
 /// A screen on the sub-screen stack (the page itself is the root, below the stack).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
@@ -235,6 +245,8 @@ pub struct Menu {
     stack: Vec<Screen>,
     outbox: Outbox,
     closed: bool,
+    chord_capture: ChordCapture,
+    chord_refusal: Option<super::ini_files::EditRefusal>,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -255,6 +267,8 @@ impl Menu {
             stack: Vec::new(),
             outbox: Outbox::default(),
             closed: false,
+            chord_capture: ChordCapture::Preview,
+            chord_refusal: None,
         };
         menu.sync();
         menu
@@ -268,6 +282,8 @@ impl Menu {
         self.stack.clear();
         self.outbox = Outbox::default();
         self.closed = false;
+        self.chord_capture = ChordCapture::Preview;
+        self.chord_refusal = None;
         self.sync();
     }
 
@@ -686,6 +702,9 @@ impl Menu {
 
     /// One logical button press (an accepted press edge, or a stick repeat).
     pub fn press(&mut self, button: Button) {
+        if matches!(self.screen(), Some(Screen::ChordEntry { .. })) && self.chord_capture != ChordCapture::Preview {
+            return;
+        }
         match self.stack.last().copied() {
             None => self.press_page(button),
             Some(Screen::List { row, cursor }) => self.press_list(button, row, cursor),
@@ -1208,13 +1227,55 @@ impl Menu {
         }
     }
 
+    pub fn chord_capture(&self) -> ChordCapture { self.chord_capture }
+
+    pub fn chord_refusal(&self) -> Option<super::ini_files::EditRefusal> { self.chord_refusal }
+
+    /// Consume capture before processing navigation from the same physical poll.
+    /// X arms first even when A/B/Y arrive in that poll; those are data, not an
+    /// accidental confirmation/cancellation of the previous preview.
+    pub fn chord_poll(&mut self, held: u16, pressed: u16) -> bool {
+        if !matches!(self.screen(), Some(Screen::ChordEntry { .. })) {
+            self.chord_capture = ChordCapture::Preview;
+            self.chord_refusal = None;
+            return false;
+        }
+        match self.chord_capture {
+            ChordCapture::Preview if pressed & (1 << 2) != 0 => {
+                self.chord_refusal = None;
+                self.chord_capture = ChordCapture::Release;
+                true
+            }
+            ChordCapture::Preview => false,
+            ChordCapture::Release => {
+                if held == 0 { self.chord_capture = ChordCapture::Buttons(Chord::NONE); }
+                true
+            }
+            ChordCapture::Buttons(seen) => {
+                let next = Chord(seen.0 | held);
+                if !next.is_empty() {
+                    self.chord_entry(next);
+                    self.chord_capture = if held == 0 { ChordCapture::Preview } else { ChordCapture::Buttons(next) };
+                }
+                true
+            }
+        }
+    }
+
+    /// Only INI shortcut confirmation is immediate; settings still commit on close.
+    pub fn take_button_config(&mut self) -> Option<[Chord; 2]> { self.outbox.button_config.take() }
+
+    /// The runtime's authoritative slots after applying/refusing a confirmed edit.
+    pub fn shortcuts_applied(&mut self, shortcuts: [Chord; 2]) { self.env.shortcuts = shortcuts; }
+
     fn press_chord_entry(&mut self, button: Button, target: ChordTarget, captured: Chord) {
+        self.chord_refusal = None;
         match button {
             // Confirm.
             Button::A => {
-                self.confirm_chord(target, captured);
-                self.stack.pop();
+                if self.confirm_chord(target, captured) { self.stack.pop(); }
             }
+            Button::X => self.chord_capture = ChordCapture::Release,
             // Empty the chord (a menu shortcut with an empty chord is disabled).
             Button::Y => self.top(Screen::ChordEntry { target, captured: Chord::NONE }),
             Button::B => {
@@ -1224,7 +1285,7 @@ impl Menu {
         }
     }
 
-    fn confirm_chord(&mut self, target: ChordTarget, chord: Chord) {
+    fn confirm_chord(&mut self, target: ChordTarget, chord: Chord) -> bool {
         match target {
             ChordTarget::Row(i) => {
                 let id = CHORD_ROWS[usize::from(i)].1;
@@ -1232,12 +1293,18 @@ impl Menu {
             }
             ChordTarget::Shortcut(slot) => {
                 let slot = usize::from(slot & 1);
+                let [first, second] = self.env.shortcuts;
+                if let Err(why) = super::ini_files::check_edit(super::menu_shortcuts::MenuShortcuts::new(first, second), slot, chord) {
+                    self.chord_refusal = Some(why);
+                    return false;
+                }
                 if self.env.shortcuts[slot] != chord {
                     self.env.shortcuts[slot] = chord;
                     self.outbox.button_config = Some(self.env.shortcuts);
                 }
             }
         }
+        true
     }
 
     fn press_grid(&mut self, button: Button, layout: GridLayout, page: usize, cell: usize) {

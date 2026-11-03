@@ -11,7 +11,7 @@ pub fn publish(snapshot: &crate::model::settings::Snapshot) {
     ui::worker::wake();
 }
 
-/// Existing post-mapping input hook. Only qualified P1 raw input is read; no mutation.
+/// Existing P1 mapping hook, before menu/chord processing. Only qualified raw input is read; no mutation.
 pub unsafe fn on_poll(slot: i64, controller: usize) {
     if !REQUESTS.enabled() || slot != 0 || controller == 0 || controller % 4 != 0 { return; }
     let buttons = ((controller + crate::model::chords::field::CURRENT_BUTTONS) as *const u32).read();

@@ -152,6 +152,11 @@ pub const PERMANENT: Chord = Chord(B | DPAD_UP);
 pub struct Step {
     /// A closed menu was asked to open (a chord passed).
     pub open: bool,
+    /// Logical chord fields from this same raw poll, before pause suppression.
+    pub held: u16,
+    pub pressed: u16,
+    /// Release-only polls must reach an active physical chord capture too.
+    pub changed: bool,
     pub presses: [Option<Button>; 12],
 }
 
@@ -192,7 +197,7 @@ impl Adapter {
         let logical = logical(buttons, style);
         let pressed = logical & !self.logical;
         let (dpad, stick) = directions(buttons);
-        let mut step = Step::default();
+        let mut step = Step { held: logical, pressed, changed: logical != self.logical, ..Step::default() };
         if open {
             for i in 0..4 {
                 let repeat = self.repeat[i].frame(stick[i]);

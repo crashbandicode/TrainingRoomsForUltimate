@@ -12,7 +12,7 @@ use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GRO
 use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout, RosterUse};
 use super::menu::table::{Control, Row, GROUPS, ROWS};
-use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
+use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
 const HINT_LIST: &str = "Up/Down choose   A set   B back";
@@ -20,7 +20,7 @@ const HINT_CHECKLIST: &str = "Up/Down move   A tick   ZL all or none   B back";
 const HINT_DELAY: &str = "Up/Down move   A tick or edit the handle   Y clear   ZL all   B back";
 const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
-const HINT_CHORD: &str = "Hold one button and press the others   A confirm   Y empty   B back";
+const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
 
 /// First line of a window of `ROW_LINES` rows over `total` that keeps `cursor` in view.
 pub fn window_start(cursor: usize, total: usize) -> usize {
@@ -449,7 +449,16 @@ fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut 
     frame.focus = Some(0);
     let _ = frame.help[0].write_str("Hold one button and press the others to set the chord.");
     let _ = frame.help[1].write_str("An empty chord never passes (a menu shortcut with none is disabled).");
-    let _ = frame.hint.write_str(HINT_CHORD);
+    let hint = match menu.chord_capture() {
+        ChordCapture::Preview => HINT_CHORD,
+        ChordCapture::Release => "Release all buttons to start capture",
+        ChordCapture::Buttons(_) => "Hold one button, press the others; release all to preview",
+    };
+    let _ = frame.hint.write_str(hint);
+    if let Some(why) = menu.chord_refusal() {
+        frame.help[1].clear();
+        let _ = frame.help[1].write_str(why.text());
+    }
 }
 
 fn external_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {

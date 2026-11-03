@@ -169,7 +169,7 @@ pub fn load_ini() {
     publish_shortcuts(shortcuts);
 }
 
-/// The menu's confirmed shortcut change (draft 9, N7), called by package 5's menu worker when it closes: the new
+/// The menu's confirmed shortcut change (draft 9, N7), called by package 5's worker as the chord editor confirms: the new
 /// chords are live at once and the file is rewritten by the writer thread as a transaction (this call only stores
 /// the request: no file I/O here). A refused edit changes nothing; a failed write keeps the change in memory for
 /// the session and says so (SPEC-input-04 question 6 (b), (c)).
