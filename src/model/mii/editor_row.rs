@@ -32,10 +32,24 @@ pub fn from_seed(seed: &MiiConfig) -> Result<Row, &'static str> {
 }
 
 pub fn parse(row: &Row) -> Result<(String, Configuration), &'static str> {
-    let raw = saved::parse_header(0, 0, row).map_err(|_| "Invalid owned editor row")?;
-    let config = inventory::classify(&raw).map_err(|_| "Invalid edited Mii")?;
-    let value = Configuration::from_saved(&config).map_err(|_| "Edited Mii resources differ")?;
-    Ok((config.name, value))
+    let (raw, value) = validated(row)?;
+    Ok((String::from_utf16_lossy(&raw.name_units[..raw.name_len as usize]), value))
+}
+
+/// Native handoffs need only the checked owned value, never a display name.
+pub(crate) fn configuration(row: &Row) -> Result<Configuration, &'static str> {
+    validated(row).map(|(_, value)| value)
+}
+
+fn validated(row: &Row) -> Result<(inventory::RawSlot, Configuration), &'static str> {
+    let raw = saved::parse_header_value(0, 0, row).map_err(|_| "Invalid owned editor row")?;
+    let canonical = inventory::classify_canonical(&raw).map_err(|_| "Invalid edited Mii")?;
+    let value = Configuration::from_saved(&MiiConfig {
+        slot_id: raw.slot_id, slot_index: raw.index, name: String::new(),
+        charinfo: raw.charinfo, raw_tags: [raw.tag_outfit, raw.tag_hat, raw.tag_chara],
+        canonical, copies: Vec::new(),
+    }).map_err(|_| "Edited Mii resources differ")?;
+    Ok((raw, value))
 }
 
 #[cfg(test)]

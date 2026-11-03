@@ -50,7 +50,7 @@ unsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {
             ui_resume::Screen::Color(color) => cosmetic_resume::keep_equipped_color(&mut row, color),
             _ => {}
         }
-        super::draft::Draft::Ready(row)
+        super::draft::Draft::ready(row)
     };
     let generation = match origin {
         Origin::Quickplay => lifecycle::generation_for(owner),
@@ -79,7 +79,7 @@ unsafe fn store(screen: ui_resume::Screen, focus: i32) -> bool {
                 } else {
                     s.event("ui_checkpoint_suspended", [generation.unwrap(), focus as u64,
                         seed.hash(), 0]);
-                    if let super::draft::Draft::NativeDefault(class) = seed {
+                    if let Some(class) = seed.pending_class() {
                         s.event("ui_default_intent_suspended", [generation.unwrap(), class.kind() as u64, 0, 0]);
                     }
                     if let ui_resume::Screen::Specials(snapshot) = screen {

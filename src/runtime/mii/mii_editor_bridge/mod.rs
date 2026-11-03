@@ -152,10 +152,10 @@ pub(crate) fn request(request: crate::engine::mii_root::mii_menu::EditorRequest)
         };
         if !request.catalog.is_complete() { return Err("Mii catalog is incomplete"); }
         let seed = match request.seed {
-            crate::engine::mii_root::mii_menu::EditorSeed::Saved(seed) => Draft::Ready(value::from_seed(&seed)?),
+            crate::engine::mii_root::mii_menu::EditorSeed::Saved(seed) => Draft::ready(value::from_seed(&seed)?),
             crate::engine::mii_root::mii_menu::EditorSeed::NativeDefault(class) => {
                 if !native_default::available() { return Err("Native default adapter is unavailable"); }
-                Draft::NativeDefault(class)
+                Draft::native_default(class)
             }
         };
         if ui_resume::pending() { return Err("An unfinished editor is waiting to resume"); }
@@ -197,7 +197,7 @@ fn begin_session(
         trace };
     session.event(if restore.is_some() { "automatic_resume_requested" } else { "requested" },
         [seed.hash(), 0, 0, 0]);
-    if let Draft::NativeDefault(class) = seed {
+    if let Some(class) = seed.pending_class() {
         session.event("native_default_requested", [class.kind() as u64, 0, 0, 0]);
     }
     *state = Some(session);
@@ -453,7 +453,7 @@ unsafe fn materialize_default(base: usize, context: usize, scene: usize) {
         let state = STATE.lock();
         let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued
             && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };
-        let Draft::NativeDefault(class) = s.seed else { return; };
+        let Some(class) = s.seed.pending_class() else { return; };
         let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };
         if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }
         (class, s.restore_ticket)
@@ -462,7 +462,7 @@ unsafe fn materialize_default(base: usize, context: usize, scene: usize) {
     let mut state = STATE.lock();
     let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted
         && s.thread == current_thread() && s.editor == scene
-        && s.seed == Draft::NativeDefault(class) && s.restore_ticket == restoring) else { return; };
+        && s.seed.pending_class() == Some(class) && s.restore_ticket == restoring) else { return; };
     let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };
     if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }
     let result = result.and_then(|row| {

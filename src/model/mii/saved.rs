@@ -41,11 +41,17 @@ pub fn select_ids(names: impl Iterator<Item = Result<String, String>>) -> Result
 
 /// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.
 pub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {
+    parse_header_value(id, index, bytes)
+        .map_err(|stored| format!("filename id {id} differs from header id {stored}"))
+}
+
+/// A mismatched stored ID is a value; only file/report consumers format it.
+pub(crate) fn parse_header_value(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, u32> {
     let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());
     let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());
     let stored = u32_at(0);
     if stored != id {
-        return Err(format!("filename id {id} differs from header id {stored}"));
+        return Err(stored);
     }
     let mut name_units = [0; 10];
     for (i, unit) in name_units.iter_mut().enumerate() {
