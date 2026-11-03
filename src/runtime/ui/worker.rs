@@ -153,7 +153,6 @@ struct Session {
     setup_note: Option<String>,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
     stage_request: Option<u64>,
-    roster_originals: [Option<u32>; 2],
     phase: Phase,
     /// The panel row the menu is on while `phase` is `Panel`.
     panel: Option<Editor>,
@@ -172,8 +171,6 @@ impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
         if self.setups.watching() { return true; }
-        if self.menu.as_ref().is_some_and(|m| matches!(m.screen(),
-            Some(Screen::Grid { layout, .. }) if matches!(layout.kind, crate::model::menu::grid::GridKind::Roster(_)))) { return true; }
         if self.stage_request.is_some() && self.menu.as_ref().is_some_and(|m| matches!(m.screen(),
             Some(Screen::Grid { layout, .. }) if layout.kind == crate::model::menu::grid::GridKind::Stages)) { return true; }
         #[cfg(feature = "mii-saved-alpha")]
@@ -218,8 +215,6 @@ fn handle(code: u8, s: &mut Session) {
     if code == EV_RESET {
         s.menu = None;
         s.stage_context = None;
-        s.roster_originals = [None; 2];
-        super::facts::roster_ready(None);
         s.stage_request = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
         // external-name owner distinguish actual retirement on the worker.
@@ -239,7 +234,6 @@ fn handle(code: u8, s: &mut Session) {
     }
     if code == EV_OPEN {
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
-        s.roster_originals = super::facts::roster_originals();
         s.stage_request = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         match &mut s.menu {
@@ -311,7 +305,7 @@ fn handle(code: u8, s: &mut Session) {
                 stage_press(m, tile, button, s.stage_context, &mut s.stage_request, &mut s.refusal);
             }
             if let Some((tile, button)) = m.take_roster_press() {
-                roster_press(m, &mut s.roster, tile, button, s.roster_originals);
+                roster_press(m, &mut s.roster, tile, button);
             }
         }
         m.is_closed()
@@ -476,7 +470,7 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button,
 }
 
 /// A press on the portrait roster grid: package 6's roster rules on the active kept key (`editors::roster`).
-fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button, originals: [Option<u32>; 2]) {
+fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button) {
     use crate::editors::roster::RosterEditor;
     let Some(Screen::Grid { layout, .. }) = m.screen().copied() else { return };
     let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind else { return };
@@ -484,7 +478,7 @@ fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::Roster
         *editor = Some(RosterEditor::new(use_));
     }
     let Some(e) = editor.as_mut() else { return };
-    e.apply(m, usize::from(tile), button, originals);
+    e.apply(m, usize::from(tile), button);
 }
 
 /// The page's Record Slot (the row `recording_slot`, one-hot over the five slots).
@@ -501,11 +495,6 @@ fn stage_label(i: usize) -> &'static str {
 /// when it differs from the last one.
 fn publish_frame(s: &Session) {
     let Some(menu) = s.menu.as_ref() else { return };
-    // Retire a readiness query immediately when its cycle grid is no longer visible.
-    if s.phase != Phase::Menu || !matches!(menu.screen(), Some(Screen::Grid { layout, .. })
-        if layout.kind == crate::model::menu::grid::GridKind::Roster(crate::model::menu::grid::RosterUse::Cycles)) {
-        super::facts::roster_ready(None);
-    }
     let mut next = NEXT_FRAME.lock();
     next.reset();
     if s.phase == Phase::Clip {
@@ -551,10 +540,7 @@ fn publish_frame(s: &Session) {
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
                 let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
                 let values = editor.values(menu.kept(editor.key()));
-                let solo = editor.solo_enabled(menu);
-                let ready = super::facts::roster_ready((use_ == crate::model::menu::grid::RosterUse::Cycles)
-                    .then_some((editor.cpu(), solo)));
-                editor.decorate(&mut next, &values, solo, editor.excluded(menu, s.roster_originals), ready);
+                editor.decorate(&mut next, &values, editor.solo_enabled(menu));
             }
         }
         if let Some(reason) = s.refusal {

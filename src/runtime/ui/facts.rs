@@ -4,7 +4,7 @@
 //! atomic that is at most one frame old; when no frame has refreshed them for [`FRESH_MS`] (the scene ended, the CPU body is gone)
 //! every fact reads as "not ready". No allocation.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 
 use smash::app::{lua_bind::StatusModule, utility, BattleObjectModuleAccessor, Fighter};
 
@@ -49,7 +49,6 @@ pub unsafe fn publish_frame_facts(cpu: &mut BattleObjectModuleAccessor) {
     // practice): it reads the game here, on the game thread, and the worker reads the answer (lead, 2026-11-02 merge ruling).
     PRESENT.store(crate::runtime::lobby::training::practice::acquire(), Ordering::Release);
     CPU_KIND.store(utility::get_kind(cpu), Ordering::Release);
-    publish_roster_facts();
     STAMP_MS.store(clock::uptime_ms().max(1), Ordering::Release);
     FRAME_NUMBER.fetch_add(1, Ordering::Release);
 }
@@ -108,55 +107,3 @@ pub fn fact_cpu_situation() -> Option<i32> {
 }
 
 pub fn fact_frame_number() -> u64 { FRAME_NUMBER.load(Ordering::Acquire) }
-
-
-// One game-frame writer and one menu-worker reader. These are display hints,
-// never native ownership receipts; no pointer leaves the game context.
-#[derive(Clone, Copy)]
-struct RosterSnapshot {
-    originals: [Option<u32>; 2],
-    request: u8,
-    ready: u128,
-}
-static ROSTER_FACTS: hos_lock::TripleBuffer<RosterSnapshot> = hos_lock::TripleBuffer::new(
-    RosterSnapshot { originals: [None; 2], request: 0, ready: 0 });
-static ROSTER_REQUEST: AtomicU8 = AtomicU8::new(0);
-
-fn publish_roster_facts() {
-    use crate::runtime::roster::{character_roster, cycle_preload};
-    let request = if super::state::OPEN.load(Ordering::Acquire) {
-        ROSTER_REQUEST.load(Ordering::Acquire)
-    } else { 0 };
-    let mut snapshot = RosterSnapshot {
-        originals: [character_roster::original_player_kind(), character_roster::original_cpu_kind()],
-        request,
-        ready: 0,
-    };
-    if (1..=4).contains(&request) {
-        let role = usize::from((request - 1) / 2);
-        let solo = (request - 1) % 2 != 0;
-        // Fixed catalog, no Vec/JSON/native pointer copy. Only the visible cycle
-        // role is queried, and only while its grid requests readiness hints.
-        for &(kind, _) in crate::engine::swap::trio::CHOICES {
-            if kind < 128 && cycle_preload::fighter_ready(role, kind, solo) {
-                snapshot.ready |= 1u128 << kind;
-            }
-        }
-    }
-    ROSTER_FACTS.write(snapshot);
-}
-
-/// Menu worker only: capture original selections once per menu opening.
-pub fn roster_originals() -> [Option<u32>; 2] {
-    if !fresh() { return [None; 2]; }
-    ROSTER_FACTS.read().0.originals
-}
-
-/// Menu worker only. A changed role/form waits for matching game-published facts.
-pub fn roster_ready(request: Option<(bool, bool)>) -> u128 {
-    let request = request.map_or(0, |(cpu, solo)| 1 + u8::from(cpu) * 2 + u8::from(solo));
-    ROSTER_REQUEST.store(request, Ordering::Release);
-    if request == 0 || !fresh() { return 0; }
-    let snapshot = ROSTER_FACTS.read().0;
-    if snapshot.request == request { snapshot.ready } else { 0 }
-}

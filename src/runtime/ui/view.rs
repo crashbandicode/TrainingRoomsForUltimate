@@ -331,10 +331,8 @@ impl Panes {
             }
             if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
                 let size = (cell_h - 28.0).min(cell_w - 12.0);
-                let grey = frame.tile_state[i] == 2;
-                self.rect(p::IDX_TILE + i, x, y + 10.0, size, size, if grey { [100, 100, 100, 255] } else { [255; 4] });
-                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y - cell_h / 2.0 + 12.0, cell_w - 6.0,
-                    if grey { p::TEXT_OFF } else { p::TEXT });
+                self.rect(p::IDX_TILE + i, x, y + 10.0, size, size, [255, 255, 255, 255]);
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y - cell_h / 2.0 + 12.0, cell_w - 6.0, p::TEXT);
                 continue;
             }
             if frame.tile_stage_grid && crate::runtime::ui::thumbs::is_bound(i) {
@@ -359,8 +357,7 @@ impl Panes {
                 continue;
             }
             self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
-            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0,
-                if frame.tile_roster_grid && frame.tile_state[i] == 2 { p::TEXT_OFF } else { p::TEXT });
+            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0, p::TEXT);
         }
         if shown && frame.tile_count > 0 {
             let (x, y) = centre(usize::from(frame.tile_focus));

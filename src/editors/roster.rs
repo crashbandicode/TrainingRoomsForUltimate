@@ -64,25 +64,10 @@ impl RosterEditor {
         })
     }
 
-    pub fn cpu(&self) -> bool { self.grid.role() == Role::Cpu }
-
-    /// Match the runtime cycle's original-slot exclusion, including the two
-    /// independently selected Ice Climbers forms and the exact-Mii CPU exception.
-    pub fn excluded(&self, menu: &crate::model::menu::Menu, originals: [Option<u32>; 2]) -> Option<u32> {
-        if self.use_ != RosterUse::Cycles { return None; }
-        let original = originals[usize::from(self.cpu())];
-        if self.cpu() && original.is_some_and(|kind| (0x48..=0x4a).contains(&kind)) { return None; }
-        let cycle_solo = self.solo_enabled(menu);
-        let original_solo = if self.cpu() { cycle_solo } else {
-            menu.settings().menu.get("solo_popo_original").is_some_and(|v| v == [1, 0])
-        };
-        crate::engine::swap::roster_grid::cycle_exclusion(original, original_solo, cycle_solo)
-    }
-
     /// Apply one editor input to the menu snapshot, preserving the other role's settings.
-    pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button, originals: [Option<u32>; 2]) {
+    pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
         let mut values = self.values(menu.kept(self.key()));
-        match self.press(cell, button, &mut values, self.excluded(menu, originals)) {
+        match self.press(cell, button, &mut values) {
             Effect::Changed => menu.set_kept(self.key(), Self::value_of(&values)),
             Effect::ToggleSolo => {
                 let on = !self.solo_enabled(menu);
@@ -124,13 +109,8 @@ impl RosterEditor {
     }
 
     /// A pick/add, R remove, Y Solo Popo on Ice Climbers, X form, ZR role.
-    pub fn press(&mut self, cell: usize, button: Button, values: &mut [u8], excluded: Option<u32>) -> Effect {
+    pub fn press(&mut self, cell: usize, button: Button, values: &mut [u8]) -> Effect {
         let Some(info) = self.grid.info(cell) else { return Effect::Nothing };
-        if matches!(button, Button::A | Button::R) && info.kind().is_some_and(|kind|
-            excluded.is_some_and(|original| crate::engine::swap::roster_grid::group_kind(original)
-                == crate::engine::swap::roster_grid::group_kind(kind))) {
-            return Effect::Nothing;
-        }
         match (button, info.content) {
             (Button::ZR, _) if !self.pick() => {
                 self.grid.toggle_role();
@@ -179,9 +159,8 @@ impl RosterEditor {
     }
 
     /// Write the tiles' labels (name with the rank, the pick or the All mark) and the role on the second help line.
-    pub fn decorate(&self, frame: &mut Frame, values: &[u8], solo: bool, excluded: Option<u32>, ready: u128) {
+    pub fn decorate(&self, frame: &mut Frame, values: &[u8], solo: bool) {
         let kinds = kinds();
-        let excluded_rank = excluded.and_then(|kind| group_rank(&kinds, values, kind));
         frame.tile_roster_grid = true;
         frame.tile_cpu = self.grid.role() == Role::Cpu;
         frame.tile_sig = 0x8000_0000 | u32::from(frame.tile_cpu);
@@ -189,9 +168,6 @@ impl RosterEditor {
             let Some(info) = self.grid.info(cell) else { continue };
             frame.tile_n[cell] = info.kind().and_then(|kind| u16::try_from(kind).ok()).unwrap_or(u16::MAX);
             frame.tile_sig = frame.tile_sig.wrapping_mul(16777619) ^ u32::from(frame.tile_n[cell]);
-            let blocked = info.kind().is_some_and(|kind| excluded.is_some_and(|original|
-                crate::engine::swap::roster_grid::group_kind(original) == crate::engine::swap::roster_grid::group_kind(kind)));
-            frame.tile_state[cell] = if blocked { 2 } else { 0 };
             let mut label = Text::<28>::new();
             match info.content {
                 CellContent::All => {
@@ -204,10 +180,7 @@ impl RosterEditor {
                     let chosen = CHOICES.iter().position(|(k, _)| *k == kind).is_some_and(|i| values.get(i) == Some(&1));
                     let _ = write!(label, "{}{}", if chosen { "> " } else { "" }, info.label);
                 }
-                CellContent::Fighter(kind) => match if blocked { None } else {
-                    group_rank(&kinds, values, kind).map(|rank|
-                        rank - u8::from(excluded_rank.is_some_and(|old| old < rank)))
-                } {
+                CellContent::Fighter(kind) => match group_rank(&kinds, values, kind) {
                     Some(rank) => {
                         let _ = write!(label, "{rank}. {}", info.label);
                     }
@@ -219,18 +192,11 @@ impl RosterEditor {
             if solo && self.use_ == RosterUse::Cycles && info.kind() == Some(0x4b) {
                 let _ = label.write_str(" S");
             }
-            if !blocked && self.use_ == RosterUse::Cycles
-                && info.kind().is_some_and(|kind| ready & 1u128.checked_shl(kind).unwrap_or(0) != 0) {
-                let _ = label.write_str(" *");
-            }
             frame.tiles[cell] = label;
         }
         if !self.pick() {
             frame.help[1].clear();
             let _ = write!(frame.help[1], "Editing the {} list.", if self.grid.role() == Role::Player { "Player" } else { "CPU" });
-            if self.use_ == RosterUse::Cycles {
-                let _ = frame.help[1].write_str(" Grey: original slot 0. *: ready.");
-            }
         }
     }
 }
@@ -249,10 +215,10 @@ mod tests {
         let mut editor = RosterEditor::new(RosterUse::PlayerPick);
         let mut values = editor.values(None);
         assert_eq!(values.len(), CHOICES.len());
-        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values, None), Effect::Changed); // Steve
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Changed); // Steve
         assert_eq!(values.iter().filter(|v| **v == 1).count(), 1);
-        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values, None), Effect::Nothing);
-        assert_eq!(editor.press(cell_of(0x00), Button::A, &mut values, None), Effect::Changed); // Mario
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Nothing);
+        assert_eq!(editor.press(cell_of(0x00), Button::A, &mut values), Effect::Changed); // Mario
         assert_eq!(values[CHOICES.iter().position(|(k, _)| *k == 0x00).unwrap()], 1);
         assert_eq!(editor.key(), "player_character");
     }
@@ -262,18 +228,18 @@ mod tests {
         let mut editor = RosterEditor::new(RosterUse::Cycles);
         let mut values = editor.values(None);
         assert_eq!(values[0], 1, "factory: All");
-        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values, None), Effect::Changed);
-        assert_eq!(editor.press(cell_of(0x07), Button::A, &mut values, None), Effect::Changed); // Fox
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Changed);
+        assert_eq!(editor.press(cell_of(0x07), Button::A, &mut values), Effect::Changed); // Fox
         assert_eq!(values[0], 0);
         let kinds = kinds();
         assert_eq!(group_rank(&kinds, &values, 0x58), Some(1));
         assert_eq!(group_rank(&kinds, &values, 0x07), Some(2));
-        assert_eq!(editor.press(cell_of(0x58), Button::R, &mut values, None), Effect::Changed);
+        assert_eq!(editor.press(cell_of(0x58), Button::R, &mut values), Effect::Changed);
         assert_eq!(group_rank(&kinds, &values, 0x07), Some(1));
-        assert_eq!(editor.press(0, Button::ZR, &mut values, None), Effect::Shown);
+        assert_eq!(editor.press(0, Button::ZR, &mut values), Effect::Shown);
         assert_eq!(editor.key(), "cpu_roster");
         let mut frame = Frame::new();
-        editor.decorate(&mut frame, &values, false, None, 0);
+        editor.decorate(&mut frame, &values, false);
         assert!(frame.help[1].string_lossy().contains("CPU"));
     }
 
@@ -282,19 +248,19 @@ mod tests {
         let mut editor = RosterEditor::new(RosterUse::Cycles);
         let mut values = editor.values(None);
         let before = values.clone();
-        assert_eq!(editor.press(cell_of(0x4b), Button::Y, &mut values, None), Effect::ToggleSolo);
+        assert_eq!(editor.press(cell_of(0x4b), Button::Y, &mut values), Effect::ToggleSolo);
         assert_eq!(values, before, "Solo Popo does not remove a roster member");
         assert_eq!(editor.solo_key(), "solo_popo_player_cycle");
         let mut frame = Frame::new();
-        editor.decorate(&mut frame, &values, true, None, 0);
+        editor.decorate(&mut frame, &values, true);
         assert!(frame.tiles[cell_of(0x4b)].string_lossy().ends_with(" S"));
-        assert_eq!(editor.press(cell_of(0), Button::Y, &mut values, None), Effect::Nothing);
-        editor.press(0, Button::ZR, &mut values, None);
+        assert_eq!(editor.press(cell_of(0), Button::Y, &mut values), Effect::Nothing);
+        editor.press(0, Button::ZR, &mut values);
         assert_eq!(editor.solo_key(), "solo_popo_cpu");
         for use_ in [RosterUse::PlayerPick, RosterUse::CpuPick, RosterUse::Hats] {
             let mut other = RosterEditor::new(use_);
             let mut values = other.values(None);
-            assert_eq!(other.press(cell_of(0x4b), Button::Y, &mut values, None), Effect::Nothing);
+            assert_eq!(other.press(cell_of(0x4b), Button::Y, &mut values), Effect::Nothing);
         }
     }
 
@@ -304,14 +270,14 @@ mod tests {
         let mut menu = Menu::new(Settings::factory(), Env::default());
         let mut editor = RosterEditor::new(RosterUse::Cycles);
         let cell = cell_of(0x4b);
-        editor.apply(&mut menu, cell, Button::Y, [None; 2]);
+        editor.apply(&mut menu, cell, Button::Y);
         assert!(editor.solo_enabled(&menu));
-        editor.apply(&mut menu, cell, Button::ZR, [None; 2]);
+        editor.apply(&mut menu, cell, Button::ZR);
         assert!(!editor.solo_enabled(&menu));
-        editor.apply(&mut menu, cell, Button::Y, [None; 2]);
+        editor.apply(&mut menu, cell, Button::Y);
         assert!(editor.solo_enabled(&menu));
-        editor.apply(&mut menu, cell, Button::ZR, [None; 2]);
-        editor.apply(&mut menu, cell, Button::Y, [None; 2]);
+        editor.apply(&mut menu, cell, Button::ZR);
+        editor.apply(&mut menu, cell, Button::Y);
         assert!(!editor.solo_enabled(&menu));
         assert_eq!(menu.kept("solo_popo_cpu"), Some(&serde_json::json!([1, 0])));
         assert_eq!(menu.settings().menu.get("solo_popo_original"), Some(&[0, 1][..]));
@@ -327,46 +293,4 @@ mod tests {
         assert_eq!(editor.values(Some(&json)), values);
         assert_eq!(editor.values(Some(&Value::from("x")))[0], 1);
     }
-
-    #[test]
-    fn original_group_is_not_editable_or_ready_and_numbered_badges_skip_it() {
-        let mut editor = RosterEditor::new(RosterUse::Cycles);
-        let mut values = vec![0; CHOICES.len() + 1];
-        for (rank, kind) in [(1, 0x5a), (2, 7)] {
-            values[1 + CHOICES.iter().position(|(k, _)| *k == kind).unwrap()] = rank;
-        }
-        let before = values.clone();
-        for button in [Button::A, Button::R] {
-            assert_eq!(editor.press(cell_of(0x5a), button, &mut values, Some(0x5b)), Effect::Nothing);
-            assert_eq!(values, before, "the original group's stored preference is preserved");
-        }
-        let mut frame = Frame::new();
-        editor.decorate(&mut frame, &values, false, Some(0x5b), (1u128 << 7) | (1u128 << 0x5a));
-        assert_eq!(frame.tile_state[cell_of(0x5a)], 2);
-        assert!(!frame.tiles[cell_of(0x5a)].string_lossy().ends_with(" *"));
-        assert_eq!(frame.tiles[cell_of(7)].string_lossy(), "1. Fox *");
-        editor.decorate(&mut frame, &values, false, None, 0);
-        assert_eq!(frame.tiles[cell_of(7)].string_lossy(), "2. Fox",
-            "stored cycle order is not CSS display order");
-        assert!(frame.tiles[cell_of(0x5a)].string_lossy().starts_with("1. "));
-    }
-
-    #[test]
-    fn original_exclusion_tracks_role_and_independent_ice_climber_forms() {
-        use crate::model::{menu::{Env, Menu}, settings::Settings};
-        let mut menu = Menu::new(Settings::factory(), Env::default());
-        let mut editor = RosterEditor::new(RosterUse::Cycles);
-        let originals = [Some(0x4b), Some(7)];
-        assert_eq!(editor.excluded(&menu, originals), Some(0x4b));
-        editor.apply(&mut menu, cell_of(0x4b), Button::Y, originals);
-        assert_eq!(editor.excluded(&menu, originals), None, "numbered Solo differs from original pair");
-        editor.apply(&mut menu, 0, Button::ZR, originals);
-        assert_eq!(editor.excluded(&menu, originals), Some(7));
-        assert_eq!(editor.excluded(&menu, [Some(0x4b), Some(0x49)]), None,
-            "CPU saved Mii is not a generic class-kind original");
-        assert_eq!(RosterEditor::new(RosterUse::Hats).excluded(&menu, originals), None,
-            "a fighter original is not an excluded hat");
-        assert!(CHOICES.iter().all(|(kind, _)| *kind < 128), "every catalog kind fits readiness bits");
-    }
-
 }

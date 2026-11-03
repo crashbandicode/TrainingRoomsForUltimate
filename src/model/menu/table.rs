@@ -94,7 +94,6 @@ const SHIELD: u8 = 3;
 const ATTACKS: u8 = 4;
 const P1: u8 = 5;
 const STATES: u8 = 6;
-const SETUPS: u8 = 7;
 const RECORDING: u8 = 8;
 const PLAYBACK: u8 = 9;
 const MACROS: u8 = 10;
@@ -206,7 +205,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 96] = [
+pub static ROWS: [Row; 94] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -299,11 +298,6 @@ pub static ROWS: [Row; 96] = [
       "The range a random value for the CPU is drawn from.\nUsed only when damage on load is Random Value."),
     r(STATES, "Buffs on load", "buff_state", Control::MultiSelect(&o::BUFFS),
       "Character buffs applied after a load.\nTick every buff that should be on."),
-    // Saves > Setup library
-    r(SETUPS, "Save setup to library...", "setup_library_save", Control::Editor(Editor::SetupSave),
-      "Names the selected slot's setup and keeps it.\nIt can be restored later from the library."),
-    r(SETUPS, "Setup library", "", Control::Editor(Editor::SetupLibrary),
-      "The saved setups. A binds a setup to the slot and\nrestores it; Y binds it without restoring."),
     // Recording > Recording
     r(RECORDING, "Record Slot", "recording_slot", Control::Dropdown(&o::SLOTS),
       "The slot a new recording goes to."),

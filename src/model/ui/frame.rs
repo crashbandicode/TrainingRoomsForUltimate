@@ -178,7 +178,7 @@ pub struct Frame {
     /// A short last row is centred under the full ones (the portrait roster's last row of 9 under 13 columns).
     pub tile_centre_last: bool,
     pub tile_sig: u32,
-    /// Per tile: 0 clear, 1 ticked, 2 greyed. Delay tile_focus 255 selects a range handle.
+    /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
     pub range: RangeView,
     pub clip: ClipBar,
