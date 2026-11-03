@@ -181,7 +181,7 @@ impl RosterEditor {
     /// Write the tiles' labels (name with the rank, the pick or the All mark) and the role on the second help line.
     pub fn decorate(&self, frame: &mut Frame, values: &[u8], solo: bool, excluded: Option<u32>, ready: u128) {
         let kinds = kinds();
-        let order = crate::engine::swap::roster_grid::css_order(&kinds, values, excluded);
+        let excluded_rank = excluded.and_then(|kind| group_rank(&kinds, values, kind));
         frame.tile_roster_grid = true;
         frame.tile_cpu = self.grid.role() == Role::Cpu;
         frame.tile_sig = 0x8000_0000 | u32::from(frame.tile_cpu);
@@ -204,10 +204,10 @@ impl RosterEditor {
                     let chosen = CHOICES.iter().position(|(k, _)| *k == kind).is_some_and(|i| values.get(i) == Some(&1));
                     let _ = write!(label, "{}{}", if chosen { "> " } else { "" }, info.label);
                 }
-                CellContent::Fighter(kind) => match if self.use_ == RosterUse::Cycles && values.first() != Some(&1) {
-                    order.iter().position(|value| crate::engine::swap::roster_grid::group_kind(*value)
-                        == crate::engine::swap::roster_grid::group_kind(kind)).map(|i| (i + 1) as u8)
-                } else { group_rank(&kinds, values, kind) } {
+                CellContent::Fighter(kind) => match if blocked { None } else {
+                    group_rank(&kinds, values, kind).map(|rank|
+                        rank - u8::from(excluded_rank.is_some_and(|old| old < rank)))
+                } {
                     Some(rank) => {
                         let _ = write!(label, "{rank}. {}", info.label);
                     }
@@ -345,6 +345,10 @@ mod tests {
         assert_eq!(frame.tile_state[cell_of(0x5a)], 2);
         assert!(!frame.tiles[cell_of(0x5a)].string_lossy().ends_with(" *"));
         assert_eq!(frame.tiles[cell_of(7)].string_lossy(), "1. Fox *");
+        editor.decorate(&mut frame, &values, false, None, 0);
+        assert_eq!(frame.tiles[cell_of(7)].string_lossy(), "2. Fox",
+            "stored cycle order is not CSS display order");
+        assert!(frame.tiles[cell_of(0x5a)].string_lossy().starts_with("1. "));
     }
 
     #[test]
