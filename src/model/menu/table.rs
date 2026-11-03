@@ -205,7 +205,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 94] = [
+pub static ROWS: [Row; 92] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -329,10 +329,6 @@ pub static ROWS: [Row; 94] = [
       "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
       "Names the current slot's recording and keeps it."),
-    r(MACROS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
-      "Nudges where a loaded recording starts."),
-    r(MACROS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
-      "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(MACROS, "Replay capture", "", Control::ReplayCapture,
       "On: matches are captured for the replay window.\nThe choice is kept in replay_capture.ini."),
     // Fighters & Stages > Player 1 and CPU
