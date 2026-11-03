@@ -571,3 +571,6 @@ scheduling and ordinary portrait row exclusion. They await the one coherent
 candidate host gate before Eden; no scratch Cargo/native/runtime run was made.
 
 Lead composition: cf161f5 is integrated after Slim7950485. Both count and Hitbox-observer seam tables/declarations are absent (seven retained tables); both count and fixed-bank-probe install calls are removed. Appended exact carry transforms express the reviewed combined delta from8c0ec63, retaining all Slim exclusions and unchanged original source hashes. Regeneration preserved every reviewed destination byte; all247 remaining files re-derived successfully. The worker253-file result above describes its isolated branch, not this combined inventory. Candidate host/native/runtime gates remain pending.
+
+### RC reset pkg4 provenance correction (2026-11-03)
+Slim full rederivation on9c65c2e found two DIFFERS: named_macros.rs and replay_capture.rs. The reviewed11ee226 workflow closure had omitted its manifest edits. Recorded exact11ee226-parent-to-product transforms, regenerated the existing ledger, rederived all41files, and compared every resulting destination byte to the reviewed pre-regeneration source. All41match; original source SHA pins unchanged. No behavior change or acceptance inferred from the earlier failed check.

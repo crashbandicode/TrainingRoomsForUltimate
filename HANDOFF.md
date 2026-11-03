@@ -44,7 +44,7 @@ No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign ar
 
 ## Remaining execution
 
-1. Consume parent LEAD-INBOX PRIMARY REQUESTs at least every10min; lead turn report about every45min without ending. Last10:09, next10:54.
+1. Consume parent LEAD-INBOX PRIMARY REQUESTs at least every10min; lead turn report about every45min without ending. Last10:52, next~11:39.
 2. Review four boundary returns; disable/remove deferred exposed paths and compose ONE candidate. Update NEXT-VERSION exclusions and known issues. Current140243normalizedr18 exceeds136069baseline; no ceiling increase or formatting/count trick.
 3. Candidate gates: all-targethost tests, clippy all-targets -Dwarnings0, no-default build, release+diag0warnings, stack policy, normalizedsize<=136069, carry/provenance, explicit-release compliance and allmanual dispositions scoped to reset matrix. Fix genuine failures and rerun affected checks, preserving failures.
 4. ONE continuous Surface diagnostic session for all single-console rows; Yoga baseline replay retained as online peer and Surface release replay retained as online host/release-lap process: target THREE physical starts total. Every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
