@@ -1,5 +1,24 @@
 # Implementation progress, ui-screens stream (planning copy; moves into the worktree once it exists)
 
+## Phase-2 RC8 restart — PRIMARY16:1x order, consumed16:13Z
+1. OWN branch `stream/ui-phase2-rc8`, new worktree `TrainingRoomsForUltimate-ui-phase2-rc8`, exactbase `cf4bf44c104ecc96a78d382b4c0276bf33838f18`; frozenRC8/main/boundhelpers untouched.
+2. Scope core02/03/07,N1/N5/N7/N9/N10,B3,Q5 plus PRIMARY-assigned R3-D1 registration-fixture correction; no deferred Setup/Q15/F9/custom-Mii resurrection.
+3. Previous RC6 N7 draft stays uncompiled/incomplete in `TrainingRoomsForUltimate-ui-phase23`; no reset/merge or silent acceptance. Re-read/selectively port only reviewed root pieces into RC8.
+4. R3-D1: register the fresh layout before renderer-failure ticks, preserve every pause/queue/resume assertion; tests/ui_native_pause.rs focused probe plus both own mandatory gates.
+5. N7 demonstrated source failure: physical input sends only menu presses, no runtime Menu::chord_entry; live chord/INI changes wait for whole-menu close contrary to confirm contract.
+6. Preserve approved X-capture/release gate, all16 buttons, Aconfirm/Bcancel/Yempty/permanent chord; one ordered poll packet in existing ring, no latestmask sidechannel/new native hook.
+7. Actual adapter→packet→Menu regressions: original physical failure, all16/controllerstyles, held/release/cancel/reopen/session generation/fullqueue; confirm-only publication and unknown/comments-preserving INI persistence.
+8. Shared input_delay call relocation and queue/session cancellation require lead source review before acceptance; no CPU/recording/provider ownership overlap without notice.
+9. Existing N1 Developer/Q5 lastpage/N5 stage-item behavior inventoried before changes; original external-state/negative tests only for real gaps.
+10. N9 emptySDI CPU adapter remains pkg6-owned; UI supplies exact consumer/regression facts. N10/core07 emitter-composite asset contract needs qualified native facts before runtime/resource change.
+11. Preserve B3 override/two-buffer >=5s grace/zeroheap; no rewrite for row credit. Q16 provider/final runtime remains lead-owned.
+12. Native facts: use retained approved ELF/data.arc first; any missing fields join ONE finite combined Phase2 trace list for lead, no workertrace/newprint/newboot.
+13. RC/lr02 requests always preempt; inbox whole-file insertion-aware checks ~5min. No Phase2Eden beforeRCREADY, no Surfacecompiler duringlr02.
+14. Yoga admissions PAUSED for pkg4 baseline/onlinepeer; hostchecks use Ally only with fresh queue/fullledger/resources/strictcaps, otherwise wait. No hostavailability assumed.
+15. Each code-fix return requires own exact all-targetclippy-Dwarnings+no-default receipts; focusedtests/lists and frozen-source/actualELFs recorded, no offline→native acceptance upgrade.
+16. Playbook03e23218 pulled/read completely, applicable M/C checklist retained in prior scoped reports; refresh scope/compliance before return, historical wrapperFAILs remain disclosed.
+17. No new agents/transport/framework/push/tag/release/card/DBI/USB; modelSolhigh verified, sole watcher514442 retained. Current restart no claim/compiler/queue/profile mutation.
+
 ## RC7 R3-3/R3-4 — contribution RETURNED; whole RC NOT READY
 
 RC7 Safety-only repair **dc6deb7d800271ffa471543ee1d46a822087af8a RETURNED**: exact12Safetycontracts/3Rustfiles non-doccodeIDENTICALtof2a, no lintallow/visibility/guard/body/assertion/carrychange; pkg4source no blockerACK. Lead15:11 request inserted above cursor consumed15:19; subsequentwatch searches full addressed messages too. Samegreen4frozen1535/content1d1ce2ae/archive493e6260: focusedclippy15:21Cargo0, **newmandatory OWNbranch alltargetclippy15:23:16–38Cargo0/0warnings +no-default15:24:17–23Cargo0/0warnings**, allbefore-afterMATCH, perjobruntime-boundrunnerssaved. Exactlogs/resources in validationdoc+green4; no testELFexecutionclaimedforcompilejobs. Sixthfinishedtargetretired945files/188133811B hashedinventory+readback; no liveclaim/queue/compiler/Eden/profile. Original1769clippy101/source retained, leadbatchesONE RC8; previousf2behavior/tests notnative/newcandidateacceptance. Sourcecompliance refreshed with31manualdispositions/proceduralFAIL retained. NoPhase2resume/driver/boot/quirkhunt, watchresumes originalup-to60minwindow.
