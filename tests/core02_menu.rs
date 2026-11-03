@@ -246,27 +246,41 @@ fn every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key() {
     }
 }
 
-// ---- the layout (MENU-DRAFT §2 counts) -----------------------------------------------------------
+// ---- the layout (MENU-DRAFT §2 with the approved RC deferrals) -----------------------------------------------------------
 
 #[test]
-fn layout_row_counts_match_the_draft() {
+fn layout_row_counts_match_the_rc_freeze() {
     let counts = |pilot| {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
             .map(|page| row_count(page, pilot))
     };
-    assert_eq!(counts(false), [31, 13, 17, 20, 11, 3]);
-    assert_eq!(counts(true), [30, 13, 17, 20, 11, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 92);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 91);
+    assert_eq!(counts(false), [31, 11, 15, 20, 11, 3]);
+    assert_eq!(counts(true), [30, 11, 15, 20, 11, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 88);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 87);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 13, "12 checklists and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
-    // Every group has rows, every row's group exists.
+    // The RC defers four editors, retaining the empty Setup group index so
+    // persisted group IDs do not move. Every other group still has rows.
+    assert_eq!(ROWS.len(), 92);
+    assert!(!ROWS.iter().any(|r| matches!(r.control,
+        Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
+    assert_eq!(GROUPS[7].title, "Setup library");
+    assert_eq!(GROUPS[7].page, Page::Saves);
     for (g, group) in GROUPS.iter().enumerate() {
-        assert!(ROWS.iter().any(|r| usize::from(r.group) == g), "{} is empty", group.title);
+        assert_eq!(ROWS.iter().any(|r| usize::from(r.group) == g), g != 7, "{}", group.title);
+    }
+    assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
+    for pilot_present in [false, true] {
+        let m = menu_with(Env { pilot_present, ..Env::default() });
+        assert!((0..m.entry_count(Page::Saves)).all(|i| m.entry(Page::Saves, i) != Some(Entry::Group(7))));
+    }
+    for title in ["Named library", "Save slot to library...", "Replay capture"] {
+        assert!(ROWS.iter().any(|r| r.title == title), "retained row {title}");
     }
 }
 
