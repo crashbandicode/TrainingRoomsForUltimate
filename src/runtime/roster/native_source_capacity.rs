@@ -544,7 +544,18 @@ pub(super) fn load_supported() -> bool {
     LOAD_VERIFIED.load(Ordering::Acquire)
 }
 
-/// All clients verify the pristine ranges before either shared hook is installed.
+#[path = "../../model/swap/pristine_load.rs"]
+mod pristine_load;
+pub(crate) use pristine_load::VerifiedLoad;
+
+/// Boot-only verification before lifecycle or capacity installs overlapping hooks.
+/// This publishes no readiness and installs no callback.
+pub(crate) fn prepare_load_contract() -> Option<VerifiedLoad> {
+    let base = unsafe { skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize };
+    VerifiedLoad::capture(base, || unsafe { verify_load(base) })
+}
+
+/// All clients verify the pristine ranges before any overlapping owned hook is installed.
 #[cfg(feature = "managed-third-source-alpha")]
 unsafe fn verify_load(base: usize) -> bool {
     for (offset, len, expected) in [
@@ -568,10 +579,7 @@ unsafe fn verify_load(base: usize) -> bool {
         #[cfg(feature = "managed-grouped-source-alpha")]
         (0x6b7aa0, 52, 0x7009ea488edbd02a),
     ] {
-        let mut hash = 0xcbf29ce484222325u64;
-        for byte in std::slice::from_raw_parts((base + offset) as *const u8, len) {
-            hash = (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
-        }
+        let hash = pristine_load::fingerprint(std::slice::from_raw_parts((base + offset) as *const u8, len));
         if hash != expected {
             crate::engine::compat::logging::diagnostic(format_args!(
                 "[NativeSourceCapacity] load contract mismatch +0x{:x} len={} expected=0x{:016x} actual=0x{:016x}; load clients disabled",
@@ -717,7 +725,7 @@ const LOAD_SEAMS: &[&str] = &[
     "capacity.actor_tables",
 ];
 
-pub(super) unsafe fn init(base: usize) {
+pub(super) unsafe fn init(base: usize, load_contract: Option<VerifiedLoad>) {
     use crate::runtime::seams::seam_install::gate;
     let creation = verify_creation(base);
     if let Err(offset) = creation {
@@ -739,7 +747,7 @@ pub(super) unsafe fn init(base: usize) {
     }
     #[cfg(feature = "managed-third-source-alpha")]
     let load_verified = {
-        let contract = verify_load(base);
+        let contract = VerifiedLoad::permits(load_contract, base);
         gate("native_source_capacity", LOAD_SEAMS, contract) && contract
     };
     // Both original ranges have now been checked, before any overlapping patch.

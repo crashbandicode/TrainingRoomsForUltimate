@@ -52,6 +52,8 @@ mod native_source;
 #[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;
+#[cfg(feature = "managed-third-source-alpha")]
+pub(super) use native_source_capacity::{prepare_load_contract, VerifiedLoad};
 #[path = "character_sources.rs"]
 pub mod sources;
 /// GS-PANIC: the process-memory admission every fighter load the mod starts goes through.
@@ -2261,7 +2263,7 @@ const ROSTER_SEAMS: &[&str] = &["roster.native_service", "lifecycle.reload_entry
     "roster.waiting_online_icons", "roster.icon_hash", "roster.icon_request", "roster.icon_assign",
     "roster.spawn_pose_loads", "roster.spawn_pose_facing"];
 
-pub fn init() {
+pub fn init(#[cfg(feature = "managed-third-source-alpha")] load_contract: Option<VerifiedLoad>) {
     unsafe {
         let base = getRegionAddress(Region::Text) as usize;
         let legacy = [
@@ -2363,7 +2365,7 @@ pub fn init() {
         #[cfg(feature="mii-ordinary-player-alpha")]
         if !mii_ordinary_player::init(base) {return;}
         #[cfg(feature = "managed-third-source-alpha")]
-        native_source_capacity::init(base);
+        native_source_capacity::init(base, load_contract);
         #[cfg(feature="mii-ldn-qualification-probe")]
         mii_ldn_qualification::init(base);
         #[cfg(feature="mii-ordinary-cpu-alpha")]

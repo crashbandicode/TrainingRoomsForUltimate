@@ -2345,7 +2345,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "4c2324b8e0d595798367653183ef10ab5ae2cdb23397873e600d4891f1694fcd",
+   "dest_sha256": "987bd1b1a7528c9bcb4fdfc6804cc3dac4d0a1ff2d0eca862c4d73c507e69a63",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -2638,6 +2638,21 @@
      "new": "/// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.\n#[cfg(feature=\"mii-hud-portrait-alpha\")]\n#[derive(Clone, Copy, Debug)]\npub(crate) enum PortraitIntent {\n    Exact(crate::engine::mii::lifetime::Configuration),\n    Original { original_kind: u32 },\n",
      "count": 1,
      "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "mod native_source_capacity;",
+     "new": "mod native_source_capacity;\n#[cfg(feature = \"managed-third-source-alpha\")]\npub(super) use native_source_capacity::{prepare_load_contract, VerifiedLoad};",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
+    },
+    {
+     "old": "pub fn init() {",
+     "new": "pub fn init(#[cfg(feature = \"managed-third-source-alpha\")] load_contract: Option<VerifiedLoad>) {",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
+    },
+    {
+     "old": "native_source_capacity::init(base);",
+     "new": "native_source_capacity::init(base, load_contract);",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
     }
    ]
   },
@@ -4016,7 +4031,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "2f4bb88784c56143ef57948e6b94986258763956012d4de655fb07d6e34eee6d",
+   "dest_sha256": "e778c2f64de0d63ead6ddaa4ccc0ecbda1ea89729ef5e019c83ae4fa268980c1",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -4257,6 +4272,26 @@
      "old": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(super) enum Layout {\n    Training,\n    #[cfg(any(feature = \"source-ldn-capacity-empty-probe\", feature = \"managed-ldn-third-source-alpha\"))]\n    LdnWaiting,\n    #[cfg(feature = \"lobby-preload-extended\")]\n    QuickplayWaiting,\n",
      "new": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(super) enum Layout {\n    Training,\n    #[cfg(feature = \"managed-ldn-third-source-alpha\")]\n    LdnWaiting,\n    #[cfg(feature = \"lobby-preload-extended\")]\n    QuickplayWaiting,\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "/// All clients verify the pristine ranges before either shared hook is installed.",
+     "new": "#[path = \"../../model/swap/pristine_load.rs\"]\nmod pristine_load;\npub(crate) use pristine_load::VerifiedLoad;\n\n/// Boot-only verification before lifecycle or capacity installs overlapping hooks.\n/// This publishes no readiness and installs no callback.\npub(crate) fn prepare_load_contract() -> Option<VerifiedLoad> {\n    let base = unsafe { skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize };\n    VerifiedLoad::capture(base, || unsafe { verify_load(base) })\n}\n\n/// All clients verify the pristine ranges before any overlapping owned hook is installed.",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
+    },
+    {
+     "old": "        let mut hash = 0xcbf29ce484222325u64;\n        for byte in std::slice::from_raw_parts((base + offset) as *const u8, len) {\n            hash = (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3);\n        }\n        if hash != expected {\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[NativeSourceCapacity] load contract mismatch",
+     "new": "        let hash = pristine_load::fingerprint(std::slice::from_raw_parts((base + offset) as *const u8, len));\n        if hash != expected {\n            crate::engine::compat::logging::diagnostic(format_args!(\n                \"[NativeSourceCapacity] load contract mismatch",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
+    },
+    {
+     "old": "pub(super) unsafe fn init(base: usize) {",
+     "new": "pub(super) unsafe fn init(base: usize, load_contract: Option<VerifiedLoad>) {",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
+    },
+    {
+     "old": "let contract = verify_load(base);",
+     "new": "let contract = VerifiedLoad::permits(load_contract, base);",
+     "reason": "Lead-approved capacity load guard root: verify pristine full ranges before owned lifecycle patch, pass a base-bound single-use proof to unchanged later activation; preserve strict guards and callback order."
     }
    ]
   },

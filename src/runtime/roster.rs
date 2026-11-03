@@ -185,6 +185,10 @@ pub(crate) fn init() {
     practice_trace::init();
     native_unlink_install::init();
     native_gc_guard::init();
+    // Capture the full pristine load contract before reload_trace patches its interior.
+    // Activation remains after the ordinary Mii guards in character_roster::init.
+    #[cfg(feature = "managed-third-source-alpha")]
+    let load_contract = character_roster::prepare_load_contract();
     character_lifecycle::init();
-    character_roster::init();
+    character_roster::init(#[cfg(feature = "managed-third-source-alpha")] load_contract);
 }
