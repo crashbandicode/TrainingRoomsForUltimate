@@ -14,6 +14,7 @@ from pathlib import Path
 
 import route4 as r
 import hook_stats
+from capture_status import idle_preference
 
 LABEL = sys.argv[1]
 SD = f"{r.PROFILE_SD}/TrainingRooms"
@@ -226,8 +227,7 @@ def main():
 
     initial_status = line_after(cmd("status"), "[NamedMacroDiag] status", 8)
     row("Off-at-boot replay preference with adapter ready",
-        initial_status is not None and "capture_armed=false" in initial_status
-        and "capture_ready=true" in initial_status, initial_status or "no status")
+        idle_preference(initial_status, False), initial_status or "no status")
 
     # named capture with the stop chord
     m = mark()
@@ -488,7 +488,7 @@ def main():
     shot("after-fighter-switch")
 
     # Q7 uses the existing writer diagnostic request, the same request boundary as menu close.
-    # This proves arming/persistence; a subsequent actual native match/save is still required.
+    # This proves the idle live preference/persistence; native start/save remain required.
     toggle_mark = mark()
     rc, out, err = r.remote(
         f"[IO.File]::WriteAllText('{SD}/diag-capture.req','on')", 30)
@@ -496,28 +496,29 @@ def main():
     toggle_receipt = line_after(toggle_mark, "diag_request replay_capture enabled=true", 10)
     row("replay preference request reaches the production writer", toggle_receipt is not None,
         toggle_receipt or "no receipt")
-    armed = None
+    preference_status = None
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         status = line_after(cmd("status"), "[NamedMacroDiag] status", 3)
-        if status and "capture_armed=true" in status and "capture_ready=true" in status:
-            armed = status
+        if idle_preference(status, True):
+            preference_status = status
             break
-    row("Off-to-On arms the already resident adapter in this boot", armed is not None, armed or "not armed")
+    row("Off-to-On updates the resident next-record preference while idle",
+        preference_status is not None, preference_status or "no ready idle On preference")
     preference = wait_file(f"{SD}/replay_capture.ini",
         capture_preference_on)
     row("On preference persisted", capture_preference_on(preference),
         preference.strip())
     (OUT / "replay-capture-preference.ini").write_text(preference)
     # The same live boot continues into a real VS match and native Save Replay.
-    # Retain the arming boundary and seeded IDs so a later archive cannot be
+    # Retain the preference boundary and seeded IDs so a later archive cannot be
     # mistaken for this boot's new persisted capture.
     (OUT / "native-save-handoff.json").write_text(json.dumps({
         "label": LABEL,
         "training_start_mark": START,
         "toggle_mark": toggle_mark,
         "toggle_receipt": toggle_receipt,
-        "armed_status": armed,
+        "preference_status": preference_status,
         "prior_capture_ids": sorted(set(
             match.group(1) for line in (OUT / "captures.txt").read_text().splitlines()
             if (match := re.search(r"capture id=([0-9a-f]+)\b", line))

@@ -270,14 +270,17 @@ fn run(command: Command) {
         },
         AUDIT_CAPTURES => audit_captures(),
         STATUS => {
+            let capture = replay_store::toggle().snapshot();
             diagnostic(format_args!(
-                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} recorder={:?} cpu_kind={:?}",
+                "[NamedMacroDiag] status named_source={} panel={} browser={} editor={} capture_armed={} capture_ready={} capture_desired={} capture_phase={:?} recorder={:?} cpu_kind={:?}",
                 named_macros::source_is_named(),
                 named_macros::panel_visible(),
                 replay_capture::browser_visible(),
                 replay_capture::panel_visible(),
-                replay_store::toggle().is_armed(),
-                replay_store::toggle().is_ready(),
+                capture.phase.armed() == Some(true),
+                capture.ready,
+                capture.desired,
+                capture.phase,
                 crate::runtime::features::recorder::phase(),
                 crate::runtime::features::recorder::cpu_kind()
             ));
