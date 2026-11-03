@@ -2,7 +2,7 @@
 //!
 //! The settings live as rows in the clean room (`model::settings::Settings`); `published::publish` turns the rows into the typed
 //! view (`published::Live::menu`, read wait-free: boot, every commit, the diag reload: the one path), and [`apply_kept`] adds what a
-//! `Snapshot` does not carry (the saved defaults and the kept keys `stage_preferences`, `mii_preferences`) once, on the committing thread; a hook or tick reads
+//! `Snapshot` does not carry (the kept keys `stage_preferences`, `mii_preferences`) once, on the committing thread; a hook or tick reads
 //! the stored copy with `read(&MENU)` and allocates nothing. Before the first publish the factory values are what a reader gets.
 //!
 //! The carried engines also change the menu: the roster cycle records the fighter it swapped to, the preload INI overlays its keys.
@@ -19,10 +19,9 @@ use crate::engine::stages::stage_menu::Preferences as StagePreferences;
 use crate::model::settings::Settings;
 use crate::runtime::compat::sync::{Assignable, Lockable, Readable};
 
-/// What a `Snapshot` does not carry: the saved defaults and the kept keys. Written by the publishing thread (`apply_kept`) as one
+/// What a `Snapshot` does not carry: the kept keys. Written by the publishing thread (`apply_kept`) as one
 /// assignment (computed before the lock is taken), read by hooks for a copy.
 struct Kept {
-    defaults: TrainingModpackMenu,
     stage: StagePreferences,
     mii: MiiPreferences,
 }
@@ -43,10 +42,6 @@ static EDIT_HANDOFF: hos_lock::TripleBuffer<Option<(u32, TrainingModpackMenu)>> 
 pub struct Menu;
 pub static MENU: Menu = Menu;
 
-/// The carried code's `DEFAULTS_MENU`: the player's saved defaults, typed.
-pub struct DefaultsMenu;
-pub static DEFAULTS_MENU: DefaultsMenu = DefaultsMenu;
-
 /// The typed menu now: a game-side edit made since the last publish, else the published rows (`published::Live`), else the factory
 /// values. The published value is read wait-free (stream/sync).
 fn current_menu() -> TrainingModpackMenu {
@@ -66,59 +61,35 @@ impl Readable for Menu {
     }
 }
 
-impl Readable for DefaultsMenu {
-    type Value = TrainingModpackMenu;
-    fn read_value(&self) -> TrainingModpackMenu {
-        KEPT.read().as_ref().map_or(BASE_MENU, |kept| kept.defaults)
-    }
-}
-/// Typed views waiting to be written back into the settings (menu, saved defaults): no allocation to leave one here, so a game
-/// callback can store; the menu worker does the rest (`flush_writeback`).
-static PENDING: Mutex<[Option<TrainingModpackMenu>; 2]> = Mutex::new([None, None]);
+/// A game-side typed menu edit waiting for the menu worker. Saved defaults
+/// belong exclusively to the menu model's current/default snapshot pair.
+static PENDING: Mutex<Option<TrainingModpackMenu>> = Mutex::new(None);
 
-/// Write the waiting typed views back into the settings (called by the menu worker's thread, after `request_writeback`).
 pub fn flush_writeback() {
-    let [menu, defaults] = std::mem::take(&mut *PENDING.lock());
-    for (is_defaults, typed) in [(false, menu), (true, defaults)] {
-        if let Some(typed) = typed {
-            crate::runtime::ui::worker::adopt_typed(is_defaults, &typed.rows(), &typed.kept_values());
-        }
+    let menu = PENDING.lock().take();
+    if let Some(menu) = menu {
+        crate::runtime::ui::worker::adopt_typed(false, &menu.rows(), &menu.kept_values());
     }
 }
 
-/// Store a typed view (`defaults` selects the saved defaults); what changed is written back into the settings by the menu worker.
-fn store(defaults: bool, menu: TrainingModpackMenu) {
-    let changed = if defaults {
-        let mut kept = KEPT.write();
-        let kept = kept.get_or_insert_with(|| Kept { defaults: BASE_MENU, stage: StagePreferences::default(), mii: MiiPreferences::default() });
-        let changed = kept.defaults != menu;
-        kept.defaults = menu;
-        changed
-    } else {
-        let changed = current_menu() != menu;
-        let edit = Some((crate::runtime::published::live_generation(), menu));
+/// Store a game-side edit, then ask the existing worker to persist its changed rows.
+fn store(menu: TrainingModpackMenu) {
+    let changed = current_menu() != menu;
+    let edit = Some((crate::runtime::published::live_generation(), menu));
+    {
         let mut edited = EDITED.lock();
         *edited = edit;
-        // The publishing path's copy (stream/sync slice 3): written while `EDITED` is held, so the writers are serialised.
         EDIT_HANDOFF.write(edit);
-        changed
-    };
+    }
     if changed {
-        PENDING.lock()[usize::from(defaults)] = Some(menu);
+        *PENDING.lock() = Some(menu);
         crate::runtime::ui::worker::request_writeback();
     }
 }
 impl Assignable for Menu {
     type Value = TrainingModpackMenu;
     fn assign_value(&self, value: TrainingModpackMenu) {
-        store(false, value);
-    }
-}
-
-impl Assignable for DefaultsMenu {
-    type Value = TrainingModpackMenu;
-    fn assign_value(&self, value: TrainingModpackMenu) {
-        store(true, value);
+        store(value);
     }
 }
 
@@ -142,7 +113,7 @@ impl DerefMut for MenuGuard {
 
 impl Drop for MenuGuard {
     fn drop(&mut self) {
-        store(false, self.menu);
+        store(self.menu);
     }
 }
 
@@ -192,7 +163,7 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 /// publish of a run has nothing to compare with.
 pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
     if next != published {
-        PENDING.lock()[0] = Some(next);
+        *PENDING.lock() = Some(next);
         crate::runtime::ui::worker::request_writeback();
     }
     if let Some(previous) = previous.filter(|previous| *previous != next) {
@@ -227,12 +198,11 @@ pub(crate) fn run_roster_change() {
         crate::runtime::roster::character_roster::settings_changed(&previous, None);
     }
 }
-/// The settings-only part of the typed view: the saved defaults and the two kept keys (`stage_preferences`, `mii_preferences`), which
+/// The settings-only part of the typed view: the two kept keys (`stage_preferences`, `mii_preferences`), which
 /// a `Snapshot` does not carry. Called after the publish at boot, at every commit and by the diag reload (never in a hook). The values
 /// are computed first; the lock is held for the assignment only. The menu rows reach `MENU` through `published::Live` (one path).
 pub fn apply_kept(settings: &Settings) {
     let kept = Kept {
-        defaults: TrainingModpackMenu::from_snapshot(&settings.defaults),
         stage: kept(settings, "stage_preferences"),
         mii: kept(settings, "mii_preferences"),
     };

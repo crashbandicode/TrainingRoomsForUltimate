@@ -1001,10 +1001,10 @@ fn core03_delay_popup_render_plan() {
 
 #[test]
 fn core02_delay_row_reset_and_save_defaults() {
-    // R / X treat the checklist and the range as one row: both are restored together.
+    // Reset and save treat the checklist and the range as one row: both are restored together.
     let mut m = menu();
     set(&mut m, "aerial_delay_range", &[3, 8]);
-    m.save_defaults();
+    m.press(Button::X);
     // Change the row to a checklist (clear the range first), then reset the page: back to the range.
     let mut s = m.settings().clone();
     s.menu.set("aerial_delay_range", &[]).unwrap();
@@ -1012,14 +1012,14 @@ fn core02_delay_row_reset_and_save_defaults() {
     let env = *m.env();
     m.reopen(s, env);
     goto(&mut m, "mash_state");
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert_eq!(get(&m, "aerial_delay_range"), [3, 8]);
     assert!(get(&m, "aerial_delay").iter().all(|v| *v == 0), "the checklist is restored with it");
     // Factory defaults: the range is empty after a reset.
     let mut m = menu();
     set(&mut m, "pummel_delay_range", &[0, 2]);
     goto(&mut m, "mash_state");
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert!(get(&m, "pummel_delay_range").is_empty());
 }
 
@@ -1042,7 +1042,7 @@ fn core02_delay_row_bulk_update_clears_range() {
 #[test]
 fn core02_defaults_and_reset() {
     let mut m = menu();
-    // Change several rows of the CPU page, then X returns the page to the defaults.
+    // Change several rows of the CPU page, then ZR returns the page to the defaults.
     goto(&mut m, "sdi_strength");
     m.press(Button::Right);
     goto(&mut m, "stale_dodges");
@@ -1060,7 +1060,7 @@ fn core02_defaults_and_reset() {
     m.press(Button::L);
     m.press(Button::L);
     assert_eq!(m.page(), Page::Cpu);
-    m.press(Button::X);
+    m.press(Button::ZR);
     let factory = Settings::factory();
     for id in ["sdi_strength", "stale_dodges", "mash_state", "di_state"] {
         assert_eq!(m.settings().menu.get(id), factory.menu.get(id), "{id}");
@@ -1069,10 +1069,10 @@ fn core02_defaults_and_reset() {
     // Saved defaults replace the factory ones for the next reset.
     goto(&mut m, "stale_dodges");
     m.press(Button::A);
-    m.save_defaults();
+    m.press(Button::X);
     m.press(Button::A);
     assert_eq!(get(&m, "stale_dodges"), [1, 0]);
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert_eq!(get(&m, "stale_dodges"), [0, 1], "reset restores the saved default");
 }
 
@@ -1331,9 +1331,9 @@ fn menu_change_to_cpu_choices_emits_reroll_events() {
     goto(&mut m, "sdi_state");
     press(&mut m, &[Button::A, Button::A, Button::B]);
     let _ = m.take_outbox();
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert_eq!(m.take_outbox().rerolls, reroll::SDI_DIRECTION | reroll::LEDGE_OPTIONS | reroll::THROW_OPTIONS);
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert_eq!(m.take_outbox().rerolls, 0, "a reset that changes nothing re-rolls nothing");
 }
 
@@ -1447,7 +1447,7 @@ fn chords_ini_written_only_on_confirmed_change() {
     assert_eq!(m.take_outbox(), Default::default());
     // Resetting the page does not touch the INI-held shortcuts.
     goto(&mut m, "Menu shortcut 1");
-    m.press(Button::X);
+    m.press(Button::ZR);
     assert_eq!(m.env().shortcuts[0], Chord::NONE);
     assert_eq!(m.take_outbox().button_config, None);
 }
@@ -1670,4 +1670,24 @@ fn dropdown_options_are_unique_and_row_values_read_back() {
     }
     assert_eq!(m.value(row_of("input_display")), RowValue::Choice(Some(1)), "Smash Inputs");
     assert_eq!(m.value(row_of("recording_duration")), RowValue::Choice(Some(3)), "150 frames");
+}
+
+
+#[test]
+fn page_defaults_controls_roundtrip_and_reset_only_the_focused_complete_row() {
+    let mut m = menu();
+    goto(&mut m, "aerial_delay");
+    set(&mut m, "aerial_delay_range", &[3, 8]);
+    m.press(Button::X);
+    let defaults = m.settings().defaults.clone();
+    m.bulk_update(&[("aerial_delay", &[0, 1])]);
+    set(&mut m, "stale_dodges", &[0, 1]);
+    m.press(Button::Y);
+    assert_eq!(get(&m, "aerial_delay_range"), [3, 8]);
+    assert!(get(&m, "aerial_delay").iter().all(|v| *v == 0));
+    assert_eq!(get(&m, "stale_dodges"), [0, 1], "row reset does not reset its page");
+    assert_eq!(m.settings().defaults, defaults, "reset never overwrites saved defaults");
+    let json = m.serialized();
+    let reloaded = settings::parse(&json);
+    assert_eq!(reloaded.settings.defaults, defaults);
 }

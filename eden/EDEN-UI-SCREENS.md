@@ -150,3 +150,9 @@ profile restore. The helper-path boot hold is still binding.
 - Original Ice Climbers with a different cycle Solo setting becomes selectable; matching settings dim it again. ZR switches to the CPU original and independent Solo preference. Saved CPU Miis must not exclude a generic class identity.
 - Verify a built parked alternative shows a star, an active/unready body does not, and a role or Solo change never borrows the previous request's ready marks. Repeat with text fallback portraits.
 - Close the cycle grid: no readiness queries continue. Scene retirement/stale frame facts remove hints; no native pointers cross to the menu worker. Capture hook allocation and exact callback stack evidence for the new publication call path.
+
+### Current/default settings controls (pending native acceptance)
+
+- Change a delay range and another page row; page X saves current defaults. Change them again, then Y restores only the focused complete delay row (checklist plus range).
+- ZR resets every settings row on the current page, preserving other pages and INI-held shortcuts/replay-capture settings.
+- Close, restart, and verify both current and defaults snapshots survive; resetting does not overwrite defaults. Specialized popup/grid X/Y/ZR actions retain their existing meanings.
