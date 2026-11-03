@@ -57,9 +57,13 @@ pub fn item_for(kind: i32, variation: usize) -> Option<(u8, i32)> {
 }
 
 /// The snapshot the old setting means for one slot: `index` is the option (1..=16), the kinds are the
-/// slot's two records. The lifetime and fuse fields are -1/-1 so the restore skips their write-back
+/// slot's two records. A never-saved player cannot receive an item, even when the CPU supplies its kind.
+/// The lifetime and fuse fields are -1/-1 so the restore skips their write-back
 /// (the fork writes them back only when the item's maxima match the saved maxima).
 pub fn snapshot_for(index: usize, player_kind: i32, cpu_kind: i32) -> Option<HeldItem> {
+    if player_kind < 0 {
+        return None;
+    }
     let (kind, variation) = match index {
         1..=8 => (player_kind, index - 1),
         9..=16 => (cpu_kind, index - 9),
@@ -79,7 +83,7 @@ pub fn convert_file(file: &mut SaveFile, index: usize) -> usize {
     let mut converted = 0;
     for slot in 0..file.player.len() {
         let player = &file.player[slot];
-        if player.held_item.is_some() || player.fighter_kind < 0 {
+        if player.held_item.is_some() {
             continue;
         }
         if let Some(item) = snapshot_for(index, player.fighter_kind, file.cpu[slot].fighter_kind) {

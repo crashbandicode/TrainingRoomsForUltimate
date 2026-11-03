@@ -1,5 +1,75 @@
 # Implementation progress, package 4 (stream `pkg4`)
 
+## Phase 2 pkg4 plan — RC6-based successor, 2026-11-03 (16 lines)
+1. Owned branch `stream/pkg4-phase2`, same existing worktree, exact base `719255d578c952160e6ed73c5cefb5ad28b2c968`; no reset/rebase/moving merge/new worktree.
+2. Old `stream/pkg4` remains at `11e478f`; successor audits/checklist at `cc5acdb`/`39e4084` and original plan at `11e478f` remain historical, not merged into RC6.
+3. RC assignments preempt; finish lead13:45 retained-row/source-only lookup before Phase2 edits; frozen RC6 artifacts/helpers stay unchanged.
+4. Playbook `2dee6cc1fcabb379ac67db4bfd6a3aa453dd3303` ff-pulled/full-read again after checkpoint; native exact Sol/high verified; sole owner-bound watcher retained.
+5. Inventory existing core08/N4/N6/N8/Q7 code/tests first; implement only reproducible gaps, not duplicate features or deferred advanced editors.
+6. core08: `src/model/{storage,migration,migration_run}.rs`, runtime import worker; old-root copy-only, destination preservation, marker-last/retry/error contracts.
+7. N6: `src/model/state/convert.rs`, `tests/{migration_run,state04_convert}.rs`; original CPU-selection9/player-1/CPU0x2d regression through real JSON/full import before fix.
+8. N6 variants: valid player, existing explicit snapshot/empty/unsupported input, source-byte preservation, marker/idempotence and separate-process persisted continuation.
+9. N8: existing background capture copier/64KiB path; no capture cap, `.part` publication, interruption/retry and marker after both parts; no boot/hook blocking.
+10. N4: existing override setting and CPU DI/SDI/air-dodge/tech/mistech/throw consumers; default recording wins, On overrides, live transition/persistence.
+11. Q7: existing capture setting/INI transaction/menu/optional Deluxe/resident adapter; one file-of-record, Off→On without reboot, no second provider.
+12. Host tests use existing queue/ledger/runner, RC head, Yoga admission only while Surface RC Eden lives; unique target, fresh disk/memory, bounded jobs.
+13. No native facts initially needed for pure conversion/copy; reuse guarded interfaces; resolve real native gaps statically from approved main ELF/data.arc first.
+14. Only unresolved native facts enter ONE combined Phase2 trace list; no Phase2/3 Eden before RC READY, no separate boot request.
+15. Preserve carry transforms/ledger if carried files change; full M/C checklist/compliance and independent review before READY; no test/build PASS yet at plan time.
+16. No push/tag/release/card/DBI/USB/subdelegation; coordinate settings_file overlap with Slim before edits there.
+
+## N6 focused root / current successor checkpoint — 2026-11-03 14:03Z
+
+- Same branch/base/worktree above. Historical prior stream notes below are NOT this successor's live jobs. Retained-row RC follow-up completed first: `../tmp-pkg4/RC6-RETAINED-BOUNDARY-EVIDENCE.md` final section; exact40 authored-main removals/no additions/no retained guard changes,16 non-main rows remain outside old main scan, active Counterpick observer retired, whole sharing/placement still unverified. Original receipts and all frozen RC6 inputs untouched.
+- Original regression ACTUALLY FAILED at14:00:09–18Z through `migration_run::run_blocking/run_background`: CPU selection9/player−1/CPU0x2d converts2 records, expected1. Bound1529-file red source content`68b501154ff12c68b9935bdf206a57669847087d470d569811b2da19603ffaa0`, archive`ebbfeed5a11fb467e140bce7245d797d7c3e78719a76b5046a58cf7d7f313c28`; Cargo101/rawlog612758dd/ELF02662816, `../tmp-pkg4/phase2-n6/red1/red/job.json`. Source before/after MATCH;6GiB/swap0/Tasks256/540s inner600s outer; peak668934144B. Original failure preserved.
+- Contract SPEC-core08§4N6: only saved player-role records without any nonnull snapshot may receive the selected same-slot CPU item; never-saved/missing/malformed player kinds remain unchanged. CPU-role records, explicit empty/unsupported/item snapshots, source bytes and existing destinations are preserved; marker prevents reconversion. No format/ABI change, native site, hook path or carry file touched.
+- Root: move the existing typed converter's negative-player invariant into shared `snapshot_for`, removing its redundant typed caller check; both typed and JSON conversion now use the same recipient-validity owner before selecting either role's item kind. No special R.O.B. case, alternate implementation, tolerance, setting restriction or lint allowance.
+- FOUR new top-level regression functions: JSON/typed representations with CPU first/eighth variations and saved/never-saved/empty/unsupported/item records; missing/null/string/negative/out-of-i32 player kinds plus valid null-snapshot contrast; real filesystem import with source-byte/marker/idempotence checks; fresh saver exits before a separate restorer loads nondefault Gyro variation7 and continues against different index9 without rewriting the snapshot. Literal choice29/variation0-or7 oracle, not a cloned production formula.
+- Focused positive run ACTUALLY PASSED14:02:00–11Z: `cargo test --locked --test migration_run --test state04_convert --no-fail-fast -- --nocapture`. Harness summaries228 and212, four new named regressions pass, no warnings/errors; NOT a full all-target suite or whole Phase2 gate. `../tmp-pkg4/phase2-n6/green1/green/job.json`: content`79b58447fd43cde0749464b7ad9d8dad4f70ded79e6d9751fb15475a219836d2`, archive`c10d14c32d8d971d61eca9e01878dfc7794a8015975277ad3461d7fc7a247ac6`, log68b00595, exact preservedELFs migrationa6ef9c65/state271c548f. Full1529 source before/after MATCH; peak952774656B/same bounds. Listing and focused clippy queued separately, not yet passed.
+- Fresh process raw evidence is green job.log33: saver3358557 start1793714531052493449ns, exit observed1793714531062640823ns BEFORE restorer launch1793714531062642769ns/start1793714531064180529ns, restorer3358559; both child statuses success. Savedsha`a68c46de7ad79836c2ed6081baec4cfb78055d9f837e807db5b922b5c2681240`, markerfae81c96/sourcead698d59 identical after restore/continuation; exact generated JSON compared before saver exit. Not gameplay/native restore acceptance.
+- Reused supplied evidence.py freeze/extract/verify, existing ordered `/tmp/tr-capture-command.py`, shared ledger.py/params.py. Narrow single-job adapters `../tmp-pkg4/pkg4-phase2-{run,host}.ps1` adapt existing RC host/admission scripts for Yoga and two focused test binaries, with actual cgroup checks/ELF preservation/receipts/finally release; no new scheduler. First shell tool timeout1000ms interrupted staging only; no test/claim existed, exact controller absence reconciled, same already-extracted source then admitted once. Original command error retained in inbox/tool output. All subsequent jobs use adequate outer tool timeout.
+- First progress patch appended its plan at EOF although inbox said TOP; moved to actual TOP now without deleting history. Green frozen source therefore differs from working tree ONLY by progress documentation after testing; product/test identity unchanged. Modelwatcher511198 remains sole hidden owner1534622/session-bound watcher; no alert observed, exact native Sol/high verified after checkpoint. No current claim/compiler/Eden/profile, no Surface compilation; red/green owned targets still exist pending evidence-preserving retirement. RC preempts queued Phase2 jobs.
+- Inventory, not new acceptance: N4 already has shared `covered_setting_applies`, actual CPU publication/consumers, cpu02/04/06 playback/default/On/end regressions; Q7 already has packed CaptureToggle, one INI writer, resident adapter and pinned MIT Deluxe handler; core08/N8 already have real copy/error/retry/marker tests and boot/background scheduling. Do not rewrite for row credit. Missing native facts initially NONE for N6; future ONE combined Phase2 trace needs actual imported save/item, background nonblocking/menu responsiveness, N4 live publication/end transitions and Q7 Off→On/native Save Replay plus INI agreement. Runtime import still says NOT YET SWITCH-RUN.
+- Independent lead review requested before acceptance (recipient-validity change to imported/restored state); no self-review claim. Full host/clippy/no-default/native release+diag/size/carry/compliance and Phase2 native acceptance remain separate gates. No push/tag/release/card/DBI/USB/subdelegation; no settings_file/recorder/input-delay boundary edits, Slim/UI overlaps acknowledged.
+- PRIMARY14:0x R3 fixes PREEMPT: entire162-line independent RC6 review read; withdrawn unclaimed Phase2 listing queue before any new admission. Listing/focusedclippy NOT RUN, no retry to get around RC priority. Preparing local tested-slice checkpoint and owned cache retirement only; available for addressed RC assignment. UI aggregate60GB hold is superseded by PRIMARY inbox6680–6685 (binding per-host disk/memory/queue/ledger rules); no foreign cleanup or threshold change performed here.
+
+### Successor M/C checklist — Phase2 N6 slice (in progress, not READY)
+
+| Requirement | Tag | Result | Evidence / remaining gate |
+| --- | --- | --- | --- |
+| cdylib-only / release profile / Skyline0.6.0 / host1.98.1 | M | pass | Existing Cargo.toml/rust-toolchain unchanged; machine checker still required |
+| Pure model / Switch-only runtime / original host tests | M | pass | convert.rs pure model; four original regressions executed through actual converters/importer |
+| Full test/clippy/no-default/release/diag gates | M | not authorized | Focused two-harness PASS only; final combined wave not yet run |
+| No hook heap / counting allocator runtime delta0 | M | not authorized | No hook code changed; current candidate-wide runtime deltas unverified |
+| Fixed buffers/static writer/stack paths | M | N/A: no writer/hook changes | Boot conversion reuses existing owner; no new runtime buffer |
+| Root fix / explicit workaround approval / shared cause | M | pass | One recipient-validity constructor invariant replaces duplicate typed-only check; no workaround |
+| Version13.0.5 / 64-byte guards | M | pass | No site changed; existing machine source rows, checker pending |
+| Dated card scan | M | N/A: no new site | Source-only retained scan audit separately scoped; non-main coverage gap preserved |
+| Sharing/chain/stand-ins/load orders | C | not authorized | No new hook; whole RC MP4/overlay/manual gaps unchanged |
+| After-prologue or called function | M | N/A: no hook changed | Retained whole-hook rationale audit not upgraded to PASS |
+| No diagnostic markers in shipped NRO | M | not authorized | No N6 Switch binary built; never substitute RC6 binary |
+| Release logging policy / product data exception | M/C | N/A: no logging change | Original sparse-lifecycle contract remains lead-reviewed |
+| Online read-only review / replay A-B / two-console end path | C | not authorized | N6 boot filesystem only; whole plugin runtime acceptance not supplied |
+| Claim/release / one Eden / memory / own profile | M | pass | Yoga original+positive claims released, fresh ≥10GiB/≥40GB, no worker Eden/profile |
+| Identical-copy links / writable copies | M | N/A: no profile copy | Fresh source archive extraction; no in-place immutable shared writes |
+| Unique targets/shared cargo home/fresh sources/cache retirement | M | not authorized | Separate red1/green1 targets; retirement manifest still owed after final focused job |
+| Gated waits / failed-precondition retry / shortest ruleset | M | N/A: no gameplay | No sleeps/routes; commands bounded, inbox checks~5min |
+| Restore/release resources | M | pass | No profile mutation; both completed claims released |
+| Full console health/run.json/memory.peak/labeled outputs | M | N/A: no Eden | Host cgroup peak/events and labeled raw logs/ELFs retained |
+| Every local command memory/time guard | M | fail | Historical initial metadata/bootstrap commands unbounded; later work corrected, not retroactively PASS |
+| README/fullscreen1280GIF<10s/date/build/install/license/disclaimer | M | not authorized | No media assignment; candidate-wide evidence not claimed by N6 host slice |
+| Dated evidence/source/build/run identities | M | pass | This checkpoint and red/green bound receipts; original failure preserved |
+| Log numbers from supplied tested counter | C | not authorized | Supplied cargo-count requires all-target jobs; focused listing audit pending, no whole-suite total claimed |
+| No unsupported claims/operator quotes | M | pass | Implemented/host-tested/native-unverified explicitly separated |
+| Current handoff/checkpoint | M | pass | This current branch section supersedes historical live state below |
+| Version/tag/release/anonymous assets / tagged rebuild | C | not authorized | No release order |
+| Card transaction/preflight/rollback/readback | C | not authorized | No card/DBI/USB order |
+| User device lifecycle/no unauthorized push-tag-card | M | pass | None performed; no device command |
+| Forgejo / UTF-8 commit message | M | not authorized | Origin remains Forgejo; assigned slice commit pending |
+| Exact model/effort / one owner-bound watcher | M | pass | Native session Sol/high and existing watcher511198 |
+| Delegated workers own read/compliance | M | N/A: no delegation | None spawned |
+| Final checker/manual dispositions/independent review | M | not authorized | In progress, no READY |
+
 ## Astra continuation — 2026-11-02
 
 ### Current checkpoint — recorder fixes published for the main integration wave

@@ -197,6 +197,118 @@ fn migration_item_on_load_converts_player_records_in_the_copy() {
 }
 
 #[test]
+fn migration_cpu_item_selection_keeps_never_saved_player_absent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    let mut settings: Value = serde_json::from_slice(&fs::read(t.fork().join("training_modpack_menu.conf")).unwrap()).unwrap();
+    let mut selection = vec![0; 17];
+    selection[9] = 1; // CPU 1st Var.; the same-slot R.O.B. resolves to Gyro, not the player's kind.
+    settings["menu"]["character_item"] = serde_json::json!(selection);
+    write(&t.fork().join("training_modpack_menu.conf"), &serde_json::to_vec(&settings).unwrap());
+    let mut source: Value = serde_json::from_str(&saves(-1, 0x2d)).unwrap();
+    source["player"][1]["fighter_kind"] = 7.into();
+    source["cpu"][1]["fighter_kind"] = 0x2d.into();
+    write(&t.fork().join("save_states.json"), &serde_json::to_vec(&source).unwrap());
+    let original = tree(&t.fork());
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.converted, 1, "only the saved player, even though both CPU kinds resolve");
+    let mut expected = source;
+    expected["player"][1]["held_item"] = serde_json::json!({
+        "state": "item", "choice": 29, "variation": 0,
+        "lifetime": -1, "lifetime_max": -1, "fuse": -1, "fuse_max": -1
+    });
+    let copied: Value = serde_json::from_slice(&fs::read(t.rooms().join("save_states.json")).unwrap()).unwrap();
+    assert_eq!(copied, expected, "never-saved player and every CPU record stay byte-semantically unchanged");
+    assert_eq!(tree(&t.fork()), original, "source bytes untouched");
+    let saved = tree(&t.rooms());
+    let (source, dest) = (t.fork(), t.rooms());
+    assert!(matches!(run_blocking(Roots { source: &source, dest: &dest }, 9, "0.1.0", &mut |_| {}), Stage::MarkerPresent));
+    assert_eq!(tree(&dest), saved, "second boot does not rewrite imported data");
+    let marker: Value = serde_json::from_slice(&fs::read(dest.join("migration.json")).unwrap()).unwrap();
+    assert_eq!(marker["converted_item_snapshots"], 1);
+}
+
+#[test]
+fn migration_cpu_item_selection_survives_fresh_process() {
+    const NAME: &str = "migration_cpu_item_selection_survives_fresh_process";
+    const ROOT: &str = "TR_N6_PROCESS_ROOT";
+    const PHASE: &str = "TR_N6_PROCESS_PHASE";
+    let stamp = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos().to_string();
+    if let Some(root) = std::env::var_os(ROOT) {
+        let root = PathBuf::from(root);
+        let (source, dest) = (root.join("TrainingModpack"), root.join("TrainingRooms"));
+        let phase = std::env::var(PHASE).unwrap();
+        let started = stamp();
+        let expected: Value = serde_json::from_slice(&fs::read(root.join("expected.json")).unwrap()).unwrap();
+        if phase == "save" {
+            let Stage::Imported { blocking, marker } = run_blocking(Roots { source: &source, dest: &dest }, 16, "0.1.0", &mut |_| {}) else { panic!("import did not run") };
+            assert_eq!(blocking.pending_captures(), 0);
+            marker.unwrap().unwrap();
+            assert_eq!(blocking.receipt.converted, 1);
+            let actual: Value = serde_json::from_slice(&fs::read(dest.join("save_states.json")).unwrap()).unwrap();
+            assert_eq!(actual, expected["copy"], "validate exact persisted fixture, not a recreated seed");
+        } else {
+            assert_eq!(phase, "restore");
+            let (mut restored, outcome) = model::state::persist::load(&dest.join("save_states.json"));
+            assert_eq!(outcome, model::state::persist::Outcome::Read);
+            assert_eq!(restored.player[0].fighter_kind, -1);
+            assert_eq!(restored.player[0].held_item, None);
+            assert_eq!(restored.player[1].held_item, Some(model::state::held_item::HeldItem::Item {
+                choice: 29, variation: 7, lifetime: -1, lifetime_max: -1, fuse: -1, fuse_max: -1
+            }));
+            assert!(restored.cpu.iter().all(|record| record.held_item.is_none()));
+            // Continue with a different legacy variation: neither a conversion nor boot may overwrite it.
+            let before = restored.clone();
+            assert_eq!(model::state::convert::convert_file(&mut restored, 9), 0);
+            assert_eq!(restored, before);
+            assert!(matches!(run_blocking(Roots { source: &source, dest: &dest }, 17, "0.1.0", &mut |_| {}), Stage::MarkerPresent));
+        }
+        let source_hash = sha256_hex(&fs::read(source.join("save_states.json")).unwrap());
+        assert_eq!(source_hash, expected["source_sha256"].as_str().unwrap());
+        let receipt = serde_json::json!({
+            "phase": phase, "pid": std::process::id(), "started_ns": started, "finished_ns": stamp(),
+            "save_sha256": sha256_hex(&fs::read(dest.join("save_states.json")).unwrap()),
+            "marker_sha256": sha256_hex(&fs::read(dest.join("migration.json")).unwrap()), "source_sha256": source_hash
+        });
+        write(&root.join(format!("{phase}-process.json")), &serde_json::to_vec(&receipt).unwrap());
+        return;
+    }
+    let t = Tmp::new();
+    let mut source: Value = serde_json::from_str(&saves(-1, 0x2d)).unwrap();
+    source["player"][1]["fighter_kind"] = 7.into();
+    source["cpu"][1]["fighter_kind"] = 0x2d.into();
+    let bytes = serde_json::to_vec(&source).unwrap();
+    write(&t.fork().join("save_states.json"), &bytes);
+    let mut selection = vec![0; 17];
+    selection[16] = 1;
+    write(&t.fork().join("training_modpack_menu.conf"), &serde_json::to_vec(&serde_json::json!({"menu": {"character_item": selection}})).unwrap());
+    source["player"][1]["held_item"] = serde_json::json!({"state":"item", "choice":29, "variation":7, "lifetime":-1, "lifetime_max":-1, "fuse":-1, "fuse_max":-1});
+    write(&t.0.join("expected.json"), &serde_json::to_vec(&serde_json::json!({"copy": source, "source_sha256": sha256_hex(&bytes)})).unwrap());
+    let exe = std::env::current_exe().unwrap();
+    let launch = |phase| {
+        let start = stamp();
+        let result = std::process::Command::new(&exe).args(["--exact", NAME, "--nocapture"])
+            .env(ROOT, &t.0).env(PHASE, phase).output().unwrap();
+        assert!(result.status.success(), "{phase}: {}{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+        (start, stamp())
+    };
+    let (save_started, save_exited) = launch("save");
+    let (restore_started, restore_exited) = launch("restore");
+    let load = |phase| serde_json::from_slice::<Value>(&fs::read(t.0.join(format!("{phase}-process.json"))).unwrap()).unwrap();
+    let (saved, restored) = (load("save"), load("restore"));
+    assert_ne!(saved["pid"], restored["pid"]);
+    assert!(save_exited.parse::<u128>().unwrap() <= restore_started.parse::<u128>().unwrap());
+    for key in ["save_sha256", "marker_sha256", "source_sha256"] {
+        assert_eq!(saved[key], restored[key], "durable {key} unchanged after fresh-process continuation");
+    }
+    println!("N6 fresh-process evidence {}", serde_json::json!({"save": saved, "restore": restored,
+        "save_launch_ns":save_started, "save_exit_observed_ns":save_exited,
+        "restore_launch_ns":restore_started, "restore_exit_observed_ns":restore_exited,
+        "saver_success_before_restore_launch":true, "equal_persisted_hashes":true}));
+}
+
+#[test]
 fn migration_item_on_load_never_overwrites_a_snapshot_or_an_existing_save() {
     let t = Tmp::new();
     fork_folder(&t);
