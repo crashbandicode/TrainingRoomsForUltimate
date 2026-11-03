@@ -1,8 +1,9 @@
 # RC compliance evidence map
 
-2026-11-03, reviewed packaging map updated by the lead. Latest development compilation is frozen r16 758cee5; root HANDOFF.md records
-exact source/diagnostic identities and targeted gates. Modified-path qualification completed08:31 UTC; r16 runtime lanes are underway.
-Their results do not establish final-candidate acceptance. The final release candidate remains unaccepted.
+2026-11-03 11:01 UTC: RC reset and three-phase operator order supersede the old359-row final acceptance references below. Current product661f7ad incorporates the coupled freeze removals; final native-editor exposure closure and the coherent gate/runtime wave remain pending. Latest compiled development evidence is r18 f1db4cb, not a release candidate. All historical scoped evidence/failures below remain unchanged.
+
+Phase1 final acceptance is the STATUS RC RESET PLAN: M5q actual functional passes, already-working UI, one full replay A/B and one LDN session, zero total Unmapped/no new crash, preserved zero-hook-allocation fixes, unchanged size/stack/lint/provenance gates and explicit final-release checker. S2/B4/B7/HB1 belong to later Phase3 and do not block RC. Three physical starts are planned, with shared replay/online processes. No final gate or compliance completion is claimed here.
+
 This maps the **30 agent rows** emitted by playbook `2dee6cc` when no matching
 release NRO is supplied: one binary row plus 29 explicit agent rows.
 It does not replace the full playbook checklist or mark the RC ready.
