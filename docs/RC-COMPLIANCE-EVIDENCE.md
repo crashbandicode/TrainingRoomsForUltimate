@@ -99,3 +99,34 @@ Unmapped, measured stack margins, size/carry/lint gates, proper rulesets and
 the evidence workflow. Those remain required even when not separate rows in
 the checker. Historical failures, including SH first-pass rejection and UI's
 TraceWriter margin failure, must remain visible beside later regression results.
+
+## Reviewed development evidence, 2026-11-03 07:50Z
+
+The qualified diagnostic remains frozen r15 ab13a0f. Main96da3a4 adds the
+count-promotion root fix and is not yet native-qualified. These are scoped
+updates to rows3,11–19,21 and24, not final closures or a new checker run.
+
+- main-r15/lead-sh02-audit.json independently verifies69files,32 zero-allocation
+  hook samples and zero total Unmapped. Both original first-pass failures
+  positively request11 emitters with8 available. Eventual retry success does
+  not close Hitbox acceptance. Full1600profile/19harness restore is verified.
+- main-r15/lead-ui20-audit.json independently verifies47files/90178211bytes,
+  full7846-line console,165 zero-allocation hook samples, zero total Unmapped,
+  contiguous diagnostics1..910 and full1362profile/14harness restoration.
+  Startup notice contrast, developer toggle polarity and waiting-room text
+  failed. Six saved-Mii constructor observations establish context only;
+  coherent snapshot/provider ownership remains open. Failure GIFs are not
+  corrected-feature media and do not close row22.
+- main-r15/lead-f639-failure-audit.json preserves the failed early bootstrap,
+  58files and full1600profile/18harness restoration. No accepted transaction
+  or paired performance result occurred. Fresh41/42 use the same bounded
+  catalog-and-owner qualification in both lanes and retain startup cost.
+- main-r15/lead-count-marker-host-audit.json verifies all1203 worker source
+  files, actual executed ELF19a41a7c and raw log5bd29f15: five targeted tests
+  pass, zero fail/ignored,1277 filtered. Main patch78e82fff applies as96da3a4;
+  all eight after-hashes and253 carried files match. Full native qualification
+  and runtime count/lifetime regression remain owed.
+
+All artifact paths above are beneath artifacts/trainingrooms-lead-astra4/.
+Final release identity, full gates, all359 regression rows, online/LDN,
+corrected media and explicit agent-row dispositions remain open.
