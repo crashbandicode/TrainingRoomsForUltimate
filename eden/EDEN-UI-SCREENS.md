@@ -156,3 +156,111 @@ profile restore. The helper-path boot hold is still binding.
 - Change a delay range and another page row; page X saves current defaults. Change them again, then Y restores only the focused complete delay row (checklist plus range).
 - ZR resets every settings row on the current page, preserving other pages and INI-held shortcuts/replay-capture settings.
 - Close, restart, and verify both current and defaults snapshots survive; resetting does not overwrite defaults. Specialized popup/grid X/Y/ZR actions retain their existing meanings.
+
+## ui17 r10 evidence and next acceptance route — 2026-11-03
+
+Runtime source `d9e1cd35ac087d26e1c63122b43763724d7e69a2`, diagnostic NRO
+`7af7fb32cc2764ee155e4fafc11805527b2967a4d7a4a7a229ce1a1d44ca0fa2`,
+ELF `a779278f57b2fef0b94a31b83992abaff015a9e832919a756bdf786c43023b96`.
+The Ally run `live-ui-17` completed its bounded batch and was explicitly stopped.
+The complete console SHA256 is
+`fe0cb99a70a74b5fc4da7627d8f417b4f5a10278f372ae3ef60e5b4f7960b5b2`.
+
+- Physical A on Fighter Mismatch / Keep current fighter entered the replay
+  editor; physical B returned to Training. This qualifies the `7638954` handover
+  correction without a diagnostic confirmation command.
+- X saved Input Delay 2, Y restored it after a further change, and ZR reset the
+  page. Closing persisted current/default index 2 and HUD On. This batch does
+  not claim the separate fresh-process save-only or complete delay-range rows.
+- Two modified Training archive loads used the vanilla base, allocated zero
+  in the load hook, and retired after 5003 and 5000 ms. The existing archive
+  gate passes with `required_base="vanilla", minimum_handouts=2`.
+- The tested health scanner finds no panic/abort/crash/Unmapped lines. All 118
+  parsed hook samples have zero total and delta; the exercised UI hooks have
+  nonzero coverage. `run.json` retains peak 5,493,469,184 B and explicit Job-kill
+  exit 137; its `reason=crashed` is not a spontaneous-crash verdict.
+- The external probe completed, with measured stack usage 151,920 B. The
+  policy requires 208,896 B (204 KiB), so the old 196 KiB allocation is not
+  accepted merely because `low=false`. The next candidate needs the measured
+  table update and qualification.
+
+The alleged missing labels in ui16/ui17 were a **false visual interpretation**.
+Six text regions in 44 original GIF frames are byte-identical to the complete
+baseline. This includes the historical Y/ZR sequences previously described as
+blank then recovered. No renderer workaround or extra observer is justified.
+The original claims and their correction remain in the progress/inbox history.
+This audit covers those captured regions/frames, not all possible output.
+
+Reproduce the evidence with the committed parsers below, through the required
+PowerShell/memory/time wrappers. These commands perform local analysis only:
+
+```text
+python3 -I tests/eden/test_analyze.py ScanTests HookStatsGateTests LayoutArchiveGateTests
+python3 -I eden/hook_stats.py eden/runs/ui-17/final/run/console.log ui_archive ui_pass_calculate ui_register_calculate menu_input menu_draw named_service roster_input
+python3 -I tests/eden/test_ui_glyph_audit.py
+python3 -I eden/ui_glyph_audit.py eden/runs
+```
+
+The first test command passes 14 tests; the glyph audit has three negative/control
+tests, including erased text in a middle frame followed by recovery. Health and
+B3 acceptance use the existing tested callables
+`tr_eden.scan_lines(console.splitlines())` and
+`hook_stats.gate_layout_archives(console, ["info_training"], required_base="vanilla", minimum_handouts=2)`.
+Importing the scanner does not authorize or invoke the legacy controller.
+`runs/ui-17/runtime-parser-receipt.json` binds parser/test hashes and results;
+`glyph/committed-parser-audit.json` binds every original GIF and frame comparison.
+No new metrics framework or native build was introduced.
+
+All 51 collected run/plugin/tile evidence files were checked against remote
+hashes. The run restored 122 native-save files, 29 ARCropolis files and 59 mod
+files exactly; standard restoration verified five plugins, two exefs files,
+87 ultimate files and Qt configuration with no mismatches. The original rig
+claim was restored, the fixture/set-aside were absent, Eden count was zero,
+and the canonical claim was released at 03:40Z. Receipts are under
+`runs/ui-17/restoration/`, `post-restore-state.json`, and `release.json`.
+
+### Next candidate prerequisites and bounded route
+
+Use the next lead-qualified coherent candidate, not a standalone build from
+this older stream. It must compose the Q15 constructor observer with `d029583`,
+the strict capacity verification ordering repair, and the measured Probe stack
+table. Retain its exact source/NRO/ELF/stack receipts before admission. Do not
+repeat the disproved glyph investigation or the native-VS lane owned by pkg4.
+
+1. **Same-boot Q15 observation.** Reuse the qualified integrated client and
+   `s5_walk` menu navigation. Enter native Training, capture its UI callback
+   reference samples, then Fighters & Stages → Mii Brawler → Add New… through
+   actual menu input. Retain the native editor screen, constructor observations,
+   current-thread/SP and registration/pass references from this same process.
+   Return through the actual editor exit and capture Training re-entry. Compare
+   constructor context against both known UI callbacks; absence or mismatch is
+   evidence, not permission to force the constructor onto a guessed thread.
+   This diagnoses the producer context only. Saved-list bust rendering still
+   needs the provider lifetime/identity implementation and its own acceptance.
+2. **Waiting-room prerequisite.** No qualified arena-entry macro exists in the
+   current TrainingRooms macro set. PRIMARY must name the approved host and
+   concrete native arena route before this row starts; Ally hosting is not
+   approved and its inbound Block remains unchanged. Reuse existing controller
+   actions with a screenshot gate at every native route transition; do not
+   invent a transport or claim an unexecuted route is qualified.
+3. **Waiting-room observations once admitted.** Bind the private waiting B3
+   fixture SHA `326f8341ed801372721c1ae70c85705dcc19584806a3f535638f1dd2d605f090`
+   to an owned mod manifest and preserve native/kept files before staging.
+   Require `info_waiting` registration, complete hosted panes, and practice
+   readiness before B+Up. Capture menu, notification/input-log host behavior,
+   native popup suspension, resume in the same lobby, and actual lobby departure.
+   Re-enter for a second archive handout/retirement, applying the same tested
+   B3 gate to `info_waiting`. A Training-only pass never substitutes for this.
+4. **Media and remaining UI rows.** During that admitted candidate batch,
+   record a continuous short clip with existing Eden recording controls around
+   a physical menu action, retaining start/action/result and a date/build caption.
+   Reuse the existing Setup/stage/defaults/roster rows above for the still-open
+   acceptance items; do not count host tests or old candidate screenshots as
+   final native acceptance. Stop at the bounded row deadline, collect full raw
+   outputs, restore native/kept/standard profile state, verify, then release.
+
+Final Cargo/native gates and final release compliance remain lead-owned. The
+development compliance update classifies every agent row and preserves the
+failed machine/history rows; this document does not mark the worker READY.
+
+Lead route disposition 2026-11-03: the next qualified UI batch uses the existing private Yoga rig after pkg4 restoration/release, private TLS enabled with exact Qt restoration, and screenshot-gated Quickplay/Solo waiting-room entry. See RC-ONLINE-PLAN.md. This supersedes the pending-host paragraph above for that bounded lane; arena-specific and two-console/LDN acceptance remain separate. No Ally hosting is authorized.
