@@ -334,7 +334,9 @@ fn run_inner() {
     }
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
-    let base_reports: [SiteReport; STATE_END + sites_pkg4::SITES.len()] = std::array::from_fn(|i| {
+    // Construct the already-owned report vector directly: an intermediate full array
+    // remains in the boot frame even while the synchronous loader fallback runs.
+    let mut reports: Vec<SiteReport> = (0..STATE_END + sites_pkg4::SITES.len()).map(|i| {
         if i < SITE_COUNT {
             SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
         } else if i < STATE_END {
@@ -343,8 +345,7 @@ fn run_inner() {
             let j = i - STATE_END;
             SiteReport { site: sites_pkg4::SITES[j].name, found: found4[j], written: written4[j] }
         }
-    });
-    let mut reports: Vec<SiteReport> = base_reports.to_vec();
+    }).collect();
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
     reports.extend(hitbox::reports(&hb_found, &hb_written));
