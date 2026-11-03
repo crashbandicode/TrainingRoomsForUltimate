@@ -126,6 +126,16 @@ Upstream order differed in two ways that the clean room must not copy: it regist
 
 ## 6. Edge cases and interactions
 
+**Primary clarification, 2026-11-03 (DECISIONS: asynchronous Developer reload):**
+The per-frame developer-config read described here and in §2 is represented by
+one counted request for each qualifying held-L+R+A P1 poll, processed on the
+existing worker. No filesystem I/O or heap allocation occurs in the hook.
+The worker uses bounded batches and reports requested/completed/pending/dropped
+counts, errors and lag/overflow. Row/page Off cancels outstanding work. Requests
+are not coalesced; read timing and completed count at shutdown may differ from
+the synchronous description. The configuration struct remains empty. This is
+a primary policy decision, not an operator-level hook-filesystem exception.
+
 - **Missing `libnro_hook.nro`:** upstream and fork panic (`expect("Did not find nro_hook plugin!")`), which opens the error applet. Playbook rule: a missing provider is a logged skip. Recommendation: log `provider=libnro_hook result=missing`, skip the three `common` hooks and the unload callback, and run with the shield/DI/tech features that need them off; show one notification. Q4.
 - **Missing `libparam_hook.nro`:** fork logs `provider=libparam_hook result=skipped reason=plugin_missing` and continues (the shield parameter installer null-checks the parameter pointer). Required behaviour.
 - **Another plugin on the same site:** HOOK-SHARING rules. Known coexistence facts the fork measured: Deluxe ≥ 0.3.1 function-hooks the UI pass entry `main+0x375e260` with a 16-byte far-jump stub; the fork therefore never requires the entry words and locates the pass by a needle starting 0x14 bytes in (REVISION30). The two anchor sites, the layout-archive site and the fighter thunks were uncontested on the operator's card as of 2026-10-31; re-run the card scan before choosing sites.

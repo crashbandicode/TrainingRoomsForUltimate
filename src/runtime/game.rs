@@ -286,6 +286,16 @@ pub mod natives {
         at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
 
+    /// Guarded fighter-kind query for the hidden Developer debug hook.
+    pub unsafe fn fighter_kind(accessor: usize) -> i32 {
+        at::<extern "C" fn(usize) -> i32>(sites_pkg2::UTILITY_GET_KIND_OFFSET).map_or(-1, |f| f(accessor))
+    }
+
+    /// Owned ELF 1655610: const accessor argument, inverted flag bit0 result.
+    pub unsafe fn backshield_visible(accessor: usize) -> bool {
+        at::<extern "C" fn(usize) -> bool>(crate::model::developer_debug::BACKSHIELD_VISIBLE_OFFSET).is_some_and(|f| f(accessor))
+    }
+
     /// `WorkModule::get_param_float(accessor, param type hash, param hash)`.
     pub unsafe fn get_param_float(accessor: usize, kind: u64, name: u64) -> f32 {
         at::<extern "C" fn(usize, u64, u64) -> f32>(sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, kind, name))

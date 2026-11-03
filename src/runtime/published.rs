@@ -93,6 +93,8 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);
     HUD.store(snapshot.hud(), Ordering::Release);
+    crate::runtime::developer::publish(snapshot);
+    crate::runtime::developer_reload::publish(snapshot);
 }
 
 pub fn input_delay() -> u8 {

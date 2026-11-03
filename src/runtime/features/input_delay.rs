@@ -87,6 +87,7 @@ fn apply() {
     }
     // The menu reads P1 before the delay (SPEC-core-03 §4.1 sub-handler order); it sets the MENU owner,
     // which makes the poll below output neutral.
+    unsafe { crate::runtime::developer_reload::on_poll(slot, pending.controller(&NativeTls)) };
     ui::input::on_p1_poll(holder);
     // Package 6: the roster's cycle chords and the Kirby hat shortcut see P1's record before the delay (and may consume the chord).
     if slot == 0 {

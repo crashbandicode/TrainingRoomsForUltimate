@@ -100,6 +100,8 @@ hook_ids! {
     MenuDraw => "menu_draw",
     MenuThumbs => "menu_thumbs",
     MacroPanel => "macro_panel",
+    DeveloperFloat => "developer_float",
+    DeveloperBackshield => "developer_backshield",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

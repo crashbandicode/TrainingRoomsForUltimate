@@ -7,6 +7,8 @@
 mod alloc;
 mod boot;
 mod clock;
+mod developer;
+mod developer_reload;
 mod compat;
 pub(crate) mod diag_log;
 #[cfg(feature = "diag")]

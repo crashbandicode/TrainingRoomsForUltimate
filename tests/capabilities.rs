@@ -107,6 +107,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
         "stage_hazards" => Some(Feature::StageHazards),
         "recorder" => Some(Feature::Recording),
         "notices" => Some(Feature::Notices),
+        "developer" => Some(Feature::DeveloperDebug),
         "states" | "state_restore" => Some(Feature::StateCore),
         "anchors" | "archive" => Some(Feature::Ui),
         "cpu_pilot" => Some(Feature::P1Cpu),

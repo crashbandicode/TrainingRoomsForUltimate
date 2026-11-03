@@ -184,6 +184,7 @@ fn run_inner() {
     #[cfg(not(feature = "diag"))]
     let poison_text = String::new();
     let hb_found = hitbox::check(&|name| poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == name));
+    let developer_found = crate::runtime::developer::check();
     let mut u4_found = [GuardOutcome::Stock; sites_u4::SITES.len()];
     for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
         *slot = site.outcome(&game::read_window(site.offset));
@@ -203,6 +204,7 @@ fn run_inner() {
             .or_else(|| by_name(&sites_u4::SITES, &u4_found))
             .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
             .or_else(|| by_name(&sites_hitbox::SITES, &hb_found))
+            .or_else(|| by_name(&crate::model::developer_debug::SITES, &developer_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -332,6 +334,10 @@ fn run_inner() {
     } else {
         diagnostic(format_args!("[TrainingRooms] roster cycle not started: a game function it calls failed its site guard"));
     }
+    let developer_debug_on = crate::runtime::developer::install(
+        developer.developer_page, capabilities::unit_usable(Feature::DeveloperDebug, &usable),
+    );
+
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     // Construct the already-owned report vector directly: an intermediate full array
@@ -349,6 +355,7 @@ fn run_inner() {
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
     reports.extend(hitbox::reports(&hb_found, &hb_written));
+    reports.extend(crate::runtime::developer::reports(&developer_found, developer_debug_on));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
     let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
@@ -361,6 +368,7 @@ fn run_inner() {
     // Q7 / L1: the Replay capture row on the Deluxe Plugins page (registered from the layer install above).
     let (deluxe_on, deluxe_reason) = crate::runtime::deluxe_row::report();
     let features = [
+        report(Feature::DeveloperDebug, developer_debug_on, (!developer.developer_page).then_some("page_disabled")),
         report(Feature::InputDelay, input_delay_on, input_delay_reason),
         report(Feature::LraReset, lra_on, None),
         report(Feature::StageHazards, hazards_on, None),

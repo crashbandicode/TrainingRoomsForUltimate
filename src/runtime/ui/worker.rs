@@ -188,6 +188,7 @@ const POLL: std::time::Duration = std::time::Duration::from_millis(33);
 fn run() {
     let _ = WORKER.set(std::thread::current());
     let mut session = Session::default();
+    let mut developer_reload = crate::runtime::developer_reload::Worker::default();
     loop {
         // Retire departing layer state before accepting a new scene's panel input.
         crate::runtime::macros::port::worker_events();
@@ -204,7 +205,8 @@ fn run() {
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
         sync_panels(&mut session);
-        if session.watching() {
+        let developer_pending = developer_reload.step();
+        if session.watching() || developer_pending {
             std::thread::park_timeout(POLL);
         } else {
             std::thread::park();

@@ -31,6 +31,10 @@ pub mod chords;
 pub mod damage_display;
 #[path = "model/developer_ini.rs"]
 pub mod developer_ini;
+#[path = "model/developer_debug.rs"]
+pub mod developer_debug;
+#[path = "model/developer_reload.rs"]
+pub mod developer_reload;
 #[path = "model/diag_ring.rs"]
 pub mod diag_ring;
 #[path = "model/factory.rs"]

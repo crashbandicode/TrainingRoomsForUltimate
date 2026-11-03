@@ -97,6 +97,7 @@ features! {
     CpuShieldDamage => "cpu_shield_damage",
     /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
     CpuCamera => "cpu_camera",
+    DeveloperDebug => "developer_debug",
 }
 
 /// One guarded site.
