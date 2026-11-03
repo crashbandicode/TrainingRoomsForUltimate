@@ -46,6 +46,16 @@ These describe the intended feature set. The remaining screen, multi-CPU ownersh
 rows are tracked in the handoff. Verified
 demonstration footage will be added after those rows pass on the candidate.
 
+## Waiting-menu development preview
+
+![Opening the TrainingRooms menu in Solo waiting and changing its page](docs/media/waiting-menu-r16.gif)
+
+Recorded 2026-11-03 in Eden with development build `758cee5` (r16,
+NRO `88abde8e`). The 9.5-second clip shows Solo waiting, opening the menu
+with B+Up, and changing page with R. This demonstrates the waiting-menu text
+fix; it does not establish release or online-regression acceptance.
+[Recording provenance and limits](docs/UI-DEMO-PROVENANCE.md).
+
 ## Architecture and saved data
 
 The plugin follows the workspace playbook layout: a `cdylib` only; pure logic in
