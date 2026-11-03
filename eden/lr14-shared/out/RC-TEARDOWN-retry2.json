@@ -1,0 +1,12 @@
+{
+  "id": "RC-TEARDOWN-retry2",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "e3f334d0fcfae8ac0c67d1b887d3cc3c72fa31a6bfc0d9719ccdeeb967968c6f",
+  "started": 1793749049.1532316,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('UI route did not finalize within pending construction; see pending-window.json')",
+  "ended": 1793749097.0686386
+}

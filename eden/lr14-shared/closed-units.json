@@ -1,0 +1,16 @@
+[
+  {
+    "key": "yoga",
+    "unit": "eden-life-ef5fef578728455bb38d929033234eb9-yoga.service",
+    "state": {
+      "ActiveState": "failed",
+      "MainPID": "0",
+      "Result": "signal",
+      "ExecMainCode": "2",
+      "ExecMainStatus": "9",
+      "ControlGroup": "",
+      "MemoryPeak": "7131791360",
+      "KillMode": "mixed"
+    }
+  }
+]

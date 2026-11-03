@@ -1,0 +1,35 @@
+{
+  "id": "06-lucas",
+  "start": "cpu-held74",
+  "end": "ready",
+  "evidence": [],
+  "manifest_sha256": "ae9978c3ad1ce5f097559ca7d1bf5aaf0dab2972526df595353acd38f707a9fb",
+  "started": 1793748602.907091,
+  "results": [
+    {
+      "play": "cpu74-lucas",
+      "on": "yoga"
+    },
+    {
+      "gate": "lucas",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "settled screen=css at=39 hovered=39"
+      }
+    },
+    {
+      "play": "lucas-pick",
+      "on": "yoga"
+    },
+    {
+      "gate": "ready",
+      "on": "yoga",
+      "evidence": "/home/intpa/eden-runs/lr-14/out/06-lucas/yoga-233013Z-234384-gate-ready.png"
+    },
+    {
+      "shot": "/home/intpa/eden-runs/lr-14/out/06-lucas/yoga-233014Z-148086-ready.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793748614.217982
+}

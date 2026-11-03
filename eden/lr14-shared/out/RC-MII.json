@@ -1,0 +1,55 @@
+{
+  "id": "RC-MII",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ae9978c3ad1ce5f097559ca7d1bf5aaf0dab2972526df595353acd38f707a9fb",
+  "started": 1793748622.497859,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "first": {
+          "request": "646675061 #348 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 3, entry: 77630881792, sequence: 1 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "646675715 #374 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 3, entry: 77630881792, sequence: 1 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/eden-runs/lr-14/out/RC-MII/yoga-233042Z-451452-Donkey-Kong.png",
+          "settled_shot": "/home/intpa/eden-runs/lr-14/out/RC-MII/yoga-233044Z-439104-settled-Donkey-Kong.png"
+        },
+        "plan": "646675718 #376 [GroupSwap] plan owner=1 group=0 kinds=[4a] special=Mii bodies=1 ready_fighters=12 pool=5/24 reserve=6 hats=0 alias=0x11d78c2300 identity=Some((1, [69, 0, 2, 37]))",
+        "ready": {
+          "request": "646678902 #410 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 3, entry: 77630881792, sequence: 2 } outgoing=0x1 target=0x4a index=0 cursor=Some(1) mii=true",
+          "done": "646679400 #438 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 3, entry: 77630881792, sequence: 2 } target=0x4a physical=0x4a index=1 original=false mii=true resource_pair=Some(true) released=true",
+          "shot": "/home/intpa/eden-runs/lr-14/out/RC-MII/yoga-233045Z-188281-Mii-Gunner.png",
+          "settled_shot": "/home/intpa/eden-runs/lr-14/out/RC-MII/yoga-233051Z-140962-settled-Mii-Gunner.png"
+        },
+        "canonical": [
+          null,
+          null,
+          "4a00000000000000000000000000000000000000000000000000000000000000000000000000000002014040000000000000690501040b040303020c1305030007020b0a000b211302000d080000040a0008040a000402140000000000022577f4ac661aeaa5efa90f871dab5712"
+        ],
+        "identity_limit": "full setup trace review required",
+        "tuple_points": [
+          {
+            "id": "3"
+          },
+          {
+            "id": "4"
+          },
+          {
+            "id": "5"
+          }
+        ],
+        "cpu_row": "0x85fce990",
+        "full_tuple_review": "Current-point/current-bank/time E+1aa..1b5 and paired outfit/hat getter returns must match saved identity",
+        "native_setup_point": {
+          "id": "6"
+        },
+        "setup_resource_expression": "[[0x8602d680]+0xf0]",
+        "setup_record_expression": "[[[0x866446a0]]+0x24d0]"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793748651.0310564
+}

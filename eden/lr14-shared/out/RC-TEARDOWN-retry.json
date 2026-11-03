@@ -1,0 +1,12 @@
+{
+  "id": "RC-TEARDOWN-retry",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "11a151015833b64ee95e787fc940c8206278eb1e6a304e00e2da3ee1a237c84c",
+  "started": 1793748970.9820957,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('macro.play on yoga: {\\'error\\': {\\'code\\': \\'invalid_file\\', \\'message\\': \\'events[0]: missing key \"motion\"\\'}, \\'id\\': \\'e71773cefb2048bfa587efae28a410c7\\', \\'ok\\': False}')",
+  "ended": 1793749001.837419
+}

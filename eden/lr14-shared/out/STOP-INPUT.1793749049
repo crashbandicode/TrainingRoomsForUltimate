@@ -1,0 +1,1 @@
+RC-TEARDOWN-retry: RuntimeError('macro.play on yoga: {\'error\': {\'code\': \'invalid_file\', \'message\': \'events[0]: missing key "motion"\'}, \'id\': \'e71773cefb2048bfa587efae28a410c7\', \'ok\': False}')

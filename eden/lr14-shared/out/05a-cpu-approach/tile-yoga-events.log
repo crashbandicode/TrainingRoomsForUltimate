@@ -1,0 +1,5 @@
+12413706731838 plugin=ssbu-tile-cursor/0.1.0 hooks=css,sss,cursor_query heap_allocations=0
+12415190453018 screen=sss tiles=116 heap_allocations=0
+12415280317190 screen=css tiles=87 heap_allocations=0
+12415314977828 step screen=css dir=up from=none to=78 token=p1 x=-576.0 y=-77.0
+12415318203475 settled screen=css at=78 hovered=78 x=-576.0 y=-77.0

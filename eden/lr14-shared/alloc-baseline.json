@@ -1,0 +1,41 @@
+[
+  {
+    "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5q/eden/A/live-m5qa-b1/sd/ultimate/TrainingModpack/practice-diagnostics.log",
+    "sha256": "ee19bca27a1a8c83963fbce5451d4e8557587389ecb9cb9a5f2cc5ad79be007d",
+    "rows": [
+      {
+        "line": 80,
+        "counters": {
+          "heap_allocations": "unmetered"
+        },
+        "context": "unchecked,turnip.item_peach_selection+0x40:unchecked,turnip.item_peach_selection+0x80:unchecked,turnip.item_daisy_selection:unchecked,turnip.item_daisy_selection+0x40:unchecked,turnip.item_daisy_selection+0x80:unchecked,turnip.item_peach_consumer:unchecked,turnip.item_peach_consumer+0x40:unchecked,turnip.item_daisy_consumer:unchecked,turnip.item_daisy_consumer+0x40:unchecked,console_map.attribute_fn:unchecked,console_map.attribute_fn+0x40:unchecked,console_map.attribute_fn+0x80:unchecked,console_map.attribute_fn+0xc0:unchecked,console_map.attribute_result:unchecked,console_map.svc_return:unchecked,console_load.load_entry:unchecked,console_load.pins_347220:unchecked,console_load.pins_347220+0x40:unchecked,console_load.pins_347220+0x80:unchecked,console_load.pins_347220+0xc0:unchecked,console_load.pins_347370:unchecked,console_load.pins_347370+0x40:unchecked,console_load.pins_347370+0x80:unchecked,console_load.pins_347370+0xc0:unchecked,console_load.pins_347470:unchecked,console_load.pins_347470+0x40:unchecked,console_load.pins_347470+0x80:unchecked,console_load.pins_347470+0xc0:unchecked,console_load.pins_347470+0x100:unchecked,console_load.pins_347470+0x140:unchecked,console_load.pins_347470+0x180:unchecked,console_load.pins_347470+0x1c0:unchecked,console_load.pins_347470+0x200:unchecked,console_load.pins_347470+0x240:unchecked,console_load.pins_330a90:unchecked,console_load.pins_330a90+0x40:unchecked,console_load.pins_330a90+0x80:unchecked,console_load.pins_330b20:unchecked,console_load.item_pre:unchecked,console_load.item_post:unchecked,console_load.nrr_pre:unchecked,console_load.nrr_post:unchecked,console_load.nrr_unregister:unchecked] authoritative_images=[training,turnip_identity] foreign=none heap_allocations=unmetered ring_dropped=0 ring_truncated=0 ring_lines=79"
+      }
+    ]
+  },
+  {
+    "path": "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5q/eden/S/s85/console.log",
+    "sha256": "07e9055dc4b69ab11759f52e6a452b319b6098be0b7fe03f53c69a11bfdb1d93",
+    "rows": [
+      {
+        "line": 7760,
+        "counters": {
+          "heap_allocations": "unmetered"
+        },
+        "context": "unchecked,turnip.item_peach_selection+0x40:unchecked,turnip.item_peach_selection+0x80:unchecked,turnip.item_daisy_selection:unchecked,turnip.item_daisy_selection+0x40:unchecked,turnip.item_daisy_selection+0x80:unchecked,turnip.item_peach_consumer:unchecked,turnip.item_peach_consumer+0x40:unchecked,turnip.item_daisy_consumer:unchecked,turnip.item_daisy_consumer+0x40:unchecked,console_map.attribute_fn:unchecked,console_map.attribute_fn+0x40:unchecked,console_map.attribute_fn+0x80:unchecked,console_map.attribute_fn+0xc0:unchecked,console_map.attribute_result:unchecked,console_map.svc_return:unchecked,console_load.load_entry:unchecked,console_load.pins_347220:unchecked,console_load.pins_347220+0x40:unchecked,console_load.pins_347220+0x80:unchecked,console_load.pins_347220+0xc0:unchecked,console_load.pins_347370:unchecked,console_load.pins_347370+0x40:unchecked,console_load.pins_347370+0x80:unchecked,console_load.pins_347370+0xc0:unchecked,console_load.pins_347470:unchecked,console_load.pins_347470+0x40:unchecked,console_load.pins_347470+0x80:unchecked,console_load.pins_347470+0xc0:unchecked,console_load.pins_347470+0x100:unchecked,console_load.pins_347470+0x140:unchecked,console_load.pins_347470+0x180:unchecked,console_load.pins_347470+0x1c0:unchecked,console_load.pins_347470+0x200:unchecked,console_load.pins_347470+0x240:unchecked,console_load.pins_330a90:unchecked,console_load.pins_330a90+0x40:unchecked,console_load.pins_330a90+0x80:unchecked,console_load.pins_330b20:unchecked,console_load.item_pre:unchecked,console_load.item_post:unchecked,console_load.nrr_pre:unchecked,console_load.nrr_post:unchecked,console_load.nrr_unregister:unchecked] authoritative_images=[training,turnip_identity] foreign=none heap_allocations=unmetered ring_dropped=0 ring_truncated=0 ring_lines=78"
+      }
+    ]
+  },
+  {
+    "path": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/events.log",
+    "sha256": "b81c4670ae127449b1d3c55edf0b27d6c94d842f57ecdcade71f0bc35fb4eaef",
+    "rows": [
+      {
+        "line": 1,
+        "counters": {
+          "heap_allocations": "0"
+        },
+        "context": "set_rgb_partial_last=stock/checked effect_set_rate_last=stock/checked motion_animcmd_set_sleep_effect=stock/checked sv_battle_object_module_accessor=stock/checked hitbox_attack_stack=stock/checked hitbox_catch_stack=stock/checked developer_set_float=stock/far developer_backshield=stock/checked developer_debug=installed input_delay=installed lra_reset=installed stage_hazards=installed reset_hub=installed cpu_core=installed cpu_defence=installed cpu_ledge=installed cpu_tech=installed cpu_shield=installed cpu_mash=installed cpu_shield_damage=installed cpu_camera=installed cpu_common=not_installed reason=awaiting_common_nro state_core=installed hitbox=installed chords=installed input_display=installed recording=installed notices=installed ui=installed p1_cpu=not_installed reason=standalone_pilot_present ui_texture=installed named_macros=installed live_replay=installed deluxe_row=installed macros_port=not_installed reason=preview_restore=temporary_checkpoint roster=installed seams=277 seams_stock=270 seams_other=[group_swap.task_wait,lifecycle.reload_entry,lifecycle.destruction_entry,mii_ordinary_gate.called_652160,mii_saved_fingerprints.called_653240,replay.write_record:shared] seams_skipped=[lobby_stage.resource_request:occupied,practice_stage.stage_update:stock,practice_stage.update_fields:stock,practice_stage.item_manager:stock,practice_stage.item_predicate:stock,practice_stage.item_predicate+0x40:stock,practice_stage.item_list_init:stock,practice_stage.item_list_init+0x40:stock,practice_stage.scene_fields:stock] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked=307 seams_images_unchecked=12 developer=on reason=on settings: input_delay=2 lra_reset=on stage_hazards=off migration=none captures=done skipped_staging=0 result=installed heap_allocations=0"
+      }
+    ]
+  }
+]

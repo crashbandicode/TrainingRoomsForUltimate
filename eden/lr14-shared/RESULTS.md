@@ -1,0 +1,18 @@
+# lr14 — 2026-11-03; grouped Yoga lead rows; phase NOT READY
+Frozen RC8 `cf4bf44`; product source/Cargo/toolchain diff empty. Playbook `582841c`; canonical eden_test/runner/lifecycle, same-boot corrections only.
+Diagnostic NRO `/home/intpa/tr-lr04-inputs/files/libtraining_rooms.nro`, SHA256 `3ca7f0c5c9e5552be4725050949b1ba96266cf4f5875bef660f94ba9b323e9e4`.
+Eden `/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage`, SHA256 `6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb`.
+RC-BOOT zero/health PASS: install `out/RC-BOOT-allocation/`; post-row `out/RC-BOOT-postrows.json` #2579 heap_allocations=0, #2580 allocations=0/delta=0; clean full console/unit journal.
+M5q numerical comparison DEFERRED: retained installs explicitly unmetered (`alloc-baseline.json`, `alloc_compare.py`); no invented delta. Primary accepts TR zero as no-worse-than a nonnegative baseline.
+RC-MII missing bound tuple PASS for CPU Gunner bank: setup point6 sequence62/frame7995, alias11d78c2300, E index1/tokens69,0,2,37/specials0,0,0,0; setup/resource mirrors and masked record1 agree; native tagged outfit/hat getters match canonical.
+MII plan#376→bank-ready#438 (mii/resource_pair/released); settled body/HUD reviewed. `out/RC-MII.json`, `tuple-observation.json`, `trace-review.json`, `review-media/`; no all-class or untraced D-mirror claim.
+RC-HATS FAILED/product defect: helper#778 ready, Mario#781 confirmed; second-copy lookup point7 sequences102–103 returns x0=1, miscast as BattleObject pointer by game.rs:414/common.rs:176; native cleanup point8 not reached. `out/RC-HATS.json`, `hats-trace.json`.
+RC-TEARDOWN interrupted×3 DEFERRED:22-frame route never quit;44/36-frame routes quit/re-entered after construction settled, including explicit Sora/Kazuya/Sephiroth three-body plan#2325→built#2432→finalize#2441. No pending drain; no general UI-impossibility claim (`out/RC-TEARDOWN*/`, `trace-review.json`).
+R3 DEFERRED independent renderer-unavailable producer: fixture absent in frozen binary. Menu open#502/close#508; native pause#516→#517/leak0#518, retirement/re-entry#612/#619 positive (`out/R3-independent-pause.json` and logs).
+Receipt accounting:15PASS/7FAILED, including retained PATH-python/PIL failure and malformed-motion macro refusal; two gated recoveries PASS. Runner PASS is execution only. `closure.json` excludes project-state.json from row counts.
+Down PASS: cleanup_failures[], restore+SEPARATEverify equal/snapshot_equal21410; RELEASED23:45:00.217971Z, about17m08s after Up started; timing/lifecycle actions retained.
+Shutdown health PASS: main-firstTERM→KILL, KillMode=mixed, Result=signal/Code2/status9, MainPID0/emptycgroup; full console and exact-unit journal0Unmapped/SIGBUS/core-dump/fatal/panic/abort/crash. game.stop timeout retained, not graceful shutdown.
+Harvest0segments/0gates. Final manifest dry-run READY15rows/59gates/0errors; initial14rows READY; two evidence-parser tests PASS; Python syntax PASS. All22 receipt manifests/executed project sources retained in `executed/` and raw archive.
+Reproduce: `/usr/bin/python3 -I eden/lr14-shared/review_trace.py`; `test_evidence.py`; `close_review.py <raw archive directory>`. Full raw media/lifecycle: `artifacts/trainingrooms-lead-astra4/rc8/lr14-shared/` from workspace root.
+Generic RESULTS generator overcounts project-state and reports initial manifest/last-retry timing; original generated report retained in raw archive; gap posted to Primary.
+Next: operator decides HATS fix; Primary adjudicates remaining TEARDOWN/R3 and owns phase compliance. No further boot queued; no product changes, push, tag, release, card or DBI actions.

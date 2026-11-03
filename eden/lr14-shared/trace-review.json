@@ -1,0 +1,328 @@
+{
+  "mii": {
+    "expected": {
+      "specials": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "colour": 2,
+      "voice": 37,
+      "outfit_hash40": 113391760503,
+      "hat_hash40": 67275564522
+    },
+    "bank": "0x11d78c2300",
+    "reads": [
+      {
+        "sequence": "62",
+        "frame": "7995",
+        "resource": "0x11d78c2358",
+        "e": {
+          "index": 1,
+          "tokens": [
+            69,
+            0,
+            2,
+            37
+          ],
+          "specials": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "fe": [
+          1,
+          69,
+          0,
+          2,
+          37
+        ],
+        "owner_index": 1,
+        "owner_tokens": [
+          69,
+          0,
+          2,
+          37
+        ],
+        "masked_charinfo_matches": true,
+        "specials_match": true,
+        "colour_voice_match": true,
+        "mirrors_match": true,
+        "getters": [
+          {
+            "point": "3",
+            "expected": "0x1300451a66acf477",
+            "matching_returns": [
+              {
+                "sequence": "5",
+                "frame": "6645",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "7",
+                "frame": "6647",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "9",
+                "frame": "6649",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "25",
+                "frame": "7803",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "30",
+                "frame": "7923",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "32",
+                "frame": "7938",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "37",
+                "frame": "7944",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "42",
+                "frame": "7944",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "46",
+                "frame": "7954",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "48",
+                "frame": "7956",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "50",
+                "frame": "7958",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "55",
+                "frame": "7993",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "59",
+                "frame": "7994",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "66",
+                "frame": "8011",
+                "value": "0x1300451a66acf477"
+              },
+              {
+                "sequence": "68",
+                "frame": "8013",
+                "value": "0x1300451a66acf477"
+              }
+            ]
+          },
+          {
+            "point": "4",
+            "expected": "0x5a00000fa9efa5ea",
+            "matching_returns": [
+              {
+                "sequence": "3",
+                "frame": "6643",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "11",
+                "frame": "6649",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "27",
+                "frame": "7803",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "34",
+                "frame": "7938",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "39",
+                "frame": "7944",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "44",
+                "frame": "7952",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "52",
+                "frame": "7958",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "57",
+                "frame": "7993",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "61",
+                "frame": "7994",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "64",
+                "frame": "8004",
+                "value": "0x5a00000fa9efa5ea"
+              },
+              {
+                "sequence": "70",
+                "frame": "8035",
+                "value": "0x5a00000fa9efa5ea"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "ready": "646679400 #438 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 3, entry: 77630881792, sequence: 2 } target=0x4a physical=0x4a index=1 original=false mii=true resource_pair=Some(true) released=true",
+    "scope": "CPU Gunner bank setup; native D mirrors and chara hash40 not independently captured"
+  },
+  "hats": {
+    "lookup": [
+      {
+        "backtrace": [],
+        "captures": [],
+        "core_id": 0,
+        "event": "entry",
+        "frame": "11187",
+        "locations": {
+          "0x7ca8b79588": "nro:4a70978d64714459be66007ddf4b8378692ee8f31d19507a600bc101e25c4eb4+0x13f588",
+          "0x82cd30b0": "main+0x1fca0b0"
+        },
+        "point_id": "7",
+        "process_id": "81",
+        "registers": {
+          "pc": "0x82cd30b0",
+          "x0": "0x11eab90880",
+          "x1": "0x1",
+          "x30": "0x7ca8b79588"
+        },
+        "schema": 1,
+        "sequence": "102",
+        "thread_id": "80",
+        "wall_time_ns": "1793748698506248045"
+      },
+      {
+        "backtrace": [],
+        "captures": [],
+        "core_id": 0,
+        "event": "return",
+        "frame": "11187",
+        "locations": {
+          "0x7ca8b79588": "nro:4a70978d64714459be66007ddf4b8378692ee8f31d19507a600bc101e25c4eb4+0x13f588"
+        },
+        "point_id": "7",
+        "process_id": "81",
+        "registers": {
+          "pc": "0x7ca8b79588",
+          "x0": "0x1",
+          "x1": "0x1",
+          "x30": "0x7ca8b79588"
+        },
+        "schema": 1,
+        "sequence": "103",
+        "thread_id": "80",
+        "wall_time_ns": "1793748698506336928"
+      }
+    ],
+    "cleanup_counter": {
+      "abandoned_returns": "0",
+      "address": "0x8189f770",
+      "dropped": "0",
+      "hits": "0",
+      "id": "8",
+      "matched": "0",
+      "mode": "records",
+      "process_id": "81",
+      "recorded": "0",
+      "return_overflow": "0",
+      "state": "armed",
+      "target": "main+0xb96770"
+    }
+  },
+  "teardown": [
+    {
+      "path": "out/RC-TEARDOWN/pending-window.json",
+      "prefetched": [
+        "646852301 #1009 [GroupSwap] prefetched owner=0 group=0 kinds=[5d, 5c, 58] us=666081 INSTALL_released=true map=9 tree=5"
+      ],
+      "build": "646856335 #1063 [GroupSwap] build owner=0 group=0 kinds=[5d, 5c, 58] special=None actors=1 R=0x120a9a1400 flags=0x0->0x1 refs=0->0 map=9 task_pending=0 pool_live=6 records=Some([0, 0, 0]) dispatch_detached=Some([11ec8d7b88, 11ec8d7b68]) identity=None mode=async reason=-",
+      "queue": "646856569 #1069 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cec1c0, 1180cec120, 1180cedf20] control_us=232078 us=233630; frames run until the tasks settle",
+      "built": "646857518 #1073 [GroupSwap] built owner=0 group=0 ok=true us=1182655 installed=3 pool_live=6->9 bodies=Some([Body { address: 76991001104, id: 393216 }, Body { address: 76991064912, id: 458752 }, Body { address: 76991128720, id: 524288 }]) map=0 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f12a0a28, 11f301af08]) mii_setup=None mode=async setup_us=532 queued_us=233630 settled_us=[532788, 782299, 1182093] ticks=71 max_tick_gap_us=23981",
+      "finalize": null,
+      "drain": null,
+      "build_to_pause_ms": 98,
+      "build_to_built_ms": 1183,
+      "build_to_finalize_ms": null,
+      "queue_to_built_ms": 949
+    },
+    {
+      "path": "out/RC-TEARDOWN-retry2/pending-window.json",
+      "prefetched": [
+        "647105002 #1523 [GroupSwap] prefetched owner=0 group=0 kinds=[5d, 5c, 58] us=633663 INSTALL_released=true map=9 tree=5"
+      ],
+      "build": "647108501 #1577 [GroupSwap] build owner=0 group=0 kinds=[5d, 5c, 58] special=None actors=1 R=0x11fccf3500 flags=0x0->0x1 refs=0->0 map=9 task_pending=0 pool_live=6 records=Some([0, 0, 0]) dispatch_detached=Some([11ec8d7f08, 11ec8d7ee8]) identity=None mode=async reason=-",
+      "queue": "647108735 #1583 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cede80, 1180cec1c0, 1180cedf20] control_us=233187 us=233291; frames run until the tasks settle",
+      "built": "647109484 #1587 [GroupSwap] built owner=0 group=0 ok=true us=982486 installed=3 pool_live=6->9 bodies=Some([Body { address: 76795802256, id: 393216 }, Body { address: 76795866064, id: 458752 }, Body { address: 76795929872, id: 524288 }]) map=0 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f505e568, 11f301b6c8]) mii_setup=None mode=async setup_us=74 queued_us=233291 settled_us=[450337, 616478, 982437] ticks=59 max_tick_gap_us=25005",
+      "finalize": "647109709 #1595 [GroupSwap] teardown owner=0 reason=finalize groups=1 bodies=2 contexts=2 routes=1 dispatchers=1 records=0 keys=0 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 7))",
+      "drain": null,
+      "build_to_pause_ms": 99,
+      "build_to_built_ms": 983,
+      "build_to_finalize_ms": 1208,
+      "queue_to_built_ms": 749
+    },
+    {
+      "path": "out/RC-TEARDOWN-retry3/pending-window.json",
+      "prefetched": [
+        "647237935 #1921 [GroupSwap] prefetched owner=0 group=0 kinds=[5d, 5c] us=499844 INSTALL_released=true map=6 tree=4"
+      ],
+      "build": "647242668 #1988 [GroupSwap] build owner=0 group=0 kinds=[5d, 5c] special=None actors=1 R=0x11f422d300 flags=0x0->0x1 refs=0->0 map=12 task_pending=0 pool_live=6 records=Some([0, 0, 0]) dispatch_detached=Some([11ec8d8328, 11ec8d8308]) identity=None mode=async reason=-",
+      "queue": "647242851 #1994 [GroupSwap] bodies queued owner=0 group=0 tasks=[11e5c51800, 1180cedde0] control_us=183164 us=183239; frames run until the tasks settle",
+      "built": "647243235 #1998 [GroupSwap] built owner=0 group=0 ok=true us=567055 installed=2 pool_live=6->8 bodies=Some([Body { address: 76749296208, id: 393216 }, Body { address: 76749360016, id: 458752 }, Body { address: 0, id: 0 }]) map=6 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f36709e8, 11f301b868]) mii_setup=None mode=async setup_us=48 queued_us=183239 settled_us=[400282, 566908, 0] ticks=34 max_tick_gap_us=17662",
+      "finalize": "647243743 #2008 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=1 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 6))",
+      "drain": null,
+      "build_to_pause_ms": 98,
+      "build_to_built_ms": 567,
+      "build_to_finalize_ms": 1075,
+      "queue_to_built_ms": 384
+    },
+    {
+      "path": "out/RC-TEARDOWN-three-1/pending-window.json",
+      "prefetched": [
+        "647373435 #2340 [GroupSwap] prefetched owner=0 group=0 kinds=[5d, 5c, 59] us=700097 INSTALL_released=true map=9 tree=6"
+      ],
+      "build": "647379952 #2422 [GroupSwap] build owner=0 group=0 kinds=[5d, 5c, 59] special=None actors=1 R=0x1206c66a00 flags=0x0->0x1 refs=0->0 map=12 task_pending=0 pool_live=7 records=Some([0, 0, 0]) dispatch_detached=Some([11ec8d8628, 11ec8d8608]) identity=None mode=async reason=-",
+      "queue": "647380168 #2428 [GroupSwap] bodies queued owner=0 group=0 tasks=[11e5c543c0, 1180cedfc0, 1180cee060] control_us=215866 us=215970; frames run until the tasks settle",
+      "built": "647380785 #2432 [GroupSwap] built owner=0 group=0 ok=true us=832963 installed=3 pool_live=7->10 bodies=Some([Body { address: 77227427024, id: 458752 }, Body { address: 77227490832, id: 524288 }, Body { address: 77227554640, id: 589824 }]) map=3 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([1205486708, 11f301b728]) mii_setup=None mode=async setup_us=61 queued_us=215970 settled_us=[416457, 599360, 832918] ticks=51 max_tick_gap_us=17669",
+      "finalize": "647381004 #2441 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=3 contexts=3 routes=1 dispatchers=1 records=0 keys=1 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 7))",
+      "drain": null,
+      "build_to_pause_ms": 98,
+      "build_to_built_ms": 833,
+      "build_to_finalize_ms": 1052,
+      "queue_to_built_ms": 617
+    }
+  ]
+}

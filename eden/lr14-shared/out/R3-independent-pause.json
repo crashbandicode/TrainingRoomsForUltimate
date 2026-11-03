@@ -1,0 +1,36 @@
+{
+  "id": "R3-independent-pause",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ae9978c3ad1ce5f097559ca7d1bf5aaf0dab2972526df595353acd38f707a9fb",
+  "started": 1793748651.0317526,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "menu_producer": "646684708 #502 [Ui] menu opened",
+        "shot": "/home/intpa/eden-runs/lr-14/out/R3-independent-pause/yoga-233051Z-484745-independent-menu.png",
+        "native": {
+          "begin": "646686316 #516 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+          "end": "646688133 #517 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=111 owned_non_neutral=0 owners=0x00",
+          "resume": "646688151 #518 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0",
+          "open": "Independent pause producer and frame-advantage positive/retirement still require specific evidence"
+        },
+        "retirement": [
+          "646686316 #516 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+          "646688133 #517 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=111 owned_non_neutral=0 owners=0x00",
+          "646688151 #518 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0",
+          "646689150 #519 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+          "646691500 #523 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=137 owned_non_neutral=0 owners=0x00",
+          "646691886 #584 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10"
+        ],
+        "fresh": 589,
+        "unverified": "Renderer-unavailable fixture absent in frozen diagnostic binary"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793748674.8853176
+}

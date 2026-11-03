@@ -1,0 +1,8 @@
+ActiveState=failed
+MainPID=0
+Result=signal
+ExecMainCode=2
+ExecMainStatus=9
+ControlGroup=
+MemoryPeak=7131791360
+KillMode=mixed

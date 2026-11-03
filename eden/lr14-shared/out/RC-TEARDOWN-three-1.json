@@ -1,0 +1,12 @@
+{
+  "id": "RC-TEARDOWN-three-1",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "3c5918bc7c7e2cae3a46e69463079276f87e7da7d1cd18b466c4ea0ae7133b25",
+  "started": 1793749317.0901737,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('UI route did not finalize within pending construction; see pending-window.json')",
+  "ended": 1793749362.9270737
+}

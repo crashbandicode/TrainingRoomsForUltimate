@@ -1,0 +1,140 @@
+{
+  "id": "RC-BOOT-postrows",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "1b94cc813ea0849608f54e8ed96879eef62c8603f04a6e8baaca38a6a44dfc82",
+  "started": 1793749405.2111797,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "post_rows_allocations": "647447108 #2580 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=47970 hooks=input_caller_a_note:74506,input_caller_a_apply:304856,reset_check:36065,hazard_rule:12,reset_hub:47,cpu_frame:71499,cpu_stick_x:71499,cpu_stick_y:71499,cpu_transition_term:359129,cpu_motion_change:376,cpu_check_button_on:214617,cpu_shield_param:143102,ui_archive:333,ui_pass_calculate:371331,ui_register_calculate:208,live_replay:142998,hitbox_frame:71499,roster_input:74506,roster_sources:35334,roster_kirby:35334,roster_items:35334,roster_preload:35334,practice_lease:35334,state_frame:71499,recorder_ai:26123,recorder_poll:38095,named_service:107658,menu_input:38095,menu_draw:36189,menu_thumbs:36189,other:363791",
+        "post_rows_heap": "647444501 #2579 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=3 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0",
+        "trace_counters": {
+          "boot_error": "",
+          "file_lost": "0",
+          "output": "/home/intpa/eden-runs/lr-14/state/run-yoga/yoga.trace.jsonl",
+          "output_error": "",
+          "points": [
+            {
+              "abandoned_returns": "0",
+              "address": "0x8135c240",
+              "dropped": "0",
+              "hits": "54",
+              "id": "1",
+              "matched": "54",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "54",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x653240"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x8135b4e0",
+              "dropped": "0",
+              "hits": "120",
+              "id": "2",
+              "matched": "120",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "120",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x6524e0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x83f8bb70",
+              "dropped": "0",
+              "hits": "63",
+              "id": "3",
+              "matched": "63",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "126",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x3282b70"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x83f900b0",
+              "dropped": "0",
+              "hits": "43",
+              "id": "4",
+              "matched": "43",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "86",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x32870b0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x824ef4d0",
+              "dropped": "0",
+              "hits": "152",
+              "id": "5",
+              "matched": "10",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "10",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x17e64d0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x81387ad0",
+              "dropped": "0",
+              "hits": "98",
+              "id": "6",
+              "matched": "13",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "13",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x67ead0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x82cd30b0",
+              "dropped": "0",
+              "hits": "1",
+              "id": "7",
+              "matched": "1",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "2",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x1fca0b0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x8189f770",
+              "dropped": "0",
+              "hits": "1",
+              "id": "8",
+              "matched": "1",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "1",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0xb96770"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793749413.6008422
+}

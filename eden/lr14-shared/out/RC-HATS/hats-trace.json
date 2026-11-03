@@ -1,0 +1,163 @@
+{
+  "choices": [
+    {
+      "index": 1,
+      "kind": 0,
+      "name": "Mario"
+    },
+    {
+      "index": 2,
+      "kind": 1,
+      "name": "Donkey Kong"
+    },
+    {
+      "index": 3,
+      "kind": 2,
+      "name": "Link"
+    },
+    {
+      "index": 4,
+      "kind": 3,
+      "name": "Samus"
+    },
+    {
+      "index": 8,
+      "kind": 7,
+      "name": "Fox"
+    }
+  ],
+  "attempts": [
+    {
+      "helper": "646730934 #772 [CharacterSources] ready slot=2 kind=0x0 ticks=33",
+      "request": "646731486 #780 [KirbyHats] request role=0 kind=0x0 source_slot=2 body=0x1",
+      "confirmed": "646731524 #781 [KirbyHats] confirmed role=0 kind=0x0 body=0x1",
+      "shot": "/home/intpa/eden-runs/lr-14/out/RC-HATS/yoga-233138Z-826213-hat-0.png"
+    }
+  ],
+  "lookup_trace": {
+    "id": "7"
+  },
+  "clear_trace": {
+    "id": "8"
+  },
+  "trace_counters": {
+    "boot_error": "",
+    "file_lost": "0",
+    "output": "/home/intpa/eden-runs/lr-14/state/run-yoga/yoga.trace.jsonl",
+    "output_error": "",
+    "points": [
+      {
+        "abandoned_returns": "0",
+        "address": "0x8135c240",
+        "dropped": "0",
+        "hits": "14",
+        "id": "1",
+        "matched": "14",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "14",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x653240"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x8135b4e0",
+        "dropped": "0",
+        "hits": "30",
+        "id": "2",
+        "matched": "30",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "30",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x6524e0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x83f8bb70",
+        "dropped": "0",
+        "hits": "15",
+        "id": "3",
+        "matched": "15",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "30",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x3282b70"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x83f900b0",
+        "dropped": "0",
+        "hits": "11",
+        "id": "4",
+        "matched": "11",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "22",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x32870b0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x824ef4d0",
+        "dropped": "0",
+        "hits": "35",
+        "id": "5",
+        "matched": "2",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "2",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x17e64d0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x81387ad0",
+        "dropped": "0",
+        "hits": "26",
+        "id": "6",
+        "matched": "5",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "5",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x67ead0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x82cd30b0",
+        "dropped": "0",
+        "hits": "1",
+        "id": "7",
+        "matched": "1",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "2",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x1fca0b0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x8189f770",
+        "dropped": "0",
+        "hits": "0",
+        "id": "8",
+        "matched": "0",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "0",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0xb96770"
+      }
+    ]
+  }
+}

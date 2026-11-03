@@ -1,0 +1,90 @@
+{
+  "rows": {
+    "FAILED": 7,
+    "PASS": 15
+  },
+  "failed": [
+    {
+      "file": "01-main.FAILED-python-path.json",
+      "error": "ModuleNotFoundError(\"No module named 'PIL'\")"
+    },
+    {
+      "file": "RC-HATS.json",
+      "error": "RuntimeError('Missing positive evidence: \\\\[KirbyHats\\\\] request role=0 kind=0x1\\\\b')"
+    },
+    {
+      "file": "RC-TEARDOWN-retry.json",
+      "error": "RuntimeError('macro.play on yoga: {\\'error\\': {\\'code\\': \\'invalid_file\\', \\'message\\': \\'events[0]: missing key \"motion\"\\'}, \\'id\\': \\'e71773cefb2048bfa587efae28a410c7\\', \\'ok\\': False}')"
+    },
+    {
+      "file": "RC-TEARDOWN-retry2.json",
+      "error": "RuntimeError('UI route did not finalize within pending construction; see pending-window.json')"
+    },
+    {
+      "file": "RC-TEARDOWN-retry3.json",
+      "error": "RuntimeError('UI route did not finalize within pending construction; see pending-window.json')"
+    },
+    {
+      "file": "RC-TEARDOWN-three-1.json",
+      "error": "RuntimeError('UI route did not finalize within pending construction; see pending-window.json')"
+    },
+    {
+      "file": "RC-TEARDOWN.json",
+      "error": "RuntimeError('gate ready on yoga did not pass within 30 s')"
+    }
+  ],
+  "released": true,
+  "cleanup_failures": [],
+  "units": [
+    {
+      "key": "yoga",
+      "unit": "eden-life-ef5fef578728455bb38d929033234eb9-yoga.service",
+      "state": {
+        "ActiveState": "failed",
+        "MainPID": "0",
+        "Result": "signal",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "9",
+        "ControlGroup": "",
+        "MemoryPeak": "7131791360",
+        "KillMode": "mixed"
+      }
+    }
+  ],
+  "health": {
+    "state/run-yoga/console.log": {
+      "sha256": "90d6ce7d8670a0c0bb378137b8e10a952228a6e9f602b37dc9a7af2402dc39ed",
+      "matches": []
+    },
+    "yoga-unit-journal.log": {
+      "sha256": "a478bee19394d0158fc48154599bd1b47527b6c50c0a3384f1e1939fac771d03",
+      "matches": []
+    }
+  },
+  "receipt_manifest_bindings": {
+    "01-main.FAILED-python-path.json": "rows/rows.initial.json",
+    "01-main.json": "rows/rows.initial.json",
+    "02-stage.json": "rows/rows.initial.json",
+    "03-css.json": "rows/rows.initial.json",
+    "04-steve.json": "rows/rows.initial.json",
+    "05a-cpu-approach.json": "rows/rows.initial.json",
+    "05b-cpu-pick.json": "rows/rows.initial.json",
+    "05c-cpu74.json": "rows/rows.initial.json",
+    "06-lucas.json": "rows/rows.initial.json",
+    "07-training.json": "rows/rows.initial.json",
+    "R3-independent-pause.json": "rows/rows.initial.json",
+    "RC-BOOT-allocation.json": "rows/rows.initial.json",
+    "RC-BOOT-postrows.json": "rows/rows.json",
+    "RC-HATS-recovery.json": "rows/rows.continuation.json",
+    "RC-HATS.json": "rows/rows.initial.json",
+    "RC-MII.json": "rows/rows.initial.json",
+    "RC-TEARDOWN-recovery.json": "attempt1.tar:rows/rows.json",
+    "RC-TEARDOWN-retry.json": "attempt1.tar:rows/rows.json",
+    "RC-TEARDOWN-retry2.json": "attempt2.tar:rows/rows.json",
+    "RC-TEARDOWN-retry3.json": "attempt3.tar:rows/rows.json",
+    "RC-TEARDOWN-three-1.json": "attempt4.tar:rows/rows.json",
+    "RC-TEARDOWN.json": "rows/rows.continuation.json"
+  },
+  "missing_project_source_hashes": [],
+  "python_syntax": "PASS"
+}

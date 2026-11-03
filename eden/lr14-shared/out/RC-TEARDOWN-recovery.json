@@ -1,0 +1,21 @@
+{
+  "id": "RC-TEARDOWN-recovery",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "11a151015833b64ee95e787fc940c8206278eb1e6a304e00e2da3ee1a237c84c",
+  "started": 1793748958.847673,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-TEARDOWN",
+        "route": "pause",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793748970.9812915
+}

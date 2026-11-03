@@ -1,0 +1,357 @@
+{
+  "schema": 1,
+  "phase": "down",
+  "owner": "OpenCode ses_e5c466751ffeQY7rRsnoHAlnqN/lead",
+  "host": "yoga",
+  "label": "lr-14",
+  "token": "ef5fef578728455bb38d929033234eb9",
+  "claimed": true,
+  "released": true,
+  "config": {
+    "owner": "OpenCode ses_e5c466751ffeQY7rRsnoHAlnqN/lead",
+    "label": "lr-14",
+    "host": "yoga",
+    "hostname": "yoga-ubuntu",
+    "work_root": "/home/intpa/eden-runs/lr-14/work",
+    "state_dir": "/home/intpa/eden-runs/lr-14/state",
+    "ledger": "/tmp/deluxe-surface-1007/OWNER-COORDINATION.md",
+    "runner": {
+      "path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/runner.py",
+      "sha256": "6482c2cc0d3bd85924ce2b441488888d54b53b88fb4e747916b76b9cf0a582ac"
+    },
+    "rows": {
+      "path": "/home/intpa/eden-runs/lr-14/rows/rows.json",
+      "sha256": "ae9978c3ad1ce5f097559ca7d1bf5aaf0dab2972526df595353acd38f707a9fb"
+    },
+    "runtime": 1200,
+    "socket_cap": 90,
+    "load_cap": 180,
+    "stop_cap": 30,
+    "force_cap": 30,
+    "display_helper": {
+      "path": "/home/intpa/eden-nso-autolan/live-tools/display-rootful.ps1",
+      "sha256": "a930b7a6dcb6c7401afb8bbbb2c918ee9b09219a1cd64b4af862938c094e2cff"
+    },
+    "instances": [
+      {
+        "key": "yoga",
+        "display": ":99",
+        "source": "/home/intpa/trainingrooms-eden-lead-astra4/profiles/y",
+        "app": {
+          "path": "/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage",
+          "sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb"
+        },
+        "game": "/home/intpa/Games/Roms/Switch/Super Smash Bros. Ultimate [01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci",
+        "plugins": [
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libtraining_rooms.nro",
+            "sha256": "3ca7f0c5c9e5552be4725050949b1ba96266cf4f5875bef660f94ba9b323e9e4"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libnro_hook.nro",
+            "sha256": "ca7aec03aee49fea539dcb92569fea5bc5389f77377ba2a30e4d0b7ebd0255e6"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libparam_hook.nro",
+            "sha256": "3ed7a2945084176cbb7742d99878f1e8d3a0992feb0fef74be2cfbc68ac8fb88"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libssbu_cpu_pilot.nro",
+            "sha256": "e30334261370a09453d5eeb36513a44c945440694d86d916375dfd83ef9c7582"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libsmash_replay_to_mp4.nro",
+            "sha256": "c3873f120e4c760df3bea051652daa20bd1d0cd3a9b319865f7e6ba507f429d0"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libsmash_gamepad_overlay.nro",
+            "sha256": "a7fba17917be6c69e7b20cbf79fe21f3a9897f59c673e4e61a067b818e8b2db6"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libssbu_online_deluxe_rewrite.nro",
+            "sha256": "a8dcda242b890f09f3fdb2bd767dda2b85dbb1cd519f8e95c8fb6b57e41a5a59"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libssbu_tile_cursor.nro",
+            "sha256": "b8313ca2e66a52f1bcfc4afc764df1b7cdc5aee7e194bdea671cea02746934bc"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/libssbu_desync_detector.nro",
+            "sha256": "29067bb63fd2721ed577f613088614a365804c9ac7101c4ad4ff8b8df3cd23a8"
+          }
+        ],
+        "files": [
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/settings-delay2.json",
+            "sha256": "77e8dc122317171670b32d45ba3a283992eff0497dd4015f0dc92be40f38330b",
+            "to": "user/sdmc/ultimate/TrainingRooms/settings.json"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/developer.ini",
+            "sha256": "67a947da3d85f460168f7a06578ff1d7ac8607bad52f8619c0b30fa8cfba68cf",
+            "to": "user/sdmc/ultimate/TrainingRooms/developer.ini"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/cycle_preload.ini",
+            "sha256": "19cf0208af0d9956a39521b1d7e3110ab35d3fd30c4c0879873b9fd79e0902c5",
+            "to": "user/sdmc/ultimate/TrainingRooms/cycle_preload.ini"
+          },
+          {
+            "path": "/home/intpa/tr-lr04-inputs/files/rc-deluxe-config.ini",
+            "sha256": "96710302ea94db19754490eeb8a68fbad064fed447a184bf7eaedb0a74559dfb",
+            "to": "user/sdmc/ultimate/ssbu_online_deluxe_rewrite/config.ini"
+          }
+        ],
+        "sources": {
+          "events_log": "user/sdmc/ultimate/TrainingRooms/events.log",
+          "tile_log": "user/sdmc/ultimate/ssbu-tile-cursor/events.log"
+        },
+        "trace": {
+          "points": [
+            {
+              "target": "main+0x653240",
+              "registers": [
+                "x0",
+                "x1",
+                "x2",
+                "pc",
+                "x30"
+              ],
+              "captures": [
+                {
+                  "expression": "x0+0xe0",
+                  "type": "u32"
+                },
+                {
+                  "expression": "x1+0x18",
+                  "type": "u32"
+                },
+                {
+                  "expression": "x2",
+                  "type": "u8"
+                }
+              ],
+              "on_return": false,
+              "max_hits": 256,
+              "rate_limit": 1000
+            },
+            {
+              "target": "main+0x6524e0",
+              "registers": [
+                "x0",
+                "pc",
+                "x30"
+              ],
+              "captures": [
+                {
+                  "expression": "x0+0xe0",
+                  "type": "u32"
+                },
+                {
+                  "expression": "x0+0x18",
+                  "type": "u32"
+                }
+              ],
+              "on_return": false,
+              "max_hits": 256,
+              "rate_limit": 1000
+            }
+          ],
+          "unmapped_access": "log"
+        }
+      }
+    ],
+    "log_filter": "*:Warning Frontend:Info Service.Sockets:Info Network:Info"
+  },
+  "instances": [
+    {
+      "key": "yoga",
+      "display": ":99",
+      "source": "/home/intpa/trainingrooms-eden-lead-astra4/profiles/y",
+      "app": {
+        "path": "/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage",
+        "sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb"
+      },
+      "game": "/home/intpa/Games/Roms/Switch/Super Smash Bros. Ultimate [01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci",
+      "plugins": [
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libtraining_rooms.nro",
+          "sha256": "3ca7f0c5c9e5552be4725050949b1ba96266cf4f5875bef660f94ba9b323e9e4"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libnro_hook.nro",
+          "sha256": "ca7aec03aee49fea539dcb92569fea5bc5389f77377ba2a30e4d0b7ebd0255e6"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libparam_hook.nro",
+          "sha256": "3ed7a2945084176cbb7742d99878f1e8d3a0992feb0fef74be2cfbc68ac8fb88"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libssbu_cpu_pilot.nro",
+          "sha256": "e30334261370a09453d5eeb36513a44c945440694d86d916375dfd83ef9c7582"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libsmash_replay_to_mp4.nro",
+          "sha256": "c3873f120e4c760df3bea051652daa20bd1d0cd3a9b319865f7e6ba507f429d0"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libsmash_gamepad_overlay.nro",
+          "sha256": "a7fba17917be6c69e7b20cbf79fe21f3a9897f59c673e4e61a067b818e8b2db6"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libssbu_online_deluxe_rewrite.nro",
+          "sha256": "a8dcda242b890f09f3fdb2bd767dda2b85dbb1cd519f8e95c8fb6b57e41a5a59"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libssbu_tile_cursor.nro",
+          "sha256": "b8313ca2e66a52f1bcfc4afc764df1b7cdc5aee7e194bdea671cea02746934bc"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/libssbu_desync_detector.nro",
+          "sha256": "29067bb63fd2721ed577f613088614a365804c9ac7101c4ad4ff8b8df3cd23a8"
+        }
+      ],
+      "files": [
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/settings-delay2.json",
+          "sha256": "77e8dc122317171670b32d45ba3a283992eff0497dd4015f0dc92be40f38330b",
+          "to": "user/sdmc/ultimate/TrainingRooms/settings.json"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/developer.ini",
+          "sha256": "67a947da3d85f460168f7a06578ff1d7ac8607bad52f8619c0b30fa8cfba68cf",
+          "to": "user/sdmc/ultimate/TrainingRooms/developer.ini"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/cycle_preload.ini",
+          "sha256": "19cf0208af0d9956a39521b1d7e3110ab35d3fd30c4c0879873b9fd79e0902c5",
+          "to": "user/sdmc/ultimate/TrainingRooms/cycle_preload.ini"
+        },
+        {
+          "path": "/home/intpa/tr-lr04-inputs/files/rc-deluxe-config.ini",
+          "sha256": "96710302ea94db19754490eeb8a68fbad064fed447a184bf7eaedb0a74559dfb",
+          "to": "user/sdmc/ultimate/ssbu_online_deluxe_rewrite/config.ini"
+        }
+      ],
+      "sources": {
+        "events_log": "user/sdmc/ultimate/TrainingRooms/events.log",
+        "tile_log": "user/sdmc/ultimate/ssbu-tile-cursor/events.log"
+      },
+      "trace": {
+        "points": [
+          {
+            "target": "main+0x653240",
+            "registers": [
+              "x0",
+              "x1",
+              "x2",
+              "pc",
+              "x30"
+            ],
+            "captures": [
+              {
+                "expression": "x0+0xe0",
+                "type": "u32"
+              },
+              {
+                "expression": "x1+0x18",
+                "type": "u32"
+              },
+              {
+                "expression": "x2",
+                "type": "u8"
+              }
+            ],
+            "on_return": false,
+            "max_hits": 256,
+            "rate_limit": 1000
+          },
+          {
+            "target": "main+0x6524e0",
+            "registers": [
+              "x0",
+              "pc",
+              "x30"
+            ],
+            "captures": [
+              {
+                "expression": "x0+0xe0",
+                "type": "u32"
+              },
+              {
+                "expression": "x0+0x18",
+                "type": "u32"
+              }
+            ],
+            "on_return": false,
+            "max_hits": 256,
+            "rate_limit": 1000
+          }
+        ],
+        "unmapped_access": "log"
+      },
+      "profile": "/home/intpa/eden-runs/lr-14/work/profiles/profile-yoga",
+      "snapshot": "/home/intpa/eden-runs/lr-14/state/snapshot-yoga",
+      "run": "/home/intpa/eden-runs/lr-14/state/run-yoga",
+      "socket": "/home/intpa/eden-runs/lr-14/state/run-yoga/control.sock",
+      "console_log": "/home/intpa/eden-runs/lr-14/state/run-yoga/console.log",
+      "unit": "eden-life-ef5fef578728455bb38d929033234eb9-yoga.service",
+      "snapshot_ready": true,
+      "launch_intent": true,
+      "display_units": [
+        "eden-life-ef5fef578728455bb38d929033234eb9-yoga-display.service",
+        "eden-life-ef5fef578728455bb38d929033234eb9-yoga-display-x.service"
+      ],
+      "display_intent": true,
+      "display_pids": {
+        "eden-life-ef5fef578728455bb38d929033234eb9-yoga-display.service": [
+          {
+            "pid": 4177868,
+            "start": "64652863",
+            "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+          },
+          {
+            "pid": 4177879,
+            "start": "64652866",
+            "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+          },
+          {
+            "pid": 4177880,
+            "start": "64652867",
+            "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+          }
+        ],
+        "eden-life-ef5fef578728455bb38d929033234eb9-yoga-display-x.service": [
+          {
+            "pid": 4177882,
+            "start": "64652897",
+            "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+          }
+        ]
+      },
+      "owned_pids": [
+        {
+          "pid": 4177901,
+          "start": "64652933",
+          "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+        },
+        {
+          "pid": 4177907,
+          "start": "64652935",
+          "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+        }
+      ],
+      "restored": true,
+      "verified": true
+    }
+  ],
+  "started": "2026-11-03T23:27:52.639378+00:00",
+  "stale_claim_skipped": [],
+  "stop_errors": [
+    {
+      "key": "yoga",
+      "error": "Refused('Deadline: terminal game.stop')"
+    }
+  ],
+  "cleanup_failures": []
+}

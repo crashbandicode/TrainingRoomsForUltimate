@@ -1,0 +1,17 @@
+{
+  "id": "RC-HATS-recovery",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "e40ed4cf839030a257473ae03684a16b6fc497ffd70bf453350cd5dac90fe816",
+  "started": 1793748791.1811714,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/eden-runs/lr-14/out/RC-HATS-recovery/yoga-233311Z-663411-gate-training-hud-unpaused.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793748791.243738
+}
