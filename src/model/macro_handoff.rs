@@ -57,6 +57,16 @@ pub struct MacroQueries {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipInputRoute { Pass, Consume, Forward }
 
+/// The worker arms close ownership before publishing its closed editor query.
+/// Read that query first: a new closed snapshot must not follow an old arm read.
+pub fn route_clip_input(
+    read_queries: impl FnOnce() -> MacroQueries,
+    poll_close: impl FnOnce() -> bool,
+) -> ClipInputRoute {
+    let queries = read_queries();
+    queries.clip_input_route(poll_close())
+}
+
 impl MacroQueries {
     pub fn clip_input_route(&self, close_owned: bool) -> ClipInputRoute {
         if close_owned { ClipInputRoute::Consume }
@@ -769,6 +779,22 @@ mod tests {
         assert_eq!(queries.clip_input_route(guard.poll(true, true)), Pass);
         guard.arm(15);
         assert_eq!(queries.clip_input_route(guard.poll(false, true)), Pass);
+    }
+
+    #[test]
+    fn a_close_published_at_the_query_read_cannot_follow_an_old_guard_poll() {
+        let close_arm = std::cell::Cell::new(false);
+        let route = route_clip_input(
+            || {
+                // Worker close lands just before the mapper observes the new
+                // closed snapshot, with its release-store of ARM before publish.
+                close_arm.set(true);
+                MacroQueries::IDLE
+            },
+            || close_arm.replace(false),
+        );
+        assert_eq!(route, ClipInputRoute::Consume);
+        assert!(!close_arm.get(), "this mapping consumed the published arm");
     }
 
 }
