@@ -1,0 +1,412 @@
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738538.7107813}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204218Z-870973-gate-main.png"}, "ok": true, "time": 1793738538.7382324}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738539.7629383}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204219Z-025861-gate-main.png"}, "ok": true, "time": 1793738539.7829068}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738540.7926118}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204220Z-746009-gate-main.png"}, "ok": true, "time": 1793738540.8181021}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738541.8271334}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204221Z-271857-gate-main.png"}, "ok": true, "time": 1793738541.846927}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738542.8560362}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204222Z-247678-gate-main.png"}, "ok": true, "time": 1793738542.8811054}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738543.8892007}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204223Z-289878-gate-main.png"}, "ok": true, "time": 1793738543.9111366}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738544.9193091}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204224Z-491769-gate-main.png"}, "ok": true, "time": 1793738545.0803854}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738546.1037416}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204226Z-817917-gate-main.png"}, "ok": true, "time": 1793738546.2952764}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738547.3246012}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204227Z-796358-GATE-FAILED-main.png"}, "ok": true, "time": 1793738547.523012}
+{"gate": "main", "on": "yoga", "recover": "intro-cancel", "after": "RuntimeError('gate main on yoga did not pass within 8 s')", "time": 1793738547.523461}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/tr-lr06-inputs/segments/intro-cancel.edenmacro.json"}, "ok": true, "time": 1793738547.5258238}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738547.5263608}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738547.7268836}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738547.9275267}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738548.1281207}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738548.3287132}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738548.3290079}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738548.3304455}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204228Z-554827-gate-main.png"}, "ok": true, "time": 1793738548.347786}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738549.3591816}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204229Z-305456-gate-main.png"}, "ok": true, "time": 1793738549.3851392}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738550.3978548}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204230Z-972824-gate-main.png"}, "ok": true, "time": 1793738550.4221976}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738551.4354346}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204231Z-566301-gate-main.png"}, "ok": true, "time": 1793738551.4603684}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738552.4737113}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204232Z-982218-gate-main.png"}, "ok": true, "time": 1793738552.501438}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738553.5129642}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204233Z-049320-gate-main.png"}, "ok": true, "time": 1793738553.5362942}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738554.5495627}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204234Z-715986-gate-main.png"}, "ok": true, "time": 1793738554.5734074}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738555.5861874}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204235Z-280089-gate-main.png"}, "ok": true, "time": 1793738555.61172}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738556.6233006}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204236Z-511726-GATE-FAILED-main.png"}, "ok": true, "time": 1793738556.6508076}
+{"gate": "main", "on": "yoga", "recover": "intro-cancel", "after": "RuntimeError('gate main on yoga did not pass within 8 s')", "time": 1793738556.6509392}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/tr-lr06-inputs/segments/intro-cancel.edenmacro.json"}, "ok": true, "time": 1793738556.652331}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738556.6549509}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738556.855655}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738557.0567412}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738557.2576501}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738557.4586284}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738557.4589386}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738557.4611285}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204237Z-182654-gate-main.png"}, "ok": true, "time": 1793738557.4816844}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738558.490641}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204238Z-766377-gate-main.png"}, "ok": true, "time": 1793738558.5465205}
+{"gate": "main", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204238Z-766377-gate-main.png", "time": 1793738558.5634713}
+{"gate": "installed", "on": ["yoga"], "pass": true, "lines": {"yoga": "cpu_common=installed"}, "time": 1793738558.5637581}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738558.5652485}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/01-main/yoga-204238Z-302428-main.png"}, "ok": true, "time": 1793738558.6203148}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738558.6211822}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738558.623165}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/02-stage/yoga-204238Z-241334-gate-main.png"}, "ok": true, "time": 1793738558.6773071}
+{"gate": "main", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/02-stage/yoga-204238Z-241334-gate-main.png", "time": 1793738558.6946764}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json"}, "ok": true, "time": 1793738558.6968968}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738558.698186}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738558.899113}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738559.0996132}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738559.300071}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738559.5005324}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738559.7011147}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738559.9015856}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738560.1034062}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738560.304137}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738560.5046442}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738560.7052877}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738560.9058475}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738561.1064377}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738561.3071716}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738561.5079463}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738561.7085705}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738561.9091008}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738562.1096814}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738562.3107226}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738562.5124323}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738562.7130651}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738562.913644}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738563.114182}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738563.3146813}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738563.51516}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738563.715659}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738563.916117}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738564.1165683}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738564.3170123}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738564.5178356}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738564.7183285}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738564.9187942}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738565.1194909}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738565.31999}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738565.520478}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738565.7211857}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738565.92178}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738566.12236}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738566.3228645}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738566.5234241}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738566.7241306}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738566.9248657}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738567.126254}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738567.326759}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738567.5273077}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738567.7290616}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738567.929605}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738568.1301033}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738568.330613}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738568.531105}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738568.7316134}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738568.7317727}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738568.7329783}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/02-stage/yoga-204248Z-016843-gate-stage.png"}, "ok": true, "time": 1793738568.831069}
+{"gate": "stage", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/02-stage/yoga-204248Z-016843-gate-stage.png", "time": 1793738568.8517046}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738568.8531227}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/02-stage/yoga-204248Z-187724-stage.png"}, "ok": true, "time": 1793738568.9505806}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738568.9510055}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738568.95256}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204248Z-602269-gate-stage.png"}, "ok": true, "time": 1793738569.0503025}
+{"gate": "stage", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204248Z-602269-gate-stage.png", "time": 1793738569.0710964}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json"}, "ok": true, "time": 1793738569.0719795}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738569.0722716}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738569.2731307}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738569.47375}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738569.6744428}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738569.8750756}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738570.0764463}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738570.2770627}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738570.4776628}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738570.477888}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738570.4793165}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204250Z-446514-gate-css.png"}, "ok": true, "time": 1793738570.501847}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738571.516883}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204251Z-005777-gate-css.png"}, "ok": true, "time": 1793738571.5351894}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738572.5505567}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204252Z-687260-gate-css.png"}, "ok": true, "time": 1793738572.6516838}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738573.6743176}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204253Z-449201-gate-css.png"}, "ok": true, "time": 1793738573.7697341}
+{"gate": "css", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204253Z-449201-gate-css.png", "time": 1793738573.7982476}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738573.799957}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/03-css/yoga-204253Z-050465-css.png"}, "ok": true, "time": 1793738573.8932743}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738573.8936777}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738573.8955033}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/04-steve/yoga-204253Z-685398-gate-css.png"}, "ok": true, "time": 1793738573.9897864}
+{"gate": "css", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/04-steve/yoga-204253Z-685398-gate-css.png", "time": 1793738574.0142617}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/steve-hover.edenmacro.json"}, "ok": true, "time": 1793738574.0151775}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738574.0156286}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738574.2163117}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738574.41684}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738574.617346}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738574.8179014}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.0185008}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.2191057}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738575.219317}
+{"gate": "steve78", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=78 hovered=78"}, "time": 1793738575.2194622}
+{"gate": "steve78", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=78 hovered=78"}, "time": 1793738575.2195344}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/steve-place.edenmacro.json"}, "ok": true, "time": 1793738575.2202618}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.2204564}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.42112}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.6217294}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738575.6219347}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738575.6232688}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/04-steve/yoga-204255Z-334242-gate-steve-selected.png"}, "ok": true, "time": 1793738575.724417}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/04-steve/yoga-204255Z-334242-gate-steve-selected.png", "time": 1793738575.7450612}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738575.746921}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/04-steve/yoga-204255Z-996730-cpu-route-start.png"}, "ok": true, "time": 1793738575.8467836}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738575.8474069}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738575.8493583}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05a-cpu-approach/yoga-204255Z-430302-gate-steve-selected.png"}, "ok": true, "time": 1793738575.9487681}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/05a-cpu-approach/yoga-204255Z-430302-gate-steve-selected.png", "time": 1793738575.969087}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lr04-cpu-approach.edenmacro.json"}, "ok": true, "time": 1793738575.9702084}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738575.970433}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738576.1709545}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738576.3715434}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738576.5720882}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738576.7735908}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738576.9741757}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738576.9743767}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738576.975799}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05a-cpu-approach/yoga-204256Z-864594-gate-steve-selected.png"}, "ok": true, "time": 1793738577.0715935}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/05a-cpu-approach/yoga-204256Z-864594-gate-steve-selected.png", "time": 1793738577.0914164}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738577.09314}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05a-cpu-approach/yoga-204257Z-201058-cpu-approach-review.png"}, "ok": true, "time": 1793738577.190999}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738577.1917458}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738577.19361}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05b-cpu-pick/yoga-204257Z-729674-gate-steve-selected.png"}, "ok": true, "time": 1793738577.2931776}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/05b-cpu-pick/yoga-204257Z-729674-gate-steve-selected.png", "time": 1793738577.3126645}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lr04-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793738577.3142424}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738577.3170528}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738577.5181139}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738577.7186637}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738577.9191806}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738578.1197815}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738578.3203406}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738578.5209587}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738578.72157}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738578.7217948}
+{"gate": "cpu-token-fresh", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=86 to=85 token=p2"}, "time": 1793738578.721935}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738578.7238011}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05b-cpu-pick/yoga-204258Z-912742-cpu-held-review.png"}, "ok": true, "time": 1793738578.8178034}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738578.8184764}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738578.8204186}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05c-cpu74/yoga-204258Z-481559-gate-cpu85-held.png"}, "ok": true, "time": 1793738578.9160042}
+{"gate": "cpu85-held", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/05c-cpu74/yoga-204258Z-481559-gate-cpu85-held.png", "time": 1793738578.9379523}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lr04-cpu85-to74.edenmacro.json"}, "ok": true, "time": 1793738578.9395607}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738578.9418466}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738579.1423423}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738579.3429673}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738579.3431756}
+{"gate": "cpu74-fresh", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=up from=85 to=74 token=p2"}, "time": 1793738579.3433197}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738579.3446927}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05c-cpu74/yoga-204259Z-766835-gate-cpu-held74.png"}, "ok": true, "time": 1793738579.4409292}
+{"gate": "cpu-held74", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/05c-cpu74/yoga-204259Z-766835-gate-cpu-held74.png", "time": 1793738579.4633598}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738579.4650078}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/05c-cpu74/yoga-204259Z-086617-cpu74.png"}, "ok": true, "time": 1793738579.5594487}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738579.5600035}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738579.5618362}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204259Z-900406-gate-cpu-held74.png"}, "ok": true, "time": 1793738579.6576357}
+{"gate": "cpu-held74", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204259Z-900406-gate-cpu-held74.png", "time": 1793738579.6800008}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/cpu74-lucas.edenmacro.json"}, "ok": true, "time": 1793738579.6811554}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738579.6814966}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738579.8824272}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738580.0830505}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738580.2836723}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738580.4843135}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738580.684957}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738580.8855543}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738581.0861034}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738581.2866716}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738581.4872887}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738581.687907}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738581.888498}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738582.0891104}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738582.2897398}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738582.4903777}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738582.6915832}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738582.8931284}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738583.0937424}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738583.294269}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738583.4948177}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738583.6955082}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738583.8961852}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738584.096967}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738584.297579}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738584.4981816}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738584.698794}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738584.899493}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738585.1001256}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738585.3006985}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738585.501324}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738585.7018564}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738585.903716}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738586.1042552}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738586.3047652}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738586.5052464}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738586.7056916}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738586.906821}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738587.108059}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738587.3086796}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738587.5095565}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738587.7101598}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738587.9107838}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.1113575}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738588.1116672}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793738588.111823}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793738588.1118984}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793738588.1131837}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.1135886}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.3145568}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.5151634}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.71578}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738588.9164574}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738589.1169765}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738589.3186464}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738589.5191436}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738589.5197878}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738589.5211}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204309Z-154671-gate-ready.png"}, "ok": true, "time": 1793738589.6234708}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738590.6469803}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204310Z-130325-gate-ready.png"}, "ok": true, "time": 1793738590.7526257}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204310Z-130325-gate-ready.png", "time": 1793738590.7742822}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738590.77596}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/06-lucas/yoga-204310Z-021334-ready.png"}, "ok": true, "time": 1793738590.881916}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738590.882441}
+{"gate": "delay2-settings", "on": "yoga", "pass": true, "copy": "/home/intpa/tr-lr06-inputs/out/07-training/delay2-settings-settings.json", "time": 1793738590.8831828}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738590.8845427}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/07-training/yoga-204310Z-603137-gate-ready.png"}, "ok": true, "time": 1793738590.9874372}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/07-training/yoga-204310Z-603137-gate-ready.png", "time": 1793738591.0091677}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793738591.0108078}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738591.0111518}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738591.2120519}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738591.4126756}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738591.6132324}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738591.8139315}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738592.0145404}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738592.2151258}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738592.2153816}
+{"gate": "p1-original", "on": ["yoga"], "pass": true, "lines": {"yoga": "[CharacterRoster] observed owner=0 entry=0x120bb4c000 kind=0x58"}, "time": 1793738597.0202613}
+{"gate": "cpu-original", "on": ["yoga"], "pass": true, "lines": {"yoga": "[CharacterRoster] observed owner=1 entry=0x120bb52000 kind=0x28"}, "time": 1793738597.3206937}
+{"gate": "catalog", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[2, 2] opening=2"}, "time": 1793738598.5220234}
+{"gate": "player-owner", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained"}, "time": 1793738598.5221694}
+{"gate": "cpu-owner", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryCpu] catalog owner qualified; immutable origin retained"}, "time": 1793738598.5222473}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738598.5237565}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/07-training/yoga-204318Z-827122-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793738598.5543437}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/07-training/yoga-204318Z-827122-gate-training-hud-unpaused.png", "time": 1793738598.5651884}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738598.5667796}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/07-training/yoga-204318Z-895658-training.png"}, "ok": true, "time": 1793738598.595062}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738598.5958667}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738598.5976715}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-787900-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793738598.6248686}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-787900-gate-training-hud-unpaused.png", "time": 1793738598.6353877}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738598.6369958}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-133010-mark-hud-before.png"}, "ok": true, "time": 1793738598.6647656}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738598.6662254}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-281158-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793738598.6919656}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-281158-gate-training-hud-unpaused.png", "time": 1793738598.7019982}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793738598.70292}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738598.7031817}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738598.9036596}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738599.1042123}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738599.304835}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738599.3050563}
+{"gate": "p1-b", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 2, entry: 77505806336, sequence: 1 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n636632444 #224 [Destroy] plan owner=0 reason=mod reload s"}, "time": 1793738600.2061532}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738600.207707}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204320Z-790991-gate-p1-hud-changed.png"}, "ok": true, "time": 1793738600.2395906}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738600.762664}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204320Z-789988-gate-p1-hud-changed.png"}, "ok": true, "time": 1793738600.7915874}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738601.328345}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204321Z-430086-gate-p1-hud-changed.png"}, "ok": true, "time": 1793738601.357955}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738601.894667}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204321Z-846435-gate-p1-hud-changed.png"}, "ok": true, "time": 1793738601.924914}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738602.4669642}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-084178-gate-p1-hud-changed.png"}, "ok": true, "time": 1793738602.4942203}
+{"gate": "p1-hud-changed", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-084178-gate-p1-hud-changed.png", "mark": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204318Z-133010-mark-hud-before.png", "time": 1793738602.535592}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738602.537267}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-331051-falcon-ready.png"}, "ok": true, "time": 1793738602.568783}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738602.5706723}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-755485-mark-hud-before.png"}, "ok": true, "time": 1793738602.5978835}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738602.5995343}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-590509-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793738602.6282687}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-590509-gate-training-hud-unpaused.png", "time": 1793738602.6392004}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/cpu-next-frames.edenmacro.json"}, "ok": true, "time": 1793738602.6404018}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738602.641177}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738602.8417337}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738603.042344}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793738603.2429574}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738603.243246}
+{"gate": "cpu-4a", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryCpu] submit ticket=Ticket { epoch: 2, entry: 77505830912, sequence: 1 } outgoing=0x28 target=0x4a index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n636637354 #287 [MiiOrdinaryCpu] staged ticket=Ticket { epoch"}, "time": 1793738604.1442556}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738604.1457229}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204324Z-774627-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738604.175649}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738604.6989226}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204324Z-045325-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738604.7268107}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738605.2723317}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204325Z-450780-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738605.3016973}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738605.838824}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204325Z-910451-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738605.8691742}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738606.4063933}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204326Z-542631-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738606.43942}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738606.9777493}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204326Z-875105-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738607.008981}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738607.5469475}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204327Z-104140-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738607.5763314}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738608.1204329}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204328Z-568112-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738608.1501553}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738608.6879163}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204328Z-038380-gate-cpu-hud-changed.png"}, "ok": true, "time": 1793738608.719314}
+{"gate": "cpu-hud-changed", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204328Z-038380-gate-cpu-hud-changed.png", "mark": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204322Z-755485-mark-hud-before.png", "time": 1793738608.7554145}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738608.7570846}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-groups/yoga-204328Z-273136-cpu-gunner-ready.png"}, "ok": true, "time": 1793738608.792103}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738608.792758}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738608.7945895}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204328Z-717837-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793738608.8268087}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204328Z-717837-gate-training-hud-unpaused.png", "time": 1793738608.8373547}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738608.8389742}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204328Z-033343-gate-training-closed.png"}, "ok": true, "time": 1793738608.869465}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738609.8836646}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204329Z-792235-gate-training-closed.png"}, "ok": true, "time": 1793738609.9119549}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738610.9280088}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204330Z-164418-gate-training-closed.png"}, "ok": true, "time": 1793738610.9559455}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738611.9692936}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204331Z-391237-gate-training-closed.png"}, "ok": true, "time": 1793738611.9989169}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738613.0119371}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204333Z-018396-gate-training-closed.png"}, "ok": true, "time": 1793738613.0427508}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738614.0557375}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204334Z-815462-gate-training-closed.png"}, "ok": true, "time": 1793738614.089177}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738615.1023552}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204335Z-429196-gate-training-closed.png"}, "ok": true, "time": 1793738615.1333654}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738616.147821}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204336Z-920364-gate-training-closed.png"}, "ok": true, "time": 1793738616.1764178}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738617.190799}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204337Z-918319-gate-training-closed.png"}, "ok": true, "time": 1793738617.220697}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738618.2353044}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204338Z-429663-gate-training-closed.png"}, "ok": true, "time": 1793738618.2657833}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738619.2800746}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204339Z-192846-gate-training-closed.png"}, "ok": true, "time": 1793738619.3086853}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738620.323096}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204340Z-212485-gate-training-closed.png"}, "ok": true, "time": 1793738620.3548129}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738621.369507}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204341Z-614700-gate-training-closed.png"}, "ok": true, "time": 1793738621.3986125}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738622.413545}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204342Z-669510-gate-training-closed.png"}, "ok": true, "time": 1793738622.4443731}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738623.4571202}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204343Z-209861-gate-training-closed.png"}, "ok": true, "time": 1793738623.4888465}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793738624.502051}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o136", "path": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204344Z-152031-GATE-FAILED-training-closed.png"}, "ok": true, "time": 1793738624.5309432}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793738624.5315108}

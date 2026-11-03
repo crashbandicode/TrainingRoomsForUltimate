@@ -1,0 +1,20 @@
+{
+  "id": "cycle1-warm-return",
+  "start": "training",
+  "end": "css-return",
+  "evidence": [
+    "Native original-owner retirement only; not GroupSwap warm teardown or interrupted-build qualification."
+  ],
+  "manifest_sha256": "3c0f097fc0b9c388d7e8eeaca3ab2810bca496012598b2d51e7256ec46f5452a",
+  "started": 1793738608.7932467,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr06-inputs/out/cycle1-warm-return/yoga-204328Z-717837-gate-training-hud-unpaused.png"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate training-closed on yoga did not pass within 15 s')",
+  "ended": 1793738624.5311513
+}

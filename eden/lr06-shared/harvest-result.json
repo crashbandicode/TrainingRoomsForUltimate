@@ -1,0 +1,18 @@
+{
+  "segments": [],
+  "gates": [],
+  "skipped": [
+    "main-stage",
+    "stage-css",
+    "steve-hover",
+    "steve-place",
+    "lr04-cpu-approach",
+    "lr04-cpu-pick",
+    "lr04-cpu85-to74",
+    "cpu74-lucas",
+    "lucas-pick",
+    "enter-training",
+    "p1-next-frames",
+    "cpu-next-frames"
+  ]
+}
