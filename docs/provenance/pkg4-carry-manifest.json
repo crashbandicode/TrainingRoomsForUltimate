@@ -1216,7 +1216,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "c349610d0299eaee8f4443eff3a265a532efa5def32e5ef051f3396ad7f3dca9",
+   "dest_sha256": "e171fe2714d1f5c5f843a9aac5f77bea5dea55a901983b592e657f358c4652f0",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1503,6 +1503,11 @@
      "old": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n",
      "new": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n    if loading() {\n        if controller.just_down.b() { cancel_reload(); }\n        return;\n    }\n",
      "reason": "RC F8 loading cancellation root: pending RELOAD parks EDITOR, so foreground-only routing lost B while the loading footer advertised cancel. Restore B-only handling on the existing worker paths, preserving cancel_reload selection/crop semantics; hooks read the published loading bit and post copied controls, never worker state."
+    },
+    {
+     "old": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n",
+     "new": "pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {\n    use crate::runtime::macros::port::input::ControllerStyle;\n    // While the menu is open its Pad route owns this same physical press.\n    // Otherwise a copied B cancels loading before Pad::Back closes the restored crop.\n    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n",
+     "reason": "Design C worker input ownership: while menu OPEN, only its Pad route handles physical presses; avoid duplicate loading cancellation closing the restored crop. Standalone editor keeps copied physical input."
     }
    ]
   },
