@@ -1812,7 +1812,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "a646bdbe594fd54a6b5543f63905dd40c88a85c485a1af720a77b46abbf540e3",
+   "dest_sha256": "2b6ba4809af82eb4d2928c608350b8bc6d974fef16d1961ab942d48259d78752",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -2105,6 +2105,11 @@
      "old": "/// Game-owned fixed tokens. Every operation on frame storage is a worker event.",
      "new": "// Existing menu worker only; ARCHIVE has been released before formatting.\n#[cfg(feature = \"diag\")]\n#[inline(never)]\nfn worker_first_seal_note(serial: u64, note: crate::engine::macros::FirstSeal) {\n    println!(\"[ReplayCaptureSeal] serial={} {}\", serial, note);\n}\n\n/// Game-owned fixed tokens. Every operation on frame storage is a worker event.",
      "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "    println!(\"[ReplayCaptureSeal] serial={} {}\", serial, note);",
+     "new": "    crate::runtime::diag_log::enqueue_diagnostic(format_args!(\n        \"[ReplayCaptureSeal] serial={} {}\", serial, note));",
+     "reason": "Approved first-seal-only enqueue entry: retain existing ring ownership and drop accounting without caller synchronous drain"
     }
    ]
   },

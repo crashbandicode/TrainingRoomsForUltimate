@@ -119,7 +119,8 @@ pub fn worker_events() {
 #[cfg(feature = "diag")]
 #[inline(never)]
 fn worker_first_seal_note(serial: u64, note: crate::engine::macros::FirstSeal) {
-    println!("[ReplayCaptureSeal] serial={} {}", serial, note);
+    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+        "[ReplayCaptureSeal] serial={} {}", serial, note));
 }
 
 /// Game-owned fixed tokens. Every operation on frame storage is a worker event.

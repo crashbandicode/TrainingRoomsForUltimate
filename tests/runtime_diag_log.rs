@@ -57,6 +57,36 @@ fn the_ring_reaches_the_file_rotates_and_reports_failures() {
     assert_eq!(read(&prev), text);
     assert_eq!(read(&cur), "");
 
+    // Enqueue owns the bytes without the pre-writer filesystem fallback.
+    let committed = diag_log::ring_stats().0.committed;
+    let mut owned_note = String::from("[TrainingRooms] queued serial=731 first=Some(215)");
+    diag_log::enqueue_diagnostic(format_args!("{owned_note}"));
+    owned_note.clear(); // Capture lifecycle no longer owns the queued bytes.
+    assert_eq!(read(&cur), "");
+    assert_eq!(diag_log::ring_stats().0.committed, committed + 1);
+    diag_log::diagnostic(format_args!("[Hud] filtered must not drain queued evidence"));
+    assert_eq!(read(&cur), "", "a filtered normal call must still skip draining");
+    assert_eq!(diag_log::ring_stats().0.committed, committed + 1);
+    diag_log::diagnostic(format_args!("[TrainingRooms] normal fallback after queued"));
+    let queued = read(&cur);
+    let first = queued.find("queued serial=731 first=Some(215)").unwrap();
+    let normal = queued.find("normal fallback after queued").unwrap();
+    assert!(first < normal);
+    assert_eq!(queued.matches("queued serial=731").count(), 1);
+
+    // Passing the filter is not the same as a successful commit: a full ring
+    // must still be drained by the normal pre-writer API, including its drops.
+    for _ in 0..2048 {
+        diag_log::enqueue_diagnostic(format_args!(
+            "[TrainingRooms] queued fill 0123456789012345678901234567890123456789"));
+    }
+    let dropped = diag_log::ring_stats().0.dropped;
+    assert!(dropped > 0, "the bounded ring must have filled without a caller drain");
+    let before_full_drain = read(&cur);
+    diag_log::diagnostic(format_args!("[TrainingRooms] full ring normal fallback"));
+    assert!(diag_log::ring_stats().0.dropped > dropped);
+    assert_ne!(read(&cur), before_full_drain, "a dropped normal line must still trigger draining");
+
     // Many lines: the files stay within the limit and the newest lines are in the current file.
     for n in 0..3000 {
         diag_log::diagnostic(format_args!("[TrainingRooms] line {n:05} {}", "x".repeat(60)));
@@ -79,6 +109,25 @@ fn the_ring_reaches_the_file_rotates_and_reports_failures() {
     diag_log::diagnostic(format_args!("[TrainingRooms] after the failure"));
     diag_log::flush();
     assert!(!missing.exists());
+
+    // The actual writer starts by marking readiness, then draining. Readiness
+    // alone does not write; both pre-start and ready enqueues survive to flush.
+    diag_log::init_at(&path(&cur), &path(&prev), &path(&events));
+    diag_log::enqueue_diagnostic(format_args!("[TrainingRooms] before writer serial=901"));
+    assert_eq!(read(&cur), "");
+    diag_log::writer_started();
+    assert_eq!(read(&cur), "");
+    diag_log::flush();
+    let started = read(&cur);
+    assert_eq!(started.matches("before writer serial=901").count(), 1);
+    diag_log::enqueue_diagnostic(format_args!("[TrainingRooms] after writer serial=902"));
+    assert_eq!(read(&cur), started, "enqueue-only stays asynchronous after readiness");
+    diag_log::flush();
+    diag_log::flush();
+    let flushed = read(&cur);
+    assert_eq!(flushed.matches("before writer serial=901").count(), 1);
+    assert_eq!(flushed.matches("after writer serial=902").count(), 1);
+    assert!(flushed.find("serial=901").unwrap() < flushed.find("serial=902").unwrap());
 
     let _ = fs::remove_dir_all(&dir);
 }

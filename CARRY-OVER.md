@@ -502,3 +502,14 @@ Adopted the bounded Slim 07f80c4 repair: seven appended transforms across charac
 ## pkg6 retained sources, fixed CPU seats and exact created destinations
 
 Integrated reviewed cumulative 1dd2629 composition plus 0bb452d native-owned seat admission. Seventeen existing carry rows receive append-only transforms, followed by three corrected rows. Preserved F6, pristine-load, developer measurement gating, Q15 and Hitbox observer changes. Known-empty native-owned seats require fresh exact active identities and epoch/count/entry rechecks; they grant no managed source token. All managed-generation and capacity resource proofs remain. Source only: integrated tests/native callback ABI/runtime and four-owner HUD remain pending.
+
+## pkg4 first-seal enqueue boundary (2026-11-03)
+
+The existing carried diagnostic formatter/filter/timestamp/ring-push body in
+`src/runtime/diag_log.rs` is extracted into an enqueue helper. The normal API
+retains its pre-writer synchronous drain and filtered-line short circuit. A
+diag/test-only enqueue entry lets the first-seal worker transfer its formatted
+bytes to the existing ring without invoking that drain. No new state, capacity,
+logging policy, or stage source was added/read. The live_replay call is recorded
+as an appended exact-text pkg4 carry transformation; the runtime logger has no
+carry manifest (see its original scoped mixed-file attribution above).

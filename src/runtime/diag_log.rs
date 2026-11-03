@@ -2,7 +2,8 @@
 //! whole lines to `practice-diagnostics.log` (two files of at most 128 KiB, rotated) and to the
 //! kernel debug output, and the panic breadcrumb. The shipped build admits only the
 //! `diag_ring::SHIPPED_TAGS`; a `diag` build writes every line. Formatting happens on the caller's
-//! stack and the ring is a fixed array, so a log call allocates nothing.
+//! stack and the ring is a fixed array, so enqueueing allocates nothing. The normal diagnostic
+//! API retains a synchronous filesystem drain before the writer starts; that drain may allocate.
 //!
 //! Lines 1-265 below the imports come from the earlier fork's `src/logging.rs` lines 20-284 (stage
 //! m5o, fork-only, ours); CARRY-OVER.md lists the edits. The file is no longer held open: each drain
@@ -167,21 +168,33 @@ pub fn init_diagnostics() {
         LINE_MAX
     ));
 }
-/// Record one diagnostic line. Never blocks on I/O, never allocates, never panics.
+/// Record one diagnostic line; before the writer starts, drain synchronously.
 pub fn diagnostic(args: fmt::Arguments<'_>) {
+    if enqueue(args) && !WRITER.load(Ordering::Acquire) {
+        drain();
+    }
+}
+
+/// Queue a diagnostic without invoking the caller-side synchronous drain.
+/// The existing bounded ring owns the formatted bytes and reports drops.
+#[cfg(any(feature = "diag", test))]
+pub(crate) fn enqueue_diagnostic(args: fmt::Arguments<'_>) {
+    let _ = enqueue(args);
+}
+
+/// True means the line passed the shipped-tag filter, not guaranteed delivery.
+fn enqueue(args: fmt::Arguments<'_>) -> bool {
     let mut line = StackLine::new();
     let whole = line.format(args);
     if !cfg!(feature = "diag") && !diag_ring::shipped(line.text()) {
-        return;
+        return false;
     }
     let ts = clock::uptime_ms();
     let text = whole.then_some(line.text());
     if RING.with(|ring| ring.push(ts, text, args, LINE_MAX)).is_none() {
         LOCK_MISSES.fetch_add(1, Ordering::Relaxed);
     }
-    if !WRITER.load(Ordering::Acquire) {
-        drain();
-    }
+    true
 }
 
 
