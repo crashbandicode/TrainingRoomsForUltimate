@@ -51,6 +51,8 @@ pub struct ThreadStack {
     pub bytes: usize,
     /// Deepest static path from the thread's entry in the diag NRO (`stack_depth.py <elf> table`): a lower bound.
     pub static_bound: usize,
+    /// Qualified callees outside the owned ELF, in addition to its static path.
+    pub external_bound: usize,
     /// Highest `used=` of the thread's `[ThreadStack]` lines over the Eden runs named in `measured_in` (0: not measured).
     pub measured: usize,
     pub measured_in: &'static str,
@@ -63,7 +65,7 @@ const KIB: usize = 1024;
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 4_880, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 5_056, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
     row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
@@ -86,8 +88,9 @@ pub const THREADS: [ThreadStack; 17] = [
     row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 13_488, "Eden st-02..st-12", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#2}"),
-    // ARCropolis mount wait and the layout file probe
-    row(ThreadId::Probe, c"tr-probe", 24 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}"),
+    // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
+    // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md.
+    row(ThreadId::Probe, c"tr-probe", 196 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
@@ -111,7 +114,18 @@ const fn row(
         Ok(name) => name,
         Err(_) => panic!("thread names are ASCII"),
     };
-    ThreadStack { id, c_name, name, bytes, static_bound, measured, measured_in, symbol }
+    ThreadStack { id, c_name, name, bytes, static_bound, external_bound: 0, measured, measured_in, symbol }
+}
+
+impl ThreadStack {
+    const fn with_external(mut self, bytes: usize) -> Self {
+        self.external_bound = bytes;
+        self
+    }
+
+    pub const fn required(&self) -> usize {
+        required(self.static_bound + self.external_bound, self.measured)
+    }
 }
 
 /// The row of a thread.

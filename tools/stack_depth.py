@@ -131,11 +131,11 @@ def deepest(funcs, root):
     return go(root)
 
 
-ROW_RE = re.compile(r'row\(ThreadId::(\w+),\s*c?"([^"]+)",\s*(\d+)\s*\*\s*KIB,\s*([\d_]+),\s*([\d_]+),\s*"[^"]*",\s*"([^"]+)"')
+ROW_RE = re.compile(r'row\(ThreadId::(\w+),\s*c?"([^"]+)",\s*(\d+)\s*\*\s*KIB,\s*([\d_]+),\s*([\d_]+),\s*"[^"]*",\s*"([^"]+)"\s*\)(?:\.with_external\(([\d_]+)\))?')
 
 
 def table_rows(text):
-    return [(m.group(1), m.group(2), int(m.group(3)) * 1024, int(m.group(4).replace("_", "")), int(m.group(5).replace("_", "")), m.group(6))
+    return [(m.group(1), m.group(2), int(m.group(3)) * 1024, int(m.group(4).replace("_", "")), int(m.group(5).replace("_", "")), m.group(6), int((m.group(7) or "0").replace("_", "")))
             for m in ROW_RE.finditer(text)]
 
 
@@ -154,16 +154,16 @@ def check_table(funcs, rows):
     base = 0 if entries else (start["frame"] if start else 0)
     shims = entries or [f for f in funcs.values() if "spawn_unchecked<" in f["name"] and "call_once::{shim" in f["name"]]
     lines, bad = [f"thread_start frame {base} B"], 0
-    for ident, name, size, static_bound, measured, symbol in rows:
+    for ident, name, size, static_bound, measured, symbol, external_bound in rows:
         hits = [f for f in shims if symbol in f["name"]]
         if not hits:
             lines.append(f"{name:20s} size={size:7d} no shim in this ELF (feature off)")
             continue
         depth = max(base + deepest(funcs, f["addr"])[0] for f in hits)
-        need = required(max(depth, static_bound), measured)
+        need = required(max(depth, static_bound) + external_bound, measured)
         ok = static_bound >= depth and size >= need
         bad += not ok
-        lines.append(f"{name:20s} size={size:7d} static={depth:7d} table_static={static_bound:7d} measured={measured:7d} "
+        lines.append(f"{name:20s} size={size:7d} static={depth:7d} table_static={static_bound:7d} external={external_bound:7d} measured={measured:7d} "
                      f"required={need:7d} {'ok' if ok else 'FAIL'}")
     return lines, bad
 

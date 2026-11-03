@@ -87,11 +87,10 @@ class StackDepth(unittest.TestCase):
         self.assertEqual(sd.deepest(self.funcs, 0x6000)[0], 0x10)
 
     def test_table_check(self):
-        text = '''row(ThreadId::TraceWriter, "tr-trace-writer", 64 * KIB, 0, 0, "", "compat::filesystem::init::{closure#0}",
-                  "x"),
-                  row(ThreadId::Probe, "tr-probe", 256 * KIB, 2_928, 0, "", "ui::probe::install::{closure#0}", "y"),'''
+        text = '''row(ThreadId::TraceWriter, "tr-trace-writer", 64 * KIB, 0, 0, "", "compat::filesystem::init::{closure#0}"),
+                  row(ThreadId::Probe, "tr-probe", 256 * KIB, 2_928, 0, "", "ui::probe::install::{closure#0}"),'''
         rows = sd.table_rows(text)
-        self.assertEqual(rows[0], ("TraceWriter", "tr-trace-writer", 65536, 0, 0, "compat::filesystem::init::{closure#0}"))
+        self.assertEqual(rows[0], ("TraceWriter", "tr-trace-writer", 65536, 0, 0, "compat::filesystem::init::{closure#0}", 0))
         lines, bad = sd.check_table(self.funcs, rows)
         # 0x70 + 0x10 + 0xe9a0 + 0x1010 = 64,000 B static: the 64 KiB row fails (and its table_static of 0 too)
         self.assertEqual(bad, 1)
@@ -102,6 +101,24 @@ class StackDepth(unittest.TestCase):
         # model::thread_stacks::required: max * 1.25 + 16 KiB, whole pages
         self.assertEqual(sd.required(59_840, 0), 94_208)
         self.assertEqual(sd.required(0, 0), 16_384)
+
+    def test_external_read_path_cannot_hide_behind_small_owned_frame_or_paint(self):
+        text = '''row(ThreadId::Probe, "tr-probe", 24 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}").with_external(143_376),'''
+        funcs = sd.link(sd.parse('''0000000000001000 <training_rooms::runtime::threads::imp::detached::<ui::probe::install::{closure#0}>>:
+    1000: sub sp, sp, #0xd70
+    1004: blr x8
+    1008: ret
+'''))
+        rows = sd.table_rows(text)
+        self.assertEqual(rows[0][-1], 143_376)
+        lines, bad = sd.check_table(funcs, rows)
+        self.assertEqual(bad, 1)
+        self.assertIn("required= 200704 FAIL", lines[1])
+        self.assertEqual(sd.required(3_440, 0), 24_576, "the old owned-only check admitted 24 KiB")
+        fixed = text.replace("24 * KIB", "196 * KIB")
+        self.assertEqual(sd.check_table(funcs, sd.table_rows(fixed))[1], 0)
+        grown = fixed.replace("143_376", "147_472")
+        self.assertEqual(sd.check_table(funcs, sd.table_rows(grown))[1], 1)
 
 
 if __name__ == "__main__":

@@ -35,11 +35,11 @@ fn rows_are_in_id_order_with_unique_names() {
 fn rows_cover_their_need() {
     for row in &THREADS {
         assert_eq!(row.bytes % 4096, 0, "{}: whole pages", row.name);
-        let need = thread_stacks::required(row.static_bound, row.measured);
+        let need = row.required();
         assert!(
             row.bytes >= need,
-            "{}: {} B stack, needs {} B (static {} B, measured {} B, +25% + {} B SDK reserve)",
-            row.name, row.bytes, need, row.static_bound, row.measured, SDK_RESERVE
+            "{}: {} B stack, needs {} B (static {} B, external {} B, measured {} B, +25% + {} B SDK reserve)",
+            row.name, row.bytes, need, row.static_bound, row.external_bound, row.measured, SDK_RESERVE
         );
         assert_eq!(row.measured == 0, row.measured_in.is_empty(), "{}: a measurement names its runs", row.name);
     }
@@ -49,6 +49,28 @@ fn rows_cover_their_need() {
 fn the_fault_s_numbers_fail_the_rule() {
     // tr-trace-writer before the fix: thread_start 112 + shim 16 + body 59,712 B (diag ELF of 27d84f4) on 64 KiB.
     assert!(thread_stacks::required(59_840, 0) > 64 * 1024);
+}
+
+#[test]
+fn probe_accounts_for_the_actual_external_read_path_even_when_paint_misses_it() {
+    // ui-16's 128 KiB subtraction jumped below the 24 KiB painted allocation.
+    // Addressed ABI frames: adapter64 + read320 + parent10368 + decoder131904
+    // + nested720. The owned scanner's 3440 remains a separate contribution.
+    let mut probe = *thread_stacks::of(ThreadId::Probe);
+    assert_eq!(probe.static_bound, 3_440);
+    assert_eq!(probe.external_bound, 64 + 320 + 10_368 + 131_904 + 720);
+    assert!(thread_stacks::required(probe.static_bound, 0) <= 24 * 1024,
+        "the old owned-only rule admitted the overflowing allocation");
+    assert_eq!(probe.required(), 200_704);
+    probe.measured = 18_560; // The misleading in-allocation ui-16 paint result.
+    assert!(24 * 1024 < probe.required());
+    assert_eq!(probe.required(), 200_704);
+    assert_eq!(probe.bytes, probe.required());
+    probe.external_bound += 4096;
+    assert!(probe.required() > probe.bytes, "a growing external path must fail again");
+    for row in &THREADS {
+        if row.id != ThreadId::Probe { assert_eq!(row.external_bound, 0); }
+    }
 }
 
 #[test]
