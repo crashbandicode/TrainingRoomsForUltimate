@@ -326,6 +326,20 @@ pub struct CatalogEntry<'a> {
 }
 
 pub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {
+    let canonical = classify_canonical(slot)?;
+    Ok(MiiConfig {
+        slot_id: slot.slot_id,
+        slot_index: slot.index,
+        name: String::from_utf16_lossy(&slot.name_units[..slot.name_len as usize]),
+        charinfo: slot.charinfo,
+        raw_tags: [slot.tag_outfit, slot.tag_hat, slot.tag_chara],
+        canonical,
+        copies: Vec::new(),
+    })
+}
+
+/// The same catalog validation without constructing a display name.
+pub(crate) fn classify_canonical(slot: &RawSlot) -> Result<Canonical, Finding> {
     let (slot_index, slot_id) = (slot.index, slot.slot_id);
     if slot.specials.iter().any(|s| *s > 2) {
         return Err(Finding::SpecialOutOfRange { slot_index, slot_id, specials: slot.specials });
@@ -346,25 +360,17 @@ pub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {
     }
     let mut masked = slot.charinfo;
     masked[..CHARINFO_MASK_END].fill(0);
-    Ok(MiiConfig {
-        slot_id,
-        slot_index,
-        name: String::from_utf16_lossy(&slot.name_units[..slot.name_len as usize]),
-        charinfo: slot.charinfo,
-        raw_tags: [slot.tag_outfit, slot.tag_hat, slot.tag_chara],
-        canonical: Canonical {
-            class,
-            appearance: Appearance {
-                charinfo_masked: masked,
-                specials: slot.specials,
-                colour: slot.colour,
-                voice: slot.voice,
-                outfit: slot.tag_outfit.hash40(),
-                hat: slot.tag_hat.hash40(),
-                chara: slot.tag_chara.hash40(),
-            },
+    Ok(Canonical {
+        class,
+        appearance: Appearance {
+            charinfo_masked: masked,
+            specials: slot.specials,
+            colour: slot.colour,
+            voice: slot.voice,
+            outfit: slot.tag_outfit.hash40(),
+            hat: slot.tag_hat.hash40(),
+            chara: slot.tag_chara.hash40(),
         },
-        copies: Vec::new(),
     })
 }
 

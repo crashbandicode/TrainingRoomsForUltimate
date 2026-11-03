@@ -13,6 +13,9 @@ mod hook_stats;
 use mii::inventory::{MiiClass, MiiConfig, TaggedId};
 use mii::lifetime::{Configuration, Tokens};
 use mii::native_values::RowIds;
+use mii::{editor_row as value, inventory};
+#[path = "../src/runtime/mii/mii_editor_bridge/draft.rs"]
+mod draft;
 
 #[global_allocator]
 static ALLOCATOR: hook_stats::CountingAllocator = hook_stats::CountingAllocator;
@@ -87,6 +90,191 @@ fn constructors_reject_values_that_cannot_be_reconstructed_losslessly() {
     let mut mismatched = saved(original);
     mismatched.canonical.class = MiiClass::Gunner;
     assert!(Configuration::from_saved(&mismatched).is_err());
+}
+
+fn editor_row() -> value::Row {
+    let mut row = [0; 432];
+    row[0x114] = 1;
+    row[0x118] = b'A';
+    row[0x130..0x138].copy_from_slice(&ROWS.outfit.to_le_bytes());
+    row[0x138..0x140].copy_from_slice(&ROWS.hat.to_le_bytes());
+    row[0x140] = 255;
+    row[0x141] = 254;
+    row[0x142..0x146].copy_from_slice(&[0, 1, 2, 1]);
+    row[0x148..0x1a0].fill(42);
+    row[0x1a0..0x1a8].copy_from_slice(&0xc1000013fdfdfb2bu64.to_le_bytes());
+    row
+}
+
+#[test]
+fn draft_refinement_preserves_error_order_and_independent_copies() {
+    use draft::Draft;
+    let pending = Draft::native_default(MiiClass::Brawler);
+    assert_eq!(pending.row(), None);
+    assert_eq!(pending.hash(), 0);
+    assert_eq!(pending.validate(), Ok(()));
+    let row = editor_row();
+    let mut refined = pending;
+    let mut identity = row;
+    identity[0] = 1;
+    assert_eq!(refined.materialize(MiiClass::Gunner, identity), Err("default_intent_changed"));
+    assert_eq!(refined, pending);
+    assert_eq!(refined.materialize(MiiClass::Brawler, identity), Err("default_identity_not_zero"));
+    assert_eq!(refined, pending);
+    let mut invalid = row;
+    invalid[0x142] = 3;
+    assert_eq!(refined.materialize(MiiClass::Brawler, invalid), Err("Invalid edited Mii"));
+    assert_eq!(refined, pending);
+    let mut other_class = row;
+    other_class[0x1a0..0x1a8].copy_from_slice(&0xc100001257ab1d87u64.to_le_bytes());
+    assert_eq!(refined.materialize(MiiClass::Brawler, other_class), Err("default_class_mismatch"));
+    assert_eq!(refined, pending);
+    assert_eq!(refined.materialize(MiiClass::Brawler, row), Ok(()));
+    assert_eq!(pending.row(), None);
+    assert_eq!(refined.row(), Some(&row));
+    assert_eq!(refined.pending_class(), None);
+    assert_eq!(refined.validate(), Ok(()));
+    assert_eq!(refined, Draft::ready(row));
+    let copy = refined;
+    assert_eq!(refined.materialize(MiiClass::Brawler, identity), Err("default_intent_changed"));
+    assert_eq!(refined, copy);
+    let mut changed = row;
+    changed[20] = 1; // A byte outside parsed appearance still belongs to the exact row.
+    assert_ne!(refined, Draft::ready(changed));
+    assert_ne!(pending, Draft::native_default(MiiClass::Gunner));
+    assert!(Draft::ready([0; 432]).validate().is_err());
+}
+
+#[test]
+fn editor_value_validation_preserves_errors_and_lossy_name_behavior() {
+    let row = editor_row();
+    assert_eq!(value::parse(&row).unwrap(), ("A".into(), observed()));
+    for (offset, byte, expected) in [
+        (0, 1, "Invalid owned editor row"),
+        (0x114, 0, "Invalid edited Mii"), (0x114, 11, "Invalid edited Mii"),
+        (0x137, 0, "Invalid edited Mii"), (0x13f, 0, "Invalid edited Mii"),
+        (0x1a7, 0, "Invalid edited Mii"), (0x142, 3, "Invalid edited Mii"),
+    ] {
+        let mut invalid = row;
+        invalid[offset] = byte;
+        assert_eq!(value::configuration(&invalid), Err(expected));
+        assert_eq!(value::parse(&invalid), Err(expected));
+    }
+    let mut bad_hint = row;
+    bad_hint[0x135..0x137].fill(255);
+    assert_eq!(value::configuration(&bad_hint), Err("Edited Mii resources differ"));
+    let mut lossy = row;
+    lossy[0x118..0x11a].copy_from_slice(&0xd800u16.to_le_bytes());
+    assert_eq!(value::parse(&lossy).unwrap(), ("\u{fffd}".into(), observed()));
+    assert_eq!(value::configuration(&lossy), Ok(observed()));
+    let mut id = row;
+    id[0] = 9;
+    assert_eq!(mii::saved::parse_header(0, 0, &id).unwrap_err(), "filename id 0 differs from header id 9");
+}
+
+#[test]
+fn native_default_seed_and_saved_name_paths_preserve_bytes() {
+    let mut seed = saved(observed());
+    let mut expected = editor_row();
+    expected[0x114] = 7;
+    expected[0x118..0x12c].fill(0);
+    for (i, byte) in b"New Mii".iter().enumerate() { expected[0x118 + i * 2] = *byte; }
+    assert_eq!(value::from_seed(&seed), Ok(expected));
+    for (name, expected_name) in [
+        ("123456789\u{1f600}", "123456789"), ("12345678\u{1f600}", "12345678\u{1f600}"),
+        ("\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}x", "\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}"),
+        ("", "New Mii"),
+    ] {
+        seed.name = name.into();
+        let row = value::from_seed(&seed).unwrap();
+        assert_eq!(value::parse(&row).unwrap().0, expected_name);
+        assert_eq!(value::configuration(&row), Ok(observed()));
+    }
+}
+
+#[test]
+fn actual_seed_first_and_repeated_valid_and_invalid_paths_allocate_nothing() {
+    const CHILD: &str = "TR_SEED_ALLOC_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "actual_seed_first_and_repeated_valid_and_invalid_paths_allocate_nothing", "--test-threads=1", "--nocapture"])
+            .env(CHILD, "1").status().unwrap();
+        assert!(status.success());
+        return;
+    }
+    let default = saved(observed());
+    let mut named = saved(observed());
+    named.name = "12345678\u{1f600}x".into();
+    let mut invalid = saved(observed());
+    invalid.canonical.appearance.specials[0] = 3;
+    let measure = |count| {
+        let before = hook_stats::hook_allocations();
+        {
+            let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+            for _ in 0..count {
+                std::hint::black_box(value::from_seed(&default).unwrap());
+                std::hint::black_box(value::from_seed(&named).unwrap());
+                assert_eq!(value::from_seed(&invalid), Err("Invalid editor appearance"));
+            }
+        }
+        hook_stats::hook_allocations() - before
+    };
+    let first = measure(1);
+    let repeated = measure(64);
+    let before = hook_stats::hook_allocations();
+    {
+        let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+        std::hint::black_box(vec![7u8; 1024]);
+    }
+    let control = hook_stats::hook_allocations() - before;
+    println!("Seed allocations first={first} repeated={repeated} positive_control={control}");
+    assert!(control > 0);
+    assert_eq!((first, repeated), (0, 0));
+}
+
+#[test]
+fn actual_draft_first_and_repeated_refinement_allocate_nothing() {
+    const CHILD: &str = "TR_DRAFT_ALLOC_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "actual_draft_first_and_repeated_refinement_allocate_nothing", "--test-threads=1", "--nocapture"])
+            .env(CHILD, "1").status().unwrap();
+        assert!(status.success());
+        return;
+    }
+    let row = editor_row();
+    let measure = |count| {
+        let before = hook_stats::hook_allocations();
+        {
+            let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+            for _ in 0..count {
+                let mut pending = draft::Draft::native_default(MiiClass::Brawler);
+                pending.materialize(MiiClass::Brawler, row).unwrap();
+                assert_eq!(pending.validate(), Ok(()));
+                std::hint::black_box((pending, pending.hash()));
+                for (offset, byte) in [(0, 1), (0x114, 0), (0x137, 0), (0x142, 3)] {
+                    let mut invalid = row;
+                    invalid[offset] = byte;
+                    assert!(draft::Draft::ready(invalid).validate().is_err());
+                    let mut refused = draft::Draft::native_default(MiiClass::Brawler);
+                    assert!(refused.materialize(MiiClass::Brawler, invalid).is_err());
+                    assert_eq!(refused.row(), None);
+                }
+            }
+        }
+        hook_stats::hook_allocations() - before
+    };
+    let first = measure(1);
+    let repeated = measure(64);
+    let before = hook_stats::hook_allocations();
+    {
+        let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+        std::hint::black_box(vec![7u8; 1024]);
+    }
+    let control = hook_stats::hook_allocations() - before;
+    println!("Draft allocations first={first} repeated={repeated} positive_control={control}");
+    assert!(control > 0);
+    assert_eq!((first, repeated), (0, 0));
 }
 
 #[test]

@@ -601,7 +601,27 @@
    "dest": "src/model/mii/editor_row.rs",
    "crate": "mii",
    "src_sha256": "bd6f9f383f890d202164a8ee194797bcbbe69e9c73a816c0c5bc3ed21788176d",
-   "dest_sha256": "b486201369e88b6eda5513dc4be239e093dce41c6e56cf84fedb27bfb78899f6"
+   "dest_sha256": "516e67caccc9aa2c2a483ea237e75adb10d9a0a765097096a91e2f91b35de56e",
+   "edits": [
+    {
+     "old": "}\n\npub fn parse(row: &Row) -> Result<(String, Configuration), &'static str> {\n    let raw = saved::parse_header(0, 0, row).map_err(|_| \"Invalid owned editor row\")?;\n    let config = inventory::classify(&raw).map_err(|_| \"Invalid edited Mii\")?;\n    let value = Configuration::from_saved(&config).map_err(|_| \"Edited Mii resources differ\")?;\n    Ok((config.name, value))\n}\n\n#[cfg(test)]\n",
+     "new": "}\n\npub fn parse(row: &Row) -> Result<(String, Configuration), &'static str> {\n    let (raw, value) = validated(row)?;\n    Ok((String::from_utf16_lossy(&raw.name_units[..raw.name_len as usize]), value))\n}\n\n/// Native handoffs need only the checked owned value, never a display name.\npub(crate) fn configuration(row: &Row) -> Result<Configuration, &'static str> {\n    validated(row).map(|(_, value)| value)\n}\n\nfn validated(row: &Row) -> Result<(inventory::RawSlot, Configuration), &'static str> {\n    let raw = saved::parse_header_value(0, 0, row).map_err(|_| \"Invalid owned editor row\")?;\n    let canonical = inventory::classify_canonical(&raw).map_err(|_| \"Invalid edited Mii\")?;\n    let value = Configuration::from_saved(&MiiConfig {\n        slot_id: raw.slot_id, slot_index: raw.index, name: String::new(),\n        charinfo: raw.charinfo, raw_tags: [raw.tag_outfit, raw.tag_hat, raw.tag_chara],\n        canonical, copies: Vec::new(),\n    }).map_err(|_| \"Edited Mii resources differ\")?;\n    Ok((raw, value))\n}\n\n#[cfg(test)]\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "pub fn from_seed(seed: &MiiConfig) -> Result<Row, &'static str> {\n    Configuration::from_saved(seed).map_err(|_| \"Invalid editor appearance\")?;\n    let mut row = [0; saved::HEADER_LEN];\n    let mut units = Vec::new();\n    for ch in seed.name.chars() {\n        let mut encoded = [0; 2];\n        let next = ch.encode_utf16(&mut encoded);\n        if units.len() + next.len() > 10 { break; }\n        units.extend_from_slice(next);\n    }\n    if units.is_empty() { units.extend(\"New Mii\".encode_utf16()); }\n    row[0x114..0x118].copy_from_slice(&(units.len() as u32).to_le_bytes());\n    for (i, unit) in units.into_iter().enumerate() {\n        row[0x118 + i * 2..0x11a + i * 2].copy_from_slice(&unit.to_le_bytes());\n    }\n    for (offset, tag) in [0x130, 0x138, 0x1a0].into_iter().zip(seed.raw_tags) {\n",
+     "new": "pub fn from_seed(seed: &MiiConfig) -> Result<Row, &'static str> {\n    Configuration::from_saved(seed).map_err(|_| \"Invalid editor appearance\")?;\n    let mut row = [0; saved::HEADER_LEN];\n    let mut units = [0u16; 10];\n    let mut len = 0;\n    for ch in seed.name.chars() {\n        let mut encoded = [0; 2];\n        let next = ch.encode_utf16(&mut encoded);\n        if len + next.len() > units.len() { break; }\n        units[len..len + next.len()].copy_from_slice(next);\n        len += next.len();\n    }\n    if len == 0 {\n        for unit in \"New Mii\".encode_utf16() { units[len] = unit; len += 1; }\n    }\n    row[0x114..0x118].copy_from_slice(&(len as u32).to_le_bytes());\n    for (i, unit) in units[..len].iter().enumerate() {\n        row[0x118 + i * 2..0x11a + i * 2].copy_from_slice(&unit.to_le_bytes());\n    }\n    for (offset, tag) in [0x130, 0x138, 0x1a0].into_iter().zip(seed.raw_tags) {\n",
+     "count": 1,
+     "reason": "Lead 2026-11-03 00:07:39Z: native default caller uses same validated canonical/raw fields without allocated display name, relying on identical existing New Mii fallback. from_seed uses bounded ten UTF16 units and value-only validation, preserving scalar truncation, error precedence, native calls and output bytes."
+    },
+    {
+     "old": "    row[0x141] = appearance.voice;\n    row[0x142..0x146].copy_from_slice(&appearance.specials);\n    row[0x148..0x1a0].copy_from_slice(&seed.charinfo);\n    let (_, checked) = parse(&row)?;\n    if checked.canonical() != seed.canonical { return Err(\"Editor seed differs from selected Mii\"); }\n    Ok(row)\n}\n",
+     "new": "    row[0x141] = appearance.voice;\n    row[0x142..0x146].copy_from_slice(&appearance.specials);\n    row[0x148..0x1a0].copy_from_slice(&seed.charinfo);\n    let checked = configuration(&row)?;\n    if checked.canonical() != seed.canonical { return Err(\"Editor seed differs from selected Mii\"); }\n    Ok(row)\n}\n",
+     "count": 1,
+     "reason": "Lead 2026-11-03 00:07:39Z: native default caller uses same validated canonical/raw fields without allocated display name, relying on identical existing New Mii fallback. from_seed uses bounded ten UTF16 units and value-only validation, preserving scalar truncation, error precedence, native calls and output bytes."
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/identity.rs",
@@ -615,7 +635,21 @@
    "dest": "src/model/mii/inventory.rs",
    "crate": "mii",
    "src_sha256": "7cb9fa0651cbee81e6a3d0cc62745e62f3c2f798acf84f9ea25eeafb65c7cf2f",
-   "dest_sha256": "f121fdb3473c8b566ef04065f5f459302bfa76ec9298c8a5cd87777663c484c8"
+   "dest_sha256": "0be5136462c22b585ee25d88e068eb5bb9e993e93a2341fcbfc4a3dd41638ca3",
+   "edits": [
+    {
+     "old": "}\n\npub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {\n    let (slot_index, slot_id) = (slot.index, slot.slot_id);\n    if slot.specials.iter().any(|s| *s > 2) {\n        return Err(Finding::SpecialOutOfRange { slot_index, slot_id, specials: slot.specials });\n",
+     "new": "}\n\npub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {\n    let canonical = classify_canonical(slot)?;\n    Ok(MiiConfig {\n        slot_id: slot.slot_id,\n        slot_index: slot.index,\n        name: String::from_utf16_lossy(&slot.name_units[..slot.name_len as usize]),\n        charinfo: slot.charinfo,\n        raw_tags: [slot.tag_outfit, slot.tag_hat, slot.tag_chara],\n        canonical,\n        copies: Vec::new(),\n    })\n}\n\n/// The same catalog validation without constructing a display name.\npub(crate) fn classify_canonical(slot: &RawSlot) -> Result<Canonical, Finding> {\n    let (slot_index, slot_id) = (slot.index, slot.slot_id);\n    if slot.specials.iter().any(|s| *s > 2) {\n        return Err(Finding::SpecialOutOfRange { slot_index, slot_id, specials: slot.specials });\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "    }\n    let mut masked = slot.charinfo;\n    masked[..CHARINFO_MASK_END].fill(0);\n    Ok(MiiConfig {\n        slot_id,\n        slot_index,\n        name: String::from_utf16_lossy(&slot.name_units[..slot.name_len as usize]),\n        charinfo: slot.charinfo,\n        raw_tags: [slot.tag_outfit, slot.tag_hat, slot.tag_chara],\n        canonical: Canonical {\n            class,\n            appearance: Appearance {\n                charinfo_masked: masked,\n                specials: slot.specials,\n                colour: slot.colour,\n                voice: slot.voice,\n                outfit: slot.tag_outfit.hash40(),\n                hat: slot.tag_hat.hash40(),\n                chara: slot.tag_chara.hash40(),\n            },\n        },\n        copies: Vec::new(),\n    })\n}\n\n",
+     "new": "    }\n    let mut masked = slot.charinfo;\n    masked[..CHARINFO_MASK_END].fill(0);\n    Ok(Canonical {\n        class,\n        appearance: Appearance {\n            charinfo_masked: masked,\n            specials: slot.specials,\n            colour: slot.colour,\n            voice: slot.voice,\n            outfit: slot.tag_outfit.hash40(),\n            hat: slot.tag_hat.hash40(),\n            chara: slot.tag_chara.hash40(),\n        },\n    })\n}\n\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/ldn_handshake.rs",
@@ -750,7 +784,15 @@
    "dest": "src/model/mii/saved.rs",
    "crate": "mii",
    "src_sha256": "56a7f3f2957398f6efbfd5944e1a1dbab5c45bbae2057916c8b2dff92d54a976",
-   "dest_sha256": "4d1242a356be6b218d760dec1991e507d0819543e55a0dab467dd4ddf2b6a9e2"
+   "dest_sha256": "25da9474d14aa2558148dfa398249aca73dc06212e293f561a4c4f0914cc386f",
+   "edits": [
+    {
+     "old": "\n/// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.\npub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {\n    let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());\n    let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());\n    let stored = u32_at(0);\n    if stored != id {\n        return Err(format!(\"filename id {id} differs from header id {stored}\"));\n    }\n    let mut name_units = [0; 10];\n    for (i, unit) in name_units.iter_mut().enumerate() {\n",
+     "new": "\n/// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.\npub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {\n    parse_header_value(id, index, bytes)\n        .map_err(|stored| format!(\"filename id {id} differs from header id {stored}\"))\n}\n\n/// A mismatched stored ID is a value; only file/report consumers format it.\npub(crate) fn parse_header_value(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, u32> {\n    let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());\n    let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());\n    let stored = u32_at(0);\n    if stored != id {\n        return Err(stored);\n    }\n    let mut name_units = [0; 10];\n    for (i, unit) in name_units.iter_mut().enumerate() {\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/selection.rs",
@@ -5953,7 +5995,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/resume_adapter.rs",
    "crate": "root",
    "src_sha256": "3c61b782426a242d53d888a67fe2fefa48f9dfd10cea9d1e322a0063dfd0e020",
-   "dest_sha256": "d95f4265395eca154fd0f0a1ecb03916bee9ac0c37eedea4baad4b6b7282d6d2",
+   "dest_sha256": "0b90ca5dd6874c575c20000d3eb203275b4d29c94bf13d3232c47872bb02bba2",
    "edits": [
     {
      "old": "/// pointers here are comparison tokens, never read after a release callback.\npub(super) unsafe fn before_release(context: usize) {\n    name_keyboard::before_release(context);\n    *CAPTURE.lock().unwrap() = None;\n    *RECONSTRUCTION.lock().unwrap() = None;\n    settings_resume::release();\n    cosmetic_resume::clear();\n    settle(false, 3);\n",
@@ -6044,6 +6086,18 @@
      "old": "//! Bridges value checkpoints to the owned native editor's current callbacks.\nuse super::{connected_native as contract, cosmetic_resume, current_thread, handshake, lifecycle, name_keyboard,\n    native, settings_resume, specials_resume, ui_resume, Origin, Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE, ACTIVE};\nuse std::sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex};\n\nstruct Capture {\n    context: usize,\n",
      "new": "//! Bridges value checkpoints to the owned native editor's current callbacks.\nuse super::{connected_native as contract, cosmetic_resume, current_thread, handshake, lifecycle, name_keyboard,\n    native, settings_resume, specials_resume, ui_resume, Origin, Phase, BASE, EDIT_CONTEXT, EDIT_OWNED, STATE, ACTIVE};\nuse std::sync::{atomic::{AtomicU64, Ordering}, Arc};\nuse hos_lock::Mutex;\n\nstruct Capture {\n    context: usize,\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "            ui_resume::Screen::Color(color) => cosmetic_resume::keep_equipped_color(&mut row, color),\n            _ => {}\n        }\n        super::draft::Draft::Ready(row)\n    };\n    let generation = match origin {\n        Origin::Quickplay => lifecycle::generation_for(owner),\n",
+     "new": "            ui_resume::Screen::Color(color) => cosmetic_resume::keep_equipped_color(&mut row, color),\n            _ => {}\n        }\n        super::draft::Draft::ready(row)\n    };\n    let generation = match origin {\n        Origin::Quickplay => lifecycle::generation_for(owner),\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "                } else {\n                    s.event(\"ui_checkpoint_suspended\", [generation.unwrap(), focus as u64,\n                        seed.hash(), 0]);\n                    if let super::draft::Draft::NativeDefault(class) = seed {\n                        s.event(\"ui_default_intent_suspended\", [generation.unwrap(), class.kind() as u64, 0, 0]);\n                    }\n                    if let ui_resume::Screen::Specials(snapshot) = screen {\n",
+     "new": "                } else {\n                    s.event(\"ui_checkpoint_suspended\", [generation.unwrap(), focus as u64,\n                        seed.hash(), 0]);\n                    if let Some(class) = seed.pending_class() {\n                        s.event(\"ui_default_intent_suspended\", [generation.unwrap(), class.kind() as u64, 0, 0]);\n                    }\n                    if let ui_resume::Screen::Specials(snapshot) = screen {\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
     }
    ]
   },
@@ -6265,7 +6319,15 @@
    "dest": "src/runtime/mii/mii_editor_bridge/native_default.rs",
    "crate": "root",
    "src_sha256": "db28494490813b40de6cea6afd1f33a68f00a37da2475177b036d1bda4586bbd",
-   "dest_sha256": "315399804836c1b6d733facdf6fcbf511bb78b2ece51926103cb971f61ecdd1e"
+   "dest_sha256": "a78f6b60d5adcf9f7757c8175d76534a3a185fa7acca4713d7716c9238ffc373",
+   "edits": [
+    {
+     "old": "        colour, voice: 37, specials: [0; 4], charinfo: charinfo.0,\n        tag_outfit: outfit, tag_hat: hat, tag_chara: chara,\n    };\n    let config = inventory::classify(&raw).map_err(|_| \"default_owned_values_invalid\")?;\n    value::from_seed(&config)\n}\n",
+     "new": "        colour, voice: 37, specials: [0; 4], charinfo: charinfo.0,\n        tag_outfit: outfit, tag_hat: hat, tag_chara: chara,\n    };\n    let canonical = inventory::classify_canonical(&raw).map_err(|_| \"default_owned_values_invalid\")?;\n    // Native defaults always use the existing empty-name fallback: \"New Mii\".\n    // No display name or catalog copy list is needed on this native handoff.\n    let config = inventory::MiiConfig {\n        slot_id: raw.slot_id, slot_index: raw.index, name: String::new(),\n        charinfo: raw.charinfo, raw_tags: [raw.tag_outfit, raw.tag_hat, raw.tag_chara],\n        canonical, copies: Vec::new(),\n    };\n    value::from_seed(&config)\n}\n",
+     "count": 1,
+     "reason": "Lead 2026-11-03 00:07:39Z: native default caller uses same validated canonical/raw fields without allocated display name, relying on identical existing New Mii fallback. from_seed uses bounded ten UTF16 units and value-only validation, preserving scalar truncation, error precedence, native calls and output bytes."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/settings_resume.rs",
@@ -6563,7 +6625,21 @@
    "dest": "src/runtime/mii/mii_editor_bridge/draft.rs",
    "crate": "root",
    "src_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be",
-   "dest_sha256": "d2e5751de2e6169466be2de8ef70df12d3c8f75609ed904f1dbed6933e0a95be"
+   "dest_sha256": "128088568c8e288aeac63c52fe3ee95f1bb3ba09220a1075a2e29bcea314e425",
+   "edits": [
+    {
+     "old": "use super::{inventory::{self, MiiClass}, value};\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n// The session and resume slot already owned a fixed 432-byte row. Keep that\n// bounded value inline: refining an intent must not allocate on the native\n// handoff, and snapshots must remain independent copies.\n#[allow(clippy::large_enum_variant)]\npub(super) enum Draft {\n    NativeDefault(MiiClass),\n    Ready(value::Row),\n}\n\nimpl Draft {\n    pub(super) fn validate(&self) -> Result<(), &'static str> {\n        match self {\n            Self::NativeDefault(_) => Ok(()),\n            Self::Ready(row) => value::parse(row).map(|_| ()),\n        }\n    }\n\n    pub(super) fn row(&self) -> Option<&value::Row> {\n        match self { Self::Ready(row) => Some(row), Self::NativeDefault(_) => None }\n    }\n\n    pub(super) fn hash(&self) -> u64 {\n",
+     "new": "use super::{inventory::{self, MiiClass}, value};\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\nenum Intent {\n    NativeDefault(MiiClass),\n    Ready,\n}\n\n/// Fixed owned storage, exposed as a row only after the intent becomes Ready.\n/// The zeroed backing of NativeDefault is not a valid or partially valid row.\n#[derive(Clone, Copy, Debug)]\npub(super) struct Draft {\n    intent: Intent,\n    storage: value::Row,\n}\n\nimpl PartialEq for Draft {\n    fn eq(&self, other: &Self) -> bool {\n        self.intent == other.intent && self.row() == other.row()\n    }\n}\nimpl Eq for Draft {}\n\nimpl Draft {\n    pub(super) fn native_default(class: MiiClass) -> Self {\n        Self { intent: Intent::NativeDefault(class), storage: [0; core::mem::size_of::<value::Row>()] }\n    }\n\n    pub(super) fn ready(row: value::Row) -> Self {\n        Self { intent: Intent::Ready, storage: row }\n    }\n\n    pub(super) fn pending_class(&self) -> Option<MiiClass> {\n        match self.intent { Intent::NativeDefault(class) => Some(class), Intent::Ready => None }\n    }\n\n    pub(super) fn validate(&self) -> Result<(), &'static str> {\n        match self.row() {\n            None => Ok(()),\n            Some(row) => value::configuration(row).map(|_| ()),\n        }\n    }\n\n    pub(super) fn row(&self) -> Option<&value::Row> {\n        match self.intent { Intent::Ready => Some(&self.storage), Intent::NativeDefault(_) => None }\n    }\n\n    pub(super) fn hash(&self) -> u64 {\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "    /// Refine only the matching pending intent. A completed value never selects\n    /// a new default on resume, even if native defaults or the catalog change.\n    pub(super) fn materialize(&mut self, class: MiiClass, row: value::Row) -> Result<(), &'static str> {\n        if *self != Self::NativeDefault(class) { return Err(\"default_intent_changed\"); }\n        if row[..12] != [0; 12] { return Err(\"default_identity_not_zero\"); }\n        let (_, config) = value::parse(&row)?;\n        if config.canonical().class != class { return Err(\"default_class_mismatch\"); }\n        *self = Self::Ready(row);\n        Ok(())\n    }\n}\n",
+     "new": "    /// Refine only the matching pending intent. A completed value never selects\n    /// a new default on resume, even if native defaults or the catalog change.\n    pub(super) fn materialize(&mut self, class: MiiClass, row: value::Row) -> Result<(), &'static str> {\n        if self.pending_class() != Some(class) { return Err(\"default_intent_changed\"); }\n        if row[..12] != [0; 12] { return Err(\"default_identity_not_zero\"); }\n        let config = value::configuration(&row)?;\n        if config.canonical().class != class { return Err(\"default_class_mismatch\"); }\n        *self = Self::ready(row);\n        Ok(())\n    }\n}\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/specials_resume.rs",
@@ -6577,7 +6653,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "ac84174dda75a4892cb8c7224348a517d5d9be18ce50a4e909302ac529bd838a",
+   "dest_sha256": "d9c5bce1b6947e031fa1ce8e926f247a2a453bebf9f8a7ad2c0863aaccd6dfe9",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -6811,6 +6887,30 @@
      "old": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc, Mutex};\nuse std::time::{Duration, Instant};\nuse crate::engine::mii::inventory::{self, Snapshot};\nuse crate::engine::mii_root::resume::ResumeTicket;\n",
      "new": "#[cfg(feature = \"diag\")]\nuse serde::Serialize;\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse std::sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc};\nuse hos_lock::Mutex;\nuse std::time::{Duration, Instant};\nuse crate::engine::mii::inventory::{self, Snapshot};\nuse crate::engine::mii_root::resume::ResumeTicket;\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        };\n        if !request.catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n        let seed = match request.seed {\n            crate::engine::mii_root::mii_menu::EditorSeed::Saved(seed) => Draft::Ready(value::from_seed(&seed)?),\n            crate::engine::mii_root::mii_menu::EditorSeed::NativeDefault(class) => {\n                if !native_default::available() { return Err(\"Native default adapter is unavailable\"); }\n                Draft::NativeDefault(class)\n            }\n        };\n        if ui_resume::pending() { return Err(\"An unfinished editor is waiting to resume\"); }\n",
+     "new": "        };\n        if !request.catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n        let seed = match request.seed {\n            crate::engine::mii_root::mii_menu::EditorSeed::Saved(seed) => Draft::ready(value::from_seed(&seed)?),\n            crate::engine::mii_root::mii_menu::EditorSeed::NativeDefault(class) => {\n                if !native_default::available() { return Err(\"Native default adapter is unavailable\"); }\n                Draft::native_default(class)\n            }\n        };\n        if ui_resume::pending() { return Err(\"An unfinished editor is waiting to resume\"); }\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "        trace };\n    session.event(if restore.is_some() { \"automatic_resume_requested\" } else { \"requested\" },\n        [seed.hash(), 0, 0, 0]);\n    if let Draft::NativeDefault(class) = seed {\n        session.event(\"native_default_requested\", [class.kind() as u64, 0, 0, 0]);\n    }\n    *state = Some(session);\n",
+     "new": "        trace };\n    session.event(if restore.is_some() { \"automatic_resume_requested\" } else { \"requested\" },\n        [seed.hash(), 0, 0, 0]);\n    if let Some(class) = seed.pending_class() {\n        session.event(\"native_default_requested\", [class.kind() as u64, 0, 0, 0]);\n    }\n    *state = Some(session);\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "        let state = STATE.lock();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued\n            && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };\n        let Draft::NativeDefault(class) = s.seed else { return; };\n        let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };\n        if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }\n        (class, s.restore_ticket)\n",
+     "new": "        let state = STATE.lock();\n        let Some(s) = state.as_ref().filter(|s| s.phase == Phase::Queued\n            && !s.interrupted && s.thread == current_thread() && s.editor == scene) else { return; };\n        let Some(class) = s.seed.pending_class() else { return; };\n        let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };\n        if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }\n        (class, s.restore_ticket)\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
+    },
+    {
+     "old": "    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted\n        && s.thread == current_thread() && s.editor == scene\n        && s.seed == Draft::NativeDefault(class) && s.restore_ticket == restoring) else { return; };\n    let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };\n    if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }\n    let result = result.and_then(|row| {\n",
+     "new": "    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Queued && !s.interrupted\n        && s.thread == current_thread() && s.editor == scene\n        && s.seed.pending_class() == Some(class) && s.restore_ticket == restoring) else { return; };\n    let Some(editor) = native::Editor::bind(base, context, s.owner) else { return; };\n    if editor.state != 3 || editor.desired != 4 || !native::drained(editor.sequence) { return; }\n    let result = result.and_then(|row| {\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
     }
    ]
   },
