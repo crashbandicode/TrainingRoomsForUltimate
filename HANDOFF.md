@@ -1,8 +1,8 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 09:22 UTC. **RC acceptance remains open.**
+Updated 2026-11-03 09:36 UTC. **RC acceptance remains open.**
 
-Integration: work/implementation at /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Main b148b62 has only CPU-plan documentation after compiled a340978; this handoff/compliance update is also documentation-only. Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, watcher303502 bound to182663; verify exact model/effort and watcher after compaction.
+Integration: work/implementation at /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work, main3d51f53. Source correction2dbfe6e restores Training-before-identity ordering in promoted reset republishing; full253 carry and independent source review pass. Commit3d51f53 adds audited r16 waiting-menu development media. These changes are not represented by frozen r17; fresh coherent gates are required. Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, watcher303502 bound to182663; verify exact model/effort after compaction.
 
 ## Current development candidate
 
@@ -34,9 +34,11 @@ TraceWriter historical8624-byte write path remains to be re-exercised. Minimal t
 Read docs/RC-COMPLIANCE-EVIDENCE.md for all30 explicit scoped dispositions. R17 diagnostic checker exits1:894guardsall64; two media failures and two missing-Git-metadata failures on the frozen archive. Actual main Forgejo origin/clean tree and manifest-based script scan independently checked; raw checker is unchanged. Static1408 test attributes are not executions, and limited diagnostic string scans cannot establish release compliance. Final matching RELEASE NRO and complete final evidence remain owed.
 
 1. Read parent TRAININGROOMS-LEAD-INBOX.md PRIMARY REQUESTs first; review current worker returns before any launch. Check at least every10minutes, post Lead turn report about every45minutes without ending the turn.
-2. Validate pkg6/pkg4 addressed r17 compiled reports against main-r17/diag/job.json, exact source/ELF and stack-review/plugin.asm; only then write lead-development-qualification.json and admit fresh bounded F9/timer lanes.
+2. R17 compiled HUD and first-seal reviews are complete and scoped, but candidate remains UNADMITTED. Online source review found the Training read-order issue now corrected in2dbfe6e. First-seal readiness contract is pending with pkg4: no synchronous drain from the new observer and no silent loss of the first note. Compose the reviewed corrections, freeze a new candidate, run coherent gates and addressed changed-path reviews before fresh F9/timer admission. Preserve original r17 evidence.
 3. For each lane use full canonical Yoga /tmp/deluxe-surface-1007/OWNER-COORDINATION.md, TRAININGROOMS-EDEN-QUEUE.md, fresh per-host idle/memory/disk/cache admission, exact inputs, mute-before-load, complete collection and full restoration plus separate verification. Never infer a claim from this plan. Lead host/diag claims RELEASED09:10/09:13; latest UI release09:14. Recheck live state.
 4. Review UI22 exact source/assets and operator resource answer; preserve all failures. No further native rebuild until a coherent reviewed slice is ready. Use existing guarded tools and owned artifacts, no tooling detours.
 5. After roots close, run final all-targets/clippy zero-warning/no-default/release+diag, normalized size/lint/carry gates, all359 Eden rows with zero TOTAL Unmapped, online/LDN/desync A/B, corrected real media and final compliance/review. Sync only is closed;14blockers/10gates/allfinalrows remain open (E9/H286/I58/N0/F4/S2 are evidence classes, not final passes).
 
 Authority and detailed continuation: parent STATUS, RC-ACCEPTANCE, RC-SPEC-ROWS, LEAD-INBOX and LEAD-ASTRA-4-CHECKPOINT. Older evidence remains in TRAININGROOMS-HANDOFF.md and Git history. No push/tag/release/card/DBI/USB/OpenCode action authorized. Ext4 scratch,60GB aggregate target cap and40GB disk floor apply. Preserve source/executed binaries/native artifacts/raw logs and hash a complete manifest before deleting only owned finished target caches. Operator question blocks only its dependent semantic change; continue independent work.
+
+Development media update09:36: README now contains verified 95-frame/9500ms waiting-menu clip b1108582 from r16 only; source-only checker must be rerun on this main to establish machine-row changes. Frozen r17 checker failures remain historically accurate. Input-log contrast and final media/RC acceptance remain open.

@@ -3,6 +3,10 @@
 2026-11-03. Pending execution on the final integrated candidate. This plan does
 not turn a solo waiting-room observation into two-console or LDN acceptance.
 
+## Changed-path source review, 2026-11-03
+
+[The r17 HUD and first-seal audit](../docs/R17-ONLINE-RELEASE-DELTA.md) binds the exact changed paths and their caller scene guards. It found identity reads before the Training check in reset republishing; source correction 2dbfe6e restores that order and is independently reviewed. The next native binary and actual transitions still need validation. First-seal source cfg elimination is established only for non-diag; the diagnostic logger startup fallback remains under disposition. Neither source review nor the waiting-menu development clip establishes desync, online pair, or LDN acceptance.
+
 ## Evidence contract
 
 The reviewed detector contract is the owned ssbu-desync-detector
