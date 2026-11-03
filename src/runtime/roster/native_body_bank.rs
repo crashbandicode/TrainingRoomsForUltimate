@@ -1749,7 +1749,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     true
 }
 
-enum Action { None, Swap, Lifecycle, Construct }
+enum Action { None, Swap, Lifecycle, Construct, SyncCopies }
 
 /// Called before all normal roster/source/HUD work, never instead of that work.
 /// INSTALL completion remains owned by the original roster/Mii transaction.
@@ -1773,6 +1773,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         Action::None => {}
         Action::Swap => perform_swap(entry, owner, role),
         Action::Lifecycle => group_lifecycle(entry, owner, role),
+        Action::SyncCopies => sync_copy_packages(entry, owner, role),
         Action::Construct => settle_construction(entry, owner, role),
     }
 }
@@ -1884,9 +1885,14 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 bank.tick.disarm();
                 split::report_gaps(role, owner, kind);
             }
-            let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none()
-                && (bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned));
-            return if idle { Action::Lifecycle } else { Action::None };
+            let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none();
+            // Other native entries can change after all our groups prefetch.
+            // Keep their copy-package dependencies current before the next
+            // requested registration, without restarting group lifecycle work.
+            return if !idle { Action::None }
+                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned) {
+                    Action::Lifecycle
+                } else { Action::SyncCopies };
         }
         return Action::None;
     }
@@ -3343,10 +3349,8 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
 
 // ----- prefetch lifecycle (bank Ready, no change pending) -----
 
-unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
+unsafe fn sync_copy_packages(entry: *mut u8, owner: u32, role: usize) {
     let base = BASE.load(Ordering::Acquire);
-    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
-    let now = now_us();
     // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a
     // group holds keys or bodies, so they are resident before any registration; release them when
     // no group does or the bank retired (`swap_native::copy_packages`). Outside a swap only.
@@ -3359,6 +3363,13 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             crate::runtime::roster::copy_packages::sync(base, role, owner, alias, &sets, "tick");
         }
     }
+}
+
+unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
+    let base = BASE.load(Ordering::Acquire);
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    let now = now_us();
+    sync_copy_packages(entry, owner, role);
     // D-KIRBY1: no bank prefetch key rests on this R while its live member is
     // Kirby (a copy of a group kind would share R's G68 mirror with the key, and
     // the key's later `0x17e8610` release corrupts the registry the Reload walks;

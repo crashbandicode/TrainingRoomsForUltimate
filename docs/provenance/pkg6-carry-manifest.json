@@ -3276,7 +3276,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "dd9638c5ea494319dbf3bacf584e362099d6fa9c21fa0c115afd9dc589472bcc",
+   "dest_sha256": "056c76621614d98367a88cb6f4e96e8fb2981201a0a9b541fa220c4ceae6bea9",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -3913,6 +3913,31 @@
      "new": "let mut state = BANKS[role].lock();",
      "count": 2,
      "reason": "Fix integrated F6 settlement after BANKS became hos_lock: keep the Option under its live guard; std poison unwrap accidentally became Option unwrap. Both control-task lock scopes and outside-lock native queuing remain unchanged. Native main-r2 E0599 at2617/2645/2659 is the reproduction."
+    },
+    {
+     "old": "enum Action { None, Swap, Lifecycle, Construct }",
+     "new": "enum Action { None, Swap, Lifecycle, Construct, SyncCopies }",
+     "reason": "F6 current-r6 f6-14 #427/#633 refused requested groups because copy-package holdings stopped updating once all groups prefetched; #306/#424 prove changed native roster keys loaded only at admission. Service fresh ready banks through the existing bounded copy sync even without pending prefetch. Preserve native admission, source identity, outside-lock calls and separate group lifecycle scheduling; runtime acceptance pending."
+    },
+    {
+     "old": "        Action::Lifecycle => group_lifecycle(entry, owner, role),",
+     "new": "        Action::Lifecycle => group_lifecycle(entry, owner, role),\n        Action::SyncCopies => sync_copy_packages(entry, owner, role),",
+     "reason": "F6 current-r6 f6-14 #427/#633 refused requested groups because copy-package holdings stopped updating once all groups prefetched; #306/#424 prove changed native roster keys loaded only at admission. Service fresh ready banks through the existing bounded copy sync even without pending prefetch. Preserve native admission, source identity, outside-lock calls and separate group lifecycle scheduling; runtime acceptance pending."
+    },
+    {
+     "old": "            let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none()\n                && (bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned));\n            return if idle { Action::Lifecycle } else { Action::None };",
+     "new": "            let idle = GROUPS_ENABLED.load(Ordering::Acquire) && !bank.departed && bank.swap.is_none();\n            // Other native entries can change after all our groups prefetch.\n            // Keep their copy-package dependencies current before the next\n            // requested registration, without restarting group lifecycle work.\n            return if !idle { Action::None }\n                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned) {\n                    Action::Lifecycle\n                } else { Action::SyncCopies };",
+     "reason": "F6 current-r6 f6-14 #427/#633 refused requested groups because copy-package holdings stopped updating once all groups prefetched; #306/#424 prove changed native roster keys loaded only at admission. Service fresh ready banks through the existing bounded copy sync even without pending prefetch. Preserve native admission, source identity, outside-lock calls and separate group lifecycle scheduling; runtime acceptance pending."
+    },
+    {
+     "old": "unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {\n    let base = BASE.load(Ordering::Acquire);\n    let settings = crate::runtime::roster::cycle_preload_config::snapshot();\n    let now = now_us();\n    // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a",
+     "new": "unsafe fn sync_copy_packages(entry: *mut u8, owner: u32, role: usize) {\n    let base = BASE.load(Ordering::Acquire);\n    // K15: hold the Kirby copy packages every set this bank may register needs, from the moment a",
+     "reason": "F6 current-r6 f6-14 #427/#633 refused requested groups because copy-package holdings stopped updating once all groups prefetched; #306/#424 prove changed native roster keys loaded only at admission. Service fresh ready banks through the existing bounded copy sync even without pending prefetch. Preserve native admission, source identity, outside-lock calls and separate group lifecycle scheduling; runtime acceptance pending."
+    },
+    {
+     "old": "    // D-KIRBY1: no bank prefetch key rests on this R while its live member is",
+     "new": "}\n\nunsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {\n    let base = BASE.load(Ordering::Acquire);\n    let settings = crate::runtime::roster::cycle_preload_config::snapshot();\n    let now = now_us();\n    sync_copy_packages(entry, owner, role);\n    // D-KIRBY1: no bank prefetch key rests on this R while its live member is",
+     "reason": "F6 current-r6 f6-14 #427/#633 refused requested groups because copy-package holdings stopped updating once all groups prefetched; #306/#424 prove changed native roster keys loaded only at admission. Service fresh ready banks through the existing bounded copy sync even without pending prefetch. Preserve native admission, source identity, outside-lock calls and separate group lifecycle scheduling; runtime acceptance pending."
     }
    ]
   },
