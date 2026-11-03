@@ -65,7 +65,7 @@ const KIB: usize = 1024;
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 5_056, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 28 * KIB, 5_136, 9_072, "Eden st-02..st-12", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
     row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_488, "Eden st-02..st-12", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
@@ -75,7 +75,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // diag: request files, diag-settings.json parse, publish and apply
     row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_592, "Eden st-02..st-12", "states::start_diag_triggers::{closure#0}"),
     // button_config.ini, replay_capture.ini and settings.json atomic writes
-    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_184, 9_344, "Eden st-02..st-12", "features::writer::run"),
+    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_216, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 20 * KIB, 2_720, 1_696, "Eden st-02..st-12", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply

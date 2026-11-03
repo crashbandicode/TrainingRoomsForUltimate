@@ -30,6 +30,9 @@ pub struct Worker {
 }
 
 impl Worker {
+    // Keep the read buffer and diagnostics out of the long-lived menu worker
+    // frame: unrelated menu/editor calls must not carry this turn's stack cost.
+    #[inline(never)]
     pub fn step(&mut self) -> bool {
         let counts = self.reader.drain(&REQUESTS, PATH);
         let now = crate::runtime::clock::uptime_ms();
