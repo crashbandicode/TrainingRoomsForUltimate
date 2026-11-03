@@ -45,11 +45,11 @@ if (Get-Process eden -ErrorAction SilentlyContinue) { throw 'eden.exe is running
 switch ($Mode) {
     'setaside' {
         if (Test-Path $SA) { throw 'set-aside exists already' }
-        $claim = (Get-Content "$O\CLAIM" -Raw).Trim()
-        if ($claim -ne $Lent) { throw "unexpected claim: $claim" }
+        $previousClaim = (Get-Content "$O\CLAIM" -Raw).Trim()
+        if ($previousClaim -ne $Lent) { throw "unexpected claim: $previousClaim" }
         if ((Sha256Of "$EX\subsdk9") -ne $SKY_STOCK -or (Sha256Of "$EX\main.npdm") -ne $NPDM) { throw 'exefs is not the stock Skyline pair' }
         New-Item -ItemType Directory -Force $W | Out-Null
-        Set-Content "$W\CLAIM.orig" $claim -NoNewline; Set-Content "$O\CLAIM" $Claim -NoNewline
+        Set-Content "$W\CLAIM.orig" $previousClaim -NoNewline; Set-Content "$O\CLAIM" $Claim -NoNewline
         $pre = [ordered]@{ plugins = Tree $PL; exefs = Tree $EX; ultimate = [ordered]@{}; keep = $null; qt = Sha256Of $QT }
         foreach ($d in (Others)) { $pre.ultimate[$d.Name] = Tree $d.FullName }
         $pre.keep = [ordered]@{}; foreach ($k in $Keep) { $pre.keep[$k] = Tree "$U\$k" }
