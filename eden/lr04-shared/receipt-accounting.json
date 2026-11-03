@@ -1,0 +1,179 @@
+{
+  "active_rows": 21,
+  "receipts": [
+    {
+      "id": "01-main",
+      "status": "FAILED",
+      "error": "RuntimeError('gate main on yoga did not pass within 45 s')",
+      "manifest_sha256": "2d976b60172e1ad2a7a3676a10073ab8f580f6cecb234e433b263c2841656929",
+      "receipt_sha256": "5c34d181202eb15d73b588935981916033215c04b6a2d49204619d37ba08e432"
+    },
+    {
+      "id": "01b-tutorial-recovery",
+      "status": "FAILED",
+      "error": "RuntimeError('gate main on yoga did not pass within 20 s')",
+      "manifest_sha256": "fdca8dee358c3b4a822e2ea9d474b7b4d7c4de578a0179f0f6f86e1ffb7bf2b8",
+      "receipt_sha256": "1864b3419a6bcd8295a0b0f24ce85171fd36392a7e4f40abae961d7264ee61e3"
+    },
+    {
+      "id": "01c-title-main",
+      "status": "FAILED",
+      "error": "RuntimeError('gate title on yoga did not pass within 5 s')",
+      "manifest_sha256": "f4c7e66a9c98d874ef4ef4e2ce92ca7f8a04e52ba85b9da5318f111e94404115",
+      "receipt_sha256": "8a46a692cb1c8d34e363115465c6da223ef3f81da08dcf3235abba6cbb4194e8"
+    },
+    {
+      "id": "01d-main-reached",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+      "receipt_sha256": "4bfcb64dea85ff098e821a56a24fd5b750f7ed05c5916ba41a388127a50a16ea"
+    },
+    {
+      "id": "02-stage",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+      "receipt_sha256": "e26ed6fecde5d7c9d77cae11562d47da484c5331ff193a67494b0784b5dd642f"
+    },
+    {
+      "id": "03-css",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+      "receipt_sha256": "4ee85c088bb41c06c31085538e4447fef06284a8b43acc88c747a63d4b54ffc3"
+    },
+    {
+      "id": "04-steve",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+      "receipt_sha256": "bb9edf78c11cb9bae1eb74e797ecd942bcb04534e5576f769d585f920dda4da5"
+    },
+    {
+      "id": "05a-cpu-approach",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "2909cd8f09db3076f0ea82dd6fa07e2dd0564423c7e8ad8a1990de6149d2a647",
+      "receipt_sha256": "c196a4856359af09f0e933dcdd945720a161f5415da73b9a4c04cbf83d312ecd"
+    },
+    {
+      "id": "05b-cpu-pick",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "5db6dd3ae031d212237b2ca7914af1c80facc1a47b29a8ec3624e95d7bd03210",
+      "receipt_sha256": "ac323bed40defcfc3bb5da0768667e3685bfeb50e37a5937835c6c69ed3cbe1c"
+    },
+    {
+      "id": "05c-cpu74",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "100347d230e174c2625438164fc202a3ef422a23b36b42c3bf82a1d3578cd949",
+      "receipt_sha256": "0d0bac2e82ec8f23fd5377e2a6be64fa3a64ee98685e3c1d3ef9b3aa25bbc492"
+    },
+    {
+      "id": "06-lucas",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+      "receipt_sha256": "e63277fc812bd1d635629a1a8d1cce04d873706d95c9997aeb5da014255e3e91"
+    },
+    {
+      "id": "07-training",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+      "receipt_sha256": "b0366eb7b74d2cafdac08a76552aaba1e30787cf1f1399c88451c0d3f9cdcec5"
+    },
+    {
+      "id": "08-delay2-pause",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+      "receipt_sha256": "81ae3b02f75c22261d9cce99a9196a4ef06e043dc3eb905ff7cce5ce68a6b03d"
+    },
+    {
+      "id": "09-delay2-resume",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+      "receipt_sha256": "99c1fc1f0e3048a45c9b25076f1fe3cc222fcd7aef126ff5c54b9bc959c78327"
+    },
+    {
+      "id": "10-native-return",
+      "status": "FAILED",
+      "error": "RuntimeError('gate finalize-p1 on yoga did not pass within 30 s')",
+      "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+      "receipt_sha256": "54ab9f0c873b92a3c066b486127a8c783f1baa37a9e949f77f8455aab1b4de7e"
+    },
+    {
+      "id": "10b-css-return-check",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "4c380cc1c0e8645bdd30d5dd705e06355e618f2ca94b4f3181bb46a4bc1021f3",
+      "receipt_sha256": "e310eb8b1e6873b45be4b89247e59137b1948443a19e28e8d8203c793d0f8817"
+    },
+    {
+      "id": "11-return-cpu-pick",
+      "status": "FAILED",
+      "error": "RuntimeError('gate return-cpu40 on yoga did not pass within 8 s')",
+      "manifest_sha256": "23188c99e5d2eb4b4a8e58a4ebb37969552dcd7106fab6e9d72ba623522a1052",
+      "receipt_sha256": "46df583ece94a2a42c9c20f101f5db47dc23a15e2b8456de03fc7bd46b712f99"
+    },
+    {
+      "id": "11b-return-observe",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "5ce706dccb5398abc7979cfa74cfabe8b2f721428810159ad74dc7fc1b7eae09",
+      "receipt_sha256": "022d05f5b050ce975d038e6233a71d00312aff3a0a23a08385ee04595cef875b"
+    },
+    {
+      "id": "12-return-lucas",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "583a927f56bc56ce2a00f50ac84e84b137e02136fd1419037ce98ffa36655a23",
+      "receipt_sha256": "62bfeebed9d672f79daf7563efa874d021be815bb8496799d594857121f321ba"
+    },
+    {
+      "id": "13-training-reentry",
+      "status": "FAILED",
+      "error": "RuntimeError('gate p1-original on yoga did not pass within 60 s')",
+      "manifest_sha256": "ede7a54a30791eaa5b3cdbe3864f2214537c5501d7908425c8d04c15d2830350",
+      "receipt_sha256": "a2c2abbd27d6ca2538c002c567235198f335237c281154db8f90465b72cc33db"
+    },
+    {
+      "id": "13b-reentry-check",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "dbbc4fcbf03e1e35e66e46ccf13afe694969768450c0a594244f34b4c9f035f4",
+      "receipt_sha256": "b9219b29a11d23b653e7376af7557df713723660a53afcb1d45dbaaaa597472f"
+    },
+    {
+      "id": "14-native-return-replay-start",
+      "status": "PASS",
+      "error": null,
+      "manifest_sha256": "dbbc4fcbf03e1e35e66e46ccf13afe694969768450c0a594244f34b4c9f035f4",
+      "receipt_sha256": "e4ab460b71aea18efe77c22bee439ebe5693e08f97eb8bd0786a62c4307566f7"
+    },
+    {
+      "id": "15-return-cpu-replay",
+      "status": "FAILED",
+      "error": "RuntimeError('gate return-roy-fresh on yoga did not pass within 8 s')",
+      "manifest_sha256": "fc065947c5fa17596aad60acc5de8e60de57ea7fc739850fe86751c97b732141",
+      "receipt_sha256": "1668ea4ed8224d5ce52c875187a7fe02a94dab0e13c9a5a86c00c0eae3ac72fa"
+    }
+  ],
+  "counts": {
+    "PASS": 16,
+    "FAILED": 7
+  },
+  "unrun": [
+    "16-return-lucas-replay"
+  ],
+  "read_only_pass_rows": [
+    "01d-main-reached",
+    "10b-css-return-check",
+    "11b-return-observe",
+    "13b-reentry-check"
+  ]
+}

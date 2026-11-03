@@ -1,0 +1,134 @@
+{
+  "01-main": {
+    "manifest_sha256": "2d976b60172e1ad2a7a3676a10073ab8f580f6cecb234e433b263c2841656929",
+    "retained_exact_files": [
+      "rows-yoga-before-recovery.json"
+    ]
+  },
+  "01b-tutorial-recovery": {
+    "manifest_sha256": "fdca8dee358c3b4a822e2ea9d474b7b4d7c4de578a0179f0f6f86e1ffb7bf2b8",
+    "retained_exact_files": [
+      "rows-yoga-before-title.json"
+    ]
+  },
+  "01c-title-main": {
+    "manifest_sha256": "f4c7e66a9c98d874ef4ef4e2ce92ca7f8a04e52ba85b9da5318f111e94404115",
+    "retained_exact_files": [
+      "rows-yoga-before-main-reached.json"
+    ]
+  },
+  "01d-main-reached": {
+    "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+    "retained_exact_files": [
+      "yoga-inputs/rows.json"
+    ]
+  },
+  "02-stage": {
+    "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+    "retained_exact_files": [
+      "yoga-inputs/rows.json"
+    ]
+  },
+  "03-css": {
+    "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+    "retained_exact_files": [
+      "yoga-inputs/rows.json"
+    ]
+  },
+  "04-steve": {
+    "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+    "retained_exact_files": [
+      "yoga-inputs/rows.json"
+    ]
+  },
+  "05a-cpu-approach": {
+    "manifest_sha256": "2909cd8f09db3076f0ea82dd6fa07e2dd0564423c7e8ad8a1990de6149d2a647",
+    "retained_exact_files": []
+  },
+  "05b-cpu-pick": {
+    "manifest_sha256": "5db6dd3ae031d212237b2ca7914af1c80facc1a47b29a8ec3624e95d7bd03210",
+    "retained_exact_files": []
+  },
+  "05c-cpu74": {
+    "manifest_sha256": "100347d230e174c2625438164fc202a3ef422a23b36b42c3bf82a1d3578cd949",
+    "retained_exact_files": []
+  },
+  "06-lucas": {
+    "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+    "retained_exact_files": [
+      "rows-before-css-return-check-data.json"
+    ]
+  },
+  "07-training": {
+    "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+    "retained_exact_files": [
+      "rows-before-css-return-check-data.json"
+    ]
+  },
+  "08-delay2-pause": {
+    "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+    "retained_exact_files": [
+      "rows-before-css-return-check-data.json"
+    ]
+  },
+  "09-delay2-resume": {
+    "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+    "retained_exact_files": [
+      "rows-before-css-return-check-data.json"
+    ]
+  },
+  "10-native-return": {
+    "manifest_sha256": "6e97fe28277bb5dc63c37be40ce411896079ae72f444b8f56d3e414aa8a87c63",
+    "retained_exact_files": [
+      "rows-before-css-return-check-data.json"
+    ]
+  },
+  "10b-css-return-check": {
+    "manifest_sha256": "4c380cc1c0e8645bdd30d5dd705e06355e618f2ca94b4f3181bb46a4bc1021f3",
+    "retained_exact_files": [
+      "rows-before-cpu-return-pick-data.json"
+    ]
+  },
+  "11-return-cpu-pick": {
+    "manifest_sha256": "23188c99e5d2eb4b4a8e58a4ebb37969552dcd7106fab6e9d72ba623522a1052",
+    "retained_exact_files": [
+      "rows-before-cpu-return-observe-data.json"
+    ]
+  },
+  "11b-return-observe": {
+    "manifest_sha256": "5ce706dccb5398abc7979cfa74cfabe8b2f721428810159ad74dc7fc1b7eae09",
+    "retained_exact_files": [
+      "rows-before-return-finish.json"
+    ]
+  },
+  "12-return-lucas": {
+    "manifest_sha256": "583a927f56bc56ce2a00f50ac84e84b137e02136fd1419037ce98ffa36655a23",
+    "retained_exact_files": []
+  },
+  "13-training-reentry": {
+    "manifest_sha256": "ede7a54a30791eaa5b3cdbe3864f2214537c5501d7908425c8d04c15d2830350",
+    "retained_exact_files": [
+      "rows-before-reentry-check.json"
+    ]
+  },
+  "13b-reentry-check": {
+    "manifest_sha256": "dbbc4fcbf03e1e35e66e46ccf13afe694969768450c0a594244f34b4c9f035f4",
+    "retained_exact_files": [
+      "rows-before-return-replay-data.json"
+    ]
+  },
+  "14-native-return-replay-start": {
+    "manifest_sha256": "dbbc4fcbf03e1e35e66e46ccf13afe694969768450c0a594244f34b4c9f035f4",
+    "retained_exact_files": [
+      "rows-before-return-replay-data.json"
+    ]
+  },
+  "15-return-cpu-replay": {
+    "manifest_sha256": "fc065947c5fa17596aad60acc5de8e60de57ea7fc739850fe86751c97b732141",
+    "retained_exact_files": [
+      "rows-exact-final.json",
+      "rows.json",
+      "final-inputs/rows.json"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "11b-return-observe",
+  "start": "cpu40-held",
+  "end": "return-review",
+  "evidence": [
+    "Read-only failure observation only; preceding11 did NOT establish cpu40-held despite its anticipated chain label. No navigation/state qualification or harvestable segment in this row."
+  ],
+  "manifest_sha256": "5ce706dccb5398abc7979cfa74cfabe8b2f721428810159ad74dc7fc1b7eae09",
+  "started": 1793735897.0717406,
+  "results": [
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/11b-return-observe/yoga-195817Z-240947-return-failure-state.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/11b-return-observe/tile-yoga-events.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735897.1719286
+}

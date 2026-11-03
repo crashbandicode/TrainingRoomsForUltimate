@@ -1,0 +1,31 @@
+{
+  "id": "10b-css-return-check",
+  "start": "css-return",
+  "end": "css-return",
+  "evidence": [
+    "Read-only checkpoint after10 native quit. Row10 remains FAILED on warm GroupSwap teardown gate: this run has no group swaps; fresh Destroy plan/pad-route finalize exists for both owners. Do not replay native quit or claim warm/interrupted teardown acceptance."
+  ],
+  "manifest_sha256": "4c380cc1c0e8645bdd30d5dd705e06355e618f2ca94b4f3181bb46a4bc1021f3",
+  "started": 1793735754.2050343,
+  "results": [
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/10b-css-return-check/yoga-195554Z-805410-return-state-before-check.png"
+    },
+    {
+      "gate": "ready",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr04-inputs/out/10b-css-return-check/yoga-195557Z-162293-gate-ready.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/10b-css-return-check/yoga-195557Z-649804-cpu-return-route-start.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/10b-css-return-check/tile-yoga-events.log"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/10b-css-return-check/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735757.9379165
+}

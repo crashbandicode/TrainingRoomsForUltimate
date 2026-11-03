@@ -1,0 +1,12 @@
+{
+  "id": "01-main",
+  "start": "boot",
+  "end": "main",
+  "evidence": [],
+  "manifest_sha256": "2d976b60172e1ad2a7a3676a10073ab8f580f6cecb234e433b263c2841656929",
+  "started": 1793734854.55915,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate main on yoga did not pass within 45 s')",
+  "ended": 1793734947.5469773
+}

@@ -1,0 +1,22 @@
+{
+  "id": "15-return-cpu-replay",
+  "start": "css-return",
+  "end": "roy-held",
+  "evidence": [
+    "Actual200259 native-return screenshot matches195557 starting hand and Steve/Lucas layout. Replay original recorded11 bytes; gate actual26to27 p2 endpoint, not failed assumed39to40."
+  ],
+  "manifest_sha256": "fc065947c5fa17596aad60acc5de8e60de57ea7fc739850fe86751c97b732141",
+  "started": 1793736329.7733023,
+  "results": [
+    {
+      "play": "lr04-return-cpu-pick",
+      "on": "yoga"
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/15-return-cpu-replay/yoga-200531Z-501342-return-replay-end.png"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate return-roy-fresh on yoga did not pass within 8 s')",
+  "ended": 1793736339.7272074
+}

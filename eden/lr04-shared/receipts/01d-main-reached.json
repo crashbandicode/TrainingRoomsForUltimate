@@ -1,0 +1,29 @@
+{
+  "id": "01d-main-reached",
+  "start": "boot",
+  "end": "main",
+  "evidence": [
+    "Actual194620 failed-title screenshot is main menu; read-only requalification, never replay title input onto main."
+  ],
+  "manifest_sha256": "6a3131ce7f4d81de62add0580a6deb2c1b134294fac509676a67a1f0502a6a6b",
+  "started": 1793735234.2592816,
+  "results": [
+    {
+      "gate": "main",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr04-inputs/out/01d-main-reached/yoga-194714Z-732943-gate-main.png"
+    },
+    {
+      "gate": "installed",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "cpu_common=installed"
+      }
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/01d-main-reached/yoga-194714Z-734841-main.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735234.4044375
+}

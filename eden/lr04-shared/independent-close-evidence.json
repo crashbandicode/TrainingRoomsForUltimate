@@ -1,0 +1,15 @@
+{
+  "phase": "down",
+  "released": true,
+  "source_equal_snapshot": true,
+  "entries": 21410,
+  "topology": {
+    "immutable_files": 252,
+    "mutable_files": 20436,
+    "violations": []
+  },
+  "owned_open_claims": [],
+  "owned_units_pids": [],
+  "shared_lifecycle_sha256": "2b35bb09c4b82298eea262eb488e5f038ce1ebe8569791f78512fb20d1b481af",
+  "console_bytes": 3470923181
+}

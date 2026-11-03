@@ -1,0 +1,29 @@
+{
+  "id": "05a-cpu-approach",
+  "start": "steve-selected",
+  "end": "cpu-approach-review",
+  "evidence": [
+    "Recorded missing free-hand approach only from actual194731 banner hand. No coin acquisition claimed; review endpoint before A."
+  ],
+  "manifest_sha256": "2909cd8f09db3076f0ea82dd6fa07e2dd0564423c7e8ad8a1990de6149d2a647",
+  "started": 1793735370.007221,
+  "results": [
+    {
+      "play": "lr04-cpu-approach",
+      "on": "yoga"
+    },
+    {
+      "gate": "steve-selected",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr04-inputs/out/05a-cpu-approach/yoga-194931Z-746096-gate-steve-selected.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/05a-cpu-approach/yoga-194931Z-862324-cpu-approach-review.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/05a-cpu-approach/tile-yoga-events.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735371.3873477
+}

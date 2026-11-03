@@ -1,0 +1,34 @@
+{
+  "segments": [
+    "steve-hover",
+    "steve-place",
+    "lr04-cpu-approach",
+    "lr04-cpu-pick",
+    "lr04-cpu85-to74",
+    "lr04-roy-lucas"
+  ],
+  "gates": [
+    "steve78",
+    "steve-selected",
+    "cpu-token-fresh",
+    "cpu85-held",
+    "cpu74-fresh",
+    "delay2-settings",
+    "no-leak2",
+    "return-roy-held",
+    "return-lucas-fresh",
+    "native-finalize-p1",
+    "native-finalize-cpu"
+  ],
+  "skipped": [
+    "main-stage",
+    "stage-css",
+    "cpu74-lucas",
+    "lucas-pick",
+    "enter-training",
+    "pause-open",
+    "pause-close",
+    "focus-native-quit-frames",
+    "confirm-native-quit-frames"
+  ]
+}

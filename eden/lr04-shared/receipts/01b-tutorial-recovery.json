@@ -1,0 +1,19 @@
+{
+  "id": "01b-tutorial-recovery",
+  "start": "boot",
+  "end": "main",
+  "evidence": [
+    "Actual failed01 checkpoint194227 shows native tutorial. One recordedPlus recovery from that observed moving state; no repeated blind recovery. Initial failed01 retained."
+  ],
+  "manifest_sha256": "fdca8dee358c3b4a822e2ea9d474b7b4d7c4de578a0179f0f6f86e1ffb7bf2b8",
+  "started": 1793735072.529663,
+  "results": [
+    {
+      "play": "intro-cancel",
+      "on": "yoga"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate main on yoga did not pass within 20 s')",
+  "ended": 1793735094.1426268
+}

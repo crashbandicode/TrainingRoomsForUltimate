@@ -1,0 +1,19 @@
+{
+  "id": "11-return-cpu-pick",
+  "start": "css-return",
+  "end": "cpu40-held",
+  "evidence": [
+    "195557 reviewed native-return Steve/Lucas CSS, free pointer near260,480; CPU coin Lucas39 near100,230. Recorded frame-count route requires fresh exact39to40 p2 transition."
+  ],
+  "manifest_sha256": "23188c99e5d2eb4b4a8e58a4ebb37969552dcd7106fab6e9d72ba623522a1052",
+  "started": 1793735820.3256388,
+  "results": [
+    {
+      "play": "lr04-return-cpu-pick",
+      "on": "yoga"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate return-cpu40 on yoga did not pass within 8 s')",
+  "ended": 1793735832.3229642
+}

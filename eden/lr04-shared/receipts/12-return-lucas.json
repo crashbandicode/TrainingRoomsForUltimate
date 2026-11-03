@@ -1,0 +1,44 @@
+{
+  "id": "12-return-lucas",
+  "start": "return-review",
+  "end": "ready",
+  "evidence": [
+    "11 failed expected39to40, but actual fresh26to27 p2 proves acquisition atRoy27; reviewed screenshot binds that recovery start. Original failed expectation retained."
+  ],
+  "manifest_sha256": "583a927f56bc56ce2a00f50ac84e84b137e02136fd1419037ce98ffa36655a23",
+  "started": 1793735987.7049475,
+  "results": [
+    {
+      "play": "lr04-roy-lucas",
+      "on": "yoga"
+    },
+    {
+      "gate": "return-lucas-fresh",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "step screen=css dir=left from=40 to=39 token=p2"
+      }
+    },
+    {
+      "gate": "lucas",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "settled screen=css at=39 hovered=39"
+      }
+    },
+    {
+      "play": "lucas-pick",
+      "on": "yoga"
+    },
+    {
+      "gate": "ready",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr04-inputs/out/12-return-lucas/yoga-195951Z-409451-gate-ready.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/12-return-lucas/yoga-195952Z-042797-return-lucas-ready.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735992.1976118
+}

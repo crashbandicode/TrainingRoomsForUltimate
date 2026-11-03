@@ -1,0 +1,14 @@
+{
+  "id": "01c-title-main",
+  "start": "boot",
+  "end": "main",
+  "evidence": [
+    "194454 actual title screenshot; stable logo ROI verifies title before existing single-A macro. Attract recovery targets title, not main."
+  ],
+  "manifest_sha256": "f4c7e66a9c98d874ef4ef4e2ce92ca7f8a04e52ba85b9da5318f111e94404115",
+  "started": 1793735168.2917068,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate title on yoga did not pass within 5 s')",
+  "ended": 1793735180.6910095
+}

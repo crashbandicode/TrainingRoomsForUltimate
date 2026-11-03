@@ -1,0 +1,32 @@
+{
+  "id": "13b-reentry-check",
+  "start": "training",
+  "end": "training",
+  "evidence": [
+    "Original13 failure retained; exact current-file sequence1607/gen3,3/opening4 manually correlated to13 reentry, not old bootstrap."
+  ],
+  "manifest_sha256": "dbbc4fcbf03e1e35e66e46ccf13afe694969768450c0a594244f34b4c9f035f4",
+  "started": 1793736170.3773644,
+  "results": [
+    {
+      "gate": "reentry-generation3-observed",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "#1607 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[3, 3] opening=4"
+      }
+    },
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr04-inputs/out/13b-reentry-check/yoga-200250Z-539173-gate-training-hud-unpaused.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/13b-reentry-check/yoga-200250Z-018961-reentry-reviewed.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/13b-reentry-check/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793736170.4646392
+}

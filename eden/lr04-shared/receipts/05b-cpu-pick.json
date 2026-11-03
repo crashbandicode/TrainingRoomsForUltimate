@@ -1,0 +1,31 @@
+{
+  "id": "05b-cpu-pick",
+  "start": "cpu-approach-review",
+  "end": "cpu-held-review",
+  "evidence": [
+    "194931 reviewed pointer near852,280; measured initial26right/14down displacement. Correction targets RandomCPU coin near1000,385; fresh p2 token log required, endpoint reviewed before navigation."
+  ],
+  "manifest_sha256": "5db6dd3ae031d212237b2ca7914af1c80facc1a47b29a8ec3624e95d7bd03210",
+  "started": 1793735448.9603028,
+  "results": [
+    {
+      "play": "lr04-cpu-pick",
+      "on": "yoga"
+    },
+    {
+      "gate": "cpu-token-fresh",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "step screen=css dir=left from=86 to=85 token=p2"
+      }
+    },
+    {
+      "shot": "/home/intpa/tr-lr04-inputs/out/05b-cpu-pick/yoga-195050Z-272341-cpu-held-review.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr04-inputs/out/05b-cpu-pick/tile-yoga-events.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793735450.5060303
+}

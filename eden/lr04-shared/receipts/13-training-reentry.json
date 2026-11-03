@@ -1,0 +1,17 @@
+{
+  "id": "13-training-reentry",
+  "start": "ready",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ede7a54a30791eaa5b3cdbe3864f2214537c5501d7908425c8d04c15d2830350",
+  "started": 1793735992.1982644,
+  "results": [
+    {
+      "play": "enter-training",
+      "on": "yoga"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate p1-original on yoga did not pass within 60 s')",
+  "ended": 1793736053.3839812
+}
