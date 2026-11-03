@@ -1,0 +1,14 @@
+{
+  "local_preparation": {
+    "runner_sha256": "9cb369084548b4209cf24990cfaaa51d32ec07a4679fb3e1d0db2e07c51c74b0",
+    "lifecycle_sha256": "644f9d2af5d7b74e425ed027ef5c21b832ef9c1ea3eddfd88130e1bd70b90917",
+    "library_sha256": "729c615440c531cb8af4e78bdc2557a2596994b3d8736df102dda294ca014562"
+  },
+  "executor_readback": {
+    "runner_sha256": "9cb369084548b4209cf24990cfaaa51d32ec07a4679fb3e1d0db2e07c51c74b0",
+    "lifecycle_sha256": "644f9d2af5d7b74e425ed027ef5c21b832ef9c1ea3eddfd88130e1bd70b90917",
+    "library_sha256": "271502fc7f8ed849e2d87e21ed664757ca1a592741b38164e2c7dfe83c2cb818"
+  },
+  "library_equal": false,
+  "scope": "Executor library source is authoritative for expansion; row manifest snapshots retain expanded definitions."
+}

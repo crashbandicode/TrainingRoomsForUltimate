@@ -1,0 +1,2 @@
+2026-11-03T21:48:27.907980+00:00 CLAIMED: OpenCode ses_e5ea4d5f3ffeMMtWumvKxZhl2t/tr-lead-astra-6 host=yoga lifecycle=26198ad8839a4174ab394d008c114746 Eden lifecycle admitted
+2026-11-03T21:52:12.251448+00:00 RELEASED: OpenCode ses_e5ea4d5f3ffeMMtWumvKxZhl2t/tr-lead-astra-6 host=yoga lifecycle=26198ad8839a4174ab394d008c114746 Eden stopped; full profile restored and separately verified

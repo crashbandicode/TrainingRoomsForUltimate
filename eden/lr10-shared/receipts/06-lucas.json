@@ -1,0 +1,35 @@
+{
+  "id": "06-lucas",
+  "start": "cpu-held74",
+  "end": "ready",
+  "evidence": [],
+  "manifest_sha256": "4cc3a6a88f5a79b6b7da2e0e6ae331a0dbfcc4331c8e4d6a7ac1629f58ca89ed",
+  "started": 1793742598.213991,
+  "results": [
+    {
+      "play": "cpu74-lucas",
+      "on": "yoga"
+    },
+    {
+      "gate": "lucas",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "settled screen=css at=39 hovered=39"
+      }
+    },
+    {
+      "play": "lucas-pick",
+      "on": "yoga"
+    },
+    {
+      "gate": "ready",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr10-inputs/out/06-lucas/yoga-215010Z-781113-gate-ready.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr10-inputs/out/06-lucas/yoga-215010Z-712391-ready.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793742610.6762278
+}

@@ -1,0 +1,14 @@
+# lr-10 — 2026-11-03 — RC NOT READY
+- Eden: `/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage`
+- SHA256: `6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb`; RC8 cf4bf44 / diagnostic3ca7f0c5 unchanged.
+- Up21:49:16.893246Z → RELEASED21:52:12.251448Z; lifecycle26198ad8839a4174ab394d008c114746.
+- PASS: nine navigation rows + teardown1-prefix (`receipts/*.json`; `receipt-accounting.json`): reached Dark Pit in Training.
+- FAILED: `receipts/teardown1-pending-quit.json`: missing async construction queue; request preceded exact target-group prefetch and took ordinary reload.
+- Deferred/unrun: teardown2-prefix, teardown2-pending-quit, teardown3-prefix, teardown3-pending-quit, busy-prefix, busy-pending-press; prior fail-fast caller stopped.
+- RC-BUSY / RC-TEARDOWN remain OPEN: no pending quit or busy rejection acceptance obtained.
+- Failure-path trace checkpoint retained in `runner-actions.jsonl`; install5/finalize0, no drops; both checkpoint sheets reviewed.
+- Down PASS: cleanup_failures=[], full restore + separate verify equal, released; capped game.stop error retained (`down.log`, `lifecycle-actions.jsonl`).
+- Full console: zero Unmapped/panic/abort/crash matches (`console-scan.json`); no claim beyond this run.
+- Harvest: 0 segments / 0 gates (`harvest-result.json`).
+- Next: one comprehensive Yoga batch, cheap independent rows first, teardown last; fix/defer and recover on the same boot.
+- Executed playbook07dcb7e; closure follows705cc21 rules8–9; full compliance once at Phase1 close-out.

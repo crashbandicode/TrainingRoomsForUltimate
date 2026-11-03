@@ -1,0 +1,80 @@
+{
+  "PASS": 10,
+  "FAILED": 1,
+  "unrun": [
+    "teardown2-prefix",
+    "teardown2-pending-quit",
+    "teardown3-prefix",
+    "teardown3-pending-quit",
+    "busy-prefix",
+    "busy-pending-press"
+  ],
+  "receipts": [
+    {
+      "id": "01-main",
+      "status": "PASS",
+      "sha256": "ac75aee7195e047f07aa7dbcddfd5670f37efd9f11b315df2709ade91a8f2738",
+      "error": null
+    },
+    {
+      "id": "02-stage",
+      "status": "PASS",
+      "sha256": "a97e384428eb8537a7f39ebcd0123355ff822671ecf299eab385d10abc8cbb5f",
+      "error": null
+    },
+    {
+      "id": "03-css",
+      "status": "PASS",
+      "sha256": "37d1b3cdc917529bf52b95a21e9e217f0b650f00c7c84075debc6182297429ca",
+      "error": null
+    },
+    {
+      "id": "04-steve",
+      "status": "PASS",
+      "sha256": "13d8dc31d9d1e15c4b0bff83cf4668fb577247ef82f2905da12e26c604aebe5c",
+      "error": null
+    },
+    {
+      "id": "05a-cpu-approach",
+      "status": "PASS",
+      "sha256": "9ad8d81cb54466e1afefdd4beab1453bcf70fb0cd05faa5112b271201fad2505",
+      "error": null
+    },
+    {
+      "id": "05b-cpu-pick",
+      "status": "PASS",
+      "sha256": "2ce10c4e66bcfe911368e87d1233f51b8d082824e441f7d1a3139f4f83891bab",
+      "error": null
+    },
+    {
+      "id": "05c-cpu74",
+      "status": "PASS",
+      "sha256": "1977a757468aacd66619e4306fa264dc298a2c56d692d06da376e87bd405933e",
+      "error": null
+    },
+    {
+      "id": "06-lucas",
+      "status": "PASS",
+      "sha256": "4b26ae9efb7aaada9344f13dbcf26d9f4b85744d02daec686e47445e4d7782b3",
+      "error": null
+    },
+    {
+      "id": "07-training",
+      "status": "PASS",
+      "sha256": "2ca266af792821cd278424e86be750252560648136965637d8ca08c28cb8a710",
+      "error": null
+    },
+    {
+      "id": "teardown1-prefix",
+      "status": "PASS",
+      "sha256": "1d2015f12146483c447ed7730d7d6f0405c118e0d967198cd6a194058d98ae33",
+      "error": null
+    },
+    {
+      "id": "teardown1-pending-quit",
+      "status": "FAILED",
+      "sha256": "cff7edc88bb8caecf5125f0802c22a00338f85fd264e7b4560b299cccd515c31",
+      "error": "RuntimeError('Missing positive evidence: ordinary native construction queued')"
+    }
+  ]
+}

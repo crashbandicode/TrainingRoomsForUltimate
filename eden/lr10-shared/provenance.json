@@ -1,0 +1,23 @@
+{
+  "playbook_head": "55bc761ceef6038803dd1c1f055cc2bce746ba7d",
+  "rows_sha256": "4cc3a6a88f5a79b6b7da2e0e6ae331a0dbfcc4331c8e4d6a7ac1629f58ca89ed",
+  "hook_sha256": "4770690fd42d54814cb7f3edad8609addc4a0b0d372763a2908bb78e9943e3af",
+  "roster_helper_sha256": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93",
+  "runner_sha256": "9cb369084548b4209cf24990cfaaa51d32ec07a4679fb3e1d0db2e07c51c74b0",
+  "lifecycle_sha256": "644f9d2af5d7b74e425ed027ef5c21b832ef9c1ea3eddfd88130e1bd70b90917",
+  "library_sha256": "729c615440c531cb8af4e78bdc2557a2596994b3d8736df102dda294ca014562",
+  "eden": {
+    "path": "/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage",
+    "sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb"
+  },
+  "short_macro_provenance": "Edited prior recorded p1-next-frames: release frame13->3, duration26->5; fresh playback qualification pending.",
+  "executor": {
+    "runner_sha256": "9cb369084548b4209cf24990cfaaa51d32ec07a4679fb3e1d0db2e07c51c74b0",
+    "lifecycle_sha256": "644f9d2af5d7b74e425ed027ef5c21b832ef9c1ea3eddfd88130e1bd70b90917",
+    "library_sha256": "271502fc7f8ed849e2d87e21ed664757ca1a592741b38164e2c7dfe83c2cb818"
+  },
+  "all_receipts_match_executed_manifest": true,
+  "raw_evidence_root": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr10-shared",
+  "export_verified": true,
+  "portable_manifest_sha256": "8ccef5603b9bb752440a46a2444a786280bdec8e176304ff3e9c7e68154f32ce"
+}
