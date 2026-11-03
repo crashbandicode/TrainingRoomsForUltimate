@@ -1,9 +1,10 @@
 //! Q15 diag-only observation guards, generated from owned 13.0.5 ELF0789f0a4.
 use super::*;
 
-#[cfg(not(feature = "diag"))]
+#[cfg(not(any(test, feature = "diag")))]
 pub const ROWS: &[Seam] = &[];
-#[cfg(feature = "diag")]
+// The host census checks every hook attribute, including diagnostic-only hooks.
+#[cfg(any(test, feature = "diag"))]
 pub const ROWS: &[Seam] = &[
     Seam { label: "q15_bust_context.constructor", group: "q15_bust_context", offset: 0x377c0d0,
         kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Entry },
