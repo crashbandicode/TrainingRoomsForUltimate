@@ -1,6 +1,6 @@
 # Current asset recipe reproduction
 
-2026-11-03. Scoped host reproduction passes for the builder and item inputs of frozen ab13a0f. Final native pixels, archive reversal and whole-RC acceptance remain open.
+2026-11-03. Scoped host reproduction and the required stock-preservation/layout-reversal checks pass for frozen ab13a0f. Final native pixels and whole-RC acceptance remain open.
 
 The lead executed the retained UI19 builder binary in two fresh processes, one Training and one Waiting, without Cargo or a compiler. Its SHA-256 is a14622ca015460da41efddf0b6941b510aca54f99567d83626e07459f3916375. All 51 original frozen inputs were rehashed before and after. Builder source/manifests, pane and recipe models, and all approved item files match r15 exactly. Private stock inputs were verified against the original UI19 receipt before execution; no live profile was read or changed.
 
@@ -24,3 +24,31 @@ A separate inverse starts from each generated target layout, removes only the ad
 Neither stock layout has a pane-name collision with the owned prefixes. Mutating an original pane alpha in each target causes the inverse comparison to fail. The173 Training and182 Waiting members other than the modified layout and appended BNTX remain byte-identical to stock. Private scripts, original independent parser and reversed layouts are retained at main-r15/layout-reversal; receipt SHA25695fa7c25314628bcc1d9f4cb38fab3b6debc84bcce589e687c2c0c3429cac684.
 
 This closes the exact layout inverse subcase. Whole BNTX-file reversal and original SARC container padding are not proved, so core07.3 remains open. The pinned SARC writer explicitly guarantees member preservation rather than original serialization; its untouched-roundtrip differences are not a claim of changed stock payloads. No compiler, native build, live profile change or runtime acceptance is associated with this audit.
+
+## Required preservation contract reconciled, 08:08 UTC
+
+SPEC-core-07 section4.2 requires stock texture metadata, pixels, mip offset
+arrays and4KiB pool alignment to survive. Section4.4 specifies byte-for-byte
+reversal of the original layout. It does not require reproducing original
+SARC padding or an identical whole BNTX container after removing additions.
+The earlier complete-container inverse hold was broader than this contract.
+Its raw serialization differences remain recorded; they are not a failure of
+stock-member preservation. No requirement or runtime failure was waived.
+
+A fresh independent raw-byte audit verifies all43Training and91Waiting stock
+textures: metadata spans, every pixel byte and every relative mip offset
+match. Each target adds exactly38owned item textures. All173/182untouched
+SARC members match byte-for-byte; the previously proved inverse restores both
+stock BFLYT files exactly. BNTX relocations, each texture alignment,4KiB pool
+size and relocation/data-section boundaries pass. A mutated stock pixel is
+rejected by the comparison. Both combined BNTX members also start on4KiB
+archive offsets. The small stock bushvt member is not4KiB aligned; an initial
+extra assertion incorrectly applied the texture-pool requirement to every
+shader member and was removed. Its unchanged bytes remain verified.
+
+Private evidence: main-r15/stock-texture-preservation.json, SHA256
+8f558fcd3c5c117cdf48a7eac097d50f47161af145bd007c11f5b985d9f126fb;
+verifier tmp-lead-astra4/audit-stock-textures.py. This supplies the missing
+host evidence for core07.3. Re-run the scoped checks on the next generated
+assets and final candidate; no final RC row is closed by this development
+result. No compiler, native build or live profile was used.
