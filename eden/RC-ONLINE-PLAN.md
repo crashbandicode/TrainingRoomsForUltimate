@@ -28,9 +28,9 @@ with their hard-coded foreign roots/owners. One Eden per host. Surface and Yoga
 claims must both be admitted for a paired run; no compile beside either Eden.
 
 The qualified private Yoga rig is /home/intpa/trainingrooms-eden-lead-astra4,
-profile y, display :98. It is currently transferred to pkg4 and is unavailable
-until that owner explicitly restores/releases it. The next UI owner takes its
-own claim, labels and unit after normal queue admission. Source profile b is
+profile y, display :98. UI owns the current UI21 development lanes under separate claims and full
+restoration between them. Re-read the canonical ledger and queue at admission;
+this planning document is not evidence that either host is free. Source profile b is
 read-only. The launch already supplies the existing LAN runtime at
 /home/intpa/elite-rematch-work/eden-lan-runtime, SHA256
 ee3c2e953a0b87541c29eb8918ce0354489035296ac5eaf060b3444d06a8bbcb.

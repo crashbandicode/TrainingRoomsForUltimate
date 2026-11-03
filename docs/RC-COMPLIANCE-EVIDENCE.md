@@ -1,8 +1,8 @@
 # RC compliance evidence map
 
 2026-11-03, reviewed packaging map updated by the lead. Latest development compilation is frozen r16 758cee5; root HANDOFF.md records
-exact source/diagnostic identities and targeted gates. Modified-path qualification
-is pending; r15 remains the latest runtime-tested development artifact. The final release candidate remains unaccepted.
+exact source/diagnostic identities and targeted gates. Modified-path qualification completed08:31 UTC; r16 runtime lanes are underway.
+Their results do not establish final-candidate acceptance. The final release candidate remains unaccepted.
 This maps the **30 agent rows** emitted by playbook `2dee6cc` when no matching
 release NRO is supplied: one binary row plus 29 explicit agent rows.
 It does not replace the full playbook checklist or mark the RC ready.
@@ -145,3 +145,9 @@ All final release, full regression, online/LDN, media and remaining agent rows s
 
 ### Qualification completed08:31 UTC
 The preceding pending explicit-review state is superseded by main-r16/lead-development-qualification.json SHA4310ac12c95418cfc66828667905c6d823a62a14f83875912af66e559c377339. UI42/Hitbox101/count100 review files were independently verified; required conditional/typed/native local frames are included without relaxing thresholds. Development lanes are admitted as recorded in HANDOFF.md. Runtime, final release gates and complete compliance remain open.
+
+### Source-only checker at main5664bf3, 2026-11-03 08:39 UTC
+
+Playbook2dee6cc checker exited1: two mandatory machine failures (README GIF content and docs/media GIF),30 agent rows,894 guard initializers all64 bytes, clean source tree and root handoff present. Explicit nonexistent RELEASE-PENDING.nro prevented stale build auto-discovery. Raw report main-r16/source-compliance-5664bf3.md SHA256 06d448a947b81496adfcf99a102cb9f22711c0cdc7edb41ac5de2f5ec0bfd695. This report does not qualify the diagnostic as a shipped release, and the source test-attribute count is not an executed-test count. All thirty rows retain the scoped dispositions above; final closure is still owed.
+
+The first r16 F9 runtime attempt s6-12 reports the corrected full identity completion followed by Samus body with Sonic HUD. The original mismatch was retained and the run stopped/restored; full lead archive audit is pending. No F9 closure follows from the count-marker repair. Pkg4 first-seal observation is authorized as bounded evidence collection only; timer truncation has no accepted root fix.
