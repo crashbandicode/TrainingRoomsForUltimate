@@ -1,12 +1,12 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 10:37 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+Updated 2026-11-03 10:51 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
 ## Objective and source
 
-RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new feature work. Deferred scope and pending exclusion boundaries: NEXT-VERSION.md.
+RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new Phase-1 feature work. Subsequent Phase 2 and Phase 3 are explicitly authorized below; deferred scope and exclusion boundaries: NEXT-VERSION.md.
 
-Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Product currently7e760ec, documentation56beb14 before this reset checkpoint. This is NOT yet the frozen RC: F9/Setup/advanced workflows need reviewed disable/removal and UI22 source-only addition is deferred. Final source and NRO identities will be recorded after coherent composition, not for scratch iterations.
+Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Current product11ee226: UI22 reversed0c60459; StateWriter40KiB8fe6261; UI freeze87597fc/6ba06e7; advanced-workflow closure11ee226. F9 and optional-observer retirement remain in worker streams, so this is NOT the frozen RC. Final source/NRO identities follow coherent composition; no scratch receipts.
 
 Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, Astra medium. Owner182663/watch303502; verify exact model/effort on compaction. Playbook2dee6cc fully read. Primary owns four existing Sol workers; no duplicate launches. Operator-authorized OpenCode staffing supersedes the old no-OpenCode rule.
 
@@ -16,9 +16,9 @@ Lead owns no compile/Eden/claim. Pkg4 p4c04 stopped10:29:57, full1362profile+14h
 
 - Pkg6 Sol: proven roster/Mii/hat inventory and safe F9 disable boundary; later Surface laps/teardown/Mii/hats/release rows.
 - Pkg4 Sol: proven recording versus advanced unfinished workflow boundary, M5q truncation facts; later host gates and replay assistance.
-- UI Sol: Setup/Q15/UI22 boundary and evidence inventory; later Yoga new-UI/defaults/Developer/waiting rows.
-- Slim Sol: size recovery through deferrals, state lifecycle stays unintegrated; later Ally native/pair exclusions and pilot coexistence, size/carry/stack review.
-- Lead: review boundaries, compose candidate, online pair, final integration and acceptance. Four source-boundary returns due about10:54–10:55Z. No worker compiles before coherent plan/composition.
+- UI Sol: Setup/Q15/UI22 boundary and evidence inventory; UI segment of the shared Surface batch.
+- Slim Sol: size recovery through deferrals, state lifecycle stays unintegrated; native/pair exclusions and pilot segment of the shared Surface batch, size/carry/stack review.
+- Lead: review boundaries, compose candidate, online pair, final integration and acceptance. Pkg4 and UI source slices integrated; pkg6/Slim product returns due about11:17Z. No worker compiles before coherent plan/composition.
 
 ## Kept evidence and limitations
 
@@ -47,7 +47,7 @@ No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign ar
 1. Consume parent LEAD-INBOX PRIMARY REQUESTs at least every10min; lead turn report about every45min without ending. Last10:09, next10:54.
 2. Review four boundary returns; disable/remove deferred exposed paths and compose ONE candidate. Update NEXT-VERSION exclusions and known issues. Current140243normalizedr18 exceeds136069baseline; no ceiling increase or formatting/count trick.
 3. Candidate gates: all-targethost tests, clippy all-targets -Dwarnings0, no-default build, release+diag0warnings, stack policy, normalizedsize<=136069, carry/provenance, explicit-release compliance and allmanual dispositions scoped to reset matrix. Fix genuine failures and rerun affected checks, preserving failures.
-4. Final matrix across Surface/Yoga/Ally, every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
+4. ONE continuous Surface diagnostic session for all single-console rows; Yoga baseline replay retained as online peer and Surface release replay retained as online host/release-lap process: target THREE physical starts total. Every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
 5. R-D1 same complete replay baseline/candidate checks ANDpositions; R-O1 actual LDN approvedjoin/membership/waiting changes/one completedmatch and detector equalendframes/desync_seen0both. R-O1 uses LANOnlineOFF per actualM5q evidence, correcting older public-TLS planning. Full profiles restored/separately verified before release.
 6. Final README/HANDOFF/compliance/GIF, RC READY, primary Astra-high review. No push/tag/release/card/DBI/USB.60GB target cap/40GB disk floor, bounded jobs, one Eden per host/no compile beside it, shared ledger/fairness remain.
 
@@ -66,3 +66,9 @@ No speculative writer refactor or F9 attribution. Existing thread_stacks host
 checks and final compiled/static/runtime gates must verify the coherent RC;
 no new intermediate build or PASS claim. Retain this historical maximum even
 if disabling Setup later reduces one path.
+
+## Subsequent operator-authorized phases (10:5x / 11:0x orders)
+
+Phase 2 after RC: implement all missing listed core02/03/07/08, N1–N10, B3, Q5/Q7/Q16 behavior with host tests before one batched Eden validation. B11 already exists; no new implementation. S2/B4/B7 move to Phase 3. Target one validation plus at most one bug-confirmation boot, and at most one combined native trace boot only if facts block implementation.
+
+Phase 3, TrainingRooms only: S2 field-wise settings recovery preserving settings.invalid-<n>.json and permission-denial regression; B4 no CPU-settings writes to entry0 and Record refusal under P1 pilot; B7 opponent-relative air-dodge/shield-tilt In/Out; HB1 all enabled hurtboxes plus option A isolated visualization sphere with equivalent geometry/translucency/tints/bone-following/size/first-frame and Ridley full first-pass proof. Ordinary shields unchanged, no fork backport. Implement/host-test the whole batch before ONE Eden run; batch any necessary native traces and bug fixes. Phase 1/2 keep unproven items disabled or at M5q behavior and are not blocked by Phase 3.

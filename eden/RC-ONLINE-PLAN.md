@@ -8,14 +8,12 @@ not turn a solo waiting-room observation into two-console or LDN acceptance.
 This section supersedes the broader historical plan below. Required online
 acceptance is ONE R-D1 replay A/B plus ONE R-O1 LDN session, matching M5q
 online/RESULT.md. Public Quickplay matchmaking/TLS is not a separate RC gate.
-The M5q run used LAN Online OFF on both peers; do not use the older TLS-on
+The M5q run used LAN Online OFF on both peers; set airplane mode OFF in both owned profiles as well; do not use the older TLS-on
 preflight settings for this LDN session. Keep those observations as history.
 
-R-D1: on Yoga, use the same retained native replay for baseline and candidate,
-with the same detector binary and settings. Compare complete matching frame
-counts, every check value AND every position. M5q used1678frames; reuse that
-replay if present in the owned profile, otherwise document the exact retained
-replay before both passes. No partial prefix can pass.
+Physical-start budget: THREE total across the RC. First, Surface diagnostic runs the complete single-console batch. Second, Yoga detector-only runs the full replay baseline and stays alive as the online peer. Third, Surface release runs the same complete replay, release-only laps and then hosts the online pair without restarting. UI/specials/pilot add no independent boot.
+
+R-D1: use identical retained native replay bytes and equivalent game/save/settings on Yoga baseline and Surface release candidate, with the same detector. Compare every check AND every position over the complete matching length. M5q used1678frames; that specific replay is not yet located in our private profiles. Read-only Yoga inventory found three replay files, none yet qualified as the selected fixture. Copy only into owned profiles after snapshots; never alter source profiles. No partial prefix can pass.
 
 R-O1: Surface modded, Yoga peer, one complete native local-wireless session.
 Both leave intro and reach actual menus; frontendroom2/2 is not membership.
@@ -38,6 +36,8 @@ Read and adapt approved route semantics; never execute the historical
 foreign-owner pair scripts directly. Candidate composition and gates must
 precede runtime admission. Lead owns paired coordination; pkg4 assists with
 replay data. Final source and release/diagnostic identities remain pending.
+
+Everything below is historical planning; the reset authority and three-start order above override old separate UI/replay/online boots and TLS-on settings.
 
 ## Changed-path source review, 2026-11-03
 

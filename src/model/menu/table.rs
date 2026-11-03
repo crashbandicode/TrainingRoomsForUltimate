@@ -330,7 +330,7 @@ pub static ROWS: [Row; 92] = [
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
       "Names the current slot's recording and keeps it."),
     r(MACROS, "Replay capture", "", Control::ReplayCapture,
-      "On: matches are captured for the replay window.\nThe choice is kept in replay_capture.ini."),
+      "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
     // Fighters & Stages > Player 1 and CPU
     r(PEOPLE, "Player Swapping", "trio_practice", TOGGLE,
       "On: the Player 1 cycle chord changes your fighter.\nOff: only the CPU can be changed."),
