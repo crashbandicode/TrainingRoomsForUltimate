@@ -3,7 +3,8 @@
 Writes boot settings before launch, or drives laps after group prefetch. Cycle laps require the ordinary-owner
 adapter completion matching the current role, ticket and target with its lease released. A fallback bank-ready
 event is not completion of a refused request. Bootstrap separately waits for each initial body bank.
-The native baseline explicitly selects --native-reload and requires `[CharacterRoster] complete owner=<role>`.
+Matched performance adds --matched to both bootstrap and laps for strict transactions, expected fighter order,
+and six seconds after observed ready (one-second polling). Legacy native baseline selects --native-reload and requires `[CharacterRoster] complete owner=<role>`.
 A missing completion ends the lane with a retained failed receipt. Options come from the settings file.
 
 Usage: f6_rows.py settings <out.json>
@@ -86,8 +87,56 @@ def cycle_result(line, role, request):
     return None
 
 
+def qualified_boot(lines):
+    """Only accept qualification after this boot's latest physical observations.
+
+    Run 39's handed-to-owner line was a consumed loading request, not a submit.
+    Requiring the latest session boundary also excludes the previous log file.
+    """
+    boots = [i for i, line in enumerate(lines) if '[PracticeDiagnostics]' in line and 'session_start;' in line]
+    if not boots:
+        return None
+    boot = boots[-1]
+    observations = []
+    for role, kind in ((0, '58'), (1, '42')):
+        found = [i for i in range(boot + 1, len(lines))
+                 if f'[CharacterRoster] observed owner={role} ' in lines[i]]
+        if not found or not re.search(rf'kind=0x{kind}\b', lines[found[-1]]):
+            return None
+        observations.append(found[-1])
+    queued = [i for i in range(max(observations) + 1, len(lines))
+              if '[MiiAutoInit] catalog read queued ' in lines[i]]
+    if not queued:
+        return None
+    q = queued[-1]
+    identity = lines[q].split('catalog read queued ', 1)[1]
+    ready = next((i for i in range(q + 1, len(lines))
+                  if '[MiiAutoInit] catalog ready;' in lines[i] and lines[i].endswith(identity)), None)
+    if ready is None:
+        return None
+    owners = []
+    for role in ('Player', 'Cpu'):
+        owner = next((i for i in range(ready + 1, len(lines))
+                      if f'[MiiOrdinary{role}] catalog owner qualified; immutable origin retained' in lines[i]), None)
+        if owner is None:
+            return None
+        owners.append(owner)
+    def stamp(i):
+        return int(lines[i].split()[0])
+    return {'boot': lines[boot], 'observations': [lines[i] for i in observations],
+            'catalog_queued': lines[q], 'catalog_ready': lines[ready],
+            'owners': [lines[i] for i in owners],
+            'boot_to_qualification_ms': stamp(max(owners)) - stamp(boot),
+            'first_physical_observation_to_qualification_ms': stamp(max(owners)) - stamp(min(observations))}
+
+
 def laps(args):
     bootstrap = getattr(args, "bootstrap", False)
+    matched = getattr(args, "matched", False)
+    expected_targets = {0: [0x2d] if bootstrap else [0x2c, 0x1c, 6, 0xb, 0x1f, 0x2e, 0x58, 0x2d, 0x2c, 0x1c, 6],
+                        1: [8] if bootstrap else [0xf, 1, 7, 2]}
+    if matched and (args.p1 != len(expected_targets[0]) or args.cpu != len(expected_targets[1])):
+        raise SystemExit("GATE FAIL: matched route requires bootstrap1+1 or laps11+4")
     # Use the shared, reviewed harness; do not start or claim an instance here.
     harness = Path(args.harness or os.environ.get("TR_HARNESS", str(HERE / "harness")))
     if not (harness / "route.py").is_file():
@@ -130,12 +179,37 @@ def laps(args):
             return f"shot failed: {exc}"
 
     start = 0
-    if bootstrap and wait_for(0, '[PreloadStatus] delivered text=Some("Swap both once to load")', args.settle) is None:
+    if bootstrap and not args.native_reload and wait_for(0, '[PreloadStatus] delivered text=Some("Swap both once to load")', args.settle) is None:
         raise SystemExit("GATE FAIL: initial Training preload notice was not delivered; no cycle inputs sent")
     if args.native_reload and not any(
             "[CyclePreload] loaded slots=0 " in line and "bank_members=0 group_swap=false" in line
             for line in read()):
         raise SystemExit("GATE FAIL: native baseline preload/bank Off was not observed; no cycle inputs sent")
+    if matched and not args.native_reload and not any(
+            "[CyclePreload] loaded slots=5 " in line and "bank_members=3 group_swap=true" in line
+            for line in read()):
+        raise SystemExit("GATE FAIL: matched candidate preload/bank On was not observed")
+    if matched and bootstrap:
+        for owner, kind in ((0, 0x58), (1, 0x42)):
+            observed = wait_for(0, lambda line: re.search(
+                rf"\[CharacterRoster\] observed owner={owner} .*?kind=0x{kind:x}\b", line), args.settle)
+            if observed is None:
+                raise SystemExit(f"GATE FAIL: matched starting fighter owner={owner} kind={kind:#x} missing")
+        gate_started = time.monotonic()
+        deadline = gate_started + args.settle
+        qualification = qualified_boot(read())
+        while qualification is None and time.monotonic() < deadline:
+            time.sleep(1.0)
+            qualification = qualified_boot(read())
+        receipt = {'qualified': qualification is not None, 'evidence': qualification,
+                   'wait_seconds': time.monotonic() - gate_started,
+                   'observed_monotonic': time.monotonic(), 'timeout_seconds': args.settle}
+        go = out / 'go.json'
+        if go.exists():
+            receipt['css_plus_to_qualification_observed_seconds'] = time.monotonic() - json.loads(go.read_text())['monotonic']
+        (out / 'bootstrap-qualification.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        if qualification is None:
+            raise SystemExit('GATE FAIL: current-boot catalog and both ordinary owners unqualified; no cycle inputs sent')
     if not args.native_reload and not bootstrap:
         ready = wait_for(start, "[GroupSwap] prefetched", args.settle)
         if ready is None:
@@ -147,8 +221,9 @@ def laps(args):
             if bootstrap and wait_for(0, f"[CharacterRoster] observed owner={role}", args.settle) is None:
                 raise SystemExit(f"GATE FAIL: bootstrap owner={role} was not observed; no cycle input sent")
             m = count()
+            pressed_at = time.monotonic()
             session.press("zl,right" if role == 0 else "zl,left", 200)
-            transaction_lap = not args.native_reload and not bootstrap
+            transaction_lap = matched or (not args.native_reload and not bootstrap)
             queued = wait_for(m, (lambda line: cycle_request(line, role)) if transaction_lap
                               else f"[CharacterRoster] queued owner={role}", 8)
             completion = "matching cycle transaction" if transaction_lap else (
@@ -161,10 +236,28 @@ def laps(args):
             else:
                 done = wait_for(m, (lambda line: native_complete(line, role)) if args.native_reload
                                 else f"{completion} owner={role}", 20)
+            ready_observed_at = time.monotonic()
+            expected_target = expected_targets[role][i] if matched else None
+            if matched and queued:
+                actual_target = int(cycle_request(queued, role).group(3), 16)
+                if actual_target != expected_target:
+                    refused = f"unexpected target={actual_target:#x}, expected={expected_target:#x}"
+                    done = None
+            bank_ready = None
+            if matched and bootstrap and not args.native_reload and done:
+                bank_ready = wait_for(m, f"[BodyBank] ready owner={role}", 20)
+                if bank_ready is None:
+                    refused = "matched bootstrap body bank readiness missing"
+                    done = None
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
             rec = {"phase": "bootstrap" if bootstrap else "lap", "role": role, "press": i + 1, "queued": queued, "done": done, "refused": refused, "lines": built,
                    "shot": shot(f"r{role}-p{i + 1}") if any("[GroupSwap] built" in x for x in built) else None}
+            if matched:
+                rec.update(expected_target=expected_target, bank_ready=bank_ready,
+                           pressed_monotonic=pressed_at, ready_observed_monotonic=ready_observed_at,
+                           cadence_seconds=args.gap,
+                           cadence_boundary="ready observed by one-second polling")
             records.append(rec)
             # Persist each attempted lap, including a failure, before another input.
             with (out / ("bootstrap.jsonl" if bootstrap else "laps.jsonl")).open("a", encoding="utf-8") as f:
@@ -177,7 +270,9 @@ def laps(args):
             for x in built:
                 print("  ", x[:400], flush=True)
             # Let a prefetch of the next group finish before the next press (the planner's own pace).
-            if not args.native_reload and not bootstrap:
+            if matched:
+                time.sleep(max(0.0, args.gap - (time.monotonic() - ready_observed_at)))
+            elif not args.native_reload and not bootstrap:
                 wait_for(count(), "[GroupSwap] prefetched", args.gap)
     print("BOOTSTRAP DONE" if bootstrap else "LAPS DONE", len(records), flush=True)
 
@@ -195,11 +290,15 @@ def main():
     s.add_argument("--gap", type=float, default=6)
     s.add_argument("--harness", help="shared eden/harness directory (or TR_HARNESS)")
     s.add_argument("--native-reload", action="store_true", help="no bank prefetch; require native roster completion")
+    s.add_argument("--matched", action="store_true", help="strict matched11+4 route and fixed post-observed-ready cadence")
     s = sub.add_parser("bootstrap", help="enter each role's first body bank before waiting for group prefetch")
     s.add_argument("label")
     s.add_argument("--harness")
     s.add_argument("--settle", type=float, default=20)
-    s.set_defaults(bootstrap=True, native_reload=False, p1=1, cpu=1, gap=0)
+    s.add_argument("--native-reload", action="store_true")
+    s.add_argument("--matched", action="store_true")
+    s.add_argument("--gap", type=float, default=6)
+    s.set_defaults(bootstrap=True, p1=1, cpu=1)
     a = p.parse_args()
     if a.op == "settings":
         settings(a.out)
