@@ -78,3 +78,19 @@ online-safety verdict. Review every changed callback that can mutate simulated
 state or call native RNG, including inherited callers, against its actual
 registration and scene gate. Do not substitute an unchanged-code assertion or a
 zero-Unmapped scan for detector equality.
+## Detector staging identity checked 2026-11-03 08:01Z
+
+Read-only inspection of the immutable Yoga source profile b found the active
+plugins/libssbu_desync_detector.nro:483328bytes,SHA256
+7603ad747733b5e55a52b8e69fc63e3a698bb4258c7e728ca6c845ca41d2113f.
+The separately set-aside copy has SHA256
+b01823ddefb329cc21c02f8eec0557d3a97ead3cf930bc6a4e0d390222433ecb;
+it is a different binary and must not be silently substituted. No source or
+live profile was modified. Rehash the selected aid at actual staging and use
+the identical aid for baseline, candidate and both peers. This is an available
+artifact identity, not a new qualification or proof of its version/source.
+The detector README/WHAT-IS-CHECKED/HOOKS documents were reread: playback
+frames contain computed and recorded position checks as well as RNG checks;
+all must be compared across the complete retained replay. Full online session
+summaries and separate LDN remain required. No replay or online run is claimed
+by this inspection.
