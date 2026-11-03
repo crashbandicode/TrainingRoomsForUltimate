@@ -7,6 +7,10 @@
 - **Upstream reference read (spec writer only):** `src/training/ui/mod.rs` (draw hook, archive hook, helpers), `src/training/ui/display.rs` (notification panel draw and the native combo-display toggle), `src/common/mod.rs` (the native pause-menu structure), `src/common/offsets.rs` (`DRAW`, `LAYOUT_ARC_MALLOC`), `Cargo.toml` (`layout_arc_from_file`, `include-flate`, `sarc`) at commit `97cbe9b9` (unchanged in `077a8e43`); fork changes at stage M5i `src/training/ui/mod.rs` `7-8, 11, 14-16, 18, 21-23, 25, 27-102, 138-152, 154-182, 185-186, 195, 199-201, …`, `src/training/ui/display.rs` `28`, plus the fork-only `src/training/ui/{anchors,layout_registry,archive_name,archive_retirement,waiting_archive,native_menu}.rs`, `training_mod_macros/src/ui_anchor.rs`, `src/hang_trace.rs`, `docs/REVISION29_DRAW_DECOUPLING.md`, `docs/REVISION30_HOOKPROOF_PROLOGUE.md`, `docs/REVISION33_STARTUP_MEMORY.md`, from `docs/provenance/provenance-files.md`.
 - **Implementers must not open the upstream paths above.** Everything an implementer needs is in this file and in the native reference tables it cites.
 
+## RC residency decision (2026-11-03, primary)
+
+The primary approved retaining two preallocated archive working buffers for RC. This supersedes the historical fork free-between-loads requirement wherever it appears below. Logical hand-outs retire after at least 5 seconds; returning a buffer to the pool retains its capacity. Current requested capacity is 2 x 1,570,692 = 3,141,384 bytes, plus bookkeeping. Require zero hook allocations, the two-buffer bound, repeated-load correctness and measured headroom. Include this cost in resident accounting and the 10+5 hot-slot measurement. Off-hook free-between-loads preparation is next-version work. See docs/DECISIONS.md; no runtime PASS follows from this decision.
+
 ## 1. Purpose (one paragraph)
 
 The plugin's on-screen elements (menu, notifications, input log, damage readouts) live in panes added to the game's own Training HUD layout. To get them there, the plugin substitutes its own version of the Training layout archive at the moment the game decompresses the original, so the game builds the plugin's panes as if they were native. Every frame, at the point where the game is about to recompute each layout, the plugin runs its UI work for that layout; for the Training HUD that means drawing the menu and panels, and for the game's HUD layouts it means hiding them when the player turned the HUD off or the menu is open. The fork's REVISION33 change, which releases the decompressed archive a few seconds after the game copied it instead of keeping 4.2 MB resident for the whole session, is required behaviour.
@@ -90,7 +94,7 @@ None (the `hud` setting is part of the menu file, SPEC-core-04). The development
 | Metric | Fork today (measured, source) | Target | How it will be measured |
 | --- | --- | --- | --- |
 | Embedded archive in the image | upstream archive 4,213,268 B inflated; about 195 KB deflated for the fork's Training archive + waiting recipe together (REVISION33) | deflated size of the clean-room archive ≤ the fork's; report in `docs/resource-costs.md` (W5) | `nro_size.py` (`.rodata`) |
-| Resident archive memory | upstream: 4,213,268 B for the whole session (plus a second ~4.2 MB for the waiting room); fork: 0 between loads, one inflated copy for ≤ 5 s after each load; the fork's current Training archive is 7,820,940 B inflated | released within 5 s of every load | `[LayoutArchive] released` lines; heap meter in diag |
+| Resident archive memory | Historical fork freed payloads between loads | RC: two preallocated buffers, 3,141,384 B requested capacity plus bookkeeping; logical hand-outs retire after at least 5 s; capacity stays reserved | Bind hand-out/release times, repeated-load health, two-buffer bound, allocation counters and measured headroom; never infer heap/RSS reclamation from release |
 | Archive hook cost | directory scan only (no payload copies); one inflate per load, "a few tens of milliseconds" on a loading screen | same | diag timing |
 | Per-frame work | one tick per live layout per frame (≈ 120/s `ui_pass` at 60 fps with two practice layouts in the fork's heartbeat), name compare + the HUD rule + name-gated draws | same | heartbeat/diag counters |
 | Stack | inline trampoline ≈ 0x310 B + tick frame on the UI job thread | measure once | diag |
@@ -111,7 +115,7 @@ None (the `hud` setting is part of the menu file, SPEC-core-04). The development
 | Combo-display observers: value copied, defaults enabled, no retained pointer; notifications cleared when off | `core05_combo_display_observer` | `core05-E8` turn combo display off in the game's menu | — |
 | Missing plugin panes → no draw, no panic | `core05_missing_pane_skip` | `core05-E9` stock archive forced | — |
 | **B3** (decided) A non-stock `info_training` layout from another mod is overridden anyway; the install line names the foreign layout; no skip | `core05_foreign_layout_injects_and_notes` | `core05-E11` profile with a layout mod | `docs/EDEN-RESULTS.md` |
-| Resident memory before/after release | — | `core05-E10` heap meter diag lines | `docs/resource-costs.md` |
+| Reserved two-buffer capacity and logical retirement, repeated loads and measured headroom | — | `core05-E10` heap meter diag lines | `docs/resource-costs.md` |
 
 ## 10. Open questions
 

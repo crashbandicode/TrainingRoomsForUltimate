@@ -1,5 +1,17 @@
 # Resource costs of the upstream-origin features
 
+## Current clean-room RC archive accounting
+
+Primary decision relayed in TRAININGROOMS-LEAD-INBOX.md under PRIMARY DECISION ~05:5xZ; operator informed and may override. Keep the existing two preallocated archive working buffers for RC to preserve zero allocations in the archive hook. Current recipe maximum is 1,570,692 bytes per buffer: 3,141,384 bytes (about 3.0 MiB) requested capacity total, plus allocator/bookkeeping overhead. Five-second release means logical hand-out retirement and return to the pool; it does not mean heap or RSS reclamation.
+
+Mandatory acceptance remains zero hook allocations, at most two buffers, at least five seconds of hand-out grace, repeated-load correctness and measured headroom. Count the reserved capacity separately from NRO image residency and include it in the 10-fighter plus 5-hat hot-slot memory measurement. Logical payload lengths, requested allocation capacity, allocator residency and host RSS are different measurements; do not add the buffer cost again to a measured heap total that already includes it.
+
+Freeing between loads through qualified off-hook preparation becomes next-version memory work, not an RC blocker. core05.12 closes only on the corrected requirement plus actual runtime evidence; this decision alone is not a PASS.
+
+
+Historical research tables below retain their original scope and do not describe the current clean-room runtime. Current r13 diagnostic NRO image residency is 6,164,480 bytes; adding the separately requested archive capacity gives 9,305,864 bytes before archive bookkeeping and all other dynamic allocations. This arithmetic is not total process/native RSS or a final release measurement. UI18 runtime hand-out/grace/re-entry/headroom evidence remains pending.
+
+
 Compiled 2026-11-01 (research worker, read-only). Every number below carries the file and line (or JSON key)
 it was read from, or the command that produced it. Nothing was built or run except
 `/usr/bin/python3 -I /home/intpa/ssbu-mod-playbook/tools/build/nro_size.py <nro>` on NRO files already in the

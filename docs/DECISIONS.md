@@ -471,3 +471,12 @@ This records authorization only; implementation and runtime proof are pending.
 PRIMARY approved the asynchronous worker recommendation in TRAININGROOMS-LEAD-INBOX.md (heading approximately04:3xZ, received04:21Z). This is a primary decision, not an operator-level exception. SPEC-core-01 synchronous read per frame means one counted request per qualifying held-L+R+A P1 frame processed off-thread. The existing worker reads in bounded batches; the hook performs no filesystem I/O or heap allocation. Report requested/completed/pending/dropped counts and explicit lag/overflow diagnostics. Cancel pending work when the row or page is Off.
 
 The developer struct has no fields and no configuration effect. Actual read timing and the completed count at shutdown may differ; nothing visible changes. A dirty-bit coalescing implementation alone does not preserve the requested per-frame accounting. This resolves the policy question only; implementation, original accounting/cancellation tests, callback allocation evidence and runtime read-count proof remain required.
+
+
+## 2026-11-03: RC archive working-buffer residency
+
+Primary decision relayed in TRAININGROOMS-LEAD-INBOX.md under PRIMARY DECISION ~05:5xZ; operator informed and may override. Keep the existing two preallocated archive working buffers for RC to preserve zero allocations in the archive hook. Current recipe maximum is 1,570,692 bytes per buffer: 3,141,384 bytes (about 3.0 MiB) requested capacity total, plus allocator/bookkeeping overhead. Five-second release means logical hand-out retirement and return to the pool; it does not mean heap or RSS reclamation.
+
+Mandatory acceptance remains zero hook allocations, at most two buffers, at least five seconds of hand-out grace, repeated-load correctness and measured headroom. Count the reserved capacity separately from NRO image residency and include it in the 10-fighter plus 5-hat hot-slot memory measurement. Logical payload lengths, requested allocation capacity, allocator residency and host RSS are different measurements; do not add the buffer cost again to a measured heap total that already includes it.
+
+Freeing between loads through qualified off-hook preparation becomes next-version memory work, not an RC blocker. core05.12 closes only on the corrected requirement plus actual runtime evidence; this decision alone is not a PASS.
