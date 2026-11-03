@@ -205,6 +205,11 @@ impl LiveArchive {
     pub const fn new() -> Self {
         Self { pool: crate::engine::macros::LiveCapturePool::new(), bindings: std::collections::VecDeque::new(), last_loss: 0 }
     }
+    #[cfg(any(feature = "diag", test))]
+    pub fn take_first_seal(&mut self) -> Option<crate::engine::macros::FirstSeal> {
+        self.pool.take_first_seal()
+    }
+
     /// A missing lifecycle/sample event invalidates uncertain associations. A later
     /// Start is independent; no suffix or reused native slot is rebound as complete.
     pub fn apply(&mut self, serial: u64, event: LiveEvent, last_lost_serial: u64) -> Option<LiveCommit> {

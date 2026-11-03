@@ -82,12 +82,77 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "2f61a92d6209b26c1f4e20689ed322c89833cdf5008cee495e7311d6a16810be",
+   "dest_sha256": "bda82f18e63d9873a8b7f0751defc28827ffeb68bada1bef6070b18fa028aa4e",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
      "new": "    /// Worker handoff: preserve the game owner's monotonic incarnation even\n    /// after a dropped event retired a prior timeline.\n    pub fn start_record_owned(&mut self, key: NativeRecordKey) -> bool {\n        if key.generation <= self.generation { return false; }\n        self.generation = key.generation - 1;\n        self.start_record(key.index);\n        true\n    }\n\n    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
      "reason": "Design C: worker-owned frame pool accepts the game callback's monotonic record token without duplicating native reads"
+    },
+    {
+     "old": "struct LiveRecord {",
+     "new": "/// First worker transition only. Flags: gap=1, invalid sample=2, late start=4.\n#[cfg(any(feature = \"diag\", test))]\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct FirstSeal {\n    pub key: NativeRecordKey,\n    pub reason: SealReason,\n    pub flags: u8,\n    pub entry: Option<i32>,\n    /// Entry length, or total retained samples for a record-wide partial finish.\n    pub frames: u32,\n    pub first: Option<u32>,\n    pub last: Option<u32>,\n    pub next: Option<u32>,\n}\n#[cfg(any(feature = \"diag\", test))]\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub enum SealReason { Sample, Reservation, Limit, Explicit, PartialFinish }\n#[cfg(any(feature = \"diag\", test))]\nimpl std::fmt::Display for FirstSeal {\n    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n        let reason = match self.reason {\n            SealReason::Sample => \"sample\", SealReason::Reservation => \"reservation\",\n            SealReason::Limit => \"limit\", SealReason::Explicit => \"explicit\",\n            SealReason::PartialFinish => \"partial_finish\",\n        };\n        write!(f, \"record={}:{} reason={} flags={} entry={:?} frames={} first={:?} last={:?} next={:?}\",\n            self.key.generation, self.key.index, reason, self.flags, self.entry,\n            self.frames, self.first, self.last, self.next)\n    }\n}\n\nstruct LiveRecord {",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "    records: VecDeque<Record>,",
+     "new": "    records: VecDeque<Record>,\n    #[cfg(any(feature = \"diag\", test))]\n    first_seal: Option<FirstSeal>,",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "Self { generation: 0, active: None, records: VecDeque::new() }",
+     "new": "Self { generation: 0, active: None, records: VecDeque::new(),\n            #[cfg(any(feature = \"diag\", test))]\n            first_seal: None,\n        }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "        self.records.clear();",
+     "new": "        self.records.clear();\n        #[cfg(any(feature = \"diag\", test))]\n        { self.first_seal = None; }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "    pub fn start_record(&mut self, index: u32) -> NativeRecordKey {",
+     "new": "    pub fn start_record(&mut self, index: u32) -> NativeRecordKey {\n        #[cfg(any(feature = \"diag\", test))]\n        { self.first_seal = None; }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "    pub fn invalidate_record(&mut self, index: u32) {",
+     "new": "    pub fn invalidate_record(&mut self, index: u32) {\n        #[cfg(any(feature = \"diag\", test))]\n        if self.first_seal.is_some_and(|note| note.key.index == index) { self.first_seal = None; }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
+     "new": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }\n\n    /// Existing worker consumes this after applying the event, before releasing its lock.\n    /// Formatting happens only after that lock is released.\n    #[cfg(any(feature = \"diag\", test))]\n    pub fn take_first_seal(&mut self) -> Option<FirstSeal> { self.first_seal.take() }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "            live.sealed[entry as usize] = true;\n            live.session.truncated = true;",
+     "new": "            #[cfg(any(feature = \"diag\", test))]\n            observe_seal(&mut self.first_seal, live, key, SealReason::Explicit, 0, Some(entry), None);\n            live.sealed[entry as usize] = true;\n            live.session.truncated = true;",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "        if gap || !sample.is_valid() {\n            live.sealed[slot] = true;",
+     "new": "        if gap || !sample.is_valid() {\n            #[cfg(any(feature = \"diag\", test))]\n            observe_seal(&mut self.first_seal, live, key, SealReason::Sample,\n                u8::from(gap) | (u8::from(!sample.is_valid()) << 1)\n                    | (u8::from(gap && live.last_tick[slot].is_none()) << 2),\n                Some(entry), Some(tick));\n            live.sealed[slot] = true;",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "                if frames.try_reserve_exact(MAX_FRAMES).is_err() {\n                    live.sealed[slot] = true;",
+     "new": "                if frames.try_reserve_exact(MAX_FRAMES).is_err() {\n                    #[cfg(any(feature = \"diag\", test))]\n                    observe_seal(&mut self.first_seal, live, key, SealReason::Reservation, 0, Some(entry), Some(tick));\n                    live.sealed[slot] = true;",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "        let track = &mut live.session.tracks[track_index];\n        if track.frames.len() == MAX_FRAMES {\n            live.sealed[slot] = true;\n            live.session.truncated = true;\n            return false;\n        }\n        track.frames.push(sample);",
+     "new": "        if live.session.tracks[track_index].frames.len() == MAX_FRAMES {\n            #[cfg(any(feature = \"diag\", test))]\n            observe_seal(&mut self.first_seal, live, key, SealReason::Limit, 0, Some(entry), Some(tick));\n            live.sealed[slot] = true;\n            live.session.truncated = true;\n            return false;\n        }\n        live.session.tracks[track_index].frames.push(sample);",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "        if self.active.is_some() {\n            if let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) {\n                live.session.truncated = true;",
+     "new": "        if let Some(_key) = self.active {\n            if let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) {\n                #[cfg(any(feature = \"diag\", test))]\n                observe_seal(&mut self.first_seal, live, _key, SealReason::PartialFinish, 0, None, None);\n                live.session.truncated = true;",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "#[cfg(test)]\nmod tests {",
+     "new": "/// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.\n#[cfg(any(feature = \"diag\", test))]\nfn observe_seal(out: &mut Option<FirstSeal>, live: &LiveRecord, key: NativeRecordKey,\n                reason: SealReason, flags: u8, entry: Option<i32>, next: Option<u32>) {\n    if live.session.truncated { return; }\n    let frames = live.session.tracks.iter().filter(|t| entry.is_none_or(|e| e == t.entry))\n        .map(|t| t.frames.len() as u32).sum();\n    *out = Some(FirstSeal { key, reason, flags, entry, frames, first: live.session.first_counter,\n        last: entry.and_then(|e| live.last_tick[e as usize]), next });\n}\n\n#[cfg(test)]\n#[path = \"worker_first_seal_tests.rs\"]\nmod worker_first_seal_tests;\n\n#[cfg(test)]\nmod tests {",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
     }
    ]
   },
@@ -252,8 +317,8 @@
      "reason": "slug() is private to model::store, whose own tests pin it; the observable ids are pinned by names_without_ascii... below"
     },
     {
-     "old": "    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"macro\");\n    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"macro-2\");\n",
-     "new": "    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"entry\");\n    assert_eq!(lib.save_new(&recording(\"日本語\")).unwrap(), \"entry-2\");\n",
+     "old": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"macro-2\");\n",
+     "new": "    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry\");\n    assert_eq!(lib.save_new(&recording(\"\u65e5\u672c\u8a9e\")).unwrap(), \"entry-2\");\n",
      "reason": "the shared Store's id fallback is `entry` (package 3, CARRY-OVER item 5), the fork library's was `macro`"
     },
     {
@@ -273,7 +338,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "786011be8a9129aa6bd7e197de22791c70375a097f14770dcd3c5907cd57e4f6",
+   "dest_sha256": "7471df8655c04bdc6d7b1950fdcaaf339193563a1c2930a902d7c157538a68d8",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -308,6 +373,11 @@
      "old": "pub mod handoff;",
      "new": "#[cfg(any(feature = \"diag\", test))]\npub mod completion_trace;\npub mod handoff;",
      "reason": "Diag-only bounded completion observation helper; no release/runtime policy dependency."
+    },
+    {
+     "old": "pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};",
+     "new": "pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};\n#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
     }
    ]
   },
@@ -409,13 +479,13 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "old": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro { frames, start, .. } => format!(\n                        \"Fighter {} · {}f · {:.2}s. A confirms, B cancels, Y deletes.\",\n                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
-     "new": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro(body) => format!(\n                        \"Fighter {} · {}f · {:.2}s. A confirms, B cancels, Y deletes.\",\n                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "old": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro { frames, start, .. } => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        start.fighter_kind, frames.len(), frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
+     "new": "            Screen::Save(draft) => {\n                fill_keys(&mut labels, name_keys(draft.page));\n                let detail = match &draft.body {\n                    NameBody::Macro(body) => format!(\n                        \"Fighter {} \u00b7 {}f \u00b7 {:.2}s. A confirms, B cancels, Y deletes.\",\n                        body.start.fighter_kind, body.frames.len(), body.frames.len() as f32 / 60.0),\n                    NameBody::External { summary, .. } => format!(\n                        \"{summary}. A confirms, B cancels, Y deletes.\"),\n                };\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "old": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro { frames, .. } => format!(\n                \"{} · {}f · {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} · {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
-     "new": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro(body) => format!(\n                \"{} · {}f · {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} · {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "old": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro { frames, .. } => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), frames.len(), frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
+     "new": "    pub fn native_name_view(&self) -> Option<View> {\n        let Screen::Save(draft) = &self.screen else { return None };\n        let footer = match &draft.body {\n            NameBody::Macro(body) => format!(\n                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   Y: placement   B: return\",\n                shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),\n            NameBody::External { summary, .. } => format!(\n                \"{} \u00b7 {summary}\\nA: system keyboard   B: return\",\n                shown_name(&draft.name)),\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
@@ -1742,7 +1812,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "f30b23f4d804a3f507dd0664c70c58c1fb7740e0fdcb6d7af1ab3559378bed66",
+   "dest_sha256": "a646bdbe594fd54a6b5543f63905dd40c88a85c485a1af720a77b46abbf540e3",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -2025,6 +2095,16 @@
      "old": "        CAPTURE.lock().completion_note(CompletionEvent::Publish, None, 0, None);",
      "new": "        if let Some(mut capture) = CAPTURE.try_lock() {\n            capture.completion_note(CompletionEvent::Publish, None, 0, None);\n        }",
      "reason": "Diagnostic rejection must not add a blocking lock to the previous native-invalid early return; best-effort try_lock only."
+    },
+    {
+     "old": "        let committed = ARCHIVE.lock().unwrap().apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));",
+     "new": "        #[cfg(feature = \"diag\")]\n        let (committed, first_seal) = {\n            let mut archive = ARCHIVE.lock().unwrap();\n            let committed = archive.apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));\n            (committed, archive.take_first_seal())\n        };\n        #[cfg(not(feature = \"diag\"))]\n        let committed = ARCHIVE.lock().unwrap().apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));\n        #[cfg(feature = \"diag\")]\n        if let Some(note) = first_seal { worker_first_seal_note(serial, note); }",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "/// Game-owned fixed tokens. Every operation on frame storage is a worker event.",
+     "new": "// Existing menu worker only; ARCHIVE has been released before formatting.\n#[cfg(feature = \"diag\")]\n#[inline(never)]\nfn worker_first_seal_note(serial: u64, note: crate::engine::macros::FirstSeal) {\n    println!(\"[ReplayCaptureSeal] serial={} {}\", serial, note);\n}\n\n/// Game-owned fixed tokens. Every operation on frame storage is a worker event.",
+     "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
     }
    ]
   },

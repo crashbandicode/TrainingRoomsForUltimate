@@ -88,7 +88,16 @@ pub fn worker_events() {
     let mut scratch = SCRATCH.lock().unwrap();
     if scratch.is_empty() { scratch.resize(4096, (0, 0)); }
     EVENTS.drain_with_scratch(&mut scratch, |(serial, event)| {
+        #[cfg(feature = "diag")]
+        let (committed, first_seal) = {
+            let mut archive = ARCHIVE.lock().unwrap();
+            let committed = archive.apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));
+            (committed, archive.take_first_seal())
+        };
+        #[cfg(not(feature = "diag"))]
         let committed = ARCHIVE.lock().unwrap().apply(serial, event, LOST_SERIAL.load(Ordering::Acquire));
+        #[cfg(feature = "diag")]
+        if let Some(note) = first_seal { worker_first_seal_note(serial, note); }
         if let Some(mut commit) = committed {
             if commit.needs_miis {
                 commit.miis = take_miis(commit.save);
@@ -104,6 +113,13 @@ pub fn worker_events() {
     if dropped != 0 { println!("[MacroHandoff] live_events_dropped={dropped}"); }
     let dropped = MII_EVENTS.take_dropped();
     if dropped != 0 { println!("[MacroHandoff] live_mii_events_dropped={dropped}"); }
+}
+
+// Existing menu worker only; ARCHIVE has been released before formatting.
+#[cfg(feature = "diag")]
+#[inline(never)]
+fn worker_first_seal_note(serial: u64, note: crate::engine::macros::FirstSeal) {
+    println!("[ReplayCaptureSeal] serial={} {}", serial, note);
 }
 
 /// Game-owned fixed tokens. Every operation on frame storage is a worker event.

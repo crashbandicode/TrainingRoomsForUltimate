@@ -52,6 +52,8 @@ pub use capture_toggle::{CaptureToggle, RecordEnded, RecordOwner, RecordOwnershi
 pub use crate::model::store::{Listing, Record, SkippedFile, Store, MAX_FILE_BYTES, MAX_ID_CHARS};
 pub use library::{Library, MacroEntry};
 pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};
+#[cfg(any(feature = "diag", test))]
+pub use live_capture::{FirstSeal, SealReason};
 pub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};
 pub use recording::{
     InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,

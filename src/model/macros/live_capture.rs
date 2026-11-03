@@ -19,6 +19,37 @@ pub struct NativeRecordKey {
 pub const MAX_RETAINED_CAPTURES: usize = 4;
 const ENTRIES: usize = 8;
 
+/// First worker transition only. Flags: gap=1, invalid sample=2, late start=4.
+#[cfg(any(feature = "diag", test))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FirstSeal {
+    pub key: NativeRecordKey,
+    pub reason: SealReason,
+    pub flags: u8,
+    pub entry: Option<i32>,
+    /// Entry length, or total retained samples for a record-wide partial finish.
+    pub frames: u32,
+    pub first: Option<u32>,
+    pub last: Option<u32>,
+    pub next: Option<u32>,
+}
+#[cfg(any(feature = "diag", test))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SealReason { Sample, Reservation, Limit, Explicit, PartialFinish }
+#[cfg(any(feature = "diag", test))]
+impl std::fmt::Display for FirstSeal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let reason = match self.reason {
+            SealReason::Sample => "sample", SealReason::Reservation => "reservation",
+            SealReason::Limit => "limit", SealReason::Explicit => "explicit",
+            SealReason::PartialFinish => "partial_finish",
+        };
+        write!(f, "record={}:{} reason={} flags={} entry={:?} frames={} first={:?} last={:?} next={:?}",
+            self.key.generation, self.key.index, reason, self.flags, self.entry,
+            self.frames, self.first, self.last, self.next)
+    }
+}
+
 struct LiveRecord {
     session: LiveSession,
     last_tick: [Option<u32>; ENTRIES],
@@ -35,6 +66,8 @@ pub struct LiveCapturePool {
     generation: u64,
     active: Option<NativeRecordKey>,
     records: VecDeque<Record>,
+    #[cfg(any(feature = "diag", test))]
+    first_seal: Option<FirstSeal>,
 }
 
 impl Default for LiveCapturePool {
@@ -43,16 +76,23 @@ impl Default for LiveCapturePool {
 
 impl LiveCapturePool {
     pub const fn new() -> Self {
-        Self { generation: 0, active: None, records: VecDeque::new() }
+        Self { generation: 0, active: None, records: VecDeque::new(),
+            #[cfg(any(feature = "diag", test))]
+            first_seal: None,
+        }
     }
 
     /// Drop only pool ownership. A save already bound to an Arc remains valid.
     pub fn clear(&mut self) {
         self.active = None;
         self.records.clear();
+        #[cfg(any(feature = "diag", test))]
+        { self.first_seal = None; }
     }
 
     pub fn start_record(&mut self, index: u32) -> NativeRecordKey {
+        #[cfg(any(feature = "diag", test))]
+        { self.first_seal = None; }
         self.finish_record();
         self.records.retain(|record| record.key.index != index);
         while self.records.len() >= MAX_RETAINED_CAPTURES {
@@ -85,9 +125,16 @@ impl LiveCapturePool {
 
     pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }
 
+    /// Existing worker consumes this after applying the event, before releasing its lock.
+    /// Formatting happens only after that lock is released.
+    #[cfg(any(feature = "diag", test))]
+    pub fn take_first_seal(&mut self) -> Option<FirstSeal> { self.first_seal.take() }
+
     /// A native prefix reset replaces a slot without changing its numeric index.
     /// Previously bound immutable snapshots remain owned by their save operation.
     pub fn invalidate_record(&mut self, index: u32) {
+        #[cfg(any(feature = "diag", test))]
+        if self.first_seal.is_some_and(|note| note.key.index == index) { self.first_seal = None; }
         if self.active.is_some_and(|key| key.index == index) { self.active = None; }
         self.records.retain(|record| record.key.index != index);
     }
@@ -110,6 +157,8 @@ impl LiveCapturePool {
     pub fn seal_entry(&mut self, key: NativeRecordKey, entry: i32) {
         if self.active != Some(key) || !(0..ENTRIES as i32).contains(&entry) { return; }
         if let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) {
+            #[cfg(any(feature = "diag", test))]
+            observe_seal(&mut self.first_seal, live, key, SealReason::Explicit, 0, Some(entry), None);
             live.sealed[entry as usize] = true;
             live.session.truncated = true;
         }
@@ -130,6 +179,11 @@ impl LiveCapturePool {
             None => live.session.first_counter.is_some_and(|first| first != tick),
         };
         if gap || !sample.is_valid() {
+            #[cfg(any(feature = "diag", test))]
+            observe_seal(&mut self.first_seal, live, key, SealReason::Sample,
+                u8::from(gap) | (u8::from(!sample.is_valid()) << 1)
+                    | (u8::from(gap && live.last_tick[slot].is_none()) << 2),
+                Some(entry), Some(tick));
             live.sealed[slot] = true;
             live.session.truncated = true;
             return false;
@@ -141,6 +195,8 @@ impl LiveCapturePool {
                 // One bounded reservation when this fighter first appears. No
                 // growth/allocation on subsequent simulation samples.
                 if frames.try_reserve_exact(MAX_FRAMES).is_err() {
+                    #[cfg(any(feature = "diag", test))]
+                    observe_seal(&mut self.first_seal, live, key, SealReason::Reservation, 0, Some(entry), Some(tick));
                     live.sealed[slot] = true;
                     live.session.truncated = true;
                     return false;
@@ -149,13 +205,14 @@ impl LiveCapturePool {
                 live.session.tracks.len() - 1
             }
         };
-        let track = &mut live.session.tracks[track_index];
-        if track.frames.len() == MAX_FRAMES {
+        if live.session.tracks[track_index].frames.len() == MAX_FRAMES {
+            #[cfg(any(feature = "diag", test))]
+            observe_seal(&mut self.first_seal, live, key, SealReason::Limit, 0, Some(entry), Some(tick));
             live.sealed[slot] = true;
             live.session.truncated = true;
             return false;
         }
-        track.frames.push(sample);
+        live.session.tracks[track_index].frames.push(sample);
         live.session.first_counter.get_or_insert(tick);
         live.last_tick[slot] = Some(tick);
         true
@@ -175,8 +232,10 @@ impl LiveCapturePool {
 
     /// Preserve a valid prefix when the native record itself becomes discontinuous.
     pub fn finish_partial(&mut self) {
-        if self.active.is_some() {
+        if let Some(_key) = self.active {
             if let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) {
+                #[cfg(any(feature = "diag", test))]
+                observe_seal(&mut self.first_seal, live, _key, SealReason::PartialFinish, 0, None, None);
                 live.session.truncated = true;
             }
         }
@@ -190,6 +249,21 @@ impl LiveCapturePool {
         self.records.iter().find(|record| record.key == key)?.saved.clone()
     }
 }
+
+/// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.
+#[cfg(any(feature = "diag", test))]
+fn observe_seal(out: &mut Option<FirstSeal>, live: &LiveRecord, key: NativeRecordKey,
+                reason: SealReason, flags: u8, entry: Option<i32>, next: Option<u32>) {
+    if live.session.truncated { return; }
+    let frames = live.session.tracks.iter().filter(|t| entry.is_none_or(|e| e == t.entry))
+        .map(|t| t.frames.len() as u32).sum();
+    *out = Some(FirstSeal { key, reason, flags, entry, frames, first: live.session.first_counter,
+        last: entry.and_then(|e| live.last_tick[e as usize]), next });
+}
+
+#[cfg(test)]
+#[path = "worker_first_seal_tests.rs"]
+mod worker_first_seal_tests;
 
 #[cfg(test)]
 mod tests {
