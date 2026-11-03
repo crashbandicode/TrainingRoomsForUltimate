@@ -69,7 +69,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 5_696, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 28 * KIB, 4_592, 9_616, "Eden st-02..st-12, f6-37/sh-01", "boot::load_settings_boxed"),
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_592, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 14_192, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
@@ -79,7 +79,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // button_config.ini, replay_capture.ini and settings.json atomic writes
     row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_248, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
-    row(ThreadId::TraceWriter, c"tr-trace-writer", 20 * KIB, 2_720, 1_696, "Eden st-02..st-12", "compat::filesystem::init::{closure#0}"),
+    row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
     row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 9_840, "Eden st-02..st-12", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
@@ -87,7 +87,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // first-boot import of the fork's captures in the background
     row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}"),
     // the menu worker: model steps, screens, settings JSON on close
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 27_072, "Eden st-02..st-12, f6-37/sh-01", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 27_312, "Eden st-02..st-12, f6-37/sh-01/ui18-02", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
