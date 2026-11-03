@@ -757,8 +757,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     }
     if let Some(slot) = out.saved_notice {
         state_diag!("[TrainingRooms] state saved_notice slot={}", slot + 1);
-        #[cfg(not(feature = "diag"))]
-        let _ = slot;
+        crate::runtime::features::notices::saved(slot);
     }
     if let Some(ledge) = out.restored {
         recorder::on_state_restored(ledge);

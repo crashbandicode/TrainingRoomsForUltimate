@@ -11,7 +11,7 @@
 //!
 //! NOT YET SWITCH-RUN.
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
@@ -24,6 +24,9 @@ use crate::runtime::alloc::HookScope;
 use crate::runtime::{published, scene};
 
 static QUEUE: Mutex<Queue> = Mutex::new(Queue::new());
+static BOOT_NOTICES: Mutex<crate::model::boot_notices::BootNotices> =
+    Mutex::new(crate::model::boot_notices::BootNotices::new());
+static STARTUP_PENDING: AtomicBool = AtomicBool::new(true);
 
 /// The frame-advantage notification's title.
 const FRAME_ADVANTAGE_HEADER: &str = "Frame Advantage";
@@ -87,6 +90,11 @@ pub fn clear(id: u8) {
     send(Mail::Clear(id));
 }
 
+/// The state hook sends only the slot; queue mutation stays on the UI thread.
+pub fn saved(slot: usize) {
+    send(Mail::Saved(slot));
+}
+
 /// What a thread asks of the notification queue. Any thread posts it (the menu worker, the writer thread, package 4's and 6's
 /// notifications, a hook); the HUD tick, on the game's UI thread, applies it under `QUEUE` (stream/sync: no thread but the game's
 /// takes `QUEUE`).
@@ -95,6 +103,7 @@ enum Mail {
     Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
     Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
     Clear(u8),
+    Saved(usize),
 }
 
 static MAILBOX: hos_lock::Mailbox<Mail, 16> = hos_lock::Mailbox::new();
@@ -110,6 +119,7 @@ fn take_mail(queue: &mut Queue) {
         Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
         Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
         Mail::Clear(id) => queue.clear_id(id),
+        Mail::Saved(slot) => crate::model::boot_notices::saved(queue, slot),
     });
 }
 /// The standing notice `id` is queued (not yet shown for its whole time, not cleared).
@@ -153,10 +163,25 @@ pub fn reset_combo_display() {
 }
 
 /// One HUD tick. `menu_open` is the plugin menu's flag (package 5; the owner bit meanwhile).
-pub fn hud_tick() -> TickOut {
+pub fn hud_tick(native_hud_ready: bool) -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);
+    // Read published values before taking either UI-owned queue lock. The INI's
+    // two menu shortcuts are independently published atomics.
+    let needs_startup = native_hud_ready && STARTUP_PENDING.load(Ordering::Acquire);
+    let startup_chords = if needs_startup {
+        published::live().map(|live| {
+            let [first, second] = super::chords::shortcuts();
+            crate::model::chords::ChordSet {
+                shortcuts: crate::model::menu_shortcuts::MenuShortcuts::new(first, second),
+                ..live.chords
+            }
+        })
+    } else { None };
     let out = {
         let mut queue = QUEUE.lock();
+        if needs_startup && BOOT_NOTICES.lock().post_once(native_hud_ready, startup_chords, &mut queue) {
+            STARTUP_PENDING.store(false, Ordering::Release);
+        }
         take_mail(&mut queue);
         // Waiting practice has no Combo Display option. A value observed in a
         // previous native Training scene must not clear its notifications.

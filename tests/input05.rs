@@ -10,6 +10,105 @@ use std::cell::Cell;
 use model::damage_display::*;
 use model::notify::{Body, Queue, BODY_MAX, CAPACITY, DEFAULT_COLOR};
 
+#[test]
+fn startup_notices_wait_for_training_and_settings_and_do_not_repeat_after_clear() {
+    let mut boot = model::boot_notices::BootNotices::new();
+    let mut queue = Queue::new();
+    let chords = model::chords::ChordSet::factory();
+    assert!(!boot.post_once(false, Some(chords), &mut queue));
+    assert!(!boot.post_once(true, None, &mut queue));
+    assert!(queue.is_empty());
+    assert!(boot.post_once(true, Some(chords), &mut queue));
+    assert_eq!(queue.len(), 6);
+    queue.clear();
+    assert!(!boot.post_once(true, Some(chords), &mut queue));
+    assert!(queue.is_empty());
+}
+
+#[test]
+fn startup_displays_current_chords_in_order_for_exact_visible_durations() {
+    use model::menu::chord::Chord;
+    let mut chords = model::chords::ChordSet::factory();
+    chords.shortcuts = model::menu_shortcuts::MenuShortcuts::new(Chord::NONE, Chord(1));
+    chords.save_state = Chord(1 << 4 | 1 << 9);
+    let mut boot = model::boot_notices::BootNotices::new();
+    let mut queue = Queue::new();
+    assert!(boot.post_once(true, Some(chords), &mut queue));
+    for _ in 0..200 {
+        assert!(!queue.tick(true, true).visible, "open menu must not consume notice time");
+    }
+    for (header, text, frames) in [
+        ("TrainingRooms", "Welcome!", 60),
+        ("Open Menu", "B + D-pad Up or A", 120),
+        ("Save State", "L + D-pad Down", 120),
+        ("Load State", "ZL + D-pad Up", 120),
+        ("Input Record", "ZR + D-pad Down", 120),
+        ("Input Playback", "ZR + D-pad Up", 120),
+    ] {
+        let out = queue.tick(true, false);
+        assert!(out.visible);
+        let draw = out.draw.unwrap();
+        assert_eq!((draw.header, draw.body.as_str()), (header, text));
+        for _ in 1..frames {
+            let out = queue.tick(true, false);
+            assert!(out.visible);
+            assert!(out.draw.is_none());
+        }
+    }
+    assert!(!queue.tick(true, false).visible);
+}
+
+#[test]
+fn save_notice_replaces_old_save_and_preserves_other_notices() {
+    let mut queue = Queue::new();
+    queue.post_static("Save State", "old", 120, DEFAULT_COLOR);
+    queue.post_static("Other", "keep", 1, DEFAULT_COLOR);
+    model::boot_notices::saved(&mut queue, 4);
+    assert_eq!(queue.len(), 2);
+    assert_eq!(queue.tick(true, false).draw.unwrap().header, "Other");
+    let draw = queue.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Save State", "Saved Slot 5"));
+    for _ in 1..120 {
+        assert!(queue.tick(true, false).visible);
+    }
+    assert!(!queue.tick(true, false).visible);
+    for (slot, text) in ["Saved Slot 1", "Saved Slot 2", "Saved Slot 3", "Saved Slot 4", "Saved Slot 5"].iter().enumerate() {
+        model::boot_notices::saved(&mut queue, slot);
+        assert_eq!(queue.tick(true, false).draw.unwrap().body.as_str(), *text);
+        queue.clear();
+    }
+    model::boot_notices::saved(&mut queue, usize::MAX);
+    assert!(queue.is_empty());
+}
+
+#[test]
+fn disabled_optional_shortcuts_do_not_hide_the_permanent_menu_chord() {
+    use model::menu::chord::Chord;
+    let mut chords = model::chords::ChordSet::factory();
+    chords.shortcuts = model::menu_shortcuts::MenuShortcuts::new(Chord::NONE, Chord::NONE);
+    let mut queue = Queue::new();
+    model::boot_notices::BootNotices::new().post_once(true, Some(chords), &mut queue);
+    for _ in 0..60 { queue.tick(true, false); }
+    assert_eq!(queue.tick(true, false).draw.unwrap().body.as_str(), "B + D-pad Up");
+}
+
+#[test]
+fn startup_and_save_notices_allocate_nothing_on_first_and_repeated_use() {
+    use model::menu::chord::Chord;
+    let mut chords = model::chords::ChordSet::factory();
+    chords.shortcuts = model::menu_shortcuts::MenuShortcuts::new(Chord(1), Chord(2));
+    let mut queue = Queue::new();
+    let mut boot = model::boot_notices::BootNotices::new();
+    let before = ALLOCS.with(Cell::get);
+    assert!(boot.post_once(true, Some(chords), &mut queue));
+    assert!(!boot.post_once(true, Some(chords), &mut queue));
+    for slot in [0, 4, 0] {
+        model::boot_notices::saved(&mut queue, slot);
+    }
+    while !queue.is_empty() { queue.tick(true, false); }
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
 thread_local! {
     static ALLOCS: Cell<usize> = const { Cell::new(0) };
 }

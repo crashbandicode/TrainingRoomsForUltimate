@@ -86,7 +86,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     };
     let owners = published::input_owners();
     let menu_open = owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE);
-    write_notice(notice, &notices::hud_tick());
+    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()));
     let plan = input_display::hud_tick(menu_open);
     if !plan.is_empty() {
         #[cfg(feature = "diag")]

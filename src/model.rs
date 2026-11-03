@@ -161,3 +161,6 @@ pub mod close_handoff;
 
 #[path = "model/scalar_tls.rs"]
 pub mod scalar_tls;
+
+#[path = "model/boot_notices.rs"]
+pub mod boot_notices;
