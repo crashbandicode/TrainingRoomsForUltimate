@@ -2613,7 +2613,7 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
     // State 9 (F6): the control init queued at the exchange runs on the task worker. Once its pending count is 0, state 10 frees
     // the task and, outside the bank lock, allocates the bodies and queues their construction; they settle on later ticks.
     let control = {
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let Some(c) = bank.construction.as_mut() else { return; };
         if c.control == 0 {
@@ -2639,7 +2639,7 @@ unsafe fn settle_construction(entry: *mut u8, owner: u32, role: usize) {
         free_tasks(base, &[control]);
         split::mark(split::Step::FreeTasks);
         let queued = queue_bodies(base, entry as usize, owner, members);
-        let mut state = BANKS[role].lock().unwrap();
+        let mut state = BANKS[role].lock();
         match queued {
             Ok(tasks) => {
                 match state.as_mut().and_then(|bank| bank.construction.as_mut()) {

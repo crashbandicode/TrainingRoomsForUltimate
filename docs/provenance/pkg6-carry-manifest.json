@@ -3184,7 +3184,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "76b617ad70b1b27bd8061e720dbe3bdb293f437c89d0a7685e493fe8fc92f527",
+   "dest_sha256": "dd9638c5ea494319dbf3bacf584e362099d6fa9c21fa0c115afd9dc589472bcc",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -3815,6 +3815,12 @@
      "old": "use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};\nuse crate::runtime::roster::r_handle;\nuse crate::runtime::roster::special_articles as articles;\n\nmacro_rules! trace {\n    ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };\n",
      "new": "use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};\nuse crate::runtime::roster::r_handle;\nuse crate::runtime::roster::special_articles as articles;\nuse crate::runtime::roster::build_split as split;\n\nmacro_rules! trace {\n    ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };\n",
      "reason": "Integrate exact F6 7bdeacf into reviewed a850/pkg4 composition: native control-init task ordering and guarded callback/functor sites, bounded allocation-free diagnostic timing; preserve current owner locks and release semantics. Original F6 behavior/native evidence retained, final integrated acceptance pending."
+    },
+    {
+     "old": "let mut state = BANKS[role].lock().unwrap();",
+     "new": "let mut state = BANKS[role].lock();",
+     "count": 2,
+     "reason": "Fix integrated F6 settlement after BANKS became hos_lock: keep the Option under its live guard; std poison unwrap accidentally became Option unwrap. Both control-task lock scopes and outside-lock native queuing remain unchanged. Native main-r2 E0599 at2617/2645/2659 is the reproduction."
     }
    ]
   },
