@@ -1,0 +1,12 @@
+{
+  "id": "RC-PILOT",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+  "started": 1793746722.7474873,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Pilot selected row did not become CPU')",
+  "ended": 1793746728.0420744
+}

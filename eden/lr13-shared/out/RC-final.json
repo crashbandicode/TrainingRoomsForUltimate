@@ -1,0 +1,280 @@
+{
+  "id": "RC-final",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "6230d5bc6bf30f409018a3d4a87c19fdae2174e472594066eae17257e7d04a26",
+  "started": 1793747104.4064806,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "counters": {
+          "observed": [
+            "644881766 #1992 [PreloadStatus] state=Waiting planned=8 ready=2 prefetched=5 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=true text=\"Loaded 7/8 \u00b7 swap the CPU to load 1 more\"",
+            "644881766 #1993 [PreloadStatus] raise text=\"Loaded 7/8 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644882979 #2001 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 7/8 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "644884112 #2018 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644884682 #2021 [PreloadStatus] state=Loading planned=9 ready=2 prefetched=5 failed=0 pending=1 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 7/9\"",
+            "644884682 #2022 [PreloadStatus] wiped text=Some(\"Loaded 7/8 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644884682 #2023 [PreloadStatus] raise text=\"Loading 7/9\" frames=90",
+            "644886648 #2034 [PreloadStatus] state=Waiting planned=9 ready=2 prefetched=6 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"",
+            "644886648 #2035 [PreloadStatus] raise text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644887878 #2070 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644888348 #2071 [PreloadStatus] state=Waiting planned=9 ready=5 prefetched=3 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"",
+            "644888348 #2072 [PreloadStatus] wiped text=Some(\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644888348 #2073 [PreloadStatus] raise text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644890513 #2090 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644891299 #2091 [PreloadStatus] wiped text=Some(\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644891299 #2092 [PreloadStatus] raise text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644893513 #2093 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "644895328 #2110 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644896097 #2112 [PreloadStatus] wiped text=Some(\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644896097 #2113 [PreloadStatus] raise text=\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644899067 #2148 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644899814 #2153 [PreloadStatus] state=Waiting planned=10 ready=7 prefetched=1 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Loaded 8/10 \u00b7 swap both to load 2 more\"",
+            "644899814 #2154 [PreloadStatus] wiped text=Some(\"Loaded 8/9 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644899814 #2155 [PreloadStatus] raise text=\"Loaded 8/10 \u00b7 swap both to load 2 more\" frames=120",
+            "644902112 #2158 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 8/10 \u00b7 swap both to load 2 more\" color=[0, 0, 0, 255]",
+            "644904730 #2162 [PreloadStatus] delivered text=Some(\"Loaded 8/10 \u00b7 swap both to load 2 more\")",
+            "644906778 #2211 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644907184 #2232 [PreloadStatus] state=Loading planned=8 ready=2 prefetched=0 failed=0 pending=6 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Loading 2/8\"",
+            "644907184 #2233 [PreloadStatus] raise text=\"Loading 2/8\" frames=90",
+            "644909778 #2255 [TrainingRooms] notice_draw header=\"CPU Character\" body=\"CPU fighter applied\" color=[0, 0, 0, 255]",
+            "644910113 #2256 [PreloadStatus] state=Loading planned=8 ready=2 prefetched=3 failed=0 pending=3 unstarted=0 swap=0 blocked=false scheduler_blocked=true text=\"Loading 5/8\"",
+            "644910113 #2257 [PreloadStatus] raise text=\"Loading 5/8\" frames=90",
+            "644911098 #2265 [PreloadStatus] state=Done planned=8 ready=2 prefetched=6 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"All loaded (8/8, 2 instant)\"",
+            "644911098 #2266 [PreloadStatus] raise text=\"All loaded (8/8, 2 instant)\" frames=180",
+            "644912779 #2267 [TrainingRooms] notice_draw header=\"Fighters\" body=\"All loaded (8/8, 2 instant)\" color=[0, 0, 0, 255]",
+            "644915980 #2270 [PreloadStatus] delivered text=Some(\"All loaded (8/8, 2 instant)\")",
+            "644940945 #2378 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644941399 #2382 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "644941399 #2383 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "644943945 #2403 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+            "644944362 #2426 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644944397 #2427 [PreloadStatus] state=Waiting planned=6 ready=1 prefetched=4 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "644944397 #2428 [PreloadStatus] wiped text=Some(\"Loading 1/6\"); raised again",
+            "644944397 #2429 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644947362 #2445 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "644948428 #2487 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "644991063 #2504 [PreloadStatus] state=Waiting planned=6 ready=3 prefetched=2 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "644991063 #2505 [PreloadStatus] wiped text=Some(\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "644991063 #2506 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "644991079 #2508 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "644993428 #2549 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645016580 #2650 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645017149 #2654 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "645017149 #2655 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "645019070 #2670 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=false scheduler_blocked=true text=\"Loading 3/6\"",
+            "645019070 #2671 [PreloadStatus] raise text=\"Loading 3/6\" frames=90",
+            "645019600 #2673 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 3/6\" color=[0, 0, 0, 255]",
+            "645020033 #2682 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+            "645020613 #2708 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645021015 #2709 [PreloadStatus] state=Waiting planned=6 ready=1 prefetched=4 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "645021015 #2710 [PreloadStatus] wiped text=Some(\"Loading 3/6\"); raised again",
+            "645021015 #2711 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "645023612 #2726 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "645024095 #2762 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645067433 #2779 [PreloadStatus] state=Waiting planned=6 ready=3 prefetched=2 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "645067433 #2780 [PreloadStatus] wiped text=Some(\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "645067433 #2781 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "645067445 #2783 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "645069578 #2826 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645088095 #2926 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645088597 #2931 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "645088597 #2932 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "645090662 #2957 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645091532 #2967 [PreloadStatus] state=Waiting planned=6 ready=1 prefetched=4 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "645091532 #2968 [PreloadStatus] wiped text=Some(\"Loading 1/6\"); raised again",
+            "645091532 #2969 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "645093662 #2989 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]",
+            "645094746 #3030 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "645137567 #3046 [PreloadStatus] state=Waiting planned=6 ready=3 prefetched=2 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"",
+            "645137567 #3047 [PreloadStatus] wiped text=Some(\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\"); raised again",
+            "645137567 #3048 [PreloadStatus] raise text=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" frames=120",
+            "645137579 #3050 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loaded 5/6 \u00b7 swap the CPU to load 1 more\" color=[0, 0, 0, 255]"
+          ],
+          "open": "P1/CPU/both loading and exact ready total require full-batch review",
+          "trace_counters": {
+            "boot_error": "",
+            "file_lost": "0",
+            "output": "/home/intpa/tr-lr13-yoga-state/run-yoga/yoga.trace.jsonl",
+            "output_error": "",
+            "points": [
+              {
+                "abandoned_returns": "0",
+                "address": "0x81348240",
+                "dropped": "0",
+                "hits": "50",
+                "id": "1",
+                "matched": "50",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "50",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x653240"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x813474e0",
+                "dropped": "0",
+                "hits": "86",
+                "id": "2",
+                "matched": "86",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "86",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x6524e0"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x83f77b70",
+                "dropped": "0",
+                "hits": "56",
+                "id": "3",
+                "matched": "56",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "112",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x3282b70"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x83f7c0b0",
+                "dropped": "0",
+                "hits": "38",
+                "id": "4",
+                "matched": "38",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "76",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x32870b0"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x824db4d0",
+                "dropped": "0",
+                "hits": "146",
+                "id": "5",
+                "matched": "10",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "10",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x17e64d0"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x824db4d0",
+                "dropped": "0",
+                "hits": "146",
+                "id": "6",
+                "matched": "10",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "10",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x17e64d0"
+              }
+            ]
+          }
+        },
+        "same_boot_retries": {
+          "HATS-canonical-owner": {
+            "status": "FAILED",
+            "error": "RuntimeError('Missing positive evidence: \\\\[KirbyPark\\\\] fallback owner=0 .*canonical Reload')",
+            "continuation": {
+              "failed": "HATS-canonical-owner",
+              "route": "training",
+              "end": "training"
+            }
+          },
+          "NOTICE-cpu-drawn": {
+            "status": "PASS",
+            "value": {
+              "waiting": "645202496 #3423 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+              "draw": "645202513 #3426 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap the CPU once to load\" color=[0, 0, 0, 255]",
+              "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230608Z-388023-notice-cpu.png",
+              "swap": {
+                "request": "645203132 #3435 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 13, entry: 77470597120, sequence: 5 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+                "done": "645203664 #3459 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 13, entry: 77470597120, sequence: 5 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+                "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230610Z-894776-notice-cpu.png",
+                "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230612Z-076951-settled-notice-cpu.png"
+              },
+              "ready": "645203664 #3461 [PreloadStatus] state=Ready planned=1 ready=1 prefetched=0 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Ready 1/1\"",
+              "ready_shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230612Z-222327-notice-total.png",
+              "statuses": [
+                "645202496 #3423 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+                "645202496 #3424 [PreloadStatus] raise text=\"Swap the CPU once to load\" frames=120",
+                "645203664 #3461 [PreloadStatus] state=Ready planned=1 ready=1 prefetched=0 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Ready 1/1\"",
+                "645203664 #3462 [PreloadStatus] wiped text=Some(\"Swap the CPU once to load\"); raised again",
+                "645203664 #3463 [PreloadStatus] raise text=\"Ready 1/1\" frames=180"
+              ]
+            }
+          },
+          "PILOT-current-shape": {
+            "status": "PASS",
+            "value": {
+              "manual_before": {
+                "shape": "Player",
+                "kind": "page",
+                "scores": {
+                  "Player": 0.0013986013986013986,
+                  "CPU": 0.06573426573426573
+                },
+                "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230613Z-857728-pilot-current-Player-2.png",
+                "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+              },
+              "armed": {
+                "shape": "CPU",
+                "kind": "page",
+                "scores": {
+                  "Player": 0.06713286713286713,
+                  "CPU": 0.0
+                },
+                "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230613Z-422091-pilot-current-CPU-0.png",
+                "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+              },
+              "closed_armed": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230614Z-981743-pilot-current-closed-1.png",
+              "ai_clip": "/home/intpa/tr-lr13-inputs/out/RC-final/pilot-current-ai.gif",
+              "reopened_cpu": {
+                "shape": "CPU",
+                "kind": "page",
+                "scores": {
+                  "Player": 0.06713286713286713,
+                  "CPU": 0.0
+                },
+                "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-113111-pilot-current-CPU-2.png",
+                "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+              },
+              "released": {
+                "shape": "Player",
+                "kind": "page",
+                "scores": {
+                  "Player": 0.002797202797202797,
+                  "CPU": 0.06713286713286713
+                },
+                "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-235699-pilot-current-Player-0.png",
+                "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+              },
+              "closed_released": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-305888-pilot-current-closed-1.png",
+              "manual_clip": "/home/intpa/tr-lr13-inputs/out/RC-final/tr2-jab-x4.gif"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793747189.251186
+}

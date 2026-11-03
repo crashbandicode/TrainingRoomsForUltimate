@@ -1,0 +1,33 @@
+{
+  "id": "RC-NOTICE-p1",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+  "started": 1793746640.9604616,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "waiting": "644694781 #363 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=1 blocked=false scheduler_blocked=false text=\"Swap P1 once to load\"",
+        "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-p1/yoga-225741Z-348948-notice-p1.png",
+        "swap": {
+          "request": "644695553 #376 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 3, entry: 77447446528, sequence: 1 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "644696421 #397 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 3, entry: 77447446528, sequence: 1 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-p1/yoga-225742Z-174952-notice-p1.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-p1/yoga-225745Z-366458-settled-notice-p1.png"
+        },
+        "statuses": [
+          "644694781 #363 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=1 blocked=false scheduler_blocked=false text=\"Swap P1 once to load\"",
+          "644694781 #364 [PreloadStatus] raise text=\"Swap P1 once to load\" frames=120",
+          "644696552 #403 [PreloadStatus] state=Loading planned=5 ready=1 prefetched=0 failed=0 pending=4 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Loading 1/5\"",
+          "644696553 #404 [PreloadStatus] wiped text=Some(\"Swap P1 once to load\"); raised again",
+          "644696553 #405 [PreloadStatus] raise text=\"Loading 1/5\" frames=90"
+        ]
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746665.2332036
+}

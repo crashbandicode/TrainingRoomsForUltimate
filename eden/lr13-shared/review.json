@@ -1,0 +1,652 @@
+{
+  "mii": {
+    "expected": {
+      "class": 74,
+      "specials": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "colour": 2,
+      "voice": 37,
+      "outfit_hash40": 113391760503,
+      "hat_hash40": 67275564522
+    },
+    "current_bank": "0x11f21e9500",
+    "window_ns": [
+      1793746693370214656,
+      1793746722746612736
+    ],
+    "native_tuple_reads": [
+      {
+        "sequence": "39",
+        "frame": "8634",
+        "point_id": "5",
+        "tokens": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "specials": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "specials_match": true,
+        "colour_voice_match": false
+      }
+    ],
+    "getters": [
+      {
+        "field": "outfit_hash40",
+        "point_id": "3",
+        "entries": 12,
+        "returns": 12,
+        "matching_returns": [
+          {
+            "sequence": "36",
+            "frame": "8514",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "42",
+            "frame": "8634",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "44",
+            "frame": "8648",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "49",
+            "frame": "8654",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "55",
+            "frame": "8654",
+            "thread": "113",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "59",
+            "frame": "8665",
+            "thread": "113",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "61",
+            "frame": "8666",
+            "thread": "113",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "63",
+            "frame": "8668",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "68",
+            "frame": "8711",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "72",
+            "frame": "8711",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "78",
+            "frame": "8729",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          },
+          {
+            "sequence": "80",
+            "frame": "8731",
+            "thread": "80",
+            "value": "0x1300451a66acf477"
+          }
+        ],
+        "pairing_limit": "Provider return matching guarantees thread/LR/SP; correlate actual entry identity and observation scope separately"
+      },
+      {
+        "field": "hat_hash40",
+        "point_id": "4",
+        "entries": 9,
+        "returns": 9,
+        "matching_returns": [
+          {
+            "sequence": "38",
+            "frame": "8514",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "46",
+            "frame": "8648",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "51",
+            "frame": "8654",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "57",
+            "frame": "8662",
+            "thread": "113",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "65",
+            "frame": "8668",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "70",
+            "frame": "8711",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "74",
+            "frame": "8711",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "76",
+            "frame": "8722",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          },
+          {
+            "sequence": "82",
+            "frame": "8754",
+            "thread": "80",
+            "value": "0x5a00000fa9efa5ea"
+          }
+        ],
+        "pairing_limit": "Provider return matching guarantees thread/LR/SP; correlate actual entry identity and observation scope separately"
+      }
+    ],
+    "masked_charinfo_reads": 1,
+    "bank_ready": "644750879 #777 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 5, entry: 77772136448, sequence: 3 } target=0x4a physical=0x4a index=1 original=false mii=true resource_pair=Some(true) released=true",
+    "tuple_components_match": false
+  },
+  "teardown": [
+    {
+      "row": "RC-TEARDOWN-3",
+      "status": "FAILED",
+      "error": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "queued": "645094248 #3007 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cf0a40, 1180cf09a0] control_us=18651 us=18734; frames run until the tasks settle",
+      "built": "645094698 #3013 [GroupSwap] built owner=0 group=0 ok=true us=468563 installed=2 pool_live=6->8 bodies=Some([Body { address: 76800316752, id: 393216 }, Body { address: 76800380560, id: 458752 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11edd73808, 11f6c4b2e8]) mii_setup=None mode=async setup_us=54 queued_us=18734 settled_us=[284107, 468519, 0] ticks=28 max_tick_gap_us=21143",
+      "pause": "645094329 #3009 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+      "finalize_in_row": null,
+      "queued_to_built_ms": 450,
+      "queued_to_pause_ms": 81,
+      "pending_drain_proven": false
+    },
+    {
+      "row": "RC-TEARDOWN-1",
+      "status": "FAILED",
+      "error": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "queued": "644947999 #2464 [GroupSwap] bodies queued owner=0 group=0 tasks=[11e56458c0, 1180cf0900] control_us=19420 us=19498; frames run until the tasks settle",
+      "built": "644948381 #2470 [GroupSwap] built owner=0 group=0 ok=true us=400974 installed=2 pool_live=6->8 bodies=Some([Body { address: 75978443664, id: 393216 }, Body { address: 75978507472, id: 458752 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([121720e048, 11f6c4bb08]) mii_setup=None mode=async setup_us=49 queued_us=19498 settled_us=[268724, 400928, 0] ticks=25 max_tick_gap_us=21699",
+      "pause": "644948079 #2466 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+      "finalize_in_row": null,
+      "queued_to_built_ms": 382,
+      "queued_to_pause_ms": 80,
+      "pending_drain_proven": false
+    },
+    {
+      "row": "RC-TEARDOWN-2",
+      "status": "FAILED",
+      "error": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "queued": "645023665 #2739 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cf0ae0, 11e56480c0] control_us=17616 us=17722; frames run until the tasks settle",
+      "built": "645024050 #2745 [GroupSwap] built owner=0 group=0 ok=true us=403241 installed=2 pool_live=6->8 bodies=Some([Body { address: 75978490640, id: 393216 }, Body { address: 75978554448, id: 458752 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([120ac55ca8, 11f6c4afe8]) mii_setup=None mode=async setup_us=73 queued_us=17722 settled_us=[268256, 403200, 0] ticks=24 max_tick_gap_us=19703",
+      "pause": "645023745 #2741 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+      "finalize_in_row": null,
+      "queued_to_built_ms": 385,
+      "queued_to_pause_ms": 80,
+      "pending_drain_proven": false
+    }
+  ],
+  "visual_review": {
+    "kirby_rob": {
+      "status": "PASS requested settled-body/HUD clauses",
+      "sheets": [
+        "review-media/kirby-settled.png",
+        "review-media/copied-departure-special.png"
+      ],
+      "details": "All seven roster targets have matching body/portrait. Mario-hat Kirby confirmed#1402; canonical fallback#1411; settled Falcon then ordinary R.O.B. body/portrait."
+    },
+    "special": {
+      "status": "PASS ordinary settled-HUD and Aegis pause clauses",
+      "sheet": "review-media/copied-departure-special.png",
+      "details": "Ordinary ROB white/grey with red lamp and matching portrait; Pyra body+portrait, native CPUs1 pause, begin#2156/end#2159/resume#2160 leaked0."
+    },
+    "notice": {
+      "status": "PASS P1-only and CPU-only fixtures",
+      "sheet": "review-media/notice-roles.png",
+      "details": "P1 swap1#363 visually Swap P1 once to load; CPU retry swap2#3423/draw#3426 visibly Swap the CPU once to load. Ready1/1#3461 visible in pilot-shapes and AI frames0/6/12; initial notice-total screenshot itself still showed CPU fighter applied."
+    },
+    "pilot": {
+      "status": "PASS arm/release and observed AI/manual response",
+      "sheets": [
+        "review-media/pilot-shapes.png",
+        "review-media/pilot-current-ai-sheet.png",
+        "review-media/tr2-jab-x4-sheet.png"
+      ],
+      "details": "Current selected CPU(L3), close, uncontrolled Steve attacks and movement, reopen stillCPU, Player release, close, manual jab then idle. Original marker failure retained. Classifier limits string says old-binary but marker JSON explicitly binds current lr12 Player and lr13 CPU references."
+    },
+    "hats": {
+      "status": "FAILED five hats",
+      "details": "Initial Mario request#1401/confirm#1402 only; helper kind1 was ready but next copy#1403 notice Kirby is still changing characters. Canonical retry Mario#3197/3198 then same notice#3209; fallback-only postcheck failed too, masking earlier nested error. No kind7-ready/five confirmations."
+    },
+    "r3": {
+      "status": "FAILED independent producer/retirement",
+      "details": "Original row failed old pause image gate during fixture transition; gated recovery succeeded. Aegis native pause is narrower positive; renderer-unavailable independence untested."
+    }
+  },
+  "hud_change_gates": [
+    {
+      "time": 1793746665.1995366,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-p1/yoga-225745Z-102941-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-p1/yoga-225741Z-010606-hud-before-0.png"
+    },
+    {
+      "time": 1793746693.3297393,
+      "gate": "hud-settled-1",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-cpu/yoga-225813Z-030642-gate-hud-settled-1.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-cpu/yoga-225809Z-321673-hud-before-1.png"
+    },
+    {
+      "time": 1793746716.431503,
+      "gate": "hud-settled-1",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-MII/yoga-225836Z-172469-gate-hud-settled-1.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-MII/yoga-225832Z-490714-hud-before-1.png"
+    },
+    {
+      "time": 1793746722.7141044,
+      "gate": "hud-settled-1",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-MII/yoga-225842Z-349214-gate-hud-settled-1.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-MII/yoga-225836Z-422001-hud-before-1.png"
+    },
+    {
+      "time": 1793746752.3691614,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225912Z-987310-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225907Z-015561-hud-before-0.png"
+    },
+    {
+      "time": 1793746754.8324127,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225914Z-092681-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225912Z-815696-hud-before-0.png"
+    },
+    {
+      "time": 1793746757.8737214,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225917Z-283556-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225914Z-555376-hud-before-0.png"
+    },
+    {
+      "time": 1793746762.645226,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225922Z-893509-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225917Z-773862-hud-before-0.png"
+    },
+    {
+      "time": 1793746766.3886495,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225926Z-204717-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225922Z-123977-hud-before-0.png"
+    },
+    {
+      "time": 1793746768.2565067,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225928Z-192875-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225926Z-742197-hud-before-0.png"
+    },
+    {
+      "time": 1793746771.871562,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225931Z-015617-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225928Z-583872-hud-before-0.png"
+    },
+    {
+      "time": 1793746785.2717087,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225945Z-256647-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225941Z-340634-hud-before-0.png"
+    },
+    {
+      "time": 1793746788.3646183,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225948Z-426006-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225945Z-079925-hud-before-0.png"
+    },
+    {
+      "time": 1793746812.016039,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230011Z-488457-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230008Z-099574-hud-before-0.png"
+    },
+    {
+      "time": 1793746816.2339878,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230016Z-167573-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230012Z-220105-hud-before-0.png"
+    },
+    {
+      "time": 1793746819.276924,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230019Z-783744-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230016Z-033591-hud-before-0.png"
+    },
+    {
+      "time": 1793746822.651901,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230022Z-411393-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230019Z-189561-hud-before-0.png"
+    },
+    {
+      "time": 1793746846.1138964,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230046Z-499907-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230042Z-201255-hud-before-0.png"
+    },
+    {
+      "time": 1793746850.322757,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230050Z-278390-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230046Z-596653-hud-before-0.png"
+    },
+    {
+      "time": 1793746853.3743362,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230053Z-845680-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230050Z-407822-hud-before-0.png"
+    },
+    {
+      "time": 1793746856.7161477,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230056Z-939828-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230053Z-436659-hud-before-0.png"
+    },
+    {
+      "time": 1793746861.5282679,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230101Z-039172-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230056Z-257837-hud-before-0.png"
+    },
+    {
+      "time": 1793746864.5617578,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230104Z-389645-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230101Z-174728-hud-before-0.png"
+    },
+    {
+      "time": 1793746867.635137,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230107Z-560684-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230104Z-038225-hud-before-0.png"
+    },
+    {
+      "time": 1793746909.7639024,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-1/yoga-230149Z-977035-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-1/yoga-230146Z-726458-hud-before-0.png"
+    },
+    {
+      "time": 1793746914.2588654,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-1/yoga-230154Z-941211-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-1/yoga-230149Z-084612-hud-before-0.png"
+    },
+    {
+      "time": 1793746985.997234,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-2/yoga-230305Z-084322-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-2/yoga-230301Z-281077-hud-before-0.png"
+    },
+    {
+      "time": 1793746989.931696,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-2/yoga-230309Z-597503-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-2/yoga-230306Z-977537-hud-before-0.png"
+    },
+    {
+      "time": 1793747056.8892112,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-3/yoga-230416Z-715168-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-3/yoga-230413Z-962651-hud-before-0.png"
+    },
+    {
+      "time": 1793747060.5229597,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-3/yoga-230420Z-374424-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-TEARDOWN-3/yoga-230416Z-111288-hud-before-0.png"
+    },
+    {
+      "time": 1793747127.51197,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230527Z-560144-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230523Z-823152-hud-before-0.png"
+    },
+    {
+      "time": 1793747141.2148316,
+      "gate": "hud-settled-0",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230541Z-807341-gate-hud-settled-0.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230538Z-697095-hud-before-0.png"
+    },
+    {
+      "time": 1793747172.5533967,
+      "gate": "hud-settled-1",
+      "on": "yoga",
+      "pass": true,
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230612Z-524404-gate-hud-settled-1.png",
+      "mark": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230608Z-837062-hud-before-1.png"
+    }
+  ],
+  "artifact_integrity": {
+    "executed_hook_sources_retained": true,
+    "exact_manifest_bindings": {
+      "05a-cpu-approach": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "06-lucas": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "R3-independent-pause": {
+        "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+        "retained": true
+      },
+      "03-css": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "02-stage": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-SPECIAL-ordinary": {
+        "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+        "retained": true
+      },
+      "RC-TEARDOWN-1": {
+        "sha256": "91744a3a1d6aa6d6b1dda0c47e2fae277a7e5c1e90044a5a274fff68b1006784",
+        "retained": true
+      },
+      "07-training": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "01-main": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-TEARDOWN-2": {
+        "sha256": "2e97bcb1e2c4da56f3dd27b11f12277537a8a9238c44c641951c76d47b8c5118",
+        "retained": true
+      },
+      "05b-cpu-pick": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-MII": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-final": {
+        "sha256": "6230d5bc6bf30f409018a3d4a87c19fdae2174e472594066eae17257e7d04a26",
+        "retained": true
+      },
+      "04-steve": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-PILOT": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "recover-RC-PILOT": {
+        "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+        "retained": true
+      },
+      "RC-TEARDOWN-3": {
+        "sha256": "bf434ea62759e6801560a16275bb899c2ef1e1f85b277860da6141d210b5f0be",
+        "retained": true
+      },
+      "RC-HATS": {
+        "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+        "retained": true
+      },
+      "recover-RC-TEARDOWN-1": {
+        "sha256": "2e97bcb1e2c4da56f3dd27b11f12277537a8a9238c44c641951c76d47b8c5118",
+        "retained": true
+      },
+      "recover-RC-TEARDOWN-3": {
+        "sha256": "6230d5bc6bf30f409018a3d4a87c19fdae2174e472594066eae17257e7d04a26",
+        "retained": true
+      },
+      "recover-R3-independent-pause": {
+        "sha256": "91744a3a1d6aa6d6b1dda0c47e2fae277a7e5c1e90044a5a274fff68b1006784",
+        "retained": true
+      },
+      "RC-SPECIAL-aegis": {
+        "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+        "retained": true
+      },
+      "recover-RC-TEARDOWN-2": {
+        "sha256": "bf434ea62759e6801560a16275bb899c2ef1e1f85b277860da6141d210b5f0be",
+        "retained": true
+      },
+      "05c-cpu74": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-NOTICE-cpu": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "RC-KIRBY-ROB": {
+        "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+        "retained": true
+      },
+      "RC-NOTICE-p1": {
+        "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+        "retained": true
+      },
+      "recover-RC-HATS": {
+        "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+        "retained": true
+      }
+    },
+    "latest_uploaded_executed": false
+  },
+  "requested_outcome": "RC NOT READY. Shutdown success, HATS five, pending teardown, complete Mii tuple and R3 independent producer/retirement remain unverified/failed."
+}

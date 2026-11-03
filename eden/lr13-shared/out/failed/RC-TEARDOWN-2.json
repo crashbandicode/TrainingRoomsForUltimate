@@ -1,0 +1,12 @@
+{
+  "id": "RC-TEARDOWN-2",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "2e97bcb1e2c4da56f3dd27b11f12277537a8a9238c44c641951c76d47b8c5118",
+  "started": 1793746958.1172795,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+  "ended": 1793747021.3405795
+}

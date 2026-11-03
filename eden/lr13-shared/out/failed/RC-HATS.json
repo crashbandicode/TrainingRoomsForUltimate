@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+  "started": 1793746771.908674,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError(\"RuntimeError('Missing positive evidence: \\\\\\\\[KirbyHats\\\\\\\\] request role=0 kind=0x1\\\\\\\\b')\")",
+  "ended": 1793746788.4003117
+}

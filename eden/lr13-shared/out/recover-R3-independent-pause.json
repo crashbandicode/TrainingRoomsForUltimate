@@ -1,0 +1,21 @@
+{
+  "id": "recover-R3-independent-pause",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "91744a3a1d6aa6d6b1dda0c47e2fae277a7e5c1e90044a5a274fff68b1006784",
+  "started": 1793746887.0670326,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "R3-independent-pause",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746887.1368046
+}

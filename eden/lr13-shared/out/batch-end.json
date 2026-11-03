@@ -1,0 +1,42 @@
+{
+  "deferred": [
+    {
+      "id": "RC-PILOT",
+      "cause": "RuntimeError('Pilot selected row did not become CPU')",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/RC-PILOT.json",
+      "continuation": "recover-RC-PILOT"
+    },
+    {
+      "id": "RC-HATS",
+      "cause": "RuntimeError(\"RuntimeError('Missing positive evidence: \\\\\\\\[KirbyHats\\\\\\\\] request role=0 kind=0x1\\\\\\\\b')\")",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/RC-HATS.json",
+      "continuation": "recover-RC-HATS"
+    },
+    {
+      "id": "R3-independent-pause",
+      "cause": "RuntimeError('gate pause on yoga did not pass within 15 s')",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/R3-independent-pause.json",
+      "continuation": "recover-R3-independent-pause"
+    },
+    {
+      "id": "RC-TEARDOWN-1",
+      "cause": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/RC-TEARDOWN-1.json",
+      "continuation": "recover-RC-TEARDOWN-1"
+    },
+    {
+      "id": "RC-TEARDOWN-2",
+      "cause": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/RC-TEARDOWN-2.json",
+      "continuation": "recover-RC-TEARDOWN-2"
+    },
+    {
+      "id": "RC-TEARDOWN-3",
+      "cause": "RuntimeError('gate ready on yoga did not pass within 30 s')",
+      "receipt": "/home/intpa/tr-lr13-inputs/out/failed/RC-TEARDOWN-3.json",
+      "continuation": "recover-RC-TEARDOWN-3"
+    }
+  ],
+  "unrun": [],
+  "remaining_s": 351.5083179179346
+}

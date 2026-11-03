@@ -1,0 +1,64 @@
+{
+  "unit": "eden-life-8ecbe68d9e5341feb2beca7eb0d837d5-yoga.service",
+  "state": "stopped",
+  "owner": "OpenCode ses_e5ea4d5f3ffeMMtWumvKxZhl2t/tr-lead-astra-6",
+  "token": "8ecbe68d9e5341feb2beca7eb0d837d5",
+  "profile": "/home/intpa/trainingrooms-lr13-yoga/profiles/profile-yoga",
+  "app_sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb",
+  "owned_pids": [
+    {
+      "pid": 4147456,
+      "start": "64458843",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    },
+    {
+      "pid": 4147463,
+      "start": "64458845",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    }
+  ],
+  "runtime_cap_s": 1200,
+  "started": "2026-11-03T22:56:06.533821+00:00",
+  "game_loaded": "2026-11-03T22:56:20.258643+00:00",
+  "stopped": "2026-11-03T23:07:07.984560+00:00",
+  "owned_pids_stopped": {
+    "owned_pids_stopped": [
+      {
+        "pid": 4147456,
+        "start": "64458843",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      },
+      {
+        "pid": 4147463,
+        "start": "64458845",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      },
+      {
+        "pid": 4147502,
+        "start": "64458904",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      }
+    ],
+    "main_pid_stopped": {
+      "pid": 4147456,
+      "start": "64458843",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    },
+    "main_stop_signals": [
+      "SIGTERM",
+      "SIGKILL"
+    ]
+  },
+  "resources": {
+    "memory_peak": 8050896896,
+    "limits": {
+      "MemoryMax": "8589934592",
+      "MemorySwapMax": "0",
+      "TasksMax": "256",
+      "RuntimeMaxUSec": "20min",
+      "KillMode": "mixed",
+      "KillSignal": "15",
+      "FinalKillSignal": "9"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "RC-KIRBY-ROB",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+  "started": 1793746728.2635791,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": [
+        {
+          "request": "644781663 #1110 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 4 } outgoing=0x58 target=0x6 index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "644782949 #1132 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 4 } target=0x6 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225909Z-938244-kirby-6.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225912Z-984468-settled-kirby-6.png"
+        },
+        {
+          "request": "644786133 #1160 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 5 } outgoing=0x6 target=0xb index=0 mii=false",
+          "done": "644786183 #1171 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 5 } target=0xb physical=0x6 index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225913Z-777746-kirby-b.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225914Z-023506-settled-kirby-b.png"
+        },
+        {
+          "request": "644788682 #1192 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 6 } outgoing=0xb target=0x2d index=0 mii=false",
+          "done": "644789091 #1219 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 6 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225915Z-684081-kirby-2d.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225917Z-237715-settled-kirby-2d.png"
+        },
+        {
+          "request": "644791597 #1260 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 7 } outgoing=0x2d target=0x2c index=0 mii=false",
+          "done": "644791643 #1271 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 7 } target=0x2c physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225918Z-227411-kirby-2c.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225922Z-809907-settled-kirby-2c.png"
+        },
+        {
+          "request": "644796383 #1283 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 8 } outgoing=0x2c target=0x1c index=0 mii=false",
+          "done": "644797546 #1311 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 8 } target=0x1c physical=0x1c index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225924Z-356785-kirby-1c.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225926Z-410972-settled-kirby-1c.png"
+        },
+        {
+          "request": "644800114 #1322 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 9 } outgoing=0x1c target=0x58 index=0 mii=false",
+          "done": "644800167 #1332 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 9 } target=0x58 physical=0x1c index=0 original=true mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225927Z-544711-kirby-58.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225928Z-080535-settled-kirby-58.png"
+        },
+        {
+          "request": "644801981 #1342 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 10 } outgoing=0x58 target=0x6 index=0 mii=false",
+          "done": "644802077 #1362 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 10 } target=0x6 physical=0x6 index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225928Z-590223-kirby-6.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-KIRBY-ROB/yoga-225931Z-480823-settled-kirby-6.png"
+        }
+      ]
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746771.9079006
+}

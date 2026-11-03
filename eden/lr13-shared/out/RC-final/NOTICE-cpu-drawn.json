@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "value": {
+    "waiting": "645202496 #3423 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+    "draw": "645202513 #3426 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap the CPU once to load\" color=[0, 0, 0, 255]",
+    "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230608Z-388023-notice-cpu.png",
+    "swap": {
+      "request": "645203132 #3435 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 13, entry: 77470597120, sequence: 5 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+      "done": "645203664 #3459 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 13, entry: 77470597120, sequence: 5 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230610Z-894776-notice-cpu.png",
+      "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230612Z-076951-settled-notice-cpu.png"
+    },
+    "ready": "645203664 #3461 [PreloadStatus] state=Ready planned=1 ready=1 prefetched=0 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Ready 1/1\"",
+    "ready_shot": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230612Z-222327-notice-total.png",
+    "statuses": [
+      "645202496 #3423 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+      "645202496 #3424 [PreloadStatus] raise text=\"Swap the CPU once to load\" frames=120",
+      "645203664 #3461 [PreloadStatus] state=Ready planned=1 ready=1 prefetched=0 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Ready 1/1\"",
+      "645203664 #3462 [PreloadStatus] wiped text=Some(\"Swap the CPU once to load\"); raised again",
+      "645203664 #3463 [PreloadStatus] raise text=\"Ready 1/1\" frames=180"
+    ]
+  }
+}

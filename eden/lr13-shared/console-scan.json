@@ -1,0 +1,25 @@
+{
+  "console.log": {
+    "bytes": 880372,
+    "sha256": "4fa188dcfffb3b5ec2d4e11542fb1e36e65d635cee0e13e659bcb5e8e551dbef",
+    "matches": []
+  },
+  "exact-unit-journal.log": {
+    "bytes": 4757,
+    "sha256": "89d60467655f91776788e63043ca13749b08b02bd3f9f2acd8dad3b5287ad6e3",
+    "matches": []
+  },
+  "unit": {
+    "Id": "eden-life-8ecbe68d9e5341feb2beca7eb0d837d5-yoga.service",
+    "LoadState": "loaded",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "MainPID": "0",
+    "Result": "signal",
+    "ExecMainExitTimestamp": "Tue 2026-11-03 18:07:07 EST",
+    "ExecMainCode": "2",
+    "ExecMainStatus": "9",
+    "KillMode": "mixed"
+  },
+  "shutdown_acceptance": false
+}

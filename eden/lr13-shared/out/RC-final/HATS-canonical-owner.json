@@ -1,0 +1,9 @@
+{
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[KirbyPark\\\\] fallback owner=0 .*canonical Reload')",
+  "continuation": {
+    "failed": "HATS-canonical-owner",
+    "route": "training",
+    "end": "training"
+  }
+}

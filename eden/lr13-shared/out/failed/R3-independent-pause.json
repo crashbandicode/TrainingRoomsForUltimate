@@ -1,0 +1,12 @@
+{
+  "id": "R3-independent-pause",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+  "started": 1793746870.5350046,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate pause on yoga did not pass within 15 s')",
+  "ended": 1793746886.8864174
+}

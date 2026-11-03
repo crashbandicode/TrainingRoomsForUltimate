@@ -1,0 +1,221 @@
+{
+  "playbook": "9fa23c1",
+  "product_source": "cf4bf44c104ecc96a78d382b4c0276bf33838f18",
+  "tools": {
+    "runner": "6482c2cc0d3bd85924ce2b441488888d54b53b88fb4e747916b76b9cf0a582ac",
+    "lifecycle": "d25d2372dcf66bc5ad6ecf2dd6d4c4fc878f811b44dce545c5ab2c06bdbf35de"
+  },
+  "input_files": {
+    "prior.py": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0",
+    "base.py": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0",
+    "slim_actions.py": "83f7a20498280cfa558b3575e3a9d664d24f3759cd6b22672d0540b6ede4d793",
+    "config.json": "5ad8c2c24f412f511b64be30254cf596e4ec302a22ceaf2fb1bb3cf8800273b4",
+    "batch.py": "abc8b0dc834da642a0794f36a100a28d73451c039d0e43d7aaa008e210977526",
+    "baseline.json": "77e8dc122317171670b32d45ba3a283992eff0497dd4015f0dc92be40f38330b",
+    "rc_roster_segment.py": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93",
+    "navigation.py": "15f78946418b9af2aed88857631f9c968c12e5c485e3b10163bc22f3dacb8ad5",
+    "pilot-markers.json": "be60aa4b87eb5296f5c94ba2b9c7f72e01cd5ab935d44c8943d454a5a683a030",
+    "strict_predicates.py": "f5a6c99482c94b0a2c18a27c917be5d7734d8a6525caef9da4626555fc84249b",
+    "rows.json": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+    "pilot_gates.py": "17ddefbb87f6e1b396c6f9b5e825fbd845b16974bf99d0dccf04ffe2f59021c2",
+    "steps.py": "1b1a4fc68156087b59e07107c3e83b09e7d4e95c89fe2bf119cdbc80f5ce3e85",
+    "rows-initial.json": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+    "segments/lr10-p1-short.edenmacro.json": "b9bada57630efa1a0b101b03ec9115596a94bb746cc94697d4cb6006ceb478a8",
+    "segments/tr2-jab-x4.edenmacro.json": "8711f9282b8042cbb15bd57379a2105d3d9a787ad2405361cff73a13b034b1c2",
+    "segments/steve-hover.edenmacro.json": "edf2fb3e2db4b65571420dbc839219a005687f7b8685bf7201f940d06d2dd414",
+    "segments/main-stage.edenmacro.json": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+    "segments/lr04-cpu-pick.edenmacro.json": "fc6319148f476318cbd86fb5a2d3d63e4b135808aa34a21cada687b6dbddc1f9",
+    "segments/lr13-request-quit-frames.edenmacro.json": "0064db5b2e2887005299fd9bfb8e1d925182778d7f4287a3f8604be8cdc3ed13",
+    "segments/enter-training.edenmacro.json": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+    "segments/p1-next-frames.edenmacro.json": "d56e381eebfc979cfc4380a80f24af11c057990f306c4ad66b23c6e6641d6df4",
+    "segments/tr2-shield-hold-60.edenmacro.json": "98932c52af8031de73fc5c1ca31a27288376228db0cf80e51e4efa0a7caabca5",
+    "segments/hat-next.edenmacro.json": "90fb2d7218d3946b3e43dfd8f025b932a6e8fc230ce0204516840aa31e415b55",
+    "segments/intro-cancel.edenmacro.json": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+    "segments/tr2-grab.edenmacro.json": "669636ea88736e083359108702781d4413253bd18467565412af5bd67a618f81",
+    "segments/lr04-roy-lucas.edenmacro.json": "dc74d27fceb1d3387e2d0679424f2f9de484762dc634da7d532115e9b20c0702",
+    "segments/lr04-return-cpu-pick.edenmacro.json": "cb9f52fb0a7256174eb44eb2202ac11057fc6f0de848bea27a841d7df75dab28",
+    "segments/cpu74-lucas.edenmacro.json": "0c1b4ceca55fbd4c41f0be6040c072b0d21b2804d814b0bc541a0d91761c3298",
+    "segments/pause-close.edenmacro.json": "5e8ab5d918a72f8825aa47489cf0895edf975642cb915e74e6cfceed61982969",
+    "segments/confirm-native-quit-frames.edenmacro.json": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b",
+    "segments/lucas-pick.edenmacro.json": "7d74e4e47ffa0a99604767a08e0188a647281926508c614ac7f42c0590991f66",
+    "segments/lr04-cpu-approach.edenmacro.json": "27b8846bc5f9aa21d7c3746d1cef7894369f7479f29f937c248ca5f23d580396",
+    "segments/steve-place.edenmacro.json": "c02d3b0a91229c573ee848b686afc575649b4697734c3041351525e98dbe2fdc",
+    "segments/focus-native-quit-frames.edenmacro.json": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46",
+    "segments/title-main.edenmacro.json": "4aec26838a662da6d8b171800c30971e8cabb660bb09b864d1ec703ab602c44e",
+    "segments/lr04-cpu85-to74.edenmacro.json": "96f97989b34e29973e53d7ad4174cdececb754e1727bb22c5ca7d7abde102cdb",
+    "segments/pilot-page-step.edenmacro.json": "db109fa89164d216cf7516057f28626012db5f7015ee870691e47c194074c2ac",
+    "segments/cpu-next-frames.edenmacro.json": "771d9c618735334c245cbe3ea86f6753f73744aaff6841945ab9b570506f17f5",
+    "segments/tr-menu-close.edenmacro.json": "053cc52d14e53619148e497728801ecb402d78bae9c3604f23588d20ee3e8b26",
+    "segments/stage-css.edenmacro.json": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+    "segments/pause-open.edenmacro.json": "64dd73ecc545a194de80411cddb3b8cbd5e37be8e7a4e077a39a5dedee23fe24",
+    "segments/tr-menu-open.edenmacro.json": "e5a74d02bad51116d0a3346d2084587705bbcfbcf40835ff53c0e5d4ed5160d7",
+    "out/dry-run.json": "93eaabc4121bc1433c8ea1ba2ec7932c5ee672b5fbd001a310f7d23de31201a7",
+    "refs/training-hud-unpaused.png": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+    "refs/112256-player-tag.png": "8fbab7baa4cca0e919234ce2588a5a1e026c9cf40edd168c58809304ff02832a",
+    "refs/smash-submenu.png": "ab968c4f7e3b2562cca4bd363ce9979847edf311c834873af24c45e4df3e0fd7",
+    "refs/training-closed.png": "bf8371948c69d7ab8871254389ed81e85fc316eaeaf547f128b3d770154e238d",
+    "refs/css.png": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+    "refs/return-roy-held.png": "08f86998536a62d02ccb8709b1cd5aa33696b24bed948f1bee2fa164ded1aaf3",
+    "refs/ready.png": "760e864b6bfdfd06d46fd0ce8ceed91f456f09f2caef75401d4e9a49a952522f",
+    "refs/cpu-held74.png": "b0e89ddafe4979de6deb208412f869745f8e0692f6a07694d87e2f05fbec8ab7",
+    "refs/quit-focus.png": "8101e26010b70dc07f24bac30c077c2152059f87f27f4b6c0d30a0b197b69c67",
+    "refs/current-pilot-player.png": "5f04fce5640cd388096879d640d41aa62fcef931b9363f427f36f24447b775fb",
+    "refs/native-pause.png": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5",
+    "refs/112112-cpu-row.png": "85308502ea5df5574095975894616e99e1f6c6b7e66c3f07942f837b2ffb33d7",
+    "refs/112115-cpu-tag.png": "ffba72e5517692a3034bf7d5d8091e4e0b03cf7588facd920b81d562009c6acf",
+    "refs/main.png": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+    "refs/cpu85-held.png": "552ed5825f743b85e469d8104d6d8bf5ac099c8e46346a70b86f7e4a267c8ed5",
+    "refs/steve-selected.png": "e643e8ff4b88a51db98a47956725384342f8e3a2288aa43afcea4f41746ea37f",
+    "refs/stage.png": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+    "refs/112253-player-row.png": "16f38936547346bff699dd5c3009b492a24af02837ed38483b26d03e6fb02931",
+    "refs/return-sonic-held.png": "e42d97e1d1b1f8ec59708299fb8317f5a71efb8db25f2c33cec7646aa5726871",
+    "refs/title.png": "d596fc978988d3bd65678fc95f915016e76af5fef12c3de2cd52734cdb7856ac",
+    "rc-settings/mii-bank.json": "aa131c8acb75f317bf4bebc98e7d2cbf90b6f1f8b592a8d6040a79a934fa6836",
+    "rc-settings/cycle_preload.ini": "19cf0208af0d9956a39521b1d7e3110ab35d3fd30c4c0879873b9fd79e0902c5",
+    "rc-settings/specials-ic.json": "c8146f74d25232d7fbaa8cc59f20dbdae5f5c8c876b65dd091449bae893962ad",
+    "rc-settings/ordinary-return.json": "20e9c5081a05a06e51671e7041fa613d79b8d05232690781b42483dc4b3faabb",
+    "rc-settings/specials-aegis.json": "80bce0b3dff70647756cdeb747efe713d3373c597b8b0f01edb36285262a0db9",
+    "rc-settings/developer.ini": "67a947da3d85f460168f7a06578ff1d7ac8607bad52f8619c0b30fa8cfba68cf",
+    "rc-settings/kirby-hats.json": "bb0c5b417840989057a3905bfac733ddfaede8d9c37db2eeef995d6d08904441",
+    "rc-settings/specials-pt.json": "7bc2b47150e85a1f0d97edce27f47ea38dee3236c987b27030af4fba5b168e0c",
+    "rc-settings/notice-cpu.json": "adae8cc12da274b6973baf0056e8701cc559d1a9508380a3636f56e9be95dc41",
+    "rc-settings/initial.json": "20e9c5081a05a06e51671e7041fa613d79b8d05232690781b42483dc4b3faabb",
+    "rc-settings/notice-both.json": "67af394049375e4b1170a013fa2a8ddd47fedffd491f295270438e8331e54908",
+    "rc-settings/notice-p1.json": "9f87cbbb3cc04e698bf07c2368dbd67e628f2afa169972e1e4850c01de068544",
+    "rc-settings/specials-ordinary.json": "7bc2b47150e85a1f0d97edce27f47ea38dee3236c987b27030af4fba5b168e0c"
+  },
+  "retained_hook_revisions": {
+    "steps-03a4cb33b45c5907298af39db357da438a8ba7988d405d0fcf148f05f8563b80.py": "03a4cb33b45c5907298af39db357da438a8ba7988d405d0fcf148f05f8563b80",
+    "steps-1b1a4fc68156087b59e07107c3e83b09e7d4e95c89fe2bf119cdbc80f5ce3e85.py": "1b1a4fc68156087b59e07107c3e83b09e7d4e95c89fe2bf119cdbc80f5ce3e85",
+    "steps-e35b25aa96010e943db18d54eccc7cf119f48c491aa299016a4ae88453ecf5fb.py": "e35b25aa96010e943db18d54eccc7cf119f48c491aa299016a4ae88453ecf5fb",
+    "steps-73e3134b4def09cd4c9e14beb1492922bf18b17cb4c81dd802c95a28ed0a7db1.py": "73e3134b4def09cd4c9e14beb1492922bf18b17cb4c81dd802c95a28ed0a7db1",
+    "steps-bad3e363fb65e87a93603307eeb4c218d9f716aa7e64fcd4a3fbbb9a5e3095db.py": "bad3e363fb65e87a93603307eeb4c218d9f716aa7e64fcd4a3fbbb9a5e3095db",
+    "steps.py": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a"
+  },
+  "manifest_bindings": {
+    "05a-cpu-approach": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "06-lucas": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "R3-independent-pause": {
+      "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+      "retained": true
+    },
+    "03-css": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "02-stage": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-SPECIAL-ordinary": {
+      "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+      "retained": true
+    },
+    "RC-TEARDOWN-1": {
+      "sha256": "91744a3a1d6aa6d6b1dda0c47e2fae277a7e5c1e90044a5a274fff68b1006784",
+      "retained": true
+    },
+    "07-training": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "01-main": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-TEARDOWN-2": {
+      "sha256": "2e97bcb1e2c4da56f3dd27b11f12277537a8a9238c44c641951c76d47b8c5118",
+      "retained": true
+    },
+    "05b-cpu-pick": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-MII": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-final": {
+      "sha256": "6230d5bc6bf30f409018a3d4a87c19fdae2174e472594066eae17257e7d04a26",
+      "retained": true
+    },
+    "04-steve": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-PILOT": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "recover-RC-PILOT": {
+      "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+      "retained": true
+    },
+    "RC-TEARDOWN-3": {
+      "sha256": "bf434ea62759e6801560a16275bb899c2ef1e1f85b277860da6141d210b5f0be",
+      "retained": true
+    },
+    "RC-HATS": {
+      "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-1": {
+      "sha256": "2e97bcb1e2c4da56f3dd27b11f12277537a8a9238c44c641951c76d47b8c5118",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-3": {
+      "sha256": "6230d5bc6bf30f409018a3d4a87c19fdae2174e472594066eae17257e7d04a26",
+      "retained": true
+    },
+    "recover-R3-independent-pause": {
+      "sha256": "91744a3a1d6aa6d6b1dda0c47e2fae277a7e5c1e90044a5a274fff68b1006784",
+      "retained": true
+    },
+    "RC-SPECIAL-aegis": {
+      "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-2": {
+      "sha256": "bf434ea62759e6801560a16275bb899c2ef1e1f85b277860da6141d210b5f0be",
+      "retained": true
+    },
+    "05c-cpu74": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-NOTICE-cpu": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "RC-KIRBY-ROB": {
+      "sha256": "337b863b095d36271128bde6a87352e8f01a263143043d9263b77cd4cb33dc22",
+      "retained": true
+    },
+    "RC-NOTICE-p1": {
+      "sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+      "retained": true
+    },
+    "recover-RC-HATS": {
+      "sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+      "retained": true
+    }
+  },
+  "executed_hook_sources": {
+    "1b1a4fc68156087b59e07107c3e83b09e7d4e95c89fe2bf119cdbc80f5ce3e85": "steps-1b1a4fc68156087b59e07107c3e83b09e7d4e95c89fe2bf119cdbc80f5ce3e85.py",
+    "73e3134b4def09cd4c9e14beb1492922bf18b17cb4c81dd802c95a28ed0a7db1": "steps-73e3134b4def09cd4c9e14beb1492922bf18b17cb4c81dd802c95a28ed0a7db1.py",
+    "e35b25aa96010e943db18d54eccc7cf119f48c491aa299016a4ae88453ecf5fb": "steps-e35b25aa96010e943db18d54eccc7cf119f48c491aa299016a4ae88453ecf5fb.py",
+    "bad3e363fb65e87a93603307eeb4c218d9f716aa7e64fcd4a3fbbb9a5e3095db": "steps-bad3e363fb65e87a93603307eeb4c218d9f716aa7e64fcd4a3fbbb9a5e3095db.py",
+    "03a4cb33b45c5907298af39db357da438a8ba7988d405d0fcf148f05f8563b80": "steps-03a4cb33b45c5907298af39db357da438a8ba7988d405d0fcf148f05f8563b80.py"
+  },
+  "all_executed_project_sources_retained": true,
+  "last_executed_hook_sha256": "03a4cb33b45c5907298af39db357da438a8ba7988d405d0fcf148f05f8563b80",
+  "latest_uploaded_hook_sha256": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a",
+  "latest_uploaded_executed": false,
+  "unexecuted_scope": "Latest adds 0x67ead0 installed-identity trace and MII final retry; uploaded after RC-final loaded 03a4cb33, therefore NOT executed."
+}

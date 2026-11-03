@@ -1,0 +1,12 @@
+{
+  "result": "PASS archive checks only; runtime acceptance remains NOT READY",
+  "results_lines": 19,
+  "receipt_manifest_bindings": 28,
+  "executed_hook_revisions": 5,
+  "media_source_bindings": 41,
+  "python_syntax": "PASS",
+  "authored_whitespace": "PASS",
+  "tracked_source_unchanged_from": "831eb467afc61e0b45f5e6a6cdd3a09bdcc76d58",
+  "watcher_pid_absent": 1767955,
+  "phase_compliance": "Primary-owned"
+}

@@ -1,0 +1,16 @@
+{
+  "owned_watchers_stopped": [
+    {
+      "pid": 1767955,
+      "start": "64591023",
+      "signal": "SIGTERM",
+      "script": "/tmp/opencode/tr-lead-astra-6-model-watch.ps1"
+    }
+  ],
+  "completion": {
+    "shell_id": "sh_1a39af3f4001Ft0jcvQ177EsLa",
+    "state": "completed",
+    "exit_code": 1,
+    "reason": "Intentional exact-process SIGTERM; completion notification received before archive close-out"
+  }
+}

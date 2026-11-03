@@ -1,0 +1,38 @@
+{
+  "id": "RC-SPECIAL-aegis",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+  "started": 1793746822.6884053,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "ordinary": {
+          "request": "644887097 #2040 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77831184384, sequence: 22 } outgoing=0x2e target=0x2d index=0 mii=false",
+          "build": "644887114 #2047 [GroupSwap] build owner=0 group=0 mode=async queued=3 control=0x11e5665760 setup_us=67 us=68; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+          "built": "644887830 #2053 [GroupSwap] built owner=0 group=0 ok=true us=715358 installed=3 pool_live=6->9 bodies=Some([Body { address: 76999028688, id: 393216 }, Body { address: 76999092496, id: 458752 }, Body { address: 76999156304, id: 524288 }]) map=10 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11ea934868, 11f6c4a9c8]) mii_setup=None mode=async setup_us=67 queued_us=17316 settled_us=[182170, 298394, 715313] ticks=46 max_tick_gap_us=19676",
+          "done": "644887863 #2067 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77831184384, sequence: 22 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230054Z-646521-ordinary-async.png",
+          "settled": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230056Z-109626-settled-ordinary-rob.png"
+        },
+        "target": {
+          "request": "644898280 #2120 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77831184384, sequence: 25 } outgoing=0x1c target=0x5a index=0 mii=false",
+          "done": "644899062 #2146 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77831184384, sequence: 25 } target=0x5a physical=0x5a index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230105Z-682600-aegis.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-aegis/yoga-230107Z-966098-settled-aegis.png"
+        },
+        "pause": {
+          "begin": "644901411 #2156 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+          "end": "644903245 #2159 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=112 owned_non_neutral=0 owners=0x00",
+          "resume": "644903263 #2160 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0",
+          "open": "Independent pause producer and frame-advantage positive/retirement still require specific evidence"
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746870.5339859
+}

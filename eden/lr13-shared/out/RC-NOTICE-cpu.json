@@ -1,0 +1,33 @@
+{
+  "id": "RC-NOTICE-cpu",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+  "started": 1793746665.234046,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "waiting": "644723379 #539 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+        "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-cpu/yoga-225809Z-774954-notice-cpu.png",
+        "swap": {
+          "request": "644723969 #552 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 4, entry: 77745782784, sequence: 1 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "644724551 #576 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 4, entry: 77745782784, sequence: 1 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-cpu/yoga-225810Z-088482-notice-cpu.png",
+          "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-NOTICE-cpu/yoga-225813Z-583476-settled-notice-cpu.png"
+        },
+        "statuses": [
+          "644723379 #539 [PreloadStatus] state=Waiting planned=1 ready=0 prefetched=0 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Swap the CPU once to load\"",
+          "644723379 #540 [PreloadStatus] raise text=\"Swap the CPU once to load\" frames=120",
+          "644724552 #578 [PreloadStatus] state=Ready planned=1 ready=1 prefetched=0 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text=\"Ready 1/1\"",
+          "644724552 #579 [PreloadStatus] wiped text=Some(\"Swap the CPU once to load\"); raised again",
+          "644724552 #580 [PreloadStatus] raise text=\"Ready 1/1\" frames=180"
+        ]
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746693.369313
+}

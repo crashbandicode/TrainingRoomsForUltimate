@@ -1,0 +1,46 @@
+{
+  "id": "RC-SPECIAL-ordinary",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7bdcf228004bce2ea52eb293a0e7b8682683ee06f7bf1053ceb54fa399275e98",
+  "started": 1793746788.6169636,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "prefix": [
+          {
+            "request": "644841781 #1647 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 14 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+            "done": "644843180 #1667 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 14 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+            "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230009Z-148270-prefix-b.png",
+            "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230012Z-980589-settled-prefix-b.png"
+          },
+          {
+            "request": "644845847 #1689 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 15 } outgoing=0xb target=0x1f index=0 mii=false",
+            "done": "644845902 #1699 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 15 } target=0x1f physical=0xb index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230012Z-121196-prefix-1f.png",
+            "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230016Z-607116-settled-prefix-1f.png"
+          },
+          {
+            "request": "644849964 #1735 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 16 } outgoing=0x1f target=0x2e index=0 mii=false",
+            "done": "644850018 #1746 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 16 } target=0x2e physical=0xb index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230016Z-954703-prefix-2e.png",
+            "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230019Z-715541-settled-prefix-2e.png"
+          }
+        ],
+        "ordinary": {
+          "request": "644853014 #1766 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 17 } outgoing=0x2e target=0x2d index=0 mii=false",
+          "build": "644853030 #1773 [GroupSwap] build owner=0 group=0 mode=async queued=3 control=0x11e566ab20 setup_us=67 us=68; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+          "built": "644853763 #1779 [GroupSwap] built owner=0 group=0 ok=true us=733465 installed=3 pool_live=6->9 bodies=Some([Body { address: 75978485520, id: 393216 }, Body { address: 75978549328, id: 458752 }, Body { address: 75978613136, id: 524288 }]) map=11 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([121720ef28, 11f6c4bac8]) mii_setup=None mode=async setup_us=67 queued_us=16646 settled_us=[169043, 299355, 733331] ticks=44 max_tick_gap_us=21153",
+          "done": "644853800 #1793 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 7, entry: 77931732992, sequence: 17 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230020Z-946749-ordinary-async.png",
+          "settled": "/home/intpa/tr-lr13-inputs/out/RC-SPECIAL-ordinary/yoga-230022Z-758376-settled-ordinary-rob.png"
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746822.6873944
+}

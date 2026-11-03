@@ -1,0 +1,26 @@
+{
+  "hats": [
+    {
+      "helper": "644785564 #1150 [CharacterSources] ready slot=2 kind=0x0 ticks=36",
+      "request": "644805581 #1401 [KirbyHats] request role=0 kind=0x0 source_slot=2 body=0x1",
+      "confirmed": "644805611 #1402 [KirbyHats] confirmed role=0 kind=0x0 body=0x1",
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225932Z-319495-hat-0.png"
+    }
+  ],
+  "failure": "RuntimeError('Missing positive evidence: \\\\[KirbyHats\\\\] request role=0 kind=0x1\\\\b')",
+  "departure": {
+    "away": {
+      "request": "644814947 #1413 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 11 } outgoing=0x6 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+      "done": "644816480 #1442 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 11 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225942Z-496545-copied-kirby-away.png",
+      "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225945Z-851401-settled-copied-kirby-away.png"
+    },
+    "canonical": "644814947 #1411 [KirbyPark] fallback owner=0 target=0xb reason=Kirby holds a copy ability; canonical Reload",
+    "rob": {
+      "request": "644820013 #1478 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 12 } outgoing=0xb target=0x2d index=0 mii=false",
+      "done": "644820064 #1489 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76785065984, sequence: 12 } target=0x2d physical=0xb index=0 original=false mii=false resource_pair=None released=true",
+      "shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225946Z-436813-normal-rob.png",
+      "settled_shot": "/home/intpa/tr-lr13-inputs/out/RC-HATS/yoga-225948Z-253705-settled-normal-rob.png"
+    }
+  }
+}

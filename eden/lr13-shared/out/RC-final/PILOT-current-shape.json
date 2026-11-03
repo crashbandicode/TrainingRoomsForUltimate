@@ -1,0 +1,49 @@
+{
+  "status": "PASS",
+  "value": {
+    "manual_before": {
+      "shape": "Player",
+      "kind": "page",
+      "scores": {
+        "Player": 0.0013986013986013986,
+        "CPU": 0.06573426573426573
+      },
+      "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230613Z-857728-pilot-current-Player-2.png",
+      "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+    },
+    "armed": {
+      "shape": "CPU",
+      "kind": "page",
+      "scores": {
+        "Player": 0.06713286713286713,
+        "CPU": 0.0
+      },
+      "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230613Z-422091-pilot-current-CPU-0.png",
+      "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+    },
+    "closed_armed": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230614Z-981743-pilot-current-closed-1.png",
+    "ai_clip": "/home/intpa/tr-lr13-inputs/out/RC-final/pilot-current-ai.gif",
+    "reopened_cpu": {
+      "shape": "CPU",
+      "kind": "page",
+      "scores": {
+        "Player": 0.06713286713286713,
+        "CPU": 0.0
+      },
+      "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-113111-pilot-current-CPU-2.png",
+      "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+    },
+    "released": {
+      "shape": "Player",
+      "kind": "page",
+      "scores": {
+        "Player": 0.002797202797202797,
+        "CPU": 0.06713286713286713
+      },
+      "path": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-235699-pilot-current-Player-0.png",
+      "limits": "old-binary text-shape reference; not actual armed ownership, AI or release acceptance"
+    },
+    "closed_released": "/home/intpa/tr-lr13-inputs/out/RC-final/yoga-230620Z-305888-pilot-current-closed-1.png",
+    "manual_clip": "/home/intpa/tr-lr13-inputs/out/RC-final/tr2-jab-x4.gif"
+  }
+}

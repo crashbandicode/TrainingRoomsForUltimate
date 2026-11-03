@@ -1,0 +1,70 @@
+{
+  "id": "07-training",
+  "start": "ready",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9ef9a6f6f9de68b2fc291c1b797655f3f42120ee35092bbb6590a2b802d43fe3",
+  "started": 1793746632.9523067,
+  "results": [
+    {
+      "gate": "delay2-settings",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr13-inputs/out/07-training/delay2-settings-settings.json"
+    },
+    {
+      "play": "enter-training",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-original",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[CharacterRoster] observed owner=0 entry=0x11e5690000 kind=0x58"
+      }
+    },
+    {
+      "gate": "cpu-original",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[CharacterRoster] observed owner=1 entry=0x11e5696000 kind=0x28"
+      }
+    },
+    {
+      "gate": "catalog",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[2, 2] opening=2"
+      }
+    },
+    {
+      "gate": "player-owner",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained"
+      }
+    },
+    {
+      "gate": "cpu-owner",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] catalog owner qualified; immutable origin retained"
+      }
+    },
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr13-inputs/out/07-training/yoga-225720Z-566553-gate-training-hud-unpaused.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr13-inputs/out/07-training/yoga-225720Z-550233-training.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr13-inputs/out/07-training/settings-yoga-settings.json"
+    },
+    {
+      "copy": "/home/intpa/tr-lr13-inputs/out/07-training/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793746640.9596543
+}

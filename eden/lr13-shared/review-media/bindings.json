@@ -1,0 +1,209 @@
+[
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225912Z-984468-settled-kirby-6.png",
+    "sha256": "8f534450e34a46c9c31db793b9aa489ea2f945cd58012f61b4d7bf032e611d57",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225914Z-023506-settled-kirby-b.png",
+    "sha256": "48e656dc9457d7d2c229b9f030684fac08c0c1eac586c64c944ced71ef2e8b96",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225917Z-237715-settled-kirby-2d.png",
+    "sha256": "eafa2f5e0e58168cc4edd912b61fc0cf1b0e51d199f8f1dd6cdf21a732986ddb",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225922Z-809907-settled-kirby-2c.png",
+    "sha256": "a2cbcb92bb62f242f105a9532f78d2df8aa7161514de42e0e61d630700f6e5b8",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225926Z-410972-settled-kirby-1c.png",
+    "sha256": "0197c7da3d7737febf79c213b27ed6b509a3c9bffa6dd670a41870294198cdc3",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225928Z-080535-settled-kirby-58.png",
+    "sha256": "87793f3ccee42d8db55ba6de5aa0a80a45044285b6eb2d666a1988b15974ed13",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-KIRBY-ROB/yoga-225931Z-480823-settled-kirby-6.png",
+    "sha256": "0d1064e25b26641b6278e048637b683427e826f91c3d588911fc269b238e303f",
+    "sheet": "kirby-settled.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-HATS/yoga-225932Z-319495-hat-0.png",
+    "sha256": "4377c84e80dedb621b51cae85bbbec5026aa93eb446a11feba80bbdf07f621ee",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-HATS/yoga-225945Z-851401-settled-copied-kirby-away.png",
+    "sha256": "0c966d9ac624743a065b58562e9f1d4af6d1d1d1a4c9d0637fd0bd16f0cbfddc",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-HATS/yoga-225948Z-253705-settled-normal-rob.png",
+    "sha256": "1f9b3c01c18c2576724837e8bc59bb425702d5543e32962955ccd90c0a4d01e9",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-SPECIAL-ordinary/yoga-230022Z-758376-settled-ordinary-rob.png",
+    "sha256": "d7093d9a2e9a59b5c749cfbe274263c6e53adbb350bd5680b08b88d27e926b9b",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-SPECIAL-aegis/yoga-230107Z-966098-settled-aegis.png",
+    "sha256": "a45e1b74aabf40f95f4cf727df6083537d53fd8b0078871bf34bff48b84402a7",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-SPECIAL-aegis/yoga-230108Z-785679-r3-pause.png",
+    "sha256": "59a56e5021e079a84a3b42b3a904bdddbed5bdee15db4e6c2130ad0562be151b",
+    "sheet": "copied-departure-special.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230613Z-857728-pilot-current-Player-2.png",
+    "sha256": "0e9239981a7b64202f7a4e1eedcec7dd979f7ab4a76f2e2989115b74072283b8",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230613Z-422091-pilot-current-CPU-0.png",
+    "sha256": "7ab68765c781fed6f62b49690f0e0f3852e93d9c37a75223e49bab022f8a9790",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230620Z-113111-pilot-current-CPU-2.png",
+    "sha256": "03381991281ebb774e9b82be1b2d8ee5ba62cc95e75b418438a750879c2c8a2b",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230620Z-235699-pilot-current-Player-0.png",
+    "sha256": "40bcc28f1c8fb2e04280ce6ec89c0cb3e0cc04b453158972e5165bbf23ab686c",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230614Z-981743-pilot-current-closed-1.png",
+    "sha256": "960c28b3b23a695ed731cd52e07a6e47451a1e5cc07eea91845fab2f24d987f6",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230620Z-305888-pilot-current-closed-1.png",
+    "sha256": "e258570ff4c36d86a7c1816616aa292de4b0c5064327784be14c2cac9516fdcb",
+    "sheet": "pilot-shapes.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-NOTICE-p1/yoga-225741Z-348948-notice-p1.png",
+    "sha256": "b3b3ce377b2a2247eba909e26bb160cd733aeea0680aae111eeefbf4be05e1dc",
+    "sheet": "notice-roles.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230608Z-388023-notice-cpu.png",
+    "sha256": "67ef4284dead142241d230b72e84d342aedca86711d5de5ac7bd8f8a00b04964",
+    "sheet": "notice-roles.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/yoga-230612Z-222327-notice-total.png",
+    "sha256": "37ac3156d8e690ed477e300b517e2c5e536661c7f0ea5bbee8dea7f73cd41ac2",
+    "sheet": "notice-roles.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-0.png",
+    "sha256": "d40d5c66cef44694f0aab16115054fb8c00f9c09ddf69aeda9042c2185d82089",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-6.png",
+    "sha256": "e5dd355d4fcdfba694fb6f8706c2e023825b31ccb750aff799266b42f6039a6a",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-12.png",
+    "sha256": "3d3dc3ac6343a1ef4741c410102ab2d976e65eacdf78b1d97de0e9b4dc88fbb3",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-18.png",
+    "sha256": "f2287ce896cc9e31bb248a03dfa7a7ba71f852cc9ab3e3ca4da3cc1772abfcd1",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-24.png",
+    "sha256": "cb3e26650859eb4f5a8c8d869af68f1fe378e378ecabea4dc27b521c728885cf",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-30.png",
+    "sha256": "2b62770a007692cb5fd26c0947cc04d1f92004fb7576a338dfd25a6278f153e3",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-36.png",
+    "sha256": "d46a6c1a29302bf772c6eeb2d14bd070febc3421526bb445638dd9c006dee63c",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-42.png",
+    "sha256": "38a8c1c0de3aedba7b44c30d24158befaa3afb91f761529f9dfd5f24b6da63ba",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/pilot-current-ai-48.png",
+    "sha256": "911ef9cf863fc3754107a97f11c32d7c20878e63e40ab1b710d9d2f1b31a4cf4",
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/pilot-current-ai.gif",
+    "sha256": "231477df8f9e043278f77c993d8f625c619b77a2aaf04e0f8035361004f66049",
+    "frames": 50,
+    "sheet": "pilot-current-ai-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-0.png",
+    "sha256": "aaf7d70fed1701ef0b12867de3ca31eb80683eec271711a2daf8dbd6104c7a02",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-10.png",
+    "sha256": "a74754156729031a0ac425ac466d71b6a2947217a350b1fffd9812e628284d74",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-20.png",
+    "sha256": "49d87b88c6ded0cb963a77314d4e86e57cfd3af477d682efe188784033bdd5c5",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-30.png",
+    "sha256": "9dc94d0c23bd0ba7a14ae2134f404b1ddf1e4786f45bdcbf6cb267efcc97315c",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-40.png",
+    "sha256": "5a165fb20247266288a535df80a3388771d05fd2a7422aa067fec13ac70f1b66",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-50.png",
+    "sha256": "953ce50bdfb1dc4167d31a438779f76ee724b332e0eac23d6684edd759f1c6f8",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-60.png",
+    "sha256": "93c19dcedfe49974f7a27a47eeb69a8e2fa74a7fd69103e87bed8af14fd2c340",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work/eden/lr13-shared/review-media/tr2-jab-x4-70.png",
+    "sha256": "a7bac523edd27dbbac7fbdc1ea0226692276b7b61c8375750492323b45f6a3e4",
+    "sheet": "tr2-jab-x4-sheet.png"
+  },
+  {
+    "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr13-shared/final-inputs/out/RC-final/tr2-jab-x4.gif",
+    "sha256": "3b9751c4b1efc6e806c5b36d49e299408269a5f067048b115e48f83591320d23",
+    "frames": 80,
+    "sheet": "tr2-jab-x4-sheet.png"
+  }
+]
