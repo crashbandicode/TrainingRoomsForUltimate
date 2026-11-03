@@ -602,7 +602,10 @@ impl Menu {
 
     /// The player's saved defaults, replaced by `save_defaults` (the current values are copied).
     pub fn save_defaults(&mut self) {
-        self.settings.defaults = self.settings.menu.clone();
+        if self.settings.defaults != self.settings.menu {
+            self.settings.defaults = self.settings.menu.clone();
+            self.outbox.changed = true;
+        }
     }
 
     /// Bulk update from a map of id to array (SPEC-core-02 §5, the fork's `update_from_vec` rule):

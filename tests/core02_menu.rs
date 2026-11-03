@@ -1691,3 +1691,24 @@ fn page_defaults_controls_roundtrip_and_reset_only_the_focused_complete_row() {
     let reloaded = settings::parse(&json);
     assert_eq!(reloaded.settings.defaults, defaults);
 }
+
+
+#[test]
+fn saving_committed_current_values_alone_requests_persistence_without_rerolls() {
+    let mut settings = Settings::factory();
+    settings.menu.set("stale_dodges", &[0, 1]).unwrap();
+    let mut m = Menu::new(settings, Env::default());
+    assert_eq!(m.take_outbox(), Default::default());
+    m.press(Button::X);
+    m.press(Button::B);
+    let intent = m.take_outbox();
+    assert!(intent.changed, "worker close must request the settings write for an X-only save");
+    assert_eq!(intent.rerolls, 0, "saving defaults does not change current CPU choices");
+    let loaded = settings::parse(&m.serialized());
+    assert!(!loaded.corrupt());
+    assert_eq!(loaded.settings.defaults.get("stale_dodges"), Some(&[0, 1][..]));
+    assert_eq!(loaded.settings.defaults, loaded.settings.menu);
+    m.reopen(loaded.settings, Env::default());
+    m.press(Button::X);
+    assert_eq!(m.take_outbox(), Default::default(), "saving identical defaults is a no-op");
+}

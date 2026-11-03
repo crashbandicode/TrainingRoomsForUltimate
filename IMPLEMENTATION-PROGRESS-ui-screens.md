@@ -808,3 +808,5 @@ error[E0308][0m[1m: mismatched types[0m
 
 [1m```
 Root: focused_rowreturnsOption<usize>. FixusesROWS.get(index) throughand_then before reset_setting, preservingNoneonheader/outofbounds andcompoundresetsemantics. Failedfrozenfiles untouched, nextsourcegatepending, noacceptance. LeadSurfaceRELEASED00:07; noownclaim/Eden/profile.
+
+Defaults write-intent root: actualworkerclose callsrequest_settings onlywhenoutbox.changed; existingMenu::save_defaults clonedwithoutmarkingchanged. X-onlysaveofcommittedcurrentvalueswouldremainmemory-only. Boundedfixmarkschangediffdefaults!=current, norerolls; originalproductionX/B regression assertswriterintent, JSONpairroundtrip, andidenticalsave no-op. Notyetgated. Leadnotifiedbeforeedit, no worker/writerAPIchange/no redundantpartialbuild.
