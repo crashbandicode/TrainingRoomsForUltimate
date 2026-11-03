@@ -1,8 +1,8 @@
 # RC compliance evidence map
 
-2026-11-03, reviewed packaging map updated by the lead. Development composition
-is frozen r15 ab13a0f; root HANDOFF.md records exact source/diagnostic identities
-and targeted gates. The final release candidate remains unaccepted.
+2026-11-03, reviewed packaging map updated by the lead. Latest development compilation is frozen r16 758cee5; root HANDOFF.md records
+exact source/diagnostic identities and targeted gates. Modified-path qualification
+is pending; r15 remains the latest runtime-tested development artifact. The final release candidate remains unaccepted.
 This maps the **30 agent rows** emitted by playbook `2dee6cc` when no matching
 release NRO is supplied: one binary row plus 29 explicit agent rows.
 It does not replace the full playbook checklist or mark the RC ready.
@@ -130,3 +130,18 @@ updates to rows3,11–19,21 and24, not final closures or a new checker run.
 All artifact paths above are beneath artifacts/trainingrooms-lead-astra4/.
 Final release identity, full gates, all359 regression rows, online/LDN,
 corrected media and explicit agent-row dispositions remain open.
+
+## 2026-11-03 r16 development evidence update
+
+R16 contains the count-marker root, displayed Developer control correction, notice palette/waiting-material fixes, and after-only Hitbox pool instrumentation. Lead independently verified source/binary/log identities, 28 UI and19 Hitbox component tests, all9 full64 observer guards, both exact layout inverses, stock textures and253 carried files. Integrated host gate passed1988 test executions across six binaries, zero failures/warnings and3ignored; shared model tests are repeated across binaries. One diagnostic native build passed with zero warnings. Sixteen thread tables and145 generic callbacks pass, but explicit modified formatter/native chains are pending. These are development gates, not the final release wave.
+
+Evidence root artifacts/trainingrooms-lead-astra4/main-r16: candidate.json, lead-host-audit.json, lead-native-audit.json and stack-review/receipt.json. Source1329 archive17afb4f38f68f828127a37afd4b43d8316833188514bad277f76c08239042e41; NRO88abde8e01a5e4be11c6e31a7e25a302a7cd1daffda175d424a6c7ddc5769bf6; ELF7c3152adfc50425b8c3c312180988cedd229322464e5714a2f2b38187981029f. Generic prologue-only stack analysis is not a complete bound: Slim found an80-byte shrink-wrapped Capture::finish frame for explicit accounting. No measurement or allocation threshold was relaxed.
+
+[The F6 development report](F6-R15-MATCHED-DEVELOPMENT.md) maps the completed41Off/42On pair and its missing41cache/nonfinal-source limitations. Lead verified27 future-driver inputs and actual inventory invocation before launch/after stop; the corrected wrapper remains runtime-unrun. Validation-only integration c61d4b0 passes14 matched/report and13 legacy Python tests. Frozen compiledr16 remains758cee5; changing validation tools does not change its recorded source identity.
+
+Pkg4 p4c03 native timer/Replay saved route still fails capture completeness: native publishcounter4449, clean stop, imported tracks3600each and truncated=true. Lead independently verified1092 files, all4 payload hashes, full7219-line console0Unmapped, contiguous diagnostics and1362+14 restore receipts. Root review remains active. Evidence main-r15/lead-p4c03-archive-audit.json and lead-p4c03-payload-audit.json. Clean health/restoration does not close this failure.
+
+All final release, full regression, online/LDN, media and remaining agent rows stay open. No new checker invocation or complete compliance claim is made by this documentation update.
+
+### Qualification completed08:31 UTC
+The preceding pending explicit-review state is superseded by main-r16/lead-development-qualification.json SHA4310ac12c95418cfc66828667905c6d823a62a14f83875912af66e559c377339. UI42/Hitbox101/count100 review files were independently verified; required conditional/typed/native local frames are included without relaxing thresholds. Development lanes are admitted as recorded in HANDOFF.md. Runtime, final release gates and complete compliance remain open.

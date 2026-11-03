@@ -7,3 +7,5 @@ Lead read the complete patches, verified all15 baseline/after hashes, all1326 UI
 Menu measured-stack metadata increases27312 to30848 from retained p4c02 evidence; allocation57344 and static estimate32432 are unchanged. This is an evidence correction, not a stack budget increase.
 
 Pending: one composed targeted host gate and one diagnostic native build, modified callback/formatter and thread-stack qualification, then positive/negative UI, original Hitbox first-pass, and F9 regression. No runtime qualification or RC closure is inferred from host results. Final all-targets, zero-warning clippy, no-default build, release/diagnostic pair, full359-row Eden regression, online/LDN, media and compliance remain open.
+
+Qualification completed2026-11-03 08:31 UTC: targetedhost1988 executions/0fail/3ignored/0warnings; one diagnosticnative build0warnings;16threadtables/145genericcallbacks plus explicitUI/Hitbox/count reviews accepted. Exact qualification and admitted runtime order are in HANDOFF.md and private main-r16/lead-development-qualification.json. Runtime and finalRC gates remain pending.

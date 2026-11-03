@@ -1,131 +1,43 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03. **Acceptance is open; this is not a release manifest.**
+Updated 2026-11-03 08:32 UTC. **RC acceptance remains open.**
 
-The integration branch is `work/implementation`, worktree
-`/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work`.
-The qualified compiled development source is ab13a0f96397e8fe9b89715a46f046d0006eff8f (r15), frozen before this documentation-only update. Its 1321-file archive SHA-256 is 21aa13d249792f3fbaf2207964e786624e5859a4efc987e251816050981d4890. Diagnostic NRO 0bbcfde5782d91d495dbea008b4495c332d901ec03d06b015e72fb448084cc50 and ELF 4b68ec2a3fb2d9fe25d3af71107c49b4f89b04727c7107fd7f3db2be49c7b19f passed the one diagnostic build with zero warnings and unchanged frozen inputs. Targeted host groups passed 1327/13/222/3 tests, with 2 library and 1 private-fixture test ignored. The sixteen thread tables and 145 generic callback budgets pass; explicit foreign/formatter chains were reviewed for bounded development admission; runtime acceptance remains open. Diagnostic resident size is 6,234,112 bytes; this is not a release measurement. Final release identity, full gates and runtime evidence remain pending. Evidence: ../artifacts/trainingrooms-lead-astra4/main-r15/.
+Integration branch: work/implementation, at /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Main c61d4b0 adds validation tools and evidence after the compiled candidate; this documentation update does not change the frozen binary identity.
 
-Lead: tr-lead-astra-4, Codex thread
-01a19e0c-415a-7af3-ac6e-f574318709d2.
-The live campaign records are in the parent workspace:
+## Qualified development candidate
 
-- `TRAININGROOMS-STATUS.md`: assignments, worker requests and operator decisions.
-- `TRAININGROOMS-RC-ACCEPTANCE.md`: blockers and final gates.
-- `TRAININGROOMS-RC-SPEC-ROWS.md`: 359 requirement rows from 27 specifications.
-- `TRAININGROOMS-LEAD-ASTRA-4-CHECKPOINT.md`: exact continuation and operational state.
-- `TRAININGROOMS-EDEN-QUEUE.md`: host ordering; the Yoga claim ledger remains
-  authoritative for occupancy.
+- Compiled source: 758cee509531c9a2d8eabb3c8663cca8c9fda649 (r16).
+- Frozen1329-file archive: 17afb4f38f68f828127a37afd4b43d8316833188514bad277f76c08239042e41.
+- Diagnostic NRO: 88abde8e01a5e4be11c6e31a7e25a302a7cd1daffda175d424a6c7ddc5769bf6.
+- ELF: 7c3152adfc50425b8c3c312180988cedd229322464e5714a2f2b38187981029f.
+- Qualification receipt: ../artifacts/trainingrooms-lead-astra4/main-r16/lead-development-qualification.json, SHA2564310ac12c95418cfc66828667905c6d823a62a14f83875912af66e559c377339.
 
-## Work remaining
+R16 integrates the completed parked-install count-marker root, Developer On/Off publication correction, notice contrast and waiting text-material fixes, and bounded after-only Hitbox pool observations. Menu measured-stack metadata is30848 without changing its57344 allocation. The observer changes no capacity or retry policy and does not establish per-request allocation deltas.
 
-| Area | Required acceptance |
-| --- | --- |
-| Native ownership | F9 fixed-seat promotion and immediate native consumer cutover; exact fighter/Mii completion and presentation before activation; managed capacity-enabled runtime proof |
-| Hooks and threads | R5/F10 allocation deltas zero; recorder design C; empty pending hook-lock ratchet |
-| UI and rendering | Remaining roster, portrait, Solo Popo, Mii and waiting-room rows; archive allocation and retirement lifetime; hitbox/hurtbox first-pass proof |
-| F6 | First async group build, including Kirby-first, within the plain-lap gap; native-reload comparison |
-| Clip preview | Provider and consumer integrated; r10 physical mismatch-to-editor/return scoped proof retained; final preview, cancellation and restoration regression |
-| Integration | Compose remaining exact reviewed implementation/observer slices; run targeted iteration gates and then the full final integration gates |
-| Regression | Full spec matrix, remaining package-2 rows, CPU-pilot coexistence, online/LDN and replay A/B; zero total Unmapped |
-| Delivery evidence | Final README demonstrations, source/NRO hashes, resident size, provenance and completed compliance report |
+Targeted host gate:1988 executions passed, zero failures/warnings, three ignored. Shared model tests run in multiple executables; this is not1988 unique requirements. Initial runner argument rejection occurred before compilation and is retained separately. One diagnostic native build passed with zero warnings. All1329 source files, six actual host executables, NRO/ELF and logs were independently rehashed. Full253-file carry verification passed. Sixteen thread tables and145 generic callback budgets pass. Explicit UI42, Hitbox101 and count100 review files were independently rehashed and reviewed.
 
-The operator's later size ruling uses rustfmt-normalized measurement and RC
-ratchets; the target of at least 15% below the fork belongs to the next version.
-Exactly two `hos-lock` `declare_interior_mutable_const` exceptions are approved.
-No other lint, allocation, lock or runtime-failure tolerance is implied.
+Known bounds retain count10704 including native/Skyline, completion85504 plugin-only, HUD12912/12800 local sums and Menu31280 direct depth. Hitbox Capture::finish has a conditional80-byte frame missed by the prologue scanner; explicit review includes it. Guarded demand suffix2240 and broader generic sphere2816 remain distinct. Native ancestors, SDK/imported calls and recursion are not complete static bounds: actual callback coverage, allocation counts and measured headroom remain mandatory. Diagnostic resident size6242304 is not a release measurement.
 
-## Current work and evidence
+Both regenerated layouts reverse exactly to stock. Required original texture metadata/pixels/mip offsets, relocation and pool alignment, and other stock archive members pass. Historical whole-SARC padding differences are not a specification failure. New assets and native UI still need actual rendered acceptance.
 
-- Slim `stream/slim`, `4526e3e`: signed emitter-demand observation at `a5020`
-  replaces the unqualified global error-stub proposal. Thirteen targeted
-  host tests pass. Full guards and the bounded native relocation/known-caller
-  review pass; compiled callback, stack and runtime gates remain open.
-  See [the demand contract](docs/HITBOX-DEMAND-OBSERVER-CONTRACT.md) and
-  [F6's ABI review](docs/F6-HELPER-DEMAND-ABI-REVIEW.md).
-- UI `stream/ui-screens`, `fa6e9d1`: owned pane lookup and waiting-room text
-  style fixes, with 16 targeted tests and serialized preservation checks.
-  See [the UI boundary evidence](docs/UI18-UI-BOUNDARIES.md). Corrected pixels,
-  notice/input-log behavior and the real demo recording still need runtime
-  validation on the new candidate.
-- Pkg6 dba1739b is integrated exactly in r15: bounded Kirby selection, strict owned four-entry dispatch and count-promotion diagnostics. Both new observers require the asynchronous writer before locking or formatting; the conservative maximum line bound is 1458 bytes. Host evidence passes; compiled foreign chains and actual promotion/identity/lifetime acceptance remain open.
-- Configuration/Draft/native-seed roots `2176490`, `378463f`, `453e997`
-  were integrated earlier. Their exact JSON, Unicode, equality and first/
-  repeated allocation tests are historical component evidence, not a fresh
-  complete-candidate gate.
+## Runtime assignments and known failures
 
-The private artifact root is
-`/home/intpa/smash-training-lobby/artifacts/`. The exact reviewed patch hashes
-and receipts are mapped in [the compliance evidence checklist](docs/RC-COMPLIANCE-EVIDENCE.md).
-Retain [TRAININGROOMS-HANDOFF.md](TRAININGROOMS-HANDOFF.md) as historical context;
-the shared lead inbox and each stream's progress file carry subsequent events.
+Lead admitted these bounded development lanes at08:31 after qualification. Each needs fresh normal queue/full ledger/resource admission, exact frozen helpers/binaries, mute before load, full backup, zero TOTAL Unmapped, every hook allocation/delta zero, measured headroom and complete restoration plus separate verification before release. No claim is inferred merely from this assignment.
 
-## Runtime state and unresolved behavior
+- Pkg6 s6-12: first Surface slot; original F9 promotion/body/HUD/identity and1→2→3→2→1, loading/reset/save-load rows. Q15 coherent saved-Mii provider remains unqualified; no new provider hook is authorized.
+- UI21-01 thenUI21-02: Yoga; fresh hidden page with stored On, then separately admitted visible-page Off/On/Kirby/reload, notices, waiting text, input log and archive lifetime. Full restoration between boots.
+- Slim sh03: Surface after pkg6 full restore/release; original Steve/Ridley first pass, all80 observation ordinals/loss/status and actual manager capacity. No retry can erase a first-pass failure.
+- Pkg4 p4c03: restored1362 profile/14 harness entries and released Yoga08:19:24. Actual native timer/SAVE succeeds but imported tracks are3600 frames each and truncated, despite native publishcounter4449 and clean stop. Root review is active; no speculative policy or probe change is authorized.
+- F6 41Off/42On: each17 strict transactions and complete health/restoration passed as development evidence only. Missing41 cache inventories and nonfinal source block final performance acceptance. Future wrapper now invokes inventories;27 inputs independently hashed, runtime unrun. Main validation/report and legacy tests pass14+13. See docs/F6-R15-MATCHED-DEVELOPMENT.md.
 
-New r14 admissions are held: the native Mii-editor run measured TraceWriter
-8624 bytes on a 20480-byte stack, below the existing required margin. The
-r15 raises TraceWriter to 28672 bytes under the unchanged quarter-plus-16KiB policy and records the measured 8624. The compiled table passes; the same editor write path must still run again. A healthy
-different phase does not clear that failure.
+UI20 failures and Hitbox sh02 signed11>8 demand failure remain retained. TraceWriter8624-byte historical write path must be re-exercised; a healthy different phase does not close it. Q15 flush-only revision was rejected by a concrete alternate writer and recovery deletion path. No guessed exclusion or idle-only coherence is accepted.
 
-Slim owns no compiler, Eden process, controller, mutable profile, host claim
-or queue entry at this checkpoint. Its `sh-01` session was stopped, collected,
-fully restored and released. The two first-pass Ridley helper failures are
-still failures even though retries succeeded. The new demand observer is
-diagnostic evidence collection, not a capacity fix.
+## Remaining acceptance and continuation
 
-UI20 exercised the existing saved-Mii list without saving and captured six constructor calls at native19d147c. That thread matches UI registration and differs from UI pass. The positive context observation does not authorize a provider: coherent full-record reads and owned texture lifetime remain open.
+Sync cleanup is closed. Fourteen RC blockers, ten final gates and all359 final requirement rows remain open. Evidence states are E9/H286/I58/N0/F4/S2; these are scoped evidence classes, not final passes. Still owed: remaining source roots, final all-targets/clippy zero-warning/no-default/release+diag gates, full Eden matrix, coexistence/load orders, online/LDN and desync A/B, actual corrected README media, final size/provenance and every compliance row.
 
-Other required runtime evidence includes fixed CPU rotation and native-seat
-fallback, count promotion/identity/lifetime, recording through timer completion
-and movement fidelity, and the matched F6 performance pair. Online/LDN and
-two-console acceptance remain explicitly open; offline checks do not replace them.
+Live authority is in the parent workspace: TRAININGROOMS-STATUS.md, TRAININGROOMS-RC-ACCEPTANCE.md, TRAININGROOMS-RC-SPEC-ROWS.md, TRAININGROOMS-LEAD-INBOX.md and TRAININGROOMS-LEAD-ASTRA-4-CHECKPOINT.md. Queue: TRAININGROOMS-EDEN-QUEUE.md; actual occupancy: Yoga /tmp/deluxe-surface-1007/OWNER-COORDINATION.md. Read current claims and worker checkpoints before any continuation; never restart a label or duplicate a live job. Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, watcher303502 bound to182663; verify model/effort and watcher after compaction.
 
-## Next actions
+Next: audit admitted runtime outcomes, retain failures, implement only evidence-backed roots, then qualify the final coherent candidate. Check PRIMARY REQUESTs first at least every ten minutes and post Lead turn report about every45minutes without ending work. Only operator-level BLOCKED ends early. Final checker must use the matching release NRO; source-only or diagnostic checks do not close release compliance.
 
-1. Read the latest `PRIMARY REQUEST` and lead headings in
-   `../TRAININGROOMS-LEAD-INBOX.md`, plus the queue's **PRIORITY OVERRIDE**.
-   Confirm the exact model/effort and single owner-bound watcher before work.
-2. Lead completes r15 explicit compiled-path review and targeted runtime acceptance, then
-   runs the final coherent host, clippy, no-default, release and diagnostic gates.
-   Use [BUILD.md](docs/BUILD.md); one Cargo subcommand per admitted job.
-   Verify carry manifests, empty lint ratchets, the integrated size ceiling,
-   all new callback/formatter frames and the complete measured stack maxima.
-   Preserve the explicitly approved two hos-lock const exceptions recorded
-   above; do not interpret them as permission for any additional lint ratchet.
-3. Only after explicit candidate qualification/admission, run the next assigned
-   runtime rows. Slim's next label is `sh-02`; the old `hitbox-run.ps1`
-   hardcodes r13 and must not be launched unchanged. Require exact source/NRO/
-   ELF identities, fresh profile backup, screenshot/log gates, full console
-   scan, all-hook zero allocation, evidence collection, full restore and release.
-4. Finish README/media with an actual qualified-candidate recording, then run
-   the playbook's `tools/check/compliance.py` against the **matching release
-   NRO** and resolve every checklist row. A diagnostic NRO, old release, absent
-   file or machine-only pass cannot establish RC acceptance.
-5. Insert final immutable identities and remaining evidence in this handoff;
-   mark stream readiness only after all assigned criteria pass.
-
-No push, tag, release, physical Switch/card, DBI or USB action is authorized
-by this handoff. Keep scratch and build targets on ext4. Do not use OpenCode.
-
-## Lead checkpoint 2026-11-03 07:51Z
-
-Main96da3a4 integrates the completed parked-install count-promotion marker
-root fix;6227211 adds reviewed compliance evidence only. This source is not
-yet native-qualified. Worker targeted5tests pass and lead verified1203frozen
-sources, actual executed binary/log, all8 main after-hashes and253carry files.
-Next compose reviewed UI roots, then run one targeted/native qualification.
-UI20 restored1362profile/14harness entries and released Yoga07:45. Its full
-console has0Unmapped/165zero-allocation samples, but notice contrast,
-developer toggle polarity and waiting-room text failed. Preserve black/custom
-notice text perSPEC-input-05 and correct its background; typed developer
-accessor and waiting-material root are under bounded UI work.
-Hitbox sh02 restored/released: first-pass failures positively show11emitters
-requested with8available. Stock SYS_SHIELD maps to11-root P_CmnShield;
-actual live capacity/occupancy attribution remains open, no capacity fix.
-F6 failed39 was an early unaccepted input; preserve it. Fresh41/42 share the
-bounded catalog-and-both-owner gate and retain startup cost separately.
-At07:51 worker-owned F6-41 Surface and pkg4p4c-03 Yoga are live; lead owns no
-host/runtime/compiler. Do not manipulate their profiles or repeat their jobs.
-Sync cleanup is closed;14RCblockers,10finalgates and359finalrows remain open.
-R10target retired07:49 with all3executedELFs and native/source/logs preserved;
-fresh three-host TrainingRooms cache is58,438,465,504B. R15 remains retained.
+No push, tag, release, card, DBI, USB or OpenCode action is authorized. Scratch and targets stay on ext4; obey the60GB TrainingRooms cache cap and40GB disk floor. Preserve full source, executed binaries, native artifacts and raw logs before retiring only owned superseded targets. Historical context remains in TRAININGROOMS-HANDOFF.md and prior committed handoffs.
