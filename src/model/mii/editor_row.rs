@@ -6,16 +6,20 @@ pub type Row = [u8; saved::HEADER_LEN];
 pub fn from_seed(seed: &MiiConfig) -> Result<Row, &'static str> {
     Configuration::from_saved(seed).map_err(|_| "Invalid editor appearance")?;
     let mut row = [0; saved::HEADER_LEN];
-    let mut units = Vec::new();
+    let mut units = [0u16; 10];
+    let mut len = 0;
     for ch in seed.name.chars() {
         let mut encoded = [0; 2];
         let next = ch.encode_utf16(&mut encoded);
-        if units.len() + next.len() > 10 { break; }
-        units.extend_from_slice(next);
+        if len + next.len() > units.len() { break; }
+        units[len..len + next.len()].copy_from_slice(next);
+        len += next.len();
     }
-    if units.is_empty() { units.extend("New Mii".encode_utf16()); }
-    row[0x114..0x118].copy_from_slice(&(units.len() as u32).to_le_bytes());
-    for (i, unit) in units.into_iter().enumerate() {
+    if len == 0 {
+        for unit in "New Mii".encode_utf16() { units[len] = unit; len += 1; }
+    }
+    row[0x114..0x118].copy_from_slice(&(len as u32).to_le_bytes());
+    for (i, unit) in units[..len].iter().enumerate() {
         row[0x118 + i * 2..0x11a + i * 2].copy_from_slice(&unit.to_le_bytes());
     }
     for (offset, tag) in [0x130, 0x138, 0x1a0].into_iter().zip(seed.raw_tags) {
@@ -26,7 +30,7 @@ pub fn from_seed(seed: &MiiConfig) -> Result<Row, &'static str> {
     row[0x141] = appearance.voice;
     row[0x142..0x146].copy_from_slice(&appearance.specials);
     row[0x148..0x1a0].copy_from_slice(&seed.charinfo);
-    let (_, checked) = parse(&row)?;
+    let checked = configuration(&row)?;
     if checked.canonical() != seed.canonical { return Err("Editor seed differs from selected Mii"); }
     Ok(row)
 }

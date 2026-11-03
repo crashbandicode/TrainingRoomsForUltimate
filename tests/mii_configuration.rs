@@ -173,6 +173,66 @@ fn editor_value_validation_preserves_errors_and_lossy_name_behavior() {
 }
 
 #[test]
+fn native_default_seed_and_saved_name_paths_preserve_bytes() {
+    let mut seed = saved(observed());
+    let mut expected = editor_row();
+    expected[0x114] = 7;
+    expected[0x118..0x12c].fill(0);
+    for (i, byte) in b"New Mii".iter().enumerate() { expected[0x118 + i * 2] = *byte; }
+    assert_eq!(value::from_seed(&seed), Ok(expected));
+    for (name, expected_name) in [
+        ("123456789\u{1f600}", "123456789"), ("12345678\u{1f600}", "12345678\u{1f600}"),
+        ("\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}x", "\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}"),
+        ("", "New Mii"),
+    ] {
+        seed.name = name.into();
+        let row = value::from_seed(&seed).unwrap();
+        assert_eq!(value::parse(&row).unwrap().0, expected_name);
+        assert_eq!(value::configuration(&row), Ok(observed()));
+    }
+}
+
+#[test]
+fn actual_seed_first_and_repeated_valid_and_invalid_paths_allocate_nothing() {
+    const CHILD: &str = "TR_SEED_ALLOC_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "actual_seed_first_and_repeated_valid_and_invalid_paths_allocate_nothing", "--test-threads=1", "--nocapture"])
+            .env(CHILD, "1").status().unwrap();
+        assert!(status.success());
+        return;
+    }
+    let default = saved(observed());
+    let mut named = saved(observed());
+    named.name = "12345678\u{1f600}x".into();
+    let mut invalid = saved(observed());
+    invalid.canonical.appearance.specials[0] = 3;
+    let measure = |count| {
+        let before = hook_stats::hook_allocations();
+        {
+            let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+            for _ in 0..count {
+                std::hint::black_box(value::from_seed(&default).unwrap());
+                std::hint::black_box(value::from_seed(&named).unwrap());
+                assert_eq!(value::from_seed(&invalid), Err("Invalid editor appearance"));
+            }
+        }
+        hook_stats::hook_allocations() - before
+    };
+    let first = measure(1);
+    let repeated = measure(64);
+    let before = hook_stats::hook_allocations();
+    {
+        let _scope = hook_stats::HookScope::enter_hook(hook_stats::HookId::Other);
+        std::hint::black_box(vec![7u8; 1024]);
+    }
+    let control = hook_stats::hook_allocations() - before;
+    println!("Seed allocations first={first} repeated={repeated} positive_control={control}");
+    assert!(control > 0);
+    assert_eq!((first, repeated), (0, 0));
+}
+
+#[test]
 fn actual_draft_first_and_repeated_refinement_allocate_nothing() {
     const CHILD: &str = "TR_DRAFT_ALLOC_CHILD";
     if std::env::var_os(CHILD).is_none() {

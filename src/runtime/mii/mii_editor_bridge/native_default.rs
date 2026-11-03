@@ -162,6 +162,13 @@ pub(super) unsafe fn materialize(base: usize, class: MiiClass) -> Result<value::
         colour, voice: 37, specials: [0; 4], charinfo: charinfo.0,
         tag_outfit: outfit, tag_hat: hat, tag_chara: chara,
     };
-    let config = inventory::classify(&raw).map_err(|_| "default_owned_values_invalid")?;
+    let canonical = inventory::classify_canonical(&raw).map_err(|_| "default_owned_values_invalid")?;
+    // Native defaults always use the existing empty-name fallback: "New Mii".
+    // No display name or catalog copy list is needed on this native handoff.
+    let config = inventory::MiiConfig {
+        slot_id: raw.slot_id, slot_index: raw.index, name: String::new(),
+        charinfo: raw.charinfo, raw_tags: [raw.tag_outfit, raw.tag_hat, raw.tag_chara],
+        canonical, copies: Vec::new(),
+    };
     value::from_seed(&config)
 }
