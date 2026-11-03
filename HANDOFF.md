@@ -50,7 +50,9 @@ No other lint, allocation, lock or runtime-failure tolerance is implied.
   latency criterion and matched native Kirby baseline remain open.
 - UI ui-17: full console zero Unmapped; 118 hook allocation samples zero.
   Two archive handouts/release cycles and physical mismatch A/B controls passed.
-  Missing content/backgrounds still reproduce, so UI acceptance remains open.
+  The reported missing content/backgrounds were contradicted by identical raw
+  pixels in the compared frames; that attribution is retracted. Remaining
+  historical image audit, Q15 and waiting-room acceptance are still open.
 - Hitbox ly-02: zero Unmapped, but the first Ridley pass refused two effects.
   The observed free list and two early limits do not explain the refusal.
 - Capacity load verification previously ran after an overlapping owned hook.
