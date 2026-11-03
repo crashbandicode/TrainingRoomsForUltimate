@@ -21,7 +21,7 @@ impl MiiList {
     pub fn new(snapshot: Snapshot, context: Option<Context>, epoch: u64, menu: &Menu) -> Option<Self> {
         let preferences = menu.top_extra("mii_preferences").cloned()
             .and_then(|value| serde_json::from_value(value).ok()).unwrap_or_default();
-        let catalog = match context {
+        let mut catalog = match context {
             Some(context) if context.epoch == epoch => CatalogMenu::new(snapshot, context, &preferences)?,
             Some(_) => return None,
             #[cfg(feature = "mii-editor-alpha")]
@@ -29,6 +29,7 @@ impl MiiList {
             #[cfg(not(feature = "mii-editor-alpha"))]
             None => return None,
         };
+        catalog.set_editor_available(crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE);
         Some(Self { catalog, preferences, opened: None, epoch })
     }
 
@@ -97,7 +98,6 @@ impl MiiList {
 #[cfg(all(test, feature = "mii-editor-alpha"))]
 mod tests {
     use super::*;
-    use crate::engine::mii_root::mii_menu::EditorSeed;
     use crate::model::{menu::Env, settings::Settings};
 
     #[test]
@@ -129,11 +129,16 @@ mod tests {
         assert_eq!(pending.actions.len(), 1);
         assert!(matches!(pending.actions[0], Action::ReloadCpu(choice) if choice.canonical == second));
         list.press(Button::Down, &mut menu);
-        assert!(list.editor_request().is_some(), "Add New follows the two saved choices");
+        assert!(list.editor_request().is_none(), "RC never dispatches the native editor");
+        let mut frame = Frame::new();
+        list.frame(&menu, &mut frame);
+        assert_eq!(frame.row_count, 2);
+        assert_eq!(frame.focus, Some(1));
+        assert!(!frame.rows.iter().any(|row| row.label.string_lossy().contains("Add New")));
     }
 
     #[test]
-    fn waiting_catalog_opens_each_class_at_add_new_without_role_permissions() {
+    fn unqualified_empty_catalog_refuses_editor_without_granting_role_permissions() {
         let mut menu = Menu::new(Settings::factory(), Env::default());
         let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
         for class in 0..3 {
@@ -141,9 +146,11 @@ mod tests {
             let mut frame = Frame::new();
             list.frame(&menu, &mut frame);
             assert_eq!(frame.row_count, 1);
-            assert_eq!(frame.rows[0].label.string_lossy(), "Add New…");
-            let request = list.editor_request().unwrap();
-            assert!(matches!(request.seed, EditorSeed::NativeDefault(kind) if kind.kind() == 0x48 + u32::from(class)));
+            assert_eq!(frame.rows[0].label.string_lossy(), "Unavailable");
+            assert_eq!(frame.rows[0].label_tone, Tone::Off);
+            assert!(list.editor_request().is_none());
+            list.press(Button::A, &mut menu);
+            assert!(list.editor_request().is_none());
             list.press(Button::ZR, &mut menu);
             assert!(list.close().is_none());
         }

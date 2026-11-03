@@ -140,6 +140,7 @@ pub(crate) fn write_trace(trace: &Trace) -> std::io::Result<()> {
 
 pub(crate) fn request(request: crate::engine::mii_root::mii_menu::EditorRequest) {
     let result = (|| -> Result<(), &'static str> {
+        if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return Err("Native Mii editor is unavailable"); }
         if !ENABLED.load(Ordering::Acquire) { return Err("Editor adapter is unavailable"); }
         let origin = match editor_origin::admit(
             unsafe { crate::runtime::compat::common::is_native_training_mode() },
@@ -171,6 +172,7 @@ fn begin_session(
     origin: Origin, seed: Draft, catalog: Arc<Snapshot>,
     restore: Option<(ResumeTicket, ui_resume::Screen, i32)>,
 ) -> Result<(), &'static str> {
+    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return Err("Native Mii editor is unavailable"); }
     seed.validate()?;
     if !catalog.is_complete() { return Err("Mii catalog is incomplete"); }
     let mut state = STATE.try_lock().ok_or("Editor request is busy")?;

@@ -39,8 +39,9 @@ CPU options, input delay, save states, numbered recording/playback, supported
 named operations, fighter cycling, existing Mii/hat behavior and practice stages.
 The opt-in Developer page has passing hidden and visible Eden observations.
 Unproven Setup workflows, hurtboxes, expanded hot-slot budgets, F9 promotion,
-advanced preview extensions and further latency work are deferred. Their actual
-RC exclusion boundaries are being composed before final validation.
+advanced preview extensions, native Mii creation and further latency work are deferred.
+Their RC entry points are closed; ordinary saved Mii selection remains. Final
+candidate validation is pending.
 
 ## Known limitations under review
 

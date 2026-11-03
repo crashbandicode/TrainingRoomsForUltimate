@@ -5,6 +5,9 @@ use crate::engine::mii::selection::{self, Action, Active, DropdownRow, PlayerOri
 
 use crate::engine::compat::panel_view as macro_panel;
 
+/// RC keeps saved catalog selection; native creation awaits runtime qualification.
+pub const NATIVE_EDITOR_AVAILABLE: bool = false;
+
 pub const PAGES: [(&str, &str, MiiClass); 3] = [
     ("mii_brawler_config", "Mii Brawler", MiiClass::Brawler),
     ("mii_sword_config", "Mii Swordfighter", MiiClass::Swordfighter),
@@ -187,6 +190,7 @@ pub struct CatalogMenu {
     snapshot: Snapshot,
     context: Context,
     editor_only: bool,
+    editor_available: bool,
     before: Preferences,
     class: MiiClass,
     role: Option<Role>,
@@ -208,6 +212,7 @@ impl CatalogMenu {
             snapshot,
             context,
             editor_only: false,
+            editor_available: true,
             before: preferences.clone(),
             class: MiiClass::Brawler,
             role: None,
@@ -217,6 +222,12 @@ impl CatalogMenu {
             #[cfg(feature="mii-ordinary-cpu-alpha")]
             ordinary_cpu:false,
         })
+    }
+
+    /// Adapter capability, independent of saved-catalog and role qualification.
+    pub fn set_editor_available(&mut self, available: bool) {
+        self.editor_available = available;
+        if !available { self.cursor = 0; }
     }
 
     /// A waiting-room editor needs a catalog, but has no qualified fighter-swap
@@ -314,7 +325,7 @@ impl CatalogMenu {
         self.class = class;
         self.list_mode = false;
         self.role = None;
-        self.cursor = if self.editor_only { 2 } else { 0 };
+        self.cursor = if self.editor_only && self.editor_available { 2 } else { 0 };
         self.rows.clear();
     }
 
@@ -328,7 +339,7 @@ impl CatalogMenu {
     fn set_list_role(&mut self, role: Role, preferences: &Preferences) {
         self.role = Some(role);
         self.rows = selection::dropdown(&self.snapshot, preferences, role, self.class, self.context.original);
-        self.cursor = if self.editor_only { self.rows.len() } else {
+        self.cursor = if self.editor_only && self.editor_available { self.rows.len() } else {
             self.rows.iter().position(|row| row.selected).unwrap_or(0)
         };
     }
@@ -342,7 +353,7 @@ impl CatalogMenu {
 
     pub fn step(&mut self, delta: isize) {
         if self.editor_only { return; }
-        let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode) } else { 3 };
+        let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode && self.editor_available) } else { 2 + usize::from(self.editor_available) };
         if count != 0 {
             self.cursor = self.cursor.saturating_add_signed(delta).min(count - 1);
         }
@@ -352,7 +363,7 @@ impl CatalogMenu {
     #[cfg(feature = "mii-editor-alpha")]
     pub fn editor_seed(&self, preferences: &Preferences) -> Option<EditorRequest> {
         let add_new = if self.list_mode { self.cursor == self.rows.len() } else { self.role.is_none() && self.cursor == 2 };
-        if !add_new || !self.snapshot.is_complete() {
+        if !self.editor_available || !add_new || !self.snapshot.is_complete() {
             return None;
         }
         let preferred = selection::resolve(&self.snapshot, preferences, Role::Player,
@@ -420,6 +431,7 @@ impl CatalogMenu {
         let defects = self.snapshot.defects().count();
         let status = match defects {
             count if count != 0 => format!("{count} saved Mii configuration(s) could not be read. Selection is unavailable."),
+            _ if self.editor_only && !self.editor_available => "Saved Mii selection is unavailable in this context. B: Back".into(),
             _ if self.editor_only => "Create and test a Mii, including Headgear, Outfit, Color, Voice, and Random. An incoming match keeps that unfinished page. B: Back".into(),
             _ if self.snapshot.findings.iter().any(|finding| matches!(finding, Finding::PresetSource { .. })) =>
                 "Imported presets unavailable. Native saved Miis remain selectable. B: Back".into(),
@@ -450,9 +462,13 @@ impl CatalogMenu {
                 format!("{}. {}{} [{}]", index + 1, if row.selected { "✓ " } else { "" }, row.name, moves)
             }).collect();
             let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();
-            if self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {
+            if self.editor_available && self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {
                 labels.push("Add New…".into());
                 disabled.push(!cfg!(feature = "mii-editor-alpha") || !self.snapshot.is_complete());
+            }
+            if labels.is_empty() && !self.editor_available {
+                labels.push("Unavailable".into());
+                disabled.push(true);
             }
             View { panel: macro_panel::View {
                 title: format!("{title} — {}", if role == Role::Player { "Player" } else { "CPU" }),
@@ -474,9 +490,13 @@ impl CatalogMenu {
                 labels.push(format!("{name}: {}", selected.unwrap_or("Unavailable")));
             }
             let can_add = cfg!(feature = "mii-editor-alpha") && self.snapshot.is_complete();
-            labels.push(if can_add { "Add New" } else { "Add New (unavailable)" }.into());
+            let mut disabled = vec![self.editor_only, self.editor_only];
+            if self.editor_available {
+                labels.push(if can_add { "Add New" } else { "Add New (unavailable)" }.into());
+                disabled.push(!can_add);
+            }
             View { panel: macro_panel::View { title: title.into(), labels, selected: self.cursor,
-                footer: status }, disabled: vec![self.editor_only, self.editor_only, !can_add] }
+                footer: status }, disabled }
         }
     }
 }
