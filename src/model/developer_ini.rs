@@ -6,7 +6,7 @@
 //!
 //! Format: one `key=value` per line; spaces around the key, the `=` and the value are ignored; a
 //! line whose first non-blank character is `;` or `#`, a `[section]` line and a line without `=`
-//! are ignored. The key and the value are compared exactly (`developer_page`, lowercase `on`). A
+//! are ignored. The key and the value are compared ASCII case-insensitively (SPEC-core-01 step 2a). A
 //! leading UTF-8 byte-order mark is skipped. The whole file is validated before it is trusted:
 //!
 //! - a missing file, a read error (including one after a partial read) or any byte that is not
@@ -22,6 +22,12 @@ pub const MAX_BYTES: usize = 8 * 1024;
 
 /// The key the Developer page reads.
 pub const KEY: &str = "developer_page";
+
+/// Runtime publication gate for Developer rows. The persisted choice is an input,
+/// never rewritten when a boot hides the page (SPEC-core-01, decision N1).
+pub const fn effective(page_enabled: bool, stored: bool) -> bool {
+    page_enabled && stored
+}
 
 /// Why the page is shown or hidden; the install line prints `text()`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -93,13 +99,13 @@ pub fn parse(contents: &[u8]) -> DeveloperIni {
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        if key.trim_ascii() != KEY {
+        if !key.trim_ascii().eq_ignore_ascii_case(KEY) {
             continue;
         }
         if seen.is_some() {
             return DeveloperIni::hidden(Reason::DuplicateKey);
         }
-        seen = Some(value.trim_ascii() == "on");
+        seen = Some(value.trim_ascii().eq_ignore_ascii_case("on"));
     }
     match seen {
         None => DeveloperIni::hidden(Reason::KeyAbsent),

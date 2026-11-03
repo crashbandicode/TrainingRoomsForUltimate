@@ -276,14 +276,45 @@ fn core01_developer_ini() {
     // Other values, other keys, comments: hidden, with the reason that says why.
     assert_eq!(parse(b"").reason, Reason::KeyAbsent);
     assert_eq!(parse(b"developer_page=off").reason, Reason::NotOn);
-    assert_eq!(parse(b"developer_page=ON").reason, Reason::NotOn);
+    assert_eq!(parse(b"developer_page=ON").reason, Reason::On);
     assert_eq!(parse(b"developer_page=1").reason, Reason::NotOn);
     assert_eq!(parse(b"developer_page").reason, Reason::KeyAbsent);
     assert_eq!(parse(b"; developer_page=on").reason, Reason::KeyAbsent);
     assert_eq!(parse(b"x_developer_page=on").reason, Reason::KeyAbsent);
-    for text in [&b""[..], b"developer_page=off", b"developer_page=ON", b"developer_page=1", b"developer_page", b"; developer_page=on"] {
+    for text in [&b""[..], b"developer_page=off", b"developer_page=1", b"developer_page", b"; developer_page=on"] {
         assert!(!parse(text).developer_page);
     }
+}
+
+#[test]
+fn core01_developer_mixed_case_and_duplicate_keys() {
+    use model::developer_ini::{parse, Reason};
+    assert!(parse(b" DeVeLoPeR_PaGe = oN \r\n").developer_page);
+    for text in [
+        &b"developer_page=on\nDEVELOPER_PAGE=off"[..],
+        b"DEVELOPER_PAGE=ON\ndeveloper_page=on",
+        b"Developer_Page=OFF\ndeveloper_page=On",
+    ] {
+        let result = parse(text);
+        assert!(!result.developer_page);
+        assert_eq!(result.reason, Reason::DuplicateKey);
+    }
+    assert_eq!(parse(b"DEVELOPER_PAGE=ONLY").reason, Reason::NotOn);
+    assert_eq!(parse(b"OTHER_DEVELOPER_PAGE=ON").reason, Reason::KeyAbsent);
+}
+
+#[test]
+fn core01_developer_hidden_boot_preserves_stored_samples_for_enabled_boot() {
+    use model::developer_ini::{effective, parse};
+    let stored_samples = true;
+    for config in [&b""[..], b"developer_page=off", b"developer_page=on\nDEVELOPER_PAGE=on"] {
+        let boot = parse(config);
+        assert!(!effective(boot.developer_page, stored_samples));
+    }
+    // The same persisted choice becomes effective on a later enabled boot.
+    let next_boot = parse(b"DEVELOPER_PAGE=ON");
+    assert!(effective(next_boot.developer_page, stored_samples));
+    assert!(!effective(next_boot.developer_page, false));
 }
 
 /// R4 (review R1-astra-pkg1): the gate fails closed on a repeated key (either order), an oversized

@@ -35,7 +35,11 @@ fn publish(menu: &TrainingModpackMenu, event: &str) {
             "[CyclePreload] {reason}; settings.json choice remains active; cache retries on next publish or boot"
         );
     }
-    let s = synced.active;
+    let mut s = synced.active;
+    // The cache retains the player's choice; only the live samples flag is gated.
+    s.measurements = crate::model::developer_ini::effective(
+        crate::runtime::published::developer_page(), s.measurements,
+    );
     store(s);
     crate::engine::compat::logging::log_info!(
         "[CyclePreload] {} slots={} fighters={} hats={} measurements={} bank_members={} group_swap={} ready_fighters={} ic_pair_bank={} original_bank={} solo_popo_groups={} ic_pair_groups={} native_groups={} pair_groups={} mii_groups={}",
