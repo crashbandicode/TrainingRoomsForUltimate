@@ -384,6 +384,112 @@ fn migration_existing_destinations_are_never_overwritten() {
     assert_eq!(receipt.skipped.iter().filter(|(_, r)| r == "exists").count(), 2);
 }
 
+#[cfg(unix)]
+#[test]
+fn core08_existing_dangling_destination_is_preserved_not_replaced() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    fs::create_dir_all(t.rooms()).unwrap();
+    let target = t.rooms().join("button_config.ini");
+    std::os::unix::fs::symlink("user-owned-missing.ini", &target).unwrap();
+    let before = tree(&t.fork());
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(fs::read_link(&target).unwrap(), Path::new("user-owned-missing.ini"),
+        "an occupied destination is not absent just because its referent is missing");
+    assert!(receipt.skipped.iter().any(|(p, r)| p == "button_config.ini" && r == "exists"));
+    assert_eq!(tree(&t.fork()), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn n8_destination_appearing_after_blocking_is_preserved_at_publication() {
+    let t = Tmp::new();
+    write(&t.fork().join("replay_captures/11.smd/11.tmrc"), b"complete source capture");
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, marker } = run_blocking(roots, 1, "0.1.0", &mut |_| {}) else { panic!() };
+    assert!(marker.is_none() && blocking.pending_captures() == 1);
+    let target = dest.join("replay_captures/11.smd/11.tmrc");
+    fs::create_dir_all(target.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink("user-owned-missing.tmrc", &target).unwrap();
+    let (receipt, marker) = run_background(roots, blocking, &mut |_| {});
+    marker.unwrap();
+    assert_eq!(fs::read_link(&target).unwrap(), Path::new("user-owned-missing.tmrc"));
+    assert!(receipt.files.is_empty());
+    assert_eq!(receipt.skipped, [("replay_captures/11.smd/11.tmrc".to_owned(), "exists".to_owned())]);
+    assert!(!target.with_file_name("11.tmrc.part").exists());
+    assert_eq!(fs::read(source.join("replay_captures/11.smd/11.tmrc")).unwrap(), b"complete source capture");
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_existing_marker_entry_blocks_import_even_without_a_referent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    fs::create_dir_all(t.rooms()).unwrap();
+    let marker = t.rooms().join("migration.json");
+    std::os::unix::fs::symlink("user-owned-marker.json", &marker).unwrap();
+    let (source, dest) = (t.fork(), t.rooms());
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 1, "0.1.0", &mut |_| {});
+    assert!(matches!(stage, Stage::MarkerPresent));
+    assert_eq!(fs::read_link(marker).unwrap(), Path::new("user-owned-marker.json"));
+    assert!(!dest.join("settings.json").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_marker_inspection_error_defers_import_without_calling_it_present() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    std::os::unix::fs::symlink("TrainingRooms", t.rooms()).unwrap();
+    let (source, dest) = (t.fork(), t.rooms());
+    let mut messages = Vec::new();
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 1, "0.1.0", &mut |s| messages.push(s.to_owned()));
+    assert_eq!(status_word(&stage), "partial");
+    let Stage::Imported { blocking, marker } = stage else { panic!("inspection error must not be marker-present or no-source") };
+    assert!(marker.unwrap().is_err() && blocking.marker_withheld());
+    assert!(blocking.receipt.files.is_empty() && blocking.pending_captures() == 0);
+    assert_eq!(blocking.receipt.unlisted[0].0, "migration.json");
+    assert!(messages.iter().any(|s| s.contains("cannot inspect migration.json")));
+    assert_eq!(fs::read_link(&dest).unwrap(), Path::new("TrainingRooms"));
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_destination_inspection_error_is_partial_and_retryable() {
+    let t = Tmp::new();
+    write(&t.fork().join("macros/m.json"), b"macro");
+    write(&t.fork().join("button_config.ini"), b"buttons");
+    fs::create_dir_all(t.rooms()).unwrap();
+    std::os::unix::fs::symlink("macros", t.rooms().join("macros")).unwrap();
+    let (receipt, marker) = full_import(&t);
+    assert!(marker.is_err());
+    assert_eq!(receipt.result(), ImportResult::Partial);
+    assert!(receipt.skipped.iter().any(|(path, reason)| path == "macros/m.json" && reason.starts_with("io:")));
+    assert_eq!(fs::read(t.rooms().join("button_config.ini")).unwrap(), b"buttons");
+    assert!(!t.rooms().join("migration.json").exists());
+    fs::remove_file(t.rooms().join("macros")).unwrap();
+    let (_, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(fs::read(t.rooms().join("macros/m.json")).unwrap(), b"macro");
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_marker_appearing_during_background_is_not_replaced() {
+    let t = Tmp::new();
+    write(&t.fork().join("replay_captures/11.smd/11.tmrc"), b"capture");
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, .. } = run_blocking(roots, 1, "0.1.0", &mut |_| {}) else { panic!() };
+    fs::create_dir_all(&dest).unwrap();
+    std::os::unix::fs::symlink("operator-marker.json", dest.join("migration.json")).unwrap();
+    let (_, marker) = run_background(roots, blocking, &mut |_| {});
+    marker.unwrap();
+    assert_eq!(fs::read_link(dest.join("migration.json")).unwrap(), Path::new("operator-marker.json"));
+}
+
 #[test]
 fn migration_captures_have_no_size_cap_and_the_rest_do() {
     let t = Tmp::new();

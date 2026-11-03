@@ -404,43 +404,43 @@ pub const FILE_NAME: &str = "replay_capture.ini";
 pub const MAX_BYTES: usize = 8 * 1024;
 
 impl CaptureSettings {
-    /// The document after the menu's toggle changed to `enabled`: the recognised `[capture] enabled`
-    /// line's value is replaced in place, so the host's persistence writer (which replaces the first
-    /// `enabled=` line) keeps finding the same line; every other line is kept. A document without that
-    /// line gets a `[capture]` section with it appended.
+    /// Persist an explicit choice even when the old owned keys are invalid or duplicated.
+    /// Replace the first `[capture] enabled` line and remove later owned keys, retaining
+    /// their comments. Unknown lines and sections are kept. With no owned key, append one.
     pub fn to_ini_text(original: &str, enabled: bool) -> String {
         let value = if enabled { "on" } else { "off" };
-        let recognised = scan(original).ok().and_then(|s| s.enabled).map(|(index, _)| index);
         let mut out = String::with_capacity(original.len() + 32);
-        match recognised {
-            Some(target) => {
-                for (index, raw) in original.lines().enumerate() {
-                    if index == target {
-                        // Keep a trailing comment: only the value after the first `=` is replaced.
-                        let (head, _) = raw.split_once('=').unwrap_or((raw, ""));
-                        let comment = raw.find([';', '#']).map(|at| raw[at..].to_owned());
-                        out.push_str(head);
-                        out.push('=');
-                        out.push_str(value);
-                        if let Some(comment) = comment {
-                            out.push(' ');
-                            out.push_str(&comment);
-                        }
-                    } else {
-                        out.push_str(raw);
-                    }
-                    out.push('\n');
-                }
+        let mut in_capture = false;
+        let mut written = false;
+        for raw in original.lines() {
+            // Same section/key grammar as scan; an explicit choice replaces bad values
+            // rather than depending on the old document parsing successfully first.
+            let content = raw.split([';', '#']).next().unwrap_or("");
+            let line = content.trim();
+            if let Some(section) = line.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                in_capture = section.trim().eq_ignore_ascii_case("capture");
             }
-            None => {
-                out.push_str(original);
-                if !original.is_empty() && !original.ends_with('\n') {
-                    out.push('\n');
+            let key = line.split_once('=').map_or(line, |(key, _)| key.trim());
+            if in_capture && key.eq_ignore_ascii_case(CAPTURE_CONFIG_KEY) {
+                let comment = raw.find([';', '#']).map(|at| &raw[at..]);
+                if !written {
+                    let head = content.split_once('=').map_or(CAPTURE_CONFIG_KEY, |(head, _)| head);
+                    out.push_str(head);
+                    out.push('=');
+                    out.push_str(value);
+                    written = true;
+                    if comment.is_some() { out.push(' '); }
                 }
-                out.push_str("[capture]\nenabled=");
-                out.push_str(value);
-                out.push('\n');
+                if let Some(comment) = comment { out.push_str(comment); }
+            } else {
+                out.push_str(raw);
             }
+            out.push('\n');
+        }
+        if !written {
+            out.push_str("[capture]\nenabled=");
+            out.push_str(value);
+            out.push('\n');
         }
         out
     }
