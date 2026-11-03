@@ -1,6 +1,6 @@
 # RC compliance evidence map
 
-2026-11-03 11:01 UTC: RC reset and three-phase operator order supersede the old359-row final acceptance references below. Current product661f7ad incorporates the coupled freeze removals; final native-editor exposure closure and the coherent gate/runtime wave remain pending. Latest compiled development evidence is r18 f1db4cb, not a release candidate. All historical scoped evidence/failures below remain unchanged.
+2026-11-03 11:01 UTC: RC reset and three-phase operator order supersede the old359-row final acceptance references below. Current product7b035f2 incorporates all freeze removals and closes native-editor exposure; coherent candidate gates and runtime remain pending. Latest compiled development evidence is r18 f1db4cb, not a release candidate. All historical scoped evidence/failures below remain unchanged.
 
 Phase1 final acceptance is the STATUS RC RESET PLAN: M5q actual functional passes, already-working UI, one full replay A/B and one LDN session, zero total Unmapped/no new crash, preserved zero-hook-allocation fixes, unchanged size/stack/lint/provenance gates and explicit final-release checker. S2/B4/B7/HB1 belong to later Phase3 and do not block RC. Three physical starts are planned, with shared replay/online processes. No final gate or compliance completion is claimed here.
 

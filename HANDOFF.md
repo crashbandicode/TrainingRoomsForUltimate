@@ -1,14 +1,14 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 11:01 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+Updated 2026-11-03 11:18 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
 ## Objective and source
 
 RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new Phase-1 feature work. Subsequent Phase 2 and Phase 3 are explicitly authorized below; deferred scope and exclusion boundaries: NEXT-VERSION.md.
 
-Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Current product661f7ad: UI22 inverse0c60459; StateWriter40KiB8fe6261; UI freeze87597fc/6ba06e7; advanced-workflow closure11ee226; optional observers8c0ec63; coupled F9/exact-created admission withdrawal661f7ad. Lead resolved observer/count seam and carry overlap: seven tables,247 remaining carried files re-derived with every reviewed destination byte preserved. Final Add New/native custom-Mii editor exposure closure is assigned to UI before freeze; ordinary saved catalog/CPU Mii selection must remain. Final source/NRO identities follow coherent composition, no scratch receipts.
+Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Current product7b035f2: UI22 inverse0c60459; StateWriter40KiB8fe6261; UI freeze87597fc/6ba06e7; advanced-workflow closure11ee226; optional observers8c0ec63; coupled F9/exact-created admission withdrawal661f7ad. Lead resolved observer/count seam and carry overlap: seven tables,247 remaining carried files re-derived with every reviewed destination byte preserved. Add New/native custom-Mii editor exposure is closed by7b035f2 at the production adapter and fresh/resumed provider admission, preserving ordinary saved catalog/CPU Mii selection. Generic enabled model policy remains for later qualification; adapter regressions await the final host gate. Final source/NRO identities follow coherent composition, no scratch receipts.
 
-Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, Astra medium. Owner182663/watch303502; verify exact model/effort on compaction. Playbook2dee6cc fully read. Primary owns four existing Sol workers; no duplicate launches. Operator-authorized OpenCode staffing supersedes the old no-OpenCode rule.
+Lead thread01a19e0c-415a-7af3-ac6e-f574318709d2, Astra medium. Owner182663/watch303502; verify exact model/effort on compaction. Playbook2dee6cc fully read. Primary successor Claude f106ed01 owns the same four existing Sol workers; no duplicate launches. Operator-authorized OpenCode staffing supersedes the old no-OpenCode rule.
 
 ## Live state and assignments
 
@@ -18,7 +18,7 @@ Lead owns no compile/Eden/claim. Pkg4 p4c04 stopped10:29:57, full1362profile+14h
 - Pkg4 Sol: proven recording versus advanced unfinished workflow boundary, M5q truncation facts; later host gates and replay assistance.
 - UI Sol: Setup/Q15/UI22 boundary and evidence inventory; UI segment of the shared Surface batch.
 - Slim Sol: size recovery through deferrals, state lifecycle stays unintegrated; native/pair exclusions and pilot segment of the shared Surface batch, size/carry/stack review.
-- Lead: review boundaries, compose candidate, online pair, final integration and acceptance. All four initial freeze slices integrated. Final UI native-editor exposure closure due about11:14Z; pkg4 prepares the final host runner and UI/pkg6 prepare shared-session segments. No worker compiles before coherent plan/composition.
+- Lead: review boundaries, compose candidate, online pair, final integration and acceptance. All freeze slices integrated, including the lead native-editor closure7b035f2 after the UI deadline. Primary resumed the existing pkg4/UI sessions11:15; pkg4 prepares the final host runner, UI reviews the exact lead closure then prepares its shared segment. Pkg6/Slim shared-segment returns are under lead review. No worker compiles before coherent plan/composition.
 
 ## Kept evidence and limitations
 
@@ -45,7 +45,7 @@ No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign ar
 ## Remaining execution
 
 1. Consume parent LEAD-INBOX PRIMARY REQUESTs at least every10min; lead turn report about every45min without ending. Last10:52, next~11:39.
-2. Review four boundary returns; disable/remove deferred exposed paths and compose ONE candidate. Update NEXT-VERSION exclusions and known issues. Current140243normalizedr18 exceeds136069baseline; no ceiling increase or formatting/count trick.
+2. Finish bounded UI source review and compose ONE frozen candidate. All source cuts are integrated. Combined9c65c2e measured134898 normalized versus136069 ceiling; final7b035f2 count remains owed. No ceiling increase or formatting/count trick.
 3. Candidate gates: all-targethost tests, clippy all-targets -Dwarnings0, no-default build, release+diag0warnings, stack policy, normalizedsize<=136069, carry/provenance, explicit-release compliance and allmanual dispositions scoped to reset matrix. Fix genuine failures and rerun affected checks, preserving failures.
 4. ONE continuous Surface diagnostic session for all single-console rows; Yoga baseline replay retained as online peer and Surface release replay retained as online host/release-lap process: target THREE physical starts total. Every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
 5. R-D1 same complete replay baseline/candidate checks ANDpositions; R-O1 actual LDN approvedjoin/membership/waiting changes/one completedmatch and detector equalendframes/desync_seen0both. R-O1 uses LANOnlineOFF per actualM5q evidence, correcting older public-TLS planning. Full profiles restored/separately verified before release.
@@ -78,3 +78,13 @@ Phase 3, TrainingRooms only: S2 field-wise settings recovery preserving settings
 Fresh10:54 census58,606,160,455B; subsequently retired only completed owned r18 native cache326,207,148B and setup-r1/r2 caches238,989,642B each. Archived NRO/ELF/source/logs and six actual executed host binaries were verified and retained; no live references and no new per-file manifest. Estimated57,801,974,023B is not admission: refresh cache, disk, memory and shared ledger before growth.
 
 Fresh Surface lead rig is needed; the compile ledger parameter root trainingrooms-eden-state-core has no runtime profile. Existing parameterized harness supplies the route; sourceg stays read-only. Sourceg contains five native replays and complete save index plus three saved Mii files (actual class/selection still to verify). Use one identical complete game-save/replay fixture on both owned profiles for A/B after snapshots, then retain those processes for LDN. No replay fixture accepted or run yet.
+
+## Final-freeze preparation checkpoint
+
+Pkg4 provenance omission found by Slim on9c65c2e is corrected in a6afe07: exact11ee226 transforms, full41-file rederivation, all reviewed destination bytes and original source pins preserved. Original failure remains recorded. Editor closure7b035f2 similarly rederives all247pkg6 files without source-pin changes. No Cargo/native/Eden acceptance yet.
+
+Prepared source-only adapters: /tmp/tr-rc-freeze.py (explicit expected full HEAD, clean source, new rc1 artifact root, absent host/native targets); /tmp/tr-rc-native.ps1 and tr-rc-native-claimed.ps1 (parameterized final source, archive release/diag separately, bounded6GiB/1800s); /tmp/tr-rc-profile.py (existing full mutable-profile/harness backup/restore, parameterized only to the owned lead root). Syntax checks only, none executed. Fresh three-host cache census11:17:42..50 completed under1GiB/150s:57,801,974,023B, below60GB. Recheck freshness and reserve actual target growth at admission; do not use old arithmetic.
+
+Sourceg three saved-Mii file hashes match pkg6 s6-10 fixture exactly, including Gunner3137 ca5ddf724a10ffde5fee57347077487d2762e04b17c79503e82b8168baf9e240. This is file identity only; native current canonical selection/group proof remains owed. M5q actually used Lucas original with Gunner/DK choices; Gunner CSS origin is not required. Yoga private profile has two save UUID directories; confirm the actual selected Replay Vault fixture after copying, not merely a matching filename.
+
+Qualified retained aid candidates: switch-mtp-v0101-v021/pilot/after/.../plugins libnro_hook ca7aec03, libparam_hook3ed7a294, pilot e3033426; Deluxe0.10.1 at switch-mtp-v0101-v021/deluxe/libssbu_online_deluxe_rewrite.nro a8dcda24. Only these selected files, never the old full plugin folder. Prior Deluxe dx-02 functional page evidence has11bootUnmapped/rising allocations; it is not final clean acceptance. Final common provider installation and actual pilot/Deluxe control must be positive in the shared session.
