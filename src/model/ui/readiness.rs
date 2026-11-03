@@ -11,6 +11,26 @@
 /// 60 polls a second; the tick runs every frame while the layout lives).
 pub const STALL_POLLS: u32 = 180;
 
+/// The native ownership observer needs only its two live-layout callbacks and
+/// the Training predicate, not the archive, text writer, manager or worker.
+pub const NATIVE_PAUSE_ROWS: [&str; 3] = ["ui_pass_calculate", "ui_register_calculate", "is_training_mode"];
+
+/// Actual installation boundary, shared with host installation-spy regressions.
+pub fn install_pause_observer(usable: impl Fn(&str) -> bool, install: impl FnOnce()) -> bool {
+    if !NATIVE_PAUSE_ROWS.into_iter().all(usable) { return false; }
+    install();
+    true
+}
+
+/// Renderer admission consumes the same pre-write guard receipt as the observer.
+/// Never reinterpret our now-written hooks as stock, or relax any guard for them.
+pub fn renderer_anchors_ready(usable: impl Fn(&str) -> bool, input_ready: bool,
+    observer_installed: bool, manager_slot: bool) -> bool {
+    input_ready && observer_installed && manager_slot
+        && ["ui_archive_alloc", "ui_pass_calculate", "ui_register_calculate", "ui_manager_global", "ui_set_text"]
+            .into_iter().all(usable)
+}
+
 /// The facts the decision reads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Facts {

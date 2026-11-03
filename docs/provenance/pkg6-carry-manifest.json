@@ -1955,12 +1955,17 @@
    "dest": "src/model/lobby/practice_policy.rs",
    "crate": "root",
    "src_sha256": "6d28615050b338db6a207bbc955159e9f47347d91dfb402c3a4036135bf9f477",
-   "dest_sha256": "f4cbe18751eda9613f731b6e371fce246da347b89b54c164cbddb4f4eb1ee9f2",
+   "dest_sha256": "9c69bd57bf9ba8dc9419b724d66ded157f275e96bf4334c6abe4aca055c64fcc",
    "edits": [
     {
      "old": "pub struct EntryLease(Option<Entries>);\n",
      "new": "#[derive(Default)]\npub struct EntryLease(Option<Entries>);\n",
      "reason": "clippy::new_without_default (exempt in the fork because its lib exported the type); the derived Default is the same value as new()"
+    },
+    {
+     "old": "    }\n    pub fn owns(&self, entry: usize) -> bool { self.0.is_some_and(|old| old.owns(entry)) }\n    pub fn retire(&mut self) -> bool { self.0.take().is_some() }\n}\n\n#[cfg(test)]\n",
+     "new": "    }\n    pub fn owns(&self, entry: usize) -> bool { self.0.is_some_and(|old| old.owns(entry)) }\n    pub fn retire(&mut self) -> bool { self.0.take().is_some() }\n}\n\n/// Authoritative scene/P1 lifetime departure, even without a save/record lease.\n/// The native adapter releases its lease lock BEFORE clearing the consumers;\n/// neither the old lease value nor a later CPU frame decides whether they run.\npub fn depart_session(retire_lease: impl FnOnce(), clear_consumers: impl FnOnce()) {\n    retire_lease();\n    clear_consumers();\n}\n\n#[cfg(test)]\n",
+     "reason": "RC7 R3-1 and shared R3-3 lifetime root: unconditional ordered scene/P1 retirement independent of operation leases; production adapter also exercised by host probes. TrainingRooms-only correction, no fork sync or new native address."
     }
    ]
   },
@@ -2808,7 +2813,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "09952c3f9bcc61bf657159eb4e4e2fce6b56aa88e6b4c85d96ae79cce89d92a3",
+   "dest_sha256": "41eb079670442680b6c80a2d4df3ebbed98111ff768ab424b120aa7efbcc44bf",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3305,6 +3310,11 @@
      "delete_from": "/// Original native P1 selection, not the current practice replacement.\n",
      "delete_to": "/// Published only from a ready native descriptor, not from an unapplied preference.\n",
      "reason": "RC native warning-root audit, lead 2026-11-03 12:57Z: remove five orphan APIs; retain live original_kind, progress, registry and native transaction paths."
+    },
+    {
+     "old": "        return;\n    }\n    let owner = read::<u32>(entry, 0xe0);\n    #[cfg(feature = \"native-body-bank-alpha\")]\n    body_bank::on_destroy(entry);\n    training::practice::entry_departed(entry as usize);\n    #[cfg(feature=\"mii-saved-alpha\")]\n    mii_saved_alpha::on_destroy(entry,owner);\n    #[cfg(feature=\"mii-ordinary-player-alpha\")]\n",
+     "new": "        return;\n    }\n    let owner = read::<u32>(entry, 0xe0);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n    training::practice::entry_departed(entry as usize, owner);\n    #[cfg(feature = \"native-body-bank-alpha\")]\n    body_bank::on_destroy(entry);\n    #[cfg(feature=\"mii-saved-alpha\")]\n    mii_saved_alpha::on_destroy(entry,owner);\n    #[cfg(feature=\"mii-ordinary-player-alpha\")]\n",
+     "reason": "RC7 R3-1: dispatch numeric-owner role revocation and shared P1 retirement before body-bank/nested entry destruction. TrainingRooms-only correction; no new hook, native address or fork sync."
     }
    ]
   },
@@ -8349,10 +8359,17 @@
   },
   {
    "src": "src/mii_editor_bridge/fingerprints.rs",
-   "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
-   "crate": "root",
-   "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
-   "dest_sha256": "7508c8e1b13a129027368a428aeca1a38a1409c960567880d757de70b2d08bbd"
+    "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
+    "crate": "root",
+    "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
+   "dest_sha256": "85adac4fa29da42c4086c80e41c03d5b9708428a840ba8e63f043d16549a0dbf",
+   "edits": [
+    {
+     "old": "    accepted\n}\n",
+     "new": "    accepted\n}\n\n/// The retained callback uses only its existing Training context contract.\npub(crate) const RETAINED_SEAMS: &[&str] = &[\"mii_editor_bridge.training_state\"];\npub(super) unsafe fn retained_matches(base: usize) -> bool {\n    let &(offset, len, expected) = CODE.iter().find(|(offset, _, _)| *offset == 0x23ebbf0).unwrap();\n    crate::engine::mii::inventory::fnv1a64(std::slice::from_raw_parts((base + offset) as *const u8, len)) == expected\n}\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    }
+   ]
   },
   {
    "src": "src/mii_editor_bridge/lua_vm.rs",
@@ -8610,10 +8627,10 @@
   },
   {
    "src": "src/mii_editor_bridge/mod.rs",
-   "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
-   "crate": "root",
-   "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "ab8e919fd884268a2a4d4426efec2dadb376d6882f4ce524e179a2f2e089a937",
+    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
+    "crate": "root",
+    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
+   "dest_sha256": "4b0c6125dd053e37f7f59cb033b2eb1a67a5baf728f7412971a4410ce25a24e7",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -8880,7 +8897,37 @@
     {
      "old": "fn begin_session(\n    origin: Origin, seed: Draft, catalog: Arc<Snapshot>,\n    restore: Option<(ResumeTicket, ui_resume::Screen, i32)>,\n) -> Result<(), &'static str> {\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().ok_or(\"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n",
      "new": "fn begin_session(\n    origin: Origin, seed: Draft, catalog: Arc<Snapshot>,\n    restore: Option<(ResumeTicket, ui_resume::Screen, i32)>,\n) -> Result<(), &'static str> {\n    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return Err(\"Native Mii editor is unavailable\"); }\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().ok_or(\"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n",
-     "reason": "RC reset: adapter capability hides unproven native Mii editor and provider refuses fresh/resumed sessions, while saved catalog selection and generic enabled policy remain."
+      "reason": "RC reset: adapter capability hides unproven native Mii editor and provider refuses fresh/resumed sessions, while saved catalog selection and generic enabled policy remain."
+    },
+    {
+     "old": "use crate::engine::mii::ldn_handshake as handshake;\nmod fingerprints;\n\n#[cfg(feature = \"diag\")]\n",
+     "new": "use crate::engine::mii::ldn_handshake as handshake;\nmod fingerprints;\nmod install;\n\n#[cfg(feature = \"diag\")]\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "static BASE: AtomicUsize = AtomicUsize::new(0);\nstatic ENABLED: AtomicBool = AtomicBool::new(false);\nstatic ACTIVE: AtomicBool = AtomicBool::new(false);\nstatic EDIT_OWNED: AtomicBool = AtomicBool::new(false);\n",
+     "new": "static BASE: AtomicUsize = AtomicUsize::new(0);\nstatic ENABLED: AtomicBool = AtomicBool::new(false);\n/// Retained stage/catalog support is independent of editor admission/capabilities.\nstatic RETAINED_ENABLED: AtomicBool = AtomicBool::new(false);\nstatic ACTIVE: AtomicBool = AtomicBool::new(false);\nstatic EDIT_OWNED: AtomicBool = AtomicBool::new(false);\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "\nfn quickplay_available() -> bool {\n    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()\n        && crate::engine::mii::backend::Layout::quickplay_waiting_mode(\n            unsafe { native::read::<u32>(BASE.load(Ordering::Acquire), native::MODE) })\n}\n\npub(super) fn local_wireless_available() -> bool {\n    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()\n        && unsafe { native::read::<u32>(BASE.load(Ordering::Acquire), native::MODE) } == 0x02010000\n}\n\n",
+     "new": "\nfn quickplay_available() -> bool {\n    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()\n        && crate::runtime::lobby::game_mode::current().is_some_and(|mode|\n            crate::engine::mii::backend::Layout::quickplay_waiting_mode(mode.mode))\n}\n\npub(super) fn local_wireless_available() -> bool {\n    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()\n        && crate::runtime::lobby::game_mode::current().is_some_and(|mode| mode.mode == 0x02010000)\n}\n\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "        crate::runtime::lobby::training_stage_rotation::training_entry(context);\n    }\n    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };\n    let phase = {\n",
+     "new": "        crate::runtime::lobby::training_stage_rotation::training_entry(context);\n    }\n    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE\n        || !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }\n    let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };\n    let phase = {\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "/// This callback uses owned values only and performs no native memory access.\npub(crate) fn catalog_read(catalog: &Snapshot) {\n    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };\n",
+     "new": "/// This callback uses owned values only and performs no native memory access.\npub(crate) fn catalog_read(catalog: &Snapshot) {\n    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return; }\n    let mut state = STATE.lock();\n    let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "pub(crate) fn init() {\n    let base = unsafe { getRegionAddress(Region::Text) as usize };\n    // WP-A2: the 64-byte rows (20 hook sites, the called/relied contracts, the scene_queue entry ARCropolis may\n    // hook) decide; today's FNV verdict is the shadow/legacy decision. All rows are checked before any hook.\n    let legacy = unsafe { fingerprints::matches(base) };\n    if !crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\", fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy) {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] unsupported native code; disabled\"));\n        return;\n    }\n    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();\n    BASE.store(base, Ordering::Release);\n    unsafe { native_default::init(base); }\n    skyline::install_hooks!(training_ui, training_state, editor_parent, edit_initialized,\n        edit_frame, edit_decide, editor_release);\n    connected::init();\n",
+     "new": "pub(crate) fn init() {\n    let base = unsafe { getRegionAddress(Region::Text) as usize };\n    install::run(crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE,\n        || {\n            // Existing Training-state contract only. Editor-only fingerprint\n            // rows and native reads no longer gate retained stage/catalog work.\n            let legacy = unsafe { fingerprints::retained_matches(base) };\n            if !crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\",\n                fingerprints::RETAINED_SEAMS, legacy) { return false; }\n            BASE.store(base, Ordering::Release);\n            RETAINED_ENABLED.store(true, Ordering::Release);\n            true\n        },\n        || {\n            let legacy = unsafe { fingerprints::matches(base) };\n            crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\",\n                fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy)\n        },\n        || {\n            skyline::install_hook!(training_state);\n        },\n        || init_editor(base),\n    );\n}\n\n/// Unavailable in both RC release and diag; no editor-only initialization runs.\nfn init_editor(base: usize) {\n    // The applicable WP-A2 rows were accepted before the shared hook write.\n    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();\n    unsafe { native_default::init(base); }\n    skyline::install_hooks!(training_ui, editor_parent, edit_initialized,\n        edit_frame, edit_decide, editor_release);\n    connected::init();\n",
+     "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
     }
    ]
   },
@@ -9224,7 +9271,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "ae24e59cfc89de622cfba60bba8d47ed1235b1eefcc410c2ee6445ac7c28af15",
+   "dest_sha256": "6b975823eaa2c38d5ae8201eb2db5fb8049bd0b37105937a7e52466a01cbf5b2",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -9270,6 +9317,16 @@
      "old": "/// entries were replaced and resume suspended waiting drafts. The two native entry\n/// resolutions below are the only per-frame cost; immediate retirement on entry\n/// destruction or scene change does not wait for this.\npub unsafe fn refresh() {\n    if !enabled() { return; }\n    if !OWNED.lock().unwrap().active() && !super::named_macros::suspended() { return; }\n    let current = entries();\n    let replaced = OWNED.lock().unwrap().replaced(current);\n    if replaced { retire(); }\n    if current.is_some() { super::named_macros::resume_waiting(); }\n}\n\npub fn entry_departed(entry: usize) {\n    super::named_macros::forget_stopped_entry(entry);\n    super::tech::forget_hidden_entry(entry);\n    let owned = OWNED.lock().unwrap().owns(entry);\n    if owned {\n        if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }\n        retire();\n    }\n}\n",
      "new": "/// entries were replaced and resume suspended waiting drafts. The two native entry\n/// resolutions below are the only per-frame cost; immediate retirement on entry\n/// destruction or scene change does not wait for this.\npub unsafe fn refresh() {\n    if !enabled() { return; }\n    if !OWNED.lock().active() && !super::named_macros::suspended() { return; }\n    let current = entries();\n    let replaced = OWNED.lock().replaced(current);\n    if replaced { retire(); }\n    if current.is_some() { super::named_macros::resume_waiting(); }\n}\n\npub fn entry_departed(entry: usize) {\n    super::named_macros::forget_stopped_entry(entry);\n    super::tech::forget_hidden_entry(entry);\n    let owned = OWNED.lock().owns(entry);\n    if owned {\n        if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }\n        retire();\n    }\n}\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "    if current.is_some() { super::named_macros::resume_waiting(); }\n}\n\npub fn entry_departed(entry: usize) {\n    super::named_macros::forget_stopped_entry(entry);\n    super::tech::forget_hidden_entry(entry);\n    let owned = OWNED.lock().owns(entry);\n    if owned {\n        if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }\n        retire();\n    }\n}\n\npub fn scene_departed() {\n    super::named_macros::forget_stopped_scene();\n    super::tech::forget_hidden_scene();\n    retire();\n}\n\npub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {\n",
+     "new": "    if current.is_some() { super::named_macros::resume_waiting(); }\n}\n\npub fn entry_departed(entry: usize, owner: u32) {\n    crate::runtime::features::cpu::entry_departed(owner);\n    super::named_macros::forget_stopped_entry(entry);\n    super::tech::forget_hidden_entry(owner as usize);\n    let owned = OWNED.lock().owns(entry);\n    if owned || owner == 0 {\n        if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }\n        if owner == 0 { depart_session(); } else { retire(); }\n    }\n}\n\npub fn scene_departed() {\n    super::named_macros::forget_stopped_scene();\n    super::tech::forget_hidden_scene();\n    depart_session();\n}\n\nfn depart_session() {\n    practice_policy::depart_session(\n        || { OWNED.lock().retire(); },\n        super::clear_session_state,\n    );\n}\n\npub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {\n",
+     "reason": "RC7 R3-1 and shared R3-3: unconditional scene/P1 lease-then-consumer retirement, numeric-owner CPU/hidden-tech revocation before nested destruction; preserve entry-address stop receipts. TrainingRooms-only, no fork sync or new native address."
+    },
+    {
+     "old": "        && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n            .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))\n}\n\n",
+     "new": "        && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n            .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))\n}\n",
+     "reason": "RC7 practice boundary patch normalizes the final blank line; no behavior change."
     }
    ]
   },

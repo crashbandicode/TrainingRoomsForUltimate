@@ -223,3 +223,10 @@ pub(super) unsafe fn matches(base: usize) -> bool {
     }
     accepted
 }
+
+/// The retained callback uses only its existing Training context contract.
+pub(crate) const RETAINED_SEAMS: &[&str] = &["mii_editor_bridge.training_state"];
+pub(super) unsafe fn retained_matches(base: usize) -> bool {
+    let &(offset, len, expected) = CODE.iter().find(|(offset, _, _)| *offset == 0x23ebbf0).unwrap();
+    crate::engine::mii::inventory::fnv1a64(std::slice::from_raw_parts((base + offset) as *const u8, len)) == expected
+}

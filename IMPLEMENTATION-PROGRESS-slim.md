@@ -1,5 +1,77 @@
 # Slim stream: code size below the fork's (2026-11-02)
 
+## RC7 R3-2 handoff checkpoint — 2026-11-03 (after14:28Z listings)
+Source/testscab66034975f2b8d87de7cc21c648c35cc43d4ee; a3c19d0comments/provenance
+only. Full bounded evidence+commands+hashes: `docs/RC7-R3-2-VALIDATION.md`.
+Actualdefault ANDdiag hosttestsPASS, parent216/4ignored +223/0ignored EACH,
+all3newprobesPASS EACH;6nativefactsSKIPPED EACH, no fullsuite/nativeacceptance.
+Bothmatchinglistcommands actualCargo0 and run IDENTICALtestELFs; all4logs/
+8preservedELFrecords/1529before-after independentlyrehashedMATCH. Standard
+all-targetcounter refuses targetedjobs; rawrefusalretained, no inventedtotal.
+Default14:19/diag14:26/list14:27/diaglist14:28 allRELEASED/nocompiler; ownqueue
+line removed byexactpatch, no activejob/claim/profile. OwnfinishedRCtarget
+retired310files/261371917B exacthashmanifest, source/logs/ELFs preserved.
+Size134811/136069/+1258/unchangedrules; sourcecompliance0machinefail/all30manual
+scoped; pkg4sourceverdict provisionalno blocker. FullcomposedRC7gates/compiled
+closure+stacks/zeroalloc/re-review/runtime stayOPEN/lead-owned. No source-ready
+label upgrades to RC acceptance. Phase3 remains parkedcbe16ad/S2REDunchanged;
+no push/tag/release/card/DBI/USB/newagent. Solemodelwatcherext6 retainedonly
+during renewedstandby; stop before finalyield. Inbox~5min; RCpreempts.
+
+### RC7 actual focused default result — 2026-11-03 14:19Z
+Product/testscab66034975f2b8d87de7cc21c648c35cc43d4ee; follow-upa3c19d0
+comments/provenanceonly, no behavioral delta. ActualYogaoneCargo/claim14:19:13–35:
+capabilities216passed/4ignored, core06_hitbox223parentpassed/0ignored.
+ALL3newRCdispatch/closureprobesPASS; SIXnative-ELFfactstestsearlyreturnSKIPPED,
+notnativefactsPASS. Sameinline-modeltestsoccurinbothharnesses, no uniquesuitecount.
+`focused1/release` meansdefault-featureHOSTDEBUGtest, NOTSwitchreleasebuild.
+Evidence `tmp-slim/rc7-r3-evidence/focused1`:1529sourcebefore/afterMATCH,
+content82f4228a/archive1cedc4a7/log7d75b149, executedcapability96597dc4/core06f57e543f
+ELFs locallyrehashedMATCH;6GiB/swap0/Tasks256/peak1005293568B/OOM0.
+Released/no compiler. DiagtestqueuedbehindUI/pkg6 in bounded300squeuewait,
+no currentclaim atthischeckpoint; matchingdefault/diaglistsstillPENDING.
+Initialnotheadrefusalretaineddriver-release.log/noCargo. Pkg4fullsourceslice
+review+leadprovisionalACK: noR3-2sourceblocker; NOTcompiled/runtimeacceptance.
+Size134811/136069/+1258/unchangedrules, generator18rowsbyte-identicalownedELF;
+owncheckerexit0/machine0fail/30scopeddispositions in RC7-R3-2-COMPLIANCE.md.
+Phase3S2finishedtargetretired292files/175585016B viaexacthashmanifest;
+allsource/rawfailure/executedELF/receipts kept. NoPhase3productionfix.
+
+## RC7 R3-2 source checkpoint — 2026-11-03
+
+Own `stream/slim-rc7-r3` / `tmp-slim/rc7-r3`, exact base719255d578c952160e6ed73c5cefb5ad28b2c968.
+Lead7179/7182exclusiveassignment + focusedYoga regressiongrant consumed;
+Phase3 parkedcbe16ad, S2red3c52cde evidence preserved/no productionfix imported.
+Playbookfreshpull2dee6cc/fullREADME+all7docs+PROVENANCEread before these edits.
+
+R3-2 contract: ordinarytoggleOn => activeAttackData+pendingCATCH requests only;
+no HitModule pointer/group/part reads or KIND_HURT requests. Shield/Off/grab
+branches, tint/capsule/native call order/owned cleanup and capacity unchanged.
+Remove runtimewant_hurtboxes and3exclusive guardrows/constants+generatorrows.
+Keep historicalpureHB1math/layoutfacts+tests counted underunchangedsloc rules;
+no newcfg exclusion/feature/manifest/countersemantics. Purefacts have no native
+reader; geometryqualification stillPhase3, NOT proven wrong bythisreview.
+
+Minimal shared production boundary `hitbox::want_hitboxes/reconcile_frame`
+owns the existingattack planning+dispatch; runtimeGameAttacks supplies guarded
+attackcalls/primitivefieldreads, GameEffects remainsunchanged. Newhostspies
+assert exact16attackfieldaddresses/all8slotpolls/nullslot/noinactivequery,
+ordinarypoint+capsule+grab requestkeys/tints/bones/retention, poisonedHB1scratch
+neverrequested, stopbranchzeroreads/owncleanup/foreignshield900survives.
+Thirdprobe executesactualcapabilityclosure;3retiredoffsets cannotblockordinary
+feature, requiredattack/grab rows stillblockit. HistoricalHB1tests retained,
+native-test offsets local facts ratherthanproductguardconstants. Callgraph's
+explicitdynamicmapaddsfourAttackReader callbacks because modelbody isunscanned.
+`tests/capabilities.rs` smallsharedfilehunk needscompositionwithUI/pkgreview.
+
+Current probes UNRUN; no compiled/ELF/runtime/acceptance claim. OriginalRC6
+R3sourcefailure retained at exactbase/review; no executedREDclaimed. Focused
+Yoga test/list may run only normalqueue/ledger/disk/memory/process/caps per
+newleadgrant; fullRC7gates remainONEcomposedleadwave. NoSurfacecompiler while
+lr-01live. No nativeoffset/hook/resource/capacity/carry transform or unrelated
+fix. Ownsourcecompliance/unchangedsizegate required beforesourcehandoff;
+actualrelease+diagcompiledclosure/stack/allocation/runtime remainlead-owned.
+
 ## Current worker checkpoint — 2026-11-02T22:05:20.581438+00:00
 Worker Codex01a19c9f-18c1-7832-9236-a14dcebafa3b, gpt-6-astra/medium.
 Branch stream/slim; source5b40bac, docsHEAD395b5d7. Prior results retain moved-cache provenance; fresh acceptance gates now running.

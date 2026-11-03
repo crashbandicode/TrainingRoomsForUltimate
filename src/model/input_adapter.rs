@@ -73,6 +73,10 @@ pub struct InputAdapter {
     resume_left: u8,
     resume_delay: u8,
     resume_leaked: u32,
+    /// Native layout identity only, never dereferenced. Session retirement
+    /// invalidates observations that began before it, even if an address is reused.
+    pause_layout: usize,
+    pause_epoch: u32,
 }
 
 impl Default for InputAdapter {
@@ -83,7 +87,7 @@ impl Default for InputAdapter {
 
 impl InputAdapter {
     pub const fn new() -> Self {
-        Self { queue: DelayQueue::new(), report: PauseReport { queued_at_begin: 0, owned_polls: 0, owned_non_neutral: 0 }, paused: false, resume_left: 0, resume_delay: 0, resume_leaked: 0 }
+        Self { queue: DelayQueue::new(), report: PauseReport { queued_at_begin: 0, owned_polls: 0, owned_non_neutral: 0 }, paused: false, resume_left: 0, resume_delay: 0, resume_leaked: 0, pause_layout: 0, pause_epoch: 0 }
     }
 
     /// Records in the queue.
@@ -120,6 +124,38 @@ impl InputAdapter {
             (true, false) => Some(PauseEdge::End(self.pause_end(mask, delay))),
             _ => None,
         }
+    }
+
+    pub fn pause_epoch(&self) -> u32 { self.pause_epoch }
+
+    /// Feed only a live native layout callback. Unknown/missing help is not an
+    /// invented resume; a new registration explicitly retires its predecessor.
+    /// A session-retired observation cannot reacquire ownership afterward.
+    pub fn native_pause_sample(&mut self, mask: &AtomicU8, epoch: u32, layout: usize,
+        registration: bool, active: Option<bool>, delay: u8) -> Option<[Option<PauseEdge>; 2]> {
+        if epoch != self.pause_epoch || layout == 0 { return None; }
+        let retired = if registration || self.pause_layout != layout {
+            self.pause_epoch = self.pause_epoch.wrapping_add(1);
+            self.pause_layout = layout;
+            self.pause_flag(mask, false, delay)
+        } else { None };
+        let observed = active.and_then(|on| self.pause_flag(mask, on, delay));
+        Some([retired, observed])
+    }
+
+    /// Authoritative scene/session retirement; no native pointer is touched.
+    pub fn retire_native_pause(&mut self, mask: &AtomicU8, delay: u8) -> Option<PauseEdge> {
+        self.pause_epoch = self.pause_epoch.wrapping_add(1);
+        self.pause_layout = 0;
+        self.queue.clear(Clear::NativePause);
+        self.pause_flag(mask, false, delay)
+    }
+
+    /// An inactive old layout may retire only its own observation, never a new one.
+    pub fn retire_pause_layout(&mut self, mask: &AtomicU8, epoch: u32, layout: usize, delay: u8) -> bool {
+        if epoch != self.pause_epoch || self.pause_layout != layout { return false; }
+        self.retire_native_pause(mask, delay);
+        true
     }
 
     /// The game's pause began: take over P1's input and empty the queue now. Returns how many records

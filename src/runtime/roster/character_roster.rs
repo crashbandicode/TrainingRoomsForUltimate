@@ -1397,9 +1397,10 @@ pub unsafe fn on_destroy(entry: *const u8) {
         return;
     }
     let owner = read::<u32>(entry, 0xe0);
+    // R3-1: revoke both body registrations before body-bank/nested destruction.
+    training::practice::entry_departed(entry as usize, owner);
     #[cfg(feature = "native-body-bank-alpha")]
     body_bank::on_destroy(entry);
-    training::practice::entry_departed(entry as usize);
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::on_destroy(entry,owner);
     #[cfg(feature="mii-ordinary-player-alpha")]

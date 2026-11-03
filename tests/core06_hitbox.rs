@@ -338,11 +338,11 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, nine called natives and nine relied windows, including the two lower-constructor limit branches.
+    // Three hooks, nine called natives and six relied windows; HB1's three exclusive rows are absent.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 9);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 9);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 6);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -397,9 +397,6 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_ACCESSOR_OFFSET, "sv_battle_object_module_accessor"),
         (sites_hitbox::HITBOX_ATTACK_STACK_OFFSET, "hitbox_attack_stack"),
         (sites_hitbox::HITBOX_CATCH_STACK_OFFSET, "hitbox_catch_stack"),
-        (sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"),
-        (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"),
-        (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -547,7 +544,7 @@ fn core06_lua_stack_layout_matches_the_owned_elf() {
     assert_eq!(w(accessor + 4), ldr_x(0, 8, 0x1a0));
 }
 
-// ---- hurtboxes (decision HB1 (a)) -------------------------------------------------------------------------------------
+// ---- historical pure HB1 facts; no runtime reader or RC guard dependency ---------------------------------------------
 
 /// A 0x50-byte part record as the game keeps it.
 fn part(status: u32, a: [f32; 3], b: [f32; 3], size: f32, node: u64) -> [u8; 0x50] {
@@ -597,13 +594,13 @@ fn core06_hurtbox_layout_matches_the_owned_elf() {
     let w = |offset: usize| word_at(&main, offset);
     use model::hitbox::layout;
     // Every HitModule lua_bind thunk loads the module from the accessor's +0xb0; set_status_all is vtable slot 0xc8.
-    let thunk = sites_hitbox::HITBOX_HURT_MODULE_OFFSET;
+    let thunk = 0x203_db10;
     assert_eq!(w(thunk), ldr_x(0, 0, layout::HIT_MODULE as u32));
     assert_eq!(w(thunk + 8), ldr_x(3, 8, 0xc8));
     assert_eq!(main.symbol("_ZN3app8lua_bind30HitModule__set_status_all_implEPNS_26BattleObjectModuleAccessorENS_9HitStatusEi"), Some(thunk));
     // set_status_all(status, group) (the vtable at main+0x4f6e1d0 by its relocations, slot 0xc8): the group table at +0x60,
     // 0x3c bytes a group, the count at +6, the first index at +4, the part table at +0x70, 0x50 bytes a part, the status word first.
-    let g = sites_hitbox::HITBOX_HURT_GROUPS_OFFSET;
+    let g = 0x46_9af0;
     assert_eq!(w(g), ldr_x(9, 0, layout::HIT_GROUPS as u32));
     assert_eq!(w(g + 4), 0x321e_0fea, "orr w10, wzr, #0x3c");
     assert_eq!(w(g + 0x10), 0x78c0_6d4b, "ldrsh w11, [x10, #0x6]!");
@@ -612,7 +609,7 @@ fn core06_hurtbox_layout_matches_the_owned_elf() {
     assert_eq!(w(g + 0x28), movz_w(13, layout::HIT_PART_STRIDE as u32));
     assert_eq!(w(g + 0x44), 0xb82e_69e1, "str w1, [x15, x14]: the status word at +0 of a part");
     // The part update: status 3 switches the part off; otherwise the capsule from +0x08 and +0x14, size +0x20, node +0x28.
-    let u = sites_hitbox::HITBOX_HURT_PART_OFFSET;
+    let u = 0x46_8490;
     assert_eq!(w(u + 4), 0x7100_0d7f, "cmp w11, #3");
     assert_eq!(w(0x4684c0), 0xbd40_0b00, "ldr s0, [x24, #0x8]");
     assert_eq!(w(0x4684c4), add_x(8, 24, 0xc));
@@ -688,6 +685,133 @@ impl hitbox::Effects for FakeFx {
 
 fn sphere(key: u32, x: f32) -> hitbox::Sphere {
     hitbox::Sphere { key, joint: 7, pos: [x, 0.0, 0.0], scale: 0.2, tint: hitbox::HURTBOX_TINT }
+}
+
+/// No accessor/HitModule bytes are exposed: any read outside these two exact
+/// AttackData shapes fails. Slot 6 also exercises an active slot with null data.
+#[derive(Default)]
+struct AttackSpy {
+    active: Vec<i32>,
+    data: Vec<i32>,
+    reads: Vec<usize>,
+}
+
+impl hitbox::AttackReader for AttackSpy {
+    fn active(&mut self, slot: i32) -> bool {
+        self.active.push(slot);
+        matches!(slot, 1 | 5 | 6)
+    }
+
+    fn data(&mut self, slot: i32) -> usize {
+        self.data.push(slot);
+        match slot { 1 => 0x1000, 5 => 0x2000, 6 => 0, _ => panic!("inactive slot read {slot}") }
+    }
+
+    fn read_u64(&mut self, at: usize) -> u64 {
+        self.reads.push(at);
+        match at { 0x1048 => 7, 0x2048 => 9, _ => panic!("non-attack node read {at:#x}") }
+    }
+
+    fn read_f32(&mut self, at: usize) -> f32 {
+        self.reads.push(at);
+        match at {
+            0x1024 | 0x2024 => 2.0,
+            0x1000 => 1.0,
+            0x1004 | 0x1008 | 0x1010 | 0x1014 | 0x1018 => 0.0,
+            0x2000 | 0x2004 | 0x2008 | 0x2014 | 0x2018 => 0.0,
+            0x2010 => 10.0,
+            _ => panic!("non-attack scalar read {at:#x}"),
+        }
+    }
+}
+
+struct RequestSpy {
+    fx: FakeFx,
+    requests: Vec<hitbox::Sphere>,
+}
+
+impl RequestSpy {
+    fn new() -> Self { Self { fx: FakeFx::new(100), requests: Vec::new() } }
+}
+
+impl hitbox::Effects for RequestSpy {
+    fn sphere_alive(&mut self, handle: u32) -> bool { hitbox::Effects::sphere_alive(&mut self.fx, handle) }
+    fn sphere_kill_own(&mut self, handle: u32) { hitbox::Effects::sphere_kill_own(&mut self.fx, handle) }
+    fn sphere_spawn(&mut self, value: &hitbox::Sphere) -> u32 {
+        self.requests.push(*value);
+        hitbox::Effects::sphere_spawn(&mut self.fx, value)
+    }
+}
+
+#[test]
+fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
+    let mut snapshot = model::settings::Snapshot::factory();
+    snapshot.set("hitbox_vis", &[1, 0]).unwrap();
+    let mut set = hitbox::HandleSet::new();
+    let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
+    assert!(set.push_grab(grab));
+    // Poison all unused scratch entries with valid-looking HB1 requests: the
+    // production dispatcher must neither retain nor submit those stale values.
+    let poison = sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 9.0);
+    let mut wants = [poison; hitbox::MAX_HELD];
+    let mut reads = AttackSpy::default();
+    let mut fx = RequestSpy::new();
+    let facts = facts(true, hitbox::enabled(&snapshot), false, 0);
+    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, &mut fx);
+    assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (6, 0, 0, 5));
+    assert_eq!(reads.active, (0..8).collect::<Vec<_>>());
+    assert_eq!(reads.data, [1, 5, 6]);
+    assert_eq!(reads.reads, [0x1048, 0x1024, 0x1000, 0x1004, 0x1008, 0x1010, 0x1014, 0x1018,
+                            0x2048, 0x2024, 0x2000, 0x2004, 0x2008, 0x2010, 0x2014, 0x2018]);
+    let expected_keys: Vec<_> = std::iter::once(hitbox::sphere_key(hitbox::KIND_HIT, 1, 0))
+        .chain((0..4).map(|i| hitbox::sphere_key(hitbox::KIND_HIT, 5, i))).chain([grab.key]).collect();
+    assert_eq!(fx.requests.iter().map(|s| s.key).collect::<Vec<_>>(), expected_keys);
+    assert_eq!(fx.requests[0], hitbox::Sphere { key: expected_keys[0], joint: 7, pos: [1.0, 0.0, 0.0], scale: 0.19, tint: hitbox::hitbox_tint(1) });
+    assert_eq!(fx.requests[1].joint, 9);
+    assert_eq!(fx.requests[1].pos, [0.0; 3]);
+    assert_eq!(fx.requests[4].pos, [10.0, 0.0, 0.0]);
+    assert_eq!(fx.requests[4].tint, hitbox::hitbox_tint(5));
+    assert_eq!(fx.requests[5], grab);
+    assert!(fx.requests.iter().all(|s| s.key >> 24 != hitbox::KIND_HURT));
+    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, &mut fx);
+    assert_eq!((counts.spawned, counts.kept, hits), (0, 6, 5), "unchanged owned handles are retained");
+    assert_eq!(fx.requests.len(), 6);
+}
+
+#[test]
+fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
+    for (visualizes, enabled, status, keep_grab) in [(true, true, 62, true), (true, true, 30, false), (true, false, 0, false), (false, true, 0, false)] {
+        let mut set = hitbox::HandleSet::new();
+        let mut fx = RequestSpy::new();
+        // A normal game shield (or another plugin's effect) is never owned.
+        fx.fx.live.push(900);
+        let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
+        set.push_grab(grab);
+        let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut AttackSpy::default(), &mut fx);
+        let mut reads = AttackSpy::default();
+        let requests = fx.requests.len();
+        let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, false, status), &mut wants, &mut reads, &mut fx);
+        assert_eq!((reads.active.len(), reads.data.len(), reads.reads.len(), hits), (0, 0, 0, 0));
+        assert_eq!(fx.requests.len(), requests, "no attack/HB1/ordinary shield request on stop path");
+        assert_eq!((counts.killed, counts.kept), if keep_grab { (5, 1) } else { (6, 0) });
+        assert!(fx.fx.live.contains(&900), "ordinary shield survives cleanup");
+        assert_eq!(set.len(), usize::from(keep_grab));
+    }
+}
+
+#[test]
+fn core06_rc_closure_excludes_hb1_without_disabling_ordinary_visualization() {
+    // Identical SITES/closure is used with and without `diag`; run this probe
+    // in both host feature closures, and verify each compiled RC NRO separately.
+    for retired in [0x203_db10, 0x46_9af0, 0x46_8490] {
+        assert!(!SITES.iter().any(|s| s.offset == retired));
+        assert!(!capabilities::all_sites().any(|s| s.name.starts_with("hurtbox_")));
+        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &|s| s.offset != retired), None);
+    }
+    for required in ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "attack_is_attack", "attack_data", "effect_req_follow", "sphere_effect_kill"] {
+        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &|s| s.name != required), Some(required));
+    }
 }
 
 #[test]

@@ -240,7 +240,12 @@ fn run_inner() {
 
     // Reserve every scalar TLS key before installing any input callback.
     // A partial failure rolls back all keys and reports an unavailable feature.
-    let (input_delay_on, input_delay_reason) = if sites::feature_usable(Feature::InputDelay, usable) {
+    // R3-3: pause ownership is installed on its minimal guarded callbacks, even
+    // when the renderer's independent archive/text/manager closure is unavailable.
+    let native_pause_on = ui::anchors::install(&usable);
+    let (input_delay_on, input_delay_reason) = if !native_pause_on {
+        (false, Some("native_pause_observer_unavailable"))
+    } else if sites::feature_usable(Feature::InputDelay, usable) {
         match input_delay::init() {
             Ok(()) => (true, None),
             Err(result) => {
@@ -295,7 +300,7 @@ fn run_inner() {
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
-        ui::install(&*loaded, input_delay_on)
+        ui::install(&*loaded, input_delay_on, ui_found)
     } else {
         diagnostic(format_args!("[Ui] not installed: a row of its closure was rejected"));
         ui::UiInstall { found: ui_found, archive_hook: false, anchors: false, texture_found: u4_found, effect_found: u4b_found }

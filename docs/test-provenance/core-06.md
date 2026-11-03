@@ -1,5 +1,28 @@
 # Test provenance — SPEC-core-06, the hitbox visualizer
 
+## RC7 R3-2 boundary — 2026-11-03
+
+The RC removes the runtime HB1 enumerator and its three exclusive HitModule
+guard/generator rows. Ordinary attack slots and pending grab boxes still use
+the same sphere geometry, tints, owned handles and cleanup. Menu help now says
+hitboxes/grab boxes only. No independent hurtbox enable path exists in either
+default or diagnostic closure.
+
+`model::hitbox::want_hitboxes/reconcile_frame` is the production planner and
+dispatcher used by `runtime::features::hitbox::frame`, not a test replacement.
+The three new `core06_rc_*` probes inspect actual attack-field addresses,
+requests, retention and stop/cleanup paths, plus the real capability closure.
+`tests/capabilities.rs` explicitly follows its four AttackReader callbacks.
+Existing pure HB1 shape/layout and synthetic handle tests below remain as
+historical facts, not evidence that the RC draws or qualifies hurtboxes. Their
+code remains counted under the unchanged implementation rules; it was not
+moved behind a new exclusion. The three native offsets in the old HB1 layout
+test are test-local facts, no longer RC guard dependencies.
+
+The dated implementation/history below describes earlier candidates, not the
+RC7 runtime. Frozen RC6 R3-2 source failure and original SH03 pool refusals are
+preserved; removing HB1 does not prove the stock effect's resource issue fixed.
+
 Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-hitbox-visualizer.md`. Code: `src/model/hitbox.rs`
 (rules), `src/model/sites_hitbox.rs` (13 rows), `src/runtime/features/hitbox.rs` (hooks, pass, natives calls),
 `src/runtime/game.rs` (`natives::` additions). Host tests: `tests/core06_hitbox.rs`; capability closure: `tests/capabilities.rs`.

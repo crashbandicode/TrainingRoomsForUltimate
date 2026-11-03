@@ -29,7 +29,7 @@ use crate::model::cpu::status;
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::cpu::ids::{self, Table, C, UNRESOLVED};
-use crate::model::cpu::role::{is_cpu_role, FighterKey, Scene, LOBBY_CPU_ENTRY};
+use crate::model::cpu::role::{is_cpu_role, FighterKey, FrameReceipt, Scene, LOBBY_CPU_ENTRY};
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::cpu::state::Cpu;
 use crate::model::cpu::status::Situation;
@@ -40,6 +40,9 @@ use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{notices, recorder, reset_hub, states};
 use crate::runtime::game::{self, natives};
+
+#[path = "cpu_role_adapter.rs"]
+mod role_adapter;
 
 /// The CPU behaviours' state; `None` until `init`.
 static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
@@ -289,6 +292,25 @@ pub fn forget_hidden_entry(entry: usize) {
 pub fn forget_hidden_scene() {
     with(Cpu::forget_hidden);
 }
+
+/// Numeric native owner id, captured BEFORE any nested entry/body destruction.
+pub fn entry_departed(owner: u32) {
+    with(|cpu| role_adapter::entry_departed(cpu, owner));
+    if owner == 0 { forget_player_position(); }
+}
+
+/// Unconditional scene retirement, including when no save/record lease exists.
+pub fn scene_departed() {
+    with(role_adapter::scene_departed);
+    forget_player_position();
+}
+
+fn forget_player_position() {
+    PLAYER_VALID.store(false, Ordering::Release);
+    PLAYER_X.store(0, Ordering::Relaxed);
+    PLAYER_Y.store(0, Ordering::Relaxed);
+    PLAYER_Z.store(0, Ordering::Relaxed);
+}
 /// Package 6 sets this when the waiting room's practice is active.
 pub fn set_lobby(on: bool) {
     LOBBY.store(on, Ordering::Release);
@@ -352,9 +374,22 @@ pub fn set_playback(state: PlaybackState) {
     with(|cpu| cpu.playback = state);
 }
 
-/// The module accessor's body, if it is a registered CPU role.
+/// Fresh native context, not a remembered Lobby flag or a later CPU frame.
+fn role_scene() -> Option<Scene> {
+    use crate::engine::lobby::practice_policy::Context;
+    let scene = match (crate::runtime::scene::current(), crate::runtime::lobby::training::practice::context()) {
+        (Some(Scene::Training), Some(Context::Training)) => Some(Scene::Training),
+        (Some(Scene::Lobby), Some(Context::Waiting)) => Some(Scene::Lobby),
+        _ => None,
+    };
+    if scene.is_none() { forget_player_position(); }
+    scene
+}
+
+/// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
-    CPU.lock().as_ref().and_then(|cpu| cpu.roles.find(accessor))
+    let scene = role_scene();
+    with(|cpu| role_adapter::role(cpu, scene, accessor)).flatten()
 }
 
 /// Ask the game's table for every constant, once. Returns whether the table is ready. Called from the
@@ -460,6 +495,22 @@ const FIGHTER_ENTRY_FIELD: usize = lra_reset::FIGHTER_ENTRY_ID_FIELD;
 const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
 
 extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> usize {
+    // Revoke an ended scope BEFORE the original can enter role-based hooks.
+    // A receipt captured now cannot register after destruction in a callback.
+    let receipt = {
+        let _scope = HookScope::enter();
+        let scene = role_scene();
+        let entry = if a0 == 0 { -1 } else {
+            unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() }
+        };
+        let (receipt, retired) = with(|cpu| {
+            let had_roles = cpu.roles.any();
+            let receipt = role_adapter::before_frame(cpu, scene, entry);
+            (receipt, had_roles && !cpu.roles.any())
+        }).unwrap_or((None, false));
+        if retired { recorder::session_clear(); }
+        receipt
+    };
     // SAFETY: `ORIGINAL_FRAME` holds the guarded original on-frame address (set by `install_frame`).
     let original: OnFrame = unsafe { std::mem::transmute(ORIGINAL_FRAME.load(Ordering::Acquire)) };
     // Package 4, S4-4: the capture observers and the clip preview see the state the game is about to advance.
@@ -470,7 +521,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
     let _scope = HookScope::enter_hook(HookId::CpuFrame);
     if ready {
         // SAFETY: `a0` is the fighter object the game just ran a frame of.
-        unsafe { fighter_frame(a0) };
+        unsafe { fighter_frame(a0, receipt) };
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { crate::runtime::features::hitbox::frame(a0) };
@@ -496,7 +547,7 @@ fn primary_entry(lobby: bool) -> u8 {
     }
 }
 
-unsafe fn fighter_frame(fighter: usize) {
+unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if fighter == 0 {
         return;
     }
@@ -506,13 +557,15 @@ unsafe fn fighter_frame(fighter: usize) {
         return;
     }
     // The shared scene wrapper (pkg6 D4): native Training or an active lobby practice, never during a hot swap.
-    let scene_now = crate::runtime::scene::current();
+    let scene_now = role_scene();
     let training = scene_now.is_some();
+    let current_frame = receipt.is_some_and(|receipt|
+        with(|cpu| role_adapter::current_frame(cpu, scene_now, receipt)).unwrap_or(false));
     if entry == 0 {
         // Also outside Training: leaving it restores the game's multiplier.
         damage_multiplier_frame(training);
         // The player entry: remember where it stands (a body's In / Out is relative to it).
-        if training {
+        if training && current_frame {
             frame_advantage(accessor);
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
             mash_player_position(accessor);
@@ -533,6 +586,7 @@ unsafe fn fighter_frame(fighter: usize) {
         }
         return;
     }
+    let Some(receipt) = receipt.filter(|_| current_frame) else { return };
     let scene = scene_now.unwrap_or(Scene::Training);
     let lobby = scene == Scene::Lobby;
     if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter)) {
@@ -557,6 +611,7 @@ unsafe fn fighter_frame(fighter: usize) {
     let tech = tech_facts(accessor, status, primary);
 
     let out = with(|cpu| {
+        if !cpu.roles.set(receipt, accessor, key) { return None; }
         let facts = FrameFacts {
             status,
             prev_status,
@@ -571,7 +626,6 @@ unsafe fn fighter_frame(fighter: usize) {
             falling,
             reserve_dive,
         };
-        cpu.roles.set(accessor, key);
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
@@ -586,8 +640,8 @@ unsafe fn fighter_frame(fighter: usize) {
                 counts::bump(counts::FRAME);
             }
         }
-        cpu.frame(key, &facts)
-    });
+        Some(cpu.frame(key, &facts))
+    }).flatten();
     cpu_event_on_change!(
         ev::ROLE,
         key.index(),
@@ -1403,14 +1457,18 @@ unsafe fn frame_advantage(player: usize) {
         with(|cpu| cpu.frame_advantage(false, false));
         return;
     }
-    let lobby = crate::runtime::scene::current() == Some(Scene::Lobby);
-    let primary = FighterKey::new(i32::from(primary_entry(lobby)), false);
-    let Some(cpu_accessor) = primary.and_then(|key| CPU.lock().as_ref().and_then(|c| c.roles.accessor_of(key))) else { return };
     if !with(|cpu| cpu.settings.frame_advantage && cpu.settings.mash_state.is_empty()).unwrap_or(false) {
         // Off, or a mashing CPU: the state clears and nothing is read.
         with(|cpu| cpu.frame_advantage(false, false));
         return;
     }
+    let scene = role_scene();
+    // Resolve through the live manager first. Never use a retained accessor to
+    // discover whether that same accessor is alive; no CPU lock spans natives.
+    let fresh_cpu = scene.and_then(|scene|
+        game::natives::module_accessor(i32::from(primary_entry(scene == Scene::Lobby))));
+    let Some((player, cpu_accessor)) = with(|cpu|
+        role_adapter::measurement(cpu, scene, player, fresh_cpu)).flatten() else { return };
     let (p, c) = (actionable(player), actionable(cpu_accessor));
     if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
         // The notification (SPEC-cpu-07 §2): package 4's notices show it, clearing every other one.

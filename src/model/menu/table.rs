@@ -377,7 +377,7 @@ pub static ROWS: [Row; 92] = [
       "Which swaps are done as a group. An entry is greyed,\nwith the reason, while what it needs is off."),
     // Display & Controls > On screen
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the training HUD is drawn.\nOff: the game's own HUD only."),
-    r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes, grab boxes and hurtboxes are drawn."),
+    r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes and grab boxes are drawn.\nHurtboxes are not available in this RC."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display", Control::Dropdown(&o::INPUT_DISPLAY),

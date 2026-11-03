@@ -17,6 +17,7 @@ pub mod facts;
 pub mod hud;
 pub mod input;
 pub mod menu_app;
+pub mod native_pause;
 pub mod pane;
 #[cfg(feature = "diag")]
 pub mod probe;
@@ -65,7 +66,7 @@ pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteRepor
             found: install.found[i],
             written: match site.name {
                 "ui_archive_alloc" if install.archive_hook => Written::Near,
-                "ui_pass_calculate" | "ui_register_calculate" if install.anchors => Written::Near,
+                "ui_pass_calculate" | "ui_register_calculate" if anchors::installed() => Written::Near,
                 _ if install.found[i].usable() => Written::Checked,
                 _ => Written::Skipped,
             },
@@ -99,7 +100,7 @@ pub fn clear_session_state() {
     state::CLOSING.store(false, Ordering::Release);
     state::CLOSE_COUNT.store(0, Ordering::Release);
     state::MENU_SHOWN.store(false, Ordering::Release);
-    state::PAUSE_ACTIVE.store(false, Ordering::Release);
+    crate::runtime::features::input_delay::retire_native_pause();
     menu_app::note_open();
     crate::runtime::published::INPUT_OWNERS.fetch_and(!crate::model::input_delay::Owners::MENU.bits(), Ordering::AcqRel);
     input::reset_session();
@@ -108,14 +109,12 @@ pub fn clear_session_state() {
     state::FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 
-pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
+pub fn install(settings: &Settings, input_ready: bool, found: [GuardOutcome; UI_SITES.len()]) -> UiInstall {
     state::PILOT_PRESENT.store(pilot_present(), std::sync::atomic::Ordering::Release);
     #[cfg(feature = "diag")]
     probe::install();
-    let mut found = [GuardOutcome::Stock; UI_SITES.len()];
-    for (slot, site) in found.iter_mut().zip(UI_SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    // Authoritative pre-write outcomes from boot. The native observer has now
+    // written our own anchor hooks; rereading those as pristine self-rejects UI.
     let usable = |name: &str| UI_SITES.iter().position(|s| s.name == name).is_some_and(|i| found[i].usable());
     if usable("ui_set_text") {
         pane::set_text_setter(game::text_base() + sites_ui::UI_SET_TEXT_OFFSET);
@@ -139,17 +138,11 @@ pub fn install(settings: &Settings, input_ready: bool) -> UiInstall {
     );
     // Both anchors, the manager global and the input callers, or none: a menu that draws without input (or
     // the other way round) is worse than no menu (SPEC-core-05 §6: the anchors are skipped together).
-    let anchors = archive_hook
-        && input_ready
-        && usable("ui_pass_calculate")
-        && usable("ui_register_calculate")
-        && usable("ui_manager_global")
-        && usable("ui_set_text")
-        && slot.is_some();
+    let anchors = crate::model::readiness::renderer_anchors_ready(
+        usable, input_ready, anchors::installed(), slot.is_some());
     if anchors {
         registry::set_manager_slot(slot.unwrap_or_default() as usize);
         worker::start(settings.clone());
-        anchors::install();
         state::INSTALLED.store(true, std::sync::atomic::Ordering::Release);
         diagnostic(format_args!("[Ui] anchors installed manager_slot=main+{:#x} pilot_present={}", slot.unwrap_or_default() - game::text_base() as u64, state::PILOT_PRESENT.load(std::sync::atomic::Ordering::Acquire)));
     } else {

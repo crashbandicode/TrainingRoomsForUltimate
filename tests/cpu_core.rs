@@ -291,24 +291,27 @@ fn cpu01_cpu_role_only_when_p1_ai() {
 #[test]
 fn cpu_core_role_table_finds_bodies_by_accessor() {
     let mut roles = RoleTable::new();
+    let scene = Some(Scene::Training);
+    roles.observe_scene(scene);
+    let receipt = roles.receipt(1).unwrap();
     let popo = FighterKey::new(1, false).unwrap();
     let nana = FighterKey::new(1, true).unwrap();
-    roles.set(0x1000, popo);
-    roles.set(0x2000, nana);
-    assert_eq!(roles.find(0x1000), Some(popo));
-    assert_eq!(roles.find(0x2000), Some(nana));
-    assert_eq!(roles.find(0x3000), None);
-    assert_eq!(roles.find(0), None);
+    assert!(roles.set(receipt, 0x1000, popo));
+    assert!(roles.set(receipt, 0x2000, nana));
+    assert_eq!(roles.find(scene, 0x1000), Some(popo));
+    assert_eq!(roles.find(scene, 0x2000), Some(nana));
+    assert_eq!(roles.find(scene, 0x3000), None);
+    assert_eq!(roles.find(scene, 0), None);
     assert_ne!(popo.index(), nana.index());
     // A body replaced (the accessor moved) forgets the old accessor; a body that stops being a CPU
     // is forgotten.
-    roles.set(0x1800, popo);
-    assert_eq!(roles.find(0x1000), None);
-    assert_eq!(roles.accessor_of(popo), Some(0x1800));
+    assert!(roles.set(receipt, 0x1800, popo));
+    assert_eq!(roles.find(scene, 0x1000), None);
+    assert_eq!(roles.accessor_of(scene, popo), Some(0x1800));
     roles.forget(0x2000);
-    assert_eq!(roles.find(0x2000), None);
+    assert_eq!(roles.find(scene, 0x2000), None);
     roles.clear();
-    assert_eq!(roles.find(0x1800), None);
+    assert_eq!(roles.find(scene, 0x1800), None);
     assert!(FighterKey::new(8, false).is_none() && FighterKey::new(-1, false).is_none());
     let keys: std::collections::BTreeSet<_> =
         (0..8).flat_map(|e| [false, true].map(|p| FighterKey::new(e, p).unwrap().index())).collect();

@@ -83,20 +83,28 @@ pub unsafe fn refresh() {
     if current.is_some() { super::named_macros::resume_waiting(); }
 }
 
-pub fn entry_departed(entry: usize) {
+pub fn entry_departed(entry: usize, owner: u32) {
+    crate::runtime::features::cpu::entry_departed(owner);
     super::named_macros::forget_stopped_entry(entry);
-    super::tech::forget_hidden_entry(entry);
+    super::tech::forget_hidden_entry(owner as usize);
     let owned = OWNED.lock().owns(entry);
-    if owned {
+    if owned || owner == 0 {
         if super::lobby::is_waiting_scene() { super::named_macros::suspend_waiting(); }
-        retire();
+        if owner == 0 { depart_session(); } else { retire(); }
     }
 }
 
 pub fn scene_departed() {
     super::named_macros::forget_stopped_scene();
     super::tech::forget_hidden_scene();
-    retire();
+    depart_session();
+}
+
+fn depart_session() {
+    practice_policy::depart_session(
+        || { OWNED.lock().retire(); },
+        super::clear_session_state,
+    );
 }
 
 pub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {
@@ -115,4 +123,3 @@ pub fn cpu_operator(player_idx: i32) -> bool {
         && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
             .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))
 }
-

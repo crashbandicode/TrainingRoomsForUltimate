@@ -232,8 +232,31 @@ impl Cpu {
 
     /// The session ended (scene departure, swap): every body's state and the role table go.
     pub fn clear_session(&mut self) {
-        self.fighters = [Fighter::new(); FighterKey::COUNT];
+        self.reset_bodies();
         self.roles.clear();
+    }
+
+    /// Scene reconciliation is independent of save/record lease ownership.
+    pub fn role_scene(&mut self, scene: Option<Scene>) {
+        if self.roles.observe_scene(scene) { self.reset_bodies(); }
+        if let Some(scene) = scene { self.scene = scene; }
+    }
+
+    /// No native accessors are dereferenced during retirement.
+    pub fn retire_entry(&mut self, entry: u32) {
+        self.roles.retire_entry(entry);
+        if entry == 0 {
+            self.clear_session();
+        } else if entry < 8 {
+            let index = entry as usize * 2;
+            self.fighters[index..index + 2].fill(Fighter::new());
+            self.forget_hidden_entry(entry as usize);
+            self.advantage.reset();
+        }
+    }
+
+    fn reset_bodies(&mut self) {
+        self.fighters = [Fighter::new(); FighterKey::COUNT];
         // A replacement body must not inherit a stale "hidden" record.
         self.hidden = None;
         self.advantage.reset();

@@ -135,6 +135,10 @@ impl Analysis {
         for (from, to) in [("hitbox::frame", "hitbox::sphere_alive"), ("hitbox::frame", "hitbox::sphere_kill_own"), ("hitbox::frame", "hitbox::sphere_spawn"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own")] {
             graph.dynamic.push((from.to_owned(), to.to_owned()));
         }
+        // The shared production planner calls the runtime's AttackReader too.
+        for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
+            graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
+        }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
             assert_eq!(graph.find(to).len(), 1, "dynamic edge target {to}");

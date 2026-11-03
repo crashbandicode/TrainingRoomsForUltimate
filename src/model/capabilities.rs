@@ -98,7 +98,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 10] = [
     (Feature::CpuCommon, &["transition_term_hook", "work_set_float"]),
     (Feature::CpuCore, &["fighter_information", "is_operation_cpu"]),
     (Feature::DeveloperDebug, &["lua_const_lookup", "utility_get_category", "utility_get_kind"]),
-    (Feature::CpuMash, &["motion_kind", "transition_term_hook"]),
+    (Feature::CpuMash, &["fighter_manager_get_entry", "motion_kind", "transition_term_hook"]),
     (Feature::Hitbox, &["lua_const_lookup", "status_kind", "utility_get_category", "work_get_int"]),
     (Feature::InputDisplay, &["fighter_manager_get_entry", "status_kind"]),
     (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),

@@ -28,8 +28,6 @@ struct Resolved {
     panes: Option<Panes>,
     /// The game's own HUD status panel, hidden while the menu shows (SPEC-core-03 §2.2).
     status_r: *mut Pane,
-    /// Its help footer: rests at y = -80 and slides in when the game's pause menu opens.
-    help: *mut Pane,
     drawn_seq: u32,
     shown: bool,
 }
@@ -41,7 +39,6 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
     layout: 0,
     panes: None,
     status_r: core::ptr::null_mut(),
-    help: core::ptr::null_mut(),
     drawn_seq: 0,
     shown: false,
 });
@@ -54,10 +51,11 @@ pub static TICKS: AtomicU32 = AtomicU32::new(0);
 pub static REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
 pub static DRAWS: AtomicU32 = AtomicU32::new(0);
 
-/// `L_staying_help`'s resting `pos_y` (SPEC-core-03 §2.4).
-const HELP_REST_Y: f32 = -80.0;
-
 pub unsafe fn tick(layout: *mut Layout, registration: bool) {
+    // These anchors are installed for native ownership even when the renderer's
+    // archive/text/manager closure was refused. Never gate this on injected panes.
+    super::native_pause::observe(layout, registration);
+    if !state::INSTALLED.load(Ordering::Acquire) { return; }
     let Some(name) = registry::layout_name(layout) else { return };
     let waiting = name == INFO_WAITING;
     let practice_layout = name == INFO_TRAINING || waiting;
@@ -98,7 +96,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         resolve(&mut r, layout, waiting);
     }
     let r = &mut *r;
-    let Resolved { panes, status_r, help, drawn_seq, shown, .. } = r;
+    let Resolved { panes, status_r, drawn_seq, shown, .. } = r;
     let Some(panes) = panes.as_ref() else {
         // The injected archive was refused or the panes are absent: no renderer, so the menu cannot own input (R2-2).
         renderer_lost("panes unresolved");
@@ -108,20 +106,6 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     crate::runtime::lobby::training::lobby::set_ui_ready(waiting);
     POLLS_AT_TICK.store(crate::runtime::ui::input::POLLS.load(Ordering::Relaxed), Ordering::Release);
 
-    if waiting {
-        // The existing popup provider explicitly treats missing manager state as unknown.
-        let busy = help.is_null() || pane::pos_x(*help) != -540.0
-            || crate::runtime::lobby::game_mode::popup_busy().unwrap_or(true);
-        crate::runtime::lobby::training::lobby::set_native_ui_busy(busy);
-        PAUSE_ACTIVE.store(busy, Ordering::Release);
-    } else if !help.is_null() {
-        let active = (pane::pos_y(*help) - HELP_REST_Y).abs() > 0.5;
-        if PAUSE_ACTIVE.swap(active, Ordering::AcqRel) != active {
-            // The native Training menu opened or closed: it owns P1's input while it is open and the
-            // delay queue is emptied at the edge (SPEC-input-03 section 5.1, review R2 of package 1).
-            crate::runtime::features::input_delay::pause_flag(active);
-        }
-    }
     let open = OPEN.load(Ordering::Acquire);
     // A panel the menu does not own (the clip editor) is drawn with the menu closed.
     let ext = EXT_SHOWN.load(Ordering::Acquire);
@@ -215,14 +199,13 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     r.layout = layout as usize;
     r.panes = None;
     r.status_r = core::ptr::null_mut();
-    r.help = core::ptr::null_mut();
     r.drawn_seq = 0;
     r.shown = false;
     let layout_name = if waiting { "info_waiting" } else { "info_training" };
     let root = (*layout).root_pane;
     let total = pane::count(root);
     r.status_r = pane::find(root, b"status_R");
-    r.help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
+    let help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
     let menu_root = if waiting { pane::find_child(root, b"TrModPort") } else { root };
     // Waiting readiness covers every hosted panel, including the notification
     // and input-log consumers (SPEC-input-02 §6), not just the menu subtree.
@@ -244,7 +227,7 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
         "[Ui] layout={layout_name} resolved total={total} holders={} menu_panes={} missing={missing} host_complete={host_complete} text_capacity={capacity} help={} status_r={}",
         registry::holders().len(),
         p::MENU_COUNT,
-        !r.help.is_null(),
+        !help.is_null(),
         !r.status_r.is_null()
     ));
     if missing == 0 && host_complete {

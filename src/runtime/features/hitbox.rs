@@ -1,6 +1,6 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
-//! With the `hitbox_vis` setting On, every active hitbox (by id colour), every grab box and every hurtbox (yellow, decision HB1)
+//! With the `hitbox_vis` setting On, every active hitbox (by id colour) and every grab box
 //! of a fighter in Training is drawn as translucent spheres (the game's `sys_shield` effect) on its bone. The fighter's other
 //! animation-command effects are put to sleep meanwhile, except in the grab, tread and knockdown statuses.
 //!
@@ -15,7 +15,8 @@
 //! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
 //! `game::natives`, whose grant check refuses a row boot rejected.
 //!
-//! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and the hurtbox tables are read in place, and
+//! HB1 hurtboxes and their HitModule reads are excluded from this RC.
+//! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
@@ -210,59 +211,28 @@ fn effects(accessor: usize) -> GameEffects {
     GameEffects { accessor, effect: EFFECT.load(Ordering::Acquire), attribute: ATTRIBUTE.load(Ordering::Acquire) }
 }
 
-unsafe fn read_vec3(at: usize) -> [f32; 3] {
-    [(at as *const f32).read(), ((at + 4) as *const f32).read(), ((at + 8) as *const f32).read()]
-}
+struct GameAttacks(usize);
 
-/// The spheres of the fighter's active attack slots, appended to `out`. Returns how many were left out for lack of room.
-unsafe fn want_hitboxes(accessor: usize, out: &mut [Sphere], len: &mut usize) -> u32 {
-    let mut left_out = 0;
-    for slot in 0..hitbox::SLOTS {
-        if !natives::attack_is_attack(accessor, slot) {
-            continue;
-        }
-        let data = natives::attack_data(accessor, slot);
-        if data == 0 {
-            continue;
-        }
-        let shape = Shape {
-            id: slot,
-            joint: ((data + layout::NODE) as *const u64).read(),
-            size: ((data + layout::SIZE) as *const f32).read(),
-            a: read_vec3(data + layout::OFFSET),
-            b: hitbox::second_centre(read_vec3(data + layout::OFFSET2)),
-        };
-        left_out += hitbox::push_shape(out, len, hitbox::KIND_HIT, slot as usize, &shape, hitbox::hitbox_tint(slot));
+impl hitbox::AttackReader for GameAttacks {
+    fn active(&mut self, slot: i32) -> bool {
+        // SAFETY: the current fighter's pass, after the feature's closure passed.
+        unsafe { natives::attack_is_attack(self.0, slot) }
     }
-    left_out
-}
 
-/// The fighter's hurtboxes (decision HB1): the parts of `HitModule`'s group 0 that are not switched off, each its capsule on its
-/// bone, yellow. The tables are read in place (layout `model::hitbox::layout`, rows `hurtbox_*`); a table that does not look like
-/// one gives nothing. Returns how many spheres were left out for lack of room.
-unsafe fn want_hurtboxes(accessor: usize, out: &mut [Sphere], len: &mut usize) -> u32 {
-    let module = ((accessor + layout::HIT_MODULE) as *const usize).read();
-    if module == 0 {
-        return 0;
+    fn data(&mut self, slot: i32) -> usize {
+        // SAFETY: as above; only an active AttackModule slot is queried.
+        unsafe { natives::attack_data(self.0, slot) }
     }
-    let groups = ((module + layout::HIT_GROUPS) as *const usize).read();
-    let parts = ((module + layout::HIT_PARTS) as *const usize).read();
-    if groups == 0 || parts == 0 {
-        return 0;
+
+    fn read_u64(&mut self, at: usize) -> u64 {
+        // SAFETY: the planner reads only the guarded AttackData node field.
+        unsafe { (at as *const u64).read() }
     }
-    let total = ((module + layout::HIT_PART_TOTAL) as *const i32).read();
-    let group = groups + hitbox::HURTBOX_GROUP * layout::HIT_GROUP_STRIDE;
-    let first = ((group + layout::HIT_GROUP_FIRST) as *const i16).read_unaligned();
-    let count = ((group + layout::HIT_GROUP_COUNT) as *const i16).read_unaligned();
-    let Some(range) = hitbox::group_parts(first, count, total) else { return 0 };
-    let mut left_out = 0;
-    for index in range {
-        let record = ((parts + index * layout::HIT_PART_STRIDE) as *const [u8; layout::HIT_PART_STRIDE]).read_unaligned();
-        if let Some(shape) = hitbox::hurtbox_shape(&record) {
-            left_out += hitbox::push_shape(out, len, hitbox::KIND_HURT, index, &shape, hitbox::HURTBOX_TINT);
-        }
+
+    fn read_f32(&mut self, at: usize) -> f32 {
+        // SAFETY: the planner reads only the guarded AttackData shape fields.
+        unsafe { (at as *const f32).read() }
     }
-    left_out
 }
 
 /// One shape requested once and not tracked: an article's command (projectiles are not in the per-frame pass, spec Q1); it ends
@@ -340,30 +310,17 @@ pub unsafe fn frame(fighter: usize) {
         seen_epoch[i] = epoch;
         counts = set.clear(&mut fx);
     }
-    let mut len = 0;
-    let mut left_out = 0;
-    let c = if !enabled || ids.shielding(status) {
-        // Off, or shielding (the shield bubble is the game's own `sys_shield`; ours go so it reads alone).
-        set.clear(&mut fx)
-    } else if ids.in_grab(status) {
-        // Grabbing: no hitbox or hurtbox spheres, the grab boxes are kept (and the ones the command just made are requested).
-        set.reconcile(&[], true, &mut fx)
-    } else {
-        left_out += want_hitboxes(accessor, wants, &mut len);
-        let hits = len;
-        left_out += want_hurtboxes(accessor, wants, &mut len);
-        #[cfg(feature = "diag")]
-        stats::wanted(hits as u32, (len - hits) as u32);
-        #[cfg(not(feature = "diag"))]
-        let _ = hits;
-        set.reconcile(&wants[..len], true, &mut fx)
-    };
+    let (c, hits) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), &mut fx);
+    #[cfg(feature = "diag")]
+    stats::wanted(hits as u32, 0);
+    #[cfg(not(feature = "diag"))]
+    let _ = hits;
     counts.kept += c.kept;
     counts.spawned += c.spawned;
     counts.killed += c.killed;
     counts.ended += c.ended;
     counts.failed += c.failed;
-    counts.dropped += c.dropped + left_out;
+    counts.dropped += c.dropped;
     let held_now = set.len();
     HELD.store(table.held_spheres(), Ordering::Relaxed);
     drop(store);

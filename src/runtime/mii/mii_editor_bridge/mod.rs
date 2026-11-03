@@ -22,6 +22,7 @@ mod screen_reentry;
 use crate::engine::mii::editor_row as value;
 use crate::engine::mii::ldn_handshake as handshake;
 mod fingerprints;
+mod install;
 
 #[cfg(feature = "diag")]
 use serde::Serialize;
@@ -34,6 +35,8 @@ use crate::engine::mii_root::resume::ResumeTicket;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static ENABLED: AtomicBool = AtomicBool::new(false);
+/// Retained stage/catalog support is independent of editor admission/capabilities.
+static RETAINED_ENABLED: AtomicBool = AtomicBool::new(false);
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static EDIT_OWNED: AtomicBool = AtomicBool::new(false);
 // These are comparison tokens. They are never dereferenced after their callback.
@@ -228,14 +231,14 @@ fn resume_checkpoint(
 }
 
 fn quickplay_available() -> bool {
-    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
-        && crate::engine::mii::backend::Layout::quickplay_waiting_mode(
-            unsafe { native::read::<u32>(BASE.load(Ordering::Acquire), native::MODE) })
+    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+        && crate::runtime::lobby::game_mode::current().is_some_and(|mode|
+            crate::engine::mii::backend::Layout::quickplay_waiting_mode(mode.mode))
 }
 
 pub(super) fn local_wireless_available() -> bool {
-    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
-        && unsafe { native::read::<u32>(BASE.load(Ordering::Acquire), native::MODE) } == 0x02010000
+    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+        && crate::runtime::lobby::game_mode::current().is_some_and(|mode| mode.mode == 0x02010000)
 }
 
 fn waiting_catalog_ready() -> bool {
@@ -343,7 +346,8 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
     if native::Training::entering(base, context) {
         crate::runtime::lobby::training_stage_rotation::training_entry(context);
     }
-    if !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }
+    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE
+        || !ACTIVE.load(Ordering::Acquire) { return original!()(context, args); }
     let Some(current) = native::Training::bind(base, context) else { return original!()(context, args); };
     let phase = {
         let mut state = STATE.lock();
@@ -737,6 +741,7 @@ unsafe fn save_ready_for_return(base: usize) -> bool {
 /// new native ID and canonical values there, after the writer-idle return gate.
 /// This callback uses owned values only and performs no native memory access.
 pub(crate) fn catalog_read(catalog: &Snapshot) {
+    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return; }
     let mut state = STATE.lock();
     let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Finished) else { return; };
     let Some((id, canonical)) = s.saved_native else { return; };
@@ -748,18 +753,36 @@ pub(crate) fn catalog_read(catalog: &Snapshot) {
 
 pub(crate) fn init() {
     let base = unsafe { getRegionAddress(Region::Text) as usize };
-    // WP-A2: the 64-byte rows (20 hook sites, the called/relied contracts, the scene_queue entry ARCropolis may
-    // hook) decide; today's FNV verdict is the shadow/legacy decision. All rows are checked before any hook.
-    let legacy = unsafe { fingerprints::matches(base) };
-    if !crate::runtime::seams::seam_install::gate("mii_editor_bridge", fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy) {
-        crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] unsupported native code; disabled"));
-        return;
-    }
+    install::run(crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE,
+        || {
+            // Existing Training-state contract only. Editor-only fingerprint
+            // rows and native reads no longer gate retained stage/catalog work.
+            let legacy = unsafe { fingerprints::retained_matches(base) };
+            if !crate::runtime::seams::seam_install::gate("mii_editor_bridge",
+                fingerprints::RETAINED_SEAMS, legacy) { return false; }
+            BASE.store(base, Ordering::Release);
+            RETAINED_ENABLED.store(true, Ordering::Release);
+            true
+        },
+        || {
+            let legacy = unsafe { fingerprints::matches(base) };
+            crate::runtime::seams::seam_install::gate("mii_editor_bridge",
+                fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy)
+        },
+        || {
+            skyline::install_hook!(training_state);
+        },
+        || init_editor(base),
+    );
+}
+
+/// Unavailable in both RC release and diag; no editor-only initialization runs.
+fn init_editor(base: usize) {
+    // The applicable WP-A2 rows were accepted before the shared hook write.
     #[cfg(feature = "diag")]
     crate::runtime::compat::filesystem::init();
-    BASE.store(base, Ordering::Release);
     unsafe { native_default::init(base); }
-    skyline::install_hooks!(training_ui, training_state, editor_parent, edit_initialized,
+    skyline::install_hooks!(training_ui, editor_parent, edit_initialized,
         edit_frame, edit_decide, editor_release);
     connected::init();
     lifecycle::init();

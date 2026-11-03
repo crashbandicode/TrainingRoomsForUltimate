@@ -8,10 +8,21 @@ use skyline::hooks::InlineCtx;
 use crate::model::hook_stats::{HookId, HookScope};
 use crate::model::sites_ui::{UI_PASS_CALCULATE_OFFSET, UI_REGISTER_CALCULATE_OFFSET};
 use crate::runtime::ui::{registry, tick};
+use std::sync::atomic::{AtomicBool, Ordering};
+static INSTALLED: AtomicBool = AtomicBool::new(false);
 
-pub fn install() {
-    skyline::install_hook!(ui_pass_calculate);
-    skyline::install_hook!(ui_register_calculate);
+pub fn installed() -> bool { INSTALLED.load(Ordering::Acquire) }
+
+/// Boot calls this independently of the optional plugin renderer's closure.
+pub fn install(usable: &dyn Fn(&crate::model::sites::Site) -> bool) -> bool {
+    crate::model::readiness::install_pause_observer(
+        |name| crate::model::capabilities::find(name).is_some_and(usable),
+        || {
+            skyline::install_hook!(ui_pass_calculate);
+            skyline::install_hook!(ui_register_calculate);
+            INSTALLED.store(true, Ordering::Release);
+        },
+    )
 }
 
 #[skyline::hook(offset = UI_PASS_CALCULATE_OFFSET, inline)]

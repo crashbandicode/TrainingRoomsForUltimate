@@ -12,7 +12,7 @@ use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::input_adapter::InputAdapter;
-use crate::model::input_delay::{self, Clear, MappedInputs};
+use crate::model::input_delay::{self, Clear, MappedInputs, Owners};
 use crate::model::sites;
 use crate::runtime::alloc::{HookId, HookScope};
 #[cfg(feature = "diag")]
@@ -147,11 +147,35 @@ pub fn clear(why: Clear) -> usize {
     ADAPTER.lock().clear(why)
 }
 
-/// The game's Training menu flag as the UI tick samples it (`ui::state::PAUSE_ACTIVE`, SPEC-core-03 section
-/// 2.4): an edge takes over P1's input and empties the queue (begin) or releases it (end).
-pub fn pause_flag(now: bool) {
+/// Snapshot before resolving native panes; retirement invalidates an in-flight observation.
+pub fn native_pause_epoch() -> u32 { ADAPTER.lock().pause_epoch() }
+
+pub fn native_pause_sample(epoch: u32, layout: usize, registration: bool, active: Option<bool>) -> bool {
+    let mut adapter = ADAPTER.lock();
+    let Some(edges) = adapter.native_pause_sample(&published::INPUT_OWNERS, epoch, layout, registration, active, published::input_delay()) else { return false; };
+    ui::state::PAUSE_ACTIVE.store(published::input_owners().contains(Owners::VANILLA_PAUSE), std::sync::atomic::Ordering::Release);
+    drop(adapter);
+    for edge in edges { log_pause_edge(edge); }
+    true
+}
+
+pub fn retire_native_pause() {
+    let mut adapter = ADAPTER.lock();
+    let edge = adapter.retire_native_pause(&published::INPUT_OWNERS, published::input_delay());
+    ui::state::PAUSE_ACTIVE.store(false, std::sync::atomic::Ordering::Release);
+    drop(adapter);
+    log_pause_edge(edge);
+}
+
+pub fn retire_pause_layout(epoch: u32, layout: usize) {
+    let mut adapter = ADAPTER.lock();
+    if adapter.retire_pause_layout(&published::INPUT_OWNERS, epoch, layout, published::input_delay()) {
+        ui::state::PAUSE_ACTIVE.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
+fn log_pause_edge(edge: Option<crate::model::input_adapter::PauseEdge>) {
     use crate::model::input_adapter::PauseEdge;
-    let edge = ADAPTER.lock().pause_flag(&published::INPUT_OWNERS, now, published::input_delay());
     #[cfg(feature = "diag")]
     match edge {
         Some(PauseEdge::Begin { dropped }) => diagnostic(format_args!(

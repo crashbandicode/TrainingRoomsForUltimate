@@ -1,8 +1,18 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 13:20 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+Updated 2026-11-03 15:06 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
 ## Current continuation
+
+Lead `tr-lead-astra-6`, same NVIDIA GPT-6 Astra medium session and sole owner-bound watcher. Playbook `03e2321` pulled/current; complete playbook read, including the mandatory guest-tracepoint rule. Native facts use lead-armed tracepoints during authorized runs; no extra trace boot or diagnostic-print rebuild without a stated reason. The menu-open timing observation is not under investigation.
+
+ONE RC7 correction is assembled from exact RC6 `719255d` plus pkg6 `39656a5`/`185e4c8`/`4e2e73c`, Slim `cab6603` through documentation/comment-only `b931875`, and UI `f9860f2`/`6545f1d`/`f2a6127`. Validation docs `cdada134` and `ef0269f` are included. No manual conflicts: complete product/test/tool union matches the reviewed blobs; the identical shared practice policy and carry entry occur once. Five carried destinations changed, with full247-file m5q derivation PASS. No dependency, budget, toolchain, exclusion or lint-allowance change. Worker focused tests/listings and pkg4 reviews are complete; coherent RC7 gates and R3 changed-boundary re-review remain required before confirming runtime.
+
+RC6 `lr-01` bug-finding stopped15:01:22Z. Full console21,427lines/3,309,708B/SHA256 `90b31e04a55e122ebe87f16b132a7ac33b42bb5b3cc6456d577635790757acae`: total Unmapped0, panic/abort/crash0. Full1604profile+10harness restore and a separate verification passed; DONE15:01:28Z, raw15:01RELEASED independently parsed, no lead claim/Eden/display remains. Per-row results and failures are in parent `artifacts/trainingrooms-lead-astra4/rc6/runtime/lr-01/RESULTS.md`. Native roster token restoration was incomplete after an early Loading3/9 gate was refused; full stopped-profile restoration is separately proven. No additional demonstrated product root joins RC7.
+
+No RC READY: genuine interrupted-build rows, full native resource IDs, remaining runtime/UI/special/pilot/coexistence rows, positive allocation/stack matrix, replay A/B and LDN are still open. Preserve generic8KiB compiled inventory failures and all historical failed observations. Runtime order remains core→native UI/restoration→gameplay-only reload fixtures. Same17-file replay staging and detector identity below apply. Phase2/3 implementation may proceed on isolated existing worker branches, with no Phase2/3 Eden before RC READY and no leakage into RC7.
+
+## Historical 13:20 continuation
 
 Lead `tr-lead-astra-6`, OpenCode `ses_e5ea4d5f3ffeMMtWumvKxZhl2t`, verified NVIDIA GPT-6 Astra medium. Durable operational state is in the parent `TRAININGROOMS-LEAD-ASTRA-5-CHECKPOINT.md`; PRIMARY orders and worker returns are in `TRAININGROOMS-LEAD-INBOX.md`. Earlier lead/process references below are historical. Playbook `2dee6cc` was pulled and read completely.
 

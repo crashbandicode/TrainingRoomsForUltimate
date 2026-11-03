@@ -43,6 +43,14 @@ impl EntryLease {
     pub fn retire(&mut self) -> bool { self.0.take().is_some() }
 }
 
+/// Authoritative scene/P1 lifetime departure, even without a save/record lease.
+/// The native adapter releases its lease lock BEFORE clearing the consumers;
+/// neither the old lease value nor a later CPU frame decides whether they run.
+pub fn depart_session(retire_lease: impl FnOnce(), clear_consumers: impl FnOnce()) {
+    retire_lease();
+    clear_consumers();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

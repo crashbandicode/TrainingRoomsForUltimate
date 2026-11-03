@@ -43,6 +43,10 @@ advanced preview extensions, native Mii creation and further latency work are de
 Their RC entry points are closed; ordinary saved Mii selection remains. Final
 candidate validation is pending.
 
+Hitbox Visualization retains ordinary hitboxes and grab boxes. HB1 hurtbox
+enumeration and its exclusive HitModule guards are absent from this RC in both
+release and diagnostic builds; enabling the ordinary toggle cannot enable HB1.
+
 ## Known limitations under review
 
 - CPU count increases retain M5q behavior, including its wrong-CPU limitation;

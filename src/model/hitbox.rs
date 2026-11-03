@@ -43,7 +43,7 @@ pub mod layout {
     /// The node's `Hash40`, the bone the hitbox follows.
     pub const NODE: usize = 0x48;
 
-    /// `HitModule` (hurtboxes): the module pointer in the accessor, its group table (0x3c bytes per group: the first part's
+    /// Historical pure HB1 facts, not read by the RC runtime: `HitModule`'s module pointer in the accessor, its group table (0x3c bytes per group: the first part's
     /// index at `+4`, the part count at `+6`, both `i16`) and its part table (0x50 bytes per part).
     pub const HIT_MODULE: usize = 0xb0;
     pub const HIT_GROUPS: usize = 0x60;
@@ -162,7 +162,7 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
     (b != [0.0; 3]).then_some(b)
 }
 
-// ---- hurtboxes (decision HB1 (a), 2026-11-02) ----------------------------------------------------------------------
+// ---- historical pure HB1 rules (2026-11-02); no reader or dispatch in the RC ---------------------------------------
 
 /// Hurtboxes are drawn yellow.
 pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
@@ -524,6 +524,59 @@ pub fn push_shape(out: &mut [Sphere], len: &mut usize, kind: u32, index: usize, 
         *len += 1;
     }
     left_out
+}
+
+/// The retained attack-slot reader. The runtime supplies guarded calls and reads;
+/// host probes run this same planning/dispatch code with address-counting spies.
+pub trait AttackReader {
+    fn active(&mut self, slot: i32) -> bool;
+    fn data(&mut self, slot: i32) -> usize;
+    fn read_u64(&mut self, at: usize) -> u64;
+    fn read_f32(&mut self, at: usize) -> f32;
+}
+
+fn attack_vec3(reader: &mut impl AttackReader, at: usize) -> [f32; 3] {
+    [reader.read_f32(at), reader.read_f32(at + 4), reader.read_f32(at + 8)]
+}
+
+/// Ordinary hitboxes only: no HitModule lookup or HB1 part enumeration.
+pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &mut usize) -> u32 {
+    let mut left_out = 0;
+    for slot in 0..SLOTS {
+        if !reader.active(slot) {
+            continue;
+        }
+        let data = reader.data(slot);
+        if data == 0 {
+            continue;
+        }
+        let shape = Shape {
+            id: slot,
+            joint: reader.read_u64(data + layout::NODE),
+            size: reader.read_f32(data + layout::SIZE),
+            a: attack_vec3(reader, data + layout::OFFSET),
+            b: second_centre(attack_vec3(reader, data + layout::OFFSET2)),
+        };
+        left_out += push_shape(out, len, KIND_HIT, slot as usize, &shape, hitbox_tint(slot));
+    }
+    left_out
+}
+
+/// The production RC pass's planning and owned-handle dispatch. Returns counts
+/// and ordinary hitbox spheres wanted (pending CATCH spheres stay in the set).
+/// HB1 has no reader or request path here, in release or diagnostic builds.
+pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, fx: &mut impl Effects) -> (Counts, usize) {
+    if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
+        return (set.clear(fx), 0);
+    }
+    if facts.ids.in_grab(facts.status) {
+        return (set.reconcile(&[], true, fx), 0);
+    }
+    let mut len = 0;
+    let left_out = want_hitboxes(reader, wants, &mut len);
+    let mut counts = set.reconcile(&wants[..len], true, fx);
+    counts.dropped += left_out;
+    (counts, len)
 }
 
 /// What the plugin asks of the game's effect module for one fighter (the runtime calls the natives; the tests count).
