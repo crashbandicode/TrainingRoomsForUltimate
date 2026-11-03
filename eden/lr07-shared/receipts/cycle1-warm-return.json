@@ -1,0 +1,14 @@
+{
+  "id": "cycle1-warm-return",
+  "start": "training",
+  "end": "css-return",
+  "evidence": [
+    "Actual native pause/focus/confirm, clean warm finalize owners0/1, native CSS. Not pending-build interruption."
+  ],
+  "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+  "started": 1793739213.508342,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate lr06-clean-finalize-1 on yoga did not pass within 25 s')",
+  "ended": 1793739241.3183458
+}

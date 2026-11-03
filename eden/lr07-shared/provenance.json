@@ -1,0 +1,228 @@
+{
+  "playbook_head": "403f517a7927533290fdaaa582c519b77c12277c",
+  "runner_sha256": "a209e35c801f53d340d3a9f76269f22ff3ef2bb66212c372cd09d91c7738907b",
+  "lifecycle_sha256": "244cd9181c92fa0505a77fcabd298720e2d3ba6f171d60b35225f7e43fe628ea",
+  "hook_sha256": "31c8f8b6750ae37a99ec0dd32bed8f561fb8fd985aff826cfd1a0d26be457aa8",
+  "rows_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+  "library_sha256": "962a8cdacd22a0f5d7a4b32b42e7320c30b3eb0497a4598003f16c94243e3d75",
+  "source_product": "cf4bf44c104ecc96a78d382b4c0276bf33838f18",
+  "prior_failure_archive": "c4d99ee",
+  "checklist": "Same scoped checklist as lr06; new nativequit hook must pass actual pause and warm-finalize before CSS. Fresh identities/health/fullrestore/separateverify/release/harvest/compliance. No productbuild/publication/device; remaining wholeRC clauses open.",
+  "portable_manifest_sha256": "692a89a838b586ed6898b2ec4e1099806ab18ba74070f6124528cd7d617fb2cd",
+  "path_rewrites": [
+    {
+      "name": "main-stage",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/main-stage.edenmacro.json",
+      "archive": "segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb"
+    },
+    {
+      "name": "stage-css",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/stage-css.edenmacro.json",
+      "archive": "segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74"
+    },
+    {
+      "name": "cpu74-lucas",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/cpu74-lucas.edenmacro.json",
+      "archive": "segments/cpu74-lucas.edenmacro.json",
+      "sha256": "0c1b4ceca55fbd4c41f0be6040c072b0d21b2804d814b0bc541a0d91761c3298"
+    },
+    {
+      "name": "lucas-pick",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/lucas-pick.edenmacro.json",
+      "archive": "segments/lucas-pick.edenmacro.json",
+      "sha256": "7d74e4e47ffa0a99604767a08e0188a647281926508c614ac7f42c0590991f66"
+    },
+    {
+      "name": "enter-training",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/enter-training.edenmacro.json",
+      "archive": "segments/enter-training.edenmacro.json",
+      "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1"
+    },
+    {
+      "name": "pause-open",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/pause-open.edenmacro.json",
+      "archive": "segments/pause-open.edenmacro.json",
+      "sha256": "64dd73ecc545a194de80411cddb3b8cbd5e37be8e7a4e077a39a5dedee23fe24"
+    },
+    {
+      "name": "pause-close",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/pause-close.edenmacro.json",
+      "archive": "segments/pause-close.edenmacro.json",
+      "sha256": "5e8ab5d918a72f8825aa47489cf0895edf975642cb915e74e6cfceed61982969"
+    },
+    {
+      "name": "p1-next-frames",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/p1-next-frames.edenmacro.json",
+      "archive": "segments/p1-next-frames.edenmacro.json",
+      "sha256": "d56e381eebfc979cfc4380a80f24af11c057990f306c4ad66b23c6e6641d6df4"
+    },
+    {
+      "name": "cpu-next-frames",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/cpu-next-frames.edenmacro.json",
+      "archive": "segments/cpu-next-frames.edenmacro.json",
+      "sha256": "771d9c618735334c245cbe3ea86f6753f73744aaff6841945ab9b570506f17f5"
+    },
+    {
+      "name": "focus-native-quit-frames",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/focus-native-quit-frames.edenmacro.json",
+      "archive": "segments/focus-native-quit-frames.edenmacro.json",
+      "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46"
+    },
+    {
+      "name": "confirm-native-quit-frames",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/confirm-native-quit-frames.edenmacro.json",
+      "archive": "segments/confirm-native-quit-frames.edenmacro.json",
+      "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b"
+    },
+    {
+      "name": "intro-cancel",
+      "source": "segments/intro-cancel.edenmacro.json",
+      "archive": "segments/intro-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f"
+    },
+    {
+      "name": "steve-hover",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/steve-hover.edenmacro.json",
+      "archive": "segments/steve-hover.edenmacro.json",
+      "sha256": "edf2fb3e2db4b65571420dbc839219a005687f7b8685bf7201f940d06d2dd414"
+    },
+    {
+      "name": "steve-place",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/steve-place.edenmacro.json",
+      "archive": "segments/steve-place.edenmacro.json",
+      "sha256": "c02d3b0a91229c573ee848b686afc575649b4697734c3041351525e98dbe2fdc"
+    },
+    {
+      "name": "title-main",
+      "source": "segments/title-main.edenmacro.json",
+      "archive": "segments/title-main.edenmacro.json",
+      "sha256": "4aec26838a662da6d8b171800c30971e8cabb660bb09b864d1ec703ab602c44e"
+    },
+    {
+      "name": "lr04-cpu-approach",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/lr04-cpu-approach.edenmacro.json",
+      "archive": "segments/lr04-cpu-approach.edenmacro.json",
+      "sha256": "27b8846bc5f9aa21d7c3746d1cef7894369f7479f29f937c248ca5f23d580396"
+    },
+    {
+      "name": "lr04-cpu-pick",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/lr04-cpu-pick.edenmacro.json",
+      "archive": "segments/lr04-cpu-pick.edenmacro.json",
+      "sha256": "fc6319148f476318cbd86fb5a2d3d63e4b135808aa34a21cada687b6dbddc1f9"
+    },
+    {
+      "name": "lr04-cpu85-to74",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/lr04-cpu85-to74.edenmacro.json",
+      "archive": "segments/lr04-cpu85-to74.edenmacro.json",
+      "sha256": "96f97989b34e29973e53d7ad4174cdececb754e1727bb22c5ca7d7abde102cdb"
+    },
+    {
+      "name": "lr04-return-cpu-pick",
+      "source": "segments/lr04-return-cpu-pick.edenmacro.json",
+      "archive": "segments/lr04-return-cpu-pick.edenmacro.json",
+      "sha256": "cb9f52fb0a7256174eb44eb2202ac11057fc6f0de848bea27a841d7df75dab28"
+    },
+    {
+      "name": "lr04-roy-lucas",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/segments/lr04-roy-lucas.edenmacro.json",
+      "archive": "segments/lr04-roy-lucas.edenmacro.json",
+      "sha256": "dc74d27fceb1d3387e2d0679424f2f9de484762dc634da7d532115e9b20c0702"
+    },
+    {
+      "name": "smash-submenu",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/smash-submenu.png",
+      "archive": "refs/smash-submenu.png",
+      "sha256": "ab968c4f7e3b2562cca4bd363ce9979847edf311c834873af24c45e4df3e0fd7"
+    },
+    {
+      "name": "main",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/main.png",
+      "archive": "refs/main.png",
+      "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc"
+    },
+    {
+      "name": "stage",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/stage.png",
+      "archive": "refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033"
+    },
+    {
+      "name": "css",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/css.png",
+      "archive": "refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76"
+    },
+    {
+      "name": "cpu-held74",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/cpu-held74.png",
+      "archive": "refs/cpu-held74.png",
+      "sha256": "b0e89ddafe4979de6deb208412f869745f8e0692f6a07694d87e2f05fbec8ab7"
+    },
+    {
+      "name": "ready",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/ready.png",
+      "archive": "refs/ready.png",
+      "sha256": "760e864b6bfdfd06d46fd0ce8ceed91f456f09f2caef75401d4e9a49a952522f"
+    },
+    {
+      "name": "training-closed",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/training-closed.png",
+      "archive": "refs/training-closed.png",
+      "sha256": "bf8371948c69d7ab8871254389ed81e85fc316eaeaf547f128b3d770154e238d"
+    },
+    {
+      "name": "native-pause",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/native-pause.png",
+      "archive": "refs/native-pause.png",
+      "sha256": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5"
+    },
+    {
+      "name": "training-hud-unpaused",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/training-hud-unpaused.png",
+      "archive": "refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c"
+    },
+    {
+      "name": "quit-focus",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/quit-focus.png",
+      "archive": "refs/quit-focus.png",
+      "sha256": "8101e26010b70dc07f24bac30c077c2152059f87f27f4b6c0d30a0b197b69c67"
+    },
+    {
+      "name": "steve-selected",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/steve-selected.png",
+      "archive": "refs/steve-selected.png",
+      "sha256": "e643e8ff4b88a51db98a47956725384342f8e3a2288aa43afcea4f41746ea37f"
+    },
+    {
+      "name": "title",
+      "source": "refs/title.png",
+      "archive": "refs/title.png",
+      "sha256": "d596fc978988d3bd65678fc95f915016e76af5fef12c3de2cd52734cdb7856ac"
+    },
+    {
+      "name": "cpu85-held",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/cpu85-held.png",
+      "archive": "refs/cpu85-held.png",
+      "sha256": "552ed5825f743b85e469d8104d6d8bf5ac099c8e46346a70b86f7e4a267c8ed5"
+    },
+    {
+      "name": "return-roy-held",
+      "source": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared/executor-runner/library/refs/return-roy-held.png",
+      "archive": "refs/return-roy-held.png",
+      "sha256": "08f86998536a62d02ccb8709b1cd5aa33696b24bed948f1bee2fa164ded1aaf3"
+    },
+    {
+      "name": "return-sonic-held",
+      "source": "refs/return-sonic-held.png",
+      "archive": "refs/return-sonic-held.png",
+      "sha256": "e42d97e1d1b1f8ec59708299fb8317f5a71efb8db25f2c33cec7646aa5726871"
+    }
+  ],
+  "raw_evidence_root": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr07-shared",
+  "console_transfer_verified": true,
+  "executed_manifest_snapshot_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+  "all_receipts_match_executed_manifest": true
+}

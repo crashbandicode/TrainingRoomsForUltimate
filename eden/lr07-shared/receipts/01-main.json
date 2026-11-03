@@ -1,0 +1,27 @@
+{
+  "id": "01-main",
+  "start": "boot",
+  "end": "main",
+  "evidence": [],
+  "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+  "started": 1793739143.4694028,
+  "results": [
+    {
+      "gate": "main",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr07-inputs/out/01-main/yoga-205243Z-838175-gate-main.png"
+    },
+    {
+      "gate": "installed",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "cpu_common=installed"
+      }
+    },
+    {
+      "shot": "/home/intpa/tr-lr07-inputs/out/01-main/yoga-205243Z-558243-main.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793739163.3095284
+}

@@ -1,0 +1,96 @@
+{
+  "PASS": 10,
+  "FAILED": 1,
+  "unrun": [
+    "cycle1-cpu-normalize",
+    "cycle1-fresh-reentry",
+    "cycle2-warm-groups",
+    "cycle2-warm-return",
+    "cycle2-cpu-normalize",
+    "cycle2-fresh-reentry",
+    "cycle3-warm-groups",
+    "cycle3-warm-return",
+    "cycle3-cpu-normalize",
+    "cycle3-fresh-reentry",
+    "final-continuation"
+  ],
+  "receipts": [
+    {
+      "id": "01-main",
+      "status": "PASS",
+      "sha256": "3f87211d72705f0e27ed5542b1a4255a9f996d01cb92627d6641a83c2c375bce",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "02-stage",
+      "status": "PASS",
+      "sha256": "6a7b7bf6f639bade930728392a9b34994d8c72a62e216555fb1e8e379bc1b504",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "03-css",
+      "status": "PASS",
+      "sha256": "efa615ff40e7fdf5e6783dd5ea8d29099739cbcdb46406185fa3e40b1f2db453",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "04-steve",
+      "status": "PASS",
+      "sha256": "1f54d9bbf0f4143b1d7699b44397cba728df50c80335045364f49c68a8015164",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "05a-cpu-approach",
+      "status": "PASS",
+      "sha256": "05f3facc195ea43e3146674894b7743e23e02daa37e0bfb4289631525d678d12",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "05b-cpu-pick",
+      "status": "PASS",
+      "sha256": "d0db97c1ef6ad438386ab6c566afac0bdd089c8fee7874436dc0e62cb39b7dc7",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "05c-cpu74",
+      "status": "PASS",
+      "sha256": "9038c867dbe465fc4cf54bed8b2ece185f9f529dd244f77868d1700f422016dc",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "06-lucas",
+      "status": "PASS",
+      "sha256": "e5e299c6cf76fea57dbef74eb55c55d2361d60f96f706e1002d941e9dc452235",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "07-training",
+      "status": "PASS",
+      "sha256": "0618e4480f99e4d76e661e8c4dc3da7fee949a4aa9a7436990078d87d02dae65",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "cycle1-warm-groups",
+      "status": "PASS",
+      "sha256": "840f225a81ec6d6f656d7f89cf6bf687b6aa46934476b5fe9d4e8ed3185e106e",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": null
+    },
+    {
+      "id": "cycle1-warm-return",
+      "status": "FAILED",
+      "sha256": "e3ec86b3204a6d9c34da8df986fb44fef76a8c8ad64188a3c3ed81366d592753",
+      "manifest_sha256": "13cd84880d33837f8b811dab7bd13ae2727348c3966fd7eff335c2b21f7ab157",
+      "error": "RuntimeError('gate lr06-clean-finalize-1 on yoga did not pass within 25 s')"
+    }
+  ]
+}
