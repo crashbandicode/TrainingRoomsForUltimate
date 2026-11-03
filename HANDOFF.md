@@ -52,3 +52,17 @@ No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign ar
 6. Final README/HANDOFF/compliance/GIF, RC READY, primary Astra-high review. No push/tag/release/card/DBI/USB.60GB target cap/40GB disk floor, bounded jobs, one Eden per host/no compile beside it, shared ledger/fairness remain.
 
 The historical359-row inventory is post-RC backlog; do not resume chasing every old blocker. No current candidate acceptance is inferred from this handoff.
+## StateWriter stack correction in reset composition
+
+Personally checked s6-13 full console lines13457–13481: state saved/queued,
+file_written, then high_water17664/36864 (free19200, low=false). The existing
+health parser correctly fails the stronger policy despite low=false:
+ceil_page(17664 +4416 +16384)=40960. The table still recorded historical15408,
+so its allocation underestimated the now-observed writer path. Updated the
+same table row to measured17664 and40KiB; static bound15184 and unchanged25%
+plus16KiB reserve remain. runtime/threads.rs derives its actual static array
+from that row, adding4096B BSS with no hook allocation or behavioral change.
+No speculative writer refactor or F9 attribution. Existing thread_stacks host
+checks and final compiled/static/runtime gates must verify the coherent RC;
+no new intermediate build or PASS claim. Retain this historical maximum even
+if disabling Setup later reduces one path.
