@@ -1,0 +1,43 @@
+{
+  "game_sha256": "0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2",
+  "loader_sha256": "9959ecb13eab6db81a07cee04a789b1905fd605409fc84efeb7ec43da7e29280",
+  "site": "0x155c188",
+  "words": [
+    "0xaaa7d4a",
+    "0x6b17011f",
+    "0xb901c68a",
+    "0x5400c060"
+  ],
+  "branch_target": "0x155d9a0",
+  "far_emitted_words": [
+    "0x54000040",
+    "0x14000005",
+    "0x58000051",
+    "0xd61f0220"
+  ],
+  "far_literal_target": "0x155d9a0",
+  "far_taken": "BEQ +8 -> LDR x17 literal -> BR x17 -> original target",
+  "far_not_taken": "B +20 from offset4 -> offset24 -> trampoline tail -> 155c198",
+  "near_examples": [
+    {
+      "output": "0x155c9a0",
+      "word": "0x54008000",
+      "target": "0x155d9a0"
+    },
+    {
+      "output": "0x155e9a0",
+      "word": "0x54ff8000",
+      "target": "0x155d9a0"
+    }
+  ],
+  "optional_alignment": "NOP only",
+  "nzcv": "CMP at18c produces flags; STR and all emitted branch/NOP/LDR/BR instructions preserve them.",
+  "scratch": "x17 clobber permitted only by separate F6 whole-function liveness review.",
+  "evidence": {
+    "skyline-conditional-relocation.asm": "926c4e2f173095f6fbf4827a86703b5a2ff95863ed79215b7b2e2f5a57cbad4d",
+    "skyline-relocation-interval.asm": "fb94bd3afe1e3193c4d05f1beea297ef95c3d91c5de546856e721b9a242ce037",
+    "skyline-inline-relocation-loop.asm": "e1f06248737f117975b39b43d0a502700fa218098575093e96075195707be162",
+    "skyline-inline-relocation-entry.asm": "9ad157ebd46e48d12ac93cb128c5765ec696b593d743a744a8babd9e396dc3d7"
+  },
+  "scope": "Static exact-loader qualification only; compiled callback stacks and live execution remain required."
+}
