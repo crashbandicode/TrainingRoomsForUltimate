@@ -90,7 +90,7 @@ pub const THREADS: [ThreadStack; 17] = [
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_712, "Eden st-02..st-12", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md.
-    row(ThreadId::Probe, c"tr-probe", 196 * KIB, 3_440, 0, "", "ui::probe::install::{closure#0}").with_external(143_376),
+    row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer

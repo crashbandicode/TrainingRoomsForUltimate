@@ -61,6 +61,9 @@ fn probe_accounts_for_the_actual_external_read_path_even_when_paint_misses_it() 
     assert_eq!(probe.external_bound, 64 + 320 + 10_368 + 131_904 + 720);
     assert!(thread_stacks::required(probe.static_bound, 0) <= 24 * 1024,
         "the old owned-only rule admitted the overflowing allocation");
+    // Reconstruct the earlier static-only contract separately from fresh ui-17 paint.
+    probe.measured = 0;
+    probe.bytes = 200_704;
     assert_eq!(probe.required(), 200_704);
     probe.measured = 18_560; // The misleading in-allocation ui-16 paint result.
     assert!(24 * 1024 < probe.required());
@@ -221,4 +224,14 @@ fn a_prepared_boxed_slot_allocates_nothing() {
         }
     }
     assert_eq!(hook_allocations(), before, "put, take, finish and flush_boxed moved buffers only");
+}
+
+#[test]
+fn completed_arc_probe_high_water_keeps_the_full_margin_policy() {
+    let probe = thread_stacks::of(ThreadId::Probe);
+    assert_eq!(probe.measured, 151_920);
+    assert!(probe.measured_in.contains("ui-17"));
+    assert_eq!(probe.required(), 208_896);
+    assert!(200_704 < probe.required(), "the old allocation had SDK room but missed the quarter margin");
+    assert_eq!(probe.bytes, probe.required());
 }
