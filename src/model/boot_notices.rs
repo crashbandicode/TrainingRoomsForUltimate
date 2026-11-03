@@ -3,8 +3,52 @@
 use core::fmt::Write;
 
 use super::chords::ChordSet;
-use super::notify::{Body, Queue, DEFAULT_COLOR};
+use super::notify::{Body, Queue, BODY_MAX, DEFAULT_COLOR};
 use super::storage::FixedPath;
+
+/// Every logical button, every separator, and both optional menu alternatives.
+/// The permanent chord is 12 ASCII bytes. This bound also detects future
+/// button-label growth at compile time.
+const _: () = {
+    let mut longest = 0;
+    let mut i = 0;
+    while i < super::menu::chord::NAMES.len() {
+        longest += super::menu::chord::NAMES[i].len();
+        i += 1;
+    }
+    longest += (super::menu::chord::BUTTONS - 1) * 3;
+    assert!(12 + 2 * (4 + longest) <= BODY_MAX);
+};
+
+pub const SHORT_UNITS: usize = 48;
+pub const LONG_COLUMNS: usize = 64;
+
+/// The exact UTF-16 body consumed by the native notice writer. Long text uses
+/// the separately preallocated multiline pane. Wrapping replaces separator
+/// spaces, never button-label characters, and needs no extra buffer capacity.
+pub fn notice_units(text: &str, out: &mut [u16; BODY_MAX]) -> usize {
+    let mut len = 0;
+    for unit in text.encode_utf16().take(out.len()) {
+        out[len] = unit;
+        len += 1;
+    }
+    if len > SHORT_UNITS {
+        let mut start = 0;
+        let mut space = None;
+        for i in 0..len {
+            if out[i] == u16::from(b' ') { space = Some(i); }
+            if out[i] == u16::from(b'\n') { start = i + 1; space = None; continue; }
+            if i - start >= LONG_COLUMNS {
+                if let Some(at) = space.filter(|at| *at >= start) {
+                    out[at] = u16::from(b'\n');
+                    start = at + 1;
+                    space = None;
+                }
+            }
+        }
+    }
+    len
+}
 
 #[derive(Default)]
 pub struct BootNotices {
@@ -26,7 +70,7 @@ impl BootNotices {
         self.posted = true;
         queue.post_static("TrainingRooms", "Welcome!", 60, DEFAULT_COLOR);
         let [first, second] = chords.shortcuts.slots();
-        let mut text = FixedPath::<256>::new();
+        let mut text = FixedPath::<BODY_MAX>::new();
         // The permanent B + D-pad Up chord is never disabled by the INI.
         let _ = write!(text, "{}", super::menu_shortcuts::DEFAULT_OPEN_MENU_CONFIG);
         for chord in [first, second].into_iter().filter(|chord| !chord.is_empty()) {
@@ -39,7 +83,7 @@ impl BootNotices {
             ("Input Record", chords.input_record),
             ("Input Playback", chords.input_playback),
         ] {
-            let mut text = FixedPath::<256>::new();
+            let mut text = FixedPath::<BODY_MAX>::new();
             let _ = write!(text, "{chord}");
             queue.post(header, Body::copied(text.as_str()), 120, DEFAULT_COLOR);
         }

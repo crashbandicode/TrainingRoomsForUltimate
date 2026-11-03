@@ -137,12 +137,24 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
     let Some(draw) = out.draw else { return };
     let header = find(container, p::IDX_NOTICE_HEADER);
     let text = find(container, p::IDX_NOTICE_TEXT);
+    let long_text = find(container, p::IDX_NOTICE_LONG);
+    let base = find(container, p::IDX_NOTICE_BASE);
     if !header.is_null() {
         set_text(header, draw.header);
     }
-    if !text.is_null() {
-        set_text(text, draw.body.as_str());
-        pane::set_text_color(text, p::linear(draw.color));
+    let mut buffer = [0u16; crate::model::notify::BODY_MAX];
+    let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
+    let long = len > crate::model::boot_notices::SHORT_UNITS;
+    if !text.is_null() { pane::set_visible(text, !long); }
+    if !long_text.is_null() { pane::set_visible(long_text, long); }
+    if !base.is_null() {
+        pane::set_pos(base, 0.0, if long { 355.0 } else { 405.0 });
+        pane::set_height(base, if long { 250.0 } else { 150.0 });
+    }
+    let target = if long { long_text } else { text };
+    if !target.is_null() {
+        pane::set_text(target, &buffer[..len]);
+        pane::set_text_color(target, p::linear(draw.color));
     }
     #[cfg(feature = "diag")]
     diagnostic(format_args!(

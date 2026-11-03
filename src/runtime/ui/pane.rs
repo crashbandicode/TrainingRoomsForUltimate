@@ -150,8 +150,8 @@ pub fn set_text_setter(address: usize) {
     TEXT_SETTER.store(address, Ordering::Release);
 }
 
-/// Longest text the menu writes to one box (the frame's longest line).
-pub const MAX_UNITS: usize = 160;
+/// Longest owned text body, including complete startup shortcut alternatives.
+pub const MAX_UNITS: usize = crate::model::notify::BODY_MAX;
 static TEXT_SETTER: AtomicUsize = AtomicUsize::new(0);
 pub unsafe fn set_text_color(pane: *mut Pane, color: [u8; 4]) {
     (*(pane as *mut TextBox)).set_color(color[0], color[1], color[2], color[3]);

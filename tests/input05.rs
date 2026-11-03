@@ -109,6 +109,53 @@ fn startup_and_save_notices_allocate_nothing_on_first_and_repeated_use() {
     assert_eq!(ALLOCS.with(Cell::get), before);
 }
 
+#[test]
+fn longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries() {
+    use model::{boot_notices, menu::chord::Chord, panes};
+    // The review counterexample exceeds the former 48-unit queue and writer
+    // limits; both maximal shortcuts also exceeded the former 256-byte builder.
+    for chord in [Chord(0xc1c0), Chord(u16::MAX)] {
+        let mut chords = model::chords::ChordSet::factory();
+        chords.shortcuts = model::menu_shortcuts::MenuShortcuts::new(chord, chord);
+        chords.save_state = chord;
+        chords.load_state = chord;
+        chords.input_record = chord;
+        chords.input_playback = chord;
+        let chord_text = chord.to_string();
+        let menu_text = format!("B + D-pad Up or {chord} or {chord}");
+        let mut queue = Queue::new();
+        let mut boot = boot_notices::BootNotices::new();
+        let before = ALLOCS.with(Cell::get);
+        assert!(boot.post_once(true, Some(chords), &mut queue));
+        assert_eq!(queue.len(), 6);
+        for _ in 0..60 { queue.tick(true, false); }
+        for expected in [&menu_text, &chord_text, &chord_text, &chord_text, &chord_text] {
+            let draw = queue.tick(true, false).draw.unwrap();
+            assert_eq!(draw.body.as_str(), expected);
+            let mut units = [0; BODY_MAX];
+            let len = boot_notices::notice_units(draw.body.as_str(), &mut units);
+            assert_eq!(len, expected.len());
+            for (&unit, byte) in units[..len].iter().zip(expected.bytes()) {
+                assert!(unit == u16::from(byte) || (byte == b' ' && unit == u16::from(b'\n')));
+            }
+            let mut lines = 0;
+            for line in units[..len].split(|unit| *unit == u16::from(b'\n')) {
+                assert!(line.len() <= boot_notices::LONG_COLUMNS);
+                lines += 1;
+            }
+            assert!(lines <= 7, "all lines must fit the 180-unit pane at 24-unit font height");
+            for _ in 1..120 { assert!(queue.tick(true, false).visible); }
+        }
+        assert!(!queue.tick(true, false).visible);
+        assert_eq!(ALLOCS.with(Cell::get), before);
+    }
+    let pane = panes::spec(panes::IDX_NOTICE_LONG);
+    let panes::Kind::Text { chars, font, .. } = pane.kind else { panic!("notice must be text") };
+    assert!(usize::from(chars) > BODY_MAX, "preallocate the complete body and terminator");
+    assert!(font.0 * boot_notices::LONG_COLUMNS as f32 <= pane.w);
+    assert!(font.1 * 7.0 <= pane.h);
+}
+
 thread_local! {
     static ALLOCS: Cell<usize> = const { Cell::new(0) };
 }

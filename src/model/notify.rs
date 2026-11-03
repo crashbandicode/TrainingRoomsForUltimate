@@ -17,7 +17,7 @@ pub const CAPACITY: usize = 8;
 /// Delivery records the queue keeps for its owners (a full ring drops the oldest).
 pub const DELIVERED_CAPACITY: usize = 4;
 /// Longest dynamic body in bytes.
-pub const BODY_MAX: usize = 48;
+pub const BODY_MAX: usize = 320;
 /// Text colour used when a post gives none (black).
 pub const DEFAULT_COLOR: [u8; 4] = [0, 0, 0, 255];
 
@@ -25,7 +25,7 @@ pub const DEFAULT_COLOR: [u8; 4] = [0, 0, 0, 255];
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Body {
     Static(&'static str),
-    Copied { bytes: [u8; BODY_MAX], len: u8 },
+    Copied { bytes: [u8; BODY_MAX], len: u16 },
 }
 
 impl Body {
@@ -36,7 +36,7 @@ impl Body {
         }
         let mut bytes = [0u8; BODY_MAX];
         bytes[..end].copy_from_slice(&text.as_bytes()[..end]);
-        Body::Copied { bytes, len: end as u8 }
+        Body::Copied { bytes, len: end as u16 }
     }
 
     pub fn as_str(&self) -> &str {

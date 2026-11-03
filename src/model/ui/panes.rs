@@ -206,6 +206,9 @@ pub const IDX_NOTICE: usize = IDX_ITEM_ICON + ITEM_ICONS;
 pub const IDX_NOTICE_BASE: usize = IDX_NOTICE + 1;
 pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
 pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
+pub const IDX_NOTICE_LONG: usize = IDX_NOTICE + 4;
+/// Full startup chord text plus its terminator; checked against notify::BODY_MAX.
+pub const NOTICE_LONG_UNITS: u16 = 321;
 /// The input log (SPEC-input-02, lead ruling 2026-11-02: text slots, no new textures): a column container, 15 row
 /// containers, and in each row 5 slots. A slot is a text box (a button glyph of the game's font, coloured) and two
 /// rectangles (the shaft and the head of the plugin's own arrow for a stick direction), plus the held-frames text
@@ -217,7 +220,7 @@ pub const LOG_SLOTS: usize = 5;
 pub const LOG_SLOT_X0: f32 = -200.0;
 pub const LOG_SLOT_PITCH: f32 = 54.0;
 pub const LOG_HEAD_OFFSET: f32 = 16.0;
-pub const IDX_LOG: usize = IDX_NOTICE_TEXT + 1;
+pub const IDX_LOG: usize = IDX_NOTICE_LONG + 1;
 pub const IDX_LOG_ROW: usize = IDX_LOG + 1;
 pub const IDX_LOG_GLYPH: usize = IDX_LOG_ROW + LOG_ROWS;
 pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
@@ -268,6 +271,7 @@ pub const fn name_of(index: usize) -> Name {
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
+        IDX_NOTICE_LONG => Name::new("TrModDisp0Long"),
         IDX_LOG => Name::new("TrModInputLog"),
         IDX_CHIP_HI => Name::new("tr_ch_hi"),
         IDX_TILE_HI => Name::new("tr_ti_hi"),
@@ -369,6 +373,8 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], [8, 10, 14, 235], true), name_of(IDX_NOTICE)),
         IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, TEXT_DIM), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT => under(text(name, [0.0, 390.0, 960.0, 70.0], Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
+            NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
         IDX_LOG => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: -700.0, y: 380.0, w: 520.0, h: 800.0, visible: false },
         i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => {
