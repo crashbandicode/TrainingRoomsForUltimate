@@ -1,0 +1,114 @@
+{
+  "PASS": 13,
+  "FAILED": 1,
+  "unrun": [
+    "cycle2-warm-return",
+    "cycle2-cpu-normalize",
+    "cycle2-fresh-reentry",
+    "cycle3-warm-groups",
+    "cycle3-warm-return",
+    "cycle3-cpu-normalize",
+    "cycle3-fresh-reentry",
+    "final-continuation"
+  ],
+  "receipts": [
+    {
+      "id": "01-main",
+      "status": "PASS",
+      "sha256": "f832edd2c921ee119718d3250a42728cc92a9568868498eb943e42c72960960e",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "02-stage",
+      "status": "PASS",
+      "sha256": "00bed01993eb18dad9a23f153b176477c0a8416acb878ca30d5b70f508a42cb7",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "03-css",
+      "status": "PASS",
+      "sha256": "a589837d962ab1a948c3b7aaf87a0ae3a028a90840a42a947a1bb69e5903594b",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "04-steve",
+      "status": "PASS",
+      "sha256": "bf21ebf5e18d49111260d77519948608549223456ebdd464c6c3531e6f251731",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "05a-cpu-approach",
+      "status": "PASS",
+      "sha256": "51d5f7d1d4032b10e369242a2e96e79a212ef96a5edbcb1afc7fd67559de4331",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "05b-cpu-pick",
+      "status": "PASS",
+      "sha256": "129525326c71a48e5c0830b640330834110d39ee3d77b46c9d229b332fbc519e",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "05c-cpu74",
+      "status": "PASS",
+      "sha256": "7c970a71a67c3acd77b84b9c3229aa0396a53e5918c4f4d674030b925b72672e",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "06-lucas",
+      "status": "PASS",
+      "sha256": "aac512e1aad3292be8a1485c2a72f33a3a83404da07a82e602981fbff4fb1648",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "07-training",
+      "status": "PASS",
+      "sha256": "85ce0c31887bb9860c783c07ffc485dfa29529d704ca7df850ffb168514ee5f9",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "cycle1-warm-groups",
+      "status": "PASS",
+      "sha256": "04e570b8ca8b2fbf3beb3379c718ca135d3e23d337ed67d46558d5fa594723e7",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "cycle1-warm-return",
+      "status": "PASS",
+      "sha256": "d7f90ad16c220b023bba557f36ed31c8241f4ad7afd699f272be0259108515b7",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "cycle1-cpu-normalize",
+      "status": "PASS",
+      "sha256": "5a1ba0bedee446743b6356cf69a0d76bde790d15fab1e2c67066f5df356ae2a7",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "cycle1-fresh-reentry",
+      "status": "PASS",
+      "sha256": "76af6190dc2a1a1845eed97d513cf2be6bc282ff0b7cbccf7f4eb2f9273581fa",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": null
+    },
+    {
+      "id": "cycle2-warm-groups",
+      "status": "FAILED",
+      "sha256": "1263ae2b1ebbbf245b339d6bf4c42ccd46cd4e2be76c151496489c3213bd95df",
+      "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+      "error": "RuntimeError('gate lr08-cpu-synchronous on yoga did not pass within 25 s')"
+    }
+  ]
+}

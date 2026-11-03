@@ -1,0 +1,24 @@
+{
+  "id": "03-css",
+  "start": "stage",
+  "end": "css",
+  "evidence": [],
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "started": 1793740434.7588303,
+  "results": [
+    {
+      "play": "stage-css",
+      "on": "yoga"
+    },
+    {
+      "gate": "css",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/03-css/yoga-211359Z-894739-gate-css.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/03-css/yoga-211359Z-351823-css.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793740439.7599874
+}

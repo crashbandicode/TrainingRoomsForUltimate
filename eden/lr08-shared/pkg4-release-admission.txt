@@ -1,0 +1,1 @@
+2026-11-03T21:12:05.325855+00:00 RELEASED: OpenCode ses_e5e69459dffezdJWciBt7kT062/pkg4-surface-shared host=yoga lifecycle=c8cc9ced9b1b464f88ba4ecc957899ee Eden stopped; full profile restored and separately verified

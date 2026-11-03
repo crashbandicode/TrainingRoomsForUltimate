@@ -1,0 +1,77 @@
+{
+  "id": "cycle1-fresh-reentry",
+  "start": "ready",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "started": 1793740489.486421,
+  "results": [
+    {
+      "gate": "delay2-settings",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle1-fresh-reentry/delay2-settings-settings.json"
+    },
+    {
+      "play": "enter-training",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-original",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[CharacterRoster] observed owner=0 entry=0x11fb484000 kind=0x58"
+      }
+    },
+    {
+      "gate": "cpu-original",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[CharacterRoster] observed owner=1 entry=0x11fb48a000 kind=0x28"
+      }
+    },
+    {
+      "gate": "catalog",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[3, 3] opening=4"
+      }
+    },
+    {
+      "gate": "player-owner",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained"
+      }
+    },
+    {
+      "gate": "cpu-owner",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] catalog owner qualified; immutable origin retained"
+      }
+    },
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle1-fresh-reentry/yoga-211453Z-734233-gate-training-hud-unpaused.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/cycle1-fresh-reentry/yoga-211453Z-566898-training.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr08-inputs/out/cycle1-fresh-reentry/settings-yoga-settings.json"
+    },
+    {
+      "copy": "/home/intpa/tr-lr08-inputs/out/cycle1-fresh-reentry/diag-yoga-practice-diagnostics.log"
+    },
+    {
+      "gate": "lr06-catalog-cycle1",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[3, 3] opening=4"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793740493.9390595
+}

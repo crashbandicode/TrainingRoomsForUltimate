@@ -1,0 +1,10 @@
+{
+  "phase": "down",
+  "released": true,
+  "game_stop_errors": [
+    {
+      "key": "yoga",
+      "error": "Refused('Deadline: terminal game.stop')"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "cycle1-cpu-normalize",
+  "start": "css-return",
+  "end": "ready",
+  "evidence": [],
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "started": 1793740484.0543175,
+  "results": [
+    {
+      "run": "steps.py:return_cpu_to_lucas",
+      "on": "yoga",
+      "value": {
+        "pickup_edge": [
+          39,
+          40
+        ],
+        "final_tile": 39,
+        "token": "p2",
+        "placed": true
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr08-inputs/out/cycle1-cpu-normalize/tile-yoga-events.log"
+    },
+    {
+      "copy": "/home/intpa/tr-lr08-inputs/out/cycle1-cpu-normalize/settings-yoga-settings.json"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793740489.4854555
+}

@@ -1,0 +1,73 @@
+{
+  "id": "cycle1-warm-groups",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "started": 1793740464.979007,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/yoga-211424Z-943054-gate-training-hud-unpaused.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "p1-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-b",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 2, entry: 77024968704, sequence: 1 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n638498821 #224 [Destroy] plan owner=0 reason=mod reload s"
+      }
+    },
+    {
+      "gate": "p1-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/yoga-211428Z-015080-gate-p1-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/yoga-211428Z-460634-falcon-ready.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "cpu-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "cpu-4a",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] submit ticket=Ticket { epoch: 2, entry: 77024993280, sequence: 1 } outgoing=0x28 target=0x4a index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n638503850 #287 [MiiOrdinaryCpu] staged ticket=Ticket { epoch"
+      }
+    },
+    {
+      "gate": "cpu-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/yoga-211435Z-352677-gate-cpu-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/yoga-211435Z-817949-cpu-gunner-ready.png"
+    },
+    {
+      "gate": "lr08-cpu-synchronous",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] staged ticket=Ticket { epoch: 2, entry: 77024993280, sequence: 1 } bank_build=false descriptor=[00, 00, 00, 00, 01, 00, 00, 00, 09, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 01, 00, 00, 00, 4a, 00, 00, 00, ff, ff, ff, ff, ff, ff, ff, ff, 00, 00, 00, 00, 01, 00, 00, 00, 01, 00, 00,"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr08-inputs/out/cycle1-warm-groups/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793740475.25462
+}

@@ -11,7 +11,7 @@
       "end_gate": "stage",
       "from_run": "lr-03",
       "row": "02-stage",
-      "library": "main-stage"
+      "archived_library": "main-stage"
     },
     "stage-css": {
       "file": "segments/stage-css.edenmacro.json",
@@ -21,7 +21,7 @@
       "end_gate": "css",
       "from_run": "lr-03",
       "row": "03-css",
-      "library": "stage-css"
+      "archived_library": "stage-css"
     },
     "cpu74-lucas": {
       "file": "segments/cpu74-lucas.edenmacro.json",
@@ -31,7 +31,7 @@
       "end_gate": "lucas",
       "from_run": "lr-03",
       "row": "05-lucas",
-      "library": "cpu74-lucas"
+      "archived_library": "cpu74-lucas"
     },
     "lucas-pick": {
       "file": "segments/lucas-pick.edenmacro.json",
@@ -41,7 +41,7 @@
       "end_gate": "ready",
       "from_run": "lr-03",
       "row": "05-lucas",
-      "library": "lucas-pick"
+      "archived_library": "lucas-pick"
     },
     "enter-training": {
       "file": "segments/enter-training.edenmacro.json",
@@ -51,7 +51,7 @@
       "end_gate": "p1-original",
       "from_run": "lr-03",
       "row": "06-training",
-      "library": "enter-training"
+      "archived_library": "enter-training"
     },
     "pause-open": {
       "file": "segments/pause-open.edenmacro.json",
@@ -61,7 +61,7 @@
       "end_gate": "pause",
       "from_run": "lr-03",
       "row": "07-pause",
-      "library": "pause-open"
+      "archived_library": "pause-open"
     },
     "pause-close": {
       "file": "segments/pause-close.edenmacro.json",
@@ -71,7 +71,7 @@
       "end_gate": "resume",
       "from_run": "lr-03",
       "row": "09-pause-roundtrip",
-      "library": "pause-close"
+      "archived_library": "pause-close"
     },
     "p1-next-frames": {
       "file": "segments/p1-next-frames.edenmacro.json",
@@ -81,7 +81,7 @@
       "end_gate": "p1-b",
       "from_run": "lr-03",
       "row": "10-p1-falcon",
-      "library": "p1-next-frames"
+      "archived_library": "p1-next-frames"
     },
     "cpu-next-frames": {
       "file": "segments/cpu-next-frames.edenmacro.json",
@@ -91,7 +91,7 @@
       "end_gate": "cpu-4a",
       "from_run": "lr-03",
       "row": "22-cpu-gunner",
-      "library": "cpu-next-frames"
+      "archived_library": "cpu-next-frames"
     },
     "focus-native-quit-frames": {
       "file": "segments/focus-native-quit-frames.edenmacro.json",
@@ -101,7 +101,7 @@
       "end_gate": "quit-focus",
       "from_run": "lr-03",
       "row": "25-warm-scene-exit",
-      "library": "focus-native-quit-frames"
+      "archived_library": "focus-native-quit-frames"
     },
     "confirm-native-quit-frames": {
       "file": "segments/confirm-native-quit-frames.edenmacro.json",
@@ -111,7 +111,7 @@
       "end_gate": "finalize-p1",
       "from_run": "lr-03",
       "row": "25-warm-scene-exit",
-      "library": "confirm-native-quit-frames"
+      "archived_library": "confirm-native-quit-frames"
     },
     "intro-cancel": {
       "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
@@ -119,10 +119,24 @@
       "file": "segments/intro-cancel.edenmacro.json"
     },
     "steve-hover": {
-      "library": "steve-hover"
+      "file": "segments/steve-hover.edenmacro.json",
+      "sha256": "edf2fb3e2db4b65571420dbc839219a005687f7b8685bf7201f940d06d2dd414",
+      "cap": 20,
+      "start_gate": "css",
+      "end_gate": "steve78",
+      "from_run": "lr-04",
+      "row": "04-steve",
+      "archived_library": "steve-hover"
     },
     "steve-place": {
-      "library": "steve-place"
+      "file": "segments/steve-place.edenmacro.json",
+      "sha256": "c02d3b0a91229c573ee848b686afc575649b4697734c3041351525e98dbe2fdc",
+      "cap": 20,
+      "start_gate": "steve78",
+      "end_gate": "steve-selected",
+      "from_run": "lr-04",
+      "row": "04-steve",
+      "archived_library": "steve-place"
     },
     "title-main": {
       "file": "segments/title-main.edenmacro.json",
@@ -131,13 +145,34 @@
       "cap": 15
     },
     "lr04-cpu-approach": {
-      "library": "lr04-cpu-approach"
+      "file": "segments/lr04-cpu-approach.edenmacro.json",
+      "sha256": "27b8846bc5f9aa21d7c3746d1cef7894369f7479f29f937c248ca5f23d580396",
+      "cap": 20,
+      "start_gate": "steve-selected",
+      "end_gate": "steve-selected",
+      "from_run": "lr-04",
+      "row": "05a-cpu-approach",
+      "archived_library": "lr04-cpu-approach"
     },
     "lr04-cpu-pick": {
-      "library": "lr04-cpu-pick"
+      "file": "segments/lr04-cpu-pick.edenmacro.json",
+      "sha256": "fc6319148f476318cbd86fb5a2d3d63e4b135808aa34a21cada687b6dbddc1f9",
+      "cap": 25,
+      "start_gate": "steve-selected",
+      "end_gate": "cpu-token-fresh",
+      "from_run": "lr-04",
+      "row": "05b-cpu-pick",
+      "archived_library": "lr04-cpu-pick"
     },
     "lr04-cpu85-to74": {
-      "library": "lr04-cpu85-to74"
+      "file": "segments/lr04-cpu85-to74.edenmacro.json",
+      "sha256": "96f97989b34e29973e53d7ad4174cdececb754e1727bb22c5ca7d7abde102cdb",
+      "cap": 15,
+      "start_gate": "cpu85-held",
+      "end_gate": "cpu74-fresh",
+      "from_run": "lr-04",
+      "row": "05c-cpu74",
+      "archived_library": "lr04-cpu85-to74"
     },
     "lr04-return-cpu-pick": {
       "file": "segments/lr04-return-cpu-pick.edenmacro.json",
@@ -175,7 +210,14 @@
       "recorded": "2026-11-03T19:57:04Z"
     },
     "lr04-roy-lucas": {
-      "library": "lr04-roy-lucas"
+      "file": "segments/lr04-roy-lucas.edenmacro.json",
+      "sha256": "dc74d27fceb1d3387e2d0679424f2f9de484762dc634da7d532115e9b20c0702",
+      "cap": 15,
+      "start_gate": "return-roy-held",
+      "end_gate": "return-lucas-fresh",
+      "from_run": "lr-04",
+      "row": "12-return-lucas",
+      "archived_library": "lr04-roy-lucas"
     }
   },
   "gates": {
@@ -186,7 +228,7 @@
       "whole_file": true,
       "cap": 120,
       "from_run": "lr-03",
-      "library": "installed"
+      "archived_library": "installed"
     },
     "smash-submenu": {
       "kind": "image",
@@ -202,7 +244,7 @@
       "cap": 10,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "smash-submenu"
+      "archived_library": "smash-submenu"
     },
     "main": {
       "kind": "image",
@@ -218,9 +260,9 @@
       "cap": 8,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "main",
       "recover": "intro-cancel",
-      "recover_times": 3
+      "recover_times": 3,
+      "archived_library": "main"
     },
     "stage": {
       "kind": "image",
@@ -236,7 +278,7 @@
       "cap": 45,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "stage"
+      "archived_library": "stage"
     },
     "css": {
       "kind": "image",
@@ -252,7 +294,7 @@
       "cap": 60,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "css"
+      "archived_library": "css"
     },
     "cpu-held74": {
       "kind": "image",
@@ -268,7 +310,7 @@
       "cap": 10,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "cpu-held74"
+      "archived_library": "cpu-held74"
     },
     "lucas": {
       "kind": "log",
@@ -276,7 +318,7 @@
       "pattern": "settled screen=css at=39 hovered=39",
       "cap": 15,
       "from_run": "lr-03",
-      "library": "lucas"
+      "archived_library": "lucas"
     },
     "ready": {
       "kind": "image",
@@ -292,7 +334,7 @@
       "cap": 30,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "ready"
+      "archived_library": "ready"
     },
     "p1-original": {
       "kind": "log",
@@ -300,7 +342,7 @@
       "pattern": "\\[CharacterRoster\\] observed owner=0 [^\\n]*kind=0x58\\b",
       "cap": 60,
       "from_run": "lr-03",
-      "library": "p1-original"
+      "archived_library": "p1-original"
     },
     "cpu-original": {
       "kind": "log",
@@ -308,7 +350,7 @@
       "pattern": "\\[CharacterRoster\\] observed owner=1 [^\\n]*kind=0x28\\b",
       "cap": 30,
       "from_run": "lr-03",
-      "library": "cpu-original"
+      "archived_library": "cpu-original"
     },
     "catalog": {
       "kind": "log",
@@ -316,7 +358,7 @@
       "pattern": "\\[MiiAutoInit\\] catalog ready;[^\\n]*",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "catalog"
+      "archived_library": "catalog"
     },
     "player-owner": {
       "kind": "log",
@@ -324,7 +366,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] catalog owner qualified; immutable origin retained",
       "cap": 30,
       "from_run": "lr-03",
-      "library": "player-owner"
+      "archived_library": "player-owner"
     },
     "cpu-owner": {
       "kind": "log",
@@ -332,7 +374,7 @@
       "pattern": "\\[MiiOrdinaryCpu\\] catalog owner qualified; immutable origin retained",
       "cap": 30,
       "from_run": "lr-03",
-      "library": "cpu-owner"
+      "archived_library": "cpu-owner"
     },
     "training-closed": {
       "kind": "image",
@@ -348,7 +390,7 @@
       "cap": 15,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "training-closed"
+      "archived_library": "training-closed"
     },
     "pause": {
       "kind": "log",
@@ -356,7 +398,7 @@
       "pattern": "pause_owner begin [^\\n]*owners=0x10",
       "cap": 15,
       "from_run": "lr-03",
-      "library": "pause"
+      "archived_library": "pause"
     },
     "native-pause": {
       "kind": "image",
@@ -372,7 +414,7 @@
       "cap": 15,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "native-pause"
+      "archived_library": "native-pause"
     },
     "resume": {
       "kind": "log",
@@ -380,7 +422,7 @@
       "pattern": "pause_owner end [^\\n]*owned_non_neutral=0 owners=0x00",
       "cap": 15,
       "from_run": "lr-03",
-      "library": "resume"
+      "archived_library": "resume"
     },
     "training-hud-unpaused": {
       "kind": "image",
@@ -397,7 +439,7 @@
       "scope": "Undimmed native zero digit, excluding changing faction emblem; applies only to this no-damage cycle lane.",
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "training-hud-unpaused"
+      "archived_library": "training-hud-unpaused"
     },
     "p1-b": {
       "kind": "log",
@@ -411,7 +453,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x1f\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x1f\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "p1-1f"
+      "archived_library": "p1-1f"
     },
     "p1-hud-changed": {
       "kind": "change",
@@ -432,7 +474,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2e\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2e\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "p1-2e"
+      "archived_library": "p1-2e"
     },
     "p1-2d": {
       "kind": "log",
@@ -440,7 +482,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2d\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2d\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "p1-2d"
+      "archived_library": "p1-2d"
     },
     "p1-2c": {
       "kind": "log",
@@ -448,7 +490,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x2c\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x2c\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "p1-2c"
+      "archived_library": "p1-2c"
     },
     "p1-58": {
       "kind": "log",
@@ -456,7 +498,7 @@
       "pattern": "\\[MiiOrdinaryPlayer\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x58\\b[\\s\\S]*?\\[MiiOrdinaryPlayer\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x58\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "p1-58"
+      "archived_library": "p1-58"
     },
     "cpu-4a": {
       "kind": "log",
@@ -483,7 +525,7 @@
       "pattern": "\\[MiiOrdinaryCpu\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x1\\b[\\s\\S]*?\\[MiiOrdinaryCpu\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x1\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "cpu-1"
+      "archived_library": "cpu-1"
     },
     "cpu-28": {
       "kind": "log",
@@ -491,7 +533,7 @@
       "pattern": "\\[MiiOrdinaryCpu\\] (?:(?P<bank>bank switch)|submit) ticket=(?P<t>Ticket \\{[^}]+\\}) [^\\n]*?target=0x28\\b[\\s\\S]*?\\[MiiOrdinaryCpu\\] (?(bank)bank ready|ready) ticket=(?P=t) [^\\n]*target=0x28\\b[^\\n]*released=true",
       "cap": 45,
       "from_run": "lr-03",
-      "library": "cpu-28"
+      "archived_library": "cpu-28"
     },
     "quit-focus": {
       "kind": "image",
@@ -507,7 +549,7 @@
       "cap": 15,
       "reference_is_roi": true,
       "from_run": "lr-03",
-      "library": "quit-focus"
+      "archived_library": "quit-focus"
     },
     "finalize-p1": {
       "kind": "log",
@@ -515,7 +557,7 @@
       "pattern": "\\[GroupSwap\\] teardown owner=0 [^\\n]*reason=finalize",
       "cap": 30,
       "from_run": "lr-03",
-      "library": "finalize-p1"
+      "archived_library": "finalize-p1"
     },
     "finalize-cpu": {
       "kind": "log",
@@ -523,16 +565,39 @@
       "pattern": "\\[GroupSwap\\] teardown owner=1 [^\\n]*reason=finalize",
       "cap": 30,
       "from_run": "lr-03",
-      "library": "finalize-cpu"
+      "archived_library": "finalize-cpu"
     },
     "steve78": {
-      "library": "steve78"
+      "kind": "log",
+      "source": "tile",
+      "pattern": "settled screen=css at=78 hovered=78",
+      "cap": 15,
+      "from_run": "lr-04",
+      "archived_library": "steve78"
     },
     "steve-selected": {
-      "library": "steve-selected"
+      "kind": "image",
+      "reference": "refs/steve-selected.png",
+      "sha256": "e643e8ff4b88a51db98a47956725384342f8e3a2288aa43afcea4f41746ea37f",
+      "roi": [
+        315,
+        545,
+        415,
+        580
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-04",
+      "archived_library": "steve-selected"
     },
     "no-leak2": {
-      "library": "no-leak2"
+      "kind": "log",
+      "source": "diag",
+      "pattern": "pause_owner resume_checked delay=2 leaked=0",
+      "cap": 15,
+      "from_run": "lr-04",
+      "archived_library": "no-leak2"
     },
     "title": {
       "kind": "image",
@@ -548,16 +613,77 @@
       "recover": "intro-cancel"
     },
     "cpu-token-fresh": {
-      "library": "cpu-token-fresh"
+      "kind": "log",
+      "source": "tile",
+      "pattern": "step screen=css [^\\n]*token=p2",
+      "cap": 5,
+      "from_run": "lr-04",
+      "archived_library": "cpu-token-fresh"
     },
     "cpu85-held": {
-      "library": "cpu85-held"
+      "kind": "image",
+      "reference": "refs/cpu85-held.png",
+      "sha256": "552ed5825f743b85e469d8104d6d8bf5ac099c8e46346a70b86f7e4a267c8ed5",
+      "roi": [
+        930,
+        545,
+        1125,
+        579
+      ],
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-04",
+      "archived_library": "cpu85-held"
     },
     "cpu74-fresh": {
-      "library": "cpu74-fresh"
+      "kind": "log",
+      "source": "tile",
+      "pattern": "step screen=css dir=up from=85 to=74 token=p2",
+      "cap": 10,
+      "from_run": "lr-04",
+      "archived_library": "cpu74-fresh"
     },
     "delay2-settings": {
-      "library": "delay2-settings"
+      "kind": "json",
+      "source": "settings",
+      "expect": {
+        "menu.input_delay": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "cap": 5,
+      "from_run": "lr-04",
+      "archived_library": "delay2-settings"
     },
     "return-cpu40": {
       "kind": "log",
@@ -566,7 +692,19 @@
       "cap": 8
     },
     "return-roy-held": {
-      "library": "return-roy-held"
+      "kind": "image",
+      "reference": "refs/return-roy-held.png",
+      "sha256": "08f86998536a62d02ccb8709b1cd5aa33696b24bed948f1bee2fa164ded1aaf3",
+      "roi": [
+        1052,
+        548,
+        1127,
+        581
+      ],
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-04",
+      "archived_library": "return-roy-held"
     },
     "return-roy-fresh": {
       "kind": "log",
@@ -575,13 +713,28 @@
       "cap": 8
     },
     "return-lucas-fresh": {
-      "library": "return-lucas-fresh"
+      "kind": "log",
+      "source": "tile",
+      "pattern": "step screen=css dir=left from=40 to=39 token=p2",
+      "cap": 8,
+      "from_run": "lr-04",
+      "archived_library": "return-lucas-fresh"
     },
     "native-finalize-p1": {
-      "library": "native-finalize-p1"
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[Destroy\\] plan owner=0 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0",
+      "cap": 20,
+      "from_run": "lr-04",
+      "archived_library": "native-finalize-p1"
     },
     "native-finalize-cpu": {
-      "library": "native-finalize-cpu"
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[Destroy\\] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0",
+      "cap": 20,
+      "from_run": "lr-04",
+      "archived_library": "native-finalize-cpu"
     },
     "reentry-generation3-observed": {
       "kind": "log",

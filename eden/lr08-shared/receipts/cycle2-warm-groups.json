@@ -1,0 +1,64 @@
+{
+  "id": "cycle2-warm-groups",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "0c4a20a5a100d535961545c426a7101706d30c03500685e2b673b00df74da5d8",
+  "started": 1793740493.9398482,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle2-warm-groups/yoga-211453Z-324181-gate-training-hud-unpaused.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "p1-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-b",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 3, entry: 77230260224, sequence: 2 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n638527772 #471 [Destroy] plan owner=0 reason=mod reload s"
+      }
+    },
+    {
+      "gate": "p1-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle2-warm-groups/yoga-211457Z-417954-gate-p1-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/cycle2-warm-groups/yoga-211457Z-716525-falcon-ready.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "cpu-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "cpu-4a",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] submit ticket=Ticket { epoch: 3, entry: 77230284800, sequence: 2 } outgoing=0x28 target=0x4a index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n638532356 #527 [MiiOrdinaryCpu] staged ticket=Ticket { epoch"
+      }
+    },
+    {
+      "gate": "cpu-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr08-inputs/out/cycle2-warm-groups/yoga-211503Z-839884-gate-cpu-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr08-inputs/out/cycle2-warm-groups/yoga-211503Z-150918-cpu-gunner-ready.png"
+    }
+  ],
+  "status": "FAILED",
+  "error": "RuntimeError('gate lr08-cpu-synchronous on yoga did not pass within 25 s')",
+  "ended": 1793740529.1660805
+}

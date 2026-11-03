@@ -1,0 +1,10 @@
+{
+  "path": "/home/intpa/tr-lr08-yoga-state/run-yoga/console.log",
+  "sha256": "8045251714392dae0a20c6f30f0dd3467a8745359fc49b359bcf9554fd541782",
+  "lines": 5842,
+  "unmapped": 0,
+  "unmapped_low": 0,
+  "review": 0,
+  "bytes": 826643,
+  "scope": "Full retained console, no line exclusions. Every Unmapped or review hit requires attribution before health acceptance."
+}

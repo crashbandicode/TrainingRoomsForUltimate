@@ -1,0 +1,8 @@
+{
+  "segments": [],
+  "gates": [
+    "lr08-cpu-synchronous",
+    "lr06-catalog-cycle1"
+  ],
+  "skipped": []
+}
