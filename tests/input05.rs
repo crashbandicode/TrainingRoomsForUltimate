@@ -275,6 +275,81 @@ fn copied_bodies_are_bounded_and_char_safe() {
     assert_eq!(Body::copied("hello").as_str(), "hello");
 }
 
+// Literal fixture lengths are independent of the production truncation loop.
+const FULL_STATIC_BODY: &str = concat!(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+);
+const SPLIT_STATIC_BODY: &str = concat!(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "é!",
+);
+
+#[test]
+fn inline_body_preserves_copy_capacity_and_complete_static_notice() {
+    assert_eq!(BODY_MAX, 320, "complete configured chords retain their capacity");
+    assert_eq!(FULL_STATIC_BODY.len(), 320);
+    assert!(std::mem::size_of::<Body>() <= 328, "must not grow beyond the former enum");
+    let before = ALLOCS.with(Cell::get);
+    let mut q = Queue::new();
+    q.post_static("Full", FULL_STATIC_BODY, 1, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    let copied_twice = (draw.body, draw.body);
+    assert_eq!(copied_twice.0, copied_twice.1);
+    assert_eq!(draw.body.as_str(), FULL_STATIC_BODY);
+    assert!(q.is_empty());
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
+#[test]
+fn static_utf8_cut_preserves_next_notice_and_visible_time() {
+    assert_eq!(SPLIT_STATIC_BODY.len(), 322);
+    // 319 ASCII bytes then a two-byte character straddling the 320-byte edge.
+    assert_eq!(&SPLIT_STATIC_BODY[319..], "é!");
+    let before = ALLOCS.with(Cell::get);
+    let mut q = Queue::new();
+    q.post_static("Cut", SPLIT_STATIC_BODY, 2, DEFAULT_COLOR);
+    q.post_static("Next", "é complete", 1, DEFAULT_COLOR);
+    assert!(!q.tick(true, true).visible);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!(draw.body.as_str(), &SPLIT_STATIC_BODY[..319]);
+    assert!(q.tick(true, false).draw.is_none());
+    let next = q.tick(true, false).draw.unwrap();
+    assert_eq!((next.header, next.body.as_str()), ("Next", "é complete"));
+    assert!(q.is_empty());
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
+#[test]
+fn maximum_inline_bodies_continue_through_redraw_update_and_delivery_without_heap() {
+    let before = ALLOCS.with(Cell::get);
+    let mut q = Queue::new();
+    for _ in 0..32 {
+        q.upsert(7, "Standing", Body::copied("old"), 1, DEFAULT_COLOR);
+        q.post_static("Plain", FULL_STATIC_BODY, 2, DEFAULT_COLOR);
+        q.upsert(7, "Standing", Body::copied(FULL_STATIC_BODY), 2, DEFAULT_COLOR);
+        assert!(!q.tick(true, true).visible);
+        assert_eq!(q.tick(true, false).draw.unwrap().body.as_str(), FULL_STATIC_BODY);
+        q.on_layout_registered();
+        assert_eq!(q.tick(true, false).draw.unwrap().body.as_str(), FULL_STATIC_BODY);
+        let standing = q.tick(true, false).draw.unwrap();
+        assert_eq!((standing.header, standing.body.as_str()), ("Standing", FULL_STATIC_BODY));
+        assert_eq!(q.take_delivered(), None);
+        assert!(q.tick(true, false).draw.is_none());
+        assert_eq!(q.take_delivered(), Some(7));
+        assert_eq!(q.take_delivered(), None);
+        assert!(q.is_empty());
+    }
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
 #[test]
 fn tick_allocates_nothing() {
     let mut q = Queue::new();

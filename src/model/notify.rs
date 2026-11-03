@@ -4,7 +4,7 @@
 //!
 //! Decisions applied: B8 question 3 a notice only counts down while it is visible, so one posted
 //! behind an open menu waits for the menu to close; length 0 is treated as 1 (question 1); headers are
-//! static strings and bodies are static or a small fixed buffer, so posting allocates nothing
+//! static strings and bodies are copied into a fixed buffer, so posting allocates nothing
 //! (question 2); the recorder posts once per phase change (§6.2).
 //!
 //! Standing notices (package 6's Ready and hot-swap notices): one entry per `id`, updated in place by
@@ -16,16 +16,16 @@
 pub const CAPACITY: usize = 8;
 /// Delivery records the queue keeps for its owners (a full ring drops the oldest).
 pub const DELIVERED_CAPACITY: usize = 4;
-/// Longest dynamic body in bytes.
+/// Longest notice body in bytes.
 pub const BODY_MAX: usize = 320;
 /// Text colour used when a post gives none (black).
 pub const DEFAULT_COLOR: [u8; 4] = [0, 0, 0, 255];
 
-/// A body: a static string or bytes copied into the entry.
+/// A UTF-8 body copied into the entry, independent of the producer's lifetime.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Body {
-    Static(&'static str),
-    Copied { bytes: [u8; BODY_MAX], len: u16 },
+pub struct Body {
+    bytes: [u8; BODY_MAX],
+    len: u16,
 }
 
 impl Body {
@@ -36,14 +36,11 @@ impl Body {
         }
         let mut bytes = [0u8; BODY_MAX];
         bytes[..end].copy_from_slice(&text.as_bytes()[..end]);
-        Body::Copied { bytes, len: end as u16 }
+        Body { bytes, len: end as u16 }
     }
 
     pub fn as_str(&self) -> &str {
-        match self {
-            Body::Static(text) => text,
-            Body::Copied { bytes, len } => std::str::from_utf8(&bytes[..usize::from(*len)]).unwrap_or(""),
-        }
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("")
     }
 }
 
@@ -147,7 +144,7 @@ impl Queue {
     }
 
     pub fn post_static(&mut self, header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
-        self.post(header, Body::Static(body), length, color);
+        self.post(header, Body::copied(body), length, color);
     }
 
     fn remove(&mut self, at: usize) {

@@ -15,6 +15,10 @@ description = "Host tool: builds the TrainingRooms layout archive recipe from th
 nx-layout-toolbox = { git = "https://github.com/crashbandicode/Toolbox-Cli", rev = "9010ca890b6339346758fa68bb53075d24aa0f95", default-features = false }
 serde_json = "1"
 
+[patch.crates-io]
+# Exact 0.13.4 plus upstream's public prelude export correction; see its patch note.
+binrw = { path = "../../third_party/binrw-0.13.4" }
+
 [[bin]]
 name = "layout-builder"
 path = "src/main.rs"
