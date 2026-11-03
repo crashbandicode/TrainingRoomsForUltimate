@@ -87,30 +87,54 @@ pub mod runtime {
         pub mod menu_app { pub fn captures_input() -> bool { false } pub fn note_open() {} }
         pub mod registry {
             use crate::nn::ui2d::Layout;
+            /// # Safety
+            /// `layout` must point to an initialized live host Layout for this
+            /// read. Its name field holds static bytes, so the returned borrow
+            /// does not outlive its backing storage.
             pub unsafe fn layout_name<'a>(layout: *mut Layout) -> Option<&'a [u8]> { Some((*layout).name) }
             pub fn holders() -> &'static [*const u8] { &[] }
         }
         pub mod hud {
+            /// # Safety
+            /// No extra requirements: this host no-op never accesses its arguments.
             pub unsafe fn run(_: *mut crate::nn::ui2d::Layout, _: &[u8]) {}
+            /// # Safety
+            /// No extra requirements: this host no-op never accesses its arguments.
             pub unsafe fn hud_rule(_: *mut crate::nn::ui2d::Layout, _: &[u8]) {}
         }
         pub mod view {
             pub struct Panes { pub container: *mut crate::nn::ui2d::Pane,
                 pub all: [*mut crate::nn::ui2d::Pane; crate::model::panes::MENU_COUNT] }
-            impl Panes { pub unsafe fn draw(&self, _: &crate::model::frame::Frame) {} }
+            impl Panes {
+                /// # Safety
+                /// No extra requirements: this host no-op does not access panes.
+                pub unsafe fn draw(&self, _: &crate::model::frame::Frame) {}
+            }
         }
         pub mod texture { pub fn tick() {} }
         pub mod requests { pub fn run_menu_requests() {} }
         pub mod thumbs {
             pub fn note_frame(_: &crate::model::frame::Frame) {}
+            /// # Safety
+            /// No extra requirements: this host no-op owns no native layout.
             pub unsafe fn lose_layout() {}
+            /// # Safety
+            /// No extra requirements: this host no-op owns no native panes.
             pub unsafe fn hide() {}
+            /// # Safety
+            /// No extra requirements: this host no-op does not access panes.
             pub unsafe fn run(_: &super::view::Panes) -> bool { false }
         }
         pub mod chips {
             pub fn note_frame(_: &crate::model::frame::Frame) {}
+            /// # Safety
+            /// No extra requirements: this host no-op owns no native layout.
             pub unsafe fn lose_layout() {}
+            /// # Safety
+            /// No extra requirements: this host no-op owns no native panes.
             pub unsafe fn hide() {}
+            /// # Safety
+            /// No extra requirements: this host no-op does not access panes.
             pub unsafe fn run(_: &super::view::Panes) -> bool { false }
         }
     }

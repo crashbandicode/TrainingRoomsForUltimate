@@ -1,5 +1,40 @@
 # RC7 UI correction contribution — 2026-11-03
 
+## RC7 clippy follow-up / RC8 composition prerequisite
+
+`dc6deb7d800271ffa471543ee1d46a822087af8a` documents the 12 missing
+`# Safety` contracts exposed by composed RC7 `1769bdd` clippy. The original
+failed freeze/log remains untouched. Tick/observer contracts state the existing
+live callback/tree, serialized native access and lifetime-registration duties;
+the ten host shim contracts distinguish the actual layout read from no-ops.
+All three Rust files are non-doc/whitespace-normalized identical to `f2a6127`;
+no bodies, guards, assertions, visibility, carry, allowance or policy changed.
+Pkg4 independently reviewed the exact diff with no blocking source finding.
+
+New mandatory worker precomposition rule was applied before this repair return:
+both checks below actually passed on this OWN branch, in addition to focused
+three-target clippy. Evidence: `../tmp-ui-screens/rc7-r3/green4/`.
+
+Frozen1535 files, content `1d1ce2ae003bf80af319df858a7e4036d750dabed893c1a6610ad22a3cc0ce48`,
+archive `493e6260eb63051c024c597cb8ba06ea884b48dfba7d193f6b54c6037f99111a`.
+All source checks match before/after each separate normally admitted claim;
+same6GiB/swap0/Tasks256/1800s/incremental0 bounds as below, all released.
+
+| Command | UTC | Actual exit | Log SHA256 | Peak B |
+| --- | --- | --- | --- | --- |
+| `cargo clippy --locked --all-targets -- -D warnings` | 15:23:16–38 | 0 | `4ac3dcf70fb14db5756ba3cba18ed3f84e788a665d1eebcececced205f49cd3c` | 2151809024 |
+| `cargo build --locked --no-default-features` | 15:24:17–23 | 0 | `cb6a1102d4d9aa76d52106d7b5aa6fd6560cd117deb5eca6055b2dca44d97d0a` | 481013760 |
+
+Zero warnings/errors. Exact per-job runners are preserved and runtime-bound to
+SHA `54580fde90b5823a0b7da2dec1d59d587396e9b135ab3764dc8c2338968f1a89`.
+Focused clippy15:21:16–21 also passed (log `770db219…`), with its earlier runner
+preserved separately. These are compile/lint checks, not executed test ELF
+claims or native acceptance. Behavior tests below remain exactly `f2a6127`.
+The sixth finished target is retired by exact hashed inventory:945files,
+188133811B, no runtime-test ELF; manifest/receipt preserved beside green4.
+Lead batches this Safety-only delta with the remaining RC7 findings into ONE
+RC8; original RC7 is not retroactively green. No new native/refusal stand-in.
+
 Returned for composition; not whole-RC/native acceptance. Pkg4 independently
 reviewed the source and all four final focused host receipts with no blocking
 contribution finding. Composition must include pkg6's authoritative scene/P1

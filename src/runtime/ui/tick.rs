@@ -51,6 +51,14 @@ pub static TICKS: AtomicU32 = AtomicU32::new(0);
 pub static REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
 pub static DRAWS: AtomicU32 = AtomicU32::new(0);
 
+/// Process the layout supplied by the current native Calculate callback.
+///
+/// # Safety
+/// `layout` must be non-null and point to a live initialized layout and pane
+/// tree for this callback. Native UI access/destruction must be serialized with
+/// these reads/writes; regular passes run on the UI job thread. Pass
+/// `registration = true` for every new layout lifetime, including address reuse,
+/// before regular passes can use cached panes from that lifetime.
 pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     // These anchors are installed for native ownership even when the renderer's
     // archive/text/manager closure was refused. Never gate this on injected panes.

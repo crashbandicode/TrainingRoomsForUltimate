@@ -1,8 +1,18 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 15:06 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+Updated 2026-11-03, RC8 batched gate repair. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
 ## Current continuation
+
+Lead `tr-lead-astra-6`, same NVIDIA GPT-6 Astra medium session/sole owner-bound watcher; playbook `03e2321`. This RC8 batch adds reviewed UI `dc6deb7` and its receipt documentation `16158f5` to frozen RC7 `1769bdd`. Exactly twelve missing Safety contracts in the real tick/native observer and ten host shims; executable bodies, guards, visibility, assertions, carry transforms, dependency/toolchain/size policies and lint allowances are unchanged. No Phase2/3 source imported. UI's OWN-branch all-target clippy `-D warnings` and no-default build both passed, independently reviewed by pkg4. PRIMARY now requires both checks before every worker fix return.
+
+Original RC7 remains a failed-clippy candidate: Cargo101/twelve missing Safety sections preserved under parent `artifacts/trainingrooms-lead-astra4/rc7`. Its remaining coherent wave completed: all/list15902 top-level passes/91harnesses; no-default; release and diagnostic Cargo0/zero warnings; six standalone and four owned-fixture test/list pairs with exact source/log/preserved-binary audits. Independent normalizedsize135264/136069, full247+41carry and protected provenance checks passed. Counts from overlapping scopes are not summed. Actual compiled thread/entry budgets pass in the retained model; generic8KiB inventory still fails50 per binary/max111824 and is not waived. RC8 must be independently frozen/gated and submitted to PRIMARY for changed-boundary R3 review before its confirming run; no historical binary upgrades it.
+
+PRIMARY's confirming plan: one10800-second Surface diagnostic process,10200-second driving deadline plus600-second cleanup margin, unchanged8GiB/swap0/Tasks256. Unreached/R3-affected rows first; all native UI tokens restore complete settings/defaults/unknown keys and native originals before gameplay reload fixtures. Source-only driver repairs retain actual image/log gates. Renderer-install refusal is covered by host probes; normal native pause/resume and the independent producer remain native rows. Load order A in diagnostic and order B in the already-planned release boot cover both, with actual order evidence. Special/PT/Aegis/IC/Mii mid-build interruption is N/A by synchronous construction; three genuinely pending ORDINARY async teardown/reentry rows remain required. No artificial delay or extra trace boot. Existing N11/HB1/option-A tracepoint plans run only at natural scheduled moments with the lead as sole driver.
+
+Replay remains identical coherent17-file NAND/account/avatar/Mii staging, detector `29067bb63fd2721ed577f613088614a365804c9ac7101c4ad4ff8b8df3cd23a8`,1678 contiguous records/33560B, equal checks AND positions and computed==recorded. Yoga baseline stays as the LDN peer; Surface release reuses its replay process for release laps/online. Full source-bound runtime/replay/LDN, positive allocation coverage, applicable coexistence/placement and restoration evidence remain open. Parent STATUS/inbox/checkpoint and the final artifact root govern current live state. No push/tag/release/card/DBI/USB authority.
+
+## Historical RC7 composition checkpoint
 
 Lead `tr-lead-astra-6`, same NVIDIA GPT-6 Astra medium session and sole owner-bound watcher. Playbook `03e2321` pulled/current; complete playbook read, including the mandatory guest-tracepoint rule. Native facts use lead-armed tracepoints during authorized runs; no extra trace boot or diagnostic-print rebuild without a stated reason. The menu-open timing observation is not under investigation.
 

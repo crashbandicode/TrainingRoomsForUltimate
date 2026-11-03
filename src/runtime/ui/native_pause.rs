@@ -4,6 +4,13 @@ use std::sync::atomic::Ordering;
 use skyline::nn::ui2d::Layout;
 use crate::runtime::{features::input_delay, ui::{pane, registry, state}};
 
+/// Sample native pause panes only during their live layout callback.
+///
+/// # Safety
+/// `layout` must be non-null and reference an initialized live layout whose
+/// name and pane tree remain readable for this call, without concurrent native
+/// mutation/destruction. The caller must report each new layout lifetime with
+/// `registration = true`, including when its address is reused.
 pub unsafe fn observe(layout: *mut Layout, registration: bool) {
     let epoch = input_delay::native_pause_epoch();
     let Some(name) = registry::layout_name(layout) else { return };
