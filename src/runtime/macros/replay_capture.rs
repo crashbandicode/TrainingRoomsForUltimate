@@ -911,6 +911,9 @@ fn apply_action(action: ClipAction) {
 /// reloads the other fighter and the crop never moves.
 pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     use crate::runtime::macros::port::input::ControllerStyle;
+    // While the menu is open its Pad route owns this same physical press.
+    // Otherwise a copied B cancels loading before Pad::Back closes the restored crop.
+    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }
     if loading() {
         if controller.just_down.b() { cancel_reload(); }
         return;
