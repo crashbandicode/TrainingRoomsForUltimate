@@ -212,3 +212,40 @@ fn core04_save_publishes_through_the_same_replace() {
     assert_eq!(settings_file::load(&dir).settings, players_settings());
     fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Invalid settings must still boot when the directory denies deletion and recovery writes.
+/// This exercises the production filesystem path, not a mocked successful cleanup.
+#[cfg(unix)]
+#[test]
+fn core04_invalid_undeletable_settings_defaults_once_without_writing_elsewhere() {
+    use std::os::unix::fs::PermissionsExt;
+    struct WritableOnDrop(PathBuf, fs::Permissions);
+    impl Drop for WritableOnDrop {
+        fn drop(&mut self) {
+            let _ = fs::set_permissions(&self.0, self.1.clone());
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let parent = folder("invalid-undeletable");
+    let dir = parent.join("data");
+    fs::create_dir(&dir).unwrap();
+    let original = b"{ invalid settings";
+    let active = dir.join(file::SETTINGS);
+    fs::write(&active, original).unwrap();
+    let restore = WritableOnDrop(dir.clone(), fs::metadata(&dir).unwrap().permissions());
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+    let error = fs::remove_file(&active).expect_err("fixture must actually deny deletion");
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    for _ in 0..2 {
+        let boot = settings_file::load(&dir);
+        assert_eq!(boot.settings, Settings::factory());
+        assert_eq!(boot.notes.len(), 1, "one boot diagnostic, no cleanup retry spam: {:?}", boot.notes);
+        assert!(boot.notes[0].contains("recovery abandoned"));
+        assert!(boot.notes[0].contains("using factory settings"));
+        assert_eq!(read(&dir, file::SETTINGS), original);
+        assert_eq!(names(&dir), [file::SETTINGS]);
+        assert_eq!(names(&parent), ["data"], "never redirect recovery to a writable parent");
+    }
+    drop(restore);
+    fs::remove_dir(parent).unwrap();
+}

@@ -70,11 +70,19 @@ pub fn load(dir: &Path) -> Boot {
         }
     };
     let loaded = settings::parse_bytes(&bytes);
+    let issue_start = notes.len();
     for issue in &loaded.issues {
         notes.push(format!("[TrainingRooms] settings issue at={} reason={}", issue.at, issue.reason));
     }
-    if loaded.corrupt() {
-        recover(dir, &path, source, &bytes, &loaded.settings, &mut notes);
+    if loaded.corrupt() && !recover(dir, &path, source, &bytes, &loaded.settings, &mut notes) {
+        // A wholly invalid file has no usable values. Report its parse/recovery failure
+        // once at boot; a denied cleanup must not become a panic or a retry loop.
+        if let Some(issue) = loaded.issues.iter().find(|issue| issue.at.is_empty()) {
+            if let Some(failure) = notes.pop() {
+                notes.truncate(issue_start);
+                notes.push(format!("{failure}; invalid settings: {}; using factory settings", issue.reason));
+            }
+        }
     }
     Boot { settings: loaded.settings, notes }
 }
@@ -92,9 +100,10 @@ fn restore_orphaned_backup(dir: &Path, active: &Path, notes: &mut Vec<String>) {
 }
 
 /// Steps 1 and 2 of the module comment. Never panics, never leaves a half-made backup.
-fn recover(dir: &Path, path: &Path, source: SettingsSource, original: &[u8], recovered: &Settings, notes: &mut Vec<String>) {
+fn recover(dir: &Path, path: &Path, source: SettingsSource, original: &[u8], recovered: &Settings, notes: &mut Vec<String>) -> bool {
     let abandon = |notes: &mut Vec<String>, what: String| {
         notes.push(format!("[TrainingRooms] settings recovery abandoned: {what}; the original file stays active"));
+        false
     };
 
     let Some(backup) = storage::first_free_invalid_copy(|name| exists(&dir.join(name)))
@@ -125,6 +134,7 @@ fn recover(dir: &Path, path: &Path, source: SettingsSource, original: &[u8], rec
         }
     }
     notes.push(format!("[TrainingRooms] settings recovered; the original is kept as {}", file_name(&backup)));
+    true
 }
 
 fn file_name(path: &Path) -> String {
