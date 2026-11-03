@@ -786,3 +786,25 @@ Productbase6cd5 stage; newvalue-only rosterfacts at existingCPU gameframe bounda
 Lead23:56 approvespageXsave/Yfocusedreset/ZRpagereset. Implementedonlypagebindings andfooter; reset_setting preservescompoundrange/groups/overrides/chordkeys andpagevisibility rules. Existingresettests nowuseZR andactualXsavebinding; neworiginalrow-isolation+JSONdefaultspersistence regression added, NOTRUN. RetiredunusedDefaultsMenu/DEFAULTS_MENU andtheirduplicateKept.defaults+deadpendinglane; canonicalmodelSettings.menu/defaults preserved, runtimeMENUwritebackstillidenticalorder andlockreleasebeforeworker notification. Allnineassignedwarnings addressedin source across6cd5 stage/0acb roster/thisslice, NOTnativezero-warning proof. Mainnextcombinedhost/clippy/no-default/native/static gates pending; nativeUIrows unrun, noREADY. Noownclaim/queue/compiler/Eden/profile.
 
 Roster review correction: css_order iterates everyCSSgroup, notstoredrank order; 0acb intermediate badge computation waswrong. Replacedwith existinggroup_rank minus the singleexcludedoriginalgroup rankwhenitprecedes thisgroup. Preservesmanualcycleorder, removesextraVec, andextendedoriginalregression toassertnon-CSS order whennoexclusion. Mustcomposefollowupbeforehost/nativegate; no failedtestreceipt invented (caughtbyfullcallee reviewbeforeexecution).
+
+## Exact main-r3 native failure and focused-row root fix
+Leadfrozen88498e3 source1263/content1243043e327e2c74af5e2e023cb3d9ad44f77e52a8b699748280bbf138c58bf9 nativecargo101 (00:06:29.7588823 to00:07:07.0993909), source_verified_after=true. Independentlyreadactualjob/log andverifiedlogSHAeec22dc0a21c966faa0290686035715e34a9464f2029a9667a3e9575b18ab676. Raw /home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/main-r3/diag/build.log:
+
+```text
+error[E0308][0m[1m: mismatched types[0m
+   [1m[94m--> [0msrc/model/menu/mod.rs:745:76
+    [1m[94m|[0m
+[1m[94m745[0m [1m[94m|[0m                 if let Some(row) = self.focused_row() { self.reset_setting(row); }
+    [1m[94m|[0m                                                              [1m[94m-------------[0m [1m[91m^^^[0m [1m[91mexpected `&Row`, found `usize`[0m
+    [1m[94m|[0m                                                              [1m[94m|[0m
+    [1m[94m|[0m                                                              [1m[94marguments to this method are incorrect[0m
+    [1m[94m|[0m
+[1m[92mnote[0m: method defined here
+   [1m[94m--> [0msrc/model/menu/mod.rs:874:8
+    [1m[94m|[0m
+[1m[94m874[0m [1m[94m|[0m     fn reset_setting(&mut self, row: &Row) {
+    [1m[94m|[0m        [1m[92m^^^^^^^^^^^^^[0m            [1m[94m---------[0m
+
+
+[1m```
+Root: focused_rowreturnsOption<usize>. FixusesROWS.get(index) throughand_then before reset_setting, preservingNoneonheader/outofbounds andcompoundresetsemantics. Failedfrozenfiles untouched, nextsourcegatepending, noacceptance. LeadSurfaceRELEASED00:07; noownclaim/Eden/profile.

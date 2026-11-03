@@ -742,7 +742,7 @@ impl Menu {
             Button::B => self.closed = true,
             Button::X => self.save_defaults(),
             Button::Y => {
-                if let Some(row) = self.focused_row() { self.reset_setting(row); }
+                if let Some(row) = self.focused_row().and_then(|index| ROWS.get(index)) { self.reset_setting(row); }
             }
             Button::ZR => self.reset_page(),
             Button::A => match self.focus() {
