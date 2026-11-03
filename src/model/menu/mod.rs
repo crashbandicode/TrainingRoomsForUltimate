@@ -740,7 +740,11 @@ impl Menu {
             Button::L => self.change_page(false),
             Button::R => self.change_page(true),
             Button::B => self.closed = true,
-            Button::X => self.reset_page(),
+            Button::X => self.save_defaults(),
+            Button::Y => {
+                if let Some(row) = self.focused_row() { self.reset_setting(row); }
+            }
+            Button::ZR => self.reset_page(),
             Button::A => match self.focus() {
                 Some(Entry::Group(g)) => {
                     self.expanded ^= 1 << g;
@@ -754,7 +758,7 @@ impl Menu {
                     self.cycle(row, button == Button::Right);
                 }
             }
-            Button::Y | Button::ZL | Button::ZR => {}
+            Button::ZL => {}
         }
     }
 
@@ -855,37 +859,31 @@ impl Menu {
         }
     }
 
-    /// X on a page: every setting row of the page returns to the saved defaults (the defaults
-    /// snapshot, which is the factory table until the player saves their own). Rows kept in INI
-    /// files (the menu shortcuts, Replay capture) are not part of the settings and stay.
+    /// ZR on a page restores its saved defaults. INI-held shortcuts and
+    /// replay capture are not in the settings snapshots and stay unchanged.
     fn reset_page(&mut self) {
-        let page = self.page;
         for row in &ROWS {
-            if row.page() != page || !row.visible(self.env.pilot_present) {
-                continue;
+            if row.page() == self.page && row.visible(self.env.pilot_present) {
+                self.reset_setting(row);
             }
-            let mut ids: [&str; 2] = [row.id, ""];
-            if let Control::MultiSelectRange { range_id, .. } = row.control {
-                ids[1] = range_id;
-            }
-            if matches!(row.control, Control::SwapGroups) {
-                for id in SWAP_GROUP_IDS {
-                    self.reset_row(id);
-                }
-            }
-            if matches!(row.control, Control::Editor(Editor::SituationOverrides)) {
-                for (_, id) in SITUATIONS {
-                    self.reset_row(id);
-                }
-            }
-            if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
-                for (_, id) in CHORD_ROWS {
-                    self.reset_row(id);
-                }
-            }
-            for id in ids {
-                self.reset_row(id);
-            }
+        }
+    }
+
+    /// One visible row can own several stored keys (range/checklist, groups,
+    /// overrides, chords); a focused-row reset restores that complete value.
+    fn reset_setting(&mut self, row: &Row) {
+        if matches!(row.control, Control::SwapGroups) {
+            for id in SWAP_GROUP_IDS { self.reset_row(id); }
+        }
+        if matches!(row.control, Control::Editor(Editor::SituationOverrides)) {
+            for (_, id) in SITUATIONS { self.reset_row(id); }
+        }
+        if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
+            for (_, id) in CHORD_ROWS { self.reset_row(id); }
+        }
+        self.reset_row(row.id);
+        if let Control::MultiSelectRange { range_id, .. } = row.control {
+            self.reset_row(range_id);
         }
     }
 

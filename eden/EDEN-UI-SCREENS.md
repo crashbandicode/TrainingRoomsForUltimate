@@ -143,3 +143,16 @@ profile restore. The helper-path boot hold is still binding.
 - Keep the menu open while the practice identity changes: Direct A must refuse without addressing the replacement scene. Reopen to capture the new identity.
 - An opening without a qualified practice stage must refuse; no later silent retarget. Reset clears the opening context and request display.
 - A refused second request keeps its refusal visible; prior accepted work remains native-owned and completion notifications remain active.
+
+### Roster original/ready facts (pending native acceptance)
+
+- Open cycles with an Aegis or Pokemon Trainer original: every form in that original group is dimmed, A/R preserve its stored preference, and remaining numbered badges skip slot 0.
+- Original Ice Climbers with a different cycle Solo setting becomes selectable; matching settings dim it again. ZR switches to the CPU original and independent Solo preference. Saved CPU Miis must not exclude a generic class identity.
+- Verify a built parked alternative shows a star, an active/unready body does not, and a role or Solo change never borrows the previous request's ready marks. Repeat with text fallback portraits.
+- Close the cycle grid: no readiness queries continue. Scene retirement/stale frame facts remove hints; no native pointers cross to the menu worker. Capture hook allocation and exact callback stack evidence for the new publication call path.
+
+### Current/default settings controls (pending native acceptance)
+
+- Change a delay range and another page row; page X saves current defaults. Change them again, then Y restores only the focused complete delay row (checklist plus range).
+- ZR resets every settings row on the current page, preserving other pages and INI-held shortcuts/replay-capture settings.
+- Close, restart, and verify both current and defaults snapshots survive; resetting does not overwrite defaults. Specialized popup/grid X/Y/ZR actions retain their existing meanings.

@@ -178,7 +178,7 @@ pub struct Frame {
     /// A short last row is centred under the full ones (the portrait roster's last row of 9 under 13 columns).
     pub tile_centre_last: bool,
     pub tile_sig: u32,
-    /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
+    /// Per tile: 0 clear, 1 ticked, 2 greyed. Delay tile_focus 255 selects a range handle.
     pub tile_state: [u8; super::panes::TILES],
     pub range: RangeView,
     pub clip: ClipBar,
@@ -302,7 +302,7 @@ pub fn fade_alpha(count: u32) -> u8 {
         (255.0 / 16f32.log10() * ((remaining + 1) as f32).log10()).clamp(0.0, 255.0) as u8
     }
 }
-const HINT_PAGE: &str = "L/R page   Up/Down move   Left/Right change   A open   B close   X reset page";
+const HINT_PAGE: &str = "L/R page   Up/Down move   Left/Right change   A open   X save defaults   Y reset row   ZR reset page   B close";
 
 fn group_of(entry: Entry) -> usize {
     match entry {
