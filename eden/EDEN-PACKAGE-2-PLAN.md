@@ -1,5 +1,17 @@
 # Eden rows planned, package 2 (CPU behaviour), batched per boot
 
+## Current RC admission and evidence requirements — 2026-11-03
+
+The boot table below is the original package plan. Its missing-package and boot-only configuration limitations are historical: the integrated menu, recorder and state features now exist, but every final RC row still needs exact-candidate runtime evidence. Reuse the existing 359-row map and each original spec criterion; do not count historical small-plugin runs as final coverage.
+
+For every current lane, **any Unmapped anywhere in the complete console fails**, regardless of address or activity window. Preserve raw failures, hook allocation samples, measured thread maxima, source/NRO/plugin identities and complete profile/harness restoration plus separate verification. Installation alone does not prove an exercised callback. A missing provider is unexercised coverage, not a successful no-op.
+
+Before DI, tech or out-of-shield rows, require the actual current-boot cpu_common_load line: all four owned common-module sites guard_ok and cpu_common=installed. The initial awaiting_common_nro registration reason is not installation. no_nro_hook, missing or guard_refused cannot qualify these rows. Source boundary is runtime/features/cpu_common.rs: register resolves add_nro_load_hook; the registered module callback validates all four64-byte guards before writing the three hooks. Use a previously qualified plugin set with the required provider; retain its full hashes and load order. The minimal three-plugin F9/Hitbox sets that explicitly lack this provider cannot substitute for this positive CPU lane.
+
+Use the integrated menu to batch compatible changes in one admitted boot, retaining actual before/after settings and actions. Preserve the original SDI/reset/B11 decision semantics; menu availability does not reduce repeats, side changes, multi-hit cases or actual tether/dual-body requirements. Pilot coexistence requires positive single-driver detection in both load orders; a guarded ai_think native call is not itself a hook collision. Keep normal-shield multiplier restoration on leaving Training and role retirement at scene changes as actual transition rows.
+
+All lanes remain unrun on the final candidate. A development host or native gate does not close them. Host ownership, queue fairness, mute-before-load, resource caps and full restoration remain mandatory.
+
 2026-11-02, package-2 implementer. Nothing here has been run. Rows are the specs' own labels (`SPEC-cpu-0N` §9);
 they are grouped by the `settings.json` each boot needs, because settings are read at boot until the menu
 (package 5) exists. One window, 1 stock, 1:00, items and hazards off, Eden muted (`core.volume=0`), claim written
