@@ -16,8 +16,6 @@ pub(crate) fn init() {
     bust_context::init();
     #[cfg(feature = "mii-editor-alpha")]
     mii_editor_bridge::init();
-    #[cfg(feature = "mii-pool-observer")]
-    crate::runtime::roster::character_roster::mii_pool_observer::init();
 }
 
 #[cfg(feature = "mii-saved-alpha")]

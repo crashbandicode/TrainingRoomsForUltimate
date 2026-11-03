@@ -12,7 +12,7 @@ use model::guard::{SeamKind, GUARD_BYTES};
 use model::sites_pkg6::SITES;
 use model::{sites, sites_pkg2, sites_pkg3, sites_pkg4, sites_ui};
 
-const SYMBOLS: [(&str, &str); 19] = [
+const SYMBOLS: [(&str, &str); 9] = [
     ("p1_attack_is_infliction", "_ZN3app8lua_bind39AttackModule__is_infliction_status_implEPNS_26BattleObjectModuleAccessorEj"),
     ("p1_manager_entry_count", "_ZN3app8lua_bind32FighterManager__entry_count_implEPNS_14FighterManagerE"),
     ("p1_manager_is_result_mode", "_ZN3app8lua_bind35FighterManager__is_result_mode_implEPNS_14FighterManagerE"),
@@ -22,16 +22,6 @@ const SYMBOLS: [(&str, &str); 19] = [
     ("roster_posture_pos", "_ZN3app8lua_bind23PostureModule__pos_implEPNS_26BattleObjectModuleAccessorE"),
     ("roster_find_battle_object", "_ZN3app8lua_bind54BattleObjectManager__is_active_find_battle_object_implEPNS_19BattleObjectManagerEj"),
     ("roster_status_is_changing", "_ZN3app8lua_bind30StatusModule__is_changing_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_data", "_ZN3app8lua_bind30AttackModule__attack_data_implEPNS_26BattleObjectModuleAccessorEib"),
-    ("probe_attack_is_attack", "_ZN3app8lua_bind28AttackModule__is_attack_implEPNS_26BattleObjectModuleAccessorEib"),
-    ("probe_attack_power_add_status", "_ZN3app8lua_bind35AttackModule__power_add_status_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul", "_ZN3app8lua_bind28AttackModule__power_mul_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul_2nd", "_ZN3app8lua_bind32AttackModule__power_mul_2nd_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul_3rd", "_ZN3app8lua_bind32AttackModule__power_mul_3rd_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul_4th", "_ZN3app8lua_bind32AttackModule__power_mul_4th_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul_5th", "_ZN3app8lua_bind32AttackModule__power_mul_5th_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_attack_power_mul_status", "_ZN3app8lua_bind35AttackModule__power_mul_status_implEPNS_26BattleObjectModuleAccessorE"),
-    ("probe_damage_is_damage_lock", "_ZN3app8lua_bind33DamageModule__is_damage_lock_implEPNS_26BattleObjectModuleAccessorE"),
 ];
 
 /// The standalone pilot's sites (`tests/cpu_sites.rs`).
@@ -71,10 +61,9 @@ fn every_row_matches_the_owned_elf() {
             sites::Feature::Roster
         } else if site.name.starts_with("p1_") {
             sites::Feature::P1Cpu
-        } else if site.name.starts_with("roster_") {
-            sites::Feature::Roster
         } else {
-            sites::Feature::Probes
+            assert!(site.name.starts_with("roster_"), "unexpected retained row {}", site.name);
+            sites::Feature::Roster
         };
         assert_eq!(site.feature, expected, "{}", site.name);
     }
@@ -107,4 +96,11 @@ fn no_guard_window_touches_a_site_of_the_standalone_pilot() {
             assert!(distance >= GUARD_BYTES, "{} at {:#x} is {distance:#x} from the pilot site {pilot:#x}", site.name, site.offset);
         }
     }
+}
+
+#[test]
+fn retired_source_owner_calls_leave_only_product_rows() {
+    assert_eq!(SITES.len(), SYMBOLS.len() + RELIED.len());
+    assert!(SITES.iter().all(|site| site.feature != sites::Feature::Probes));
+    assert!(SITES.iter().all(|site| !site.name.starts_with("probe_")));
 }

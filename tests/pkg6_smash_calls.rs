@@ -69,16 +69,6 @@ const COVERED: &[(&str, &str)] = &[
     ("StopModule::is_stop", "stop_is_stop"),
     ("ArticleModule::get_active_num", "state_article_active_num"),
     ("ArticleModule::get_article", "state_article_get_article"),
-    ("AttackModule::attack_data", "probe_attack_data"),
-    ("AttackModule::is_attack", "probe_attack_is_attack"),
-    ("AttackModule::power_add_status", "probe_attack_power_add_status"),
-    ("AttackModule::power_mul", "probe_attack_power_mul"),
-    ("AttackModule::power_mul_2nd", "probe_attack_power_mul_2nd"),
-    ("AttackModule::power_mul_3rd", "probe_attack_power_mul_3rd"),
-    ("AttackModule::power_mul_4th", "probe_attack_power_mul_4th"),
-    ("AttackModule::power_mul_5th", "probe_attack_power_mul_5th"),
-    ("AttackModule::power_mul_status", "probe_attack_power_mul_status"),
-    ("DamageModule::is_damage_lock", "probe_damage_is_damage_lock"),
 ];
 
 fn all_rows() -> BTreeSet<&'static str> {

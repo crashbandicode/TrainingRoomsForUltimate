@@ -139,18 +139,13 @@ fn every_probe_trace_observer_and_meter_requires_diag() {
     }
     // Explicit retained inventory: approved probe retirements must not erase unresolved diagnostics.
     let expected = BTreeSet::from([
-        "automation-results-observer",
         "console-practice-trace",
         "console-swap-trace",
         "hang-trace",
         "mii-ldn-qualification-probe",
-        "mii-origin-observer",
-        "mii-pool-observer",
         "named-input-trace",
-        "native-body-bank-probe",
         "native-unlink-probe",
         "plugin-heap-meter",
-        "source-owner-probe",
         "texture-probe",
     ]);
     assert_eq!(checked, expected);
@@ -214,8 +209,8 @@ fn the_feature_matrix_lists_every_feature() {
     assert!(listing.contains("--features diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"));
 }
 
-/// The matrix skips exactly the fork's by-design exclusions: every `compile_error!` message of the sources is one row of
-/// `EXCLUSIONS` in `tools/feature_matrix.py`, and every row there names a message the sources still contain.
+/// Both mutually exclusive observer experiments have been retired. There must
+/// be no stale matrix skip and no source exclusion left without a matrix row.
 #[test]
 fn the_matrix_skips_exactly_the_forks_compile_error_exclusions() {
     fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
@@ -236,11 +231,30 @@ fn the_matrix_skips_exactly_the_forks_compile_error_exclusions() {
     let mut messages = Vec::new();
     walk(&root.join("src"), &mut messages);
     let tool = std::fs::read_to_string(root.join("tools/feature_matrix.py")).unwrap();
-    let rows = tool.matches("compile_error").count();
-    for message in &messages {
-        assert!(tool.contains(message.as_str()), "compile_error! not listed in EXCLUSIONS: {message}");
+    assert!(messages.is_empty(), "new source exclusion needs a reviewed matrix rule: {messages:?}");
+    assert!(tool.contains("EXCLUSIONS = []"), "retired experiments must not leave matrix skips");
+}
+
+#[test]
+fn rc_retired_observation_features_and_modules_cannot_be_reenabled() {
+    let map = features();
+    for feature in ["source-owner-probe", "mii-origin-observer", "mii-pool-observer",
+        "native-body-bank-probe", "automation-results-observer"] {
+        assert!(!map.contains_key(feature), "retired RC feature {feature}");
     }
-    assert!(!messages.is_empty() && tool.matches(".rs:").count() >= messages.len(), "{rows} {messages:?}");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    for path in ["src/runtime/roster/source_owner_probe.rs", "src/runtime/roster/mii_origin_observer.rs",
+        "src/runtime/roster/mii_pool_observer.rs", "src/runtime/roster/body_bank_probe.rs",
+        "src/model/mii_root/mii_pool_observer_policy.rs", "src/runtime/lobby/automation_helper/observer.rs",
+        "src/runtime/hitbox_observer.rs", "src/model/hitbox_observation.rs",
+        "src/model/seams/native_seams/rows_hitbox_observer.rs"] {
+        assert!(!root.join(path).exists(), "retired module {path}");
+    }
+    // Option 3 was not approved. Keep historical tools and the product pilot alias.
+    for feature in ["console-practice-trace", "console-swap-trace", "hang-trace",
+        "native-unlink-probe", "native-unlink-guard", "plugin-heap-meter", "cpu-pilot-probe"] {
+        assert!(map.contains_key(feature), "retained feature {feature}");
+    }
 }
 
 #[test]

@@ -53,8 +53,7 @@ CORE = [
     ("default", []),
     ("no-default-features", ["--no-default-features"]),
     ("default+diag", ["--features", "diag"]),
-    # No `--all-features`: the fork's probe features are mutually exclusive by design (`compile_error!` pairs, e.g. the results
-    # observer and the native adapter hook the same sites), so the union is not a product or a diag build.
+    # Explicit product/diagnostic combinations, rather than an all-features product.
     ("trace", ["--features", "diag,console-practice-trace"]),
     ("swap-trace", ["--features", "diag,console-swap-trace"]),
     ("unlink-probe", ["--features", "diag,native-unlink-probe"]),
@@ -66,13 +65,7 @@ CORE = [
 
 # The fork's mutual exclusions, by design (each is a `compile_error!` in the carried sources): a combination whose feature closure
 # holds both sides is not a build anyone makes, so the matrix skips exactly these and nothing else.
-EXCLUSIONS = [
-    ("automation-results-observer", ("automation-results-native",),
-     "src/runtime/lobby/automation_helper.rs:7: results observer and native adapter both hook 0x150e5f0 and 0x150e9d0; enable only one"),
-    ("native-body-bank-probe", ("native-body-bank-alpha",),
-     "src/runtime/roster/character_roster.rs:32: The fixed bank probe and managed bank candidate cannot share native hooks"),
-
-]
+EXCLUSIONS = []
 
 
 def closure(table, roots):

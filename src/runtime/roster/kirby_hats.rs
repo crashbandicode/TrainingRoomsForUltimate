@@ -165,11 +165,6 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
         return;
     };
     let body = bodies[role].expect("eligible Kirby body");
-    #[cfg(feature = "source-owner-probe")]
-    if !cfg!(feature = "managed-sources")
-        && crate::runtime::roster::character_roster::source_owner_probe::request_replacement(body) {
-        return;
-    }
     let settings = read(&MENU);
     let choices = settings.ordered_kirby_hat_kinds_fixed(if role == 0 {
         crate::engine::swap::roster_grid::Role::Player
@@ -349,8 +344,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             .find(|source| app::utility::get_kind(&mut **source) as u32 == pending.kind);
         let slot = source.map(|source|
             WorkModule::get_int(source, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID));
-        #[cfg(feature = "source-owner-probe")]
-        let slot = slot.or_else(|| crate::runtime::roster::character_roster::source_owner_probe::source_slot(pending.kind));
         slot
         };
         let Some(slot) = slot else {

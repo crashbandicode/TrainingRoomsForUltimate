@@ -88,7 +88,7 @@ features! {
     P1Cpu => "p1_cpu",
     /// Package 6: the roster cycle's game calls that no other package guards (sites_pkg6.rs `roster_*` rows); the cycle's hooks are carried seam rows.
     Roster => "roster",
-    /// Package 6: the diag-only source-owner probe's game calls (sites_pkg6.rs probe_* rows).
+    /// Reserved legacy source-owner feature id; its diagnostic calls were retired for the RC.
     Probes => "probes",
     /// SPEC-core-06 guarded visualizer.
     Hitbox => "hitbox",

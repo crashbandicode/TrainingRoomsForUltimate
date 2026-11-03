@@ -6,8 +6,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-#[cfg(feature = "automation-results-observer")]
-use crate::engine::lobby::trace_slot::{flush_with, LatestSlot};
 #[cfg(all(feature = "diag", feature = "mii-editor-alpha"))]
 use crate::engine::lobby::trace_slot::{flush_boxed, BoxedSlot};
 
@@ -38,29 +36,12 @@ pub fn init() {
     }
 }
 
-/// The results observer's finished trace (development builds only); the box is moved in, nothing is copied or allocated.
-#[cfg(feature = "automation-results-observer")]
-static RESULTS_OBSERVER: LatestSlot<Box<crate::runtime::lobby::automation_helper::observer::Trace>> = LatestSlot::new();
-
 /// One pass over the slots.
 fn turn() {
-    #[cfg(feature = "automation-results-observer")]
-    if let Err(error) = flush_with(&RESULTS_OBSERVER, |trace| {
-        crate::runtime::lobby::automation_helper::observer::write_trace(trace);
-        Ok(())
-    }) {
-        crate::engine::compat::logging::diagnostic(format_args!("[AutomationObserver] trace write failed: {error}"));
-    }
     #[cfg(all(feature = "diag", feature = "mii-editor-alpha"))]
     if let Err(error) = flush_boxed(&MII_EDITOR, crate::runtime::mii::mii_editor_bridge::write_trace) {
         crate::engine::compat::logging::diagnostic(format_args!("[MiiEditor] trace write failed: {error}"));
     }
-}
-
-/// The results observer's finished trace.
-#[cfg(feature = "automation-results-observer")]
-pub fn write_results_observer(trace: Box<crate::runtime::lobby::automation_helper::observer::Trace>) {
-    RESULTS_OBSERVER.put(trace);
 }
 
 /// The Mii editor bridge's newest trace (`mii-editor-last.json`).

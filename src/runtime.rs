@@ -16,8 +16,6 @@ mod developer_reload;
 mod compat;
 pub(crate) mod diag_log;
 #[cfg(feature = "diag")]
-pub(crate) mod hitbox_observer;
-#[cfg(feature = "diag")]
 mod diag_reload;
 mod deluxe_row;
 mod features;

@@ -1651,16 +1651,6 @@ pub fn scene_changed() {
     crate::runtime::roster::cycle_preload::scene_end();
 }
 
-/// Preserve the old probe's Training owner2 automation suppression independently
-/// of its diagnostics. This is not resource admission or native source ownership.
-#[cfg(any(feature = "source-owner-probe", feature = "managed-sources"))]
-#[cfg(feature = "source-owner-probe")]
-pub unsafe fn legacy_training_owner_reserved(body: &mut app::BattleObjectModuleAccessor) -> bool {
-    crate::runtime::compat::common::is_native_training_mode()
-        && app::utility::get_category(body) == *BATTLE_OBJECT_CATEGORY_FIGHTER
-        && WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == 2
-}
-
 /// Finish a load this entry already owns. True means this callback must not
 /// start another install. Pending Mii completion reaches the normal tick commit;
 /// a SourceBook complete() failure keeps the previous tick copy.

@@ -11,7 +11,7 @@ pub(crate) mod consts;
 pub(crate) mod menu;
 pub(crate) mod replay_preview;
 pub(crate) mod sync;
-#[cfg(any(all(feature = "diag", feature = "mii-editor-alpha"), feature = "automation-results-observer"))]
+#[cfg(all(feature = "diag", feature = "mii-editor-alpha"))]
 pub(crate) mod filesystem;
 pub(crate) mod hazard_manager;
 pub(crate) mod input;

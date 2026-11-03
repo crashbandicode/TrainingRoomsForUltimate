@@ -66,8 +66,6 @@ const AUTHORITATIVE: &[&str] = &[
     "mii_hud_portrait",
     "mii_identity_probe",
     "mii_ordinary_gate",
-    "mii_origin_observer",
-    "mii_pool_observer",
     "mii_preview_observer",
     "mii_quit_observer",
     "mii_saved_fingerprints",

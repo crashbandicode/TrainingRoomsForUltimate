@@ -238,9 +238,6 @@ unsafe fn grant(body: *mut app::BattleObjectModuleAccessor, spec: Spec, source_l
     let source_present = IntoIterator::into_iter([FighterId::Player, FighterId::CPU])
         .filter_map(try_get_module_accessor)
         .any(|source| app::utility::get_kind(&mut *source) == spec.source);
-    #[cfg(feature = "source-owner-probe")]
-    let source_present = source_present
-        || crate::runtime::roster::character_roster::source_owner_probe::item_source(spec.source as u32);
     if !common_item(spec) && !source_present && !source_loaded {
         let name = ITEM_NAMES[spec.choice].split(':').next().unwrap_or("Source fighter");
         return Err(format!("Load {name} as Player or CPU first"));

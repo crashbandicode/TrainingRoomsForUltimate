@@ -1,5 +1,32 @@
 # Carry-over ledger (package 1)
 
+## RC reset option 2 — 2026-11-03
+
+Lead10:42:04 authorized retirement of obsolete optional source-owner, Mii
+origin/pool, fixed-body-bank and automation-results observations, plus the
+Hitbox diagnostic-only correlation trio. Six carried files (including the
+exclusive pool policy) moved from `files` to `not_carried` in the existing
+pkg6 provenance manifest; nine surviving carried files have exact appended
+transforms. `tools/carry_pkg6.py carry` and `ledger` regenerated the sources,
+destination hashes and ledger; full `verify` re-derived 247 files from the
+already-approved ours-new M5q source set. This is product carry metadata, not
+a new scratch receipt/hash manifest. No new fork implementation was inspected.
+
+Retired caller/declaration/feature/exclusion/seam closures are part of the same
+slice. Sixteen Mii observer seams, four results-observer seams, nine Hitbox
+observer seams and ten exclusive source-owner call rows are removed; rows
+shared with product native banks/Mii remain. `Feature::Probes` is a reserved
+id, not a live probe, preserving later feature discriminants. Continuous and
+swap/hang traces, unlink guard/probe, pilot product alias, CountingAllocator,
+HookScope, stack/headroom and refusal diagnostics are retained. Product Hitbox
+requests, parameters, handles, tint/rate and feature controls are unchanged.
+
+New/adjusted host regressions pin retired feature/file absence, retained tools,
+product-only call rows and the empty obsolete-exclusion set. They have not run
+on this scratch tree: the lead's coherent-candidate host gates precede Eden.
+Historical observations remain in git and the existing raw artifact archives.
+No product parity or final gate PASS is inferred from retirement/provenance.
+
 Every file or part of a file taken from the earlier fork. Source: stage **m5o** (= C116.2 as shipped),
 `/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages/m5o/stage`
 (called `<stage>` below). Only files whose `origin` is `ours-new` in `docs/provenance/provenance-files.json`

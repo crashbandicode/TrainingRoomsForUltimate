@@ -25,12 +25,6 @@ use crate::engine::swap::character_forms::{
 mod native_service;
 use native_service::ServiceEntryContext;
 
-#[cfg(feature = "native-body-bank-probe")]
-#[path = "body_bank_probe.rs"]
-pub mod body_bank_probe;
-
-#[cfg(all(feature = "native-body-bank-probe", feature = "native-body-bank-alpha"))]
-compile_error!("The fixed bank probe and managed bank candidate cannot share native hooks");
 #[cfg(feature = "native-body-bank-alpha")]
 #[path = "native_body_bank.rs"]
 pub(crate) mod body_bank;
@@ -66,20 +60,9 @@ pub mod sources;
 #[path = "process_memory.rs"]
 pub(crate) mod process_memory;
 
-#[cfg(feature = "source-owner-probe")]
-#[path = "source_owner_probe.rs"]
-pub mod source_owner_probe;
-
 macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
 }
-
-#[cfg(feature = "mii-pool-observer")]
-#[path = "mii_pool_observer.rs"]
-pub mod mii_pool_observer;
-#[cfg(feature = "mii-origin-observer")]
-#[path = "mii_origin_observer.rs"]
-mod mii_origin_observer;
 
 #[cfg(feature="mii-saved-alpha")]
 #[path="../mii/mii_saved_alpha.rs"]
@@ -863,17 +846,11 @@ pub fn scene_changed(mode: game_mode::Mode) {
     body_bank::scene_changed();
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::scene_changed();
-    #[cfg(feature = "mii-origin-observer")]
-    mii_origin_observer::scene_changed();
-    #[cfg(feature = "mii-pool-observer")]
-    mii_pool_observer::scene_changed();
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::scene_changed();
     sources::scene_changed();
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::scene_changed();
-    #[cfg(feature = "source-owner-probe")]
-    source_owner_probe::scene_changed();
     crate::runtime::roster::character_items::scene_changed();
     let same_lobby = WAITING_MEMORY
         .lock()
@@ -998,11 +975,7 @@ unsafe fn ready_forms(entry: *const u8, owner: u32) -> Option<(Forms, u32)> {
 }
 
 /// `ready_forms` without the roster catalog admission: single-kind Mii entries only.
-#[cfg(any(
-    feature = "mii-pool-observer",
-    feature = "mii-origin-observer",
-    feature = "mii-saved-alpha"
-))]
+#[cfg(feature = "mii-saved-alpha")]
 unsafe fn ready_single_mii(entry: *const u8, owner: u32) -> Option<u32> {
     if !aligned(entry) || read::<u32>(entry, 0xe0) != owner {
         return None;
@@ -1084,27 +1057,12 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
     let owner = read::<u32>(entry, 0xe0);
     #[cfg(feature = "native-body-bank-alpha")]
     body_bank::service(entry, owner);
-    #[cfg(feature = "native-body-bank-probe")]
-    if body_bank_probe::service(entry, owner) { return; }
-    #[cfg(feature = "mii-pool-observer")]
-    mii_pool_observer::service(entry, owner);
-    #[cfg(feature = "mii-origin-observer")]
-    mii_origin_observer::service(entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::service(entry, owner);
     sources::service(ctx, entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::service(entry, owner);
     republish_after_rebuild(entry, owner);
-    #[cfg(feature = "source-owner-probe")]
-    if owner == 0 {
-        source_owner_probe::observe_rules();
-    }
-    #[cfg(feature = "source-owner-probe")]
-    if owner == 2 && !cfg!(feature = "managed-sources") {
-        source_owner_probe::service(entry);
-        return;
-    }
     service_body(entry,owner,ctx.caller_lr());
 }
 
@@ -1481,8 +1439,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
     let owner = read::<u32>(entry, 0xe0);
     #[cfg(feature = "native-body-bank-alpha")]
     body_bank::on_destroy(entry);
-    #[cfg(feature = "native-body-bank-probe")]
-    body_bank_probe::on_destroy(entry);
     training::practice::entry_departed(entry as usize);
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::on_destroy(entry,owner);
@@ -1490,20 +1446,11 @@ pub unsafe fn on_destroy(entry: *const u8) {
     mii_ordinary_player::on_destroy(entry);
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     mii_ordinary_cpu::on_destroy(entry);
-    #[cfg(feature = "mii-pool-observer")]
-    mii_pool_observer::on_destroy(owner);
-    #[cfg(feature = "mii-origin-observer")]
-    mii_origin_observer::on_destroy(owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::on_destroy(entry, owner);
     sources::on_destroy(entry, owner);
     #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::on_destroy(entry, owner);
-    #[cfg(feature = "source-owner-probe")]
-    if owner == 2 && !cfg!(feature = "managed-sources") {
-        source_owner_probe::destroy(entry);
-        return;
-    }
     if !matches!(owner, 0 | 1 | 4) {
         return;
     }
@@ -2467,14 +2414,10 @@ pub fn init(#[cfg(feature = "managed-third-source-alpha")] load_contract: Option
         mii_ordinary_cpu::init();
         native_service::install(base);
         training_count_readiness::install();
-        #[cfg(feature = "native-body-bank-probe")]
-        body_bank_probe::install(base);
         #[cfg(feature = "native-body-bank-alpha")]
         body_bank::install(base);
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::init(base);
-        #[cfg(feature = "mii-origin-observer")]
-        mii_origin_observer::init(base);
         if cfg!(feature = "waiting-roster-reload") {
             skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
         }

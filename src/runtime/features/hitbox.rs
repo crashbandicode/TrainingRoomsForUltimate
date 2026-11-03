@@ -192,11 +192,7 @@ impl Effects for GameEffects {
             let pool_before = stats::pool_snapshot();
             #[cfg(feature = "diag")]
             let limits_before = stats::emitter_limits();
-            #[cfg(feature = "diag")]
-            let observation = crate::runtime::hitbox_observer::Request::begin();
             let handle = natives::effect_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, &[0.0; 3], sphere.scale, tail);
-            #[cfg(feature = "diag")]
-            observation.finish(handle);
             if handle != 0 {
                 natives::sphere_set_rgb(self.accessor, sphere.tint);
                 natives::sphere_set_rate(self.accessor, hitbox::RATE);
@@ -492,8 +488,6 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         }
     }
     if closure {
-        #[cfg(feature = "diag")]
-        crate::runtime::hitbox_observer::init();
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
         skyline::install_hook!(hitbox_rebound_hook);

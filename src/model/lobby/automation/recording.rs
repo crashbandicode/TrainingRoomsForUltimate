@@ -2,7 +2,6 @@
 //! Tick/age are metadata: a ticking clock alone must not fill the change buffer.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "automation-results-observer", derive(serde::Serialize))]
 pub enum Stop {
     NativeExit,
     SnapshotLimit,
@@ -12,7 +11,6 @@ pub enum Stop {
     InvalidBinding,
 }
 
-#[cfg_attr(feature = "automation-results-observer", derive(serde::Serialize))]
 pub struct Frame<T> {
     pub tick: u32,
     pub native_age: u32,
