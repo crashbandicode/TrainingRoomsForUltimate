@@ -1,6 +1,20 @@
 # TrainingRooms RC handoff
 
-Updated 2026-11-03 11:18 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+Updated 2026-11-03 13:20 UTC. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
+
+## Current continuation
+
+Lead `tr-lead-astra-6`, OpenCode `ses_e5ea4d5f3ffeMMtWumvKxZhl2t`, verified NVIDIA GPT-6 Astra medium. Durable operational state is in the parent `TRAININGROOMS-LEAD-ASTRA-5-CHECKPOINT.md`; PRIMARY orders and worker returns are in `TRAININGROOMS-LEAD-INBOX.md`. Earlier lead/process references below are historical. Playbook `2dee6cc` was pulled and read completely.
+
+RC5 `5e3fe5e` passed its all/list pair: 14,189 top-level tests across 87 harnesses, with source continuity and preserved executed binaries independently checked. Other host jobs completed successfully; standalone inventories were deferred because RC5 failed clippy. Its 16 pane errors are corrected by reviewed UI `de92c4a` (safety contracts and pinned unsigned 25-byte name binding); development full clippy with `--keep-going` passed without warnings. Final-candidate gates remain required.
+
+RC5 native release and diagnostic builds both exited Cargo 0 but each emitted five unused-function warnings. The release runner initially missed ANSI-colored warnings; its original receipt and raw log are preserved alongside an independent `warning-audit.json`. The corrected runner detected the diagnostic warnings and failed that gate. Native binaries remain evidence of these failed gates, not runtime-qualified artifacts. Reviewed orphan-API removal from `128b16c` joins the pane correction in the RC6 batch; no lint allowance is added. The proposed string-presence test is omitted because it mirrors deletion rather than exercising behavior; all existing pkg6 tests remain unchanged. Full RC6 host/native/carry/size/stack gates are pending.
+
+RC5 normalized size was 134,924/136,069; full carry derivation passed 247+41. The vendored MIT binrw 0.13.4 prelude backport and two existing cfg-name declarations received independent source/license review. Final size/carry/compiled stacks/compliance and runtime acceptance are pending. No lead6 Eden has started.
+
+Replay inputs are the coherent retained M5q full save/account/avatar/Mii set (17 files), with the same detector SHA256 `29067bb63fd2721ed577f613088614a365804c9ac7101c4ad4ff8b8df3cd23a8` for baseline, candidate and online peers. UI settings/default fixtures use real menu input; diagnostic reload does not synchronize the menu worker's full settings/defaults. Developer visibility is boot-only: visible in the diagnostic batch, hidden in the already-planned release setup. These are preparation decisions, not completed runtime evidence.
+
+PRIMARY rescinded the aggregate 60GB cache admission gate. Fresh per-host disk >=40GB, memory, process, queue and shared-ledger checks remain mandatory, with completed-cache retirement and preserved evidence. No push, tag, release, card, DBI or USB operations are authorized.
 
 ## Objective and source
 
@@ -49,7 +63,7 @@ No operator-blocked Hitbox redesign remains in the RC scope: A/B and redesign ar
 3. Candidate gates: all-targethost tests, clippy all-targets -Dwarnings0, no-default build, release+diag0warnings, stack policy, normalizedsize<=136069, carry/provenance, explicit-release compliance and allmanual dispositions scoped to reset matrix. Fix genuine failures and rerun affected checks, preserving failures.
 4. ONE continuous Surface diagnostic session for all single-console rows; Yoga baseline replay retained as online peer and Surface release replay retained as online host/release-lap process: target THREE physical starts total. Every run0TOTALUnmapped/no new crash, no allocation regression from existingzero. M5q failed coldtiming bar and unrun stale-Mii/onlineledge cases are NOT extra gates.
 5. R-D1 same complete replay baseline/candidate checks ANDpositions; R-O1 actual LDN approvedjoin/membership/waiting changes/one completedmatch and detector equalendframes/desync_seen0both. R-O1 uses LANOnlineOFF per actualM5q evidence, correcting older public-TLS planning. Full profiles restored/separately verified before release.
-6. Final README/HANDOFF/compliance/GIF, RC READY, primary Astra-high review. No push/tag/release/card/DBI/USB.60GB target cap/40GB disk floor, bounded jobs, one Eden per host/no compile beside it, shared ledger/fairness remain.
+6. Final README/HANDOFF/compliance/GIF, RC READY, primary Astra-high review. No push/tag/release/card/DBI/USB. Fresh40GB disk floor, bounded jobs, one Eden per host/no compile beside it, shared ledger/queue remain; aggregate60GB cap was rescinded by PRIMARY.
 
 The historical359-row inventory is post-RC backlog; do not resume chasing every old blocker. No current candidate acceptance is inferred from this handoff.
 ## StateWriter stack correction in reset composition

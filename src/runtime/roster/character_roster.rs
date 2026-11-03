@@ -439,16 +439,6 @@ fn original_kind(role: Role) -> Option<u32> {
     (kind != u32::MAX).then_some(kind)
 }
 
-/// Original native P1 selection, not the current practice replacement.
-pub fn original_player_kind() -> Option<u32> {
-    scope(Role::Player).and_then(|_| original_kind(Role::Player))
-}
-
-/// Native CPU choice for the hat picker; practice swaps do not replace it.
-pub fn original_cpu_kind() -> Option<u32> {
-    scope(Role::Cpu).and_then(|_| original_kind(Role::Cpu))
-}
-
 /// Published only from a ready native descriptor, not from an unapplied preference.
 pub fn solo_popo_active(cpu: bool) -> bool {
     let role = if cpu { Role::Cpu } else { Role::Player };

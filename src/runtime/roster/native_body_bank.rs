@@ -834,33 +834,6 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     result
 }
 
-/// Value-only menu hint for a numbered cycle choice, using the same native
-/// receipt as the ready count. It never follows a remembered native pointer.
-/// The active body is not a parked alternative, nor is a canonical-original
-/// reload; a banked original (`original_bank`) is a member like any other.
-/// A built member of a detached group is a warm swap target too.
-pub(crate) fn cycle_ready(role: usize, kind: u32, solo: bool) -> bool {
-    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
-    if role >= BANKS.len() || settings.slots == 0 || !settings.fighters
-        || settings.bank_members < 2 { return false; }
-    let forms = if kind == 0x4b && solo { Forms::solo_popo() } else { Forms::starting(kind) };
-    let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
-    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
-    if super::original_kind(logical_role) == Some(kind)
-        && super::requested_forms_at(&menu, logical_role, kind, None) == forms
-        && !(settings.original_bank_enabled() && original_bankable(kind)) { return false; }
-    let grouped = groups_enabled(&settings);
-    // The same rule as `plan()`/`switch()` (WP-I): the holding window or group serves the kind in
-    // the requested form (`group_serves`), so a parked pair-lead window reads as ready for the
-    // pair and never for Solo. Every window can be left warm (a one-member one by its self-commit).
-    BANKS[role].lock().as_ref().is_some_and(|bank|
-        bank.phase == Phase::Ready && !bank.departed && !bank.failed
-            && bank.observed.is_some_and(|(_, active)| active != kind)
-            && (group_serves(*bank.members, kind, forms).is_some()
-                || (grouped
-                    && bank.groups.iter().any(|g| g.state == GroupState::Built && group_serves(*g.members, kind, forms).is_some()))))
-}
-
 /// A kind held by any of this role's groups (window or extra): helper look-ahead
 /// must not duplicate it.
 pub(crate) fn group_member(role: usize, kind: u32) -> bool {

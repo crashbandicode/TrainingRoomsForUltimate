@@ -24,9 +24,6 @@ static COMMITTED: hos_lock::Mutex<Registry> = hos_lock::Mutex::new(Registry {
     visible: [None;8], helpers: helpers::View::EMPTY,
 });
 pub(crate) fn registry()->hos_lock::MutexGuard<'static,Registry> { COMMITTED.lock() }
-/// Count reconciliation cannot wait on the registry leaf lock.
-#[cfg(feature="mii-managed-source-coexist-alpha")]
-pub(crate) fn try_registry()->Option<hos_lock::MutexGuard<'static,Registry>> { COMMITTED.try_lock() }
 
 pub(crate) fn helper_snapshot()->Result<helpers::View,&'static str> {
     let layout=super::super::mii_backend::current().ok_or("Mii backend unavailable")?;

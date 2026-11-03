@@ -141,14 +141,6 @@ pub(crate) fn frame() -> u32 {
     FRAME.load(Ordering::Relaxed)
 }
 
-/// UI readiness is built-body readiness; an asset-helper hit is not sufficient.
-pub(crate) fn fighter_ready(role: usize, kind: u32, solo: bool) -> bool {
-    #[cfg(feature = "native-body-bank-alpha")]
-    { crate::runtime::roster::character_roster::body_bank::cycle_ready(role, kind, solo) }
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    { let _ = (role, kind, solo); false }
-}
-
 pub(crate) fn settings_changed() {
     reset_admission_grace();
     crate::runtime::roster::character_roster::sources::pause_preload();

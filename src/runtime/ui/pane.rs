@@ -19,7 +19,7 @@ unsafe fn name_is(pane: *const Pane, name: &[u8]) -> bool {
     let raw = &(*pane).name;
     let mut i = 0;
     while i < raw.len() && raw[i] != 0 {
-        if i >= name.len() || raw[i] as u8 != name[i] {
+        if i >= name.len() || raw[i] != name[i] {
             return false;
         }
         i += 1;
@@ -28,6 +28,12 @@ unsafe fn name_is(pane: *const Pane, name: &[u8]) -> bool {
 }
 
 /// The pane called `name` below `root` (depth first), or null.
+/// # Safety
+/// `root` may be null; otherwise it and every reachable child/list link must
+/// remain aligned, initialized, readable live `Pane`/`PaneNode` objects for the
+/// call, with links embedded at the binding's `Pane::link` offset. Run on the UI
+/// job thread without concurrent tree mutation or destruction. The visit bound
+/// does not validate pointers. A returned pane is borrowed from that same tree.
 pub unsafe fn find(root: *mut Pane, name: &[u8]) -> *mut Pane {
     let mut budget = WALK_LIMIT;
     find_in(root, name, &mut budget)
@@ -36,6 +42,12 @@ pub unsafe fn find(root: *mut Pane, name: &[u8]) -> *mut Pane {
 /// Resolve a plugin container at its declared parent boundary. Stock parts may
 /// contain thousands of descendants before our containers; they are not searched.
 /// The same child-list ABI and corruption bound as `find` apply.
+/// # Safety
+/// `parent` may be null; otherwise it and its direct child list must remain
+/// aligned, initialized, readable live binding objects for the call. Every link
+/// must be embedded in a live `Pane` at `Pane::link`. Run on the UI job thread
+/// without concurrent list mutation or destruction; the walk bound does not make
+/// invalid links safe. Any result has only the parent tree's lifetime.
 pub unsafe fn find_child(parent: *mut Pane, name: &[u8]) -> *mut Pane {
     if parent.is_null() {
         return core::ptr::null_mut();
@@ -75,6 +87,11 @@ unsafe fn find_in(pane: *mut Pane, name: &[u8], budget: &mut usize) -> *mut Pane
 }
 
 /// How many panes live below `pane` (itself included), for the diagnostics.
+/// # Safety
+/// `pane` may be null; otherwise it and all reachable child/list links must
+/// remain aligned, initialized, readable live binding objects, with every link
+/// embedded at `Pane::link`. Run on the UI job thread without concurrent tree
+/// mutation or destruction. The visit bound does not validate pointers.
 pub unsafe fn count(pane: *mut Pane) -> usize {
     let mut budget = WALK_LIMIT;
     let mut n = 0;
@@ -96,15 +113,24 @@ unsafe fn count_in(pane: *mut Pane, budget: &mut usize, n: &mut usize) {
     }
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its flags on the UI job thread for the call.
 pub unsafe fn set_visible(pane: *mut Pane, visible: bool) {
     (*pane).set_visible(visible);
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its alpha field on the UI job thread for the call.
 pub unsafe fn set_alpha(pane: *mut Pane, alpha: u8) {
     (*pane).alpha = alpha;
 }
 
 /// Move a pane (centre, relative to its parent) and mark its matrix stale.
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its position and flags on the UI job thread for the call.
 pub unsafe fn set_pos(pane: *mut Pane, x: f32, y: f32) {
     if (*pane).pos_x != x || (*pane).pos_y != y {
         (*pane).pos_x = x;
@@ -113,6 +139,9 @@ pub unsafe fn set_pos(pane: *mut Pane, x: f32, y: f32) {
     }
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its size and flags on the UI job thread for the call.
 pub unsafe fn set_width(pane: *mut Pane, width: f32) {
     if (*pane).size_x != width {
         (*pane).size_x = width;
@@ -120,6 +149,9 @@ pub unsafe fn set_width(pane: *mut Pane, width: f32) {
     }
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its size and flags on the UI job thread for the call.
 pub unsafe fn set_height(pane: *mut Pane, height: f32) {
     if (*pane).size_y != height {
         (*pane).size_y = height;
@@ -128,6 +160,9 @@ pub unsafe fn set_height(pane: *mut Pane, height: f32) {
 }
 
 /// Turn a pane about its centre (degrees, counter-clockwise).
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
+/// exclusive access to its rotation and flags on the UI job thread for the call.
 pub unsafe fn set_rot_z(pane: *mut Pane, degrees: f32) {
     if (*pane).rot_z != degrees {
         (*pane).rot_z = degrees;
@@ -136,17 +171,34 @@ pub unsafe fn set_rot_z(pane: *mut Pane, degrees: f32) {
 }
 
 /// The four vertex colours of a picture pane.
+/// # Safety
+/// `pane` must be a non-null, aligned live `Picture`, not merely a base pane,
+/// with the pinned binding's base layout and writable vertex colors. The UI job
+/// thread must have exclusive access to the picture for the call.
 pub unsafe fn set_rect_color(pane: *mut Pane, color: [u8; 4]) {
     let picture = pane as *mut Picture;
     (*picture).vertex_colors = [color; 4];
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `TextBox` with the pinned binding's
+/// base layout and initialized capacity field, readable for the whole call on
+/// the UI job thread without concurrent mutation or destruction.
 pub unsafe fn text_capacity(pane: *mut Pane) -> usize {
     usize::from((*(pane as *mut TextBox)).text_buf_len)
 }
 
 /// Set a text box's text through the game's own pane text setter (it grows the buffer to fit, then sets the
 /// text and marks the box for layout). Returns whether anything changed; the text is cut to `MAX_UNITS`.
+/// # Safety
+/// `pane` must be a non-null, aligned live UTF-16 `TextBox` with the pinned
+/// binding's base layout and exclusive access on the UI job thread. If its
+/// buffer is non-null and its length equals the clamped input length, that
+/// buffer must be aligned and readable for that many initialized `u16` units.
+/// Any installed nonzero setter must remain executable with the exact
+/// `extern "C" fn(*mut Pane, *const u16, i32, u32)` ABI and synchronously copy
+/// its input without retaining the staged stack pointer. It must accept this
+/// live text box and keep its owned buffer/length fields valid after growth.
 pub unsafe fn set_text(pane: *mut Pane, units: &[u16]) -> bool {
     let tb = pane as *mut TextBox;
     let len = units.len().min(MAX_UNITS);
@@ -174,14 +226,26 @@ pub fn set_text_setter(address: usize) {
 /// Longest owned text body, including complete startup shortcut alternatives.
 pub const MAX_UNITS: usize = crate::model::notify::BODY_MAX;
 static TEXT_SETTER: AtomicUsize = AtomicUsize::new(0);
+/// # Safety
+/// `pane` must be a non-null, aligned live `TextBox`, not merely a base pane,
+/// with the pinned binding's base layout. The UI job thread must have exclusive
+/// access to its text colors and dirty bits for the call.
 pub unsafe fn set_text_color(pane: *mut Pane, color: [u8; 4]) {
     (*(pane as *mut TextBox)).set_color(color[0], color[1], color[2], color[3]);
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding,
+/// readable for the whole call on the UI job thread without concurrent mutation
+/// or destruction.
 pub unsafe fn pos_y(pane: *const Pane) -> f32 {
     (*pane).pos_y
 }
 
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding,
+/// readable for the whole call on the UI job thread without concurrent mutation
+/// or destruction.
 pub unsafe fn pos_x(pane: *const Pane) -> f32 {
     (*pane).pos_x
 }

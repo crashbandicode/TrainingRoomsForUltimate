@@ -1,5 +1,7 @@
 //! Executes the production traversal against stable, host-owned intrusive lists.
 //! The shim supplies fields only; native ABI qualification remains a separate gate.
+//! `name` matches pinned nnsdk 0.6.2: [libc_nnsdk::c_char; 25], where
+//! libc-nnsdk 0.5.0 defines c_char = u8 (including the Switch target).
 extern crate self as skyline;
 // The current integration pane writer references this unrelated text bound.
 // These tests exercise traversal only, never the text writer or native ABI.
@@ -10,7 +12,7 @@ pub mod nn {
         pub struct PaneNode { pub prev: *mut PaneNode, pub next: *mut PaneNode }
         #[repr(C)]
         pub struct Pane {
-            pub link: PaneNode, pub children_list: PaneNode, pub name: [u8; 24],
+            pub link: PaneNode, pub children_list: PaneNode, pub name: [u8; 25],
             pub alpha: u8, pub flags: u8, pub pos_x: f32, pub pos_y: f32,
             pub size_x: f32, pub size_y: f32, pub rot_z: f32,
         }
@@ -31,6 +33,7 @@ use nn::ui2d::Pane;
 fn tree(rows: &[(usize, &str)]) -> Vec<Pane> {
     let mut nodes: Vec<Pane> = rows.iter().map(|(_, name)| {
         let mut p: Pane = unsafe { core::mem::zeroed() };
+        assert!(name.len() < p.name.len(), "pane name must leave a NUL terminator");
         p.name[..name.len()].copy_from_slice(name.as_bytes());
         p
     }).collect();
@@ -126,4 +129,24 @@ fn actual_expanded_training_and_waiting_fixture() {
             }
         }
     }
+}
+
+#[test]
+fn binding_width_and_unsigned_name_bytes_are_searchable() {
+    let mut nodes = tree(&[(0, "RootPane"), (0, "abcdefghijklmnopqrstuvwx"), (0, "é")]);
+    assert_eq!(nodes[1].name.len(), 25);
+    assert_eq!(nodes[1].name[24], 0);
+    assert_eq!(nodes[2].name[0], 0xc3);
+    unsafe {
+        let root = nodes.as_mut_ptr();
+        assert_eq!(pane::find_child(root, b"abcdefghijklmnopqrstuvwx"), root.add(1));
+        assert_eq!(pane::find(root, "é".as_bytes()), root.add(2));
+        assert!(pane::find_child(root, b"abcdefghijklmnopqrstuvw").is_null());
+    }
+}
+
+#[test]
+#[should_panic(expected = "pane name must leave a NUL terminator")]
+fn host_tree_refuses_name_without_binding_terminator() {
+    let _ = tree(&[(0, "abcdefghijklmnopqrstuvwxy")]);
 }

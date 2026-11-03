@@ -294,7 +294,16 @@ The fork called these from mixed upstream code; the clean room's owner of each m
 
 ## Carried helpers waiting for a screen (consumer not built; not deleted)
 
-`character_roster::{original_player_kind, original_cpu_kind}` (the roster and hat editors' greyed cells: SPEC-core-02 `open_settings_for_player(json, original_kind)`; the clean-room `Env` has no such field until those editors exist), `cycle_preload::fighter_ready` and `native_body_bank::cycle_ready` (the roster grid's ready marks), `character_items::request` (the Give item screen), the Mii editor bridge's `request`/`menu_ready`/`catalog_read` and the `ui::menu_app` Mii-catalog methods (the Mii list screen), `practice_stage_request::*` and `training_stage_rotation::*` (the Lobby Stages screen), `lobby::set_ui_ready` (the info_waiting tick). Their owners are the ui-screens stream and package 5; the lead's list names them.
+`character_items::request` (the Give item screen), the Mii editor bridge's `request`/`menu_ready`/`catalog_read` and the `ui::menu_app` Mii-catalog methods (the Mii list screen), `practice_stage_request::*` and `training_stage_rotation::*` (the Lobby Stages screen), `lobby::set_ui_ready` (the info_waiting tick). Their owners are the ui-screens stream and package 5; the lead's list names them.
+
+RC warning-root audit (lead 2026-11-03 12:57Z): removed the now-orphaned
+`character_roster::{original_player_kind, original_cpu_kind}`,
+`cycle_preload::fighter_ready`, `native_body_bank::cycle_ready` and
+`mii_ordinary_native::try_registry`. Across all Rust sources and tests there were
+only their five definitions and the orphan `fighter_ready -> cycle_ready` call;
+no screen or feature retained a caller. The live `original_kind`, progress,
+registry and native readiness/transaction paths remain unchanged. These are
+exact-text carry deletions, not lint suppression or feature-gated placeholders.
 """
 
 
