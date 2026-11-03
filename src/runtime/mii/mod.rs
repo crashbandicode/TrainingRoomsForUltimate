@@ -7,9 +7,13 @@ pub(crate) mod native_keyboard;
 #[cfg(feature = "mii-editor-alpha")]
 pub(crate) mod mii_editor_bridge;
 pub(crate) mod mii_native_access;
+#[cfg(feature = "diag")]
+pub(crate) mod bust_context;
 
 /// Start the Mii files that are not started by the roster's own `init` (it runs first): the editor bridge. Called once from boot.
 pub(crate) fn init() {
+    #[cfg(feature = "diag")]
+    bust_context::init();
     #[cfg(feature = "mii-editor-alpha")]
     mii_editor_bridge::init();
     #[cfg(feature = "mii-pool-observer")]

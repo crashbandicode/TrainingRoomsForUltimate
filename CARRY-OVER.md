@@ -490,3 +490,7 @@ Setting snapshots, ordering, membership, actor/receipt/epoch checks and transact
 behavior are unchanged. Other roster consumers remain outside this scoped change.
 Original host allocation/order regression and native acceptance are recorded in
 IMPLEMENTATION-PROGRESS-f6.md. No new fork source or mixed file was read.
+
+
+## Q15 bounded diagnostic context observer (2026-11-03)
+Adopted exact Slim23ec705 code and UI d029583 existing-callback reference after lead source and owned-ELF guard review. Only native_seams/mod.rs carry entry changes: preserve main exact composition transforms and append the two row-table edits. Worker historical transforms differ but their before-state bytes/SHA match main exactly. diag_log gains a diag-only monotonic writer-ready query; clean-room mii/mod.rs installs the diag-only observer. Release rows are empty; neither observer calls the texture constructor or modifies native arguments. IDs remain opaque; same-boot context, native compile/stack/trampoline review and runtime proof are pending. Admission/filter tests: tests/mii_bust_context.rs. UI anchors is clean-room.

@@ -23,6 +23,7 @@ pub mod rows_a4;
 pub mod rows_a5;
 /// WP-R: the per-body identity view's hook sites (`src/swap_native/identity_view.rs`).
 pub mod rows_identity;
+pub mod rows_q15;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -185,8 +186,8 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 6] =
-    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS];
+const TABLES: [&[Seam]; 7] =
+    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS];
 
 const fn total(tables: &[&[Seam]]) -> usize {
     let (mut n, mut t) = (0, 0);

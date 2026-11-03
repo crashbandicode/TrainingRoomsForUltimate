@@ -210,6 +210,11 @@ pub fn writer_started() {
     WRITER.store(true, Ordering::Release);
 }
 
+/// Diagnostic observers must never take the pre-writer synchronous filesystem path.
+/// WRITER is monotonic, so a true observation remains true through `diagnostic`.
+#[cfg(feature = "diag")]
+pub(crate) fn async_writer_ready() -> bool { WRITER.load(Ordering::Acquire) }
+
 /// Write everything buffered (version guard and panic hook use it before they return).
 pub fn flush() {
     drain();
