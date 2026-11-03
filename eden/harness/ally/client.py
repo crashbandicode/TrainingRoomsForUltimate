@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -155,13 +156,16 @@ class AllyTransport(route.Transport):
 
     def shot(self, name, width=960):
         from PIL import Image
+        # Eden never overwrites a recording. Repeated gates and resumed drivers
+        # need distinct remote GIF paths as well as distinct local PNG paths.
+        name = f"{name}-{uuid.uuid4().hex}"
         self.run([["gshot", name, 2, width, 700]])
         dest = HERE.parent.parent / "runs" / self.label / "shots"
         gif = get(self.p, self.label, f"shots/{name}.gif", dest)
-        image = Image.open(gif)
-        image.seek(image.n_frames - 1)
-        png = dest / f"{time.strftime('%H%M%S', time.gmtime())}-{name}.png"
-        image.convert("RGB").save(png)
+        png = dest / f"{name}.png"
+        with Image.open(gif) as image:
+            image.seek(image.n_frames - 1)
+            image.convert("RGB").save(png)
         return png
 
     def lines(self, name, after=0):
