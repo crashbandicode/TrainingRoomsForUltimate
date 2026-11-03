@@ -604,6 +604,9 @@ fn damage_range_is_greyed_unless_random() {
     assert!(m.screen().is_none(), "A on a greyed row does nothing");
     set(&mut m, "save_damage_player", &[0, 0, 1]);
     assert_eq!(m.grey(range), None);
+    // The external reload has no saved page, so Q5 now opens CPU. Navigate
+    // back to the range before exercising its unchanged activation assertion.
+    goto(&mut m, "save_damage_limits_player");
     m.press(Button::A);
     assert!(matches!(m.screen(), Some(Screen::Slider { state: SliderState::LowerHover, .. })));
     // The CPU's range follows the CPU's own dropdown, not the player's.

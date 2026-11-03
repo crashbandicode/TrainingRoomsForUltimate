@@ -439,7 +439,7 @@ fn chords_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) 
         let chord = Chord::from_row(menu.settings().menu.get(id).unwrap_or(&[]));
         let _ = write!(line.value, "{chord}  >");
     });
-    let _ = frame.help[0].write_str("Hold one button of the chord and press the others.");
+    let _ = frame.help[0].write_str("Choose a row; X in its editor starts physical chord capture.");
     let _ = frame.hint.write_str("Up/Down move   A change the chord   B back");
 }
 
@@ -447,7 +447,7 @@ fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut 
     base(menu, screen, frame);
     push(frame, "Chord", &format!("{captured}"), Tone::On);
     frame.focus = Some(0);
-    let _ = frame.help[0].write_str("Hold one button and press the others to set the chord.");
+    let _ = frame.help[0].write_str("X starts capture: release all, hold the chord, then release all to preview.");
     let _ = frame.help[1].write_str("An empty chord never passes (a menu shortcut with none is disabled).");
     let hint = match menu.chord_capture() {
         ChordCapture::Preview => HINT_CHORD,
@@ -651,7 +651,15 @@ mod tests {
         m.press(Button::A);
         let f = frame(&m);
         assert!(f.crumb.string_lossy().contains("Save State Save"));
-        assert!(f.hint.string_lossy().contains("press the others"));
+        assert_eq!(f.hint.string_lossy(), "X capture   A confirm   Y empty   B cancel");
+        assert!(f.help[0].string_lossy().contains("X starts capture"));
+        m.press(Button::X);
+        assert_eq!(frame(&m).hint.string_lossy(), "Release all buttons to start capture");
+        assert!(m.chord_poll(0, 0));
+        assert_eq!(frame(&m).hint.string_lossy(), "Hold one button, press the others; release all to preview");
+        assert!(m.chord_poll(1 << 6, 1 << 6));
+        assert!(m.chord_poll(0, 0));
+        assert_eq!(frame(&m).hint.string_lossy(), "X capture   A confirm   Y empty   B cancel");
         let _ = (Page::Cpu, Editor::GiveItem);
     }
 
