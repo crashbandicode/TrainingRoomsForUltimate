@@ -1,0 +1,38 @@
+{
+  "id": "04-steve",
+  "start": "css",
+  "end": "steve-selected",
+  "evidence": [],
+  "manifest_sha256": "a544eac93e389a2c2f31912ed59e4196bca0c5d5b4005ae19dc4b3fe90cdd42d",
+  "started": 1793741462.685602,
+  "results": [
+    {
+      "play": "steve-hover",
+      "on": "yoga"
+    },
+    {
+      "gate": "steve78",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "settled screen=css at=78 hovered=78"
+      }
+    },
+    {
+      "play": "steve-place",
+      "on": "yoga"
+    },
+    {
+      "gate": "steve-selected",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/04-steve/yoga-213104Z-608431-gate-steve-selected.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr09-inputs/out/04-steve/yoga-213104Z-777686-cpu-route-start.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/04-steve/tile-yoga-events.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793741464.6713953
+}

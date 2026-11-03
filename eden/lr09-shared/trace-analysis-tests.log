@@ -1,0 +1,9 @@
+Running as unit: run-p1666047-i22631214.scope; invocation ID: dcb2e5346f0b41c6a79fa223bdeaf75e
+test_counter_loss_and_sequence_gap_fail (__main__.AnalysisTests.test_counter_loss_and_sequence_gap_fail) ... ok
+test_entry_failure_stale_row_and_missing_return_each_fail (__main__.AnalysisTests.test_entry_failure_stale_row_and_missing_return_each_fail) ... ok
+test_return_read_errors_do_not_rewrite_successful_entry (__main__.AnalysisTests.test_return_read_errors_do_not_rewrite_successful_entry) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK

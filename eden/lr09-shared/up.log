@@ -1,0 +1,20 @@
+{
+  "phase": "up",
+  "instances": {
+    "yoga": {
+      "socket": "/home/intpa/tr-lr09-yoga-state/run-yoga/control.sock",
+      "console_log": "/home/intpa/tr-lr09-yoga-state/run-yoga/console.log",
+      "profile": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga",
+      "control_log": "/home/intpa/tr-lr09-yoga-state/run-yoga/control.jsonl",
+      "game": "/home/intpa/Games/Roms/Switch/Super Smash Bros. Ultimate [01006A800016E000]+[v13.0.3+ 9DLC][US](nsw2u.com).xci",
+      "trace_jsonl": "/home/intpa/tr-lr09-yoga-state/run-yoga/yoga.trace.jsonl",
+      "settings": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga/user/sdmc/ultimate/TrainingRooms/settings.json",
+      "diag_log": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga/user/sdmc/ultimate/TrainingRooms/practice-diagnostics.log",
+      "detector_log": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga/user/sdmc/ultimate/ssbu-desync-detector/events.log",
+      "events_log": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga/user/sdmc/ultimate/TrainingRooms/events.log",
+      "tile_log": "/home/intpa/trainingrooms-lr09-yoga/profiles/profile-yoga/user/sdmc/ultimate/ssbu-tile-cursor/events.log"
+    }
+  },
+  "instances_file": "/home/intpa/tr-lr09-yoga-state/instances.json",
+  "stale_claim_skipped": []
+}

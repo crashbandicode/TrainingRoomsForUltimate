@@ -1,0 +1,59 @@
+{
+  "checks": {
+    "contiguous_sequences": true,
+    "no_loss_records": true,
+    "output_ok": true,
+    "counters:1": true,
+    "counters:2": true,
+    "fresh:cycle1-warm-groups": true,
+    "fresh:cycle1-warm-return": true,
+    "fresh:cycle2-warm-groups": true,
+    "fresh:cycle2-warm-return": true,
+    "fresh:cycle3-warm-groups": true,
+    "fresh:cycle3-warm-return": true,
+    "balanced_entry_return_stacks": true
+  },
+  "record_count": 96,
+  "points": {
+    "1": {
+      "target": "main+0x653240",
+      "entries": 18,
+      "returns": 18
+    },
+    "2": {
+      "target": "main+0x6524e0",
+      "entries": 30,
+      "returns": 30
+    }
+  },
+  "capture_errors_by_event": {
+    "return": 25
+  },
+  "fresh_cpu_entry_sequences": {
+    "cycle1-warm-groups": [
+      "3"
+    ],
+    "cycle1-warm-return": [
+      "15",
+      "17"
+    ],
+    "cycle2-warm-groups": [
+      "35"
+    ],
+    "cycle2-warm-return": [
+      "45",
+      "47"
+    ],
+    "cycle3-warm-groups": [
+      "65"
+    ],
+    "cycle3-warm-return": [
+      "75",
+      "77"
+    ]
+  },
+  "stack_pairs": 48,
+  "stream_reconciliation_pass": true,
+  "scope": "Entry captures only. Return-time captures are not entry arguments. Not clean-console or whole-RC acceptance.",
+  "trace_sha256": "c4844319027d3aeba2aab81a9b7970016d99675a3353affe90b652db45aca135"
+}

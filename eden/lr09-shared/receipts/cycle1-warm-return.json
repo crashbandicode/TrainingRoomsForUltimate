@@ -1,0 +1,31 @@
+{
+  "id": "cycle1-warm-return",
+  "start": "training",
+  "end": "css-return",
+  "evidence": [
+    "Player clean warm-bank finalize + empty ledger; synchronous CPU native retirement linked by entry; managed original-source retirement/claim release; CSS. Not pending-build or CPU detached-bank qualification."
+  ],
+  "manifest_sha256": "a544eac93e389a2c2f31912ed59e4196bca0c5d5b4005ae19dc4b3fe90cdd42d",
+  "started": 1793741498.9532568,
+  "results": [
+    {
+      "run": "steps.py:quit_warm_training",
+      "on": "yoga",
+      "value": {
+        "native_pause_verified": true,
+        "clean_bank_owner": 0,
+        "native_retired_owner": 1,
+        "source_retired": true,
+        "end": "css-return"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/cycle1-warm-return/diag-yoga-practice-diagnostics.log"
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/cycle1-warm-return/tile-yoga-events.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793741508.8809202
+}

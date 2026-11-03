@@ -1,0 +1,11 @@
+Running as unit: run-p1655499-i22608452.scope; invocation ID: bc9a858d7c8844a8922280d396919c4c
+test_accepts_actual_id_and_typed_native_fields (__main__.TraceTests.test_accepts_actual_id_and_typed_native_fields) ... ok
+test_rejects_failed_memory_read (__main__.TraceTests.test_rejects_failed_memory_read) ... ok
+test_rejects_other_point_and_return (__main__.TraceTests.test_rejects_other_point_and_return) ... ok
+test_rejects_wrong_role_target_and_flag (__main__.TraceTests.test_rejects_wrong_role_target_and_flag) ... ok
+test_resolution_refuses_pending_point (__main__.TraceTests.test_resolution_refuses_pending_point) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK

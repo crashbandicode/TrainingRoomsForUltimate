@@ -1,0 +1,10 @@
+{
+  "path": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr09-shared/final-state/run-yoga/console.log",
+  "sha256": "188561571b5e81237f69099995ef9c7fc3f5381872f4e71181fa5177290996b9",
+  "lines": 5865,
+  "unmapped": 0,
+  "unmapped_low": 0,
+  "review": 1,
+  "bytes": 829407,
+  "scope": "Full retained console, no line exclusions. Every Unmapped or review hit requires attribution before health acceptance."
+}

@@ -1,0 +1,79 @@
+{
+  "id": "cycle3-warm-groups",
+  "start": "training",
+  "end": "training",
+  "evidence": [
+    "Native trace CPU owner1/Gunner74/reloadflag1 descriptor install entry, plus correlated diagnostic ready/released and HUD. Trace is not a bank_build=false assertion."
+  ],
+  "manifest_sha256": "a544eac93e389a2c2f31912ed59e4196bca0c5d5b4005ae19dc4b3fe90cdd42d",
+  "started": 1793741546.5292685,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/yoga-213226Z-016829-gate-training-hud-unpaused.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "p1-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-b",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 4, entry: 77374930944, sequence: 3 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n639580344 #679 [Destroy] plan owner=0 reason=mod reload s"
+      }
+    },
+    {
+      "gate": "p1-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/yoga-213230Z-016314-gate-p1-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/yoga-213230Z-999925-falcon-ready.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "cpu-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "cpu-4a",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryCpu] submit ticket=Ticket { epoch: 4, entry: 77374955520, sequence: 3 } outgoing=0x28 target=0x4a index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n639584864 #737 [MiiOrdinaryCpu] staged ticket=Ticket { epoch"
+      }
+    },
+    {
+      "gate": "cpu-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/yoga-213236Z-242943-gate-cpu-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/yoga-213236Z-295492-cpu-gunner-ready.png"
+    },
+    {
+      "run": "steps.py:verify_cpu_install_trace",
+      "on": "yoga",
+      "value": {
+        "point_id": "1",
+        "owner": 1,
+        "incoming_kind": 74,
+        "reload_flag": 1,
+        "scope": "fresh-row native descriptor install entry; not a construction-completion or bank_build assertion"
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/cycle3-warm-groups/diag-yoga-practice-diagnostics.log"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793741556.2331789
+}

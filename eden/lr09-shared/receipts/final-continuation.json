@@ -1,0 +1,86 @@
+{
+  "id": "final-continuation",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "a544eac93e389a2c2f31912ed59e4196bca0c5d5b4005ae19dc4b3fe90cdd42d",
+  "started": 1793741575.5736942,
+  "results": [
+    {
+      "gate": "training-hud-unpaused",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/final-continuation/yoga-213255Z-232556-gate-training-hud-unpaused.png"
+    },
+    {
+      "mark": "hud-before",
+      "on": "yoga"
+    },
+    {
+      "play": "p1-next-frames",
+      "on": "yoga"
+    },
+    {
+      "gate": "p1-b",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "[MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 5, entry: 77870768128, sequence: 4 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false\n639609563 #896 [Destroy] plan owner=0 reason=mod reload s"
+      }
+    },
+    {
+      "gate": "p1-hud-changed",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr09-inputs/out/final-continuation/yoga-213259Z-687303-gate-p1-hud-changed.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr09-inputs/out/final-continuation/yoga-213259Z-340034-continuation-falcon.png"
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/final-continuation/diag-yoga-practice-diagnostics.log"
+    },
+    {
+      "run": "steps.py:finish_trace",
+      "on": "yoga",
+      "value": {
+        "boot_error": "",
+        "file_lost": "0",
+        "output": "/home/intpa/tr-lr09-yoga-state/run-yoga/yoga.trace.jsonl",
+        "output_error": "",
+        "points": [
+          {
+            "abandoned_returns": "0",
+            "address": "0x80ec7240",
+            "dropped": "0",
+            "hits": "18",
+            "id": "1",
+            "matched": "18",
+            "mode": "records",
+            "process_id": "81",
+            "recorded": "36",
+            "return_overflow": "0",
+            "state": "disarmed",
+            "target": "main+0x653240"
+          },
+          {
+            "abandoned_returns": "0",
+            "address": "0x80ec64e0",
+            "dropped": "0",
+            "hits": "30",
+            "id": "2",
+            "matched": "30",
+            "mode": "records",
+            "process_id": "81",
+            "recorded": "60",
+            "return_overflow": "0",
+            "state": "disarmed",
+            "target": "main+0x6524e0"
+          }
+        ]
+      }
+    },
+    {
+      "copy": "/home/intpa/tr-lr09-inputs/out/final-continuation/trace_jsonl-yoga-yoga.trace.jsonl"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793741579.578966
+}
