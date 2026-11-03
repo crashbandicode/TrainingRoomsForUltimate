@@ -9,21 +9,24 @@ use crate::engine::mii::backend::Layout;
 /// The two parked helpers are part of each witnessed native practice layout.
 pub const BASE_HELPERS: usize = 2;
 /// Native entry identities in serial creation order, never menu ordinal values.
-pub const EXTRA_SLOTS: [usize; 3] = [7, 6, 5];
+pub const EXTRA_SLOTS: [usize; 4] = [7, 6, 5, 4];
 /// Waiting has native helpers 5/6 already. Extra resources use a separate
 /// creation plan, admitted only while the corresponding rows and inputs are
 /// unclaimed. These values alone never authorize creation or a native read.
-pub const WAITING_EXTRA_SLOTS: [usize; EXTRA_SLOTS.len()] = [7, 3, 2];
+pub const WAITING_EXTRA_SLOTS: [usize; 3] = [7, 3, 2];
 /// Stable physical identities for retirement across a scene/layout transition.
 /// The active budget remains the length of one plan, not this union.
-pub const ALL_EXTRA_SLOTS: [usize; 5] = [7, 6, 5, 3, 2];
-pub const MAX_TARGETS: usize = BASE_HELPERS + EXTRA_SLOTS.len();
+pub const ALL_EXTRA_SLOTS: [usize; 6] = [7, 6, 5, 4, 3, 2];
+/// Saved speculative preload budget. Renderer demand does not add a menu choice.
+pub const MAX_TARGETS: usize = 5;
+/// Physical candidate storage includes the fourth, purpose-created renderer.
+pub const SOURCE_SLOTS: usize = BASE_HELPERS + EXTRA_SLOTS.len();
 
 pub fn capacity_index(slot: usize) -> Option<usize> {
     ALL_EXTRA_SLOTS.iter().position(|candidate| *candidate == slot)
 }
 
-pub const fn extra_slots(layout: Layout) -> &'static [usize; EXTRA_SLOTS.len()] {
+pub const fn extra_slots(layout: Layout) -> &'static [usize] {
     match layout {
         Layout::Training => &EXTRA_SLOTS,
         Layout::Ldn | Layout::Quickplay => &WAITING_EXTRA_SLOTS,
@@ -85,13 +88,17 @@ impl Extras {
 
     /// Entry identities only (value policy and tests). `owned_roots` and
     /// `admit` refuse every extra of such a value.
-    pub fn new(entries: [usize; EXTRA_SLOTS.len()]) -> Option<Self> {
+    pub fn new<const N: usize>(entries: [usize; N]) -> Option<Self> {
         Self::new_for(Layout::Training, entries)
     }
 
-    pub fn new_for(layout: Layout, entries: [usize; EXTRA_SLOTS.len()]) -> Option<Self> {
+    pub fn new_for<const N: usize>(layout: Layout, entries: [usize; N]) -> Option<Self> {
+        if N > EXTRA_SLOTS.len() { return None; }
+        let mut padded = [0; EXTRA_SLOTS.len()];
+        padded[..N].copy_from_slice(&entries);
+        let entries = padded;
         let count = entries.iter().take_while(|entry| **entry != 0).count();
-        if entries[count..].iter().any(|entry| *entry != 0)
+        if count > extra_slots(layout).len() || entries[count..].iter().any(|entry| *entry != 0)
             || (0..count).any(|index| entries[..index].contains(&entries[index]))
         {
             return None;
@@ -104,11 +111,11 @@ impl Extras {
     }
 
     /// The owning registry's records, including their roots.
-    pub fn registered(records: [Option<Roots>; EXTRA_SLOTS.len()]) -> Option<Self> {
+    pub fn registered<const N: usize>(records: [Option<Roots>; N]) -> Option<Self> {
         Self::registered_for(Layout::Training, records)
     }
 
-    pub fn registered_for(layout: Layout, records: [Option<Roots>; EXTRA_SLOTS.len()]) -> Option<Self> {
+    pub fn registered_for<const N: usize>(layout: Layout, records: [Option<Roots>; N]) -> Option<Self> {
         let mut extras = Self::new_for(layout, records.map(|record| record.map_or(0, |record| record.entry)))?;
         for (index, record) in records.iter().enumerate() {
             if let Some(record) = record {
@@ -271,6 +278,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fourth_training_creation_is_a_prefix_and_never_waiting_authority() {
+        let original = [0x10, 0x20, 0x30, 0x40, 0, 0, 0, 0];
+        for count in 0..=4 {
+            let entries = std::array::from_fn::<_, 4, _>(|i| if i < count { 0x700 - i * 0x100 } else { 0 });
+            let extras = Extras::new(entries).unwrap();
+            assert_eq!(extras.count(), count);
+            let physical = extras.physical(&original);
+            assert_eq!(extras.view(&physical), Some(original));
+            assert!(Layout::Training.shape_with(&physical, extras));
+            assert_eq!(Layout::Training.count_with(extras), 4 + count as u32);
+            assert_eq!(extras.entry(4), (count == 4).then_some(0x400));
+        }
+        // Unique entry identity is mandatory even though rows are distinct.
+        assert!(Extras::new([0x70, 0x60, 0x50, 0x70]).is_none());
+        assert!(Extras::new([0x70, 0x60, 0, 0x40]).is_none());
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            assert_eq!(extra_slots(layout), &[7, 3, 2]);
+            assert!(Extras::new_for(layout, [0x70, 0x30, 0x20, 0x40]).is_none());
+            let waiting = Extras::new_for(layout, [0x70, 0x30, 0x20, 0]).unwrap();
+            assert_eq!(waiting.entry(4), None);
+            assert!(!waiting.matches(Layout::Training));
+        }
+    }
+
+    #[test]
     fn waiting_registrations_use_their_own_slots_and_cannot_cross_layouts() {
         for layout in [Layout::Ldn, Layout::Quickplay] {
             let extras = Extras::new_for(layout, [0x700, 0x300, 0x200]).unwrap();
@@ -336,7 +368,7 @@ mod tests {
             vec![(7, 0x70), (6, 0x60)]
         );
         assert_eq!(capacity_index(7), Some(0));
-        assert_eq!(capacity_index(4), None);
+        assert_eq!(capacity_index(4), Some(3));
         assert_eq!(MAX_TARGETS, 5);
     }
 
@@ -633,7 +665,7 @@ mod tests {
             "empty created entry"
         );
         assert_eq!(
-            extra_owner(4, &owner(4, 4, 4, 0), 0x01),
+            extra_owner(8, &owner(8, 8, 8, 0), 0x01),
             Err("extra slot outside the created-entry order")
         );
         assert_eq!(

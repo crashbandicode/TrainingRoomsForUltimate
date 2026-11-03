@@ -5,10 +5,10 @@ use crate::engine::mii::{backend::Layout,capacity::{Extras,Roots,ExtraFacts},
     inventory::MiiClass,lifetime::Tokens,native_values::RowIds};
 
 fn fixture(slot:usize)->(CreatedDestination,Extras,[Option<Owner>;8],[Option<u32>;8],ExtraFacts) {
-    let owners=std::array::from_fn(|id|(id<4 || id>=5).then_some(Owner {
+    let owners=std::array::from_fn(|id|Some(Owner {
         entry:0x1000+id*0x100,row:0x2000+id*0x100,information:0x3000+id*0x100,
         object:0x4000+id*0x100,index:0,selector:id as u8,alias:0}));
-    let extras=Extras::registered([7,6,5].map(|id|Some(Roots {
+    let extras=Extras::registered([7,6,5,4].map(|id|Some(Roots {
         entry:owners[id].unwrap().entry,resource:0x7000+id*0x100,
         alias:owners[id].unwrap().object,selection:2,descriptor_selector:0}))).unwrap();
     let kinds=owners.map(|o|o.map(|_|9));
@@ -24,13 +24,35 @@ fn configuration(class:MiiClass,hat:u16)->Configuration {
 }
 
 #[test]
-fn three_created_rows_keep_creation_word_and_all_foreign_claims_through_each_class() {
-    for slot in [7,6,5] {
+fn all_eight_owners_require_every_foreign_record_in_bounds() {
+    for slot in [7, 6, 5, 4] {
+        let (destination, extras, owners, kinds, facts) = fixture(slot);
+        let protected = destination.protected();
+        assert_eq!(protected.iter().flatten().count(), 7);
+        for record in 0..8 {
+            assert_eq!(protected.contains(&Some(record)), record != slot as u16);
+        }
+        for records in 0..8 {
+            assert!(CreatedDestination::capture(Layout::Training, extras, slot,
+                &owners, &kinds, facts, records).is_none());
+        }
+        assert!(CreatedDestination::capture(Layout::Training, extras, slot,
+            &owners, &kinds, facts, 8).is_some());
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            assert!(CreatedDestination::capture(layout, extras, slot,
+                &owners, &kinds, facts, 8).is_none());
+        }
+    }
+}
+
+#[test]
+fn four_created_rows_keep_creation_word_and_all_foreign_claims_through_each_class() {
+    for slot in [7,6,5,4] {
         let (destination,extras,owners,kinds,facts)=fixture(slot);
         assert!(!Layout::Training.selector(slot));
         assert!(assignment_with(Layout::Training,extras,slot,&owners).is_none());
         let protected=destination.protected_now(Layout::Training,extras,&owners,&kinds).unwrap();
-        for record in [0,1,2,3,5,6,7].into_iter().filter(|r|*r!=slot) {
+        for record in [0,1,2,3,4,5,6,7].into_iter().filter(|r|*r!=slot) {
             assert!(protected.contains(&Some(record as u16)));
         }
         for class in [MiiClass::Brawler,MiiClass::Swordfighter,MiiClass::Gunner] {
@@ -73,7 +95,7 @@ fn three_created_rows_keep_creation_word_and_all_foreign_claims_through_each_cla
                 assert!(!destination.completed_owner(live[slot].unwrap(),ExtraFacts {resource:facts.resource+8,..published},class as u32));
             }
         }
-        for foreign in [0,1,2,3,5,6,7].into_iter().filter(|id|*id!=slot) {
+        for foreign in [0,1,2,3,4,5,6,7].into_iter().filter(|id|*id!=slot) {
             let mut changed=owners;changed[foreign].as_mut().unwrap().index=slot as u16;
             assert!(destination.protected_now(Layout::Training,extras,&changed,&kinds).is_none());
             changed=owners;changed[foreign].as_mut().unwrap().selector=slot as u8;
@@ -86,7 +108,7 @@ fn three_created_rows_keep_creation_word_and_all_foreign_claims_through_each_cla
 
 #[test]
 fn created_fresh_o_rejects_pointer_header_tokens_initialization_and_task_changes() {
-    for slot in [7,6,5] {
+    for slot in [7,6,5,4] {
         let (destination,_,_,_,_)=fixture(slot);
         let header=[slot as u32,9,u32::MAX,u32::MAX,1];
         let now=OutgoingObject {object:destination.owner().object,header,index:0,tokens:[0;4]};
@@ -112,7 +134,7 @@ fn another_created_registration_refreshes_protection_without_replacing_existing_
     let single=Extras::registered([Some(Roots {entry:owners[7].unwrap().entry,
         resource:facts.resource,alias:facts.alias_root,selection:facts.selection,
         descriptor_selector:facts.descriptor_selector}),None,None]).unwrap();
-    let mut initial=owners;initial[5]=None;initial[6]=None;
+    let mut initial=owners;initial[4]=None;initial[5]=None;initial[6]=None;
     let initial_kinds=initial.map(|o|o.map(|_|9));
     let destination=CreatedDestination::capture(Layout::Training,single,7,&initial,&initial_kinds,facts,8).unwrap();
     assert!(destination.registered_in(Layout::Training,full,7,owners[7].unwrap().entry));

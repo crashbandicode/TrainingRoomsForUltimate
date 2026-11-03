@@ -236,7 +236,7 @@ pub(super) fn bind(
             )?;
         }
     }
-    for i in 0..3 {
+    for i in 0..view.created_slots.len() {
         if Some(i)!=view.created_ordinal(source.slot()) {
             check(view.created_slots[i]==data.before.helpers.created_slots[i]
                 && view.created_miis[i]==data.before.helpers.created_miis[i],"foreign created source projection changed")?;

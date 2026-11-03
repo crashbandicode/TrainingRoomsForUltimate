@@ -7,13 +7,41 @@
 /// them: first use requires `RequestWords::idle_unregistered`, and an owned request that
 /// stops reading live is disowned.
 pub const PORTRAIT_SUBS: [u32; 3] = [7, 8, 9];
-pub const VISIBLE_OWNERS: usize = 2;
-/// Two helper rows times three subs.
-pub const OWNED_CAPACITY: usize = 6;
+pub const VISIBLE_OWNERS: usize = 4;
+/// Four exclusive renderer rows times three retained requests.
+pub const OWNED_CAPACITY: usize = 12;
 
-/// The two exact-portrait request channels in the shared source registry.
+/// The four exact-portrait request channels in the shared source registry.
 /// Configuration alone cannot identify a portrait: Kirby Mii hats carry it too.
-pub const SOURCE_CHANNELS: [usize; 2] = [3, 4];
+pub const SOURCE_CHANNELS: [usize; 4] = [3, 4, 5, 6];
+pub fn training_renderer_row(owner: usize) -> Option<u32> {
+    [7, 6, 5, 4].get(owner).copied()
+}
+
+#[cfg(test)]
+#[test]
+fn four_visible_owners_only_acquire_their_distinct_created_renderer() {
+    let mut ownership = Ownership::new();
+    for owner in 0..4 {
+        let row = training_renderer_row(owner).unwrap();
+        for slot in 0..8 {
+            assert_eq!(slot_may_install(ownership.source_exclusions(owner, true), slot), slot == row);
+        }
+        ownership.bound[owner] = Some(Binding {
+            request: Request { row, sub: 7 }, descriptor: 0x1000 + owner * 0x100,
+        });
+    }
+    for owner in 0..4 {
+        let row = training_renderer_row(owner).unwrap();
+        assert!(slot_may_install(ownership.source_exclusions(owner, true), row));
+        assert!(ownership.row_free_for(owner, row));
+        for foreign in 0..4 {
+            if foreign != owner { assert!(!ownership.row_free_for(owner, training_renderer_row(foreign).unwrap())); }
+        }
+    }
+    assert_eq!(training_renderer_row(4), None);
+    assert_eq!(ownership.source_exclusions(4, true), u8::MAX);
+}
 pub fn source_channel_admitted(channel: usize, exact: bool, menu_open: bool) -> bool {
     !menu_open || (SOURCE_CHANNELS.contains(&channel) && exact)
 }
@@ -36,7 +64,9 @@ fn open_editor_admits_exact_portraits_without_admitting_mii_hats_or_items() {
     assert_eq!(admitted, [(3, true), (4, true)]);
     assert!(!source_channel_admitted(3, false, true));
     assert!(!source_channel_admitted(4, false, true));
-    assert!(!source_channel_admitted(5, true, true));
+    assert!(source_channel_admitted(5, true, true));
+    assert!(source_channel_admitted(6, true, true));
+    assert!(!source_channel_admitted(7, true, true));
     for (c, exact) in requests { assert!(source_channel_admitted(c, exact, false)); }
 }
 
@@ -218,6 +248,12 @@ impl RequestWords {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Binding { pub request: Request, pub descriptor: usize }
 
+/// A completed render reserved for a future active publication. The serial
+/// distinguishes repeated preparation of the same request/descriptor. Native
+/// source/configuration/scene identities are additionally sealed by the adapter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Prepared { pub binding: Binding, pub generation: u64, pub serial: u64 }
+
 /// One issued render. `superseded`, `contaminated` and `departed` are latches: the job
 /// stays in flight (and its exclusive helper lease stays held) until the native queue
 /// drains, whatever happened meanwhile.
@@ -260,6 +296,8 @@ pub struct Ownership {
     /// The request each visible pane currently draws. Cleared only by a successful rebind
     /// (`bound`) or by verified batch teardown (`teardown`), never by intent cancellation.
     pub bound: [Option<Binding>; VISIBLE_OWNERS],
+    pub prepared: [Option<Prepared>; VISIBLE_OWNERS],
+    preparation_serial: u64,
     pub in_flight: Option<Job>,
 }
 
@@ -284,7 +322,8 @@ pub struct Completion { pub queue: Queue, pub table: usize, pub descriptor: usiz
 
 impl Ownership {
     pub const fn new() -> Self {
-        Self { owned: [None; OWNED_CAPACITY], bound: [None; VISIBLE_OWNERS], in_flight: None }
+        Self { owned: [None; OWNED_CAPACITY], bound: [None; VISIBLE_OWNERS],
+            prepared: [None; VISIBLE_OWNERS], preparation_serial: 0, in_flight: None }
     }
 
     pub fn is_owned(&self, request: Request) -> bool { self.owned.iter().flatten().any(|r| *r == request) }
@@ -307,6 +346,40 @@ impl Ownership {
         self.bound.iter().flatten().any(|b| b.request == request)
     }
 
+    pub fn reserved_by_any(&self, request: Request) -> bool {
+        self.bound_by_any(request)
+            || self.prepared.iter().flatten().any(|p| p.binding.request == request)
+    }
+
+    pub fn row_free_for(&self, owner: usize, row: u32) -> bool {
+        owner < VISIBLE_OWNERS && row_free_for(&self.bound, owner, row)
+            && self.prepared.iter().enumerate().all(|(o, p)|
+                o == owner || p.is_none_or(|p| p.binding.request.row != row))
+    }
+
+    /// The same mask is used by demand scheduling and lease acquisition. In
+    /// Training, each visible owner has one distinct created renderer row.
+    /// A live fighter is never the renderer source, including CPU2/3.
+    pub fn source_exclusions(&self, owner: usize, training: bool) -> u8 {
+        (0..8).fold(0, |mask, row| {
+            let purpose = !training || training_renderer_row(owner) == Some(row);
+            mask | if purpose && self.row_free_for(owner, row) { 0 } else { 1u8 << row }
+        })
+    }
+
+    pub fn prepare(&mut self, owner: usize, binding: Binding, generation: u64)
+        -> Result<Prepared, &'static str> {
+        if !self.row_free_for(owner, binding.request.row) { return Err("prepared row belongs to another owner"); }
+        if self.prepared[owner].is_some() || self.reserved_by_any(binding.request)
+            || self.in_flight.is_some() || !self.is_owned(binding.request)
+            || binding.descriptor == 0 { return Err("request cannot be prepared"); }
+        let serial = self.preparation_serial.checked_add(1).ok_or("preparation serial exhausted")?;
+        self.preparation_serial = serial;
+        let prepared = Prepared { binding, generation, serial };
+        self.prepared[owner] = Some(prepared);
+        Ok(prepared)
+    }
+
     /// Pick the request to retarget for `row`; `words[i]` are fresh reads of `PORTRAIT_SUBS[i]`.
     /// Never a request bound by any pane, never while a job is in flight, never a request
     /// native code appears to use.
@@ -315,7 +388,7 @@ impl Ownership {
         let mut fresh = None;
         for (i, sub) in PORTRAIT_SUBS.iter().copied().enumerate() {
             let request = Request { row, sub };
-            if self.bound_by_any(request) { continue; }
+            if self.reserved_by_any(request) { continue; }
             if self.is_owned(request) {
                 if words[i].owned_live(row) { return Select::Request { request, first_use: false }; }
                 self.disown(request);
@@ -328,10 +401,11 @@ impl Ownership {
         }
     }
 
-    /// Record the issued job; exactly one at a time across both owners.
+    /// Record the issued job; exactly one at a time across all owners.
     pub fn issue(&mut self, job: Job) -> Result<(), &'static str> {
         if self.in_flight.is_some() { return Err("publisher busy"); }
-        if self.bound_by_any(job.request) { return Err("would retarget a bound request"); }
+        if self.reserved_by_any(job.request) { return Err("would retarget a bound or prepared request"); }
+        if !self.row_free_for(job.owner, job.request.row) { return Err("row belongs to another owner"); }
         self.in_flight = Some(job);
         Ok(())
     }
@@ -347,6 +421,7 @@ impl Ownership {
     /// superseded and keeps waiting; the owner's bound record is untouched because the native
     /// pane may still draw that descriptor.
     pub fn cancel_owner(&mut self, owner: usize) {
+        if owner < VISIBLE_OWNERS { self.prepared[owner] = None; }
         if let Some(job) = self.in_flight.as_mut() { if job.owner == owner { job.superseded = true; } }
     }
 
@@ -358,6 +433,7 @@ impl Ownership {
 
     /// Scene departure: the in-flight job may never bind, but it is not abandoned here.
     pub fn depart(&mut self) {
+        self.prepared = [None; VISIBLE_OWNERS];
         if let Some(job) = self.in_flight.as_mut() { job.departed = true; }
     }
 
@@ -413,7 +489,10 @@ impl Ownership {
     /// After `141b8a0` succeeded and `slot+0x1ac` was verified. The owner's previous request
     /// becomes free (still owned); that is the only non-teardown way a bound record ends.
     pub fn bound(&mut self, owner: usize, binding: Binding) {
-        if owner < VISIBLE_OWNERS { self.bound[owner] = Some(binding); }
+        if owner < VISIBLE_OWNERS {
+            self.bound[owner] = Some(binding);
+            self.prepared[owner] = None;
+        }
     }
 
     /// After a verified explicit original rebind (pane read back on `0x12+owner`): the custom
@@ -453,9 +532,21 @@ pub struct Admission {
 }
 
 pub fn admit(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
-    if !a.lease_valid { return Err("portrait lease not valid"); }
+    admit_render(a, owner, row)?;
     if !a.pane_bound { return Err("visible slot has no bound bust pane"); }
     if a.pane_index >= 0x20 { return Err("visible pane index out of range"); }
+    Ok(())
+}
+
+/// A fixed parked source has no visible pane yet. This admits rendering only;
+/// publication must later satisfy the ordinary pane/bind and active-source proof.
+pub fn admit_prepared(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
+    if !matches!(owner, 2 | 3) || row != owner { return Err("not a fixed parked portrait row"); }
+    admit_render(a, owner, row)
+}
+
+fn admit_render(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
+    if !a.lease_valid { return Err("portrait lease not valid"); }
     if a.install_active { return Err("INSTALL active"); }
     if !a.helper_parked || !a.helper_exact { return Err("helper not parked/exact"); }
     // run42 observed the gate byte 01 in Training: the copy is prevented only by the scoped skip.
@@ -1158,9 +1249,12 @@ mod tests {
     fn live(row: u32, holder: usize) -> RequestWords { RequestWords { index: table_index(row) as i32, registered: 1, holder } }
     fn req(sub: u32) -> Request { Request { row: ROW, sub } }
     fn words(o: &Ownership, holders: [usize; 3]) -> [RequestWords; 3] {
+        words_on(o, ROW, holders)
+    }
+    fn words_on(o: &Ownership, row: u32, holders: [usize; 3]) -> [RequestWords; 3] {
         let mut w = [idle(); 3];
         for (i, sub) in PORTRAIT_SUBS.iter().copied().enumerate() {
-            if o.is_owned(req(sub)) { w[i] = live(ROW, holders[i]); }
+            if o.is_owned(Request { row, sub }) { w[i] = live(row, holders[i]); }
         }
         w
     }
@@ -1169,14 +1263,17 @@ mod tests {
     fn queued(table: usize) -> Completion { Completion { queue: q(1, 0xb), table, descriptor: table } }
     /// Issue, drain and bind one job for `owner`; returns the sub used.
     fn publish(o: &mut Ownership, owner: usize, generation: u64, holders: &mut [usize; 3]) -> u32 {
-        let sel = o.select(ROW, words(o, *holders));
+        publish_on(o, owner, ROW, generation, holders)
+    }
+    fn publish_on(o: &mut Ownership, owner: usize, row: u32, generation: u64, holders: &mut [usize; 3]) -> u32 {
+        let sel = o.select(row, words_on(o, row, *holders));
         let request = match sel { Select::Request { request, .. } => request, other => panic!("{:?}", other) };
         let i = PORTRAIT_SUBS.iter().position(|s| *s == request.sub).unwrap();
-        let desc = 0x7000 + request.sub as usize * 0x100;
+        let desc = 0x7000 + (row - ROW) as usize * 0x1000 + request.sub as usize * 0x100;
         o.issue(Job::new(owner, request, generation, 0x6000)).unwrap();
         holders[i] = desc + 0x28;
-        match o.complete(drained(desc), live(ROW, holders[i]), true) {
-            Outcome::Bind { owner: b, index } => { assert_eq!((b, index), (owner, 0x14)); }
+        match o.complete(drained(desc), live(row, holders[i]), true) {
+            Outcome::Bind { owner: b, index } => { assert_eq!((b, index), (owner, table_index(row))); }
             other => panic!("{:?}", other),
         }
         o.bound(owner, Binding { request, descriptor: desc });
@@ -1184,19 +1281,22 @@ mod tests {
     }
 
     #[test]
-    fn two_owners_sharing_one_helper_row_never_collide() {
+    fn two_owners_cannot_share_a_row_and_rotate_independently() {
         let mut o = Ownership::new(); let mut h = [0; 3];
         assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        assert_eq!(publish(&mut o, 1, 1, &mut h), 8);
-        assert_eq!(publish(&mut o, 0, 2, &mut h), 9); // 7 still shown by P1 until this bind
-        assert_eq!(publish(&mut o, 1, 2, &mut h), 7); // 8 shown by CPU, 9 by P1: only 7 is free
-        assert_eq!(publish(&mut o, 0, 3, &mut h), 8);
+        assert!(o.issue(Job::new(1, req(8), 1, 0)).is_err());
+        let mut cpu_h = [0; 3];
+        assert_eq!(publish_on(&mut o, 1, 3, 1, &mut cpu_h), 7);
         for _ in 0..6 {
-            let p1 = o.bound[0].unwrap().request.sub; let cpu = o.bound[1].unwrap().request.sub;
-            let next = publish(&mut o, 1, 9, &mut h);
-            assert_ne!(next, p1); assert_ne!(next, cpu);
+            let p1 = o.bound[0].unwrap(); let cpu = o.bound[1].unwrap();
+            let next = publish_on(&mut o, 1, 3, 9, &mut cpu_h);
+            assert_ne!(next, cpu.request.sub);
+            assert_eq!(o.bound[0], Some(p1));
+            let cpu = o.bound[1];
+            assert_ne!(publish(&mut o, 0, 9, &mut h), p1.request.sub);
+            assert_eq!(o.bound[1], cpu);
         }
-        assert_eq!(o.owned_count(), 3);
+        assert_eq!(o.owned_count(), 4);
     }
 
     #[test]
@@ -1309,7 +1409,7 @@ mod tests {
     #[test]
     fn departure_and_teardown_keep_the_in_flight_record_until_drain() {
         let mut o = Ownership::new(); let mut h = [0; 3];
-        publish(&mut o, 0, 1, &mut h); publish(&mut o, 1, 1, &mut h);
+        publish(&mut o, 0, 1, &mut h); publish_on(&mut o, 1, 3, 1, &mut [0; 3]);
         o.issue(Job::new(0, req(9), 2, 0)).unwrap();
         o.depart();
         assert!(o.in_flight.unwrap().departed);
@@ -1317,7 +1417,7 @@ mod tests {
         assert!(o.bound[0].is_some());
         assert!(matches!(o.complete(queued(0x7900), live(ROW, 1), true), Outcome::Wait));
         o.teardown();
-        assert_eq!(o.owned_count(), 0); assert_eq!(o.bound, [None; 2]);
+        assert_eq!(o.owned_count(), 0); assert_eq!(o.bound, [None; VISIBLE_OWNERS]);
         assert!(o.in_flight.is_some());
         assert!(matches!(o.select(ROW, [idle(); 3]), Select::Refuse(_)));
         assert!(matches!(o.complete(drained(0x7900), live(ROW, 0x7928), true), Outcome::Discard(_)));
@@ -1335,9 +1435,9 @@ mod tests {
         match o.select(ROW, w) { Select::Request { request, first_use } => { assert_eq!(request.sub, 9); assert!(first_use); } x => panic!("{:?}", x) }
         assert!(matches!(o.select(ROW, [live(ROW, 1), live(ROW, 2), live(ROW, 3)]), Select::Defer(_)));
         let mut p = Ownership::new(); let mut h = [0; 3];
-        publish(&mut p, 0, 1, &mut h); publish(&mut p, 1, 1, &mut h);
+        publish(&mut p, 0, 1, &mut h); publish_on(&mut p, 1, 3, 1, &mut [0; 3]);
         let mut w = words(&p, h); w[0] = idle();
-        assert_eq!(p.audit(ROW, w), [true, false]);
+        assert_eq!(p.audit(ROW, w), [true, false, false, false]);
         assert!(!p.is_owned(req(7))); assert_eq!(p.bound[0], None); assert!(p.bound[1].is_some());
         let mut q = Ownership::new();
         assert!(q.own(Request { row: 3, sub: 7 }));
@@ -1447,7 +1547,7 @@ mod tests {
         assert!(matches!(o.complete(drained(0x7800), live(ROW, 0x7829), true), Outcome::Bind { owner: 0, index: 0x14 }));
         // Without the observed clear the same drained words are still not a fresh registration.
         o.bound(0, Binding { request, descriptor: 0x7800 });
-        o.issue(Job::new(1, req(9), 1, 0x7900)).unwrap();
+        o.issue(Job::new(0, req(9), 4, 0x7900)).unwrap();
         assert!(matches!(o.complete(drained(0x7900), live(ROW, 1), true), Outcome::Discard(_)));
     }
 
@@ -1470,16 +1570,16 @@ mod scope_tests {
 
     #[test]
     fn one_bust_row_per_owner() {
-        let none: [Option<Binding>; VISIBLE_OWNERS] = [None, None];
+        let none: [Option<Binding>; VISIBLE_OWNERS] = [None; VISIBLE_OWNERS];
         assert!(row_free_for(&none, 0, 2));
         assert!(row_free_for(&none, 1, 2));
         // P1 bound on helper row 2: the CPU may not render on row 2, but may on row 3.
-        let p1_on_2 = [Some(binding(2, 7)), None];
+        let p1_on_2 = [Some(binding(2, 7)), None, None, None];
         assert!(row_free_for(&p1_on_2, 0, 2));   // the same owner replacing its own bust
         assert!(!row_free_for(&p1_on_2, 1, 2));
         assert!(row_free_for(&p1_on_2, 1, 3));
         // Both bound on distinct rows: each may only keep its own row.
-        let split = [Some(binding(2, 7)), Some(binding(3, 7))];
+        let split = [Some(binding(2, 7)), Some(binding(3, 7)), None, None];
         assert!(row_free_for(&split, 0, 2));
         assert!(!row_free_for(&split, 0, 3));
         assert!(row_free_for(&split, 1, 3));
@@ -1492,8 +1592,83 @@ mod scope_tests {
         assert!(!row_free_for(&o.bound, 1, 2));
     }
 }
+
+#[cfg(test)]
+mod prepared_tests {
+    use super::*;
+
+    fn render(o: &mut Ownership, owner: usize, request: Request, generation: u64) -> Binding {
+        o.issue(Job::new(owner, request, generation, 0)).unwrap();
+        let descriptor = 0x1000 + request.row as usize * 0x100 + request.sub as usize * 8;
+        assert!(matches!(o.complete(Completion {
+            queue: Queue { count: 0, word: 0 }, table: descriptor, descriptor,
+        }, RequestWords { index: table_index(request.row) as i32, registered: 1, holder: 0x8000 }, true),
+            Outcome::Bind { .. }));
+        Binding { request, descriptor }
+    }
+
+    #[test]
+    fn four_owners_reserve_prepared_requests_without_publishing_or_aliasing_rows() {
+        let mut o = Ownership::new();
+        let measured = crate::engine::swap::mii_cycle::compact_regressions::AllocationCount::start();
+        for (owner, row) in [5, 6, 2, 3].into_iter().enumerate() {
+            let b = render(&mut o, owner, Request { row, sub: 7 }, 9);
+            let p = o.prepare(owner, b, 9).unwrap();
+            assert_eq!(o.prepared[owner], Some(p));
+            assert_eq!(o.bound[owner], None);
+            assert!(o.issue(Job::new(owner, b.request, 10, b.descriptor)).is_err());
+            assert!(!o.row_free_for((owner + 1) % 4, row));
+            assert!(matches!(o.select(row, [RequestWords { index: -1, registered: 0, holder: 0 }; 3]),
+                Select::Request { request: Request { sub: 8, .. }, .. }));
+        }
+        assert_eq!(measured.finish(), 0);
+    }
+
+    #[test]
+    fn same_owner_rotation_retains_displayed_texture_during_unconditional_table_clear() {
+        let mut o = Ownership::new();
+        let a = render(&mut o, 2, Request { row: 2, sub: 7 }, 1);
+        let prepared = o.prepare(2, a, 1).unwrap();
+        o.bound(2, prepared.binding);
+        let b = render(&mut o, 2, Request { row: 2, sub: 8 }, 2);
+        o.bound(2, b);
+        o.issue(Job::new(2, a.request, 3, b.descriptor)).unwrap();
+        // Retarget A releases A's old registration and clears table[row], even
+        // though B is displayed. B remains batch-owned and must not be released.
+        assert_eq!(o.complete(Completion { queue: Queue { count: 1, word: 0xa }, table: 0,
+            descriptor: a.descriptor }, RequestWords { index: -1, registered: 0, holder: 0 }, true), Outcome::Wait);
+        assert_eq!(o.bound[2], Some(b));
+        assert!(o.is_owned(b.request));
+        assert!(matches!(o.complete(Completion { queue: Queue { count: 0, word: 0 },
+            table: a.descriptor, descriptor: a.descriptor }, RequestWords {
+                index: table_index(2) as i32, registered: 1, holder: 0x8000 }, true), Outcome::Bind { owner: 2, .. }));
+        assert_eq!(o.bound[2], Some(b));
+        o.bound(2, a);
+        assert_eq!(o.bound[2], Some(a));
+        assert!(o.is_owned(b.request));
+    }
+
+    #[test]
+    fn preparation_serial_and_departure_reject_old_receipts_without_native_release() {
+        let mut o = Ownership::new();
+        let a = render(&mut o, 3, Request { row: 3, sub: 7 }, 1);
+        let first = o.prepare(3, a, 1).unwrap();
+        o.cancel_owner(3);
+        assert_eq!(o.prepared[3], None);
+        assert!(o.is_owned(a.request));
+        let second = o.prepare(3, a, 2).unwrap();
+        assert_ne!(first.serial, second.serial);
+        o.depart();
+        assert_eq!(o.prepared[3], None);
+        assert!(o.is_owned(a.request));
+        o.teardown();
+        assert!(!o.is_owned(a.request));
+        let a = render(&mut o, 3, a.request, 2);
+        assert_ne!(o.prepare(3, a, 2).unwrap().serial, second.serial);
+    }
+}
 /// A helper avoided by this owner cannot satisfy or retain its pending want.
-pub fn slot_may_install(avoid: Option<u32>, slot: u32) -> bool { avoid != Some(slot) }
+pub fn slot_may_install(avoid: u8, slot: u32) -> bool { slot < 8 && avoid & (1u8 << slot) == 0 }
 
 /// Validate the part index before the adapter reads its child pointer.
 pub fn part_offset(index: i32) -> Option<usize> {
@@ -1540,9 +1715,9 @@ mod native_admission_tests {
     }
     #[test]
     fn avoided_rows_do_not_satisfy_or_pin_a_portrait_want() {
-        assert!(!slot_may_install(Some(2), 2));
-        assert!(slot_may_install(Some(2), 3));
-        for slot in 0..8 { assert!(slot_may_install(None, slot)); }
+        assert!(!slot_may_install(1 << 2, 2));
+        assert!(slot_may_install(1 << 2, 3));
+        for slot in 0..8 { assert!(slot_may_install(0, slot)); }
     }
     #[test]
     fn native_stores_reject_match_and_unqualified_scene_modes() {

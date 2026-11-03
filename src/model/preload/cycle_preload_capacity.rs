@@ -3,19 +3,19 @@
 //! owner checks also use. Native ownership must still qualify every entry.
 use crate::engine::mii::backend::Layout;
 
-pub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS};
+pub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS, SOURCE_SLOTS};
 pub const ABSENT_SLOT: u32 = 8;
 
 /// Potential entries, not permission to create or dereference them. Training
 /// extensions and solo waiting extensions require separate opt-in features.
 pub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)
-    -> [u32; MAX_TARGETS] {
+    -> [u32; SOURCE_SLOTS] {
     slots_with_waiting(layout, third, ldn_third, extended, false)
 }
 
 pub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended: bool, waiting: bool)
-    -> [u32; MAX_TARGETS] {
-    let mut slots = [ABSENT_SLOT; MAX_TARGETS];
+    -> [u32; SOURCE_SLOTS] {
+    let mut slots = [ABSENT_SLOT; SOURCE_SLOTS];
     slots[..BASE_HELPERS].copy_from_slice(&layout.helpers());
     let extra_count = if !third { 0 } else {
         match layout {
@@ -35,12 +35,12 @@ pub fn supported_count(layout: Layout, third: bool, ldn_third: bool, extended: b
 }
 
 pub fn target_count(requested: u8, layout: Layout, third: bool, ldn_third: bool, extended: bool) -> usize {
-    usize::from(requested).min(supported_count(layout, third, ldn_third, extended))
+    usize::from(requested).min(MAX_TARGETS).min(supported_count(layout, third, ldn_third, extended))
 }
 
 pub fn target_count_with_waiting(requested: u8, layout: Layout, third: bool, ldn_third: bool,
     extended: bool, waiting: bool) -> usize {
-    usize::from(requested).min(slots_with_waiting(layout,third,ldn_third,extended,waiting)
+    usize::from(requested).min(MAX_TARGETS).min(slots_with_waiting(layout,third,ldn_third,extended,waiting)
         .iter().filter(|slot| **slot != ABSENT_SLOT).count())
 }
 
@@ -57,31 +57,33 @@ mod tests {
     use super::*;
     #[test]
     fn only_training_can_use_every_extra_and_waiting_seats_stay_reserved() {
-        assert_eq!(slots(Layout::Training,true,true,true),[2,3,7,6,5]);
-        assert_eq!(slots(Layout::Training,true,true,false),[2,3,7,8,8]);
-        assert_eq!(slots(Layout::Ldn,true,true,true),[5,6,7,8,8]);
-        assert_eq!(slots(Layout::Ldn,true,false,true),[5,6,8,8,8]);
-        assert_eq!(slots(Layout::Quickplay,true,true,true),[5,6,8,8,8]);
-        assert_eq!(slots(Layout::Training,false,true,true),[2,3,8,8,8]);
+        assert_eq!(slots(Layout::Training,true,true,true),[2,3,7,6,5,4]);
+        assert_eq!(slots(Layout::Training,true,true,false),[2,3,7,8,8,8]);
+        assert_eq!(slots(Layout::Ldn,true,true,true),[5,6,7,8,8,8]);
+        assert_eq!(slots(Layout::Ldn,true,false,true),[5,6,8,8,8,8]);
+        assert_eq!(slots(Layout::Quickplay,true,true,true),[5,6,8,8,8,8]);
+        assert_eq!(slots(Layout::Training,false,true,true),[2,3,8,8,8,8]);
     }
     #[test]
     fn every_requested_budget_obeys_the_backend_limit() {
+        assert_eq!(supported_count(Layout::Training,true,true,true), 6);
+        assert_eq!(MAX_TARGETS, 5, "renderer demand must not extend the saved preload menu");
         for count in 0..=u8::MAX {
             assert_eq!(target_count(count,Layout::Training,true,true,true),usize::from(count).min(MAX_TARGETS));
             assert_eq!(target_count(count,Layout::Ldn,true,true,true),usize::from(count).min(3));
             assert_eq!(target_count(count,Layout::Quickplay,true,true,true),usize::from(count).min(2));
         }
         for (i, slot) in EXTRA_SLOTS.iter().enumerate() {assert_eq!(capacity_index(*slot),Some(i));}
-        assert_eq!(capacity_index(4),None);
+        assert_eq!(capacity_index(4),Some(3));
         assert_eq!(capacity_index(8),None);
     }
     #[test]
     fn waiting_capacity_is_opt_in_and_uses_its_own_plan() {
         for layout in [Layout::Ldn, Layout::Quickplay] {
-            assert_eq!(slots_with_waiting(layout,true,true,true,true),[5,6,7,3,2]);
-            assert_eq!(slots_with_waiting(layout,false,true,true,true),[5,6,8,8,8]);
+            assert_eq!(slots_with_waiting(layout,true,true,true,true),[5,6,7,3,2,8]);
+            assert_eq!(slots_with_waiting(layout,false,true,true,true),[5,6,8,8,8,8]);
             for count in 0..=u8::MAX {
-                assert_eq!(target_count_with_waiting(count,layout,true,true,true,true),usize::from(count).min(MAX_TARGETS));
+                assert_eq!(target_count_with_waiting(count,layout,true,true,true,true),usize::from(count).min(5));
             }
         }
     }

@@ -1,0 +1,37 @@
+# Fourth Training destination: lifetime follow-up
+
+Lead requested a 20-minute follow-up at 2026-11-03 05:18:57 UTC. This report supplements the immutable four-created review; no activation or instrumentation change occurred.
+
+**The separate resource cleanup order is still unresolved.** The inspected main scene cleanup proves an eight-owner Mii resource-release pass followed by eight-entry manager teardown, but those operations are not the deleting destructor of each context-owned resource object. No proof was found that a retained context or resource may legitimately be reused for waiting entry4 under a different scene epoch. Neither persistence nor replacement can be assumed from these facts.
+
+The same owned ELF SHA `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2` was used. Raw bounded excerpts are under `../tmp-pkg6/row4-review/`; `lifetime-manifest.json` SHA `c66a2026a35a6d134fba87e88c69ba0638b1dda55fceb56078a76fd3a57fbabf` binds them. The exact-target direct-branch and context-global reference query is retained as `lifetime-xrefs.json`; candidates were manually checked before interpretation. Nearby-register reuse produces false candidates, so the query is not a dataflow proof. No indirect-call completeness is claimed.
+
+## Established ordering and rejected substitutions
+
+- `14f139c..13a0` gates the manager cleanup on the current manager singleton. `14f13a4..13ac` reads context `*(5324680)` and owner alias0. The subsequent unrolled pass visits aliases through7 (`14f1dbc` reads alias7 at context+0x120). For each existing owner it reads the current Mii record index and retires the selected G record's shared resource and face handles. The final owner7 path clears G+record+0x58/+0x60 at `14f1e90` and owner face words at `14f1f24`.
+- Only then does `14f1f38` invoke `66e850`, whose row4 destructor/free/count-decrement path was proved in the first report. Clearing a G record or face handle is **not** clearing `context.owning[4]` or invoking its native deleting destructor. These cannot substitute for the required resource-owner retirement marker.
+- Actual owner deleting destructor `17e44b0` saves the owner address, calls body `17e4350` at `17e44c0`, reaches existing hook `17e44c4`, and tail-frees at `17e44d4`. Body `17e4350` cleans face handles, owner task/shared state and the key tree. The matching resource identity remains necessary; an arbitrary occurrence of this function is not our owner.
+- Direct references to `17e4350` also occur at `66e27c` and `66e2ac`, on a wrapper's `this+0x18` embedded owner. They use a different wrapper vtable and cannot be relabelled as retirement of the separately allocated `17eb000` resource. No direct call to `17e44b0` was found by the exact-target query; its known vtable dispatch remains the material indirect edge.
+- `14f381c ->1756470` was checked as the existing service-reset call later in the scene function. Its body clears service queues/flags under their locks; it contains no established per-owner deleting-destructor edge. It is not a replacement lifetime proof.
+- The historical `resource-context-cleanup.asm` stays rejected. Adjacent `17eb140` only queries owners through virtual+0x30; it does not delete them. Context-global address candidates at `18768dc` were register-reuse false positives and supply no evidence.
+
+The exact missing link is a qualified caller of the context-owned resource's virtual deleting destructor, ordered after the old created lifetime and before native construction/use of waiting4. The current evidence does not identify that caller or show all requested transitions reach it. Further unrelated native scanning would exceed this bounded review's purpose.
+
+## Proposed bounded observation using existing diagnostics
+
+This is a proposal for lead review, not an executed run or activation authorization. A row4 candidate must first receive explicit review/permission to activate its strict native creation path; current code still cannot create4. A baseline that creates only7 cannot establish retirement of a nonexistent created4.
+
+Use one fresh, coherently gated diagnostic process and the normal Training exit to menu followed by the existing waiting-room route. Batch this with the required four-created HUD/F9 cases, within the existing 45-minute runtime box. Keep the full ordered diagnostic/console output and controller timestamps; no new hook or per-frame probe is proposed.
+
+1. Require existing `[CharacterSources] capacity creation` records for slots7/6/5/4, `backend=Training`, `qualified=true`, one scene epoch and exact nonzero entry/resource identities. Require the existing strict pre/postflight contract and full native-ready/Mii receipts; no quantity-based synthetic receipt.
+2. For each creation retain `[ManagedSourceCleanup] entry destruction`, the matching `[ManagedSourceCleanup] listener ... removed=true`, and `[ManagedSourceCleanup] retirement ... entry_destroyed=true reservation_cleared=true listener_removed=Some(true)` with the exact old entry/owner/epoch. Also retain `[ManagedSourceCleanup] extended claim slot=4 owner=... released=true` plus the matching `[ManagedSourceCleanup] claim owner=... released=true`. Actor cleanup must match the loaded source, not another generation.
+3. Require retirement of old slot4 **before** the existing `[TrioBoundary] allocation owner=4 ... mode=...` for native waiting construction. This allocation diagnostic is emitted at `678174` before publication, so it is a stronger boundary than the first waiting service. Preserve raw sequence on the producing thread; do not infer order by merging separately buffered streams. If ordering cannot be established, return inconclusive.
+4. Require fresh waiting mode/epoch and native visible4 identity, no Training-created registration interpreted as waiting, normal waiting helper/input/owner checks, and no old source receipt accepted. Existing strict snapshot reads authorize live identities; saved old pointers do not authorize dereferences.
+
+Falsifiers: any missing/mismatched retirement, next waiting4 allocation before old resource cleanup, old registration still present, stale epoch accepted, failed listener/actor cleanup, changed original roots, any Unmapped or nonzero hook-allocation delta. If the bounded `[TrioBoundary]` log budget384 is exhausted, absence of the allocation marker is not success. If the actual configured feature set does not emit the needed marker, report that exact observation gap before adding instrumentation. The existing diagnostics do not directly prove whether the context address itself persists; do not make that additional claim without a current-root receipt.
+
+No product/native policy was changed for this follow-up. The pure ownership WIP received only test-fixture corrections for four owners and explicit cross-owner row rejection; it remains uncompiled. Four-row implementation and all runtime acceptance remain conditional on the lead's disposition.
+
+## Accepted observation refinement (lead, 2026-11-03 05:45Z)
+
+Existing diagnostics contain a global sequence but no producer-thread ID. Supersede the producing-thread criterion above with an interactive causal barrier: observe every exact entry/listener/owner/claim retirement for all four created rows while still at the menu, BEFORE sending any waiting-entry command. Missing or ambiguous markers mean stop and restore without entering waiting. Then bind fresh waiting4 construction and epoch. Do not infer producer thread from the log drainer.

@@ -69,13 +69,13 @@ pub(crate) struct View {
     /// Sealed resource identity projected atomically with the source reservation.
     /// This is not native activation completion and grants no new helper lease.
     pub promoted:[Option<(PromotionToken,NativeIdentity)>;2],
-    /// Training creation order 7/6/5, never native helper ordinals. SourceBook
+    /// Training creation order 7/6/5/4, never native helper ordinals. SourceBook
     /// projects these tokens; this value view owns no independent lifetime.
-    pub created_slots:[Helper;3],
-    pub created_miis:[Option<CreatedReceipt>;3],
+    pub created_slots:[Helper;4],
+    pub created_miis:[Option<CreatedReceipt>;4],
 }
 impl View {
-    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],promoted:[None;2],created_slots:[Helper::Unmanaged;3],created_miis:[None;3] };
+    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],promoted:[None;2],created_slots:[Helper::Unmanaged;4],created_miis:[None;4] };
     pub fn ordinal(self,id:usize)->Option<usize> {self.layout.helper(id)}
     pub fn created_ordinal(self,id:usize)->Option<usize> {
         (self.layout==crate::engine::mii::backend::Layout::Training)
@@ -217,7 +217,7 @@ impl super::Registry {
         // A slot that is not a helper of the current backend (e.g. a Training created
         // entry 5/6/7) never selects another layout's helper ordinals.
         if self.helpers.ordinal(slot).is_none() && self.helpers.slots==[Helper::Unmanaged;2]
-            && self.helpers.created_slots==[Helper::Unmanaged;3]
+            && self.helpers.created_slots==[Helper::Unmanaged;4]
             && backend.is_none_or(|l|l.helper(slot).is_some()) {
             use crate::engine::mii::backend::Layout;
             // Both waiting families share helpers 5/6; only the current scene names the family.

@@ -31,7 +31,7 @@ pub(crate) fn try_registry()->Option<hos_lock::MutexGuard<'static,Registry>> { C
 pub(crate) fn helper_snapshot()->Result<helpers::View,&'static str> {
     let layout=super::super::mii_backend::current().ok_or("Mii backend unavailable")?;
     let mut r=registry();
-    if r.helpers.slots==[helpers::Helper::Unmanaged;2] && r.helpers.created_slots==[helpers::Helper::Unmanaged;3] {r.helpers.layout=layout;}
+    if r.helpers.slots==[helpers::Helper::Unmanaged;2] && r.helpers.created_slots==[helpers::Helper::Unmanaged;4] {r.helpers.layout=layout;}
     let view=r.helpers;check(view.layout==layout,"old helper backend retained")?;view.available()?;Ok(view)
 }
 pub(crate) fn helper_snapshot_for(source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<helpers::View,&'static str> {

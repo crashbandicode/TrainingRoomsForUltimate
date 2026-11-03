@@ -34,10 +34,10 @@ const STALL_FAILED: &str = "stalled; native completion proven, scene proof faile
 const NATIVE_WITHOUT_RESOURCES: &str = "native completion without usable resources";
 
 // P1 hat, CPU hat, P1 item, then (portrait feature) P1 portrait, CPU portrait.
-const CHANNELS: usize = if cfg!(feature = "mii-hud-portrait-alpha") { 5 } else { 3 };
+const CHANNELS: usize = if cfg!(feature = "mii-hud-portrait-alpha") { 7 } else { 3 };
 /// Portrait wants carry the loaded configuration and avoid the other owner's bust row.
 #[cfg(feature = "mii-hud-portrait-alpha")]
-pub const PORTRAIT_CHANNELS: [usize; 2] = super::mii_hud_portrait_policy::SOURCE_CHANNELS;
+pub const PORTRAIT_CHANNELS: [usize; 4] = super::mii_hud_portrait_policy::SOURCE_CHANNELS;
 const LEASES: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -45,9 +45,9 @@ struct Want {
     epoch: SceneEpoch,
     kind: u32,
     configuration:Option<crate::engine::mii::lifetime::Configuration>,
-    /// Portrait only. `None` keeps hat/item selection identical to the feature-off path.
+    /// Portrait exclusion mask; zero preserves ordinary hat/item selection.
     #[cfg(feature = "mii-hud-portrait-alpha")]
-    avoid: Option<u32>,
+    avoid: u8,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -405,7 +405,7 @@ pub(crate) unsafe fn set_cpu_seats(cpu_seats:Option<[Option<crate::runtime::rost
     let epoch = state.book.epoch();
     state.cpu_seats = targets.map(|target| target.map(|target| Want {
         epoch, kind: target.kind, configuration: target.configuration,
-        #[cfg(feature="mii-hud-portrait-alpha")] avoid: None,
+        #[cfg(feature="mii-hud-portrait-alpha")] avoid: 0,
     }));
     state.cpu_seats_known = true;
 }
@@ -422,7 +422,7 @@ pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::ru
     if !state.book.is_current(epoch) {return;}
     let plan=targets.map(|t|t.filter(|t|(state.preload_failed|state.failed) & (1u128<<t.kind)==0)
         .map(|t|Want {epoch:state.book.epoch(),kind:t.kind,configuration:t.configuration,
-            #[cfg(feature="mii-hud-portrait-alpha")] avoid:None}));
+            #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
     if plan!=state.preload {state.preload_settled=false;state.preload=plan;}
 }
 
@@ -486,6 +486,7 @@ pub(super) unsafe fn reserve_count_promotion(old: u32, requested: u32,
             || source.token.slot() != helper.owner as usize
             || native_source::parked_identity(helper.entry as *const u8, helper.owner, source.kind) != Some(expected)
         { return false; }
+
     }
     let Some(mut state) = STATE.try_lock() else { return false; };
     if INSTALL.active() { return false; }
@@ -635,7 +636,7 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
     let sources=std::array::from_fn(|i|state.sources[i].filter(|s|state.book.is_current(s.token.epoch())
         && state.book.phase(s.token.slot())!=Ok(Phase::Failed)).map(|s|Want {
             epoch:s.token.epoch(),kind:s.kind,configuration:s.configuration,
-            #[cfg(feature="mii-hud-portrait-alpha")] avoid:None}));
+            #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
     let targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|state.preload[i].filter(|w|i<usize::from(settings.slots)
         && (state.preload_failed|state.failed)&(1u128<<w.kind)==0));
     // Scheduling grants no native admission; the created destination must still
@@ -666,7 +667,7 @@ fn callback_slot(slot: u32) -> bool {
     CALLBACK_SLOTS.contains(&slot) || (cfg!(feature = "managed-third-source-alpha") && slot == 7)
 }
 
-fn candidates(backend: Backend) -> [u32; crate::runtime::roster::cycle_preload::MAX_TARGETS] {
+fn candidates(backend: Backend) -> [u32; crate::engine::preload::cycle_preload_capacity::SOURCE_SLOTS] {
     crate::engine::preload::cycle_preload_capacity::slots_with_waiting(backend,
         cfg!(feature="managed-third-source-alpha"),cfg!(feature="managed-ldn-third-source-alpha"),
         cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"))
@@ -817,7 +818,7 @@ pub unsafe fn prepare(
     if PORTRAIT_CHANNELS.contains(&channel) {
         return Err("Portrait channels require prepare_portrait");
     }
-    prepare_with(channel, kind, holder, None, None)
+    prepare_with(channel, kind, holder, None, 0)
 }
 
 /// Exclusive portrait lease. The configuration is the one the visible owner loaded.
@@ -828,7 +829,7 @@ pub unsafe fn prepare_portrait(
     kind: u32,
     configuration: crate::engine::mii::lifetime::Configuration,
     holder: Holder,
-    avoid: Option<u32>,
+    avoid: u8,
 ) -> Result<Option<Lease>, &'static str> {
     if !PORTRAIT_CHANNELS.contains(&channel) {
         return Err("Invalid portrait channel");
@@ -844,7 +845,7 @@ unsafe fn prepare_with(
     kind: u32,
     holder: Holder,
     exact: Option<crate::engine::mii::lifetime::Configuration>,
-    avoid: Option<u32>,
+    avoid: u8,
 ) -> Result<Option<Lease>, &'static str> {
     #[cfg(not(feature = "mii-hud-portrait-alpha"))]
     let _ = (exact, avoid);
@@ -1026,7 +1027,7 @@ pub fn waiting_for_capacity(channel: usize) -> bool {
             {
                 return false;
             }
-            let mut sources = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+            let mut sources = [None; crate::engine::preload::cycle_preload_capacity::SOURCE_SLOTS];
             for (i, slot) in slots.iter().copied().map(|slot| slot as usize).enumerate() {
                 if slot >= state.sources.len() {continue;}
                 if !backend.helpers().contains(&(slot as u32))
@@ -1255,6 +1256,36 @@ pub fn portrait_ready(lease: Lease, holder: Holder) -> Option<crate::engine::swa
     state.book.leased_ready(lease.token, holder)
 }
 
+/// Renderer-specific parked admission. Created destinations require their
+/// sealed exact-Mii capability and the full current source proof; being an
+/// allocated slot alone never widens the ordinary helper predicate.
+#[cfg(feature="mii-hud-portrait-alpha")]
+pub(super) unsafe fn portrait_render_ready(entry: *const u8, lease: Lease, holder: Holder) -> bool {
+    let source = {
+        let state = STATE.lock();
+        let Some(ready) = state.book.leased_ready(lease.token, holder) else { return false; };
+        let Some(source) = state.sources.get(lease.slot as usize).copied().flatten()
+            .filter(|s| s.token == ready.source() && s.promotion.is_none() && s.install.is_none())
+            else { return false; };
+        source
+    };
+    if source.token.entry() != NativeEntry(entry as u64) { return false; }
+    #[cfg(feature="mii-managed-helper-alpha")]
+    if let Some(destination) = source.created_destination {
+        let Some(configuration) = source.configuration else { return false; };
+        let Some(ready) = portrait_ready(lease, holder) else { return false; };
+        let Ok(receipt) = super::mii_managed_helper::created_ready_receipt(ready, configuration)
+            else { return false; };
+        return receipt.destination == destination
+            && qualified_backend() == Ok(Backend::Training)
+            && native_source::ready_created(entry, lease.slot, source.kind, destination).is_some()
+            && portrait_ready(lease, holder) == Some(ready);
+    }
+    super::mii_backend::current().is_some_and(|l| l.helpers().contains(&lease.slot))
+        && native_source::parked_ready(entry, lease.slot, source.kind)
+        && portrait_lease_valid(lease, holder)
+}
+
 /// Existing portrait consumer only. Reservation does not imply activation:
 /// compare the full sealed native identity in either completed parked or active
 /// shape, with the exact current source and serial still owned by SourceBook.
@@ -1271,7 +1302,7 @@ pub(super) unsafe fn portrait_native_ready(entry:*const u8,lease:Lease,holder:Ho
         source
     };
     if entry as usize != source.token.entry().0 as usize {return false;}
-    if source.promotion.is_none() {return native_source::parked_ready(entry,lease.slot,source.kind);}
+    if source.promotion.is_none() {return portrait_render_ready(entry,lease,holder);}
     let Some(expected)=source.completed_native else{return false;};
     native_source::parked_identity(entry,lease.slot,source.kind)==Some(expected)
         || native_source::active_identity(entry,lease.slot,source.kind)==Some(expected)
@@ -1851,7 +1882,7 @@ fn refuse_want(wanted: Want, slot: u32, reason: &'static str) {
     }
 }
 
-fn slot_allowed(avoid: Option<u32>, slot: u32) -> bool {
+fn slot_allowed(avoid: u8, slot: u32) -> bool {
     #[cfg(feature = "mii-hud-portrait-alpha")]
     { super::mii_hud_portrait_policy::slot_may_install(avoid, slot) }
     #[cfg(not(feature = "mii-hud-portrait-alpha"))]
@@ -1983,7 +2014,7 @@ fn helpers_unavailable(state: &State, backend: Backend) -> bool {
 
 #[cfg(feature="managed-third-source-alpha")]
 #[derive(Clone,Copy,PartialEq,Eq)]
-struct CreationIntent {extra:u32,wanted:Want,speculative:bool}
+struct CreationIntent {extra:u32,wanted:Want,speculative:bool,portrait_row:Option<u32>}
 
 /// One shared admission policy for every additional helper. A requested cache
 /// count never makes an unowned native entry usable.
@@ -1997,6 +2028,27 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
     let limit=policy::target_count_with_waiting(slots,backend,true,
         cfg!(feature="managed-ldn-third-source-alpha"),cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"));
     if !speculative {
+        #[cfg(feature="mii-hud-portrait-alpha")]
+        if backend == Backend::Training && created_exact_supported(backend) {
+            // An exclusive renderer row is a demand purpose, independent of
+            // speculative preload count and of free generic hat helpers. The
+            // native preflight still proves each serial prerequisite in full.
+            for (owner, channel) in PORTRAIT_CHANNELS.into_iter().enumerate() {
+                let Some(wanted) = state.wants[channel].filter(|want|
+                    state.book.is_current(want.epoch) && want_exact(*want)) else { continue; };
+                let row = super::mii_hud_portrait_policy::training_renderer_row(owner)?;
+                if !slot_allowed(wanted.avoid, row) { continue; }
+                let extra = policy::extra_slots(backend).iter().copied()
+                    .take(owner + 1).find(|slot|
+                        state.capacities[capacity_index(*slot as u32)].reservation.is_none());
+                let Some(extra) = extra else { continue; };
+                let capacity = &state.capacities[capacity_index(extra as u32)];
+                if capacity.attempted != Some(wanted.epoch) && third_source_backend(backend) {
+                    return Some(CreationIntent { extra: extra as u32, wanted,
+                        speculative: false, portrait_row: Some(row) });
+                }
+            }
+        }
         // The preload candidate must preserve the original two-helper behavior
         // when extra capacity was not requested, including the Off baseline.
         let fixed = backend == Backend::Training && state.cpu_seats_known
@@ -2012,7 +2064,7 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
             && owner.reservation.is_none() && owner.attempted!=Some(wanted.epoch)
             && if want_exact(wanted) { created_exact_supported(backend) }
                 else { capacity::source_kind(wanted.kind) })
-            .then_some(CreationIntent {extra,wanted,speculative});
+            .then_some(CreationIntent {extra,wanted,speculative,portrait_row:None});
     }
     if state.wants.iter().any(Option::is_some) {return None;}
     let (position,extra)=policy::extra_slots(backend).iter().copied().enumerate()
@@ -2035,7 +2087,7 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
         && !state.sources.iter().enumerate().any(|(slot,source)|
             source.is_some_and(|source|source.promotion.is_none() && source.kind==want.kind && source.configuration==want.configuration
                 && state.book.is_current(source.token.epoch()) && state.book.phase(slot)!=Ok(Phase::Failed))))?;
-    Some(CreationIntent {extra:extra as u32,wanted,speculative})
+    Some(CreationIntent {extra:extra as u32,wanted,speculative,portrait_row:None})
 }
 
 /// Retain the native claim until real retirement, including a failed post-call
@@ -2049,7 +2101,8 @@ unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,inte
     let Ok(backend)=qualified_backend() else {return;};
     let helpers=backend.helpers();
     if !helpers.contains(&slot) || !candidates(backend).contains(&intent.extra)
-        || admission_blocked() {return;}
+        || admission_blocker().is_some()
+        || (intent.portrait_row.is_none() && super::menu::captures_input()) {return;}
     let index=capacity_index(intent.extra);
     let wanted=intent.wanted;
     {let state=STATE.lock();
@@ -2219,7 +2272,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // or portrait still needs an additional source. Service that demand here,
     // independently of speculative cache settings and before the idle return.
     #[cfg(feature="managed-third-source-alpha")]
-    if !admission_blocked() {
+    if admission_blocker().is_none() {
         if let Ok(backend) = qualified_backend() {
             let intent = { creation_intent(&STATE.lock(), backend, false) };
             if let Some(intent) = intent { create_capacity(ctx, entry, slot, intent); }

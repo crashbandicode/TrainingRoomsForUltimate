@@ -300,7 +300,7 @@ struct State {
 
 impl State {
     const fn new() -> Self {
-        Self { jobs: [None, None], own: policy::Ownership::new(), batch: 0, refused: [0, 0], halted: false, flipped: [None, None], bootstrap: None, waiting_crop: None, shown: [None, None], rebinds: [None, None] }
+        Self { jobs: [None; policy::VISIBLE_OWNERS], own: policy::Ownership::new(), batch: 0, refused: [0; policy::VISIBLE_OWNERS], halted: false, flipped: [None; policy::VISIBLE_OWNERS], bootstrap: None, waiting_crop: None, shown: [None; policy::VISIBLE_OWNERS], rebinds: [None; policy::VISIBLE_OWNERS] }
     }
     fn sync_pending(&self) {
         PENDING.store(
@@ -475,7 +475,7 @@ pub(super) unsafe fn request(
         PortraitIntent::Original { original_kind } => Intent::Original { original_kind },
     };
     let Some(layout) = mii_backend::current() else { return false; };
-    let Some(logical) = layout.logical(owner) else { return false; };
+    let Some(logical) = logical_owner(layout, owner) else { return false; };
     let in_scope = practice_scope(owner);
     let pending = Pending {
         entry: entry as usize, kind, generation, logical: logical as u32, physical: owner, layout, intent, defer_hud,
@@ -533,9 +533,23 @@ pub(super) fn should_defer_hud(owner: u32, kind: u32, intent: PortraitIntent) ->
         == policy::HudRefresh::DeferUntilPortrait
 }
 
+fn logical_owner(layout: Layout, owner: u32) -> Option<usize> {
+    if layout == Layout::Training && matches!(owner, 2 | 3) { Some(owner as usize) }
+    else { layout.logical(owner) }
+}
+
+fn publication_generation(logical: u32, physical: u32) -> Option<u64> {
+    if matches!(physical, 2 | 3) {
+        sources::promoted_presentation(physical).map(|p| p.generation)
+    } else { Some(mii_saved_alpha::current_generation(logical)) }
+}
+
 fn practice_scope(owner: u32) -> bool {
     let Some(layout) = mii_backend::current() else { return false; };
-    let Some(logical) = layout.logical(owner) else { return false; };
+    let Some(logical) = logical_owner(layout, owner) else { return false; };
+    if layout == Layout::Training && matches!(owner, 2 | 3) {
+        return scope(Role::Player).is_some_and(|s| s.mode == 0x04040000);
+    }
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     scope(role).is_some_and(|s| s.owner == owner && (layout != Layout::Training || s.mode == 0x04040000))
 }
@@ -565,7 +579,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     if !ACTIVE.load(Ordering::Acquire) {
         return;
     }
-    if let Some(logical) = mii_backend::current().and_then(|l| l.logical(owner)) {
+    if let Some(logical) = mii_backend::current().and_then(|l| logical_owner(l, owner)) {
         job_tick(base, logical, entry as usize, svc);
         rebind_tick(base, logical, entry);
     }
@@ -751,11 +765,7 @@ unsafe fn job_tick(base: usize, owner: usize, entry: usize, svc: Option<ServiceC
                     return;
                 }
             }
-            // One bust row per owner: never lease or install the helper whose row the other
-            // owner's pane is bound to (`row_free_for` stays as the invariant check).
-            let avoid = STATE.lock().own.bound.iter().enumerate()
-                .filter(|(o, _)| *o != owner)
-                .find_map(|(_, b)| b.as_ref().map(|b| b.request.row));
+            let avoid = STATE.lock().own.source_exclusions(owner, job.layout == Layout::Training);
             match sources::prepare_portrait(CHANNEL_BASE + owner, job.kind, c, job.holder, avoid) {
                 Ok(Some(lease)) => {
                     let Some(helper_entry) = native_source::entry(lease.slot) else {
@@ -845,6 +855,13 @@ unsafe fn owner_valid(job: &Job) -> bool {
 /// The publication is still this owner's live body in its layout and generation.
 /// Callers pass an entry already matched to the current callback, or an issued job's.
 unsafe fn owner_current(logical: u32, layout: Layout, physical: u32, entry: usize, kind: u32, generation: u64) -> bool {
+    if layout == Layout::Training && matches!(physical, 2 | 3) {
+        return mii_backend::current() == Some(layout) && practice_scope(physical)
+            && logical == physical
+            && sources::promoted_presentation(physical).is_some_and(|p|
+                p.entry == entry && p.kind == kind && p.generation == generation)
+            && active_body(entry as *const u8, physical, kind);
+    }
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     mii_backend::current() == Some(layout)
         && scope(role).is_some_and(|s| s.owner == physical && (layout != Layout::Training || s.mode == 0x04040000))
@@ -968,7 +985,7 @@ fn retirement_complete(reason: &str) {
     let leases = {
         let mut s = STATE.lock();
         let leases = s.jobs.map(|j| j.and_then(|j| j.lease));
-        s.jobs = [None, None];
+        s.jobs = [None; policy::VISIBLE_OWNERS];
         s.bootstrap = None;
         s.waiting_crop = None;
         s.own.teardown();
@@ -1205,7 +1222,9 @@ unsafe fn try_issue(base: usize, owner: usize, job: &Job, c: Configuration) -> R
     }
     let lease = job.lease.ok_or("no lease")?;
     let h = job.helper;
-    if mii_backend::current().is_none_or(|l| !l.helpers().contains(&h)) {
+    if mii_backend::current().is_none_or(|l| if l == Layout::Training {
+        policy::training_renderer_row(owner) != Some(h)
+    } else { !l.helpers().contains(&h) }) {
         return Err("leased slot is not a helper row");
     }
     if !policy::row_free_for(&STATE.lock().own.bound, owner, h) {
@@ -1219,7 +1238,7 @@ unsafe fn try_issue(base: usize, owner: usize, job: &Job, c: Configuration) -> R
         return Err("helper entry identity changed");
     }
     let ready = sources::portrait_ready(lease, job.holder).ok_or("helper source not ready")?;
-    let parked = native_source::parked_ready(helper_entry, h, job.kind);
+    let parked = sources::portrait_render_ready(helper_entry, lease, job.holder);
     let exact = mii_managed_helper::ready(ready, c);
     let root = base as *const u8;
     let source = pointer_chain(root, &SOURCE).ok_or("native source unavailable")?;
@@ -1543,7 +1562,7 @@ unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, te
         let (parked, exact) = match (job.lease, job.intent) {
             (Some(lease), Intent::Exact(c)) if sources::portrait_lease_valid(lease, job.holder) => {
                 let entry = native_source::entry(job.helper);
-                let parked = entry.is_some_and(|e| e as usize == job.helper_entry && native_source::parked_ready(e, job.helper, job.kind));
+                let parked = entry.is_some_and(|e| e as usize == job.helper_entry && sources::portrait_render_ready(e, lease, job.holder));
                 let exact = sources::portrait_ready(lease, job.holder).is_some_and(|ready| mii_managed_helper::ready(ready, c));
                 (Some(parked), Some(exact))
             }
@@ -1578,7 +1597,7 @@ unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, te
         let accepted = request(next.entry as *const u8, next.physical, next.generation, next.kind, intent, next.defer_hud);
         let owner_current = mii_backend::current() == Some(next.layout)
             && active_body(next.entry as *const u8, next.physical, next.kind)
-            && mii_saved_alpha::current_generation(next.logical) == next.generation;
+            && publication_generation(next.logical, next.physical) == Some(next.generation);
         if policy::rejected_deferral(next.defer_hud, accepted, owner_current, svc.is_some())
             == policy::HudStep::RefreshFallback
         {
@@ -1665,7 +1684,7 @@ unsafe fn paint_hud(entry: usize, physical: u32, kind: u32) {
 
 /// Forget the exact portrait retained for native reset, and any rebind armed for it.
 fn forget_shown(physical: u32) {
-    let Some(logical) = mii_backend::current().and_then(|l| l.logical(physical)) else { return; };
+    let Some(logical) = mii_backend::current().and_then(|l| logical_owner(l, physical)) else { return; };
     let mut s = STATE.lock();
     if s.shown[logical].is_none() && s.rebinds[logical].is_none() {
         return;
@@ -1685,7 +1704,7 @@ pub(super) unsafe fn represent(entry: *const u8, physical: u32, kind: u32) {
     let base = BASE.load(Ordering::Acquire);
     let logical = mii_backend::current()
         .filter(|layout| *layout == Layout::Training)
-        .and_then(|layout| layout.logical(physical));
+        .and_then(|layout| logical_owner(layout, physical));
     let Some(o) = logical.filter(|_| ACTIVE.load(Ordering::Acquire) && base != 0) else {
         paint_hud(entry as usize, physical, kind);
         trace!("[MiiPortrait] owner={} native reset: kind 0x{:x} republished; exact portrait inactive", physical, kind);
@@ -1693,8 +1712,12 @@ pub(super) unsafe fn represent(entry: *const u8, physical: u32, kind: u32) {
     };
     // A batch replaced while nothing was pending is observed before `bound` is trusted.
     scene_tick(base);
+    let Some(generation) = publication_generation(o as u32, physical) else {
+        paint_hud(entry as usize, physical, kind);
+        return;
+    };
     let live = policy::Live {
-        entry: entry as usize, physical, kind, generation: mii_saved_alpha::current_generation(o as u32),
+        entry: entry as usize, physical, kind, generation,
     };
     let (pending, shown, halted) = {
         let s = STATE.lock();
@@ -2126,7 +2149,7 @@ pub(super) unsafe fn before_refresh(entry: *const u8, owner: u32, kind: u32) {
     }
     let base = BASE.load(Ordering::Acquire);
     let Some(layout) = mii_backend::current() else { return; };
-    let Some(logical) = layout.logical(owner) else { return; };
+    let Some(logical) = logical_owner(layout, owner) else { return; };
     if base == 0 {
         return;
     }

@@ -60,7 +60,7 @@ impl Layout {
     }
     pub(super) fn waiting(self) -> bool { self.backend().waiting() }
     pub(super) fn owners(self) -> [u32; 4] { self.backend().owners().map(|slot| slot as u32) }
-    pub(super) fn extra_slots(self) -> &'static [usize; EXTRA_SLOTS.len()] { extra_slots(self.backend()) }
+    pub(super) fn extra_slots(self) -> &'static [usize] { extra_slots(self.backend()) }
 }
 
 /// Waiting-room additions to the scene a created-entry load must leave unchanged (scene bits 17-20), with what the
@@ -824,8 +824,8 @@ pub(super) mod managed {
             return Extras::NONE;
         };
         if registered_prefix(created, layout).is_none() { return Extras::NONE; }
-        Extras::registered_for(layout.backend(), layout.extra_slots().map(|slot|
-            registered_at(created, slot).map(|record| Roots {
+        Extras::registered_for(layout.backend(), std::array::from_fn::<_, { EXTRA_SLOTS.len() }, _>(|index|
+            layout.extra_slots().get(index).and_then(|slot| registered_at(created, *slot)).map(|record| Roots {
                 entry: record.entry, resource: record.resource, alias: record.alias,
                 selection: record.selection, descriptor_selector: record.descriptor_selector,
             })))
