@@ -151,3 +151,48 @@ The preceding pending explicit-review state is superseded by main-r16/lead-devel
 Playbook2dee6cc checker exited1: two mandatory machine failures (README GIF content and docs/media GIF),30 agent rows,894 guard initializers all64 bytes, clean source tree and root handoff present. Explicit nonexistent RELEASE-PENDING.nro prevented stale build auto-discovery. Raw report main-r16/source-compliance-5664bf3.md SHA256 06d448a947b81496adfcf99a102cb9f22711c0cdc7edb41ac5de2f5ec0bfd695. This report does not qualify the diagnostic as a shipped release, and the source test-attribute count is not an executed-test count. All thirty rows retain the scoped dispositions above; final closure is still owed.
 
 The first r16 F9 runtime attempt s6-12 reports the corrected full identity completion followed by Samus body with Sonic HUD. The original mismatch was retained and the run stopped/restored; full lead archive audit is pending. No F9 closure follows from the count-marker repair. Pkg4 first-seal observation is authorized as bounded evidence collection only; timer truncation has no accepted root fix.
+
+## R17 independent development audit, 2026-11-03 09:20 UTC
+
+Lead assigned this read-only 25-minute audit at09:17. No compiler, Eden, profile or claim. Exact source a34097866a37d72eb7a701521219a86dfc01d9cd: all1335 frozen files rehashed before and after; archive639d8f10 and manifest133cd4bc independently match. Actual diagnostic NROa9855f609436bbe183eca3e2111297386c207dc337b43346e4baec78c0394970, ELF77e4f15c1ed44fd0fc401816b79fc67fa75746afdd13866ac4439d7b95e41ac6 and build log31ec070e rehashed. Mainb148b62 was clean; exact diff from compileda340978 is only12 added lines in eden/EDEN-PACKAGE-2-PLAN.md. It is not the compiled source identity.
+
+Evidence in the parent workspace: tmp-slim/r17-compliance-audit/receipt.json SHA256919ddd794213f3f5e852b70ff4038626ea1842059f61e6e1f0e372c2b9c8c8b1 binds seven raw results and all four tool hashes. Playbook2dee6cc checker and full carry tools were read before use; jobs bounded512MiB/60s. Full source-to-destination carry passes41 package4,253 package6 and39 UI assets/ledger. Package6 emits three existing left-as-written probe-path notes; retained without claiming probe coverage.
+
+Checker invoked with the ACTUAL DEVELOPMENT DIAGNOSTIC NRO exits1, raw report10b13a891a564374840545e60e721b121f973ccca36994641bff98e2dd22adc0. Four mandatory machine failures: README combined GIF/build/license row, absent docs/media GIF, no origin, no git status. Last two describe the frozen archive without Git metadata; independent main Git read verifies Forgejo origin and clean b148b62, while frozen identity comes from the manifest. Raw results are unchanged. The checker emits29 agent rows because the explicit NRO replaces its usual missing-binary agent row; the map below retains the existing30-row numbering.
+
+Static894 guard initializers are all64 bytes; this is not proof of every live guard or hook safety. Static1408 test attributes are NOT test executions. Existing host log12e874e2 and BOTH actual executed ELF hashes independently match: lib1339 passed/2 ignored and thread_stacks222 passed, total1561 executions/0fail. This is targeted, not unique requirements or all-targets. No tests were rerun. NRO resident6242304B and absence of only diag.txt/standin byte markers do NOT turn a --features diag build into release or prove logging compliance. The checker card-script pass had no tracked archive files; its existing scanner was separately applied to all1335 manifest paths and found no prohibited commands. Likewise test-script presence does not prove every reported number was correctly calculated.
+
+| Map row | Current disposition and smallest remaining evidence |
+| --- | --- |
+| 1 Binary | Development identity closed above; matching final RELEASE NRO and audit still owed. |
+| 2 Gates | Targeted1561 and diag build scoped; final all-targets, clippy zero-warning, no-default, release/diag, size/lint/carry wave owed. |
+| 3 Root fixes | Configuration roots historical; HUD source root integrated, timer first-seal is diagnostic only. Hitbox first pass fails; Q15 provider unqualified. Actual corrected runtime owed. |
+| 4 Site inventory | Prior dated owned inventory/ABI receipts scoped; final changed-site/vtable disposition owed, no new card scan. |
+| 5 Coexistence | Overlay final-input/delete_records conflict remains open; both orders/stand-ins and pilot coexistence need exact-candidate proof. |
+| 6 Hook boundary | Existing scoped ABI/displaced-window review retained; final per-hook rationale and current compiled changes remain lead/owner reviewed. |
+| 7 Release logging | Marker scanner insufficient; actual release cfg/logging path and shipped output audit owed. |
+| 8 Online rules | Existing scoped source review only; whole changed-path hook-by-hook disposition owed. |
+| 9 Replay A/B | Matching final candidate desync-detector A/B evidence owed. |
+| 10 Two consoles | Same-frame desync_seen=0 past changed path owed; offline Eden cannot substitute. Device work not authorized here. |
+| 11 Claims | SH03 admission/release scoped pass; no claim in this audit. Future r17 lane needs its own receipt. |
+| 12 Host isolation | SH03 scoped preflight pass; no runtime in audit, no inherited r17 host admission. |
+| 13 Profile copy | Existing SH03 copy/restore evidence scoped; new run needs own verification. |
+| 14 Copy semantics | Existing immutable-link/mutable-copy proof scoped; no copies/profile mutations here. |
+| 15 Build resources | Frozen unique r17 target recorded in candidate/job; historical build-owner receipts retained. No new growth/retirement or fresh census claimed. |
+| 16 Gated waits | SH03 observed phase gates scoped; future runtime must independently gate inputs. |
+| 17 Failed preconditions | Prior failed labels retained; no runtime retry here and no same-label overwrite. |
+| 18 Restoration | SH03 full1600+19 plus separate verification/release scoped; no live Slim ownership. |
+| 19 Runtime health | SH03 full12226 lines zero TOTAL Unmapped/fatal,29 actual hook records0/0,15 measured margins scoped. Not r17 or final RC coverage. |
+| 20 Guards on commands | This audit bounded; historical short unguarded commands remain disclosed failure. |
+| 21 Evidence report | This additive report binds current source/artifacts/checks; final corrected runtime report still owed. |
+| 22 Media | UI raw default/custom notice clips scoped; frozen README/GIF machine failures remain. Actual corrected clip under10s/1280/date/build owed. Input-log contrast failure remains open. |
+| 23 Claims | This audit distinguishes static/targeted/development from final. Final assembled README/evidence claim review owed. |
+| 24 Handoff | Frozen HANDOFF remains historical. Lead updates the current root HANDOFF with r17 identity, reviewed outcomes, pending resource decision and exact next qualification steps; final accepted-candidate handoff remains owed. |
+| 25 Publication | Outside worker authority; version/tag/assets/download disposition belongs to lead/operator. |
+| 26 Rebuild | No released tag exists for this candidate; byte-identical tagged rebuild still pending publication scope. |
+| 27 Card | Prohibited to Slim; no installation acceptance or physical operations. |
+| 28 Device control | No device action. Independent manifest-script scan zero hits; does not attest other agents or hardware runs. |
+| 29 Authorized writes | Only own audit output/report/local commits; no push/tag/card/DBI/USB/OpenCode. |
+| 30 Model | Exact own thread Astra/medium and sole owner-bound watcher verified09:13; historical watcher gap not erased. |
+
+Provider gap remains separate from constructor-trigger coverage: Q15 observer contexts prove triggers, not catalog writer exclusion. CPU DI/tech/OoS requires current-boot cpu_common_load with all four guards and cpu_common=installed; absence in a minimal three-plugin lane is unexercised. Native ancestry and foreign load orders retain their limits; any Unmapped anywhere fails. No new final RC row is closed by this audit, and READY remains unset.
