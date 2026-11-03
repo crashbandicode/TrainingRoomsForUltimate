@@ -118,3 +118,40 @@ No timing acceptance from this run. Console Unmapped=0. It was stopped and
 collected, then the profile's single original NRO was restored and its full
 SHA256 set compared to source g. Surface released 16:38Z with zero Eden
 processes remaining. The ordinary-first row requeues behind existing work.
+
+
+## Current integrated r6 continuation, 2026-11-03
+
+Frozen source `e1d81d78215bf975ca0e67e1707dae0a46279508`, diagnostic NRO
+`331da18e8748fdbd6a5fdb48acd225e9ffa4675638eb8646f6d06dca2a286347`.
+The required two standard fresh boots completed their bounded inputs:
+f6-13 had 356 Unmapped Read64 events at `0xffff7e80ffff7ea0`; f6-14 had zero.
+Both profiles were restored and claims released. Caller diagnostics reproduced
+276 Read64 events in f6-15 and 1,520 Read8 events across
+`0xffff807dffff809d..0xffff807dffff80a4` in f6-18. Runs f6-16,17,19,20
+had zero total Unmapped. Full console counts, hashes, inputs and cleanup
+receipts remain under `artifacts/trainingrooms-lead-astra4/f6-*` in the parent.
+The f6-15 host stack reaches Dynarmic CPU MemoryRead; guest attribution is
+still open. These retries do not close the intermittent health failure.
+
+The old driver also accepted the wrong completion. In f6-14, diagnostic #421
+requested Kirby with sequence4; #427 reported copy packages still loading;
+#428 readied the fallback R.O.B.; #431 refused that same transaction.
+CPU Fox had the same failure at #633/#640. Thus the former `LAPS DONE 12`
+reported attempted commands, not the requested sequence. Replaying those
+actual lines reproduced the false success without Eden.
+
+The driver now requires the matching ordinary-owner cycle transaction receipt:
+same role, ticket and target, with its lease released. Explicit refusal is
+persisted in the attempted-lap receipt and ends the lane before another input.
+Thirteen driver tests cover the captured fallback/refusal, successful matching
+receipts, stale ticket/epoch, wrong owner/target and unreleased results. The
+same captured log now fails with the actual refusal. A native submit on return to the original fighter requires its matching native ready receipt.
+Native baseline/bootstrap keep their separate existing gates. The production copy-package scheduling
+root and a fresh integrated sequence run remain open.
+
+Standard-run timing tables are archived separately: Kirby-first setup was
+12,185 us in f6-13 and 4,647 us in f6-14; maximum gaps were 254,605 and
+165,804 us after poll ticks. Debugger runs are not performance acceptance.
+Actual f6-14 hook allocations reached36 (roster_input14, roster_preload22),
+so R5 and the first-switch/plain-lap comparison remain open.

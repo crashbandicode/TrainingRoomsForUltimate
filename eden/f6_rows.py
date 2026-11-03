@@ -1,8 +1,8 @@
 """F6 Eden rows, run on the Eden host after the shared harness route reached Training.
 
-Writes the boot settings with `settings` (before `up`), or drives laps with `laps`: waits until the preload has prefetched the
-groups (`[GroupSwap] prefetched`), then presses the P1 cycle chord (ZL + D-pad Right) and, with --cpu, the CPU chord (ZL + D-pad
-Left) N times each, every press gated on the role's `[BodyBank] ready owner=<role>` line.
+Writes boot settings before launch, or drives laps after group prefetch. Cycle laps require the ordinary-owner
+adapter completion matching the current role, ticket and target with its lease released. A fallback bank-ready
+event is not completion of a refused request. Bootstrap separately waits for each initial body bank.
 The native baseline explicitly selects --native-reload and requires `[CharacterRoster] complete owner=<role>`.
 A missing completion ends the lane with a retained failed receipt. Options come from the settings file.
 
@@ -60,6 +60,30 @@ def native_complete(line, role):
     adapter = "MiiOrdinaryPlayer" if role == 0 else "MiiOrdinaryCpu"
     return (f"[CharacterRoster] complete owner={role}" in line or
             (f"[{adapter}] ready ticket=" in line and "released=true" in line))
+
+
+def cycle_request(line, role):
+    adapter = "MiiOrdinaryPlayer" if role == 0 else "MiiOrdinaryCpu"
+    return re.search(r"\[" + adapter + r"\] (bank switch|submit) ticket=(Ticket \{[^}]+\}) .*?target=(0x[0-9a-f]+)\b", line)
+
+
+def cycle_result(line, role, request):
+    # The bank may become ready on its fallback member while this transaction
+    # refuses. Only this request/target and its released adapter receipt count.
+    requested = cycle_request(request, role) if request else None
+    if requested is None:
+        return None
+    adapter = "MiiOrdinaryPlayer" if role == 0 else "MiiOrdinaryCpu"
+    mode, ticket, target = requested.groups()
+    if any(f"[{adapter}] {event} ticket={ticket} " in line
+           for event in ("bank switch refused", "bank build refused", "refused")):
+        return "refused"
+    event = "bank ready" if mode == "bank switch" else "ready"
+    if (f"[{adapter}] {event} ticket={ticket} " in line
+            and re.search(r"\btarget=" + target + r"\b", line)
+            and "released=true" in line):
+        return "ready"
+    return None
 
 
 def laps(args):
@@ -124,13 +148,22 @@ def laps(args):
                 raise SystemExit(f"GATE FAIL: bootstrap owner={role} was not observed; no cycle input sent")
             m = count()
             session.press("zl,right" if role == 0 else "zl,left", 200)
-            queued = wait_for(m, f"[CharacterRoster] queued owner={role}", 8)
-            completion = "[CharacterRoster] complete" if args.native_reload else "[BodyBank] ready"
-            done = wait_for(m, (lambda line: native_complete(line, role)) if args.native_reload
-                            else f"{completion} owner={role}", 20)
+            transaction_lap = not args.native_reload and not bootstrap
+            queued = wait_for(m, (lambda line: cycle_request(line, role)) if transaction_lap
+                              else f"[CharacterRoster] queued owner={role}", 8)
+            completion = "matching cycle transaction" if transaction_lap else (
+                "[CharacterRoster] complete" if args.native_reload else "[BodyBank] ready")
+            refused = None
+            if transaction_lap:
+                result = wait_for(m, lambda line: cycle_result(line, role, queued), 20)
+                refused = result if result and cycle_result(result, role, queued) == "refused" else None
+                done = result if result and refused is None else None
+            else:
+                done = wait_for(m, (lambda line: native_complete(line, role)) if args.native_reload
+                                else f"{completion} owner={role}", 20)
             new = read()[m:]
             built = [x for x in new if "[GroupSwap] built" in x or "[BuildSplit]" in x or "[GroupSwap] swap " in x]
-            rec = {"phase": "bootstrap" if bootstrap else "lap", "role": role, "press": i + 1, "queued": queued, "done": done, "lines": built,
+            rec = {"phase": "bootstrap" if bootstrap else "lap", "role": role, "press": i + 1, "queued": queued, "done": done, "refused": refused, "lines": built,
                    "shot": shot(f"r{role}-p{i + 1}") if any("[GroupSwap] built" in x for x in built) else None}
             records.append(rec)
             # Persist each attempted lap, including a failure, before another input.
@@ -138,7 +171,8 @@ def laps(args):
                 f.write(json.dumps(rec) + "\n")
             if done is None:
                 shot(f"r{role}-p{i + 1}-gate-failed")
-                raise SystemExit(f"GATE FAIL: {completion} owner={role} missing after cycle")
+                raise SystemExit(f"GATE FAIL: {completion} owner={role} refused: {refused}" if refused else
+                                 f"GATE FAIL: {completion} owner={role} missing after cycle")
             print(json.dumps({k: rec[k] for k in ("role", "press", "done")})[:300], flush=True)
             for x in built:
                 print("  ", x[:400], flush=True)
