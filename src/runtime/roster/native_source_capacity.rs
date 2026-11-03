@@ -915,10 +915,7 @@ pub(super) mod managed {
                 || observed.kinds != forms.kinds
                 || observed.installed != u64::from(forms.count)
                 || read::<u8>(entry, 0x591f) != forms.flags
-                || (native_source::ready(entry, owner, kind).is_none()
-                    && !(scene.layout == Layout::Training
-                        && super::super::sources::training_seat_ready(entry, owner, kind)
-                        && native_source::ready_active(entry, owner, kind).is_some()))
+                || native_source::ready(entry, owner, kind).is_none()
             {
                 return None;
             }
@@ -1406,7 +1403,7 @@ pub(super) mod managed {
         let shape = match layout {
             // Every slot 4..8 is null except an earlier registered creation, which
             // must still have exactly its registered roots and selection byte.
-            Layout::Training => super::super::sources::training_seats_ready(scene.quantity)
+            Layout::Training => scene.quantity == Some(1)
                 && (4..8).all(|owner| match registered_at(created, owner) {
                     Some(record) => roots(&scene, owner) == created_roots(record),
                     None => scene.primary[owner] == 0,
@@ -1460,9 +1457,7 @@ pub(super) mod managed {
                 {
                     return Err(Refusal::Forms { index: at });
                 }
-            } else if !native_source::parked_ready(current, owner, observed.kinds[0])
-                && !(layout == Layout::Training
-                    && super::super::sources::training_seat_ready(current, owner, observed.kinds[0])) {
+            } else if !native_source::parked_ready(current, owner, observed.kinds[0]) {
                 return Err(Refusal::Parked { index: at });
             }
             #[cfg(feature = "managed-ldn-third-source-alpha")]
@@ -1635,7 +1630,7 @@ pub(super) mod managed {
             || read::<usize>(service, 0) != reservation.scene.service_inner
             || read::<u32>(internal, 0xa0) != 4 + registered as u32
             || (reservation.scene.layout == Layout::Training
-                && !super::super::sources::training_seats_ready(native_source::training_cpu_quantity()))
+                && native_source::training_cpu_quantity() != Some(1))
             || [read::<u8>(internal, 0xea), read(internal, 0xeb)] != reservation.scene.rules
             || read::<u32>(internal, 0xf0) != reservation.scene.ratio_bits
         {

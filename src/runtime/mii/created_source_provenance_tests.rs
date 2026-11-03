@@ -67,7 +67,6 @@ fn created_receipt_is_exact_source_bound_and_cleared_by_real_projection_operatio
         let mut changed=view;changed.project(book.epoch(),7,helper);
         assert!(changed.created_miis[0].is_none());
         assert_eq!(changed.slots,view.slots);assert_eq!(changed.miis,view.miis);
-        assert_eq!(changed.promoted,view.promoted);
         assert!(!changed.accepts_created(7,proof,extras,live,true));
     }
     let departed=View {epoch:Some(book.depart_scene().unwrap()),..view};

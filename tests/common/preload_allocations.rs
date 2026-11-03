@@ -2,6 +2,92 @@
 use crate::engine::swap::mii_cycle::compact_regressions::AllocationCount;
 
 #[test]
+fn rc_freeze_removes_native_count_mutators_and_fixed_seat_authority() {
+    let roster = include_str!("../../src/runtime/roster/character_roster.rs");
+    let sources = include_str!("../../src/runtime/roster/character_sources.rs");
+    let hats = include_str!("../../src/runtime/roster/kirby_hats.rs");
+    let seams = include_str!("../../src/model/seams/native_seams/mod.rs");
+    for absent in ["training_count_readiness", "count_diagnostics", "publish_promoted_presentation"] {
+        assert!(!roster.contains(absent), "RC must not register {absent}");
+    }
+    for absent in ["reserve_count_promotion", "cpu_seats_known", "fixed_source_changed",
+        "active_reload", "cutover_items", "begin_promoted_reload"] {
+        assert!(!sources.contains(absent), "RC retains F9 path {absent}");
+    }
+    assert!(!seams.contains("rows_training_count"));
+    assert!(!hats.contains("hat_source_cutover"));
+    // Removing fixed-seat publication must not strand the ordinary request walk.
+    assert!(sources.contains("pending_request_for(state,Some(slot),menu_open)"));
+    assert!(sources.contains("state.book.can_replace(index) == Ok(true)"));
+    let owned = sources.find("if service_owned(ctx, entry, slot)").unwrap();
+    let new_admission = sources[owned..].find("let Ok(backend) = qualified_backend()").unwrap();
+    assert!(new_admission > 0, "owned completion must remain ahead of new admission");
+}
+
+#[test]
+fn rc_native_mii_scope_keeps_one_cpu_and_waiting_role_without_promoted_owners() {
+    use crate::engine::mii::backend::Layout;
+    for (quantity, expected) in [(None, false), (Some(0), false), (Some(1), true),
+        (Some(2), false), (Some(3), false), (Some(u32::MAX), false)] {
+        assert_eq!(Layout::Training.quantity(quantity), expected);
+    }
+    assert_eq!(Layout::Training.logical(0), Some(0));
+    assert_eq!(Layout::Training.logical(1), Some(1));
+    for owner in [2, 3, 4, 7] { assert_eq!(Layout::Training.logical(owner), None); }
+    assert_eq!(Layout::Ldn.logical(4), Some(1));
+    assert!(Layout::Ldn.quantity(None));
+    assert!(crate::engine::mii::ordinary_cpu::supported_kind(0x4a));
+    let backend = include_str!("../../src/runtime/mii/mii_backend.rs");
+    assert!(backend.contains("if !layout.quantity(super::native_source::training_cpu_quantity())"));
+    let lifecycle = include_str!("../../src/runtime/roster/character_lifecycle.rs");
+    assert!(lifecycle.contains("if entry_id > 1 || !ordinary_training()"));
+}
+
+#[test]
+fn rc_exact_mii_uses_native_helpers_and_ordinary_created_capacity_stays_schedulable() {
+    use crate::engine::preload::cycle_preload_policy as policy;
+    let targets = [Some(0x00u32), Some(0x4a), Some(0x02)];
+    let exact = |kind| policy::exact_mii(kind, false);
+    let measured = AllocationCount::start();
+    for _ in 0..128 {
+        assert!(!policy::created_mii_sources());
+        // The native pair still prioritizes saved Gunner; an ordinary extra cannot.
+        let native = policy::schedulable(targets, true, exact);
+        let created = policy::schedulable(targets, policy::created_mii_sources(), exact);
+        assert_eq!(native, [Some(0x4a), Some(0x00), Some(0x02)]);
+        assert_eq!(created, [Some(0x00), Some(0x02), None]);
+        assert_eq!(policy::missing(native, [None; 8], 2, true, false), Some(0x4a));
+        assert_eq!(policy::missing(native, [None; 8], 3, false, false), None);
+        assert_eq!(policy::missing(created, [None; 8], 7, true, false), Some(0x00));
+        assert_eq!(policy::missing(created, [None; 8], 7, true, true), None);
+        assert_eq!(policy::missing(created, [None; 8], 8, true, false), None);
+    }
+    assert_eq!(measured.finish(), 0);
+}
+
+#[test]
+fn rc_portraits_can_reuse_native_pair_but_never_foreign_bound_row() {
+    use crate::engine::mii_root::mii_hud_portrait_policy as portrait;
+    let mut ownership = portrait::Ownership::new();
+    for training in [true, false] {
+        for owner in 0..2 {
+            for helper in [2, 3] {
+                assert!(portrait::slot_may_install(ownership.source_exclusions(owner, training), helper));
+            }
+        }
+    }
+    ownership.bound[0] = Some(portrait::Binding {
+        request: portrait::Request { row: 2, sub: 7 }, descriptor: 0x1000,
+    });
+    assert!(!portrait::slot_may_install(ownership.source_exclusions(1, true), 2));
+    assert!(portrait::slot_may_install(ownership.source_exclusions(1, true), 3));
+    assert!(portrait::slot_may_install(ownership.source_exclusions(0, true), 2));
+    let runtime = include_str!("../../src/runtime/mii/mii_hud_portrait.rs");
+    assert!(!runtime.contains("training_renderer_row"));
+    assert!(runtime.contains("!l.helpers().contains(&h)"));
+}
+
+#[test]
 fn kirby_shortcut_selection_preserves_order_without_allocating() {
     use crate::engine::compat::menu::BASE_MENU;
     use crate::engine::swap::roster_grid::Role;
@@ -55,12 +141,6 @@ fn roster_input_membership_preserves_order_without_first_or_repeat_allocations()
 
 #[path = "../../src/runtime/roster/observe.rs"]
 mod observed_map;
-
-#[path = "../../src/runtime/roster/training_count_readiness.rs"]
-mod training_count_readiness;
-
-#[path = "../../src/runtime/roster/count_diagnostics.rs"]
-mod count_diagnostics;
 
 // Native adapter methods are Switch-only; exercise its value projection here.
 #[allow(dead_code)]
@@ -487,29 +567,4 @@ fn status_raise_and_delivery_formatting_use_no_heap_on_first_or_repeated_use() {
         let mut notice=crate::model::storage::FixedPath::<96>::new();
         write!(notice,"{}",status.text()).unwrap();
     } } }
-}
-
-#[test]
-fn count_promotion_diagnostic_owners_have_independent_allocation_free_budgets() {
-    use count_diagnostics::{Changes, Event};
-    let control = AllocationCount::start();
-    let allocated = std::hint::black_box(vec![0usize; 32]);
-    assert!(control.finish() > 0);
-    drop(allocated);
-    let measured = AllocationCount::start();
-    let mut owners = [Changes::new(2), Changes::new(2)];
-    for owner in &mut owners {
-        assert_eq!(owner.observe((0u64, [0usize; 32])), Event::Changed);
-    }
-    for _ in 0..128 {
-        for owner in &mut owners {
-            assert_eq!(owner.observe((0, [0; 32])), Event::Quiet);
-        }
-    }
-    assert_eq!(owners[0].observe((1, [1; 32])), Event::Changed);
-    assert_eq!(owners[0].observe((2, [2; 32])), Event::Overflow);
-    assert_eq!(owners[1].observe((1, [1; 32])), Event::Changed);
-    assert_eq!(owners[1].observe((2, [2; 32])), Event::Overflow);
-    for owner in &mut owners { assert_eq!(owner.observe((3, [3; 32])), Event::Quiet); }
-    assert_eq!(measured.finish(), 0);
 }

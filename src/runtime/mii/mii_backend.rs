@@ -33,10 +33,8 @@ pub(super) unsafe fn extra_facts(table:usize,slot:usize,fe:usize,e:usize,d:usize
 }
 pub(super) unsafe fn ready()->bool {
     let Some(layout)=current() else{return false;};
-    if layout==Layout::Training {
-        return super::sources::training_seats_ready(super::native_source::training_cpu_quantity());
-    }
     if !layout.quantity(super::native_source::training_cpu_quantity()) {return false;}
+    if layout==Layout::Training {return true;}
     let Some(helper)=super::native_source::entry(5) else{return false;};
     super::native_source::exact_waiting_layout_with(helper,5,layout,extras())
         && layout.visible().iter().copied().all(|id|super::native_source::entry(id).is_some_and(|entry|

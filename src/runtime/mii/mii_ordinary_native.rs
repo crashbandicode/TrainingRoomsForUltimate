@@ -137,24 +137,10 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    let active=view.promoted[ordinal].and_then(|(_,_,parked_install)|super::super::native_source::promoted_identity(owner.entry as *const u8,id as u32,kind,parked_install));
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    let retained=active.is_some_and(|identity|view.accepts_promoted(id,now,identity));
-    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
-    let retained=false;
-    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) && !retained {return false;}
+    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {return false;}
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
-        // A promoted source keeps its own sealed SourceToken/SceneEpoch and
-        // exact payload. A later CPU1 selection must not revoke that lifetime.
-        // `retained` above requires the full promotion and active native identity;
-        // ordinary parked helpers still use their existing CPU1 epoch authority.
-        #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-        let epoch_matches=view.accepts_mii_epoch(id,now,active,super::super::mii_saved_alpha::current_generation(1));
-        #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
-        let epoch_matches=b.epoch==super::super::mii_saved_alpha::current_generation(1);
-        if !epoch_matches
+        if b.epoch != super::super::mii_saved_alpha::current_generation(1)
             || rd::<usize>(super::base(),POOL_HOLDER)!=b.holder
             || !span(b.holder,8,false) || rd::<usize>(b.holder,0)!=b.manager
             || !span(b.manager,0x24e0,false) || rd::<usize>(b.manager,0x24d0)!=b.vector_begin

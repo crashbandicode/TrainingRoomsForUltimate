@@ -11,37 +11,9 @@ pub const VISIBLE_OWNERS: usize = 4;
 /// Four exclusive renderer rows times three retained requests.
 pub const OWNED_CAPACITY: usize = 12;
 
-/// The four exact-portrait request channels in the shared source registry.
+/// The ordinary P1/CPU exact-portrait channels in the shared source registry.
 /// Configuration alone cannot identify a portrait: Kirby Mii hats carry it too.
-pub const SOURCE_CHANNELS: [usize; 4] = [3, 4, 5, 6];
-pub fn training_renderer_row(owner: usize) -> Option<u32> {
-    [7, 6, 5, 4].get(owner).copied()
-}
-
-#[cfg(test)]
-#[test]
-fn four_visible_owners_only_acquire_their_distinct_created_renderer() {
-    let mut ownership = Ownership::new();
-    for owner in 0..4 {
-        let row = training_renderer_row(owner).unwrap();
-        for slot in 0..8 {
-            assert_eq!(slot_may_install(ownership.source_exclusions(owner, true), slot), slot == row);
-        }
-        ownership.bound[owner] = Some(Binding {
-            request: Request { row, sub: 7 }, descriptor: 0x1000 + owner * 0x100,
-        });
-    }
-    for owner in 0..4 {
-        let row = training_renderer_row(owner).unwrap();
-        assert!(slot_may_install(ownership.source_exclusions(owner, true), row));
-        assert!(ownership.row_free_for(owner, row));
-        for foreign in 0..4 {
-            if foreign != owner { assert!(!ownership.row_free_for(owner, training_renderer_row(foreign).unwrap())); }
-        }
-    }
-    assert_eq!(training_renderer_row(4), None);
-    assert_eq!(ownership.source_exclusions(4, true), u8::MAX);
-}
+pub const SOURCE_CHANNELS: [usize; 2] = [3, 4];
 pub fn source_channel_admitted(channel: usize, exact: bool, menu_open: bool) -> bool {
     !menu_open || (SOURCE_CHANNELS.contains(&channel) && exact)
 }
@@ -64,8 +36,8 @@ fn open_editor_admits_exact_portraits_without_admitting_mii_hats_or_items() {
     assert_eq!(admitted, [(3, true), (4, true)]);
     assert!(!source_channel_admitted(3, false, true));
     assert!(!source_channel_admitted(4, false, true));
-    assert!(source_channel_admitted(5, true, true));
-    assert!(source_channel_admitted(6, true, true));
+    assert!(!source_channel_admitted(5, true, true));
+    assert!(!source_channel_admitted(6, true, true));
     assert!(!source_channel_admitted(7, true, true));
     for (c, exact) in requests { assert!(source_channel_admitted(c, exact, false)); }
 }
@@ -357,14 +329,11 @@ impl Ownership {
                 o == owner || p.is_none_or(|p| p.binding.request.row != row))
     }
 
-    /// The same mask is used by demand scheduling and lease acquisition. In
-    /// Training, each visible owner has one distinct created renderer row.
-    /// A live fighter is never the renderer source, including CPU2/3.
-    pub fn source_exclusions(&self, owner: usize, training: bool) -> u8 {
-        (0..8).fold(0, |mask, row| {
-            let purpose = !training || training_renderer_row(owner) == Some(row);
-            mask | if purpose && self.row_free_for(owner, row) { 0 } else { 1u8 << row }
-        })
+    /// Ordinary helper selection excludes every foreign displayed or retained row.
+    /// The native backend separately admits only its parked helper pair.
+    pub fn source_exclusions(&self, owner: usize, _training: bool) -> u8 {
+        (0..8).fold(0, |mask, row|
+            mask | if self.row_free_for(owner, row) { 0 } else { 1u8 << row })
     }
 
     pub fn prepare(&mut self, owner: usize, binding: Binding, generation: u64)

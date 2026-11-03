@@ -40,7 +40,6 @@ pub(super) struct Prepared {
     player_epoch: u64,
     created_epoch: Option<SceneEpoch>,
     hat_change: bool,
-    active_reload: bool,
 }
 impl Prepared {
     pub(super) fn created_destination(&self)->Option<policy::CreatedDestination> {self.before.created}
@@ -122,7 +121,8 @@ pub(super) fn slot_eligible(slot: u32, c: Configuration) -> bool {
 /// Scheduling hint only. prepare_created still proves every native root,
 /// record claim, outgoing resource and exact source receipt before INSTALL.
 pub(super) fn created_slot_eligible(slot:u32,c:Configuration)->bool {
-    origins_captured() && super::mii_backend::current()==Some(super::mii_backend::Layout::Training)
+    crate::engine::preload::cycle_preload_policy::created_mii_sources()
+        && origins_captured() && super::mii_backend::current()==Some(super::mii_backend::Layout::Training)
         && super::mii_backend::extras().entry(slot as usize).is_some()
         && policy::supported_kind(c.canonical().class as u32) && c.tokens().hat!=u16::MAX
 }
@@ -133,21 +133,12 @@ pub(super) unsafe fn prepare(
 ) -> Result<Prepared, &'static str> {
     prepare_in(entry,slot,c,None)
 }
-/// Caller holds INSTALL and has proved the exact promoted source's active
-/// native identity. Snapshot still validates all G ownership and source proofs.
-pub(super) unsafe fn prepare_reload(entry: usize, slot: u32, c: Configuration)
-    -> Result<Prepared, &'static str> {
-    check(matches!(slot, 2 | 3)
-        && super::mii_backend::current() == Some(super::mii_backend::Layout::Training),
-        "visible fixed-seat Reload requires Training CPU2/3")?;
-    let mut prepared = prepare_in(entry, slot, c, None)?;
-    prepared.active_reload = true;
-    Ok(prepared)
-}
 /// Explicit created-source entry point. Caller supplies its current SourceBook
 /// epoch; bind checks the eventual full source token under Source STATE.
 pub(super) unsafe fn prepare_created(entry:usize,slot:u32,c:Configuration,epoch:SceneEpoch)
     ->Result<Prepared,&'static str> {
+    check(crate::engine::preload::cycle_preload_policy::created_mii_sources(),
+        "Created exact-Mii sources are deferred in this RC")?;
     prepare_in(entry,slot,c,Some(epoch))
 }
 unsafe fn prepare_in(entry:usize,slot:u32,c:Configuration,created_epoch:Option<SceneEpoch>)
@@ -198,7 +189,6 @@ unsafe fn prepare_in(entry:usize,slot:u32,c:Configuration,created_epoch:Option<S
         player_epoch: if created_epoch.is_some() {0} else {mii_saved_alpha::current_generation(0)},
         created_epoch,
         hat_change,
-        active_reload: false,
     })
 }
 /// Source STATE held, no G/registry lock. Failure retains the load and never calls native INSTALL.
@@ -230,8 +220,7 @@ pub(super) fn bind(
         if Some(i) != view.ordinal(source.slot()) {
             check(
                 view.slots[i] == data.before.helpers.slots[i]
-                    && view.miis[i] == data.before.helpers.miis[i]
-                    && view.promoted[i] == data.before.helpers.promoted[i],
+                    && view.miis[i] == data.before.helpers.miis[i],
                 "foreign source projection changed",
             )?;
         }
@@ -284,7 +273,7 @@ fn target(t: &Track) -> PublicationTarget<'_> {
     }
 }
 pub(super) unsafe fn install(source: SourceToken) -> bool {
-    let (descriptor, active_reload) = {
+    let descriptor = {
         let s = STATE.lock();
         let Some(t) = s
             .track
@@ -293,15 +282,14 @@ pub(super) unsafe fn install(source: SourceToken) -> bool {
         else {
             return false;
         };
-        (t.data.descriptor, t.data.active_reload)
+        t.data.descriptor
     };
     let staged = native_fighter_install::Descriptor::from_bytes(&descriptor);
     native_fighter_install::install(
         BASE.load(Ordering::Acquire),
         source.entry().0 as *mut u8,
         &staged,
-        if active_reload { native_fighter_install::Flags::Reload }
-        else { native_fighter_install::Flags::Parked },
+        native_fighter_install::Flags::Parked,
     );
     true
 }
@@ -445,13 +433,11 @@ pub(super) unsafe fn completed_details(
         t.clone()
     };
     let kind=track.data.configuration.canonical().class as u32;
-    let ready=if track.data.active_reload {
-        native_source::active_identity(source.entry().0 as *const u8, source.slot() as u32, kind).is_some()
-    } else { match track.data.before.created {
+    let ready=match track.data.before.created {
         Some(destination)=>native_source::parked_created_ready(source.entry().0 as *const u8,
             source.slot() as u32,kind,destination),
         None=>native_source::parked_ready(source.entry().0 as *const u8,source.slot() as u32,kind),
-    }};
+    };
     if !ready {
         return Ok(None);
     }

@@ -4,44 +4,15 @@
 //! priority reserves constrained Miis before ordinary targets; the global plan
 //! order stays intact. Active leases can reduce usable capacity below the count.
 
+/// RC keeps exact saved Miis on their existing native helper pair.
+/// Creating exclusive portrait destinations is deferred, not a Cargo closure change.
+pub const fn created_mii_sources() -> bool { false }
+
 /// A helper loads the complete native group. Fighter predictions share one
 /// canonical cache key; hat predictions retain their exact copy-ability kind.
 pub fn fighter_group(kind: u32) -> u32 {
     let forms = crate::engine::swap::character_forms::Forms::starting(kind);
     *forms.kinds[..forms.count as usize].iter().min().unwrap()
-}
-
-/// Physical CPU2/3 retain the next and following rotation members, before
-/// cache canonicalization, group filtering or cross-lane deduplication. Holes
-/// and equal values remain positional; this is not a cache allocation policy.
-pub fn cpu_seats<T: Copy, const N: usize>(rotation: [Option<T>; N]) -> [Option<T>; 2] {
-    core::array::from_fn(|i| rotation.get(i).copied().flatten())
-}
-
-/// Fixed-seat readiness is positional and exact. Unlike cache readiness, a
-/// matching source in another seat cannot satisfy this owner's demand.
-pub fn fixed_seat_needs_load<T: Eq>(target: Option<T>, current: Option<T>) -> bool {
-    target.is_some() && target != current
-}
-
-/// Native-owned additional CPUs have no SourceBook token. They may qualify
-/// the Training scene only when no fixed target or managed source owns the
-/// seat and two fresh full native identities agree. This grants no source lease.
-pub fn native_seat_ready<T: Eq>(intent: Option<bool>, managed: bool, slot: u32,
-    quantity: Option<u32>, native: (Option<T>, Option<T>)) -> bool {
-    intent == Some(false) && !managed && matches!(slot, 2 | 3)
-        && quantity.is_some_and(|count| (slot..=3).contains(&count))
-        && native.0.is_some() && native.0 == native.1
-}
-
-/// Outer None is unresolved intent; Some(None) is a resolved empty rotation.
-/// Only the latter preserves native count behavior without a managed target.
-pub fn fixed_seat_ready<T: Eq>(intent: Option<Option<T>>, current: Option<T>) -> bool {
-    match intent {
-        None => false,
-        Some(None) => true,
-        Some(Some(target)) => current == Some(target),
-    }
 }
 
 pub fn merge<T: Copy + Eq, const N:usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {
@@ -1137,86 +1108,5 @@ mod tests {
         assert_eq!((ready.progress, ready.ready, ready.planned, ready.failed), (Progress::Partial, 4, 5, 1));
         assert_eq!(ready.text().to_string(), "Partial 4/5 (1 failed)");
         assert_eq!(plan[4], Some(GUNNER));
-    }
-}
-
-#[cfg(test)]
-mod cpu_seat_regressions {
-    use super::*;
-    #[test]
-    fn native_count_without_rotation_keeps_scene_admission_without_fabricating_a_source() {
-        // The native game has published CPU2/3, with no managed registration.
-        // Identity includes entry, body incarnation and resource owner.
-        let live = Some((0x1000u64, 42u32, 0x2000u64));
-        for count in [2, 3] {
-            for slot in 2..=count {
-                assert!(native_seat_ready(Some(false), false, slot, Some(count), (live, live)));
-                assert!(!native_seat_ready(None, false, slot, Some(count), (live, live)));
-                assert!(!native_seat_ready(Some(true), false, slot, Some(count), (live, live)));
-                assert!(!native_seat_ready(Some(false), true, slot, Some(count), (live, live)));
-                assert!(!native_seat_ready(Some(false), false, slot, Some(count), (None, live)));
-                assert!(!native_seat_ready(Some(false), false, slot, Some(count),
-                    (live, Some((0x1000, 43, 0x2000)))));
-                assert!(!native_seat_ready(Some(false), false, slot, Some(count), (live, None)));
-            }
-        }
-        assert!(!native_seat_ready(Some(false), false, 3, Some(2), (live, live)));
-        assert!(!native_seat_ready(Some(false), false, 2, None, (live, live)));
-        assert!(!native_seat_ready(Some(false), false, 2, Some(4), (live, live)));
-        assert!(!native_seat_ready(Some(false), false, 1, Some(3), (live, live)));
-    }
-
-    #[test]
-    fn count_menu_cannot_treat_uncaptured_or_missing_exact_intent_as_no_rotation() {
-        let exact = (0x48u32, 123u64);
-        assert!(!fixed_seat_ready::<(u32,u64)>(None, None));
-        assert!(!fixed_seat_ready(None, Some(exact)));
-        assert!(fixed_seat_ready::<(u32,u64)>(Some(None), None));
-        assert!(!fixed_seat_ready(Some(Some(exact)), None));
-        assert!(!fixed_seat_ready(Some(Some(exact)), Some((0x48, 456))));
-        assert!(fixed_seat_ready(Some(Some(exact)), Some(exact)));
-        // Invalidating intent during a new CPU selection must close admission
-        // even while the previous complete source remains in the seat.
-        assert!(!fixed_seat_ready(None, Some(exact)));
-    }
-    #[test]
-    fn rotation_advance_requires_both_physical_seats_even_with_resident_duplicates() {
-        let mario = (0u32, 0u64);
-        let first_mii = (0x48, 123);
-        let second_mii = (0x48, 456);
-        let mut physical = [Some(mario), Some(first_mii)];
-        let targets = cpu_seats([Some(first_mii), Some(second_mii), Some(mario)]);
-        // The next character is already resident in CPU3, but CPU2 must still
-        // change; equal Mii class does not authorize the wrong saved payload.
-        assert!(fixed_seat_needs_load(targets[0], physical[0]));
-        assert!(fixed_seat_needs_load(targets[1], physical[1]));
-        physical[0] = targets[0];
-        assert!(!fixed_seat_needs_load(targets[0], physical[0]));
-        assert!(fixed_seat_needs_load(targets[1], physical[1]));
-        physical[1] = targets[1];
-        assert!(!fixed_seat_needs_load(targets[1], physical[1]));
-        assert!(fixed_seat_needs_load(Some(mario), None));
-        assert!(!fixed_seat_needs_load(None, Some(mario)));
-    }
-    #[test]
-    fn fixed_members_survive_hat_priority_group_canonicalization_and_same_class_payloads() {
-        // Different exact Mii payloads and a noncanonical PT member are rotation
-        // identities. The ordinary cache lane deliberately loses the PT member.
-        let first=(0x26u32,0u64);
-        let second=(0x48,0x1234);
-        let cpu=[Some(first),Some(second),Some((0x48,0x5678)),None,None];
-        let seats=cpu_seats(cpu);
-        let cache=cpu.map(|v|v.map(|(kind,payload)|
-            (if payload==0 {fighter_group(kind)} else {kind},payload)));
-        let hats=[Some((0x09,0)),Some((0x06,0)),Some((0x07,0)),None,None];
-        let merged=merge_player_hats_first([hats,[None;5],[None;5],cache],3);
-        assert_eq!(merged,hats);
-        assert_eq!(seats,[Some(first),Some(second)]);
-        assert_ne!(cache[0],seats[0]);
-        assert_eq!(cpu_seats([Some(second),Some((0x48,0x5678))]),
-            [Some(second),Some((0x48,0x5678))]);
-        assert_eq!(cpu_seats([Some(first),Some(first)]),[Some(first);2]);
-        assert_eq!(cpu_seats([None,Some(second)]),[None,Some(second)]);
-        assert_eq!(cpu_seats::<u32,0>([]),[None,None]);
     }
 }

@@ -148,92 +148,6 @@ pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
     true
 }
 
-/// Revalidate the exact parked native lifetime of an already completed source.
-/// No archive query, game call, or lock. This is NOT a load-completion proof:
-/// the caller must match a receipt sealed after full readiness/publication.
-pub(super) unsafe fn parked_identity(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
-    if !parked_ready(current, slot, kind) { return None; }
-    let owner = resource_owner(slot)?;
-    if read::<u32>(owner, 0x58) != kind { return None; }
-    Some(identity(current, slot, kind, owner))
-}
-
-/// Full canonical active-body shape, read only. A caller must still match the
-/// sealed completed lifetime and exact source reservation; phase6 alone is not
-/// promotion authority. No bank lookup, archive query, game call or Rust lock.
-pub(super) unsafe fn active_identity(current:*const u8,slot:u32,kind:u32)->Option<ReadySource> {
-    active_identity_detail(current, slot, kind).ok()
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum ActiveIdentityFailure {
-    Entry,
-    State(super::EntryState),
-    Forms,
-    Body { index: usize, field: &'static str, actual: u64, expected: u64 },
-    Resource,
-    ResourceKind(u32),
-}
-
-/// Same strict predicate, retaining only values already read by its checks.
-/// The diagnostic caller cannot use a failure as ownership or readiness proof.
-pub(super) unsafe fn active_identity_detail(current:*const u8,slot:u32,kind:u32)
-    -> Result<ReadySource, ActiveIdentityFailure> {
-    active_identity_shape(current, slot, kind, false)
-}
-
-/// Read-only count-activation shape. Caller must own the current completed
-/// SourceToken/PromotionToken and compare the returned full sealed identity.
-/// parked_install is the completed transaction's purpose, never native phase
-/// alone. The full active Reload contract remains strict in active_identity.
-pub(super) unsafe fn promoted_identity_detail(current: *const u8, slot: u32,
-    kind: u32, parked_install: bool) -> Result<ReadySource, ActiveIdentityFailure> {
-    if !matches!(slot, 2 | 3) { return Err(ActiveIdentityFailure::Entry); }
-    active_identity_shape(current, slot, kind, parked_install)
-}
-
-pub(super) unsafe fn promoted_identity(current: *const u8, slot: u32,
-    kind: u32, parked_install: bool) -> Option<ReadySource> {
-    promoted_identity_detail(current, slot, kind, parked_install).ok()
-}
-
-unsafe fn active_identity_shape(current: *const u8, slot: u32, kind: u32,
-    parked_install: bool) -> Result<ReadySource, ActiveIdentityFailure> {
-    use ActiveIdentityFailure as Failure;
-    if !aligned(current) || read::<u32>(current,0xe0)!=slot {return Err(Failure::Entry);}
-    let state=super::EntryState {
-        count:read(current,0x14), kinds:[read(current,0x18),read(current,0x1c),read(current,0x20)],
-        actor_count:read(current,0x28), installed:read(current,0x4150),
-        index:read(current,0x5918), previous_or_next:read(current,0x5919), pending:read(current,0x591a),
-        flags:read(current,0x591f), outer:read(current,0x5920), loader:read(current,0x591c),
-        changing:read(current,0x5934), guard:read(current,0x5935),
-    };
-    let (forms,_)=state.ready_count_promoted(parked_install).ok_or(Failure::State(state))?;
-    if forms!=Forms::starting(kind) {return Err(Failure::Forms);}
-    for i in 0..forms.count as usize {
-        let body=read::<*const u8>(current,0x4160+i*8);
-        let failure=|field,actual,expected|Failure::Body {index:i,field,actual,expected};
-        if !aligned(body) {return Err(failure("pointer",body as u64,0));}
-        let actual=read::<usize>(body,0) as u64;
-        let expected=(BASE.load(Ordering::Acquire)+0x4f80210) as u64;
-        if actual!=expected {return Err(failure("vtable",actual,expected));}
-        let actual=u64::from(read::<u32>(body,0xc));
-        let expected=u64::from(forms.kinds[i]);
-        if actual!=expected {return Err(failure("kind",actual,expected));}
-        let actual=read::<u64>(body,0x10);
-        if actual!=u64::from(slot) {return Err(failure("owner",actual,u64::from(slot)));}
-        let actual=u64::from(read::<u8>(body,0x3a));
-        let expected=u64::from(forms.body_state(i,state.index));
-        if actual!=expected {return Err(failure("phase",actual,expected));}
-        let accessor=read::<*const u8>(body,0x20);
-        if !aligned(accessor) {return Err(failure("accessor",accessor as u64,0));}
-    }
-    let owner=resource_owner(slot).ok_or(Failure::Resource)?;
-    let owner_kind=read::<u32>(owner,0x58);
-    if owner_kind!=kind {return Err(Failure::ResourceKind(owner_kind));}
-    Ok(identity(current,slot,kind,owner))
-}
-
 unsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {
     let forms = Forms::starting(kind);
     let body = read::<*const u8>(current, 0x4160);
@@ -264,17 +178,7 @@ pub unsafe fn ready(current: *const u8, slot: u32, kind: u32) -> Option<ReadySou
     resources_ready(current, slot, kind)
 }
 
-/// Full resource completion for a real Reload of an already-owned visible
-/// fixed seat. The caller separately owns the current source/load generation.
-pub(super) unsafe fn ready_active(current: *const u8, slot: u32, kind: u32) -> Option<ReadySource> {
-    active_identity(current, slot, kind)?;
-    resources_ready(current, slot, kind)
-}
-
-/// Full created-Mii completion, including the same archive/parameter/copy-file
-/// checks as ordinary sources. Unlike parked_created_ready this calls native
-/// resource functions and must never run while native G or source STATE is held.
-#[cfg(feature="mii-managed-helper-alpha")]
+/// Full parked created-source readiness, after its explicit destination proof.
 pub unsafe fn ready_created(current: *const u8, slot: u32, kind: u32,
     destination: crate::engine::mii::ordinary_cpu::CreatedDestination) -> Option<ReadySource> {
     if !parked_created_ready(current, slot, kind, destination) { return None; }
@@ -306,10 +210,6 @@ unsafe fn resources_ready(current: *const u8, slot: u32, kind: u32) -> Option<Re
 /// acquired the shared install gate and proven this source is not leased.
 pub unsafe fn install(current: *mut u8, kind: u32) {
     install_with(current, kind, native_fighter_install::Flags::Parked);
-}
-
-pub(super) unsafe fn reload(current: *mut u8, kind: u32) {
-    install_with(current, kind, native_fighter_install::Flags::Reload);
 }
 
 unsafe fn install_with(current: *mut u8, kind: u32, flags: native_fighter_install::Flags) {

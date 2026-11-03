@@ -283,9 +283,6 @@ fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, s
 }
 
 pub(crate) fn request(role: usize, hat: bool, target: Target) {
-    if role == 1 && !hat {
-        crate::runtime::roster::character_roster::sources::invalidate_cpu_seats();
-    }
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !settings.measurements {
         return;
@@ -431,8 +428,7 @@ pub(crate) fn mixed_targets(
 }
 
 /// Called once on the visible Player's frame. Planning is bounded to once per
-/// second, with an immediate refresh after a completed CPU rotation. Fixed
-/// CPU-seat intent remains live when speculative caching is disabled.
+/// second, with an immediate refresh after a completed CPU rotation.
 pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if crate::runtime::lobby::training::practice::role(body) != Some(0)
@@ -441,13 +437,6 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     {
         return;
     }
-    // Count changes happen in the native pause menu too. Fixed intent cannot
-    // depend on the speculative once-per-second/menu-closed polling gate.
-    let fixed = {
-        let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
-        crate::runtime::roster::character_roster::fixed_cpu_seats(&menu)
-    };
-    crate::runtime::roster::character_roster::sources::set_cpu_seats(fixed);
     let frame = FRAME.fetch_add(1, Ordering::Relaxed);
     if settings.measurements && REQUESTS.lock().iter().any(Option::is_some) {
         let busy = crate::runtime::roster::character_roster::sources::metrics().busy;

@@ -534,22 +534,16 @@ pub(super) fn should_defer_hud(owner: u32, kind: u32, intent: PortraitIntent) ->
 }
 
 fn logical_owner(layout: Layout, owner: u32) -> Option<usize> {
-    if layout == Layout::Training && matches!(owner, 2 | 3) { Some(owner as usize) }
-    else { layout.logical(owner) }
+    layout.logical(owner)
 }
 
-fn publication_generation(logical: u32, physical: u32) -> Option<u64> {
-    if matches!(physical, 2 | 3) {
-        sources::promoted_presentation(physical).map(|p| p.generation)
-    } else { Some(mii_saved_alpha::current_generation(logical)) }
+fn publication_generation(logical: u32, _physical: u32) -> Option<u64> {
+    Some(mii_saved_alpha::current_generation(logical))
 }
 
 fn practice_scope(owner: u32) -> bool {
     let Some(layout) = mii_backend::current() else { return false; };
     let Some(logical) = logical_owner(layout, owner) else { return false; };
-    if layout == Layout::Training && matches!(owner, 2 | 3) {
-        return scope(Role::Player).is_some_and(|s| s.mode == 0x04040000);
-    }
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     scope(role).is_some_and(|s| s.owner == owner && (layout != Layout::Training || s.mode == 0x04040000))
 }
@@ -855,12 +849,6 @@ unsafe fn owner_valid(job: &Job) -> bool {
 /// The publication is still this owner's live body in its layout and generation.
 /// Callers pass an entry already matched to the current callback, or an issued job's.
 unsafe fn owner_current(logical: u32, layout: Layout, physical: u32, entry: usize, kind: u32, generation: u64) -> bool {
-    if layout == Layout::Training && matches!(physical, 2 | 3) {
-        return mii_backend::current() == Some(layout) && practice_scope(physical)
-            && logical == physical
-            && sources::current_promoted_presentation(entry as *const u8, physical).is_some_and(|p|
-                p.entry == entry && p.kind == kind && p.generation == generation);
-    }
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     mii_backend::current() == Some(layout)
         && scope(role).is_some_and(|s| s.owner == physical && (layout != Layout::Training || s.mode == 0x04040000))
@@ -1221,9 +1209,7 @@ unsafe fn try_issue(base: usize, owner: usize, job: &Job, c: Configuration) -> R
     }
     let lease = job.lease.ok_or("no lease")?;
     let h = job.helper;
-    if mii_backend::current().is_none_or(|l| if l == Layout::Training {
-        policy::training_renderer_row(owner) != Some(h)
-    } else { !l.helpers().contains(&h) }) {
+    if mii_backend::current().is_none_or(|l| !l.helpers().contains(&h)) {
         return Err("leased slot is not a helper row");
     }
     if !policy::row_free_for(&STATE.lock().own.bound, owner, h) {
@@ -1881,7 +1867,7 @@ unsafe fn helper_release_proof(job: &Job) -> Result<(), &'static str> {
     if entry as usize != job.helper_entry || read::<usize>(internal, 0x20 + job.helper as usize * 8) != job.helper_entry {
         return Err("helper entry identity changed");
     }
-    if !sources::portrait_native_ready(entry,lease,job.holder) {
+    if !sources::portrait_render_ready(entry,lease,job.holder) {
         return Err("helper retained native lifetime changed after render");
     }
     let ready = sources::portrait_ready(lease, job.holder).ok_or("helper source not ready after render")?;

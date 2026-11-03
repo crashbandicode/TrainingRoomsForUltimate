@@ -1,5 +1,5 @@
 //! Value projection of SourceBook ownership; never a second source lifetime book.
-use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken, PromotionToken, NativeIdentity};
+use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken};
 #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
 use crate::engine::swap::source_lifetime::{ReadyToken, SourceKey};
 use crate::engine::mii::ordinary_player::Owner;
@@ -66,16 +66,13 @@ pub(crate) struct View {
     pub layout:crate::engine::mii::backend::Layout,
     pub epoch: Option<SceneEpoch>, pub slots: [Helper; 2],
     pub miis:[Option<MiiProof>;2],
-    /// Sealed resource identity projected atomically with the source reservation.
-    /// This is not native activation completion and grants no new helper lease.
-    pub promoted:[Option<(PromotionToken,NativeIdentity,bool)>;2],
     /// Training creation order 7/6/5/4, never native helper ordinals. SourceBook
     /// projects these tokens; this value view owns no independent lifetime.
     pub created_slots:[Helper;4],
     pub created_miis:[Option<CreatedReceipt>;4],
 }
 impl View {
-    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],promoted:[None;2],created_slots:[Helper::Unmanaged;4],created_miis:[None;4] };
+    pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],created_slots:[Helper::Unmanaged;4],created_miis:[None;4] };
     pub fn ordinal(self,id:usize)->Option<usize> {self.layout.helper(id)}
     pub fn created_ordinal(self,id:usize)->Option<usize> {
         (self.layout==crate::engine::mii::backend::Layout::Training)
@@ -114,7 +111,7 @@ impl View {
     pub fn project(&mut self,epoch:SceneEpoch,slot:usize,helper:Helper) {
         self.epoch=Some(epoch);
         if let Some(i)=self.ordinal(slot) {
-            self.slots[i]=helper;self.miis[i]=None;self.promoted[i]=None;
+            self.slots[i]=helper;self.miis[i]=None;
         } else if let Some(i)=self.created_ordinal(slot) {
             self.created_slots[i]=helper;self.created_miis[i]=None;
         }
@@ -150,32 +147,6 @@ impl View {
                 if Some(ready.source().epoch())==self.epoch) {return Err(NO_AUTHORITY);}
         }
         Ok(())
-    }
-
-    /// Existing consumers may retain a promoted lifetime, but only after the
-    /// native caller proves the complete active shape and supplies its identity.
-    /// Exact G payload/token checks remain in helper_kind, under native G.
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    pub fn accepts_promoted(self,id:usize,now:Proof,active:NativeIdentity)->bool {
-        let Some(ordinal)=self.ordinal(id) else{return false;};
-        let Some((promotion,expected,_parked_install))=self.promoted[ordinal] else{return false;};
-        let Helper::Ready {ready,..}=self.slots[ordinal] else{return false;};
-        promotion.source()==ready.source() && expected==active
-            && active.slot as usize==id && active.entry==now.owner.entry
-            && active.kind==now.kind && active.costume==now.costume
-            && active.descriptor==now.owner.information && active.resource==now.owner.object
-            && self.accepts(id,now,true)
-    }
-
-    /// Epoch authority only, after the caller proves parked or active native
-    /// shape. CPU1 owns the parked selection epoch; a promoted lifetime owns
-    /// its exact source and active identity independently of later CPU1 edits.
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    pub fn accepts_mii_epoch(self,id:usize,now:Proof,active:Option<NativeIdentity>,cpu_epoch:u64)->bool {
-        let Some(i)=self.ordinal(id) else {return false;};
-        let Some(mii)=self.miis[i] else {return false;};
-        self.accepts(id,now,true) && (mii.binding.epoch==cpu_epoch
-            || active.is_some_and(|identity|self.accepts_promoted(id,now,identity)))
     }
 
     pub fn accepts(self, id: usize, now: Proof,
@@ -464,7 +435,7 @@ mod mii_tests {
     use crate::engine::mii::{inventory::{build_snapshot,RawSlot,MiiClass,TaggedId},
         lifetime::{Binding,Configuration},native_values::Mirrors};
     #[test]
-    fn count_promotion_helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
+    fn ordinary_helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
         let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],
             colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),
             tag_hat:TaggedId(0x5a00000fa9efa5ea),
@@ -514,51 +485,12 @@ mod mii_tests {
         assert!(!View {miis:[Some(MiiProof {binding:Binding {record_index:3,..b},..mii}),None],
             ..committed}.accepts(2,proof,true));
         let lease=book.acquire(ready,Holder {category:1,id:17}).unwrap();
-        let promotion=book.promote(ready).unwrap();
-        let identity=NativeIdentity {slot:2,entry:b.entry,kind:key.kind,costume:0,
-            body_id:23,bodies:[(0xa000,23),(0,0),(0,0)],descriptor:owner.information,resource:owner.object};
-        let retained=View {promoted:[Some((promotion,identity,true)),None],..committed};
-        assert_eq!(book.promoted_ready(promotion),Ok(ready));
         assert_eq!(book.leased_ready(lease,Holder {category:1,id:17}),Some(ready));
-        assert!(retained.accepts_promoted(2,proof,identity));
-        // Exercise the same epoch predicate called by native helper_kind:
-        // CPU1 changes cannot revoke a retained CPU2, but cannot authorize a
-        // stale source or a parked helper from a previous selection either.
-        assert!(committed.accepts_mii_epoch(2,proof,None,b.epoch));
-        assert!(!committed.accepts_mii_epoch(2,proof,None,b.epoch+1));
-        assert!(!committed.accepts_mii_epoch(2,proof,Some(identity),b.epoch+1));
-        for cpu_epoch in [b.epoch+1,b.epoch+2,u64::MAX] {
-            assert!(retained.accepts_mii_epoch(2,proof,Some(identity),cpu_epoch));
-            assert!(!retained.accepts_mii_epoch(2,proof,None,cpu_epoch));
-            assert!(!retained.accepts_mii_epoch(2,proof,
-                Some(NativeIdentity {body_id:24,..identity}),cpu_epoch));
-            assert!(!View {epoch:None,..retained}.accepts_mii_epoch(2,proof,Some(identity),cpu_epoch));
-        }
-        assert!(!committed.accepts_promoted(2,proof,identity),"ready alone is not a reservation");
-        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {body_id:24,..identity}));
-        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {bodies:[(0xa000,24),(0,0),(0,0)],..identity}));
-        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {descriptor:0x3300,..identity}));
-        assert!(!retained.accepts_promoted(2,proof,NativeIdentity {resource:0x4300,..identity}));
-        assert!(!View {miis:[None;2],..retained}.accepts_promoted(2,proof,identity));
-        let measured=crate::engine::swap::mii_cycle::compact_regressions::AllocationCount::start();
-        for _ in 0..128 {assert!(retained.accepts_promoted(2,proof,identity));}
-        assert_eq!(measured.finish(),0);
-        assert_eq!(book.readopt(promotion),Ok(ready));
-        assert!(book.promoted_ready(promotion).is_err());
-        let readopted=View {promoted:[None;2],..retained};
-        assert!(!readopted.accepts_promoted(2,proof,identity));
-        assert!(readopted.accepts(2,proof,true));
-        let next_promotion=book.promote(ready).unwrap();
-        assert_ne!(next_promotion,promotion);
-        assert!(book.promoted_ready(promotion).is_err());
-        assert_eq!(book.promoted_ready(next_promotion),Ok(ready));
-        book.readopt(next_promotion).unwrap();
         assert!(book.begin_install(2,book.epoch(),NativeEntry(b.entry as u64),key).is_err());
         assert!(book.release(lease));let next=book.begin_install(2,book.epoch(),NativeEntry(b.entry as u64),key).unwrap();
         assert_ne!(next,load);assert!(view.available_for(Some(next.source())).is_err());
         let next_ready=book.complete(next).unwrap();
-        let stale_promotion=View {slots:[Helper::Ready {ready:next_ready,key,proof},Helper::Unmanaged],..retained};
-        assert!(!stale_promotion.accepts_mii_epoch(2,proof,Some(identity),b.epoch+1));
+        assert!(View {slots:[Helper::Ready {ready:next_ready,key,proof},Helper::Unmanaged],..committed}.accepts(2,proof,true));
         assert!(book.complete(load).is_err());
         let departed=View {epoch:Some(book.depart_scene().unwrap()),..committed};
         assert!(!departed.accepts(2,proof,true));

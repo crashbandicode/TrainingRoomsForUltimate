@@ -540,3 +540,34 @@ bytes to the existing ring without invoking that drain. No new state, capacity,
 logging policy, or stage source was added/read. The live_replay call is recorded
 as an appended exact-text pkg4 carry transformation; the runtime logger has no
 carry manifest (see its original scoped mixed-file attribution above).
+
+## pkg6 RC reset: withdraw unproven F9 and exact-created portrait admission (2026-11-03)
+
+Operator RC reset and lead10:42:04 authorize this deferral. Exact base is
+`8fe6261`; ordinary roster/group/saved-CPU-Mii paths, parked helper hat/item
+requests, native count handling, save/scene cleanup, INSTALL/pristine checks and
+achieved allocation repairs remain. Removed the clean-room-only count-hook
+module, its change-budget diagnostic module and its dedicated seam table;
+removed their declarations/install call and test includes. None was an entry in
+the carried-file manifest, and older read-only CPU-quantity guards remain.
+
+The existing pkg6 carry manifest records appended exact-text removals for the
+fixed-seat producer and scheduler gate, consumer cutover, active reload,
+promoted presentation/provenance and active-seat admission. Ordinary Mii
+portrait source selection again uses the backend's parked helper pair rather
+than the deferred exclusive created rows. Created exact-Mii scheduling,
+eligibility and native preparation all consult the explicit closed RC policy;
+the ordinary created-source capacity/pristine/load/retirement paths remain.
+No broad Cargo feature toggle, stage mutation, native flag workaround, ABI or
+save-format change. Pure historical promotion models are not native authority
+and have no remaining runtime caller in this composition.
+
+All carried source changes were generated through `tools/carry_pkg6.py carry`
+from these transforms, not by editing a stage. The ledger is regenerated;
+`verify` re-derived all253 files. Source parsing and carry verification are not
+host/native/runtime acceptance. Four RC regressions in the existing library
+test module cover removed registrations, native Mii/count scope, native-vs-created
+scheduling and ordinary portrait row exclusion. They await the one coherent
+candidate host gate before Eden; no scratch Cargo/native/runtime run was made.
+
+Lead composition: cf161f5 is integrated after Slim7950485. Both count and Hitbox-observer seam tables/declarations are absent (seven retained tables); both count and fixed-bank-probe install calls are removed. Appended exact carry transforms express the reviewed combined delta from8c0ec63, retaining all Slim exclusions and unchanged original source hashes. Regeneration preserved every reviewed destination byte; all247 remaining files re-derived successfully. The worker253-file result above describes its isolated branch, not this combined inventory. Candidate host/native/runtime gates remain pending.
