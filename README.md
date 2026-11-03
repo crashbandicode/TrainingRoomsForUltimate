@@ -14,21 +14,39 @@ cycle preloading, JSON saves, practice stages, lobby practice and the seam
 guards were written for the earlier fork by this project's authors and are
 carried over as they are.
 
-Everything in this repository is licensed under the [MIT License](LICENSE).
+This project's code is licensed under the [MIT License](LICENSE). Dependency
+and carried-code origins are recorded in [PROVENANCE.md](PROVENANCE.md) and
+[CARRY-OVER.md](CARRY-OVER.md).
 
 This project was developed with the assistance of AI.
 
 ## Status
 
-Phase 0 (provenance) and the start of phase 1 (feature inventory and
-behavioural specifications). Nothing is built or installable yet. See
-[PROVENANCE.md](PROVENANCE.md) for the fork-versus-upstream table,
-[TRAININGROOMS-HANDOFF.md](TRAININGROOMS-HANDOFF.md) for the live state, and
-`specs/` for the behavioural specifications. The menu proposal is
-[docs/MENU-PROPOSAL.md](docs/MENU-PROPOSAL.md); the decisions still open for the
-operator, one picture each, are in [docs/DECISIONS.md](docs/DECISIONS.md).
+Implementation and release-candidate validation are in progress. Host tests
+and Switch builds exist, but the integrated candidate has not completed its
+full runtime and online regression gates. There is no approved
+release or installation artifact yet.
 
-## Layout (planned)
+See [HANDOFF.md](HANDOFF.md) for the current acceptance state,
+[docs/implementation-packages.md](docs/implementation-packages.md) for scope,
+and [specs/](specs/) for the behavioral contracts. Individual results under
+[eden/](eden/) identify the build they tested; an older passing run does not
+validate the current candidate.
+
+## Practice tools
+
+The implemented feature set includes CPU responses and defensive options, input delay,
+save states and character-specific restoration, input recording and playback,
+named macros and clip editing, input display, and configurable shortcuts.
+The carried engines add fighter cycling, Mii configuration, CPU-as-Player-1,
+practice stages and lobby practice. Menu screens and the hitbox/hurtbox display
+are part of the same acceptance campaign.
+
+These describe the intended feature set. The remaining screen, multi-CPU ownership, hitbox, first-use hitch and online
+rows are tracked in the handoff. Verified
+demonstration footage will be added after those rows pass on the candidate.
+
+## Architecture and saved data
 
 The plugin follows the workspace playbook layout: a `cdylib` only; pure logic in
 `model`-side crates with host tests; hooks in a `runtime` module compiled only
@@ -37,13 +55,47 @@ a `diag` feature for Eden diagnostics that the shipped NRO does not carry; one
 install line in `sd:/ultimate/TrainingRooms/events.log` and a size-capped
 diagnostics file.
 
-All of the plugin's files live under `sd:/ultimate/TrainingRooms/`. On its
+Settings and saved data live under `sd:/ultimate/TrainingRooms/`. On its
 first boot on a card that has the earlier fork's `sd:/ultimate/TrainingModpack/`
 folder, it imports the menu settings, save states and setups, Mii presets and
 named macro library once, by copying; the originals are left untouched
 (`specs/SPEC-core-08-storage-root-and-migration.md`).
 
-## Build and install
+## Build
 
-Not yet. The build commands, the install path and the evidence documents will
-be added when the first implementation package lands.
+The host toolchain is pinned by `rust-toolchain.toml`. Switch builds use
+`cargo-skyline` and its separate `skyline-v3` toolchain. Follow
+[docs/BUILD.md](docs/BUILD.md) for the verified toolchain setup and layout recipe.
+From a configured checkout, run each gate separately:
+
+```powershell
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo build --no-default-features
+cargo test --manifest-path crates/smash-match-data/Cargo.toml
+cargo test --manifest-path crates/hos-lock/Cargo.toml
+cargo skyline build --release
+cargo skyline build --release --features diag
+```
+
+The Switch artifact is
+`target/aarch64-skyline-switch/release/libtraining_rooms.nro`, or the same
+relative path under `CARGO_TARGET_DIR`. Release and diagnostic builds use the
+same output filename: archive and hash each artifact before building the next.
+The diagnostic build is for validation. The final handoff must state the exact
+release hash and resident memory size.
+
+## Installation layout
+
+The plugin targets Super Smash Bros. Ultimate **13.0.5** with Skyline. Its NRO
+belongs at:
+
+```text
+atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro
+```
+
+Installation awaits the approved candidate and operator sign-off. The
+[card-swap plan](docs/CARD-SWAP-PLAN.md) records coexistence and rollback steps.
+Do not treat a diagnostic or intermediate stream build as the release.
+
+This is an unofficial fan project, not affiliated with or endorsed by Nintendo.
