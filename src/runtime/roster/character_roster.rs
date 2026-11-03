@@ -161,7 +161,6 @@ type WaitingValue=crate::engine::mii::remembered::Value<TrioFighter,Forms>;
 /// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.
 #[cfg(feature="mii-hud-portrait-alpha")]
 #[derive(Clone, Copy, Debug)]
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum PortraitIntent {
     Exact(crate::engine::mii::lifetime::Configuration),
     Original { original_kind: u32 },

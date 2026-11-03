@@ -643,7 +643,51 @@
    "dest": "src/model/mii/lifetime.rs",
    "crate": "mii",
    "src_sha256": "c5ae4c4aa0aaaacbf795debce87f951fa1332a83ecee6743af029ceb0387feb0",
-   "dest_sha256": "ccb24cc2ef80fad885b2f2a5984563caa43c50f5aaaca336e8020953f305c71e"
+   "dest_sha256": "5f324e1f73febdf54c8b08bb132bf798ff52bbfb3ba796e4d21753914fd0640c",
+   "edits": [
+    {
+     "old": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    canonical: Canonical,\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
+     "new": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    class: MiiClass,\n    hashes: [u64; 3],\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "}\nimpl From<Configuration> for StoredConfiguration {\n    fn from(value: Configuration) -> Self {\n        let c = value.canonical;\n        let tag = |kind, row, hash| (u64::from(kind) << 56) | (u64::from(row) << 40) | hash;\n        Self { canonical: c, charinfo: value.charinfo.to_vec(), tags: [\n            tag(TAG_OUTFIT, value.tokens.outfit, c.appearance.outfit),\n",
+     "new": "}\nimpl From<Configuration> for StoredConfiguration {\n    fn from(value: Configuration) -> Self {\n        let c = value.canonical();\n        let tag = |kind, row, hash| (u64::from(kind) << 56) | (u64::from(row) << 40) | hash;\n        Self { canonical: c, charinfo: value.charinfo.to_vec(), tags: [\n            tag(TAG_OUTFIT, value.tokens.outfit, c.appearance.outfit),\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "impl core::fmt::Debug for Configuration {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {\n        f.debug_struct(\"Configuration\")\n            .field(\"class\", &self.canonical.class)\n            .field(\"canonical_hash\", &self.canonical.hash())\n            .field(\"tokens\", &self.tokens)\n            .finish_non_exhaustive()\n    }\n",
+     "new": "impl core::fmt::Debug for Configuration {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {\n        f.debug_struct(\"Configuration\")\n            .field(\"class\", &self.class)\n            .field(\"canonical_hash\", &self.canonical().hash())\n            .field(\"tokens\", &self.tokens)\n            .finish_non_exhaustive()\n    }\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "            return Err(Error::InvalidConfiguration);\n        }\n        Ok(Self {\n            canonical: c,\n            charinfo: config.charinfo,\n            tokens: Tokens {\n                outfit: outfit.row_hint(),\n",
+     "new": "            return Err(Error::InvalidConfiguration);\n        }\n        Ok(Self {\n            class: c.class,\n            hashes: [c.appearance.outfit, c.appearance.hat, c.appearance.chara],\n            charinfo: config.charinfo,\n            tokens: Tokens {\n                outfit: outfit.row_hint(),\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "    }\n\n    pub fn canonical(&self) -> Canonical {\n        self.canonical\n    }\n    pub fn charinfo(&self) -> &[u8; CHARINFO_LEN] {\n        &self.charinfo\n",
+     "new": "    }\n\n    pub fn canonical(&self) -> Canonical {\n        let mut masked = self.charinfo;\n        masked[..CHARINFO_MASK_END].fill(0);\n        Canonical {\n            class: self.class,\n            appearance: Appearance {\n                charinfo_masked: masked,\n                specials: self.tokens.specials,\n                colour: self.tokens.colour as u8,\n                voice: self.tokens.voice as u8,\n                outfit: self.hashes[0],\n                hat: self.hashes[1],\n                chara: self.hashes[2],\n            },\n        }\n    }\n    pub fn charinfo(&self) -> &[u8; CHARINFO_LEN] {\n        &self.charinfo\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "        target: Configuration,\n    ) -> Result<Option<Transaction>, Error> {\n        self.ready(live)?;\n        if choice.canonical != target.canonical {\n            return Err(Error::ChoiceMismatch);\n        }\n        if target.canonical.class != self.original.canonical.class {\n            return Err(Error::DifferentClass);\n        }\n        if target.tokens.hat != self.original.tokens.hat\n            || target.canonical.appearance.hat != self.original.canonical.appearance.hat\n        {\n            return Err(Error::DifferentHat);\n        }\n        if target.canonical == self.original.canonical {\n            return Err(Error::OriginRequiresRestore);\n        }\n        if target.canonical == self.expected.canonical {\n            return Ok(None);\n        }\n        self.prepare(target, Operation::Apply).map(Some)\n",
+     "new": "        target: Configuration,\n    ) -> Result<Option<Transaction>, Error> {\n        self.ready(live)?;\n        let canonical = target.canonical();\n        if choice.canonical != canonical {\n            return Err(Error::ChoiceMismatch);\n        }\n        if target.class != self.original.class {\n            return Err(Error::DifferentClass);\n        }\n        if target.tokens.hat != self.original.tokens.hat\n            || target.hashes[1] != self.original.hashes[1]\n        {\n            return Err(Error::DifferentHat);\n        }\n        if canonical == self.original.canonical() {\n            return Err(Error::OriginRequiresRestore);\n        }\n        if canonical == self.expected.canonical() {\n            return Ok(None);\n        }\n        self.prepare(target, Operation::Apply).map(Some)\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    },
+    {
+     "old": "            Err(Error::ChoiceMismatch)\n        );\n        let mut other = b;\n        other.canonical.class = MiiClass::Gunner;\n        assert_eq!(\n            state.apply(live(a), choice(other), other),\n            Err(Error::DifferentClass)\n",
+     "new": "            Err(Error::ChoiceMismatch)\n        );\n        let mut other = b;\n        other.class = MiiClass::Gunner;\n        assert_eq!(\n            state.apply(live(a), choice(other), other),\n            Err(Error::DifferentClass)\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/mii_setup.rs",
@@ -2194,7 +2238,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "bb825afdc5c01a6247e0bc7b788e6e47bd9c6499c743abb9c6cbc3aed9bb10a7",
+   "dest_sha256": "4c2324b8e0d595798367653183ef10ab5ae2cdb23397873e600d4891f1694fcd",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -2481,6 +2525,12 @@
      "old": "\n#[path = \"native_source.rs\"]\nmod native_source;\n#[cfg(any(\n    feature = \"source-capacity-probe\",\n    feature = \"managed-third-source-alpha\"\n))]\n#[path = \"native_source_capacity.rs\"]\nmod native_source_capacity;\n#[path = \"character_sources.rs\"]\n",
      "new": "\n#[path = \"native_source.rs\"]\nmod native_source;\n#[cfg(feature = \"managed-third-source-alpha\")]\n#[path = \"native_source_capacity.rs\"]\nmod native_source_capacity;\n#[path = \"character_sources.rs\"]\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "/// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.\n#[cfg(feature=\"mii-hud-portrait-alpha\")]\n#[derive(Clone, Copy, Debug)]\n#[allow(clippy::large_enum_variant)]\npub(crate) enum PortraitIntent {\n    Exact(crate::engine::mii::lifetime::Configuration),\n    Original { original_kind: u32 },\n",
+     "new": "/// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.\n#[cfg(feature=\"mii-hud-portrait-alpha\")]\n#[derive(Clone, Copy, Debug)]\npub(crate) enum PortraitIntent {\n    Exact(crate::engine::mii::lifetime::Configuration),\n    Original { original_kind: u32 },\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
     }
    ]
   },
@@ -4606,7 +4656,7 @@
    "dest": "src/runtime/mii/mii_hud_portrait.rs",
    "crate": "root",
    "src_sha256": "a456918a0b114f95f501babe322978a13ff72c32464ed9ab290ef11567758357",
-   "dest_sha256": "3cfbd090b8437ccec50ce75c60c26579411af151a8905ebe0cd91ee7f344a87d",
+   "dest_sha256": "e386052034968762a795544ad16d57f2d29de7fae6e65a1b094279adad7f6544",
    "edits": [
     {
      "old": "unsafe fn pipeline_before_tick(ctx: &mut InlineCtx) {\n",
@@ -4872,6 +4922,12 @@
      "old": "    if base == 0 || !aligned(batch as *const u8) {\n        return;\n    }\n    let fresh_batch = pointer_chain(base as *const u8, &BATCH).map_or(0, |b| b as usize);\n    // Same thread as the service callback; try_lock only fails closed.\n    let Ok(state) = STATE.try_lock() else { return; };\n    let Some(flight) = state.own.in_flight else { return; };\n    let issued_batch = state.jobs.get(flight.owner).copied().flatten()\n        .filter(|job| job.stage == Stage::Issued && job.lease.is_some())\n        .map_or(0, |job| job.batch);\n    if batch != fresh_batch || batch != issued_batch { return; }\n",
      "new": "    if base == 0 || !aligned(batch as *const u8) {\n        return;\n    }\n    let fresh_batch = pointer_chain(base as *const u8, &BATCH).map_or(0, |b| b as usize);\n    // Same thread as the service callback; try_lock only fails closed.\n    let Some(state) = STATE.try_lock() else { return; };\n    let Some(flight) = state.own.in_flight else { return; };\n    let issued_batch = state.jobs.get(flight.owner).copied().flatten()\n        .filter(|job| job.stage == Stage::Issued && job.lease.is_some())\n        .map_or(0, |job| job.batch);\n    if batch != fresh_batch || batch != issued_batch { return; }\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "\n#[derive(Clone, Copy)]\n// Exactly two fixed jobs plus their replacements; inline values avoid allocation in service.\n#[allow(clippy::large_enum_variant)]\nenum Intent { Exact(Configuration), Original { original_kind: u32 } }\n\n#[derive(Clone, Copy, PartialEq, Eq, Debug)]\n",
+     "new": "\n#[derive(Clone, Copy)]\n// Exactly two fixed jobs plus their replacements; inline values avoid allocation in service.\nenum Intent { Exact(Configuration), Original { original_kind: u32 } }\n\n#[derive(Clone, Copy, PartialEq, Eq, Debug)]\n",
+     "count": 1,
+     "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
     }
    ]
   },
