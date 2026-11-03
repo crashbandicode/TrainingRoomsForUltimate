@@ -84,6 +84,12 @@ pub mod runtime {
     pub mod ui {
         pub use crate::{native_pause, pane, state, tick};
         pub mod input { pub static POLLS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0); }
+        // This harness does not spawn the native worker. Keep its cancellation
+        // boundary real: renderer loss resets the same production ring model.
+        pub mod worker {
+            pub static INPUT: crate::model::ui_events::Ring<64> = crate::model::ui_events::Ring::new();
+            pub fn push_reset() { INPUT.reset(); }
+        }
         pub mod menu_app { pub fn captures_input() -> bool { false } pub fn note_open() {} }
         pub mod registry {
             use crate::nn::ui2d::Layout;

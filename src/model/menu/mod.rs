@@ -289,11 +289,7 @@ impl Menu {
 
     fn sync(&mut self) {
         let saved = self.settings.last_page().and_then(Page::from_id).filter(|page| self.page_in_ring(*page));
-        if let Some(page) = saved {
-            self.page = page;
-        } else if !self.page_in_ring(self.page) {
-            self.page = Page::Cpu;
-        }
+        self.page = saved.unwrap_or(Page::Cpu);
         self.normalize_delay_rows();
         self.clamp_cursor();
     }

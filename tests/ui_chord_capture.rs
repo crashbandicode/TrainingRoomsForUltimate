@@ -180,6 +180,9 @@ fn n7_reopen_cancels_unconfirmed_capture_and_y_disables_only_on_confirm() {
     assert_eq!(menu.chord_capture(), model::menu::ChordCapture::Preview);
     assert_eq!(menu.env().shortcuts[0], Chord::DEFAULT_SHORTCUT_1);
     assert!(menu.take_button_config().is_none());
+    let row = ROWS.iter().position(|r| r.title == "Menu shortcut 1").unwrap();
+    while menu.page() != ROWS[row].page() { menu.press(Button::R); }
+    while menu.focus() != Some(Entry::Row(row)) { menu.press(Button::Down); }
     menu.press(Button::A);
     assert!(matches!(menu.screen(), Some(Screen::ChordEntry { .. })));
     menu.press(Button::Y);
