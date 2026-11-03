@@ -1,0 +1,27 @@
+{
+  "id": "RC-SPECIAL-ordinary",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+  "started": 1793745212.8484867,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "plan": "643267957 #1224 [GroupSwap] plan owner=0 group=1 kinds=[2d, 2c, 1c] special=None bodies=3 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x11ed7b0700 identity=None",
+        "prefetch": "643271489 #1274 [GroupSwap] prefetched owner=0 group=1 kinds=[2d, 2c, 1c] us=616679 INSTALL_released=true map=14 tree=10",
+        "async": {
+          "request": "643271727 #1285 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 6, entry: 76960702464, sequence: 14 } outgoing=0x2e target=0x2d index=0 mii=false",
+          "build": "643271740 #1292 [GroupSwap] build owner=0 group=1 mode=async queued=3 control=0x11f6fe4680 setup_us=71 us=72; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+          "built": "643272439 #1298 [GroupSwap] built owner=0 group=1 ok=true us=698750 installed=3 pool_live=6->9 bodies=Some([Body { address: 76987803152, id: 393216 }, Body { address: 76987866960, id: 458752 }, Body { address: 76987930768, id: 524288 }]) map=11 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f4c83928, 11f4e4e9c8]) mii_setup=None mode=async setup_us=71 queued_us=16765 settled_us=[165654, 284009, 698624] ticks=43 max_tick_gap_us=22491",
+          "done": "643272460 #1312 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 6, entry: 76960702464, sequence: 14 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-ordinary/yoga-223358Z-227704-ordinary-async.png"
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745238.93411
+}

@@ -1,0 +1,62 @@
+643348973 #1994 [TrainingRooms] chords_passed bits=0x20
+643348973 #1995 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+643348974 #1996 [BodyBank] reuse owner=0 from=1 to=2 kind=0x1c
+643348974 #1997 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } outgoing=0x2c target=0x1c index=0 mii=false
+643348974 #1998 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643348976 #1999 [Ui] menu session cleared
+643348988 #2000 [TrainingRooms] notice_visible=false menu_open=false
+643349026 #2001 [BodyBank] ready owner=0 index=2 kind=0x1c previous=Changing bodies=[Body { address: 76926900304, id: 393216 }, Body { address: 76926964112, id: 458752 }, Body { address: 76927027920, id: 524288 }]
+643349026 #2002 [BodyBank] identity_view owner=0 reason=ready R=0x120cd93200 header=[2d, 2c, 1c] costume=0 region=1 published=0x10018000000300010000000 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:5:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643349027 #2003 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643349027 #2004 [CharacterRoster] HUD refresh owner=0 kind=0x1c delivered=1 listeners=1
+643349027 #2005 [Hud] readback owner=0 kind=0x1c exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643349027 #2006 [PreloadGrace] extend generation=16 us=643349027061 deadline_us=643351027061
+643349027 #2007 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643349027 #2008 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } target=0x1c physical=0x2d index=0 original=false mii=false resource_pair=None released=true
+643349039 #2009 [TrainingRooms] notice_visible=true menu_open=false
+643349039 #2010 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643349040 #2011 [TrainingRooms] settings.json written by the writer thread
+643349192 #2012 [PreloadStatus] state=Waiting planned=9 ready=5 prefetched=3 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text="Loaded 8/9 · swap the CPU to load 1 more"
+643349192 #2013 [PreloadStatus] wiped text=Some("Loading 7/9"); raised again
+643349192 #2014 [PreloadStatus] raise text="Loaded 8/9 · swap the CPU to load 1 more" frames=120
+643349623 #2015 [TrainingRooms] chords_passed bits=0x20
+643349623 #2016 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+643349624 #2017 [Ledger] release owner=0 kind=0x58 calls=[58] reason=pair build needs an exclusive reset batch
+643349624 #2018 [GroupSwap] keys returned owner=0 group=2 kinds=[58] released=1 kept=0 reason=pair build needs an exclusive reset batch; replanned map=4
+643349624 #2019 [GroupSwap] request owner=0 kind=0x4b group=0 member=0 via=0 from=2 state=Prefetched form=pair
+643349624 #2020 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } outgoing=0x1c target=0x4b index=0 mii=false
+643349625 #2021 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643349626 #2022 [Ui] menu session cleared
+643349638 #2023 [TrainingRooms] notice_visible=false menu_open=false
+643349642 #2024 [GroupSwap] detach owner=0 group=0 kinds=[2d, 2c, 1c] bodies=[Body { address: 76926900304, id: 393216 }, Body { address: 76926964112, id: 458752 }, Body { address: 76927027920, id: 524288 }]
+643349642 #2025 [GroupSwap] build owner=0 group=0 kinds=[4b, 4c] special=Pair actors=2 R=0x120cd93200 flags=0x0->0x1 refs=0->2 map=4 task_pending=0 pool_live=9 records=Some([0, 0, 0]) dispatch_detached=Some([1180273b28, 11f4e4bdc8]) identity=None mode=sync reason=pair group
+643349642 #2026 [Registry] build owner=0 from=[2d, 2c, 1c] to=[4b, 4c] header=[4b, 4c, ffffffff] cells=[(0, ffffffff), (0, ffffffff), (0, ffffffff)] r4c=0x1 task_pending=0
+643349642 #2027 [IcPair] construct owner=0 entry=0x12172e6000 flags=0x6 native_flags_before=0x2
+643349643 #2028 [IcPair] N1 owner=0 entry=0x12172e6000 nana_prev=popo_ctx 0x1180f24300
+643349947 #2029 [GroupSwap] memory owner=0 group=0 kinds=[4b, 4c] phase=build committed=Some(2821042176)->Some(2834870272) delta=13828096 estimate=212729856 headroom=Some(609701888)
+643349947 #2030 [RequestBit] end owner=0 group=0 how=ResetRan before=0x0 built=0x0 after=0x0 map=0 task_pending=0 constructed=true
+643349947 #2031 [GroupSwap] built owner=0 group=0 ok=true us=304464 installed=2 pool_live=9->11 bodies=Some([Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }]) map=0 flags=0x0 refs=0 entry_flags=0x6 records=[0, 0, 0] dispatch=Some([11ed7d1e08, 11f4f98568]) mii_setup=None mode=sync setup_us=0 queued_us=0 settled_us=[0, 0, 0] ticks=0 max_tick_gap_us=17299
+643349947 #2032 [GroupSwap] acknowledged owner=0 group=0 member=0 previous=0 us=304464
+643349947 #2033 [GroupSwap] body-event listeners at acknowledgement event=0x1e listeners=1 vtables=[5075770]
+643349947 #2034 [Ledger] reconcile owner=0 phase=build map=0 task_pending=0 predicted=[] actual=[] residual=[] missing=[]
+643349947 #2035 [BuildSplit] stall owner=1 gap_us=322517 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+643349956 #2036 [BuildSplit] stall owner=0 gap_us=315058 loader=13 outer=3 installed=2 changing=1 count=2 kinds=[4b, 4c] flags=0x6
+643349967 #2037 [IcPair] N2 activate pair owner=0 status=0x0 flags 0x6->2->6 popo_ctx=0x1180f24300 nana_ctx=0x1180f24380 +0x4178=0x1180f24300 +0x4180=0x1180f24380 states=[Some(4),Some(4)]
+643349984 #2038 [BodyBank] ready owner=0 index=0 kind=0x4b previous=Changing bodies=[Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }]
+643349984 #2039 [BodyBank] identity_view owner=0 reason=ready R=0x120cd93200 header=[4b, 4c, ffffffff] costume=0 region=1 published=0x10018000000300010000000 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:5:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643349984 #2040 [GroupSwap] swap owner=0 kind=0x4b request_to_ready_us=359985 bodies=[Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }] max_tick_gap_us=315069 ticks=3
+643349984 #2041 [BuildSplit] gaps owner=0 kind=0x4b ticks=3 top=[t2:315069:setup, t3:27566:poll, t1:17300:poll]
+643349984 #2042 [MiiOrdinaryPlayer] [GroupSwap] adapter rebaseline owner=0 descriptor/header/body proof passed
+643349984 #2043 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643349984 #2044 [CharacterRoster] HUD refresh owner=0 kind=0x4b delivered=1 listeners=1
+643349984 #2045 [Hud] readback owner=0 kind=0x4b exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643349984 #2046 [PreloadGrace] extend generation=16 us=643349984689 deadline_us=643351984689
+643349984 #2047 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643349984 #2048 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } target=0x4b physical=0x4b index=0 original=false mii=false resource_pair=None released=true
+643349991 #2049 [TrainingRooms] notice_visible=true menu_open=false
+643349991 #2050 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643349995 #2051 [PreloadGrace] speculative-admission-deferred generation=16 us=643349995516 deadline_us=643351984689
+643350060 #2052 [TrainingRooms] settings.json written by the writer thread
+643350509 #2053 [PreloadStatus] state=Loading planned=10 ready=6 prefetched=0 failed=0 pending=1 unstarted=3 swap=3 blocked=false scheduler_blocked=false text="Loading 6/10"
+643350509 #2054 [PreloadStatus] wiped text=Some("Loaded 8/9 · swap the CPU to load 1 more"); raised again
+643350509 #2055 [PreloadStatus] raise text="Loading 6/10" frames=90

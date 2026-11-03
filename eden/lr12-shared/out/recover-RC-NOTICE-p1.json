@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-NOTICE-p1",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "904a1f87c9b25c84e79d367570c7d03f0d657b0e2f089fd7eeeb63e53eb23ad6",
+  "started": 1793745388.2055504,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-NOTICE-p1",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745388.2690964
+}

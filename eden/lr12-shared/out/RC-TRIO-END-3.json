@@ -1,0 +1,28 @@
+{
+  "id": "RC-TRIO-END-3",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+  "started": 1793745516.1599877,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "ready_source": "643580110 #3712 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 7, epoch: SceneEpoch(15) } kind=0x28 actors=Some(Actors { pointers: [1180f23f00, 0, 0, 0, 0], actors: [Some(Actor { actor: 1180f23f00, control: 1180e92600, partner: 0, owner: 7, cleanup_owner: 7, kind: 28, flags: [0, 1, 0], control_actor: 1180f23f00, input_index: 7, binding: 11e313a190, alias_index: 7, partner_control: 0 }), None, None] })",
+        "clean": "643582656 #3726 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=0 contexts=0 routes=0 dispatchers=0 records=0 keys=4 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 6))",
+        "retired": "643582928 #3759 [ManagedSourceCleanup] retirement epoch=SceneEpoch(15) entry=0x11deb2a000 owner=0x1219f66300 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)",
+        "claim": "643582928 #3760 [ManagedSourceCleanup] claim owner=0x1219f66300 released=true claim=0 bound_owner=0x0",
+        "fresh": 3763,
+        "continuation": {
+          "request": "643604510 #3804 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 17, entry: 77363527680, sequence: 43 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+          "done": "643605558 #3823 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 17, entry: 77363527680, sequence: 43 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+          "shot": "/home/intpa/tr-lr12-inputs/out/RC-TRIO-END-3/yoga-223932Z-694088-trio-continuation.png"
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745572.0753124
+}

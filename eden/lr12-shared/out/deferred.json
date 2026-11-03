@@ -1,0 +1,56 @@
+[
+  {
+    "id": "RC-MII",
+    "cause": "RuntimeError('Current fixture has no planned group for role=1 target=0x4a')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-MII.json",
+    "continuation": "recover-RC-MII"
+  },
+  {
+    "id": "RC-HATS",
+    "cause": "RuntimeError('Missing positive evidence: expected Kirby hat request')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-HATS.json",
+    "continuation": "recover-RC-HATS"
+  },
+  {
+    "id": "RC-SPECIAL-aegis",
+    "cause": "RuntimeError('gate pause on yoga did not pass within 15 s')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-SPECIAL-aegis.json",
+    "continuation": "recover-RC-SPECIAL-aegis"
+  },
+  {
+    "id": "RC-PILOT",
+    "cause": "RuntimeError('Finite Pilot discovery did not reach selected Player row')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-PILOT.json",
+    "continuation": "recover-RC-PILOT"
+  },
+  {
+    "id": "RC-NOTICE-p1",
+    "cause": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=1\\\\b')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-NOTICE-p1.json",
+    "continuation": "recover-RC-NOTICE-p1"
+  },
+  {
+    "id": "RC-NOTICE-cpu",
+    "cause": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=2\\\\b')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-NOTICE-cpu.json",
+    "continuation": "recover-RC-NOTICE-cpu"
+  },
+  {
+    "id": "RC-TEARDOWN-1",
+    "cause": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-TEARDOWN-1.json",
+    "continuation": "recover-RC-TEARDOWN-1"
+  },
+  {
+    "id": "RC-TEARDOWN-2",
+    "cause": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-TEARDOWN-2.json",
+    "continuation": "recover-RC-TEARDOWN-2"
+  },
+  {
+    "id": "RC-TEARDOWN-3",
+    "cause": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')",
+    "receipt": "/home/intpa/tr-lr12-inputs/out/failed/RC-TEARDOWN-3.json",
+    "continuation": "recover-RC-TEARDOWN-3"
+  }
+]

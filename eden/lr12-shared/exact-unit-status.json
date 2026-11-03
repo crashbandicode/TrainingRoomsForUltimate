@@ -1,0 +1,12 @@
+{
+  "command": [
+    "systemctl",
+    "--user",
+    "show",
+    "eden-life-d94271a787184aad8e344333a831f22a-yoga.service",
+    "--property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,KillMode,MainPID,ExecMainExitTimestamp"
+  ],
+  "returncode": 0,
+  "stdout": "Id=eden-life-d94271a787184aad8e344333a831f22a-yoga.service\nLoadState=loaded\nActiveState=failed\nSubState=failed\nMainPID=0\nResult=core-dump\nExecMainExitTimestamp=Tue 2026-11-03 17:44:05 EST\nExecMainCode=3\nExecMainStatus=7\nKillMode=control-group\n",
+  "stderr": ""
+}

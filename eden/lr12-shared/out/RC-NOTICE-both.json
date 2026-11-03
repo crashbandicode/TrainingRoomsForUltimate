@@ -1,0 +1,40 @@
+{
+  "id": "RC-NOTICE-both",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+  "started": 1793745091.6588855,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "role": "both",
+        "start": "643145273 #338 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+        "transitions": [
+          {
+            "request": "643145820 #353 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 3, entry: 77594550272, sequence: 1 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+            "done": "643147042 #375 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 3, entry: 77594550272, sequence: 1 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+            "shot": "/home/intpa/tr-lr12-inputs/out/RC-NOTICE-both/yoga-223153Z-115813-notice-p1.png"
+          },
+          {
+            "request": "643147197 #382 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 3, entry: 77594574848, sequence: 1 } outgoing=0x28 target=0x4a index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+            "done": "643147524 #397 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 3, entry: 77594574848, sequence: 1 } target=0x4a index=1 resource=[b0, 36, 66, de, 11, 00, 00, 00, c0, 8d, f6, 16, 12, 00, 00, 00] released=true saved_files_written=false",
+            "shot": "/home/intpa/tr-lr12-inputs/out/RC-NOTICE-both/yoga-223154Z-891538-notice-cpu.png"
+          }
+        ],
+        "statuses": [
+          "643145273 #338 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+          "643145273 #339 [PreloadStatus] raise text=\"Swap both once to load\" frames=120",
+          "643147530 #401 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+          "643147530 #402 [PreloadStatus] wiped text=Some(\"Swap both once to load\"); raised again",
+          "643147530 #403 [PreloadStatus] raise text=\"Loading 1/6\" frames=90"
+        ],
+        "ready_total_review": "pending"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745114.2004685
+}

@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-NOTICE-cpu",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+  "started": 1793745423.101779,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-NOTICE-cpu",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745423.1690733
+}

@@ -1,0 +1,24 @@
+{
+  "id": "02-stage",
+  "start": "main",
+  "end": "stage",
+  "evidence": [],
+  "manifest_sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+  "started": 1793745051.3414567,
+  "results": [
+    {
+      "play": "main-stage",
+      "on": "yoga"
+    },
+    {
+      "gate": "stage",
+      "on": "yoga",
+      "evidence": "/home/intpa/tr-lr12-inputs/out/02-stage/yoga-223101Z-182120-gate-stage.png"
+    },
+    {
+      "shot": "/home/intpa/tr-lr12-inputs/out/02-stage/yoga-223101Z-835005-stage.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745061.675196
+}

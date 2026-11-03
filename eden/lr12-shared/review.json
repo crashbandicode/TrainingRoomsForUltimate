@@ -1,0 +1,94 @@
+{
+  "MII": {
+    "original_failure": "Wrong roster index75; canonical Gunner index89 corrected in final retry",
+    "raw_retry_matching_count": 7,
+    "qualified_current_point_R_time_reads": [
+      {
+        "sequence": "304",
+        "point_id": "4",
+        "wall_time_ns": "1793745739819874869",
+        "R": "0x11eed42700",
+        "record_address": "0x11833ba868",
+        "record_mask_equal": true,
+        "resource_words": [
+          74,
+          4294967295,
+          4294967295,
+          0,
+          1,
+          69,
+          0,
+          2,
+          37,
+          65536,
+          4294967295
+        ],
+        "resource_tokens_outfit_hat_colour_voice": [
+          69,
+          0,
+          2,
+          37
+        ]
+      }
+    ],
+    "limit": "Masked CharInfo and native outfit69/hat0/colour2/voice37 match current bank; specials and outfit/hat hash40 resolution not independently captured, so full saved tuple remains open. Final executed hook2322dd lacked filtering; this review applies it post-run."
+  },
+  "TRIO": [
+    {
+      "row": "RC-TRIO-END-1",
+      "same_entry_epoch": true,
+      "retired": "643484676 #3091 [ManagedSourceCleanup] retirement epoch=SceneEpoch(11) entry=0x11deb2a000 owner=0x12225e6900 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)",
+      "claim": "643484676 #3092 [ManagedSourceCleanup] claim owner=0x12225e6900 released=true claim=0 bound_owner=0x0"
+    },
+    {
+      "row": "RC-TRIO-END-2",
+      "same_entry_epoch": true,
+      "retired": "643532223 #3434 [ManagedSourceCleanup] retirement epoch=SceneEpoch(13) entry=0x11deb2a000 owner=0x11de85d400 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)",
+      "claim": "643532223 #3435 [ManagedSourceCleanup] claim owner=0x11de85d400 released=true claim=0 bound_owner=0x0"
+    },
+    {
+      "row": "RC-TRIO-END-3",
+      "same_entry_epoch": true,
+      "retired": "643582928 #3759 [ManagedSourceCleanup] retirement epoch=SceneEpoch(15) entry=0x11deb2a000 owner=0x1219f66300 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)",
+      "claim": "643582928 #3760 [ManagedSourceCleanup] claim owner=0x1219f66300 released=true claim=0 bound_owner=0x0"
+    }
+  ],
+  "TEARDOWN": [
+    {
+      "row": "RC-TEARDOWN-1",
+      "queue": "643630023 #4021 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180ceb7c0, 1180ceb540] control_us=15935 us=16014; frames run until the tasks settle",
+      "built": "643630493 #4027 [GroupSwap] built owner=0 group=0 ok=true us=485027 installed=2 pool_live=5->7 bodies=Some([Body { address: 76752285584, id: 327680 }, Body { address: 76752349392, id: 393216 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f4e4a128, 11f4e4c008]) mii_setup=None mode=async setup_us=47 queued_us=16014 settled_us=[300797, 484983, 0] ticks=29 max_tick_gap_us=25338",
+      "finalize": "643632504 #4054 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=0 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 5))",
+      "pending_destruction_exercised": false
+    },
+    {
+      "row": "RC-TEARDOWN-2",
+      "queue": "643684392 #4338 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180ceb7c0, 1180ceb720] control_us=18590 us=18677; frames run until the tasks settle",
+      "built": "643684807 #4344 [GroupSwap] built owner=0 group=0 ok=true us=433455 installed=2 pool_live=5->7 bodies=Some([Body { address: 76905862800, id: 327680 }, Body { address: 76905926608, id: 393216 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f4c80fc8, 11f4e4c0e8]) mii_setup=None mode=async setup_us=56 queued_us=18677 settled_us=[282833, 433411, 0] ticks=27 max_tick_gap_us=21000",
+      "finalize": "643686956 #4370 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=0 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 5))",
+      "pending_destruction_exercised": false
+    },
+    {
+      "row": "RC-TEARDOWN-3",
+      "queue": "643729340 #4654 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180ceb680, 11f6fcd0c0] control_us=15308 us=15393; frames run until the tasks settle",
+      "built": "643729790 #4660 [GroupSwap] built owner=0 group=0 ok=true us=465679 installed=2 pool_live=5->7 bodies=Some([Body { address: 76806926992, id: 327680 }, Body { address: 76806990800, id: 393216 }, Body { address: 0, id: 0 }]) map=5 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f4e4a2e8, 11f4c831e8]) mii_setup=None mode=async setup_us=51 queued_us=15393 settled_us=[283405, 465631, 0] ticks=29 max_tick_gap_us=20509",
+      "finalize": "643731878 #4685 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=0 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 5))",
+      "pending_destruction_exercised": false
+    }
+  ],
+  "R3": {
+    "gif": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr12-shared/final-inputs/out/RC-final/tr2-jab-x4.gif",
+    "sha256": "3dbd75e32447863dccdd00f2f20c890322661ba2a65b28529d605a5d42477501",
+    "frame": 12,
+    "frame_sha256": "39c995d0bf8734432a50c10e1d4e17e245ba6cb8f2329424116c520effd534cf",
+    "observed": "Falcon/Lucas stable; translucent red attack sphere at Falcon extended leg, native attack effects separate; Frame Advantage -18 visible; attack stats #5457 want_hurt=0 heap_allocations=0. Original R3 clip rejected due baseline-driven Mario reload.",
+    "open": "Independent native producer/retirement still not isolated; UI menu plus ordinary native pause does not establish renderer independence."
+  },
+  "Kirby": "Corrected return includes original Steve before Kirby (#926 -> #976); final Kirby body visible. Several immediate first-ready/HUD shots transient; ROB body observed but its immediate HUD still Falcon. Do not infer settled media from execution PASS.",
+  "SPECIAL": "PT Squirtle+Trainer and both Ice Climbers visible; ordinary async versus PT/IC sync receipts positive. Aegis fixture failed native pause gate; full SPECIAL remains open.",
+  "HATS": "Original first Mario hat request#990/confirmed#993; second press refused#1026 while helper loading. Settled-helper retry never observed kind7 ready; five-hat/departure clauses open.",
+  "PILOT": "Selected Player panel visibly reached (RC-PILOT pilot-page-7) but old reference classifier refused; no arm/release acceptance.",
+  "NOTICE": "Both Waiting swap3 observed; P1-only/CPU-only fixtures still yielded swap3 and their gates failed. Earlier Done8/8 log does not qualify those fresh-role rows.",
+  "shutdown": "Console scan zero matches, but exact-unit-status.json Result=core-dump ExecMainCode=3 ExecMainStatus=7. Old lifecycle; no acceptance of pkg6 fix.",
+  "raw_media_root": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc8/lr12-shared/final-inputs/out"
+}

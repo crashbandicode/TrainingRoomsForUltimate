@@ -1,0 +1,12 @@
+{
+  "id": "RC-NOTICE-cpu",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "904a1f87c9b25c84e79d367570c7d03f0d657b0e2f089fd7eeeb63e53eb23ad6",
+  "started": 1793745388.2702932,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=2\\\\b')",
+  "ended": 1793745422.9143677
+}

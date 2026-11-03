@@ -1,0 +1,12 @@
+{
+  "id": "RC-NOTICE-p1",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "8d4e136ac20299a054e0c46d1fa96f10200b8ad736b77c21cd43870082aec4af",
+  "started": 1793745353.098912,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=1\\\\b')",
+  "ended": 1793745388.021848
+}

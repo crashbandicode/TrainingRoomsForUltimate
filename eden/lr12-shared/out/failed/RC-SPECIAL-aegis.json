@@ -1,0 +1,12 @@
+{
+  "id": "RC-SPECIAL-aegis",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+  "started": 1793745272.5737197,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('gate pause on yoga did not pass within 15 s')",
+  "ended": 1793745288.27406
+}

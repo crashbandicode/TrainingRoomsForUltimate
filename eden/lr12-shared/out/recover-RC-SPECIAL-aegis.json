@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-SPECIAL-aegis",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+  "started": 1793745288.461933,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-SPECIAL-aegis",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745288.5265455
+}

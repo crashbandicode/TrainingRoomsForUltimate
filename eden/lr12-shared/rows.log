@@ -1,0 +1,49 @@
+Running as unit: run-p4115424-i12510239.scope; invocation ID: eb2965392d33431a8a9613172ae7a9db
+{"row": "01-main", "status": "PASS", "seconds": 19.8, "receipt": "/home/intpa/tr-lr12-inputs/out/01-main.json"}
+{"row": "02-stage", "status": "PASS", "seconds": 10.3, "receipt": "/home/intpa/tr-lr12-inputs/out/02-stage.json"}
+{"row": "03-css", "status": "PASS", "seconds": 5.0, "receipt": "/home/intpa/tr-lr12-inputs/out/03-css.json"}
+{"row": "04-steve", "status": "PASS", "seconds": 2.0, "receipt": "/home/intpa/tr-lr12-inputs/out/04-steve.json"}
+{"row": "05a-cpu-approach", "status": "PASS", "seconds": 1.4, "receipt": "/home/intpa/tr-lr12-inputs/out/05a-cpu-approach.json"}
+{"row": "05b-cpu-pick", "status": "PASS", "seconds": 1.6, "receipt": "/home/intpa/tr-lr12-inputs/out/05b-cpu-pick.json"}
+{"row": "05c-cpu74", "status": "PASS", "seconds": 0.7, "receipt": "/home/intpa/tr-lr12-inputs/out/05c-cpu74.json"}
+{"row": "06-lucas", "status": "PASS", "seconds": 11.3, "receipt": "/home/intpa/tr-lr12-inputs/out/06-lucas.json"}
+{"row": "07-training", "status": "PASS", "seconds": 8.0, "receipt": "/home/intpa/tr-lr12-inputs/out/07-training.json"}
+{"row": "RC-NOTICE-both", "status": "PASS", "seconds": 22.5, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-NOTICE-both.json"}
+{"row": "RC-MII", "status": "FAILED", "seconds": 40.2, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-MII.json"}
+{"status": "FAILED", "error": "RuntimeError('Current fixture has no planned group for role=1 target=0x4a')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-MII", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-MII.json"}
+{"row": "RC-KIRBY-ROB", "status": "PASS", "seconds": 26.3, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-KIRBY-ROB.json"}
+{"row": "RC-HATS", "status": "FAILED", "seconds": 31.7, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-HATS.json"}
+{"status": "FAILED", "error": "RuntimeError('Missing positive evidence: expected Kirby hat request')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-HATS", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-HATS.json"}
+{"row": "RC-SPECIAL-ordinary", "status": "PASS", "seconds": 26.1, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-ordinary.json"}
+{"row": "RC-SPECIAL-pt", "status": "PASS", "seconds": 33.6, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-pt.json"}
+{"row": "RC-SPECIAL-aegis", "status": "FAILED", "seconds": 15.7, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-aegis.json"}
+{"status": "FAILED", "error": "RuntimeError('gate pause on yoga did not pass within 15 s')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-SPECIAL-aegis", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-SPECIAL-aegis.json"}
+{"row": "RC-SPECIAL-ic", "status": "PASS", "seconds": 28.4, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-ic.json"}
+{"row": "R3-attack-visual", "status": "PASS", "seconds": 29.3, "receipt": "/home/intpa/tr-lr12-inputs/out/R3-attack-visual.json"}
+{"row": "RC-PILOT", "status": "FAILED", "seconds": 2.2, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-PILOT.json"}
+{"status": "FAILED", "error": "RuntimeError('Finite Pilot discovery did not reach selected Player row')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-PILOT", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-PILOT.json"}
+{"row": "R3-independent-pause", "status": "PASS", "seconds": 4.4, "receipt": "/home/intpa/tr-lr12-inputs/out/R3-independent-pause.json"}
+{"row": "RC-NOTICE-p1", "status": "FAILED", "seconds": 34.9, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-NOTICE-p1.json"}
+{"status": "FAILED", "error": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=1\\\\b')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-NOTICE-p1", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-NOTICE-p1.json"}
+{"row": "RC-NOTICE-cpu", "status": "FAILED", "seconds": 34.6, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-NOTICE-cpu.json"}
+{"status": "FAILED", "error": "RuntimeError('Missing positive evidence: \\\\[PreloadStatus\\\\] state=Waiting .*swap=2\\\\b')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-NOTICE-cpu", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-NOTICE-cpu.json"}
+{"row": "RC-TRIO-END-1", "status": "PASS", "seconds": 45.9, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TRIO-END-1.json"}
+{"row": "RC-TRIO-END-2", "status": "PASS", "seconds": 47.1, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TRIO-END-2.json"}
+{"row": "RC-TRIO-END-3", "status": "PASS", "seconds": 55.9, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TRIO-END-3.json"}
+{"row": "RC-TEARDOWN-1", "status": "FAILED", "seconds": 44.0, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TEARDOWN-1.json"}
+{"status": "FAILED", "error": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-TEARDOWN-1", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-TEARDOWN-1.json"}
+{"row": "RC-TEARDOWN-2", "status": "FAILED", "seconds": 54.0, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TEARDOWN-2.json"}
+{"status": "FAILED", "error": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-TEARDOWN-2", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-TEARDOWN-2.json"}
+{"row": "RC-TEARDOWN-3", "status": "FAILED", "seconds": 45.8, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-TEARDOWN-3.json"}
+{"status": "FAILED", "error": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')", "stop_input": "/home/intpa/tr-lr12-inputs/out/STOP-INPUT"}
+{"row": "recover-RC-TEARDOWN-3", "status": "PASS", "seconds": 0.1, "receipt": "/home/intpa/tr-lr12-inputs/out/recover-RC-TEARDOWN-3.json"}
+{"row": "RC-final", "status": "PASS", "seconds": 97.5, "receipt": "/home/intpa/tr-lr12-inputs/out/RC-final.json"}
+{"status": "DONE", "out": "/home/intpa/tr-lr12-inputs/out"}

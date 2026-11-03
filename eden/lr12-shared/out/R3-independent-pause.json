@@ -1,0 +1,24 @@
+{
+  "id": "R3-independent-pause",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "316b0c466e2afef3d67d3f22e9e5aba95024461dd4cf6ea38f97cb00f55e3d9b",
+  "started": 1793745348.6772745,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "begin": "643383955 #2414 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10",
+        "end": "643385822 #2423 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=115 owned_non_neutral=0 owners=0x00",
+        "resume": "643385839 #2424 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0",
+        "open": "Independent pause producer and frame-advantage positive/retirement still require specific evidence",
+        "independent_menu": "643382396 #2353 [Ui] menu opened",
+        "retirement_scope": "Menu close plus native owner begin/end/resume; scene retirement checked in TRIO rows"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745353.0975943
+}

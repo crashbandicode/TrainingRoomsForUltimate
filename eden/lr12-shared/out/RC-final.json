@@ -1,0 +1,161 @@
+{
+  "id": "RC-final",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "6f8ff34e2675208e40aa6f801bd674770a6fd6bdd200c35ca199aaacb25c4791",
+  "started": 1793745716.7186403,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "counters": {
+          "observed": [
+            "643605572 #3825 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643606190 #3829 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "643606190 #3830 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643607204 #3866 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643626338 #3958 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643626489 #3976 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643626907 #3980 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "643626907 #3981 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643629489 #3998 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+            "643629758 #4008 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+            "643630539 #4044 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643649554 #4141 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643650141 #4145 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "643650141 #4146 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643651255 #4182 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643680705 #4272 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643680725 #4276 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "643680725 #4277 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643680906 #4295 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643681758 #4298 [PreloadStatus] wiped text=Some(\"Loading 1/6\"); raised again",
+            "643681758 #4299 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643683758 #4315 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+            "643683905 #4317 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+            "643684855 #4361 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643703922 #4458 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643705339 #4492 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643724040 #4557 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+            "643724040 #4558 [PreloadStatus] raise text=\"Swap both once to load\" frames=120",
+            "643724055 #4560 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap both once to load\" color=[0, 0, 0, 255]",
+            "643725639 #4592 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643725825 #4610 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643726057 #4614 [PreloadStatus] state=Loading planned=6 ready=1 prefetched=0 failed=0 pending=4 unstarted=1 swap=2 blocked=false scheduler_blocked=false text=\"Loading 1/6\"",
+            "643726057 #4615 [PreloadStatus] wiped text=Some(\"Swap both once to load\"); raised again",
+            "643726057 #4616 [PreloadStatus] raise text=\"Loading 1/6\" frames=90",
+            "643728822 #4633 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Loading 1/6\" color=[0, 0, 0, 255]",
+            "643728958 #4641 [PreloadStatus] state=Paused planned=6 ready=1 prefetched=2 failed=0 pending=2 unstarted=1 swap=2 blocked=true scheduler_blocked=true text=\"Paused 3/6\"",
+            "643729839 #4677 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]",
+            "643748489 #4750 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text=\"Swap both once to load\"",
+            "643748489 #4751 [PreloadStatus] raise text=\"Swap both once to load\" frames=120",
+            "643748505 #4753 [TrainingRooms] notice_draw header=\"Fighters\" body=\"Swap both once to load\" color=[0, 0, 0, 255]",
+            "643750056 #4786 [TrainingRooms] notice_draw header=\"Player Character\" body=\"Player fighter applied\" color=[0, 0, 0, 255]"
+          ],
+          "open": "P1/CPU/both loading and exact ready total require full-batch review",
+          "trace_counters": {
+            "boot_error": "",
+            "file_lost": "0",
+            "output": "/home/intpa/tr-lr12-yoga-state/run-yoga/yoga.trace.jsonl",
+            "output_error": "",
+            "points": [
+              {
+                "abandoned_returns": "0",
+                "address": "0x810cf240",
+                "dropped": "0",
+                "hits": "78",
+                "id": "1",
+                "matched": "78",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "78",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x653240"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x810ce4e0",
+                "dropped": "0",
+                "hits": "196",
+                "id": "2",
+                "matched": "196",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "196",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x6524e0"
+              },
+              {
+                "abandoned_returns": "0",
+                "address": "0x822624d0",
+                "dropped": "0",
+                "hits": "302",
+                "id": "3",
+                "matched": "16",
+                "mode": "records",
+                "process_id": "81",
+                "recorded": "16",
+                "return_overflow": "0",
+                "state": "armed",
+                "target": "main+0x17e64d0"
+              }
+            ]
+          }
+        },
+        "same_boot_retries": {
+          "MII-index89": {
+            "status": "PASS",
+            "value": {
+              "first": {
+                "request": "643770840 #4904 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 10 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+                "done": "643771441 #4928 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 10 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+                "shot": "/home/intpa/tr-lr12-inputs/out/RC-final/yoga-224217Z-800389-cpu-bank-dk.png"
+              },
+              "plan": "643771442 #4930 [GroupSwap] plan owner=1 group=0 kinds=[4a] special=Mii bodies=1 ready_fighters=12 pool=5/24 reserve=6 hats=0 alias=0x11eed42700 identity=Some((1, [69, 0, 2, 37]))",
+              "ready": {
+                "request": "643774298 #4958 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 11 } outgoing=0x1 target=0x4a index=0 cursor=Some(1) mii=true",
+                "done": "643774424 #4985 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 11 } target=0x4a physical=0x4a index=1 original=false mii=true resource_pair=Some(true) released=true",
+                "shot": "/home/intpa/tr-lr12-inputs/out/RC-final/yoga-224220Z-480938-saved-mii-bank.png"
+              },
+              "matching_record_reads": 7,
+              "canonical": "4a00000000000000000000000000000000000000000000000000000000000000000000000000000002014040000000000000690501040b040303020c1305030007020b0a000b211302000d080000040a0008040a000402140000000000022577f4ac661aeaa5efa90f871dab5712",
+              "trace": {
+                "id": "4"
+              }
+            },
+            "started": 1793745716.8035014,
+            "ended": 1793745740.885517
+          },
+          "HATS-settled-helpers": {
+            "status": "FAILED",
+            "error": "RuntimeError('Missing positive evidence: \\\\[CharacterSources\\\\] ready slot=\\\\d+ kind=0x7\\\\b')",
+            "continuation": {
+              "failed": "HATS-settled-helpers",
+              "route": "training",
+              "end": "training"
+            },
+            "started": 1793745740.8862891,
+            "ended": 1793745783.819261
+          },
+          "R3-preserved-fixture": {
+            "status": "PASS",
+            "value": {
+              "media": "/home/intpa/tr-lr12-inputs/out/RC-final/tr2-jab-x4.gif",
+              "review": "pending active-frame review",
+              "pass": "643839627 #5379 [Hitbox] pass held=4 held_total=4 kept=0 spawned=4 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true",
+              "stats": "643844308 #5457 [Hitbox] stats passes=600 with_work=600 want_hit=15 want_hurt=0 kept=2 spawned=13 killed=13 ended=0 failed=0 dropped=0 held_max=4 held_now=0 sleeps=600 restores=600 commands=0 pass_ticks_avg=103 pass_ticks_max=13004 heap_allocations=0"
+            },
+            "started": 1793745783.8197806,
+            "ended": 1793745814.1971445
+          }
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745814.1980968
+}

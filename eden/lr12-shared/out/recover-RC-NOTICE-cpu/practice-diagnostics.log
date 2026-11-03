@@ -1,0 +1,83 @@
+643437833 #2715 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1814 hooks=input_caller_a_note:21614,input_caller_a_apply:92440,reset_check:9785,hazard_rule:9,reset_hub:62,cpu_frame:18514,cpu_stick_x:18514,cpu_stick_y:18514,cpu_transition_term:96796,cpu_motion_change:170,cpu_check_button_on:55217,cpu_shield_param:38923,ui_archive:258,ui_pass_calculate:122026,ui_register_calculate:166,live_replay:37028,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:18514,roster_input:21614,roster_sources:8825,roster_kirby:8825,roster_items:8825,roster_preload:8825,practice_lease:8825,state_frame:18514,recorder_ai:8520,recorder_poll:11546,named_service:28197,menu_input:11546,menu_draw:9804,menu_thumbs:9804,developer_float:31,other:95354
+643438685 #2716 [TrainingRooms] cpu_event common_params object=0x11a29ac418
+643438734 #2717 [TrioBoundary] allocation owner=0 caller=main+0x14ec2bc descriptor=(1, [58, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643438734 #2718 [TrioBoundary] allocation owner=1 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643438734 #2719 [TrioBoundary] allocation owner=2 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643438734 #2720 [TrioBoundary] allocation owner=3 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643438737 #2721 [BuildSplit] stall owner=0 gap_us=13414892 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643438737 #2722 [CharacterSources] cpu_quantity=4294967294 seen_by_service slot=0
+643438737 #2723 [BuildSplit] stall owner=1 gap_us=13414906 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643438892 #2724 [BuildSplit] stall owner=0 gap_us=138868 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643438892 #2725 [BuildSplit] stall owner=1 gap_us=138881 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643439695 #2726 [TrainingRooms] cpu_event camera_setup game=[-47.0, 130.0, 6000.0] class=Other stage=308 write=None
+643440785 #2727 [PracticeRecording] recorder_stop mode=0 =0
+643440785 #2728 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+643440973 #2729 [LayoutArchive] dumped stock info_training bytes=451604 fnv=8833748e9518a461
+643440976 #2730 [LayoutArchive] handed out info_training bytes=742292 stock=451604 base=stock load_allocations=0
+643441049 #2731 [TrainingRooms] diag_pause_menu object=0x1212459800
+643441056 #2732 [CharacterSources] cpu_quantity=1 seen_by_service slot=0
+643441189 #2733 [TrainingRooms] practice_session held=false (retired or acquired before this frame)
+643441189 #2734 [TrainingRooms] practice_session held=true
+643441189 #2735 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11eccfc000
+643441189 #2736 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643441240 #2737 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=151 owned_non_neutral=0 owners=0x00
+643441240 #2738 [TrainingRooms] hud_draw layout registrations=10
+643441240 #2739 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+643441241 #2740 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643441241 #2741 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11d18 around=[4b78, ed02, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643441244 #2742 [CharacterRoster] observed owner=0 entry=0x1218d12000 kind=0x58 epoch=1
+643441244 #2743 [CharacterRoster] observed owner=1 entry=0x1218d18000 kind=0x28 epoch=1
+643441257 #2744 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643441257 #2745 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11d18 around=[4b78, ed02, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643441274 #2746 [MiiAutoInit] catalog read queued generations=[11, 11] opening=21
+643441290 #2747 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[11, 11] opening=21
+643441290 #2748 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+643441290 #2749 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+643441293 #2750 [TrainingRooms] settings.json written by the writer thread
+643441458 #2751 [TrainingRooms] cpu_event tech_call accessor=0x120a6a2500 requested=1 role=false
+643442156 #2752 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text="Swap both once to load"
+643442156 #2753 [PreloadStatus] raise text="Swap both once to load" frames=120
+643442171 #2754 [TrainingRooms] notice_visible=true menu_open=false
+643442171 #2755 [TrainingRooms] notice_draw header="Fighters" body="Swap both once to load" color=[0, 0, 0, 255]
+643442174 #2756 [CharacterSources] install slot=2 kind=0x1c
+643442174 #2757 [TrioBoundary] reload entry=0x1218d1e000 owner=2 caller=main+0x7c280c5654 guard=0 incoming=(1, [1c, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643442990 #2758 [CharacterSources] memory slot=2 kinds=[1c] phase=helper committed=Some(2281353216)->Some(2423238656) delta=141885440 estimate=158924800 headroom=Some(1021333504)
+643442990 #2759 [CharacterSources] ready slot=2 kind=0x1c ticks=50
+643442990 #2760 [CharacterSources] install slot=3 kind=0x1
+643442990 #2761 [TrioBoundary] reload entry=0x1218d24000 owner=3 caller=main+0x7c280c5654 guard=0 incoming=(1, [1, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643443490 #2762 [CharacterSources] memory slot=3 kinds=[1] phase=helper committed=Some(2423238656)->Some(2415112192) delta=-8126464 estimate=50987008 headroom=Some(1029459968)
+643443490 #2763 [CharacterSources] ready slot=3 kind=0x1 ticks=31
+643443740 #2764 [TrioBoundary] allocation owner=7 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643443740 #2765 [GroupedHelperCapacity] creation layout=Training entry=0x11deb2a000 preserved=true before=[None, None] after=Some([None, None])
+643443740 #2766 [CharacterSources] capacity creation epoch=SceneEpoch(10) backend=Training slot=7 speculative=true qualified=true entry=0x11deb2a000 owner=0x11ec2c0500 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643444171 #2767 [TrainingRooms] notice_visible=false menu_open=false
+643444224 #2768 [CharacterSources] first capacity load stable slot=7 callbacks=30
+643444224 #2769 [CharacterSources] install slot=7 kind=0x36
+643444224 #2770 [TrioBoundary] reload entry=0x11deb2a000 owner=7 caller=main+0x7c280c5654 guard=0 incoming=(1, [36, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643444775 #2771 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 4, epoch: SceneEpoch(10) } kind=0x36 actors=Some(Actors { pointers: [11fda99280, 0, 0, 0, 0], actors: [Some(Actor { actor: 11fda99280, control: 1180e92600, partner: 0, owner: 7, cleanup_owner: 7, kind: 36, flags: [0, 1, 0], control_actor: 11fda99280, input_index: 7, binding: 11e0f62190, alias_index: 7, partner_control: 0 }), None, None] })
+643444775 #2772 [CharacterSources] memory slot=7 kinds=[36] phase=helper committed=Some(2415308800)->Some(2474618880) delta=59310080 estimate=63897600 headroom=Some(969953280)
+643444775 #2773 [CharacterSources] ready slot=7 kind=0x36 ticks=33
+643445008 #2774 [TrioBoundary] allocation owner=6 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643445008 #2775 [GroupedHelperCapacity] creation layout=Training entry=0x121c9c0000 preserved=true before=[None, None] after=Some([None, None])
+643445008 #2776 [CharacterSources] capacity creation epoch=SceneEpoch(10) backend=Training slot=6 speculative=true qualified=true entry=0x121c9c0000 owner=0x11ec2c1e00 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643445108 #2777 [PreloadStatus] delivered text=Some("Swap both once to load")
+643445489 #2778 [CharacterSources] first capacity load stable slot=6 callbacks=30
+643445489 #2779 [CharacterSources] install slot=6 kind=0x28
+643445489 #2780 [TrioBoundary] reload entry=0x121c9c0000 owner=6 caller=main+0x7c280c5654 guard=0 incoming=(1, [28, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643445741 #2781 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 6, entry: NativeEntry(77789396992), generation: 4, epoch: SceneEpoch(10) } kind=0x28 actors=Some(Actors { pointers: [1180f23e00, 0, 0, 0, 0], actors: [Some(Actor { actor: 1180f23e00, control: 1180e93400, partner: 0, owner: 6, cleanup_owner: 6, kind: 28, flags: [0, 1, 0], control_actor: 1180f23e00, input_index: 6, binding: 11e0f61f10, alias_index: 6, partner_control: 0 }), None, None] })
+643445741 #2782 [CharacterSources] memory slot=6 kinds=[28] phase=helper committed=Some(2473046016)->Some(2479796224) delta=6750208 estimate=72613888 headroom=Some(964775936)
+643445741 #2783 [CharacterSources] ready slot=6 kind=0x28 ticks=15
+643445975 #2784 [TrioBoundary] allocation owner=5 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643445975 #2785 [GroupedHelperCapacity] creation layout=Training entry=0x121c9c6000 preserved=true before=[None, None] after=Some([None, None])
+643445975 #2786 [CharacterSources] capacity creation epoch=SceneEpoch(10) backend=Training slot=5 speculative=true qualified=true entry=0x121c9c6000 owner=0x11ec2c3700 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643445977 #2787 [LayoutArchive] released info_training bytes=742292 after=5001ms
+643446456 #2788 [CharacterSources] first capacity load stable slot=5 callbacks=30
+643446456 #2789 [CharacterSources] install slot=5 kind=0x8
+643446456 #2790 [TrioBoundary] reload entry=0x121c9c6000 owner=5 caller=main+0x7c280c5654 guard=0 incoming=(1, [8, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643446890 #2791 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 5, entry: NativeEntry(77789421568), generation: 3, epoch: SceneEpoch(10) } kind=0x8 actors=Some(Actors { pointers: [1180f23f80, 0, 0, 0, 0], actors: [Some(Actor { actor: 1180f23f80, control: 1180e95000, partner: 0, owner: 5, cleanup_owner: 5, kind: 8, flags: [0, 1, 0], control_actor: 1180f23f80, input_index: 5, binding: 11e0f61c90, alias_index: 5, partner_control: 0 }), None, None] })
+643446890 #2792 [CharacterSources] memory slot=5 kinds=[8] phase=helper committed=Some(2479796224)->Some(2534322176) delta=54525952 estimate=60358656 headroom=Some(910249984)
+643446890 #2793 [CharacterSources] ready slot=5 kind=0x8 ticks=26
+643447073 #2794 [TrainingRooms] state_hook_counts frames=600 param=3 quake=0 sound=2 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+643448084 #2795 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=35329 hooks=input_caller_a_note:22600,input_caller_a_apply:97000,reset_check:10201,hazard_rule:10,reset_hub:64,cpu_frame:19356,cpu_stick_x:19356,cpu_stick_y:19356,cpu_transition_term:101008,cpu_motion_change:174,cpu_check_button_on:57749,cpu_shield_param:40613,ui_archive:281,ui_pass_calculate:126063,ui_register_calculate:176,live_replay:38712,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:19356,roster_input:22600,roster_sources:9246,roster_kirby:9246,roster_items:9246,roster_preload:9246,practice_lease:9246,state_frame:19356,recorder_ai:8936,recorder_poll:12115,named_service:29460,menu_input:12115,menu_draw:10215,menu_thumbs:10215,developer_float:31,other:99586
+643449224 #2796 [TrainingRooms] input_hook_counts p1_poll=898 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+643449641 #2797 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6002 motion_change=5 quake_pos=0 command_flag=4808 air_kind=0 stick_dir=0 heap_allocations=0

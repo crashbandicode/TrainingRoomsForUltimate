@@ -1,0 +1,35 @@
+{
+  "id": "RC-SPECIAL-ic",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+  "started": 1793745288.5274348,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "ordinary_async": {
+          "request": "643347457 #1944 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 27 } outgoing=0x2e target=0x2d index=0 mii=false",
+          "build": "643347473 #1951 [GroupSwap] build owner=0 group=1 mode=async queued=3 control=0x1180ceb680 setup_us=70 us=70; the control init runs on the task worker, then the bodies are queued (native states 8-10)",
+          "built": "643348173 #1957 [GroupSwap] built owner=0 group=1 ok=true us=699178 installed=3 pool_live=6->9 bodies=Some([Body { address: 76926900304, id: 393216 }, Body { address: 76926964112, id: 458752 }, Body { address: 76927027920, id: 524288 }]) map=7 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([1180273b28, 11f4e4bdc8]) mii_setup=None mode=async setup_us=70 queued_us=16780 settled_us=[165587, 273362, 699134] ticks=45 max_tick_gap_us=20004",
+          "done": "643348207 #1972 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 27 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-ic/yoga-223514Z-849744-ordinary-async.png"
+        },
+        "plan": "643343442 #1878 [GroupSwap] plan owner=0 group=0 kinds=[4b, 4c] special=Pair bodies=2 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x120cd93200 identity=None",
+        "prefetch": "643346540 #1919 [GroupSwap] prefetched owner=0 group=0 kinds=[4b, 4c] us=283503 INSTALL_released=true map=4 tree=5",
+        "sync": "643349642 #2025 [GroupSwap] build owner=0 group=0 kinds=[4b, 4c] special=Pair actors=2 R=0x120cd93200 flags=0x0->0x1 refs=0->2 map=4 task_pending=0 pool_live=9 records=Some([0, 0, 0]) dispatch_detached=Some([1180273b28, 11f4e4bdc8]) identity=None mode=sync reason=pair group",
+        "built": "643349947 #2031 [GroupSwap] built owner=0 group=0 ok=true us=304464 installed=2 pool_live=9->11 bodies=Some([Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }]) map=0 flags=0x0 refs=0 entry_flags=0x6 records=[0, 0, 0] dispatch=Some([11ed7d1e08, 11f4f98568]) mii_setup=None mode=sync setup_us=0 queued_us=0 settled_us=[0, 0, 0] ticks=0 max_tick_gap_us=17299",
+        "ready": {
+          "request": "643349624 #2020 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } outgoing=0x1c target=0x4b index=0 mii=false",
+          "done": "643349984 #2048 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } target=0x4b physical=0x4b index=0 original=false mii=false resource_pair=None released=true",
+          "shot": "/home/intpa/tr-lr12-inputs/out/RC-SPECIAL-ic/yoga-223516Z-096430-special-ic.png"
+        },
+        "remaining": "Form switching/partner behavior is only covered if shown in retained frames"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745316.8971488
+}

@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "value": {
+    "media": "/home/intpa/tr-lr12-inputs/out/RC-final/tr2-jab-x4.gif",
+    "review": "pending active-frame review",
+    "pass": "643839627 #5379 [Hitbox] pass held=4 held_total=4 kept=0 spawned=4 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true",
+    "stats": "643844308 #5457 [Hitbox] stats passes=600 with_work=600 want_hit=15 want_hurt=0 kept=2 spawned=13 killed=13 ended=0 failed=0 dropped=0 held_max=4 held_now=0 sleeps=600 restores=600 commands=0 pass_ticks_avg=103 pass_ticks_max=13004 heap_allocations=0"
+  },
+  "started": 1793745783.8197806,
+  "ended": 1793745814.1971445
+}

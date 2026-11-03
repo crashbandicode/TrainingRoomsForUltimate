@@ -1,0 +1,11 @@
+{
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[CharacterSources\\\\] ready slot=\\\\d+ kind=0x7\\\\b')",
+  "continuation": {
+    "failed": "HATS-settled-helpers",
+    "route": "training",
+    "end": "training"
+  },
+  "started": 1793745740.8862891,
+  "ended": 1793745783.819261
+}

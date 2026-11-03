@@ -1,0 +1,12 @@
+{
+  "id": "RC-PILOT",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+  "started": 1793745346.2347333,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Finite Pilot discovery did not reach selected Player row')",
+  "ended": 1793745348.4063866
+}

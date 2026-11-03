@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-TEARDOWN-2",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "f1a17728a1efb1c6d98225f43eafc829aac2f729c9578ad972c899f2567ffafe",
+  "started": 1793745670.5958583,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-TEARDOWN-2",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745670.667526
+}

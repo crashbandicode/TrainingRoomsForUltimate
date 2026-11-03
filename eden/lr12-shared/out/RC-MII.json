@@ -1,0 +1,12 @@
+{
+  "id": "RC-MII",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+  "started": 1793745114.201184,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Current fixture has no planned group for role=1 target=0x4a')",
+  "ended": 1793745154.3693411
+}

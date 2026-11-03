@@ -1,0 +1,12 @@
+{
+  "id": "RC-TEARDOWN-1",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+  "started": 1793745572.0767415,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Native quit completed after settlement; no pending destruction/drain; continuation observed')",
+  "ended": 1793745616.0582228
+}

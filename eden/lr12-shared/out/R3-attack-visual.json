@@ -1,0 +1,22 @@
+{
+  "id": "R3-attack-visual",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+  "started": 1793745316.8977966,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "media": "/home/intpa/tr-lr12-inputs/out/R3-attack-visual/tr2-jab-x4.gif",
+        "review": "pending active-frame review",
+        "pass": "643371986 #2213 [Hitbox] pass held=4 held_total=4 kept=0 spawned=4 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true",
+        "stats": "643376324 #2290 [Hitbox] stats passes=600 with_work=600 want_hit=16 want_hurt=0 kept=8 spawned=8 killed=8 ended=0 failed=0 dropped=0 held_max=4 held_now=0 sleeps=600 restores=600 commands=0 pass_ticks_avg=278 pass_ticks_max=56043 heap_allocations=0"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745346.2339554
+}

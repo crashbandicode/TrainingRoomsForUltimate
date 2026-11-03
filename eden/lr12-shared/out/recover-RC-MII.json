@@ -1,0 +1,21 @@
+{
+  "id": "recover-RC-MII",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7796e62534444790630d489e42c3991322af728626d4af6c9773b68ab34a2b24",
+  "started": 1793745154.5460145,
+  "results": [
+    {
+      "run": "steps.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "failed": "RC-MII",
+        "route": "training",
+        "end": "training"
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793745154.6121607
+}

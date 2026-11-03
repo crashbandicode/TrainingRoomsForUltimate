@@ -1,0 +1,721 @@
+643348973 #1994 [TrainingRooms] chords_passed bits=0x20
+643348973 #1995 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+643348974 #1996 [BodyBank] reuse owner=0 from=1 to=2 kind=0x1c
+643348974 #1997 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } outgoing=0x2c target=0x1c index=0 mii=false
+643348974 #1998 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643348976 #1999 [Ui] menu session cleared
+643348988 #2000 [TrainingRooms] notice_visible=false menu_open=false
+643349026 #2001 [BodyBank] ready owner=0 index=2 kind=0x1c previous=Changing bodies=[Body { address: 76926900304, id: 393216 }, Body { address: 76926964112, id: 458752 }, Body { address: 76927027920, id: 524288 }]
+643349026 #2002 [BodyBank] identity_view owner=0 reason=ready R=0x120cd93200 header=[2d, 2c, 1c] costume=0 region=1 published=0x10018000000300010000000 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:5:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643349027 #2003 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643349027 #2004 [CharacterRoster] HUD refresh owner=0 kind=0x1c delivered=1 listeners=1
+643349027 #2005 [Hud] readback owner=0 kind=0x1c exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643349027 #2006 [PreloadGrace] extend generation=16 us=643349027061 deadline_us=643351027061
+643349027 #2007 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643349027 #2008 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 29 } target=0x1c physical=0x2d index=0 original=false mii=false resource_pair=None released=true
+643349039 #2009 [TrainingRooms] notice_visible=true menu_open=false
+643349039 #2010 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643349040 #2011 [TrainingRooms] settings.json written by the writer thread
+643349192 #2012 [PreloadStatus] state=Waiting planned=9 ready=5 prefetched=3 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text="Loaded 8/9 · swap the CPU to load 1 more"
+643349192 #2013 [PreloadStatus] wiped text=Some("Loading 7/9"); raised again
+643349192 #2014 [PreloadStatus] raise text="Loaded 8/9 · swap the CPU to load 1 more" frames=120
+643349623 #2015 [TrainingRooms] chords_passed bits=0x20
+643349623 #2016 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+643349624 #2017 [Ledger] release owner=0 kind=0x58 calls=[58] reason=pair build needs an exclusive reset batch
+643349624 #2018 [GroupSwap] keys returned owner=0 group=2 kinds=[58] released=1 kept=0 reason=pair build needs an exclusive reset batch; replanned map=4
+643349624 #2019 [GroupSwap] request owner=0 kind=0x4b group=0 member=0 via=0 from=2 state=Prefetched form=pair
+643349624 #2020 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } outgoing=0x1c target=0x4b index=0 mii=false
+643349625 #2021 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643349626 #2022 [Ui] menu session cleared
+643349638 #2023 [TrainingRooms] notice_visible=false menu_open=false
+643349642 #2024 [GroupSwap] detach owner=0 group=0 kinds=[2d, 2c, 1c] bodies=[Body { address: 76926900304, id: 393216 }, Body { address: 76926964112, id: 458752 }, Body { address: 76927027920, id: 524288 }]
+643349642 #2025 [GroupSwap] build owner=0 group=0 kinds=[4b, 4c] special=Pair actors=2 R=0x120cd93200 flags=0x0->0x1 refs=0->2 map=4 task_pending=0 pool_live=9 records=Some([0, 0, 0]) dispatch_detached=Some([1180273b28, 11f4e4bdc8]) identity=None mode=sync reason=pair group
+643349642 #2026 [Registry] build owner=0 from=[2d, 2c, 1c] to=[4b, 4c] header=[4b, 4c, ffffffff] cells=[(0, ffffffff), (0, ffffffff), (0, ffffffff)] r4c=0x1 task_pending=0
+643349642 #2027 [IcPair] construct owner=0 entry=0x12172e6000 flags=0x6 native_flags_before=0x2
+643349643 #2028 [IcPair] N1 owner=0 entry=0x12172e6000 nana_prev=popo_ctx 0x1180f24300
+643349947 #2029 [GroupSwap] memory owner=0 group=0 kinds=[4b, 4c] phase=build committed=Some(2821042176)->Some(2834870272) delta=13828096 estimate=212729856 headroom=Some(609701888)
+643349947 #2030 [RequestBit] end owner=0 group=0 how=ResetRan before=0x0 built=0x0 after=0x0 map=0 task_pending=0 constructed=true
+643349947 #2031 [GroupSwap] built owner=0 group=0 ok=true us=304464 installed=2 pool_live=9->11 bodies=Some([Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }]) map=0 flags=0x0 refs=0 entry_flags=0x6 records=[0, 0, 0] dispatch=Some([11ed7d1e08, 11f4f98568]) mii_setup=None mode=sync setup_us=0 queued_us=0 settled_us=[0, 0, 0] ticks=0 max_tick_gap_us=17299
+643349947 #2032 [GroupSwap] acknowledged owner=0 group=0 member=0 previous=0 us=304464
+643349947 #2033 [GroupSwap] body-event listeners at acknowledgement event=0x1e listeners=1 vtables=[5075770]
+643349947 #2034 [Ledger] reconcile owner=0 phase=build map=0 task_pending=0 predicted=[] actual=[] residual=[] missing=[]
+643349947 #2035 [BuildSplit] stall owner=1 gap_us=322517 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+643349956 #2036 [BuildSplit] stall owner=0 gap_us=315058 loader=13 outer=3 installed=2 changing=1 count=2 kinds=[4b, 4c] flags=0x6
+643349967 #2037 [IcPair] N2 activate pair owner=0 status=0x0 flags 0x6->2->6 popo_ctx=0x1180f24300 nana_ctx=0x1180f24380 +0x4178=0x1180f24300 +0x4180=0x1180f24380 states=[Some(4),Some(4)]
+643349984 #2038 [BodyBank] ready owner=0 index=0 kind=0x4b previous=Changing bodies=[Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }]
+643349984 #2039 [BodyBank] identity_view owner=0 reason=ready R=0x120cd93200 header=[4b, 4c, ffffffff] costume=0 region=1 published=0x10018000000300010000000 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:5:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643349984 #2040 [GroupSwap] swap owner=0 kind=0x4b request_to_ready_us=359985 bodies=[Body { address: 76927091728, id: 589824 }, Body { address: 76927155536, id: 655360 }, Body { address: 0, id: 0 }] max_tick_gap_us=315069 ticks=3
+643349984 #2041 [BuildSplit] gaps owner=0 kind=0x4b ticks=3 top=[t2:315069:setup, t3:27566:poll, t1:17300:poll]
+643349984 #2042 [MiiOrdinaryPlayer] [GroupSwap] adapter rebaseline owner=0 descriptor/header/body proof passed
+643349984 #2043 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643349984 #2044 [CharacterRoster] HUD refresh owner=0 kind=0x4b delivered=1 listeners=1
+643349984 #2045 [Hud] readback owner=0 kind=0x4b exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643349984 #2046 [PreloadGrace] extend generation=16 us=643349984689 deadline_us=643351984689
+643349984 #2047 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643349984 #2048 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 8, entry: 77698326528, sequence: 30 } target=0x4b physical=0x4b index=0 original=false mii=false resource_pair=None released=true
+643349991 #2049 [TrainingRooms] notice_visible=true menu_open=false
+643349991 #2050 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643349995 #2051 [PreloadGrace] speculative-admission-deferred generation=16 us=643349995516 deadline_us=643351984689
+643350060 #2052 [TrainingRooms] settings.json written by the writer thread
+643350509 #2053 [PreloadStatus] state=Loading planned=10 ready=6 prefetched=0 failed=0 pending=1 unstarted=3 swap=3 blocked=false scheduler_blocked=false text="Loading 6/10"
+643350509 #2054 [PreloadStatus] wiped text=Some("Loaded 8/9 · swap the CPU to load 1 more"); raised again
+643350509 #2055 [PreloadStatus] raise text="Loading 6/10" frames=90
+643350731 #2056 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+643350746 #2057 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643350746 #2058 [CharacterRoster] settings role=Player size=5 kinds=[b, 1f, 2e, 2d, 2c]
+643350746 #2059 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(0))
+643350746 #2060 [MiiOrdinaryCpu] request accepted selection=Direct(TrioFighter(0)) user=true install_active=false
+643350757 #2061 [Ledger] acquire owner=0 kind=0x58 keys=[e70, e71, e76] holder=Prefetch(GroupId(2)) recipe=ConstructionTail batch=4 issued=true
+643350757 #2062 [GroupSwap] prefetch owner=0 group=2 kinds=[58] R=0x120cd93200 map=3 flags=0x0 task_pending=0 pool=11/24 headroom=609701888 INSTALL(resource) outstanding=0 need=92422144
+643350757 #2063 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((14, 0)), refresh_partners: false } on="INSTALL held" install_holder(slot,kind,ticks,speculative)=None
+643350757 #2064 [PreloadStatus] state=Paused planned=10 ready=6 prefetched=0 failed=0 pending=1 unstarted=3 swap=3 blocked=true scheduler_blocked=true text="Paused 6/10"
+643350938 #2065 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643350938 #2066 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643350940 #2067 [GroupSwap] prefetched owner=0 group=2 kinds=[58] us=184026 INSTALL_released=true map=3 tree=9
+643350940 #2068 [GroupSwap] memory owner=0 group=2 kinds=[58] phase=prefetch committed=Some(2834870272)->Some(2810949632) delta=-23920640 estimate=40108032 headroom=Some(633622528)
+643350940 #2069 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((14, 0)), refresh_partners: false } on="menu captures input" install_holder(slot,kind,ticks,speculative)=None
+643351058 #2070 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1132 stick_y=1132 clatter_start=0 transition_term=5795 motion_change=13 quake_pos=0 command_flag=4560 air_kind=0 stick_dir=0 heap_allocations=0
+643352924 #2071 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((14, 0)), refresh_partners: false } on="match not at ready-go" install_holder(slot,kind,ticks,speculative)=None
+643352971 #2072 [TrainingRooms] notice_visible=false menu_open=false
+643353325 #2073 [IcPair] teardown owner=0 reason=finalize flags=0x6 contexts=[0x1180f24300,0x1180f24380,0x0] aliases=[0x1180f24300,0x1180f24380]
+643353325 #2074 [Destroy] plan owner=0 reason=finalize steps=2 routes_cleared=2 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353325 #2075 [GroupSwap] pad route released owner=0 reason=finalize contexts=2 cleared=2
+643353641 #2076 [Ledger] release owner=0 kind=0x58 calls=[58] reason=finalize
+643353641 #2077 [Destroy] plan owner=0 reason=finalize steps=15 routes_cleared=0 attached=None routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=6 contexts=6 skipped=0
+643353641 #2078 [Registry] teardown owner=0 reason=finalize window=[4b, 4c] detached=[[2d, 2c, 1c], [b, 1f, 2e]] cells=[(0, 4b), (0, ffffffff), (0, ffffffff)]->[(0, ffffffff), (0, ffffffff), (0, ffffffff)]->[(0, 4b), (0, ffffffff), (0, ffffffff)] header=[4b, 4c, ffffffff] r4c=0x0 task_pending=0
+643353641 #2079 [GroupSwap] teardown owner=0 reason=finalize groups=3 bodies=6 contexts=6 routes=0 dispatchers=2 records=0 keys=1 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 5))
+643353641 #2080 [Ledger] reconcile owner=0 phase=finalize map=0 task_pending=0 predicted=[] actual=[] residual=[] missing=[]
+643353717 #2081 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=147 owned_non_neutral=0 owners=0x00
+643353717 #2082 [MiiSavedAlpha] destroyed owner=0 entry=0x12172e6000 cleanup_writes=false
+643353717 #2083 [CharacterRoster] invalidated observed entry before destruction owner=0 entry=0x12172e6000
+643353717 #2084 [CharacterRoster] practice consumers invalidated on P1 entry destruction
+643353717 #2085 [TrioBoundary] destroy entry=0x12172e6000 owner=0 active=(2, [4b, 4c, ffffffff], 2, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643353717 #2086 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353717 #2087 [Destroy] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353717 #2088 [GroupSwap] pad route released owner=1 reason=finalize contexts=1 cleared=1
+643353743 #2089 [MiiSavedAlpha] destroyed owner=1 entry=0x12172ec000 cleanup_writes=false
+643353743 #2090 [CharacterRoster] invalidated observed entry before destruction owner=1 entry=0x12172ec000
+643353743 #2091 [TrioBoundary] destroy entry=0x12172ec000 owner=1 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643353743 #2092 [Destroy] plan owner=1 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353743 #2093 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353749 #2094 [Ui] menu session cleared
+643353787 #2095 [CharacterSources] destroyed slot=2 tracked_leases=0
+643353787 #2096 [TrioBoundary] destroy entry=0x12172f2000 owner=2 active=(1, [4a, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643353787 #2097 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353787 #2098 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353831 #2099 [TrioBoundary] destroy entry=0x12172f8000 owner=3 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643353831 #2100 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643353862 #2101 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643355062 #2102 [NamedMacroDiag] stall frames=7315 step=0
+643356896 #2103 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=33798 hooks=input_caller_a_note:16348,input_caller_a_apply:70152,reset_check:7368,hazard_rule:7,reset_hub:50,cpu_frame:13818,cpu_stick_x:13818,cpu_stick_y:13818,cpu_transition_term:70718,cpu_motion_change:129,cpu_check_button_on:41544,cpu_shield_param:29847,ui_archive:206,ui_pass_calculate:93782,ui_register_calculate:133,live_replay:27636,hitbox_frame:13818,roster_input:16348,roster_sources:6497,roster_kirby:6497,roster_items:6497,roster_preload:6497,practice_lease:6497,state_frame:13818,recorder_ai:6451,recorder_poll:8762,named_service:21133,menu_input:8762,menu_draw:7385,menu_thumbs:7385,developer_float:31,other:71517
+643366587 #2104 [TrainingRooms] cpu_event common_params object=0x11cdc1bc18
+643366657 #2105 [TrioBoundary] allocation owner=0 caller=main+0x14ec2bc descriptor=(1, [58, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643366657 #2106 [TrioBoundary] allocation owner=1 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643366657 #2107 [TrioBoundary] allocation owner=2 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643366657 #2108 [TrioBoundary] allocation owner=3 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643366659 #2109 [BuildSplit] stall owner=0 gap_us=13369500 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643366659 #2110 [CharacterSources] cpu_quantity=4294967294 seen_by_service slot=0
+643366659 #2111 [BuildSplit] stall owner=1 gap_us=13369492 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643366805 #2112 [BuildSplit] stall owner=0 gap_us=133278 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643366805 #2113 [BuildSplit] stall owner=1 gap_us=133292 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643367040 #2114 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1963 hooks=input_caller_a_note:16371,input_caller_a_apply:70344,reset_check:7368,hazard_rule:8,reset_hub:50,cpu_frame:13818,cpu_stick_x:13818,cpu_stick_y:13818,cpu_transition_term:70718,cpu_motion_change:129,cpu_check_button_on:41544,cpu_shield_param:29847,ui_archive:208,ui_pass_calculate:95453,ui_register_calculate:135,live_replay:27636,hitbox_frame:13818,roster_input:16371,roster_sources:6497,roster_kirby:6497,roster_items:6497,roster_preload:6497,practice_lease:6497,state_frame:13818,recorder_ai:6451,recorder_poll:8785,named_service:21133,menu_input:8785,menu_draw:7385,menu_thumbs:7385,developer_float:31,other:71520
+643367545 #2115 [TrainingRooms] cpu_event camera_setup game=[-47.0, 130.0, 6000.0] class=Other stage=308 write=None
+643368631 #2116 [PracticeRecording] recorder_stop mode=0 =0
+643368631 #2117 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+643368820 #2118 [LayoutArchive] dumped stock info_training bytes=451604 fnv=8833748e9518a461
+643368823 #2119 [LayoutArchive] handed out info_training bytes=742292 stock=451604 base=stock load_allocations=0
+643368888 #2120 [TrainingRooms] diag_pause_menu object=0x11f4787800
+643368890 #2121 [CharacterSources] cpu_quantity=1 seen_by_service slot=0
+643369023 #2122 [TrainingRooms] practice_session held=false (retired or acquired before this frame)
+643369023 #2123 [TrainingRooms] practice_session held=true
+643369023 #2124 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11fdff0a40
+643369023 #2125 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643369072 #2126 [Q15UiContext] registration=true ordinal=8 name=info_training thread=0x892c3088 sp=0x1089500df0 layout=0x1209e02f00 holder=0x11ff3d0a00 draw_info=0x11ff3d0a50
+643369072 #2127 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=146 owned_non_neutral=0 owners=0x00
+643369072 #2128 [TrainingRooms] hud_draw layout registrations=8
+643369072 #2129 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+643369073 #2130 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643369073 #2131 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11cf0 around=[0e78, ff3d, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643369076 #2132 [CharacterRoster] observed owner=0 entry=0x121e6ec000 kind=0x58 epoch=1
+643369076 #2133 [CharacterRoster] observed owner=1 entry=0x121e6f2000 kind=0x28 epoch=1
+643369089 #2134 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643369089 #2135 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11cf0 around=[0e78, ff3d, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643369124 #2136 [MiiAutoInit] catalog read queued generations=[9, 9] opening=16
+643369140 #2137 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[9, 9] opening=16
+643369140 #2138 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+643369140 #2139 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+643369166 #2140 [TrainingRooms] settings.json written by the writer thread
+643369293 #2141 [TrainingRooms] cpu_event tech_call accessor=0x11e65ac5c0 requested=1 role=false
+643369590 #2142 [TrainingRooms] chords_passed bits=0x20
+643369590 #2143 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+643369590 #2144 [BodyBank] layout owner=0 target=0xb cells=[b, 1f] active=0 form=single
+643369590 #2145 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 31 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false
+643369590 #2146 [Destroy] plan owner=0 reason=mod reload steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643369590 #2147 [GroupSwap] pad route released owner=0 reason=mod reload contexts=1 cleared=1
+643369590 #2148 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643369590 #2149 [BodyBank] build owner=0 entry=0x121e6ec000 members=Members { kinds: [11, 31, 4294967295], count: 2, pair_lead: false, special: None }
+643369590 #2150 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643369590 #2151 [TrioBoundary] reload entry=0x121e6ec000 owner=0 caller=main+0x7c2808e4f4 guard=0 incoming=(2, [b, 1f, ffffffff], 1, 0) active=(1, [58, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=6 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643369594 #2152 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643369595 #2153 [Ui] menu session cleared
+643369774 #2154 [MiiOrdinaryPlayer] published ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 31 } target=0xb O=0x122fa5da00 index=0 retained_same_class_O=false native_resources_untouched=true
+643369775 #2155 [Ledger] acquire owner=0 kind=0x1f keys=[516, 51c] holder=Build(GroupId(255)) recipe=ConstructionTail batch=1 issued=true
+643369775 #2156 [BodyBank] resource owner=0 alias=0x122fa5da00 supplemental=[1f] native=[b] flags r48=0 r7d=0 r7f=0
+643370556 #2157 [BodyBank] ready owner=0 index=0 kind=0xb previous=Building bodies=[Body { address: 77275729168, id: 1 }, Body { address: 77275984400, id: 262144 }, Body { address: 0, id: 0 }]
+643370556 #2158 [BodyBank] identity_view owner=0 reason=ready R=0x122fa5da00 header=[b, 1f, ffffffff] costume=0 region=1 published=0x0 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643370556 #2159 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643370556 #2160 [CharacterRoster] HUD refresh owner=0 kind=0xb delivered=1 listeners=1
+643370556 #2161 [Hud] readback owner=0 kind=0xb exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643370556 #2162 [PreloadGrace] start generation=19 us=643370556730 deadline_us=643372556730
+643370556 #2163 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 31 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643370556 #2164 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 31 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false
+643370571 #2165 [TrainingRooms] notice_visible=true menu_open=false
+643370571 #2166 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643370588 #2167 [TrainingRooms] settings.json written by the writer thread
+643370780 #2168 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+643370781 #2169 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643370782 #2170 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(0))
+643370782 #2171 [MiiOrdinaryCpu] request accepted selection=Direct(TrioFighter(0)) user=true install_active=false
+643370793 #2172 [BodyBank] layout owner=0 target=0x0 cells=[0, b] active=0 form=single
+643370793 #2173 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 32 } outgoing=0xb target=0x0 index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false
+643370793 #2174 [Destroy] plan owner=0 reason=mod reload steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643370793 #2175 [GroupSwap] pad route released owner=0 reason=mod reload contexts=2 cleared=1
+643370793 #2176 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643370793 #2177 [BodyBank] build owner=0 entry=0x121e6ec000 members=Members { kinds: [0, 11, 4294967295], count: 2, pair_lead: false, special: None }
+643370793 #2178 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643370793 #2179 [TrioBoundary] reload entry=0x121e6ec000 owner=0 caller=main+0x7c2808e4f4 guard=0 incoming=(2, [0, b, ffffffff], 1, 0) active=(2, [b, 1f, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=6 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643370799 #2180 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((16, 0)), refresh_partners: false } on="INSTALL held" install_holder(slot,kind,ticks,speculative)=None
+643370799 #2181 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643370802 #2182 [Ui] menu session cleared
+643370806 #2183 [TrainingRooms] notice_visible=false menu_open=false
+643370976 #2184 [MiiOrdinaryPlayer] published ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 32 } target=0x0 O=0x122fa5da00 index=0 retained_same_class_O=false native_resources_untouched=true
+643370977 #2185 [Ledger] acquire owner=0 kind=0xb keys=[1ce, 1cf, 1d4] holder=Build(GroupId(255)) recipe=ConstructionTail batch=1 issued=true
+643370977 #2186 [BodyBank] resource owner=0 alias=0x122fa5da00 supplemental=[b] native=[0] flags r48=0 r7d=0 r7f=0
+643371657 #2187 [TrainingRooms] input_hook_counts p1_poll=898 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+643371690 #2188 [BodyBank] ready owner=0 index=0 kind=0x0 previous=Building bodies=[Body { address: 77275984400, id: 262145 }, Body { address: 77275729168, id: 2 }, Body { address: 0, id: 0 }]
+643371690 #2189 [BodyBank] identity_view owner=0 reason=ready R=0x122fa5da00 header=[0, b, ffffffff] costume=0 region=1 published=0x0 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643371691 #2190 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643371691 #2191 [CharacterRoster] HUD refresh owner=0 kind=0x0 delivered=1 listeners=1
+643371691 #2192 [Hud] readback owner=0 kind=0x0 exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643371691 #2193 [PreloadGrace] extend generation=19 us=643371691055 deadline_us=643373691055
+643371691 #2194 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 32 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643371691 #2195 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 32 } target=0x0 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false
+643371691 #2196 [BodyBank] layout owner=1 target=0x0 cells=[0, 1] active=0 form=single
+643371691 #2197 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } outgoing=0x28 target=0x0 index=0 cursor=None resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false
+643371691 #2198 [MiiOrdinaryCpu] staged ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } bank_build=true descriptor=[00, 00, 00, 00, 01, 00, 00, 00, 09, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 02, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, ff, ff, ff, ff, 00, 00, 00, 00, 01, 00, 00, 00, 01, 00, 00, 00, 01, 00, 00, 00, 01, 01, 01, 64, cf, 00, 90, 7f, 04, 00, 00, 00, ff, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 01, 00, 00, 00, 00, 60, 00, 09, 0b, 12, 00, 00, 00, 30, 17, d4, 85, 00, 00, 00, 00, 08, ee, 45, ae, 11, 00, 00, 00]
+643371691 #2199 [Destroy] plan owner=1 reason=mod reload steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643371691 #2200 [GroupSwap] pad route released owner=1 reason=mod reload contexts=1 cleared=1
+643371691 #2201 [Destroy] plan owner=1 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643371691 #2202 [BodyBank] build owner=1 entry=0x121e6f2000 members=Members { kinds: [0, 1, 4294967295], count: 2, pair_lead: false, special: None }
+643371691 #2203 [Destroy] plan owner=1 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643371691 #2204 [TrioBoundary] reload entry=0x121e6f2000 owner=1 caller=main+0x7c2808e4f4 guard=0 incoming=(2, [0, 1, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=6 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643371695 #2205 [Ui] menu session cleared
+643371705 #2206 [TrainingRooms] notice_visible=true menu_open=false
+643371705 #2207 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643371790 #2208 [MiiOrdinaryCpu] prequeue ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } selected=0x11eed6d400 initialized=false header=[1, 28, ffffffff, ffffffff, 0] Oindex=0 Otokens=[0, 0, 0, 0] task=0x0 outstanding=Some(0) Dindex=0 rebuild=0 current=Snapshot { layout: Training, helpers: View { layout: Training, epoch: Some(SceneEpoch(8)), slots: [Unmanaged, Unmanaged], miis: [None, None], created_slots: [Unmanaged, Unmanaged, Unmanaged, Unmanaged], created_miis: [None, None, None, None] }, created: None, extras: Extras { layout: Training, entries: [0, 0, 0, 0], roots: [None, None, None, None] }, binding: Binding { epoch: 9, owner: 1, entry: 77820010496, row: 2245269904, holder: 76555933072, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 1 }, thread: 2301374600, original_kind: 40, descriptor: [0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 100, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 8, 238, 69, 174, 17, 0, 0, 0], header: [1, 40, 4294967295, 4294967295, 0], scalars: Scalars { e: Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0, 0, 0, 0] }, d_outfit: 0, d_colour: 0, d_specials: [0, 0, 0, 0] }, index: 0, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current_record: [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 0, 0, 1], symbol: 2245219576, manager: 76555932768, internal: 75180418048, entries: [77819985920, 77820010496, 77820035072, 77820059648, 0, 0, 0, 0], owners: [Some(Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }), Some(Owner { entry: 77820010496, row: 2245269904, information: 77820010768, object: 77021500416, index: 0, selector: 1, alias: 0 }), Some(Owner { entry: 77820035072, row: 2245270512, information: 77820035344, object: 77021502976, index: 0, selector: 2, alias: 0 }), Some(Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }), None, None, None, None], protected: [Some(Protected { owner: Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }, descriptor: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 184, 237, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [0, 0, 0, 255, 0, 0, 0] }), None, Some(Protected { owner: Owner { entry: 77820035072, row: 2245270512, information: 77820035344, object: 77021502976, index: 0, selector: 2, alias: 0 }, descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 248, 238, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 1, 0, 2] }), Some(Protected { owner: Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }, descriptor: [0, 0, 0, 0, 3, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 72, 239, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 3, 0, 3] }), None, None, None, None], records: [Some((0, [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((2, [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((3, [32, 132, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 219, 114, 205, 17, 0, 0, 0, 80, 14, 115, 205, 17, 0, 0, 0, 48, 121, 115, 205, 17, 0, 0, 0, 80, 170, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 43, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 154, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), None, None, None, None, None] }
+643371791 #2209 [MiiOrdinaryCpu] published ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } target=0x0 O=0x11eed6d400 index=1 retained_same_class_O=false native_resources_untouched=true
+643371791 #2210 [Ledger] acquire owner=1 kind=0x1 keys=[2a, 30] holder=Build(GroupId(255)) recipe=ConstructionTail batch=1 issued=true
+643371791 #2211 [BodyBank] resource owner=1 alias=0x11eed6d400 supplemental=[1] native=[0] flags r48=0 r7d=0 r7f=0
+643371948 #2212 [TrainingRooms] cpu_event tech_call accessor=0x11fe01f600 requested=39 role=false
+643371986 #2213 [Hitbox] pass held=4 held_total=4 kept=0 spawned=4 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true
+643372004 #2214 [Hitbox] pass held=0 held_total=0 kept=0 spawned=0 killed=4 ended=0 failed=0 dropped=0 sleep=true redraw=true
+643372173 #2215 [PracticeRecording] recorder_stop mode=0 =0
+643372173 #2216 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=2
+643372175 #2217 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643372191 #2218 [BodyBank] ready owner=1 index=0 kind=0x0 previous=Building bodies=[Body { address: 77275792976, id: 65537 }, Body { address: 77276048208, id: 327680 }, Body { address: 0, id: 0 }]
+643372191 #2219 [BodyBank] identity_view owner=1 reason=ready R=0x11eed6d400 header=[0, 1, ffffffff] costume=0 region=1 published=0x0 prepare_entry_kind_mismatch=0 changed=[acquire:7:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643372191 #2220 [CharacterRoster] HUD listener owner=1 vtable=0x5063320 member=0x1377b40
+643372191 #2221 [CharacterRoster] HUD refresh owner=1 kind=0x0 delivered=1 listeners=1
+643372191 #2222 [Hud] readback owner=1 kind=0x0 exact=false why=publish ok=true slot=1 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643372191 #2223 [PreloadGrace] extend generation=19 us=643372191355 deadline_us=643374191355
+643372191 #2224 [Txn] outcome=Applied role=cpu ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643372191 #2225 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } target=0x0 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false
+643372191 #2226 [MiiOrdinaryCpu] completion ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 4 } current=Snapshot { layout: Training, helpers: View { layout: Training, epoch: Some(SceneEpoch(8)), slots: [Unmanaged, Unmanaged], miis: [None, None], created_slots: [Unmanaged, Unmanaged, Unmanaged, Unmanaged], created_miis: [None, None, None, None] }, created: None, extras: Extras { layout: Training, entries: [0, 0, 0, 0], roots: [None, None, None, None] }, binding: Binding { epoch: 9, owner: 1, entry: 77820010496, row: 2245269904, holder: 76555933072, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 1 }, thread: 2301374600, original_kind: 40, descriptor: [0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 100, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 8, 238, 69, 174, 17, 0, 0, 0], header: [1, 0, 1, 4294967295, 0], scalars: Scalars { e: Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0, 0, 0, 0] }, d_outfit: 0, d_colour: 0, d_specials: [0, 0, 0, 0] }, index: 0, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current_record: [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 0, 0, 1], symbol: 2245219576, manager: 76555932768, internal: 75180418048, entries: [77819985920, 77820010496, 77820035072, 77820059648, 0, 0, 0, 0], owners: [Some(Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }), Some(Owner { entry: 77820010496, row: 2245269904, information: 77820010768, object: 77021500416, index: 0, selector: 1, alias: 0 }), Some(Owner { entry: 77820035072, row: 2245270512, information: 77820035344, object: 77021502976, index: 0, selector: 2, alias: 0 }), Some(Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }), None, None, None, None], protected: [Some(Protected { owner: Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }, descriptor: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 184, 237, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [0, 0, 0, 255, 0, 0, 0] }), None, Some(Protected { owner: Owner { entry: 77820035072, row: 2245270512, information: 77820035344, object: 77021502976, index: 0, selector: 2, alias: 0 }, descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 248, 238, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 1, 0, 2] }), Some(Protected { owner: Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }, descriptor: [0, 0, 0, 0, 3, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 72, 239, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 3, 0, 3] }), None, None, None, None], records: [Some((0, [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((2, [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((3, [32, 132, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 219, 114, 205, 17, 0, 0, 0, 80, 14, 115, 205, 17, 0, 0, 0, 48, 121, 115, 205, 17, 0, 0, 0, 80, 170, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 43, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 154, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), None, None, None, None, None] }
+643372192 #2227 [GroupSwap] plan owner=0 group=0 kinds=[1f, 2e] special=None bodies=2 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x122fa5da00 identity=None
+643372192 #2228 [GroupSwap] plan owner=0 group=1 kinds=[2d, 2c] special=None bodies=2 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x122fa5da00 identity=None
+643372192 #2229 [GroupSwap] plan owner=1 group=0 kinds=[4a] special=Mii bodies=1 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x11eed6d400 identity=Some((1, [69, 0, 2, 37]))
+643372192 #2230 [GroupSwap] plan owner=1 group=1 kinds=[28] special=None bodies=1 ready_fighters=12 pool=6/24 reserve=6 hats=0 alias=0x11eed6d400 identity=None
+643372192 #2231 [PreloadStatus] state=Loading planned=8 ready=2 prefetched=0 failed=0 pending=6 unstarted=0 swap=0 blocked=false scheduler_blocked=false text="Loading 2/8"
+643372192 #2232 [PreloadStatus] raise text="Loading 2/8" frames=90
+643372207 #2233 [PreloadGrace] speculative-admission-deferred generation=19 us=643372207381 deadline_us=643374191355
+643372207 #2234 [MiiOrdinaryCpu] Mii group record published owner=1 group=0 kind=0x4a index=1 hat=0
+643372207 #2235 [GroupSwap] published owner=1 group=0 kind=0x4a index=1 tokens=[69, 0, 2, 37] charinfo=record
+643372240 #2236 [TrainingRooms] cpu_event frame_advantage value=-3
+643372255 #2237 [TrainingRooms] notice_draw header="Frame Advantage" body="-3" color=[200, 8, 8, 255]
+643372355 #2238 [TrainingRooms] input_display_plan ops=17 rows=1 icons=1
+643372372 #2239 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643372377 #2240 [Hitbox] pass held=4 held_total=4 kept=0 spawned=4 killed=0 ended=0 failed=0 dropped=0 sleep=true redraw=true
+643372409 #2241 [Hitbox] pass held=0 held_total=0 kept=0 spawned=0 killed=4 ended=0 failed=0 dropped=0 sleep=true redraw=true
+643372422 #2242 [TrainingRooms] input_display_plan ops=17 rows=2 icons=1
+643372438 #2243 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643372673 #2244 [TrainingRooms] cpu_event frame_advantage value=-19
+643372689 #2245 [TrainingRooms] notice_draw header="Frame Advantage" body="-19" color=[200, 8, 8, 255]
+643372857 #2246 [TrainingRooms] cpu_event tech_call accessor=0x11fe01f600 requested=0 role=false
+643373174 #2247 [PreloadStatus] wiped text=Some("Loading 2/8"); raised again
+643373174 #2248 [PreloadStatus] raise text="Loading 2/8" frames=90
+643373688 #2249 [TrainingRooms] notice_draw header="Fighters" body="Loading 2/8" color=[0, 0, 0, 255]
+643373826 #2250 [LayoutArchive] released info_training bytes=742292 after=5003ms
+643374206 #2251 [PreloadGrace] expire generation=19 us=643374206598
+643374206 #2252 [BodyBank] identity_view publish owner=0 R=0x122fa5da00 kind=0x1f epoch=new published=0x80000000
+643374206 #2253 [Ledger] acquire owner=0 kind=0x1f keys=[516, 51c] holder=Prefetch(GroupId(0)) recipe=ConstructionTail batch=2 issued=true
+643374206 #2254 [BodyBank] identity_view publish owner=0 R=0x122fa5da00 kind=0x2e epoch=same published=0x400080000000
+643374207 #2255 [Ledger] acquire owner=0 kind=0x2e keys=[78c, 792] holder=Prefetch(GroupId(0)) recipe=ConstructionTail batch=2 issued=true
+643374207 #2256 [GroupSwap] prefetch owner=0 group=0 kinds=[1f, 2e] R=0x122fa5da00 map=4 flags=0x0 task_pending=0 pool=6/24 headroom=1052200960 INSTALL(resource) outstanding=0 need=188858368
+643374643 #2257 [GroupSwap] prefetched owner=0 group=0 kinds=[1f, 2e] us=436750 INSTALL_released=true map=4 tree=4
+643374643 #2258 [GroupSwap] memory owner=0 group=0 kinds=[1f, 2e] phase=prefetch committed=Some(2392371200)->Some(2513940480) delta=121569280 estimate=123273216 headroom=Some(930631680)
+643374643 #2259 [BodyBank] identity_view publish owner=1 R=0x11eed6d400 kind=0x4a epoch=new published=0x4000000000000000000
+643374643 #2260 [Ledger] acquire owner=1 kind=0x4a keys=[c24, c26, c27, c28, c2a] holder=Prefetch(GroupId(0)) recipe=ConstructionTail batch=2 issued=true
+643374643 #2261 [GroupSwap] prefetch owner=1 group=0 kinds=[4a] R=0x11eed6d400 map=3 flags=0x0 task_pending=0 pool=6/24 headroom=930631680 INSTALL(resource) outstanding=33398784 need=110632960
+643374873 #2262 [GroupSwap] prefetched owner=1 group=0 kinds=[4a] us=230496 INSTALL_released=true map=3 tree=3
+643374873 #2263 [GroupSwap] memory owner=1 group=0 kinds=[4a] phase=prefetch committed=Some(2513940480)->Some(2570301440) delta=56360960 estimate=58720256 headroom=Some(874270720)
+643374874 #2264 [PreloadGrace] speculative-admission-consumed generation=19 us=643374874096
+643374874 #2265 [CharacterSources] install slot=2 kind=0x4a
+643374874 #2266 [TrioBoundary] reload entry=0x121e6f8000 owner=2 caller=main+0x7c280e3300 guard=0 incoming=(1, [4a, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643374974 #2267 [MiiHelper] prequeue source=SourceToken { slot: 2, entry: NativeEntry(77820035072), generation: 7, epoch: SceneEpoch(8) } selected=0x11eed6de00 init=false header=[2, 28, ffffffff, ffffffff, 1] index=0 tokens=[0, 0, 0, 0] task=0x0 outstanding=Some(0) Dindex=0 rebuild=0 before=Snapshot { layout: Training, helpers: View { layout: Training, epoch: Some(SceneEpoch(8)), slots: [Unavailable { token: SourceToken { slot: 2, entry: NativeEntry(77820035072), generation: 7, epoch: SceneEpoch(8) }, phase: Loading }, Unmanaged], miis: [None, None], created_slots: [Unmanaged, Unmanaged, Unmanaged, Unmanaged], created_miis: [None, None, None, None] }, created: None, extras: Extras { layout: Training, entries: [0, 0, 0, 0], roots: [None, None, None, None] }, binding: Binding { epoch: 9, owner: 2, entry: 77820035072, row: 2245270512, holder: 76555933072, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, thread: 2301374600, original_kind: 40, descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 248, 238, 69, 174, 17, 0, 0, 0], header: [2, 40, 4294967295, 4294967295, 1], scalars: Scalars { e: Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0, 0, 0, 0] }, d_outfit: 0, d_colour: 0, d_specials: [0, 0, 0, 0] }, index: 0, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current_record: [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 1, 0, 2], symbol: 2245219576, manager: 76555932768, internal: 75180418048, entries: [77819985920, 77820010496, 77820035072, 77820059648, 0, 0, 0, 0], owners: [Some(Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }), Some(Owner { entry: 77820010496, row: 2245269904, information: 77820010768, object: 77021500416, index: 0, selector: 1, alias: 0 }), Some(Owner { entry: 77820035072, row: 2245270512, information: 77820035344, object: 77021502976, index: 0, selector: 2, alias: 0 }), Some(Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }), None, None, None, None], protected: [Some(Protected { owner: Owner { entry: 77819985920, row: 2245269296, information: 77819986192, object: 78108809728, index: 0, selector: 0, alias: 0 }, descriptor: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 184, 237, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [0, 0, 0, 255, 0, 0, 0] }), Some(Protected { owner: Owner { entry: 77820010496, row: 2245269904, information: 77820010768, object: 77021500416, index: 0, selector: 1, alias: 0 }, descriptor: [0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 100, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 8, 238, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 0, 0, 1] }), None, Some(Protected { owner: Owner { entry: 77820059648, row: 2245271120, information: 77820059920, object: 77021504256, index: 0, selector: 3, alias: 0 }, descriptor: [0, 0, 0, 0, 3, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 72, 239, 69, 174, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 3, 0, 3] }), None, None, None, None], records: [Some((0, [48, 31, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 115, 205, 17, 0, 0, 0, 80, 22, 25, 211, 17, 0, 0, 0, 80, 40, 25, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 115, 205, 17, 0, 0, 0, 192, 214, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((1, [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((3, [32, 132, 114, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 219, 114, 205, 17, 0, 0, 0, 80, 14, 115, 205, 17, 0, 0, 0, 48, 121, 115, 205, 17, 0, 0, 0, 80, 170, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 43, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 154, 115, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), None, None, None, None, None] }
+643375108 #2268 [PreloadStatus] state=Loading planned=8 ready=2 prefetched=3 failed=0 pending=3 unstarted=0 swap=0 blocked=false scheduler_blocked=true text="Loading 5/8"
+643375108 #2269 [PreloadStatus] raise text="Loading 5/8" frames=90
+643375125 #2270 [TrainingRooms] notice_draw header="Fighters" body="Loading 5/8" color=[0, 0, 0, 255]
+643375206 #2271 [MiiHelper] exact parked completion source=SourceToken { slot: 2, entry: NativeEntry(77820035072), generation: 7, epoch: SceneEpoch(8) } proof=MiiProof { binding: Binding { epoch: 9, owner: 2, entry: 77820035072, row: 2245270512, holder: 76555933072, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, configuration: Configuration { class: Gunner, canonical_hash: 8791295788063903869, tokens: Tokens { outfit: 69, hat: 0, colour: 2, voice: 37, specials: [0, 0, 0, 0] }, .. }, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 224, 118, 102, 222, 17, 0, 0, 0, 0, 232, 125, 237, 17, 0, 0, 0], descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 9, 11, 18, 0, 0, 0, 48, 23, 212, 133, 0, 0, 0, 0, 248, 238, 69, 174, 17, 0, 0, 0] }
+643375206 #2272 [CharacterSources] memory slot=2 kinds=[4a] phase=helper committed=Some(2570301440)->Some(2573643776) delta=3342336 estimate=85524480 headroom=Some(870928384)
+643375206 #2273 [CharacterSources] ready slot=2 kind=0x4a ticks=21
+643375224 #2274 [BodyBank] identity_view publish owner=0 R=0x122fa5da00 kind=0x2d epoch=same published=0x600080000000
+643375224 #2275 [Ledger] acquire owner=0 kind=0x2d keys=[762, 768] holder=Prefetch(GroupId(1)) recipe=ConstructionTail batch=3 issued=true
+643375224 #2276 [BodyBank] identity_view publish owner=0 R=0x122fa5da00 kind=0x2c epoch=same published=0x700080000000
+643375224 #2277 [Ledger] acquire owner=0 kind=0x2c keys=[738, 73e] holder=Prefetch(GroupId(1)) recipe=ConstructionTail batch=3 issued=true
+643375224 #2278 [GroupSwap] prefetch owner=0 group=1 kinds=[2d, 2c] R=0x122fa5da00 map=8 flags=0x0 task_pending=0 pool=6/24 headroom=870928384 INSTALL(resource) outstanding=61194240 need=144326656
+643375491 #2279 [TrainingRooms] state_hook_counts frames=600 param=194 quake=0 sound=4 effect=0 follow=8 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+643375660 #2280 [GroupSwap] prefetched owner=0 group=1 kinds=[2d, 2c] us=435869 INSTALL_released=true map=8 tree=6
+643375660 #2281 [GroupSwap] memory owner=0 group=1 kinds=[2d, 2c] phase=prefetch committed=Some(2573643776)->Some(2669981696) delta=96337920 estimate=93454336 headroom=Some(774590464)
+643375660 #2282 [BodyBank] identity_view publish owner=1 R=0x11eed6d400 kind=0x28 epoch=same published=0x4000000010000000000
+643375660 #2283 [Ledger] acquire owner=1 kind=0x28 keys=[690, 696] holder=Prefetch(GroupId(1)) recipe=ConstructionTail batch=3 issued=true
+643375660 #2284 [GroupSwap] prefetch owner=1 group=1 kinds=[28] R=0x11eed6d400 map=5 flags=0x0 task_pending=0 pool=6/24 headroom=774590464 INSTALL(resource) outstanding=83607552 need=98467840
+643375743 #2285 [GroupSwap] prefetched owner=1 group=1 kinds=[28] us=82789 INSTALL_released=true map=5 tree=4
+643375743 #2286 [GroupSwap] memory owner=1 group=1 kinds=[28] phase=prefetch committed=Some(2669981696)->Some(2675355648) delta=5373952 estimate=62652416 headroom=Some(769216512)
+643376090 #2287 [PreloadStatus] state=Done planned=8 ready=2 prefetched=6 failed=0 pending=0 unstarted=0 swap=0 blocked=false scheduler_blocked=false text="All loaded (8/8, 2 instant)"
+643376090 #2288 [PreloadStatus] raise text="All loaded (8/8, 2 instant)" frames=180
+643376104 #2289 [TrainingRooms] notice_draw header="Fighters" body="All loaded (8/8, 2 instant)" color=[0, 0, 0, 255]
+643376324 #2290 [Hitbox] stats passes=600 with_work=600 want_hit=16 want_hurt=0 kept=8 spawned=8 killed=8 ended=0 failed=0 dropped=0 held_max=4 held_now=0 sleeps=600 restores=600 commands=0 pass_ticks_avg=278 pass_ticks_max=56043 heap_allocations=0
+643377153 #2291 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=39307 hooks=input_caller_a_note:17487,input_caller_a_apply:75304,reset_check:7863,hazard_rule:8,reset_hub:55,cpu_frame:14676,cpu_stick_x:14676,cpu_stick_y:14676,cpu_transition_term:76958,cpu_motion_change:141,cpu_check_button_on:44087,cpu_shield_param:31501,ui_archive:229,ui_pass_calculate:100087,ui_register_calculate:144,live_replay:29352,hitbox_attack:8,hitbox_frame:14676,roster_input:17487,roster_sources:6886,roster_kirby:6886,roster_items:6886,roster_preload:6886,practice_lease:6886,state_frame:14676,recorder_ai:6916,recorder_poll:9405,named_service:22460,menu_input:9405,menu_draw:7870,menu_thumbs:7870,developer_float:31,other:76061
+643377153 #2292 [HookStack] site=other calls=76061 min_free=261344 stack=0x80000 base=0x11ee230000 kind=0x5
+643377153 #2293 [HookStack] site=hitbox_attack calls=8 min_free=63280 stack=0x1f000 base=0x120acc0000 kind=0x5
+643377407 #2294 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1237 stick_y=1237 clatter_start=0 transition_term=7994 motion_change=14 quake_pos=0 command_flag=4988 air_kind=0 stick_dir=0 heap_allocations=0
+643378854 #2295 [TrainingRooms] input_display_plan ops=1 rows=1 icons=0
+643378922 #2296 [TrainingRooms] input_display_plan ops=2 rows=2 icons=0
+643379105 #2297 [TrainingRooms] notice_visible=false menu_open=false
+643379792 #2298 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+643379796 #2299 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643379984 #2300 [TrainingRooms] cpu_event tech_call accessor=0x11fe01f600 requested=55 role=false
+643379992 #2301 [TrainingRooms] input_display_plan ops=17 rows=3 icons=1
+643379999 #2302 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380002 #2303 [PreloadStatus] delivered text=Some("All loaded (8/8, 2 instant)")
+643380105 #2304 [TrainingRooms] input_display_plan ops=17 rows=4 icons=1
+643380121 #2305 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380155 #2306 [TrainingRooms] input_display_plan ops=17 rows=5 icons=1
+643380172 #2307 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380239 #2308 [TrainingRooms] input_display_plan ops=17 rows=6 icons=1
+643380256 #2309 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380373 #2310 [TrainingRooms] input_display_plan ops=17 rows=7 icons=1
+643380388 #2311 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380406 #2312 [TrainingRooms] input_display_plan ops=17 rows=8 icons=1
+643380422 #2313 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380504 #2314 [TrainingRooms] input_display_plan ops=17 rows=9 icons=1
+643380521 #2315 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380638 #2316 [TrainingRooms] input_display_plan ops=17 rows=10 icons=1
+643380654 #2317 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380672 #2318 [TrainingRooms] input_display_plan ops=17 rows=11 icons=1
+643380689 #2319 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380772 #2320 [TrainingRooms] input_display_plan ops=17 rows=12 icons=1
+643380789 #2321 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380905 #2322 [TrainingRooms] input_display_plan ops=17 rows=13 icons=1
+643380922 #2323 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643380938 #2324 [TrainingRooms] input_display_plan ops=17 rows=14 icons=1
+643380958 #2325 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643381038 #2326 [TrainingRooms] input_display_plan ops=17 rows=15 icons=1
+643381054 #2327 [TrainingRooms] input_display_plan ops=3 rows=2 icons=0
+643381172 #2328 [TrainingRooms] input_display_plan ops=17 rows=15 icons=1
+643381194 #2329 [TrainingRooms] input_display_plan ops=2 rows=1 icons=0
+643381206 #2330 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381221 #2331 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381305 #2332 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381321 #2333 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381439 #2334 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381459 #2335 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381474 #2336 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381490 #2337 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381572 #2338 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381588 #2339 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381704 #2340 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381725 #2341 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381740 #2342 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381757 #2343 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381838 #2344 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381854 #2345 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643381875 #2346 [TrainingRooms] input_hook_counts p1_poll=630 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+643381956 #2347 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643381972 #2348 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643382007 #2349 [TrainingRooms] input_display_plan ops=16 rows=15 icons=0
+643382021 #2350 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643382278 #2351 [TrainingRooms] cpu_event tech_call accessor=0x11fe01f600 requested=0 role=false
+643382389 #2352 [TrainingRooms] chords_passed bits=0x40
+643382396 #2353 [Ui] menu opened
+643382411 #2354 [Ui] first draw seq=45
+643382428 #2355 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+643382431 #2356 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+643382595 #2357 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643382597 #2358 [Ui] menu closed changed=false rerolls=0x0
+643382597 #2359 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(11))
+643382597 #2360 [MiiOrdinaryCpu] request accepted selection=Direct(TrioFighter(40)) user=true install_active=false
+643382607 #2361 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((17, 40)), refresh_partners: false } on="menu captures input" install_holder(slot,kind,ticks,speculative)=None
+643382839 #2362 [BodyBank] reuse owner=0 from=0 to=1 kind=0xb
+643382839 #2363 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 33 } outgoing=0x0 target=0xb index=0 mii=false
+643382839 #2364 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((17, 40)), refresh_partners: false } on="INSTALL held" install_holder(slot,kind,ticks,speculative)=None
+643382839 #2365 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643382841 #2366 [Ui] menu session cleared
+643382854 #2367 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+643382891 #2368 [BodyBank] ready owner=0 index=1 kind=0xb previous=Changing bodies=[Body { address: 77275984400, id: 262145 }, Body { address: 77275729168, id: 2 }, Body { address: 0, id: 0 }]
+643382891 #2369 [BodyBank] identity_view owner=0 reason=ready R=0x122fa5da00 header=[0, b, ffffffff] costume=0 region=1 published=0x700080000000 prepare_entry_kind_mismatch=0 changed=[acquire:8:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643382891 #2370 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643382891 #2371 [CharacterRoster] HUD refresh owner=0 kind=0xb delivered=1 listeners=1
+643382891 #2372 [Hud] readback owner=0 kind=0xb exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643382891 #2373 [PreloadGrace] start generation=19 us=643382891551 deadline_us=643384891551
+643382891 #2374 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 33 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643382891 #2375 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 33 } target=0xb physical=0x0 index=0 original=false mii=false resource_pair=None released=true
+643382893 #2376 [GroupSwap] request owner=1 kind=0x28 group=1 member=0 via=1 from=0 state=Prefetched form=single
+643382893 #2377 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 5 } outgoing=0x0 target=0x28 index=0 cursor=None mii=false
+643382893 #2378 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643382896 #2379 [Ui] menu session cleared
+643382904 #2380 [TrainingRooms] notice_visible=true menu_open=false
+643382904 #2381 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643382907 #2382 [GroupSwap] detach owner=1 group=1 kinds=[0, 1] bodies=[Body { address: 77275792976, id: 65537 }, Body { address: 77276048208, id: 327680 }, Body { address: 0, id: 0 }]
+643382907 #2383 [GroupSwap] build owner=1 group=1 kinds=[28] special=None actors=1 R=0x11eed6d400 flags=0x0->0x1 refs=0->0 map=5 task_pending=0 pool_live=6 records=Some([0, 0, 0]) dispatch_detached=Some([11ede335e8, 11ede335c8]) identity=None mode=async reason=-
+643382907 #2384 [Registry] build owner=1 from=[0, 1] to=[28] header=[28, ffffffff, ffffffff] cells=[(0, ffffffff), (0, ffffffff), (0, ffffffff)] r4c=0x1 task_pending=0
+643382907 #2385 [GroupSwap] build owner=1 group=1 mode=async queued=1 control=0x11f6fd9e60 setup_us=95 us=95; the control init runs on the task worker, then the bodies are queued (native states 8-10)
+643382907 #2386 [BuildSplit] setup owner=1 group=1 kinds=[28] build_of_boot=5 carried_setup_us=95 plugin=1/6 unprepare_17f26c0=1/1 roster_17e4f50=2/1 log=13/2 mii_setup=0/1 memory_svc=4/1 articles=0/1 models_654dc0=11/1 contexts_655320=57/1 control_64f820=1/1 task_392e290=1/1 functor_3cb050=2/1 schedule_3549720=7/1 setup_us=90 total_us=100 largest=contexts_655320
+643382925 #2387 [GroupSwap] bodies queued owner=1 group=1 tasks=[11f6fd9e60] control_us=18185 us=18315; frames run until the tasks settle
+643382925 #2388 [BuildSplit] queue owner=1 group=1 plugin=1/2 allocate_3ae5f0=17/1 task_392e290=2/1 functor_3cb050=1/1 schedule_3549720=5/1 free_tasks=7/1 setup_us=1 total_us=33 largest=allocate_3ae5f0
+643383022 #2389 [GroupSwap] memory owner=1 group=1 kinds=[28] phase=build committed=Some(2671816704)->Some(2678566912) delta=6750208 estimate=9961472 headroom=Some(766005248)
+643383022 #2390 [RequestBit] end owner=1 group=1 how=Restored before=0x0 built=0x1 after=0x0 map=3 task_pending=0 constructed=true
+643383022 #2391 [GroupSwap] built owner=1 group=1 ok=true us=114840 installed=1 pool_live=6->7 bodies=Some([Body { address: 77276112016, id: 393216 }, Body { address: 0, id: 0 }, Body { address: 0, id: 0 }]) map=3 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11ede3a208, 11ede383c8]) mii_setup=None mode=async setup_us=95 queued_us=18315 settled_us=[114797, 0, 0] ticks=7 max_tick_gap_us=18490
+643383022 #2392 [GroupSwap] acknowledged owner=1 group=1 member=0 previous=0 us=114840
+643383022 #2393 [GroupSwap] body-event listeners at acknowledgement event=0x1e listeners=1 vtables=[5075770]
+643383022 #2394 [Ledger] reconcile owner=1 phase=build map=3 task_pending=0 predicted=[(c24, 1), (c26, 1), (c27, 1), (c28, 1), (c2a, 1)] actual=[(c24, 1), (c26, 1), (c2a, 1)] residual=[] missing=[(c27, 1), (c28, 1)]
+643383022 #2395 [BuildSplit] settle owner=1 group=1 settle_of_boot=5 memory_svc=26/1 install_cells=2/1 free_tasks=8/1 end_request=6/1 verify_ack=24/1 ledger=123/1 setup_us=26 total_us=189 largest=ledger
+643383040 #2396 [PracticeRecording] recorder_stop mode=0 =0
+643383040 #2397 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=2
+643383042 #2398 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11fe03e880
+643383056 #2399 [BodyBank] ready owner=1 index=0 kind=0x28 previous=Changing bodies=[Body { address: 77276112016, id: 393216 }, Body { address: 0, id: 0 }, Body { address: 0, id: 0 }]
+643383056 #2400 [BodyBank] identity_view owner=1 reason=ready R=0x11eed6d400 header=[28, ffffffff, ffffffff] costume=0 region=1 published=0x4000000010000000000 prepare_entry_kind_mismatch=0 changed=[acquire:8:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643383056 #2401 [GroupSwap] swap owner=1 kind=0x28 request_to_ready_us=163347 bodies=[Body { address: 77276112016, id: 393216 }, Body { address: 0, id: 0 }, Body { address: 0, id: 0 }] max_tick_gap_us=18490 ticks=10
+643383056 #2402 [BuildSplit] gaps owner=1 kind=0x28 ticks=10 top=[t4:18490:poll, t2:18416:setup, t5:17556:poll, t9:17011:settle]
+643383058 #2403 [MiiOrdinaryCpu] [GroupSwap] adapter rebaseline CPU descriptor/header/body proof passed
+643383058 #2404 [CharacterRoster] HUD listener owner=1 vtable=0x5063320 member=0x1377b40
+643383058 #2405 [CharacterRoster] HUD refresh owner=1 kind=0x28 delivered=1 listeners=1
+643383058 #2406 [Hud] readback owner=1 kind=0x28 exact=false why=publish ok=true slot=1 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643383058 #2407 [PreloadGrace] extend generation=19 us=643383058671 deadline_us=643385058671
+643383058 #2408 [Txn] outcome=Applied role=cpu ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 5 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643383059 #2409 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 5 } target=0x28 physical=0x28 index=0 original=true mii=false resource_pair=None released=true
+643383059 #2410 [GroupSwap] plan owner=0 group=2 kinds=[58] special=None bodies=1 ready_fighters=12 pool=7/24 reserve=6 hats=0 alias=0x122fa5da00 identity=None
+643383059 #2411 [PreloadStatus] state=Loading planned=10 ready=3 prefetched=5 failed=0 pending=1 unstarted=1 swap=2 blocked=false scheduler_blocked=false text="Loading 8/10"
+643383059 #2412 [PreloadStatus] raise text="Loading 8/10" frames=90
+643383073 #2413 [PreloadGrace] speculative-admission-deferred generation=19 us=643383073461 deadline_us=643385058671
+643383955 #2414 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10
+643383955 #2415 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643385074 #2416 [PreloadGrace] expire generation=19 us=643385074117
+643385074 #2417 [BodyBank] identity_view publish owner=0 R=0x122fa5da00 kind=0x58 epoch=same published=0x10000000000700080000000
+643385074 #2418 [Ledger] acquire owner=0 kind=0x58 keys=[e70, e71, e76] holder=Prefetch(GroupId(2)) recipe=ConstructionTail batch=4 issued=true
+643385074 #2419 [GroupSwap] prefetch owner=0 group=2 kinds=[58] R=0x122fa5da00 map=11 flags=0x0 task_pending=0 pool=7/24 headroom=763318272 INSTALL(resource) outstanding=83607552 need=92422144
+643385294 #2420 [GroupSwap] prefetched owner=0 group=2 kinds=[58] us=220738 INSTALL_released=true map=11 tree=7
+643385294 #2421 [GroupSwap] memory owner=0 group=2 kinds=[58] phase=prefetch committed=Some(2681253888)->Some(2720444416) delta=39190528 estimate=40108032 headroom=Some(724127744)
+643385326 #2422 [TrainingRooms] state_hook_counts frames=600 param=3 quake=0 sound=4 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+643385822 #2423 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=115 owned_non_neutral=0 owners=0x00
+643385839 #2424 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0
+643385904 #2425 [TrainingRooms] notice_draw header="CPU Character" body="Original fighter restored" color=[0, 0, 0, 255]
+643386007 #2426 [PreloadStatus] state=Waiting planned=10 ready=3 prefetched=6 failed=0 pending=0 unstarted=1 swap=2 blocked=false scheduler_blocked=false text="Loaded 9/10 · swap the CPU to load 1 more"
+643386007 #2427 [PreloadStatus] raise text="Loaded 9/10 · swap the CPU to load 1 more" frames=120
+643386807 #2428 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+643386809 #2429 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643386809 #2430 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(0))
+643386809 #2431 [CharacterRoster] settings role=Cpu size=4 kinds=[8, 6, f, 40]
+643386809 #2432 [MiiOrdinaryCpu] request accepted selection=Direct(TrioFighter(0)) user=true install_active=false
+643386811 #2433 [BodyBank] reuse owner=0 from=1 to=0 kind=0x0
+643386811 #2434 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 34 } outgoing=0xb target=0x0 index=0 mii=false
+643386811 #2435 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((17, 0)), refresh_partners: false } on="INSTALL held" install_holder(slot,kind,ticks,speculative)=None
+643386812 #2436 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643386814 #2437 [Ui] menu session cleared
+643386821 #2438 [TrainingRooms] notice_visible=false menu_open=false
+643386821 #2439 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+643386855 #2440 [BodyBank] ready owner=0 index=0 kind=0x0 previous=Changing bodies=[Body { address: 77275984400, id: 262145 }, Body { address: 77275729168, id: 2 }, Body { address: 0, id: 0 }]
+643386855 #2441 [BodyBank] identity_view owner=0 reason=ready R=0x122fa5da00 header=[0, b, ffffffff] costume=0 region=1 published=0x10000000000700080000000 prepare_entry_kind_mismatch=0 changed=[acquire:8:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643386856 #2442 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+643386856 #2443 [CharacterRoster] HUD refresh owner=0 kind=0x0 delivered=1 listeners=1
+643386856 #2444 [Hud] readback owner=0 kind=0x0 exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643386856 #2445 [PreloadGrace] start generation=20 us=643386856145 deadline_us=643388856145
+643386856 #2446 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 34 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643386856 #2447 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 9, entry: 77819985920, sequence: 34 } target=0x0 physical=0x0 index=0 original=false mii=false resource_pair=None released=true
+643386856 #2448 [GroupSwap] request owner=1 kind=0x0 group=1 member=0 via=0 from=0 state=Built form=single
+643386856 #2449 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 6 } outgoing=0x28 target=0x0 index=0 cursor=None mii=false
+643386857 #2450 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643386859 #2451 [Ui] menu session cleared
+643386871 #2452 [TrainingRooms] notice_visible=true menu_open=false
+643386871 #2453 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+643386874 #2454 [GroupSwap] detach owner=1 group=1 kinds=[28] bodies=[Body { address: 77276112016, id: 393216 }, Body { address: 0, id: 0 }, Body { address: 0, id: 0 }]
+643386875 #2455 [GroupSwap] attach owner=1 group=1 member=0 kinds=[0, 1] dispatch=[11ede335e8, 11ede335c8] identity=false header=None
+643386875 #2456 [Registry] attach owner=1 from=[28] to=[0, 1] header=[0, 1, ffffffff] cells=[(0, 0), (0, 1), (0, ffffffff)] r4c=0x0 task_pending=0
+643386876 #2457 [GroupSwap] acknowledged owner=1 group=1 member=0 previous=0 us=1010
+643386876 #2458 [GroupSwap] body-event listeners at acknowledgement event=0x1e listeners=1 vtables=[5075770]
+643386890 #2459 [PracticeRecording] recorder_stop mode=0 =0
+643386890 #2460 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+643386891 #2461 [TrainingRooms] cpu_event role entry=1 partner=false kind=0 lobby=false accessor=0x11fdff0a40
+643386892 #2462 [BodyBank] ready owner=1 index=0 kind=0x0 previous=Changing bodies=[Body { address: 77275792976, id: 65537 }, Body { address: 77276048208, id: 327680 }, Body { address: 0, id: 0 }]
+643386893 #2463 [BodyBank] identity_view owner=1 reason=ready R=0x11eed6d400 header=[0, 1, ffffffff] costume=0 region=1 published=0x4000000010000000000 prepare_entry_kind_mismatch=0 changed=[acquire:8:0x2d/0->1,worker_1:1:0x2c/1->0,release:1:0x2c/1->0,path:105:0x1c/1->0,construct:7:0x1c/1->0,init_register:7:0x1c/1->0,init_prepare_entry:7:0x1c/1->0,setup_construct:7:0x1c/1->0,setup_key_a:7:0x1c/1->0,setup_key_b:7:0x1c/1->0,unload:7:0x1c/1->0,object_b:7:0x1c/1->0,item_owner:65:0x1c/1->0]
+643386893 #2464 [GroupSwap] swap owner=1 kind=0x0 request_to_ready_us=36489 bodies=[Body { address: 77275792976, id: 65537 }, Body { address: 77276048208, id: 327680 }, Body { address: 0, id: 0 }] max_tick_gap_us=17948 ticks=3
+643386893 #2465 [BuildSplit] gaps owner=1 kind=0x0 ticks=3 top=[t1:17947:poll, t2:15426:setup, t3:3079:poll]
+643386893 #2466 [MiiOrdinaryCpu] [GroupSwap] adapter rebaseline CPU descriptor/header/body proof passed
+643386893 #2467 [CharacterRoster] HUD listener owner=1 vtable=0x5063320 member=0x1377b40
+643386893 #2468 [CharacterRoster] HUD refresh owner=1 kind=0x0 delivered=1 listeners=1
+643386893 #2469 [Hud] readback owner=1 kind=0x0 exact=false why=publish ok=true slot=1 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+643386893 #2470 [PreloadGrace] extend generation=20 us=643386893170 deadline_us=643388893170
+643386893 #2471 [Txn] outcome=Applied role=cpu ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 6 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+643386893 #2472 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 9, entry: 77820010496, sequence: 6 } target=0x0 physical=0x0 index=0 original=false mii=false resource_pair=None released=true
+643386893 #2473 [GroupSwap] plan owner=1 group=2 kinds=[8] special=None bodies=1 ready_fighters=12 pool=7/24 reserve=6 hats=0 alias=0x11eed6d400 identity=None
+643386893 #2474 [PreloadStatus] state=Loading planned=10 ready=3 prefetched=6 failed=0 pending=1 unstarted=0 swap=0 blocked=false scheduler_blocked=false text="Loading 9/10"
+643386893 #2475 [PreloadStatus] wiped text=Some("Loaded 9/10 · swap the CPU to load 1 more"); raised again
+643386893 #2476 [PreloadStatus] raise text="Loading 9/10" frames=90
+643386906 #2477 [PreloadGrace] speculative-admission-deferred generation=20 us=643386906916 deadline_us=643388893170
+643387024 #2478 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643387024 #2479 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643387300 #2480 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=48762 hooks=input_caller_a_note:18731,input_caller_a_apply:80280,reset_check:8482,hazard_rule:8,reset_hub:59,cpu_frame:15909,cpu_stick_x:15909,cpu_stick_y:15909,cpu_transition_term:83836,cpu_motion_change:155,cpu_check_button_on:47393,cpu_shield_param:33705,ui_archive:229,ui_pass_calculate:105562,ui_register_calculate:144,live_replay:31818,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:15909,roster_input:18731,roster_sources:7506,roster_kirby:7506,roster_items:7506,roster_preload:7506,practice_lease:7506,state_frame:15909,recorder_ai:7425,recorder_poll:10027,named_service:24306,menu_input:10027,menu_draw:8479,menu_thumbs:8479,developer_float:31,other:82295
+643387300 #2481 [ThreadStack] high_water name=tr-menu used=29552 size=57344 free=27792 low=false
+643387300 #2482 [HookStack] site=other calls=82295 min_free=64720 stack=0x88000 base=0x11ee780000 kind=0x5
+643387300 #2483 [HookStack] site=hitbox_rebound calls=8 min_free=64624 stack=0x88000 base=0x11ee780000 kind=0x5
+643387300 #2484 [HookStack] site=hitbox_catch calls=8 min_free=63872 stack=0x88000 base=0x11ee780000 kind=0x5
+643387340 #2485 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1207 stick_y=1207 clatter_start=0 transition_term=6652 motion_change=14 quake_pos=0 command_flag=4880 air_kind=0 stick_dir=0 heap_allocations=0
+643388906 #2486 [PreloadGrace] expire generation=20 us=643388906829
+643388906 #2487 [BodyBank] identity_view publish owner=1 R=0x11eed6d400 kind=0x8 epoch=same published=0x4000000010000000100
+643388907 #2488 [Ledger] acquire owner=1 kind=0x8 keys=[150, 156] holder=Prefetch(GroupId(2)) recipe=ConstructionTail batch=4 issued=true
+643388907 #2489 [GroupSwap] prefetch owner=1 group=2 kinds=[8] R=0x11eed6d400 map=5 flags=0x0 task_pending=0 pool=7/24 headroom=724520960 INSTALL(resource) outstanding=114130944 need=84680704
+643389125 #2490 [GroupSwap] prefetched owner=1 group=2 kinds=[8] us=218976 INSTALL_released=true map=5 tree=5
+643389125 #2491 [GroupSwap] memory owner=1 group=2 kinds=[8] phase=prefetch committed=Some(2720051200)->Some(2764615680) delta=44564480 estimate=47579136 headroom=Some(679956480)
+643389342 #2492 [Destroy] plan owner=0 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389342 #2493 [GroupSwap] pad route released owner=0 reason=finalize contexts=2 cleared=1
+643389342 #2494 [Ledger] release owner=0 kind=0x1f calls=[1f] reason=finalize
+643389342 #2495 [Ledger] release owner=0 kind=0x2e calls=[2e] reason=finalize
+643389342 #2496 [Ledger] release owner=0 kind=0x2d calls=[2d] reason=finalize
+643389342 #2497 [Ledger] release owner=0 kind=0x2c calls=[2c] reason=finalize
+643389342 #2498 [Ledger] release owner=0 kind=0x58 calls=[58] reason=finalize
+643389342 #2499 [Destroy] plan owner=0 reason=finalize steps=1 routes_cleared=0 attached=None routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389342 #2500 [GroupSwap] teardown owner=0 reason=finalize groups=3 bodies=0 contexts=0 routes=0 dispatchers=0 records=0 keys=5 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 7))
+643389342 #2501 [Ledger] reconcile owner=0 phase=finalize map=0 task_pending=0 predicted=[] actual=[] residual=[] missing=[]
+643389439 #2502 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=140 owned_non_neutral=0 owners=0x00
+643389439 #2503 [MiiSavedAlpha] destroyed owner=0 entry=0x121e6ec000 cleanup_writes=false
+643389439 #2504 [CharacterRoster] invalidated observed entry before destruction owner=0 entry=0x121e6ec000
+643389439 #2505 [CharacterRoster] practice consumers invalidated on P1 entry destruction
+643389439 #2506 [TrioBoundary] destroy entry=0x121e6ec000 owner=0 active=(2, [0, b, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643389439 #2507 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389439 #2508 [Destroy] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389439 #2509 [GroupSwap] pad route released owner=1 reason=finalize contexts=2 cleared=1
+643389460 #2510 [Ledger] release owner=1 kind=0x4a calls=[4a] reason=finalize
+643389460 #2511 [Ledger] release owner=1 kind=0x8 calls=[8] reason=finalize
+643389460 #2512 [Destroy] plan owner=1 reason=finalize steps=4 routes_cleared=0 attached=None routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=1 contexts=1 skipped=0
+643389460 #2513 [Registry] teardown owner=1 reason=finalize window=[0, 1] detached=[[28]] cells=[(0, 0), (0, 1), (0, ffffffff)]->[(0, ffffffff), (0, ffffffff), (0, ffffffff)]->[(0, 0), (0, 1), (0, ffffffff)] header=[0, 1, ffffffff] r4c=0x0 task_pending=0
+643389460 #2514 [GroupSwap] teardown owner=1 reason=finalize groups=3 bodies=1 contexts=1 routes=0 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 4))
+643389460 #2515 [Ledger] reconcile owner=1 phase=finalize map=0 task_pending=0 predicted=[] actual=[] residual=[] missing=[]
+643389470 #2516 [Ui] menu session cleared
+643389548 #2517 [MiiSavedAlpha] destroyed owner=1 entry=0x121e6f2000 cleanup_writes=false
+643389548 #2518 [CharacterRoster] invalidated observed entry before destruction owner=1 entry=0x121e6f2000
+643389548 #2519 [TrioBoundary] destroy entry=0x121e6f2000 owner=1 active=(2, [0, 1, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643389548 #2520 [Destroy] plan owner=1 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389548 #2521 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389591 #2522 [CharacterSources] destroyed slot=2 tracked_leases=0
+643389591 #2523 [TrioBoundary] destroy entry=0x121e6f8000 owner=2 active=(1, [4a, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643389591 #2524 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389591 #2525 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389638 #2526 [TrioBoundary] destroy entry=0x121e6fe000 owner=3 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643389638 #2527 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643389665 #2528 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643389665 #2529 [TrainingRooms] notice_visible=false menu_open=false
+643390970 #2530 [NamedMacroDiag] stall frames=8495 step=0
+643397381 #2531 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=9603 hooks=input_caller_a_note:18977,input_caller_a_apply:81264,reset_check:8575,hazard_rule:8,reset_hub:59,cpu_frame:16105,cpu_stick_x:16105,cpu_stick_y:16105,cpu_transition_term:84816,cpu_motion_change:156,cpu_check_button_on:47981,cpu_shield_param:34097,ui_archive:232,ui_pass_calculate:107994,ui_register_calculate:149,live_replay:32210,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:16105,roster_input:18977,roster_sources:7604,roster_kirby:7604,roster_items:7604,roster_preload:7604,practice_lease:7604,state_frame:16105,recorder_ai:7425,recorder_poll:10150,named_service:24600,menu_input:10150,menu_draw:8603,menu_thumbs:8603,developer_float:31,other:83278
+643402697 #2532 [TrainingRooms] cpu_event common_params object=0x11e343a818
+643402746 #2533 [TrioBoundary] allocation owner=0 caller=main+0x14ec2bc descriptor=(1, [58, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643402746 #2534 [TrioBoundary] allocation owner=1 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643402746 #2535 [TrioBoundary] allocation owner=2 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643402746 #2536 [TrioBoundary] allocation owner=3 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643402755 #2537 [BuildSplit] stall owner=0 gap_us=13431017 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643402755 #2538 [CharacterSources] cpu_quantity=4294967294 seen_by_service slot=0
+643402755 #2539 [BuildSplit] stall owner=1 gap_us=13431006 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643402916 #2540 [BuildSplit] stall owner=0 gap_us=142272 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+643402916 #2541 [BuildSplit] stall owner=1 gap_us=142282 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+643403744 #2542 [TrainingRooms] cpu_event camera_setup game=[-47.0, 130.0, 6000.0] class=Other stage=308 write=None
+643404877 #2543 [PracticeRecording] recorder_stop mode=0 =0
+643404877 #2544 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+643405050 #2545 [LayoutArchive] dumped stock info_training bytes=451604 fnv=8833748e9518a461
+643405052 #2546 [LayoutArchive] handed out info_training bytes=742292 stock=451604 base=stock load_allocations=0
+643405120 #2547 [TrainingRooms] diag_pause_menu object=0x11f7c44c00
+643405123 #2548 [CharacterSources] cpu_quantity=1 seen_by_service slot=0
+643405257 #2549 [TrainingRooms] practice_session held=false (retired or acquired before this frame)
+643405257 #2550 [TrainingRooms] practice_session held=true
+643405257 #2551 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11eccf5180
+643405257 #2552 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643405324 #2553 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=153 owned_non_neutral=0 owners=0x00
+643405324 #2554 [TrainingRooms] hud_draw layout registrations=9
+643405324 #2555 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+643405325 #2556 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643405325 #2557 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11cf0 around=[6478, ed01, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643405328 #2558 [CharacterRoster] observed owner=0 entry=0x12022fe000 kind=0x58 epoch=1
+643405328 #2559 [CharacterRoster] observed owner=1 entry=0x1202304000 kind=0x28 epoch=1
+643405341 #2560 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+643405341 #2561 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11a2f11cf0 around=[6478, ed01, 0011, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+643405389 #2562 [MiiAutoInit] catalog read queued generations=[10, 10] opening=19
+643405408 #2563 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[10, 10] opening=19
+643405408 #2564 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+643405408 #2565 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+643405410 #2566 [TrainingRooms] settings.json written by the writer thread
+643405558 #2567 [TrainingRooms] cpu_event tech_call accessor=0x120eb95240 requested=1 role=false
+643406256 #2568 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text="Swap both once to load"
+643406257 #2569 [PreloadStatus] raise text="Swap both once to load" frames=120
+643406273 #2570 [TrainingRooms] notice_visible=true menu_open=false
+643406273 #2571 [TrainingRooms] notice_draw header="Fighters" body="Swap both once to load" color=[0, 0, 0, 255]
+643406275 #2572 [CharacterSources] install slot=2 kind=0xb
+643406275 #2573 [TrioBoundary] reload entry=0x120230a000 owner=2 caller=main+0x7c280c5654 guard=0 incoming=(1, [b, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643406942 #2574 [CharacterSources] memory slot=2 kinds=[b] phase=helper committed=Some(2278207488)->Some(2336731136) delta=58523648 estimate=161218560 headroom=Some(1107841024)
+643406942 #2575 [CharacterSources] ready slot=2 kind=0xb ticks=43
+643406942 #2576 [CharacterSources] install slot=3 kind=0x8
+643406942 #2577 [TrioBoundary] reload entry=0x121e580000 owner=3 caller=main+0x7c280c5654 guard=0 incoming=(1, [8, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643407574 #2578 [CharacterSources] memory slot=3 kinds=[8] phase=helper committed=Some(2336731136)->Some(2385620992) delta=48889856 estimate=60358656 headroom=Some(1058951168)
+643407574 #2579 [CharacterSources] ready slot=3 kind=0x8 ticks=40
+643407615 #2580 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=14545 hooks=input_caller_a_note:19418,input_caller_a_apply:83656,reset_check:8717,hazard_rule:9,reset_hub:61,cpu_frame:16399,cpu_stick_x:16399,cpu_stick_y:16399,cpu_transition_term:86288,cpu_motion_change:160,cpu_check_button_on:48869,cpu_shield_param:34691,ui_archive:255,ui_pass_calculate:110388,ui_register_calculate:160,live_replay:32798,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:16399,roster_input:19418,roster_sources:7751,roster_kirby:7751,roster_items:7751,roster_preload:7751,practice_lease:7751,state_frame:16399,recorder_ai:7567,recorder_poll:10448,named_service:25041,menu_input:10448,menu_draw:8741,menu_thumbs:8741,developer_float:31,other:84770
+643407807 #2581 [TrioBoundary] allocation owner=7 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643407807 #2582 [GroupedHelperCapacity] creation layout=Training entry=0x11deb2a000 preserved=true before=[None, None] after=Some([None, None])
+643407807 #2583 [CharacterSources] capacity creation epoch=SceneEpoch(9) backend=Training slot=7 speculative=true qualified=true entry=0x11deb2a000 owner=0x11ed80b400 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643408241 #2584 [CharacterSources] first capacity load stable slot=7 callbacks=30
+643408241 #2585 [CharacterSources] install slot=7 kind=0x1f
+643408241 #2586 [TrioBoundary] reload entry=0x11deb2a000 owner=7 caller=main+0x7c280c5654 guard=0 incoming=(1, [1f, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643408271 #2587 [TrainingRooms] notice_visible=false menu_open=false
+643408759 #2588 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 3, epoch: SceneEpoch(9) } kind=0x1f actors=Some(Actors { pointers: [11fda99f00, 0, 0, 0, 0], actors: [Some(Actor { actor: 11fda99f00, control: 1180e93400, partner: 0, owner: 7, cleanup_owner: 7, kind: 1f, flags: [0, 1, 0], control_actor: 11fda99f00, input_index: 7, binding: 11e0f4a190, alias_index: 7, partner_control: 0 }), None, None] })
+643408759 #2589 [CharacterSources] memory slot=7 kinds=[1f] phase=helper committed=Some(2385620992)->Some(2455351296) delta=69730304 estimate=83951616 headroom=Some(989220864)
+643408759 #2590 [CharacterSources] ready slot=7 kind=0x1f ticks=32
+643408991 #2591 [TrioBoundary] allocation owner=6 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643408991 #2592 [GroupedHelperCapacity] creation layout=Training entry=0x11de850000 preserved=true before=[None, None] after=Some([None, None])
+643408991 #2593 [CharacterSources] capacity creation epoch=SceneEpoch(9) backend=Training slot=6 speculative=true qualified=true entry=0x11de850000 owner=0x11ed80cd00 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643409073 #2594 [PreloadStatus] delivered text=Some("Swap both once to load")
+643409473 #2595 [CharacterSources] first capacity load stable slot=6 callbacks=30
+643409473 #2596 [CharacterSources] install slot=6 kind=0x6
+643409473 #2597 [TrioBoundary] reload entry=0x11de850000 owner=6 caller=main+0x7c280c5654 guard=0 incoming=(1, [6, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643410053 #2598 [LayoutArchive] released info_training bytes=742292 after=5001ms
+643410404 #2599 [BuildSplit] stall owner=0 gap_us=96715 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[58] flags=0x0
+643410404 #2600 [BuildSplit] stall owner=1 gap_us=96727 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+643410405 #2601 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 6, entry: NativeEntry(76747702272), generation: 3, epoch: SceneEpoch(9) } kind=0x6 actors=Some(Actors { pointers: [1180f23280, 0, 0, 0, 0], actors: [Some(Actor { actor: 1180f23280, control: 1180e95000, partner: 0, owner: 6, cleanup_owner: 6, kind: 6, flags: [0, 1, 0], control_actor: 1180f23280, input_index: 6, binding: 11e0f49f10, alias_index: 6, partner_control: 0 }), None, None] })
+643410405 #2602 [CharacterSources] memory slot=6 kinds=[6] phase=helper committed=Some(2455351296)->Some(2562109440) delta=106758144 estimate=127401984 headroom=Some(882462720)
+643410405 #2603 [CharacterSources] ready slot=6 kind=0x6 ticks=52
+643410575 #2604 [TrioBoundary] allocation owner=5 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643410575 #2605 [GroupedHelperCapacity] creation layout=Training entry=0x11de856000 preserved=true before=[None, None] after=Some([None, None])
+643410575 #2606 [CharacterSources] capacity creation epoch=SceneEpoch(9) backend=Training slot=5 speculative=true qualified=true entry=0x11de856000 owner=0x11eed50800 visible_mii_kept=[None, None] visible_bank_kept=[None, None]
+643411039 #2607 [CharacterSources] first capacity load stable slot=5 callbacks=30
+643411039 #2608 [CharacterSources] install slot=5 kind=0x2e
+643411039 #2609 [TrioBoundary] reload entry=0x11de856000 owner=5 caller=main+0x7c280c5654 guard=0 incoming=(1, [2e, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643411374 #2610 [TrainingRooms] state_hook_counts frames=600 param=4 quake=0 sound=2 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+643411475 #2611 [TrainingRooms] input_hook_counts p1_poll=992 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+643411672 #2612 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 5, entry: NativeEntry(76747726848), generation: 2, epoch: SceneEpoch(9) } kind=0x2e actors=Some(Actors { pointers: [1180f23f80, 0, 0, 0, 0], actors: [Some(Actor { actor: 1180f23f80, control: 1180e95e00, partner: 0, owner: 5, cleanup_owner: 5, kind: 2e, flags: [0, 1, 0], control_actor: 1180f23f80, input_index: 5, binding: 11e0f49c90, alias_index: 5, partner_control: 0 }), None, None] })
+643411672 #2613 [CharacterSources] memory slot=5 kinds=[2e] phase=helper committed=Some(2561781760)->Some(2629873664) delta=68091904 estimate=69009408 headroom=Some(814698496)
+643411672 #2614 [CharacterSources] ready slot=5 kind=0x2e ticks=39
+643413376 #2615 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6002 motion_change=7 quake_pos=0 command_flag=4808 air_kind=0 stick_dir=0 heap_allocations=0
+643417687 #2616 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49189 hooks=input_caller_a_note:20670,input_caller_a_apply:88664,reset_check:9343,hazard_rule:9,reset_hub:61,cpu_frame:17651,cpu_stick_x:17651,cpu_stick_y:17651,cpu_transition_term:92548,cpu_motion_change:164,cpu_check_button_on:52625,cpu_shield_param:37195,ui_archive:255,ui_pass_calculate:115803,ui_register_calculate:160,live_replay:35302,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:17651,roster_input:20670,roster_sources:8377,roster_kirby:8377,roster_items:8377,roster_preload:8377,practice_lease:8377,state_frame:17651,recorder_ai:8193,recorder_poll:11074,named_service:26919,menu_input:11074,menu_draw:9342,menu_thumbs:9342,developer_float:31,other:91030
+643421042 #2617 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+643421110 #2618 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+643422870 #2619 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+643422876 #2620 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+643422877 #2621 [CharacterRoster] settings role=Player size=3 kinds=[1c, 36, 8]
+643422877 #2622 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(0))
+643422877 #2623 [CharacterRoster] settings role=Cpu size=1 kinds=[1]
+643422877 #2624 [CharacterRoster] queued owner=1 entry=0x1202304000 epoch=1 selection=Direct(TrioFighter(0))
+643422891 #2625 [CharacterRoster] install owner=1 entry=0x1202304000 from=0x28 to=0x0 slot=None epoch=1 mode=0x4040000
+643422892 #2626 [Destroy] plan owner=1 reason=mod reload steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643422892 #2627 [GroupSwap] pad route released owner=1 reason=mod reload contexts=1 cleared=1
+643422892 #2628 [TrioBoundary] reload entry=0x1202304000 owner=1 caller=main+0x7c2808e4f4 guard=0 incoming=(1, [0, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=6 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643422895 #2629 [Ui] menu session cleared
+643422908 #2630 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=1 guard=1 tick=1
+643422925 #2631 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=2 guard=1 tick=2
+643422990 #2632 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=3 guard=1 tick=6
+643423008 #2633 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=4 guard=1 tick=7
+643423024 #2634 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=6 guard=1 tick=8
+643423040 #2635 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=7 guard=1 tick=9
+643423088 #2636 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643423088 #2637 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+643423239 #2638 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=9 guard=1 tick=21
+643423257 #2639 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=11 guard=1 tick=22
+643423440 #2640 [CharacterRoster] phase owner=1 target=0x0 outer=3 loader=13 guard=1 tick=33
+643423440 #2641 [PracticeRecording] recorder_stop mode=0 =0
+643423440 #2642 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+643423442 #2643 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+643423457 #2644 [CharacterRoster] phase owner=1 target=0x0 outer=6 loader=14 guard=0 tick=34
+643423457 #2645 [CharacterRoster] HUD listener owner=1 vtable=0x5063320 member=0x1377b40
+643423457 #2646 [CharacterRoster] HUD refresh owner=1 kind=0x0 delivered=1 listeners=1
+643423458 #2647 [MiiOrdinaryCpu] generic CPU owner committed kind=0x0 index=0 cursor=None
+643423459 #2648 [PreloadGrace] start generation=22 us=643423459012 deadline_us=643425459012
+643423459 #2649 [CharacterRoster] complete owner=1 target=Mario kind=0x0 slot=None ticks=34 body_id=0x10001
+643423471 #2650 [TrainingRooms] notice_visible=true menu_open=false
+643423471 #2651 [TrainingRooms] notice_draw header="CPU Character" body="Mario" color=[0, 0, 0, 255]
+643423545 #2652 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1233 stick_y=1233 clatter_start=0 transition_term=6098 motion_change=7 quake_pos=0 command_flag=4936 air_kind=0 stick_dir=0 heap_allocations=0
+643425356 #2653 [Destroy] plan owner=0 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425356 #2654 [GroupSwap] pad route released owner=0 reason=finalize contexts=1 cleared=1
+643425423 #2655 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=135 owned_non_neutral=0 owners=0x00
+643425423 #2656 [MiiSavedAlpha] destroyed owner=0 entry=0x12022fe000 cleanup_writes=false
+643425423 #2657 [CharacterRoster] invalidated observed entry before destruction owner=0 entry=0x12022fe000
+643425423 #2658 [CharacterRoster] practice consumers invalidated on P1 entry destruction
+643425423 #2659 [TrioBoundary] destroy entry=0x12022fe000 owner=0 active=(1, [58, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425423 #2660 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425423 #2661 [Destroy] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425423 #2662 [GroupSwap] pad route released owner=1 reason=finalize contexts=1 cleared=1
+643425429 #2663 [Ui] menu session cleared
+643425465 #2664 [MiiSavedAlpha] destroyed owner=1 entry=0x1202304000 cleanup_writes=false
+643425465 #2665 [CharacterRoster] invalidated observed entry before destruction owner=1 entry=0x1202304000
+643425465 #2666 [TrioBoundary] destroy entry=0x1202304000 owner=1 active=(1, [0, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425466 #2667 [Destroy] plan owner=1 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425466 #2668 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425509 #2669 [CharacterSources] destroyed slot=2 tracked_leases=0
+643425509 #2670 [TrioBoundary] destroy entry=0x120230a000 owner=2 active=(1, [b, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425509 #2671 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425509 #2672 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425566 #2673 [CharacterSources] destroyed slot=3 tracked_leases=0
+643425567 #2674 [TrioBoundary] destroy entry=0x121e580000 owner=3 active=(1, [8, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425567 #2675 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425567 #2676 [Destroy] plan owner=5 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425627 #2677 [ManagedSourceCleanup] canonical cleanup source=Some(SourceToken { slot: 5, entry: NativeEntry(76747726848), generation: 2, epoch: SceneEpoch(9) }) retiring=false index=0 masks=[(1, 1), (0, 0)] record=Some(Actor { actor: 1180f23f80, control: 1180e95e00, partner: 0, owner: 5, cleanup_owner: 5, kind: 2e, flags: [0, 1, 0], control_actor: 1180f23f80, input_index: 5, binding: 11e0f49c90, alias_index: 5, partner_control: 0 })
+643425627 #2678 [ManagedSourceCleanup] actor epoch=SceneEpoch(9) entry=0x11de856000 owner=0x11eed50800 actor=0x1180f23f80 kind=0x2e source=Some(SourceToken { slot: 5, entry: NativeEntry(76747726848), generation: 2, epoch: SceneEpoch(9) }) pending=Some(false) identity=true entry_associated=true resource_associated=true native_return=true valid=true input=Ok(Inputs { slot: 5, service: 11d316d490, data: 11cd07ee80, records: 11e0f49010, mapping: 1181103c00, map7: ffffffff, controller: 85db5830, controller_property: 85db57c0, controller_flag: 0, css_role: 0, cpu_flag: 1, slots: [InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }] })
+643425630 #2679 [ManagedSourceCleanup] entry destruction source=SourceToken { slot: 5, entry: NativeEntry(76747726848), generation: 2, epoch: SceneEpoch(9) } phase=Ok(Departed) ticks=39 departed=true pending_install=None gate_active=false
+643425630 #2680 [CharacterSources] destroyed slot=5 tracked_leases=0
+643425630 #2681 [TrioBoundary] destroy entry=0x11de856000 owner=5 active=(1, [2e, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425630 #2682 [ManagedSourceCleanup] listener epoch=SceneEpoch(9) entry=0x11de856000 owner=0x11eed50800 before=Some(23) after=Some(22) removed=true
+643425630 #2683 [Destroy] plan owner=5 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425630 #2684 [Destroy] plan owner=6 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=1 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425688 #2685 [ManagedSourceCleanup] canonical cleanup source=Some(SourceToken { slot: 6, entry: NativeEntry(76747702272), generation: 3, epoch: SceneEpoch(9) }) retiring=false index=0 masks=[(1, 1), (0, 0)] record=Some(Actor { actor: 1180f23280, control: 1180e95000, partner: 0, owner: 6, cleanup_owner: 6, kind: 6, flags: [0, 1, 0], control_actor: 1180f23280, input_index: 6, binding: 11e0f49f10, alias_index: 6, partner_control: 0 })
+643425688 #2686 [ManagedSourceCleanup] actor epoch=SceneEpoch(9) entry=0x11de850000 owner=0x11ed80cd00 actor=0x1180f23280 kind=0x6 source=Some(SourceToken { slot: 6, entry: NativeEntry(76747702272), generation: 3, epoch: SceneEpoch(9) }) pending=Some(false) identity=true entry_associated=true resource_associated=true native_return=true valid=true input=Ok(Inputs { slot: 6, service: 11d316d490, data: 11cd07ee80, records: 11e0f49010, mapping: 1181103c00, map7: ffffffff, controller: 85db5830, controller_property: 85db57c0, controller_flag: 0, css_role: 0, cpu_flag: 1, slots: [InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }] })
+643425690 #2687 [ManagedSourceCleanup] entry destruction source=SourceToken { slot: 6, entry: NativeEntry(76747702272), generation: 3, epoch: SceneEpoch(9) } phase=Ok(Departed) ticks=52 departed=true pending_install=None gate_active=false
+643425690 #2688 [CharacterSources] destroyed slot=6 tracked_leases=0
+643425690 #2689 [TrioBoundary] destroy entry=0x11de850000 owner=6 active=(1, [6, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425691 #2690 [ManagedSourceCleanup] listener epoch=SceneEpoch(9) entry=0x11de850000 owner=0x11ed80cd00 before=Some(22) after=Some(21) removed=true
+643425691 #2691 [Destroy] plan owner=6 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=1 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425691 #2692 [Destroy] plan owner=7 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425735 #2693 [ManagedSourceCleanup] canonical cleanup source=Some(SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 3, epoch: SceneEpoch(9) }) retiring=false index=0 masks=[(1, 1), (0, 0)] record=Some(Actor { actor: 11fda99f00, control: 1180e93400, partner: 0, owner: 7, cleanup_owner: 7, kind: 1f, flags: [0, 1, 0], control_actor: 11fda99f00, input_index: 7, binding: 11e0f4a190, alias_index: 7, partner_control: 0 })
+643425735 #2694 [ManagedSourceCleanup] actor epoch=SceneEpoch(9) entry=0x11deb2a000 owner=0x11ed80b400 actor=0x11fda99f00 kind=0x1f source=Some(SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 3, epoch: SceneEpoch(9) }) pending=Some(false) identity=true entry_associated=true resource_associated=true native_return=true valid=true input=Ok(Inputs { slot: 7, service: 11d316d490, data: 11cd07ee80, records: 11e0f49010, mapping: 1181103c00, map7: ffffffff, controller: 85db5830, controller_property: 85db57c0, controller_flag: 0, css_role: 0, cpu_flag: 1, slots: [InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }, InputSlot { pointer: 0, state: 2, key: ffffffff, owner: ffffffff, alias: ffffffff }] })
+643425738 #2695 [ManagedSourceCleanup] entry destruction source=SourceToken { slot: 7, entry: NativeEntry(76750692352), generation: 3, epoch: SceneEpoch(9) } phase=Ok(Departed) ticks=32 departed=true pending_install=None gate_active=false
+643425738 #2696 [CharacterSources] destroyed slot=7 tracked_leases=0
+643425738 #2697 [TrioBoundary] destroy entry=0x11deb2a000 owner=7 active=(1, [1f, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+643425738 #2698 [ManagedSourceCleanup] listener epoch=SceneEpoch(9) entry=0x11deb2a000 owner=0x11ed80b400 before=Some(21) after=Some(20) removed=true
+643425738 #2699 [Destroy] plan owner=7 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+643425755 #2700 [CharacterSources] capacity owner retired owner=0x11eed50800 entry_destroyed=true
+643425755 #2701 [ManagedSourceCleanup] retirement epoch=SceneEpoch(9) entry=0x11de856000 owner=0x11eed50800 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)
+643425755 #2702 [ManagedSourceCleanup] claim owner=0x11eed50800 released=true claim=2 bound_owner=0x11ed80b400
+643425755 #2703 [ManagedSourceCleanup] extended claim slot=5 owner=0x11eed50800 released=true
+643425755 #2704 [CharacterSources] capacity owner retired owner=0x11ed80cd00 entry_destroyed=true
+643425755 #2705 [ManagedSourceCleanup] retirement epoch=SceneEpoch(9) entry=0x11de850000 owner=0x11ed80cd00 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)
+643425755 #2706 [ManagedSourceCleanup] claim owner=0x11ed80cd00 released=true claim=2 bound_owner=0x11ed80b400
+643425755 #2707 [ManagedSourceCleanup] extended claim slot=6 owner=0x11ed80cd00 released=true
+643425755 #2708 [CharacterSources] capacity owner retired owner=0x11ed80b400 entry_destroyed=true
+643425755 #2709 [ManagedSourceCleanup] retirement epoch=SceneEpoch(9) entry=0x11deb2a000 owner=0x11ed80b400 entry_destroyed=true reservation_cleared=true ready_actors=1 actor_events=1 valid_actors=1 ready_cleanups=1 listener_removed=Some(true)
+643425755 #2710 [ManagedSourceCleanup] claim owner=0x11ed80b400 released=true claim=0 bound_owner=0x0
+643425768 #2711 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+643425768 #2712 [TrainingRooms] notice_visible=false menu_open=false
+643426993 #2713 [NamedMacroDiag] stall frames=9683 step=0
+643427775 #2714 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=35177 hooks=input_caller_a_note:21614,input_caller_a_apply:92440,reset_check:9785,hazard_rule:9,reset_hub:62,cpu_frame:18514,cpu_stick_x:18514,cpu_stick_y:18514,cpu_transition_term:96796,cpu_motion_change:170,cpu_check_button_on:55217,cpu_shield_param:38923,ui_archive:258,ui_pass_calculate:120215,ui_register_calculate:163,live_replay:37028,hitbox_attack:8,hitbox_catch:8,hitbox_rebound:8,hitbox_frame:18514,roster_input:21614,roster_sources:8825,roster_kirby:8825,roster_items:8825,roster_preload:8825,practice_lease:8825,state_frame:18514,recorder_ai:8520,recorder_poll:11546,named_service:28197,menu_input:11546,menu_draw:9804,menu_thumbs:9804,developer_float:31,other:95354

@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7796e62534444790630d489e42c3991322af728626d4af6c9773b68ab34a2b24",
+  "started": 1793745180.9333897,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: expected Kirby hat request')",
+  "ended": 1793745212.6084876
+}

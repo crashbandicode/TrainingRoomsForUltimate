@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "value": {
+    "first": {
+      "request": "643770840 #4904 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 10 } outgoing=0x28 target=0x1 index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+      "done": "643771441 #4928 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 10 } target=0x1 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+      "shot": "/home/intpa/tr-lr12-inputs/out/RC-final/yoga-224217Z-800389-cpu-bank-dk.png"
+    },
+    "plan": "643771442 #4930 [GroupSwap] plan owner=1 group=0 kinds=[4a] special=Mii bodies=1 ready_fighters=12 pool=5/24 reserve=6 hats=0 alias=0x11eed42700 identity=Some((1, [69, 0, 2, 37]))",
+    "ready": {
+      "request": "643774298 #4958 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 11 } outgoing=0x1 target=0x4a index=0 cursor=Some(1) mii=true",
+      "done": "643774424 #4985 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 24, entry: 77525819392, sequence: 11 } target=0x4a physical=0x4a index=1 original=false mii=true resource_pair=Some(true) released=true",
+      "shot": "/home/intpa/tr-lr12-inputs/out/RC-final/yoga-224220Z-480938-saved-mii-bank.png"
+    },
+    "matching_record_reads": 7,
+    "canonical": "4a00000000000000000000000000000000000000000000000000000000000000000000000000000002014040000000000000690501040b040303020c1305030007020b0a000b211302000d080000040a0008040a000402140000000000022577f4ac661aeaa5efa90f871dab5712",
+    "trace": {
+      "id": "4"
+    }
+  },
+  "started": 1793745716.8035014,
+  "ended": 1793745740.885517
+}

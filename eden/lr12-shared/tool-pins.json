@@ -1,0 +1,171 @@
+{
+  "lifecycle_sha256": "644f9d2af5d7b74e425ed027ef5c21b832ef9c1ea3eddfd88130e1bd70b90917",
+  "runner_local_sha256": "a4eba80dccfc4e0f10b57b897f1d8578b7a25bd34166ac47e38afbe004f37a57",
+  "hook_sha256": "3586f19fbc4cec846577735b8185533dbe589d74c4ce7b9cd47b836c5e5a4ebc",
+  "initial_hook_pin_limitation": "Preparation hash, superseded before Up; not the executed source hash.",
+  "retained_hook_revisions": {
+    "steps-2322dd488875c593322249c2808dec875572e2d2069dc3a4ef62b8aa9b95767d.py": "2322dd488875c593322249c2808dec875572e2d2069dc3a4ef62b8aa9b95767d",
+    "steps-1a1e7bb714a1543004ef3346130cfdb3ac5f66983ef97ff6b24bff4aa25645e0.py": "1a1e7bb714a1543004ef3346130cfdb3ac5f66983ef97ff6b24bff4aa25645e0",
+    "steps-d90f739ace0b1a4a095fca6a6864392a515ebead8137aa4aa4ea56cf86be8503.py": "d90f739ace0b1a4a095fca6a6864392a515ebead8137aa4aa4ea56cf86be8503",
+    "steps-pre-mii-abi.py": "8d652c89a24a8d468ad3cc42512f1bde09852c2d8802bfc034f9bf72c146f15d",
+    "steps-740d8a7b98b59bed3526bbbd0a7abe1ad8dcd30252487aa8dc59d8a602628211.py": "740d8a7b98b59bed3526bbbd0a7abe1ad8dcd30252487aa8dc59d8a602628211",
+    "steps-3c7dd0f713c421e294ed1007742475ee14c54c6595a0f0b88ce905025743f227.py": "3c7dd0f713c421e294ed1007742475ee14c54c6595a0f0b88ce905025743f227",
+    "steps.py": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0",
+    "steps-d70c992197675cc6f22e489018efec5479379f4a63e3b86ccf22c641d8beff7a.py": "d70c992197675cc6f22e489018efec5479379f4a63e3b86ccf22c641d8beff7a"
+  },
+  "per_row_binding": "Late dispatch actions record project_hook_sha256; earlier rows retain source revisions and update/row timing only, no exact receipt-bound hook hash.",
+  "manifest_bindings": {
+    "05a-cpu-approach": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "06-lucas": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-TRIO-END-3": {
+      "sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+      "retained": true
+    },
+    "R3-independent-pause": {
+      "sha256": "316b0c466e2afef3d67d3f22e9e5aba95024461dd4cf6ea38f97cb00f55e3d9b",
+      "retained": true
+    },
+    "03-css": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-SPECIAL-pt": {
+      "sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+      "retained": true
+    },
+    "RC-TRIO-END-2": {
+      "sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+      "retained": true
+    },
+    "02-stage": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-SPECIAL-ordinary": {
+      "sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+      "retained": true
+    },
+    "RC-TEARDOWN-1": {
+      "sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+      "retained": true
+    },
+    "R3-attack-visual": {
+      "sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+      "retained": true
+    },
+    "07-training": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "recover-RC-MII": {
+      "sha256": "7796e62534444790630d489e42c3991322af728626d4af6c9773b68ab34a2b24",
+      "retained": true
+    },
+    "01-main": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-TEARDOWN-2": {
+      "sha256": "17e668a245f19528f575037fce3ff60f7bde5af6fcd412865e16b288795556b5",
+      "retained": true
+    },
+    "05b-cpu-pick": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-MII": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-final": {
+      "sha256": "6f8ff34e2675208e40aa6f801bd674770a6fd6bdd200c35ca199aaacb25c4791",
+      "retained": true
+    },
+    "RC-SPECIAL-ic": {
+      "sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+      "retained": true
+    },
+    "04-steve": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-PILOT": {
+      "sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+      "retained": true
+    },
+    "recover-RC-PILOT": {
+      "sha256": "316b0c466e2afef3d67d3f22e9e5aba95024461dd4cf6ea38f97cb00f55e3d9b",
+      "retained": true
+    },
+    "RC-TEARDOWN-3": {
+      "sha256": "f1a17728a1efb1c6d98225f43eafc829aac2f729c9578ad972c899f2567ffafe",
+      "retained": true
+    },
+    "RC-NOTICE-both": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-HATS": {
+      "sha256": "7796e62534444790630d489e42c3991322af728626d4af6c9773b68ab34a2b24",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-1": {
+      "sha256": "17e668a245f19528f575037fce3ff60f7bde5af6fcd412865e16b288795556b5",
+      "retained": true
+    },
+    "RC-TRIO-END-1": {
+      "sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-3": {
+      "sha256": "6f8ff34e2675208e40aa6f801bd674770a6fd6bdd200c35ca199aaacb25c4791",
+      "retained": true
+    },
+    "recover-RC-SPECIAL-aegis": {
+      "sha256": "bda72557efa72083fa663669a957d0d3a3ec37d4301c19ca93856bf312f57ac5",
+      "retained": true
+    },
+    "RC-SPECIAL-aegis": {
+      "sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+      "retained": true
+    },
+    "recover-RC-TEARDOWN-2": {
+      "sha256": "f1a17728a1efb1c6d98225f43eafc829aac2f729c9578ad972c899f2567ffafe",
+      "retained": true
+    },
+    "05c-cpu74": {
+      "sha256": "9e74edf1f9b091223a920a0d1ee557bb8df90a34302c6e5718465bd56dbb420b",
+      "retained": true
+    },
+    "RC-NOTICE-cpu": {
+      "sha256": "904a1f87c9b25c84e79d367570c7d03f0d657b0e2f089fd7eeeb63e53eb23ad6",
+      "retained": true
+    },
+    "RC-KIRBY-ROB": {
+      "sha256": "7796e62534444790630d489e42c3991322af728626d4af6c9773b68ab34a2b24",
+      "retained": true
+    },
+    "RC-NOTICE-p1": {
+      "sha256": "8d4e136ac20299a054e0c46d1fa96f10200b8ad736b77c21cd43870082aec4af",
+      "retained": true
+    },
+    "recover-RC-NOTICE-p1": {
+      "sha256": "904a1f87c9b25c84e79d367570c7d03f0d657b0e2f089fd7eeeb63e53eb23ad6",
+      "retained": true
+    },
+    "recover-RC-NOTICE-cpu": {
+      "sha256": "4f9771c52f7fe99cbcdafcc3917af6da736d8bd6cf0dde292228d00bc5e51bc7",
+      "retained": true
+    },
+    "recover-RC-HATS": {
+      "sha256": "833ab9946404e0e5e3164040cfe1226993a826aeb866cd02267f54aec8276265",
+      "retained": true
+    }
+  }
+}
