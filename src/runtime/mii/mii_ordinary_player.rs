@@ -295,7 +295,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
         let automatic=false;
         let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);
-        let roster=qualifying && matches!(selection,Selection::Cycle) && setting(&MENU).player_roster.fighters().iter()
+        let roster=qualifying && matches!(selection,Selection::Cycle) && setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()
             .any(|f|MiiClass::from_kind(f.kind()).is_some());
         let direct=if let Selection::Direct(f)=selection {Some(f.kind())} else {None};
         if crate::engine::mii::auto_init::requires_owner(original_kind(Role::Player),roster,direct) {
@@ -308,7 +308,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         return None;
     };
     // A captured mixed roster remains in this adapter, including its ordinary entries.
-    let has_mii=setting(&MENU).player_roster.fighters().iter()
+    let has_mii=setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()
         .any(|f|MiiClass::from_kind(f.kind()).is_some());
     // Same-entry banks: a qualified, captured owner (current epoch, valid menu and
     // catalog, no capture pending) also keeps ordinary-only cycles and direct picks,

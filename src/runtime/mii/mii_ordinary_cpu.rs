@@ -395,7 +395,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
             if user_request {notify(Role::Cpu,"Wait for the practice character to finish loading".into());}
             return Some(true);
         }
-        let wants_mii=setting(&MENU).cpu_roster.fighters().iter()
+        let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
             .any(|f|MiiClass::from_kind(f.kind()).is_some());
         let direct=if let Selection::Direct(f)=selection {Some(f.kind())} else {None};
         if crate::engine::mii::auto_init::requires_owner(original_kind(Role::Cpu),wants_mii,direct) {
@@ -415,7 +415,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         && s.catalog.is_some() && owner.origin.binding.epoch==epoch();
     #[cfg(not(feature="native-body-bank-alpha"))]
     let ordinary_cycle=false;
-    let requested=setting(&MENU).cpu_roster.fighters().iter()
+    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
         .any(|f|MiiClass::from_kind(f.kind()).is_some())
         || ordinary_cycle
         || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());

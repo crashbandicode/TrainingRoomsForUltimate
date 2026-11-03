@@ -1,6 +1,30 @@
 //! Library-test-only regression for allocations observed on s6-09 planning ticks.
 use crate::engine::swap::mii_cycle::compact_regressions::AllocationCount;
 
+#[test]
+fn roster_input_membership_preserves_order_without_first_or_repeat_allocations() {
+    use crate::engine::mii::inventory::MiiClass;
+    use crate::engine::swap::{ordered_roster::OrderedFighterRoster, trio::TrioFighter};
+    let fighter = |kind| TrioFighter::from_kind(kind).unwrap();
+    let ordinary = OrderedFighterRoster::from_fighters(&[fighter(7), fighter(0), fighter(2)]).unwrap();
+    let mixed = OrderedFighterRoster::from_fighters(&[fighter(7), fighter(0x49), fighter(0), fighter(0x48)]).unwrap();
+    for roster in [ordinary, mixed, OrderedFighterRoster::all()] {
+        // Positive control measures the original hook expression, including its
+        // temporary vector. Expected order is retained outside the measurement.
+        let control = AllocationCount::start();
+        let original = std::hint::black_box(roster.fighters());
+        assert!(control.finish() > 0);
+        let expected = original.iter().any(|f| (0x48..=0x4a).contains(&f.kind()));
+        let measured = AllocationCount::start();
+        for _ in 0..128 {
+            let fixed = std::hint::black_box(roster.fighters_excluding_fixed(None));
+            assert!(fixed.iter().eq(original.iter()));
+            assert_eq!(fixed.iter().any(|f| MiiClass::from_kind(f.kind()).is_some()), expected);
+        }
+        assert_eq!(measured.finish(), 0);
+    }
+}
+
 #[path = "../../src/runtime/roster/observe.rs"]
 mod observed_map;
 

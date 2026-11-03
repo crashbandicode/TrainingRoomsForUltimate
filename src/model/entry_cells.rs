@@ -2,6 +2,8 @@
 //! bodies in its window (`+0x4160/68/70`, count `+0x4150`); the game's active-cell index is the byte `+0x5918` (the game's own
 //! reader, main+0x642c88: `ldrb w8,[entry+0x5918]; ldr x9,[entry+0x4150]; cmp; b.ls; ldr x0,[entry+0x4160+8*index]`). A body-bank
 //! group swap and a native Pokemon Trainer switch both change the index, so reading cell 0 (`+0x4160`) misses the running body.
+//! An empty or out-of-count window has no active body: the native `b.ls` skips its load. During initial construction the unused
+//! cells can contain heap residue (F6-30 captured count 0 and three non-pointer values); cell 0 is not a fallback for that state.
 //! Pure and host-tested; `runtime::game::natives::entry_active_body` reads the two fields and calls it.
 
 /// The window's capacity (three cells).
@@ -23,21 +25,23 @@ pub fn read_active_body(
         return 0;
     }
     let cell = if layout_guarded {
-        active_cell(byte(entry + ACTIVE_FIELD), word(entry + COUNT_FIELD))
+        let Some(cell) = active_cell(byte(entry + ACTIVE_FIELD), word(entry + COUNT_FIELD)) else {
+            return 0;
+        };
+        cell
     } else {
         0
     };
     word(entry + BODY_FIELD + 8 * cell) as usize
 }
 
-/// The cell (0..3) the game runs: the index when it is a filled cell (below the count and the capacity), else cell 0 (the
-/// first body, what every reader used before).
-pub fn active_cell(index: u8, count: u64) -> usize {
+/// The cell (0..3) the game runs, only when the index names an installed body.
+pub fn active_cell(index: u8, count: u64) -> Option<usize> {
     let index = usize::from(index);
     if (index as u64) < count && index < CELLS {
-        index
+        Some(index)
     } else {
-        0
+        None
     }
 }
 
@@ -48,16 +52,16 @@ mod tests {
     #[test]
     fn the_running_cell_is_the_games_index_when_it_is_filled() {
         // One body: cell 0. A swapped three-body group with the second body running: cell 1. PT's Charizard: cell 2.
-        assert_eq!(active_cell(0, 1), 0);
-        assert_eq!(active_cell(1, 3), 1);
-        assert_eq!(active_cell(2, 3), 2);
+        assert_eq!(active_cell(0, 1), Some(0));
+        assert_eq!(active_cell(1, 3), Some(1));
+        assert_eq!(active_cell(2, 3), Some(2));
     }
 
     #[test]
-    fn an_index_past_the_filled_cells_falls_back_to_the_first_body() {
-        assert_eq!(active_cell(1, 1), 0, "index past the count");
-        assert_eq!(active_cell(3, 4), 0, "index past the capacity");
-        assert_eq!(active_cell(0, 0), 0, "an empty window");
+    fn an_index_past_the_filled_cells_has_no_body() {
+        assert_eq!(active_cell(1, 1), None, "index past the count");
+        assert_eq!(active_cell(3, 4), None, "index past the capacity");
+        assert_eq!(active_cell(0, 0), None, "an empty window");
     }
 
     #[test]
@@ -125,7 +129,6 @@ mod tests {
                     reads.push(address);
                     match address {
                         0x14150 => count,
-                        0x14160 => 0,
                         _ => panic!("unexpected cell read: {address:x}"),
                     }
                 },
@@ -135,7 +138,7 @@ mod tests {
                 },
             );
             assert_eq!(body, 0);
-            assert_eq!(reads, [0x14150, 0x14160]);
+            assert_eq!(reads, [0x14150]);
         }
     }
 }

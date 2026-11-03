@@ -481,3 +481,12 @@ sha256 recorded under package 6) were read for the three hook offsets and their 
 (`ours-new`, package 6) is called as the lobby-practice gate. Edits to shared files, each with its reason: `Feature::Hitbox` (`sites.rs`), `HookId::Hitbox*`
 (`hook_stats.rs`), the table chain and `CROSS_NEEDS` (`capabilities.rs`, generated), the pass call in `cpu::on_frame`, one `publish` line, `game::natives` additions, boot
 (compare, install, report), `tests/capabilities.rs` (unit mapping and one boundary).
+
+## F6 roster input allocation root (2026-11-03)
+The two Mii ordinary intercept adapters now use the existing fixed-storage roster
+for their four Mii membership predicates. Exact transformations and before/after
+identities are recorded in pkg6-carry-manifest.json and its generated ledger.
+Setting snapshots, ordering, membership, actor/receipt/epoch checks and transaction
+behavior are unchanged. Other roster consumers remain outside this scoped change.
+Original host allocation/order regression and native acceptance are recorded in
+IMPLEMENTATION-PROGRESS-f6.md. No new fork source or mixed file was read.

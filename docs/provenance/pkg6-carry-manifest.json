@@ -5196,7 +5196,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "07d087351797b868551d25145594ac6139e68b5ab7ab6e610c31a822e9c6e3f2",
+   "dest_sha256": "334b3b2689e66fd73cc2c50a4f1d1bd67a550f4bf449e3ed26af4ee75f5f2fa6",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -5432,6 +5432,16 @@
      "old": "        exact.map_or(super::PortraitIntent::NotMii,super::PortraitIntent::Exact));\n    #[cfg(not(feature=\"mii-hud-portrait-alpha\"))]\n    publish_mii_presentation(entry,b.before.binding.owner,b.ticket.epoch,logical);\n    crate::runtime::roster::cycle_preload::foreground_settled();\n    let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);\n    if b.replay.is_none() {state_for(Role::Cpu).lock().unwrap().cursor=b.destination.cursor;}\n    let forms=bank_member_forms(&now.descriptor,logical);\n    let original=b.destination.target==Target::ORIGINAL;\n    publish_partners(Role::Cpu,forms);\n    if b.replay.is_none() {remember_owned(Role::Cpu,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);}\n    if let Some(fighter)=TrioFighter::from_kind(logical).filter(|_|b.replay.is_none()) {\n",
      "new": "        exact.map_or(super::PortraitIntent::NotMii,super::PortraitIntent::Exact));\n    #[cfg(not(feature=\"mii-hud-portrait-alpha\"))]\n    publish_mii_presentation(entry,b.before.binding.owner,b.ticket.epoch,logical);\n    crate::runtime::roster::cycle_preload::foreground_settled();\n    let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);\n    if b.replay.is_none() {state_for(Role::Cpu).lock().cursor=b.destination.cursor;}\n    let forms=bank_member_forms(&now.descriptor,logical);\n    let original=b.destination.target==Target::ORIGINAL;\n    publish_partners(Role::Cpu,forms);\n    if b.replay.is_none() {remember_owned(Role::Cpu,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);}\n    if let Some(fighter)=TrioFighter::from_kind(logical).filter(|_|b.replay.is_none()) {\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "        let wants_mii=setting(&MENU).cpu_roster.fighters().iter()",
+     "new": "        let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()",
+     "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
+    },
+    {
+     "old": "    let requested=setting(&MENU).cpu_roster.fighters().iter()",
+     "new": "    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()",
+     "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
     }
    ]
   },
@@ -5647,7 +5657,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "77a0f304f9a40f12837a31259c5089c3af958eab5c7ddceade5952b0e21d6531",
+   "dest_sha256": "787b97ae185a12a7dddf0a046031ef14c2e865a2b75dee713b1b4a9976b32cda",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -5853,6 +5863,16 @@
      "old": "    #[cfg(not(feature=\"mii-hud-portrait-alpha\"))]\n    publish_mii_presentation(entry,0,b.ticket.epoch,logical);\n    crate::runtime::roster::cycle_preload::foreground_settled();\n    let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);\n    crate::runtime::roster::cycle_preload::completed(0,false,logical);\n    state_for(Role::Player).lock().unwrap().cursor=b.destination.cursor;\n    let forms=bank_member_forms(&now.descriptor,logical);\n    let original=b.destination.target==mii_cycle::Target::Original;\n    publish_partners(Role::Player,forms);\n    remember_owned(Role::Player,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);\n    if let Some(fighter)=TrioFighter::from_kind(logical) {Role::Player.sync_selection(fighter);}\n",
      "new": "    #[cfg(not(feature=\"mii-hud-portrait-alpha\"))]\n    publish_mii_presentation(entry,0,b.ticket.epoch,logical);\n    crate::runtime::roster::cycle_preload::foreground_settled();\n    let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);\n    crate::runtime::roster::cycle_preload::completed(0,false,logical);\n    state_for(Role::Player).lock().cursor=b.destination.cursor;\n    let forms=bank_member_forms(&now.descriptor,logical);\n    let original=b.destination.target==mii_cycle::Target::Original;\n    publish_partners(Role::Player,forms);\n    remember_owned(Role::Player,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);\n    if let Some(fighter)=TrioFighter::from_kind(logical) {Role::Player.sync_selection(fighter);}\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "        let roster=qualifying && matches!(selection,Selection::Cycle) && setting(&MENU).player_roster.fighters().iter()",
+     "new": "        let roster=qualifying && matches!(selection,Selection::Cycle) && setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()",
+     "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
+    },
+    {
+     "old": "    let has_mii=setting(&MENU).player_roster.fighters().iter()",
+     "new": "    let has_mii=setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()",
+     "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
     }
    ]
   },
