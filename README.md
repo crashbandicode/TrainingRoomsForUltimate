@@ -74,9 +74,16 @@ cargo clippy --all-targets -- -D warnings
 cargo build --no-default-features
 cargo test --manifest-path crates/smash-match-data/Cargo.toml
 cargo test --manifest-path crates/hos-lock/Cargo.toml
+cargo test --locked --manifest-path tools/layout-builder/Cargo.toml
 cargo skyline build --release
 cargo skyline build --release --features diag
 ```
+
+The layout builder uses your own stock game archives; generated target archives stay
+private. Its archive and expanded-pane fixture tests require the owned input setup
+and are ignored by default. A default host test run does not validate those fixtures.
+Regenerate both layout recipes when changing the shared pane table, as described in
+[docs/BUILD.md](docs/BUILD.md#layout-archive-recipe-package-5-host-tool).
 
 The Switch artifact is
 `target/aarch64-skyline-switch/release/libtraining_rooms.nro`, or the same
