@@ -666,6 +666,31 @@ pub(super) fn promoted_presentation(owner: u32) -> Option<PromotedPresentation> 
         kind: source.kind, generation, configuration: source.configuration })
 }
 
+/// Fresh presentation proof for a published fixed seat. This is callable from
+/// the existing reset inline hooks: raw native identity reads only, no native
+/// call or PoolLock. Full Mii payload proof stays at existing completion/render
+/// sites. No STATE guard crosses a native read; publication alone is not proof.
+pub(super) unsafe fn current_promoted_presentation(
+    entry: *const u8, owner: u32,
+) -> Option<PromotedPresentation> {
+    if !matches!(owner, 2 | 3) || INSTALL.active() { return None; }
+    let (source, generation) = {
+        let state = STATE.lock();
+        let source = state.sources[owner as usize]?;
+        if source.install.is_some() || source.token.entry() != NativeEntry(entry as u64)
+            || source.completed_native.is_none() { return None; }
+        let generation = state.book.published_promotion(source.promotion?).ok()??;
+        (source, generation)
+    };
+    let current = native_source::promoted_identity(entry, owner, source.kind, !source.active_reload);
+    let state = STATE.lock();
+    if state.sources[owner as usize] != Some(source)
+        || state.book.published_identity(source.promotion?, source.completed_native, current,
+            INSTALL.active()) != Some(generation) { return None; }
+    Some(PromotedPresentation { entry: entry as usize, kind: source.kind, generation,
+        configuration: source.configuration })
+}
+
 /// Demand wins even if it needs the speculative source's slot. Speculation only
 /// fills qualified helpers without taking a consumer lease. Training created
 /// owners require the separate exact-Mii capability. Slot-local order reserves Miis

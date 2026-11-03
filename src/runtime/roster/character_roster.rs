@@ -1601,8 +1601,8 @@ unsafe fn presentation_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
 /// qualified identity without changing CPU1's menu selection or saved epoch.
 unsafe fn publish_promoted_presentation(entry: *const u8, owner: u32) {
     if !crate::runtime::compat::common::is_native_training_mode() { return; }
-    let Some(p) = sources::promoted_presentation(owner) else { return; };
-    if p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+    let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };
+    if p.entry != entry as usize { return; }
     PROMOTED_REBUILT[(owner - 2) as usize].store(false, Ordering::Release);
     #[cfg(feature="mii-hud-portrait-alpha")]
     {
@@ -1710,8 +1710,8 @@ pub unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64, entry: *const u
             return;
         }
         if !crate::runtime::compat::common::is_native_training_mode() { return; }
-        let Some(p) = sources::promoted_presentation(owner) else { return; };
-        if p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+        let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };
+        if p.entry != entry as usize { return; }
         if p.configuration.is_some() {
             rebuilt.store(true, Ordering::Release);
         } else if ctx.registers[0].x() as u32 == p.kind {
@@ -1763,12 +1763,14 @@ unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
     if matches!(owner, 2 | 3) {
         let rebuilt = &PROMOTED_REBUILT[(owner - 2) as usize];
         if !rebuilt.load(Ordering::Acquire) || busy() { return; }
-        let Some(p) = sources::promoted_presentation(owner) else {
+        if sources::promoted_presentation(owner).is_none() {
             rebuilt.store(false, Ordering::Release);
             return;
-        };
+        }
+        // A temporarily unready native body must not consume the reset notice.
+        let Some(p) = sources::current_promoted_presentation(entry, owner) else { return; };
         if !crate::runtime::compat::common::is_native_training_mode()
-            || p.entry != entry as usize || !active_body(entry, owner, p.kind) { return; }
+            || p.entry != entry as usize { return; }
         rebuilt.store(false, Ordering::Release);
         #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::represent(entry, owner, p.kind);
@@ -1841,8 +1843,7 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
     let ordinary = owner <= 1 && current_scope.is_some_and(|s| s.mode == 0x04040000);
     let promoted = matches!(owner, 2 | 3)
         && crate::runtime::compat::common::is_native_training_mode()
-        && sources::promoted_presentation(owner).is_some_and(|p|
-            p.entry == entry as usize && p.kind == kind && active_body(entry, owner, kind));
+        && sources::current_promoted_presentation(entry, owner).is_some_and(|p| p.kind == kind);
     if !ordinary && !waiting_cpu && !promoted {
         trace!(
             "[CharacterRoster] HUD skipped: owner={} scope={:?} game={:?}",

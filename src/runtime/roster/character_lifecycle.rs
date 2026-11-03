@@ -185,7 +185,7 @@ pub fn init() {
 // entry and admit its verified replacement to the existing native refresh path.
 // The character loader owns the identity/body checks; no game pointer is cached.
 unsafe fn allow_portrait(ctx: &mut InlineCtx, entry_id: u64) {
-    if entry_id > 1 || !ordinary_training() {
+    if !crate::engine::swap::source_lifetime::training_portrait_owner(entry_id, ordinary_training()) {
         return;
     }
     let symbol = MANAGER_SYMBOL.load(Ordering::Acquire);

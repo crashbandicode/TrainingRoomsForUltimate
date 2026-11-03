@@ -460,3 +460,11 @@ on the operator's menu decisions.
    source copy; `df` ≥ 40 GB; playbook gates one cargo call each.
 4. Keep this file current at every checkpoint; the lead's scratchpad watcher
    (PID 1724155) dies with the harness process and is not part of the repo.
+
+## Promoted HUD identity root integrated — 2026-11-03 09:06Z
+
+Exact seven-file pkg6 slice29a01946 from366a484 applied to clean4315852; all before/after hashes independently verified and full253 carry verification passed against approved m5q. Shared promoted presentation uses completed-purpose/full sealed native identity outside STATE and then exact source/publication generation/no-INSTALL recheck. Existing Mii G proofs and ordinary/Reload strictness remain; Training reset dispatcher reaches owners2/3 through qualified publication. Reset notices survive temporary unreadiness. No new native calls, PoolLock, hooks or observers.
+
+Targeted worker host gate independently audited:1209 frozen files equal before/after/current, actual executed ELF d519fd624f8e6ff36c4202b801e81f650308f2c9cad3f698a4edd160dbcfb430, log43c59b8fc8fdc853a02d4932bab143fc37ba8a1b885769279a94e387675e5412;8 passed/0 failed/0 ignored/1277 filtered, zero warnings. Three new production-model regressions plus five prior count/Mii tests. Canonical ledger confirms free Surface admission08:57 with21.276GB available/181.798GB disk,58.477GB aggregate cache+600MB,6GiB1800s, immediate RELEASE Cargo0/wrapper0; Yoga runtime independent. Skill cargo-count refused absent all-target list logs, retained in main-r16/lead-hud-host-gate-audit.json; no all-target execution claim.
+
+This source is NOT the r16 binary. Next: integrate pkg4 first-seal only after targeted gate, freeze one coherent candidate, run affected host and ONE diagnostic native build under normal admission, then addressed publication/reset/Mii call/stack review before fresh s6-13. Original r16 body/HUD mismatch and all RC gates remain open; no feature acceptance from this host result.

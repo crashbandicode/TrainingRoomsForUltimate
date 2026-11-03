@@ -30,6 +30,12 @@ pub struct NativeIdentity {
     pub resource: usize,
 }
 
+/// Existing native Training reset dispatch covers all four visible owners.
+/// Managed seats still require their current publication in the adapter.
+pub fn training_portrait_owner(owner: u64, training: bool) -> bool {
+    training && owner <= 3
+}
+
 /// Caller-defined category and identity (copy body, live item, etc.).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Holder {
@@ -340,6 +346,22 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
         Ok(self.slots[promotion.source.slot].presentation)
     }
 
+    /// Validate a published receipt against a freshly read full native identity.
+    /// The adapter selects the completed transaction's readiness contract and
+    /// rechecks its source snapshot before calling this; this never reads native
+    /// memory or upgrades an unpublished reservation to a presentation.
+    pub fn published_identity(&self, promotion: PromotionToken,
+        sealed: Option<NativeIdentity>, current: Option<NativeIdentity>, installing: bool,
+    ) -> Option<u64> {
+        if installing { return None; }
+        let sealed = sealed?;
+        if current != Some(sealed) || sealed.slot as usize != promotion.source.slot
+            || sealed.entry as u64 != promotion.source.entry.0 { return None; }
+        let state = self.exact(promotion.source).ok()?;
+        if state.key != Some(SourceKey { kind: sealed.kind, costume: sealed.costume }) { return None; }
+        self.published_promotion(promotion).ok().flatten()
+    }
+
     /// Every acquire owns a distinct lease, even when holder values are equal.
     /// Keep it until the actual consumer ends, not merely until the UI finishes.
     pub fn acquire(&mut self, ready: ReadyToken, holder: Holder) -> Result<LeaseToken, Error> {
@@ -451,6 +473,94 @@ mod tests {
     const COPY_P1: Holder = Holder { category: 1, id: 100 };
     const COPY_CPU: Holder = Holder { category: 1, id: 200 };
     const ITEM: Holder = Holder { category: 2, id: 300 };
+
+    #[test]
+    fn count_promotion_hud_uses_completed_purpose_and_full_published_identity() {
+        use crate::engine::swap::character_forms::EntryState;
+        // s6-12 #294 retained Samus identity; s6-11 #308 parked marker shape.
+        let native = NativeIdentity { slot: 2, entry: 77577412608, kind: 3,
+            costume: 3, body_id: 131073, bodies: [(75895878416, 131073), (0, 0), (0, 0)],
+            descriptor: 77577412880, resource: 77044595200 };
+        let shape = EntryState { count: 1, kinds: [3, u32::MAX, u32::MAX],
+            actor_count: 1, installed: 1, index: 0, previous_or_next: 0, pending: 255,
+            flags: 0, outer: 6, loader: 14, changing: 1, guard: 0 };
+        let mut book = SourceBook::<4, 1>::new();
+        let ready = book.register_ready(2, book.epoch(), NativeEntry(native.entry as u64),
+            SourceKey { kind: 3, costume: 3 }).unwrap();
+        let promotion = book.promote(ready).unwrap();
+        assert_eq!(book.published_identity(promotion, Some(native), Some(native), false), None);
+        let generation = book.publish_promotion(promotion).unwrap();
+        assert!(shape.ready().is_none(), "ordinary Reload stays strict");
+        assert_eq!(book.published_identity(promotion, Some(native),
+            shape.ready_count_promoted(false).map(|_| native), false), None);
+        assert_eq!(book.published_identity(promotion, Some(native),
+            shape.ready_count_promoted(true).map(|_| native), false), Some(generation));
+        let reset = EntryState { changing: 0, ..shape };
+        assert_eq!(book.published_identity(promotion, Some(native),
+            reset.ready_count_promoted(true).map(|_| native), false), Some(generation));
+        assert_eq!(book.published_identity(promotion, Some(native), Some(native), true), None);
+        assert_eq!(book.published_identity(promotion, None, Some(native), false), None);
+        assert_eq!(book.published_identity(promotion, Some(native), None, false), None);
+        for changed in [
+            NativeIdentity { slot: 3, ..native },
+            NativeIdentity { entry: native.entry + 8, ..native },
+            NativeIdentity { kind: 2, ..native },
+            NativeIdentity { costume: 4, ..native },
+            NativeIdentity { body_id: 131074, ..native },
+            NativeIdentity { bodies: [(75895878424, 131073), (0, 0), (0, 0)], ..native },
+            NativeIdentity { bodies: [(75895878416, 131074), (0, 0), (0, 0)], ..native },
+            NativeIdentity { bodies: [(75895878416, 131073), (8, 2), (0, 0)], ..native },
+            NativeIdentity { descriptor: native.descriptor + 8, ..native },
+            NativeIdentity { resource: native.resource + 8, ..native },
+        ] {
+            assert_eq!(book.published_identity(promotion, Some(native), Some(changed), false), None);
+        }
+        // Even two matching identities cannot name a foreign source/key.
+        for foreign in [NativeIdentity { slot: 1, ..native },
+            NativeIdentity { entry: 17, ..native }, NativeIdentity { kind: 4, ..native },
+            NativeIdentity { costume: 0, ..native }] {
+            assert_eq!(book.published_identity(promotion, Some(foreign), Some(foreign), false), None);
+        }
+        assert_eq!(book.published_identity(promotion, Some(native), Some(native), false), Some(generation));
+    }
+
+    #[test]
+    fn count_promotion_hud_rejects_readopt_reload_reused_entry_and_old_epoch() {
+        let native = NativeIdentity { slot: 2, entry: 17, kind: A.kind, costume: A.costume,
+            body_id: 3, bodies: [(24, 3), (0, 0), (0, 0)], descriptor: 32, resource: 40 };
+        let mut book = SourceBook::<4, 1>::new();
+        let ready = book.register_ready(2, book.epoch(), NativeEntry(17), A).unwrap();
+        let old = book.promote(ready).unwrap();
+        let generation = book.publish_promotion(old).unwrap();
+        book.readopt(old).unwrap();
+        assert_eq!(book.published_identity(old, Some(native), Some(native), false), None);
+        let next = book.promote(ready).unwrap();
+        assert_eq!(book.published_identity(next, Some(native), Some(native), false), None);
+        let newer = book.publish_promotion(next).unwrap();
+        assert!(newer > generation);
+        assert_eq!(book.published_identity(old, Some(native), Some(native), false), None);
+        assert_eq!(book.published_identity(next, Some(native), Some(native), false), Some(newer));
+        let load = book.begin_promoted_reload(next, A).unwrap();
+        assert_eq!(book.published_identity(next, Some(native), Some(native), false), None);
+        let ready = book.complete(load).unwrap();
+        let reloaded = book.promote(ready).unwrap();
+        book.publish_promotion(reloaded).unwrap();
+        book.native_destroyed(ready.source()).unwrap();
+        let reused = book.register_ready(2, book.epoch(), NativeEntry(17), A).unwrap();
+        let replacement = book.promote(reused).unwrap();
+        book.publish_promotion(replacement).unwrap();
+        assert_eq!(book.published_identity(reloaded, Some(native), Some(native), false), None);
+        assert!(book.published_identity(replacement, Some(native), Some(native), false).is_some());
+        book.depart_scene().unwrap();
+        assert_eq!(book.published_identity(replacement, Some(native), Some(native), false), None);
+    }
+
+    #[test]
+    fn count_promotion_reset_dispatch_reaches_four_training_owners_only() {
+        for owner in 0..=3 { assert!(training_portrait_owner(owner, true)); }
+        for owner in [4, 5, 6, 7, 8, u64::MAX] { assert!(!training_portrait_owner(owner, true)); }
+        for owner in 0..=8 { assert!(!training_portrait_owner(owner, false)); }
+    }
 
     #[test]
     fn visible_cutover_requires_real_consumer_release_and_a_new_completed_generation() {

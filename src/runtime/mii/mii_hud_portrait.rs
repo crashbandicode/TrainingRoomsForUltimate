@@ -858,9 +858,8 @@ unsafe fn owner_current(logical: u32, layout: Layout, physical: u32, entry: usiz
     if layout == Layout::Training && matches!(physical, 2 | 3) {
         return mii_backend::current() == Some(layout) && practice_scope(physical)
             && logical == physical
-            && sources::promoted_presentation(physical).is_some_and(|p|
-                p.entry == entry && p.kind == kind && p.generation == generation)
-            && active_body(entry as *const u8, physical, kind);
+            && sources::current_promoted_presentation(entry as *const u8, physical).is_some_and(|p|
+                p.entry == entry && p.kind == kind && p.generation == generation);
     }
     let role = if logical == 0 { Role::Player } else { Role::Cpu };
     mii_backend::current() == Some(layout)
@@ -1595,9 +1594,13 @@ unsafe fn finish_job(base: usize, svc: Option<ServiceCallback>, owner: usize, te
             Intent::Original { original_kind } => PortraitIntent::Original { original_kind },
         };
         let accepted = request(next.entry as *const u8, next.physical, next.generation, next.kind, intent, next.defer_hud);
-        let owner_current = mii_backend::current() == Some(next.layout)
-            && active_body(next.entry as *const u8, next.physical, next.kind)
-            && publication_generation(next.logical, next.physical) == Some(next.generation);
+        let owner_current = if next.layout == Layout::Training && matches!(next.physical, 2 | 3) {
+            owner_current(next.logical, next.layout, next.physical, next.entry, next.kind, next.generation)
+        } else {
+            mii_backend::current() == Some(next.layout)
+                && active_body(next.entry as *const u8, next.physical, next.kind)
+                && publication_generation(next.logical, next.physical) == Some(next.generation)
+        };
         if policy::rejected_deferral(next.defer_hud, accepted, owner_current, svc.is_some())
             == policy::HudStep::RefreshFallback
         {
