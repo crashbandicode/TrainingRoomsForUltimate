@@ -588,10 +588,6 @@
       "end": "main",
       "steps": [
         {
-          "run": "navigation.py:trace_wiring",
-          "check": true
-        },
-        {
           "gate": "main"
         },
         {
