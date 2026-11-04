@@ -15,14 +15,16 @@
 //! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
 //! `game::natives`, whose grant check refuses a row boot rejected.
 //!
-//! HB1's renderer-agnostic half is implemented and host-proven (`model::hitbox`: the hurtbox reader, the enumeration of the
-//! enabled parts and the dispatch into the same handle sets): the pass's dispatch takes the hurt reader as the draw route's
-//! plug-in point. The draw route itself is not wired: the operator's option A (an isolated visualization sphere) against the
-//! fork's shared-pool `sys_shield` route is still open (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`), so the runtime
-//! requests no hurt spheres; the wiring is one `Some(GameHurt { .. })` at the dispatch, over the three relied `hurtbox_*`
-//! guard rows now back in `sites_hitbox`. The diag build runs the reader once per fighter per frame as the hurt census
-//! (`[Hitbox] hurt census`: the parts, the first pass and the read cost) and requests no spheres; the shipped build reads no
-//! HitModule at all.
+//! HB1 route B (operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal`
+//! commit `5ca5e3b`; it reverses the 2026-11-03 option A default): the hurt spheres are drawn the fork's way, as yellow
+//! `sys_shield` spheres from the game's shared effect pool, through the same handle sets as the hit spheres
+//! (`docs/HB1-RENDER-ROUTES.md`). While the setting is On the pass constructs the `HitModule` reader (`GameHurt`, over the
+//! three relied `hurtbox_*` guard rows back in `sites_hitbox`) and plans the enabled parts' spheres into the same wants;
+//! the pool's refusals are counted (`Counts::failed`, the `[Hitbox] stats` line) and each refused sphere is asked again on
+//! a later pass, once the pool has room — one request per want per pass, never a respawn loop (the lead ruling above).
+//! Off — and the stop paths the dispatch takes first (not a practice fighter, shielding, grab) — constructs no reader, so
+//! the shipped build reads the HitModule only while the setting is On. The diag build additionally runs the reader once per
+//! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
@@ -218,6 +220,16 @@ fn effects(accessor: usize) -> GameEffects {
     GameEffects { accessor, effect: EFFECT.load(Ordering::Acquire), attribute: ATTRIBUTE.load(Ordering::Acquire) }
 }
 
+/// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
+/// same read). The reader type-checks every pointer it dereferences before it calls this: a null or misaligned address or
+/// pointer is refused there (Eden answers 0 for an unmapped read, so a missing check would not show there).
+fn mem_load(at: usize, out: &mut [u8]) {
+    // SAFETY: the reader runs only inside the installed feature's pass for a live fighter, on the game thread, and only
+    // while the setting is On (`frame` constructs it behind `enabled`); every address the reader passes was type-checked
+    // first (`model::hitbox::GameHurt`), and the read writes nothing but `out`.
+    unsafe { std::ptr::copy_nonoverlapping(at as *const u8, out.as_mut_ptr(), out.len()) };
+}
+
 struct GameAttacks(usize);
 
 impl hitbox::AttackReader for GameAttacks {
@@ -317,13 +329,23 @@ pub unsafe fn frame(fighter: usize) {
         seen_epoch[i] = epoch;
         counts = set.clear(&mut fx);
     }
-    // The dispatch passes `None` (the draw route is the operator's option A vs the shared-pool route, see the module
-    // notes): no hurt sphere is planned or requested; the diag census's own HitModule read is separate, below.
-    let (c, hits) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), None, &mut fx);
+    // Route B (operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` commit
+    // `5ca5e3b`): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and plans the
+    // enabled parts' hurt spheres into the same wants, drawn from the same shared effect pool as the hit spheres
+    // (`docs/HB1-RENDER-ROUTES.md`). The reader is constructed only here, behind `enabled`: Off — and the stop paths
+    // the dispatch takes first — reads no HitModule, so the shipped build's HitModule reads are On-only.
+    let mut hurt = enabled.then(|| hitbox::GameHurt { accessor, load: mem_load });
+    let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
+    let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut fx);
     #[cfg(feature = "diag")]
-    stats::wanted(hits as u32, 0);
+    let (hits, hurts) = {
+        let hits = wants[..len].iter().filter(|s| s.key >> 24 == hitbox::KIND_HIT).count() as u32;
+        (hits, len as u32 - hits)
+    };
+    #[cfg(feature = "diag")]
+    stats::wanted(hits, hurts);
     #[cfg(not(feature = "diag"))]
-    let _ = hits;
+    let _ = len;
     counts.kept += c.kept;
     counts.spawned += c.spawned;
     counts.killed += c.killed;
@@ -333,8 +355,9 @@ pub unsafe fn frame(fighter: usize) {
     let held_now = set.len();
     HELD.store(table.held_spheres(), Ordering::Relaxed);
     drop(store);
-    // The diag hurt census (decision HB1): one HitModule read per fighter per frame, no sphere requested; the shipped build
-    // has no such read (the module notes).
+    // The diag hurt census (decision HB1): a second HitModule read per fighter per frame over the pass's own read,
+    // for the census line's parts/first-pass/cost fields; no sphere is requested by the census itself, and the
+    // shipped build has no census at all (the module notes).
     #[cfg(feature = "diag")]
     if enabled && visualizes {
         stats::hurt_census(accessor);
@@ -665,7 +688,7 @@ mod stats {
         let window = {
             let mut book = CENSUS.lock();
             let slot = book.slot_for(kind);
-            let mut reader = hitbox::GameHurt { accessor, load: mem_load };
+            let mut reader = hitbox::GameHurt { accessor, load: super::mem_load };
             let start = now();
             let mut spheres = 0usize;
             let parts = hitbox::hurt_parts(&mut reader, |_, shape| spheres += hitbox::spheres(shape.a, shape.b, shape.size).count());
@@ -677,13 +700,4 @@ mod stats {
         }
     }
 
-    /// One raw game-memory read for `hitbox::GameHurt` (the census above). The reader type-checks every pointer
-    /// it dereferences before it calls this: a null or misaligned address or pointer is refused there (Eden
-    /// answers 0 for an unmapped read, so a missing check would not show there).
-    fn mem_load(at: usize, out: &mut [u8]) {
-        // SAFETY: the census runs inside the installed feature's pass for a live fighter, on the game thread;
-        // every address the reader passes was type-checked first (`model::hitbox::GameHurt`), and the read
-        // writes nothing but `out`.
-        unsafe { std::ptr::copy_nonoverlapping(at as *const u8, out.as_mut_ptr(), out.len()) };
-    }
 }

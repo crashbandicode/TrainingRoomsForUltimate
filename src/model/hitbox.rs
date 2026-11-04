@@ -162,12 +162,14 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
     (b != [0.0; 3]).then_some(b)
 }
 
-// ---- hurtboxes (decision HB1 (a), 2026-11-02) -----------------------------------------------------------------------
+// ---- hurtboxes (decision HB1 (a), 2026-11-02; route B, operator decision 2026-11-04 ~06:5xZ) ------------------------
 //
 // The rules below are renderer-agnostic and host-tested: what a part's shape is, which parts a pass reads, and the spheres
-// they become. The draw route (the operator's option A, an isolated visualization sphere, or the fork's shared-pool
-// `sys_shield`) is not picked yet (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`): the runtime plans the hurt spheres
-// but requests none until the route is wired, so the dispatch here is the one interface a route plugs into.
+// they become. The draw route is route B, the fork's shared-pool `sys_shield` spheres (operator decision, `docs/DECISIONS.md`
+// HB1-route, `review/menu-proposal` commit `5ca5e3b`; it reverses the 2026-11-03 option A default, which
+// `OPTION-A-DESIGN.md` could not route safely): `reconcile_frame` plans the enabled parts' spheres into the same wants and
+// requests them through the same set and `Effects` interface as the hitboxes, and the runtime passes `Some(GameHurt { .. })`
+// while the setting is On (`docs/HB1-RENDER-ROUTES.md`).
 
 /// Hurtboxes are drawn yellow.
 pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
@@ -691,7 +693,8 @@ impl<F: FnMut(usize, &mut [u8])> HurtboxReader for GameHurt<F> {
     }
 }
 
-/// One fighter kind's hurt census (the diag build only; the shipped build reads no HitModule): the enabled parts and the
+/// One fighter kind's hurt census (the diag build only; the shipped build has no census — its HitModule reads are the
+/// pass's own, while the setting is On): the enabled parts and the
 /// spheres they want of every observed pass, and the read's cost in ticks. The state of one window; `window` closes a full
 /// one into the `[Hitbox] hurt census` line's fields and opens the next (the first pass's total is kept, never reset).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -768,10 +771,12 @@ impl core::fmt::Display for HurtWindow {
     }
 }
 
-/// The production pass's planning and owned-handle dispatch. Returns counts and ordinary hitbox spheres wanted (pending CATCH
-/// spheres stay in the set). `hurt` is the hurtbox reader of the same per-frame entry (decision HB1): `Some` plans the enabled
-/// parts' spheres and requests them through the same set and effect interface as the hitboxes — the draw route's plug-in point,
-/// unwired in the runtime until the operator picks option A or the shared-pool route (`docs/HB1-RENDER-ROUTES.md`).
+/// The production pass's planning and owned-handle dispatch. Returns counts, the total spheres wanted this pass (pending
+/// `CATCH` spheres stay in the set) and how many of them are hit spheres. `hurt` is the hurtbox reader of the same per-frame
+/// entry (decision HB1 (a)); route B (operator decision 2026-11-04, `docs/DECISIONS.md` HB1-route, `review/menu-proposal`
+/// commit `5ca5e3b`) draws the enabled parts' spheres as yellow `sys_shield` spheres from the shared pool through the same
+/// set and `Effects` interface as the hitboxes: `Some` plans them, `None` (the runtime's Off dispatch, and every stop path
+/// the dispatch takes first) reads no HitModule and requests no hurt sphere (`docs/HB1-RENDER-ROUTES.md`).
 pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, hurt: Option<&mut dyn HurtboxReader>, fx: &mut impl Effects) -> (Counts, usize) {
     if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
         return (set.clear(fx), 0);

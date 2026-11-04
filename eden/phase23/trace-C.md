@@ -10,8 +10,9 @@ boot shows the census line absent or contradicting the recorded counts
 
 What the host cannot settle and one combined trace boot can: **Ridley's
 hurtbox part census** — how many parts group 0 of his `HitModule` holds and
-their shapes — which the Ridley first-pass row (C3) and the `MAX_HELD` /
-scratch-buffer sizing need before the draw route is wired. The lr02 capture
+their shapes — which the Ridley first-pass row (C3) needed before the draw
+route was wired (route B, 2026-11-04: wired; the census answers it without a
+trace). The lr02 capture
 (`docs/HB1-LR02-DISPOSITION.md`) read one part of one fighter and its group
 descriptor (`first 0`, `count 10` for that fighter); it does not census
 Ridley. No other fact is requested: the per-frame cost comes from the diag
