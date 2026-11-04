@@ -423,7 +423,7 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | FW1 | Ally Eden rigs and the Windows firewall prompt | agents may add an inbound **Block** rule (Windows Defender Firewall) for each rig `eden.exe` path they create (Training rows need no inbound network); never Allow rules; never answer the prompt itself; each rule recorded in the rig notes |
 | F6 | First-boot group-build hitch (~0.1 s first-use setup on the game thread; Kirby-first 91–109 ms) | **fix in both trees**: a fork worker root-causes it on M5q and ships M5r; the clean room carries the fix (fix-ledger row F6) |
 
-## Answered 2026-11-04 (~06:5xZ, the operator via the primary)
+## Answered 2026-11-04 (~11:5xZ, 06:5x ET, the operator via the primary)
 
 | # | Decision | Answer |
 | --- | --- | --- |
