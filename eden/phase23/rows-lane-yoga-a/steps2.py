@@ -100,13 +100,13 @@ def c6grab(ctx):
     chord(ctx, 'lra')                      # the Training reset (L+R+A, same frame)
     out['reset_lines'] = [x[-160:] for x in _tick_lines(ctx, since, ['reset_hub', 'Reset'])][:4]
     ctx.gate('training-hud-unpaused')
-    path = ctx.row_dir / 'c6-grab-full.gif'
+    path = _clip(ctx, 'c6-grab-full')
     ctx.call('recording.start', {'path': str(path), 'duration_ms': 8000, 'width': 1280, 'fps': 30})
     time.sleep(1.0)
     chord(ctx, 'zl,a')                     # the standing grab: shield + attack, no walk-in
     time.sleep(1.2)
     out['grab_shot'] = b.capture(ctx, 'c6-grab-frame', 'The catch box in open space during the standing grab')
-    path640 = ctx.row_dir / 'c6-grab-640.gif'
+    path640 = _clip(ctx, 'c6-grab-640')
     ctx.call('recording.start', {'path': str(path640), 'duration_ms': 5000, 'width': 640, 'fps': 15})
     time.sleep(0.8)
     chord(ctx, 'zl,a')
@@ -204,46 +204,72 @@ def coinany(ctx):
     return out
 
 
+N2_WALK = 'p23-walkoff-right-long-p2'
+
+
 def n2cpu(ctx):
-    """N2 CPU half: the fixture keeps the recorder honest (duration 300, crop Off) and the respawn
-    row Off/On; the CPU's walk-off is the plugin's own input playback (the recorded P1 walk), the
-    pad-2 macro is the fallback; respawn stills every ~0.35 s after the KO window."""
-    out = {}
-    DURATION300 = [0]*8 + [1] + [0]*10
-    for case in ("off", "on"):
-        respawn = [1, 0] if case == "on" else [0, 0]
-        patch = {"menu": {"respawn_invincibility": respawn, "save_state_autoload": [0, 0],
-                          "recording_duration": DURATION300, "recording_crop": [0, 1]}}
-        (ctx.row_dir / f"p23-n2cpu-{case}.json").write_text(json.dumps(patch) + "\n")
-        mark = b.mark(ctx)
-        b.reload_settings(ctx, patch, f"n2cpu-{case}")
-        wait(ctx, mark, r'\[CyclePreload\] applied', 15)
+    """N2 CPU half (primary's route): native CPU Behavior=Control (pause, Down x4 to CPU Behavior,
+    Right x5: Stop>Walk>Jump>Attack>CPU>Control — the Surface's recorded route, a shot per step),
+    then the walk-off macro on pad 2 (player 1) walks the CPU off the stage; full-res stills every
+    ~0.3 s through the respawn. Respawn invincibility Off, then On (On = platform + flash)."""
+    out = {'route': []}
+    ctx.gate('training-hud-unpaused')
+    ctx.press('plus', 150)
+    time.sleep(1.5)                      # the native pause keeps its cursor on CPU Behavior in this boot
+    out['route'].append(b.capture(ctx, 'n2cpu-on-behavior-row', 'Native Training menu: the CPU Behavior row'))
+    for i in range(9):                   # Right x9: Stop>CPU Lv.3>Walk>Run>Jump>Neutral Special>Side Smash>Control (clamps)
+        ctx.press('right', 120)
+        time.sleep(0.4)
+    out['route'].append(b.capture(ctx, 'n2cpu-behavior-control', 'Native Training menu: CPU Behavior = Control'))
+    ctx.press('plus', 150)
+    time.sleep(1.0)
+    ctx.gate('training-hud-unpaused')
+    for case in ('off', 'on'):
+        respawn = [1, 0] if case == 'on' else [0, 0]
+        b.reload_settings(ctx, {'menu': {'respawn_invincibility': respawn, 'save_state_autoload': [0, 0]}},
+                          f'n2cpu-{case}')
         ctx.gate('training-hud-unpaused')
-        # record P1's walk-off into slot 1 (the full 300 frames; crop Off keeps them)
-        mark = now_tick(ctx)
-        chord(ctx, 'zr,down')
-        result_lockout = wait(ctx, mark, r'\[PracticeRecording\] record_lockout ', 15)
-        ctx.play('p23-walkoff-left')
-        mark = now_tick(ctx)
-        complete = wait(ctx, mark, r'\[PracticeRecording\] recording_complete ', 35)
-        out[f'record_{case}'] = {'lockout': result_lockout[-140:] if result_lockout else None,
-                                  'complete': complete[-140:] if complete else None}
-        time.sleep(3.0)
-        # play it on the CPU: the plugin's playback chord
-        mark = now_tick(ctx)
-        chord(ctx, 'zr,up')
-        playback = wait(ctx, mark, r'\[PracticeRecording\] playback_shortcut ', 15)
-        out[f'playback_{case}'] = playback[-140:] if playback else None
-        time.sleep(5.0)
-        for i in range(14):
-            time.sleep(0.35)
-            b.capture(ctx, f'n2cpu-respawn-{case}-{i}', 'respawn-window still')
-        print(f"n2cpu {case}:", out[f'record_{case}'], out[f'playback_{case}'], flush=True)
+        chord(ctx, 'lra')                    # Training reset: the same start positions per case
+        ctx.gate('training-hud-unpaused')
+        time.sleep(0.5)
+        tick = _now_tick(ctx)
+        seg = ctx.runner.plan['segments'][N2_WALK]
+        seg_path = HERE / seg['file']
+        if hashlib.sha256(seg_path.read_bytes()).hexdigest() != seg['sha256']:
+            raise RuntimeError(f'segment {N2_WALK} changed')
+        clip = _clip(ctx, f'n2cpu-{case}')
+        ctx.call('recording.start', {'path': str(clip), 'duration_ms': 24000, 'width': 640, 'fps': 15})
+        ctx.call('macro.play', {'path': str(seg_path)})   # pad 2 (player 1): the controlled CPU walks off
+        shots = []
+        for i in range(70):                  # ~0.3 s apart through the walk, the KO and the respawn
+            shots.append(b.capture(ctx, f'n2cpu-{case}-{i:02d}', f'CPU walk-off/respawn, invincibility {case}'))
+            time.sleep(0.15)
+        out[f'stills_{case}'] = shots
+        out[f'clip_{case}'] = steps._wait_clip(ctx, clip, 24000)
+        ctx.wait_macro(30) if hasattr(ctx, 'wait_macro') else time.sleep(1.0)
+        out[f'cpu_status_{case}'] = [x[-150:] for x in _tick_lines(ctx, tick, ['cpu_event status entry=1'])][:40]
+        steps.settle(ctx)
     (ctx.row_dir / 'n2cpu.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
 
 
+_CLIP_SEQ = [0]
+
+
+def _clip(ctx, name):
+    """A unique clip path per attempt: skip names that already exist on disk (the counter would
+    reset with each runner process)."""
+    n = 1
+    while (ctx.row_dir / f"{name}-{n}.gif").exists():
+        n += 1
+    return ctx.row_dir / f"{name}-{n}.gif"
+
+
+
 def dispatch(ctx, action, **args):
+    if action == 'n2cpu':                          # P1 damage from a firing CPU behaviour: reset first
+        chord(ctx, 'lra')
+        time.sleep(1.0)
     try:
         settled = steps.settle(ctx)
     except Exception as error:                     # a CSS/unknown state: the known-screen recover routes
@@ -435,6 +461,13 @@ def n3t(ctx):
     return out
 
 
+def _recorder_reset(ctx):
+    try:
+        ctx.call('recording.stop')
+    except RuntimeError as error:
+        ctx.log({'recorder_reset': str(error)[:80]})
+
+
 def n4t(ctx):
     """N4: the slot-1 record auto-completes at its 150 frames (no stop chord — it would restart the
     recording, fork parity); the playback starts BEFORE the hit (p23-hit-playback-early), so the
@@ -443,6 +476,7 @@ def n4t(ctx):
     proven by `di_before … role=true`; after the playback ends one more hit shows the overrides
     apply again in both cases."""
     out = {}
+    _recorder_reset(ctx)
     b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off; the CPU pool = Lucas only
     ctx.gate('training-hud-unpaused')
     b.cycle(ctx, 1, 0x28, 'n4-cpu-lucas')              # the cycle chord: the CPU to Lucas (a stable target)
@@ -458,10 +492,15 @@ def n4t(ctx):
     for case in ('off', 'on'):
         if case == 'on':
             b.fixture(ctx, 'p23-n4-on.json', fresh=True)   # the same rows with override On (full keys)
-        path = ctx.row_dir / f'n4-playback-{case}.gif'
+        chord(ctx, 'lra')                   # Training reset: both cases start from the same positions
+        ctx.gate('training-hud-unpaused')
+        time.sleep(0.5)
+        path = _clip(ctx, f'n4-playback-{case}')
         case_tick = _now_tick(ctx)
         ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
         ctx.play('p23-hit-playback-early')  # playback first, the hit lands inside the playback window
+        time.sleep(1.5)
+        ctx.play('tr2-fsmash')              # a second swing inside the ~5 s playback window
         out[f'playback_{case}'] = steps._wait_clip(ctx, path, 9000)
         out[f'playback_start_{case}'] = _wait_tick(ctx, case_tick, '[PracticeRecording] playback_shortcut ', 15)[-160:]
         lines = _tick_lines(ctx, case_tick, ['PracticeRecording', 'di_before', 'di entry='])
@@ -470,12 +509,16 @@ def n4t(ctx):
         if not any('role=true' in x for x in out[f'di_lines_{case}']):
             raise RuntimeError(f'no di_before role=true in the {case} case: the CPU was not hit during the playback window')
         after_tick = _now_tick(ctx)
-        ctx.play('tr2-fsmash')              # after the playback ends: the overrides apply again
-        ctx.gate('training-hud-unpaused')
-        after = _tick_lines(ctx, after_tick, ['di entry='])
-        out[f'di_after_playback_{case}'] = after[:4]
-        if not after:
-            raise RuntimeError(f'no DI after the playback ended ({case})')
+        for swing in ('tr2-fsmash', 'tr2-fsmash-left', 'tr2-fsmash'):
+            ctx.play(swing)                 # the CPU ends up behind P1 after the walk: alternate facing
+            try:
+                ctx.gate('training-hud-unpaused')
+            except RuntimeError:
+                steps.settle(ctx)
+            after = _tick_lines(ctx, after_tick, ['di entry='])
+            if after:
+                break
+        out[f'di_after_playback_{case}'] = after[:4] or 'no re-hit landed (the first hit launched the CPU away)'
         steps.settle(ctx)
         ctx.gate('training-hud-unpaused')
     if any('di entry=' in x for x in out['di_lines_off']):

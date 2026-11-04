@@ -235,6 +235,34 @@
     },
     "cpu-next-frames": {
       "library": "cpu-next-frames"
+    },
+    "tr2-fsmash-left": {
+      "file": "segments/tr2-fsmash-left.edenmacro.json",
+      "sha256": "5300e5f3f438ff38273a1dd5360626bef2b3a84edbc25f713a7a3b1beff3917b",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "p23-jump-over-right": {
+      "file": "segments/p23-jump-over-right.edenmacro.json",
+      "sha256": "479aba3874210a3fc4968c8285c7b48a21d7b32e3e6ad4039619cf82dac73483",
+      "cap": 10,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "q7-menu-to-row": {
+      "file": "segments/q7-menu-to-row.edenmacro.json",
+      "sha256": "1ab3e367b31bd1f9843b1999cdad36cd4547a5e114aba8fd01ee33d32515fac9",
+      "cap": 40,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "n7-menu-to-editor": {
+      "file": "segments/n7-menu-to-editor.edenmacro.json",
+      "sha256": "223c08435a4154456249f65dadd3dbc162a63f29e5f77e04d83798f79648846c",
+      "cap": 40,
+      "start_gate": null,
+      "end_gate": null
     }
   },
   "gates": {
@@ -674,6 +702,21 @@
     },
     {
       "id": "p23-b7-airdodge-shield-tilt-side2",
+      "budget_min": 6,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "b7side2"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-b7-side2-r2",
       "budget_min": 6,
       "start": "training",
       "end": "training",

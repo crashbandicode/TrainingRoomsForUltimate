@@ -94,19 +94,21 @@ def c6grab(ctx):
     Ridley), a Training reset, then a standing grab at range with no walk-in, filmed at full rate
     plus once at 640 wide; the catch box in open space is the frame for review."""
     out = {}
+    _recorder_reset(ctx)
     b.reload_settings(ctx, {'menu': {'hitbox_vis': [1, 0]}}, 'c6-hitbox-on')
     ctx.gate('training-hud-unpaused')
     since = b.mark(ctx)
     chord(ctx, 'lra')                      # the Training reset (L+R+A, same frame)
     out['reset_lines'] = [x[-160:] for x in _tick_lines(ctx, since, ['reset_hub', 'Reset'])][:4]
     ctx.gate('training-hud-unpaused')
-    path = ctx.row_dir / 'c6-grab-full.gif'
+    path = _clip(ctx, 'c6-grab-full')
     ctx.call('recording.start', {'path': str(path), 'duration_ms': 8000, 'width': 1280, 'fps': 30})
     time.sleep(1.0)
     chord(ctx, 'zl,a')                     # the standing grab: shield + attack, no walk-in
     time.sleep(1.2)
     out['grab_shot'] = b.capture(ctx, 'c6-grab-frame', 'The catch box in open space during the standing grab')
-    path640 = ctx.row_dir / 'c6-grab-640.gif'
+    out['clip_full'] = steps._wait_clip(ctx, path, 8000)   # Eden runs one GIF recording at a time
+    path640 = _clip(ctx, 'c6-grab-640')
     ctx.call('recording.start', {'path': str(path640), 'duration_ms': 5000, 'width': 640, 'fps': 15})
     time.sleep(0.8)
     chord(ctx, 'zl,a')
@@ -241,6 +243,27 @@ def n2cpu(ctx):
         print(f"n2cpu {case}:", out[f'record_{case}'], out[f'playback_{case}'], flush=True)
     (ctx.row_dir / 'n2cpu.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
+
+
+_CLIP_SEQ = [0]
+
+
+def _clip(ctx, name):
+    """A unique clip path per attempt: skip names that already exist on disk (the counter would
+    reset with each runner process)."""
+    n = 1
+    while (ctx.row_dir / f"{name}-{n}.gif").exists():
+        n += 1
+    return ctx.row_dir / f"{name}-{n}.gif"
+
+
+
+def _recorder_reset(ctx):
+    try:
+        ctx.call('recording.stop')
+    except RuntimeError as error:
+        ctx.log({'recorder_reset': str(error)[:80]})
+
 
 
 def dispatch(ctx, action, **args):
@@ -456,7 +479,7 @@ def n4t(ctx):
     for case in ('off', 'on'):
         if case == 'on':
             b.fixture(ctx, 'p23-n4-on.json', fresh=True)   # the same rows with override On (full keys)
-        path = ctx.row_dir / f'n4-playback-{case}.gif'
+        path = _clip(ctx, f'n4-playback-{case}')
         case_tick = _now_tick(ctx)
         ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
         ctx.play('p23-hit-playback-early')  # playback first, the hit lands inside the playback window
@@ -515,8 +538,9 @@ def q7(ctx):
     out['boot_ini'] = copy_ini(ctx, 'replay_capture.ini', 'q7-boot')
     b.fixture(ctx, 'p23-q7.json', fresh=True)          # last_page=recording (pushed before any menu open)
     ctx.gate('training-hud-unpaused')
+    open_tick = _now_tick(ctx)
     ctx.play('tr-menu-open')
-    ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+    out['open_1'] = _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
     time.sleep(1.5)                                     # the menu's open fade discards the first inputs
 
     def navigate():
@@ -532,9 +556,13 @@ def q7(ctx):
     ctx.gate('training-hud-unpaused')
     out['writes'].append(_wait_tick(ctx, since_tick, 'replay_capture.ini written', 20))
     out['ini_off'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-off')
+    open_tick = _now_tick(ctx)
     ctx.play('tr-menu-open')                            # reopen: the page and the cursor are kept
-    ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+    out['open_2'] = _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
     time.sleep(1.5)
+    out['reopen_shot'] = b.capture(ctx, 'q7-reopen', 'Deluxe Recording page after reopen (cursor at the top row)')
+    out['route_2'] = _route(ctx, 'q7-menu-to-row', navigate)   # the reopen resets the cursor
+    out['page_shot_2'] = b.capture(ctx, 'q7-replay-row-2', 'Recording page, focus on the Replay capture row again')
     since_tick = _now_tick(ctx)
     ctx.press('a', 150)                                 # confirmed change 2: Off -> On
     out['on_shot'] = b.capture(ctx, 'q7-after-on', 'Replay capture row On again before the close')
@@ -552,8 +580,27 @@ def n7(ctx):
     out['boot_ini'] = copy_ini(ctx, 'button_config.ini', 'n7-boot')
     b.fixture(ctx, 'p23-n7.json', fresh=True)          # last_page=display_controls
     ctx.gate('training-hud-unpaused')
+    seg = ctx.runner.plan['segments'].get('n7-menu-to-editor')
+    if seg and (HERE / seg['file']).is_file():          # pre-step: empty the shortcut (a real change)
+        open_tick = _now_tick(ctx)
+        ctx.play('tr-menu-open')
+        _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
+        time.sleep(1.5)
+        ctx.play('n7-menu-to-editor')
+        ctx.press('y', 120)                             # Y empty
+        time.sleep(0.5)
+        out['pre_empty_shot'] = b.capture(ctx, 'n7-pre-empty', 'Editor after Y: the empty chord')
+        pre_tick = _now_tick(ctx)
+        ctx.press('a', 150)                             # confirm the empty chord (disabled)
+        time.sleep(0.6)
+        steps.close_menu(ctx)
+        ctx.gate('training-hud-unpaused')
+        time.sleep(1.0)
+        out['pre_empty_write'] = _tick_lines(ctx, pre_tick, ['button_config.ini written'])
+        out['ini_pre_empty'] = copy_ini(ctx, 'button_config.ini', 'n7-pre-empty')
+    open_tick = _now_tick(ctx)
     ctx.play('tr-menu-open')
-    ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+    _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
     time.sleep(1.5)                                     # the menu's open fade discards the first inputs
 
     def navigate():
@@ -583,12 +630,14 @@ def n7(ctx):
     out['ini_after'] = copy_ini(ctx, 'button_config.ini', 'n7-after-confirm')
     # With the menu closed: the new chord opens the menu, the old default chord does not; repeat once.
     for i in (1, 2):
-        since_tick = _now_tick(ctx)
+        open_tick = _now_tick(ctx)
         chord(ctx, 'zl,up')
-        ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+        out[f'new-open-line-{i}'] = _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
         out[f'new-opens-{i}'] = b.capture(ctx, f'n7-new-opens-{i}', 'Menu opened with the new chord, menu closed')
         steps.close_menu(ctx)
         ctx.gate('training-hud-unpaused')
+        time.sleep(0.5)
+        since_tick = _now_tick(ctx)                     # the stray window: after the new chord's menu closed
         chord(ctx, 'minus')
         time.sleep(3.0)
         stray = [x for x in _tick_lines(ctx, since_tick, ['[Ui] menu opened'])]
@@ -680,34 +729,44 @@ def _recall_and_move(ctx, log, steps_left=3):
     return placed
 
 
-def b7side2(ctx):
-    """B7 side 2: put P1 on the other side of the CPU, re-enter, and repeat the side-1 hit.
+B7_RUN_MS = 1600
 
-    Side 1 (run A): P1's token at 78 spawned LEFT of the CPU at 74, and the CPU was re-picked after
-    P1. The hook recalls P1's token after the CPU re-pick and places it just left of the CPU's tile,
-    so both candidate side rules (tile index, pick order) land P1 on the mirrored side; the clip and
-    the placement shot decide, and the CSS work is recorded as a reusable segment.
-    """
+
+def b7side2(ctx):
+    """B7 side 2 in Training: P1 on the CPU's right. The fixture keeps side 1's air-dodge /
+    shield-tilt settings; a Training reset puts P1 left of the CPU, P1 runs right past it (no CSS
+    swap: the side-1 CSS macros do not fit this boot's CSS), the placement shot shows the side,
+    and the left-facing fsmash is filmed; the CPU's reaction is read from the clip."""
     out = {}
+    _recorder_reset(ctx)
     b.fixture(ctx, 'p23-b7.json', fresh=True)
-    b.quit_css(ctx)
-    ctx.gate('ready')
-    out['css_start'] = b.capture(ctx, 'b7-side2-css-start', 'CSS after the quit: the CPU is re-picked next')
-    nav.return_cpu_to_lucas(ctx)           # the CPU token back on Lucas
-    ctx.gate('ready')
-    seg = _record_segment(ctx, 'b7-side2-swap')
-    try:
-        placed = _recall_and_move(ctx, out)
-    finally:
-        out['swap_sha256'] = _stop_segment(ctx, seg, 'b7-side2-swap')
-    if placed is None:
-        raise RuntimeError('P1\'s token did not place on a tile left of the CPU; see the row shots')
-    ctx.gate('ready')
-    out['css_swapped'] = b.capture(ctx, 'b7-side2-css-swapped', 'CSS after the swap: which side P1 takes is read from this frame')
-    ctx.play('enter-training')
     ctx.gate('training-hud-unpaused')
-    out['side2_clip'] = _film_hit(ctx, 'b7-side2-nair', ms=9000)
-    out['side2_after'] = b.capture(ctx, 'b7-side2-after', 'Side-2 hit: the CPU airdodge/shield-tilt directions are read from the clip')
+    chord(ctx, 'lra')                      # Training reset: P1 left of the CPU
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    out['start_shot'] = b.capture(ctx, 'b7-side2-start', 'After the reset: P1 left of the CPU')
+    ctx.play('p23-jump-over-right')        # run + full hop over the CPU (on the ground P1 only pushes it)
+    time.sleep(0.6)
+    out['placed_shot'] = b.capture(ctx, 'b7-side2-p1-right', 'P1 now on the CPU\'s right (side 2)')
+    path = _clip(ctx, 'b7-side2-fsmash-left')
+    hit_tick = _now_tick(ctx)
+    ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
+    ctx.play('tr2-fsmash-left')            # the side-2 hit, facing left
+    out['side2_clip'] = steps._wait_clip(ctx, path, 9000)
+    lines = _tick_lines(ctx, hit_tick, ['cpu_event shield_tilt', 'cpu_event air_dodge', 'cpu_event airdodge',
+                                        'cpu_event tech_call', 'cpu_event oos_call'])
+    out['reaction_lines'] = lines[:12]
+    side2 = []
+    for x in lines:
+        m = re.search(r'player_x=(-?[\d.]+) cpu_x=(-?[\d.]+)', x)
+        if m and float(m.group(1)) > float(m.group(2)):
+            side2.append(x)
+    out['side2_lines'] = side2[:6]
+    (ctx.row_dir / 'b7-side2.json').write_text(json.dumps(out, indent=2) + '\n')
+    if not side2:
+        raise RuntimeError('B7 side 2: no shield-tilt/air-dodge line with P1 on the CPU\'s right')
+    out['side2_after'] = b.capture(ctx, 'b7-side2-after', 'After the side-2 hit')
+    ctx.gate('training-hud-unpaused')
     (ctx.row_dir / 'b7-side2.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
 

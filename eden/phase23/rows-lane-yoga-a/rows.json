@@ -242,6 +242,41 @@
     },
     "cpu-next-frames": {
       "library": "cpu-next-frames"
+    },
+    "tr2-fsmash-left": {
+      "file": "segments/tr2-fsmash-left.edenmacro.json",
+      "sha256": "5300e5f3f438ff38273a1dd5360626bef2b3a84edbc25f713a7a3b1beff3917b",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "p23-chord-lra": {
+      "file": "segments/p23-chord-lra.edenmacro.json",
+      "sha256": "4b8ec3a2212cf9b9a4e55aba6687255967ad6da8d0cb69c68894d7b5fc02d01b",
+      "cap": 10,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "p23-walkoff-left-p2": {
+      "file": "segments/p23-walkoff-left-p2.edenmacro.json",
+      "sha256": "aef4b0c40dbc78f8537a5060b1c37d387be9c1a63b701c7c438e74ad71f9eb37",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "p23-walkoff-right-p2": {
+      "file": "segments/p23-walkoff-right-p2.edenmacro.json",
+      "sha256": "41cd5bb3631badaaec78c2c9931843dfa73f4111c886a68fe1d56a57ed20900c",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": null
+    },
+    "p23-walkoff-right-long-p2": {
+      "file": "segments/p23-walkoff-right-long-p2.edenmacro.json",
+      "sha256": "f3a53ef19fe31dd0daad8343d537e300fcb747a6cf5fb27552ca45e33d9763a1",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": null
     }
   },
   "gates": {
