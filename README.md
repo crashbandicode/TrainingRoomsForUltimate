@@ -22,10 +22,15 @@ This project was developed with the assistance of AI.
 
 ## Status
 
-The release candidate is being narrowed to the functional regression rows that
-fork M5q passed, the already-working new UI, and one replay/online smoke.
-The final candidate has not completed its gates; there is no approved release
-or installation artifact yet.
+**v0.1.0 is the Phase 1 parity release.** It matches fork M5q on the Training and
+waiting-room practice features, with the new five-page menu. Its acceptance:
+- the Phase 1 rows on Eden (`PHASE1-CLOSEOUT.md`);
+- the menu proof boot on the exact release NRO: character grids drawing the
+  game's `chara_2` stock icons, and stage mods through ARCropolis;
+- a null-read check on Eden's exact-PC unmapped-access log: 0 accesses across
+  swaps, Mii, save/load, recording and the menus.
+
+Hurtbox display and the other Phase 2/3 features come in a later release.
 
 See [HANDOFF.md](HANDOFF.md) for the current acceptance state and
 [NEXT-VERSION.md](NEXT-VERSION.md) for deferred work. The larger specification

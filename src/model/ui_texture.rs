@@ -64,6 +64,29 @@ pub fn is_ready(facts: TextureFacts) -> bool {
     facts.job == 0 && facts.handle == HANDLE_NONE && (!facts.has_state || facts.state == STATE_LOADED)
 }
 
+/// What a thumbnails slot does when the page changes, given the file hash of the texture it holds (`None` when it
+/// holds nothing) and the hash the page now showing wants for that tile (`None` for a text tile): a texture the
+/// page still wants is kept bound or loading — a role switch re-shows the same files, and re-requesting a hash
+/// whose previous texture is still being released stalls the game's loader for seconds (RC10 role-switch defect,
+/// 2026-11-04) — and anything else is released and, when the page wants a file, requested again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Carry {
+    /// The slot's texture is the wanted file's: no unbind, no release, no new request.
+    Keep,
+    /// Release what the slot holds (if anything) and request the page's file.
+    Request,
+    /// The page wants no file here: the text tile stays.
+    Idle,
+}
+
+pub fn carry(held: Option<u64>, want: Option<u64>) -> Carry {
+    match (held, want) {
+        (Some(holder), Some(wanted)) if holder == wanted => Carry::Keep,
+        (_, Some(_)) => Carry::Request,
+        (_, None) => Carry::Idle,
+    }
+}
+
 /// Releases a texture only after `delay` frames: the GPU may still read the last frame's descriptor for a frame or two after
 /// the pane stopped using it. A fixed array: the helper pushes and pops in the UI tick and never allocates.
 pub struct RetireQueue<T: Copy, const N: usize> {
@@ -145,6 +168,30 @@ mod tests {
         assert_eq!(q.len(), 2);
         assert_eq!(q.pop_due(1), Some(1));
         assert!(q.push(3, 1));
+    }
+
+    #[test]
+    fn a_kept_file_is_requested_again_only_when_the_page_stops_wanting_it() {
+        assert_eq!(carry(Some(0x51), Some(0x51)), Carry::Keep, "the same file: the texture stays");
+        assert_eq!(carry(None, Some(0x51)), Carry::Request, "nothing held: request");
+        assert_eq!(carry(Some(0x51), Some(0x52)), Carry::Request, "another file: release and request");
+        assert_eq!(carry(Some(0x51), None), Carry::Idle, "a text tile: the texture goes");
+        assert_eq!(carry(None, None), Carry::Idle);
+    }
+
+    #[test]
+    fn a_role_switch_keeps_every_tile_the_two_lists_share() {
+        // The roster grid's cells and their fighters are role-independent (roster_grid::describe), so a Player →
+        // CPU role switch wants the same hash at every tile: each bound or loading texture is kept, and nothing
+        // is re-requested while the previous texture is still being released.
+        let wants: [Option<u64>; 8] = [None, Some(0x11), Some(0x12), Some(0x13), None, Some(0x14), Some(0x15), None];
+        let held: [Option<u64>; 8] = [None, Some(0x11), Some(0x12), Some(0x13), None, Some(0x14), Some(0x15), None];
+        for i in 0..8 {
+            let expect = if held[i].is_some() { Carry::Keep } else { Carry::Idle };
+            assert_eq!(carry(held[i], wants[i]), expect, "tile {i} across the role switch");
+        }
+        // A different page (the stage grid) wants other files: everything is requested again.
+        assert_eq!(carry(Some(0x11), Some(0x99)), Carry::Request);
     }
 
     #[test]

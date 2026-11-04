@@ -1,3 +1,31 @@
+## RC10 menu-assets worker handoff — 2026-11-04
+
+Branch `rc10-menu-assets`, worktree
+`/home/intpa/smash-training-lobby/tmp-rc10-menu-assets`, cut from
+`work/implementation` at `42b510c`. One commit (`34e6576`), pushed to origin;
+no tag, release or card action.
+
+Operator order (2026-11-03, via primary f106ed01): the menu's character grids
+were to show the same art the fork showed, pulled natively from the game at run
+time (nothing baked), and the stage-mod question (Cosmic Destination in the
+menu's stage select) was to be answered with evidence.
+
+Change: `thumbs.rs` roster grids request the native key builder's `picture=0`
+waiting-room stock icon (was `picture=1` chara_1 portrait) at the active
+role's costume through the game's mod-aware file-resource service; the carried
+`character_roster.rs` helper is renamed `menu_stock_icon_hash` via manifest
+edit 42 (stage m5q, ledger regenerated). No layout/recipe change; no new hook.
+
+Evidence: `docs/MENU-GIFS.md` (six clips, NRO `50d95130...`), runs
+`glm-gifs-04`, `glm-gifs-05` (GIFs; character grids show the game's stock
+icons) and `glm-fd-stock` (Cosmic Destination moved aside attempt) under
+`/home/intpa/eden-runs/`; the stage grid follows stage mods - the FD tile
+shows the mod's picture with the mod installed (menu-stages.gif). Gates green
+(test/clippy/no-default/release/diag; carry verify). Disposed compliance
+report: `../artifacts/glm-trial/glm-04-COMPLIANCE.md`. Open: no vanilla-side
+(mod removed) tile shot - the menu's per-page focus memory defeated fixed
+press counts; defaults clip shows the keys with the page already at defaults.
+
 # TrainingRooms RC handoff
 
 ## RC9 isolated HATS build-worker handoff — 2026-11-04
