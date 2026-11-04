@@ -253,6 +253,438 @@ def n2cpu(ctx):
     return out
 
 
+DI_HOOK = 'libtraining_rooms.nro!_RNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features10cpu_common7di_hook'
+
+
+def _post_hit(ctx, name, patterns):
+    """A Training reset, P1 runs into the CPU (on the ground it only pushes it, so P1 ends adjacent), a
+    forward smash filmed at 640/30, with the DI hook's entries traced around the swing."""
+    chord(ctx, 'lra')
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    ctx.stick(1, 0, 750)
+    time.sleep(0.3)
+    placed = b.capture(ctx, f'{name}-placed', 'P1 next to the CPU before the swing')
+    ident = _arm(ctx, DI_HOOK, ['x0', 'x30'], on_return=False, max_hits=256)
+    tick = _now_tick(ctx)
+    clip = _clip(ctx, name)
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 5000, 'width': 640, 'fps': 30})
+    ctx.play('tr2-fsmash')
+    steps._wait_clip(ctx, clip, 5000)
+    entries = _trace_entries(ctx, ident, 'x0')
+    summary = _trace_summary(ctx, ident)
+    _disarm(ctx, ident)
+    lines = [x[-170:] for x in _tick_lines(ctx, tick, patterns)][:12]
+    after = b.capture(ctx, f'{name}-after', 'After the swing: the CPU damage on the HUD shows whether it hit')
+    return {'placed': placed, 'after': after, 'clip': str(clip), 'lines': lines,
+            'di_hook_entries': len(entries), 'trace_summary': summary}
+
+
+def _side_of(line):
+    m = re.search(r'player_x=(-?[\d.]+) cpu_x=(-?[\d.]+)', line)
+    if not m:
+        return None
+    return 1 if float(m.group(1)) < float(m.group(2)) else 2
+
+
+def _b7_attempt(ctx, name, side, want):
+    chord(ctx, 'lra')                      # Training reset: P1 left of the CPU (side 1)
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    if side == 1:
+        ctx.stick(1, 0, 750)               # run into the CPU: P1 ends adjacent on its left
+        swing = 'tr2-fsmash'
+    else:
+        ctx.play('p23-jump-over-right')    # over the CPU (on the ground P1 only pushes it)
+        time.sleep(0.5)
+        ctx.stick(-1, 0, 300)              # back into the CPU: adjacent on its right, facing left
+        swing = 'tr2-fsmash-left'
+    time.sleep(0.3)
+    placed = b.capture(ctx, f'{name}-placed', f'Side {side}: P1 ' + ('left' if side == 1 else 'right') + ' of the CPU')
+    tilt_id = _arm(ctx, 'libtraining_rooms.nro!cpu_stick_x_no_clamp_hook', ['x0', 'x30'], on_return=False,
+                   max_hits=512, rate_limit=2000)
+    tick = _now_tick(ctx)
+    clip = _clip(ctx, name)
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 6000, 'width': 640, 'fps': 30})
+    ctx.play(swing)
+    steps._wait_clip(ctx, clip, 6000)
+    accessors = _trace_entries(ctx, tilt_id, 'x0')
+    tilt_trace = {'entries': len(accessors), 'accessors': sorted({str(a) for a in accessors})[:6],
+                  'summary': _trace_summary(ctx, tilt_id)}
+    _disarm(ctx, tilt_id)
+    lines = [x[-170:] for x in _tick_lines(ctx, tick, ['cpu_event shield_tilt', 'cpu_event airdodge_stick',
+                                                       'cpu_event guard_button'])]
+    hits = [x for x in lines if want in x and _side_of(x) == side]
+    return {'placed': placed, 'clip': str(clip), 'lines': lines[:12], 'side_lines': hits[:4],
+            'stick_x_no_clamp_trace': tilt_trace}
+
+
+def b7both(ctx):
+    """B7 both sides, one boot, no CSS re-entry (reload_settings only): the B7 fixture (air dodge Out,
+    shield tilt In, Mash Shield on Hitstun). Side 1 = P1 left of the CPU, side 2 = P1 right. Each side
+    needs the CPU's own airdodge_stick AND shield_tilt lines carrying that side's coordinates
+    (player_x vs cpu_x); up to 4 attempts per side."""
+    out = {}
+    fixture = json.loads((HERE / 'rc-settings' / 'p23-b7.json').read_text())
+    b.reload_settings(ctx, fixture, 'b7-fixture')
+    ctx.gate('training-hud-unpaused')
+    for side in (1, 2):
+        key = f'side{side}'
+        out[key] = []
+        have = {'airdodge_stick': [], 'shield_tilt': []}
+        for _ in range(4):
+            res = _b7_attempt(ctx, f'b7-side{side}', side, 'cpu_event ')
+            out[key].append(res)
+            for x in res['side_lines'] + [l for l in res['lines'] if _side_of(l) == side]:
+                for k in have:
+                    if f'cpu_event {k} ' in x and x not in have[k]:
+                        have[k].append(x)
+            if have['airdodge_stick'] and have['shield_tilt']:
+                break
+            try:
+                ctx.gate('training-hud-unpaused')
+            except RuntimeError:
+                steps.settle(ctx)
+        out[f'{key}_lines'] = have
+        out[f'{key}_diag_copy'] = _diag_copy(ctx, f'b7-{key}')
+        (ctx.row_dir / 'b7-both.json').write_text(json.dumps(out, indent=2) + '\n')
+        missing = [k for k, v in have.items() if not v]
+        if missing:
+            raise RuntimeError(f'B7 side {side}: no {missing} line with P1 on side {side}')
+    return out
+
+
+def _menu_shot(ctx, name, expected):
+    open_tick = _now_tick(ctx)
+    ctx.play('tr-menu-open')
+    _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)
+    time.sleep(1.5)
+    shot = b.capture(ctx, name, expected)
+    steps.close_menu(ctx)
+    ctx.gate('training-hud-unpaused')
+    return shot
+
+
+def _copy_opt(ctx, name, label):
+    try:
+        return copy_ini(ctx, name, label)
+    except OSError as error:
+        return f'not copied: {error}'
+
+
+def n2ass(ctx):
+    """N2 Auto Save States sub-case: ASS On greys the Respawn invincibility row (Saves page shot); a
+    state saved at the reset position loads at once when P1 dies (stills ~0.3 s through the walk-off);
+    the respawn value survives the swap to ASS Off and back (Saves page shots + settings copies)."""
+    out = {}
+    on = {'menu': {'save_state_enable': [1, 0], 'save_state_autoload': [1, 0], 'respawn_invincibility': [1, 0]},
+          'last_page': 'saves'}
+    off = {'menu': {'save_state_enable': [1, 0], 'save_state_autoload': [0, 0], 'respawn_invincibility': [1, 0]},
+           'last_page': 'saves'}
+    b.reload_settings(ctx, on, 'n2ass-on')
+    ctx.gate('training-hud-unpaused')
+    out['greyed_on'] = _menu_shot(ctx, 'n2ass-saves-ass-on', 'Saves page, Auto-load On: Respawn invincibility greyed')
+    out['settings_on'] = _copy_opt(ctx, 'settings.json', 'n2ass-on')
+    chord(ctx, 'lra')
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    save_tick = _now_tick(ctx)
+    chord(ctx, 'zl,down')                  # save state (factory ZL + D-pad Down)
+    time.sleep(1.0)
+    out['saved_shot'] = b.capture(ctx, 'n2ass-saved', 'Right after the save chord, P1 at the reset position')
+    out['save_lines'] = [x[-170:] for x in _tick_lines(ctx, save_tick, ['save', 'Save', 'state'])][:8]
+    out['save_states_json'] = _copy_opt(ctx, 'save_states.json', 'n2ass-after-save')
+    seg = ctx.runner.plan['segments']['p23-walkoff-left']
+    seg_path = HERE / seg['file']
+    if hashlib.sha256(seg_path.read_bytes()).hexdigest() != seg['sha256']:
+        raise RuntimeError('segment p23-walkoff-left changed')
+    clip = _clip(ctx, 'n2ass-death')
+    death_tick = _now_tick(ctx)
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 14000, 'width': 640, 'fps': 30})
+    ctx.call('macro.play', {'path': str(seg_path)})   # P1 walks off; Auto-load should load the state at once
+    shots = []
+    for i in range(40):
+        shots.append(b.capture(ctx, f'n2ass-death-{i:02d}', 'P1 walk-off with Auto-load On'))
+        time.sleep(0.15)
+    out['death_stills'] = shots
+    out['death_clip'] = steps._wait_clip(ctx, clip, 14000)
+    out['death_lines'] = [x[-170:] for x in _tick_lines(ctx, death_tick, ['state', 'State', 'rebirth', 'dead'])][:12]
+    time.sleep(1.0)
+    ctx.gate('training-hud-unpaused')
+    b.reload_settings(ctx, off, 'n2ass-off')
+    ctx.gate('training-hud-unpaused')
+    out['row_ass_off'] = _menu_shot(ctx, 'n2ass-saves-ass-off', 'Saves page, Auto-load Off: Respawn invincibility On, not greyed')
+    out['settings_off'] = _copy_opt(ctx, 'settings.json', 'n2ass-off')
+    b.reload_settings(ctx, on, 'n2ass-on-again')
+    ctx.gate('training-hud-unpaused')
+    out['row_ass_on_again'] = _menu_shot(ctx, 'n2ass-saves-ass-on-again', 'Saves page, Auto-load On again: the row greyed, value kept')
+    out['settings_on_again'] = _copy_opt(ctx, 'settings.json', 'n2ass-on-again')
+    (ctx.row_dir / 'n2ass.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+def c6diag(ctx):
+    """C6 diagnosis (no fix): hitbox visualization On, a standing grab filmed at full size, and the
+    visualizer's own diag lines around it ([Hitbox] command kind=catch, pass, rebound, refused)."""
+    out = {'attempts': []}
+    _recorder_reset(ctx)
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [1, 0]}}, 'c6diag-hitbox-on')
+    ctx.gate('training-hud-unpaused')
+    for i in range(2):
+        chord(ctx, 'lra')
+        ctx.gate('training-hud-unpaused')
+        time.sleep(0.5)
+        tick = _now_tick(ctx)
+        clip = _clip(ctx, 'c6diag-grab')
+        ctx.call('recording.start', {'path': str(clip), 'duration_ms': 4000, 'width': 1280, 'fps': 30})
+        time.sleep(0.5)
+        chord(ctx, 'zl,a')                 # standing grab: shield + attack, no walk-in
+        steps._wait_clip(ctx, clip, 4000)
+        lines = [x[-220:] for x in _tick_lines(ctx, tick, ['[Hitbox] command', '[Hitbox] pass', '[Hitbox] rebound',
+                                                          '[Hitbox] refused', '[Hitbox] stats'])]
+        out['attempts'].append({'clip': str(clip), 'lines': lines[:40]})
+        (ctx.row_dir / 'c6diag.json').write_text(json.dumps(out, indent=2) + '\n')
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [0, 0]}}, 'c6diag-hitbox-off')
+    ctx.gate('training-hud-unpaused')
+    if not any('kind=catch' in x for a in out['attempts'] for x in a['lines']):
+        raise RuntimeError('no [Hitbox] command kind=catch line in either grab attempt')
+    return out
+
+
+
+def n4trace(ctx):
+    """Trace sanity for N4: the DI hook's entries around a during-playback hit (override On, DI Up), then
+    around a hit outside playback, in the same settings. Recorded, not gated."""
+    out = {'symbol': DI_HOOK, 'offset_in_diag_elf': '0xdfed8 (nm, local t)'}
+    patch = json.loads((HERE / 'rc-settings' / 'p23-n4-on.json').read_text())
+    b.reload_settings(ctx, patch, 'n4trace-on')
+    ctx.gate('training-hud-unpaused')
+    out['control_no_playback'] = _post_hit(ctx, 'n4trace-control', ['di entry=', 'di_before', 'playback_', 'sdi_'])
+    out['control_diag_copy'] = _diag_copy(ctx, 'n4trace-control')
+    steps.settle(ctx)
+    ctx.gate('training-hud-unpaused')
+    chord(ctx, 'lra')
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    ident = _arm(ctx, DI_HOOK, ['x0', 'x30'], on_return=False, max_hits=256)
+    tick = _now_tick(ctx)
+    clip = _clip(ctx, 'n4trace-playback')
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 9000, 'width': 640, 'fps': 15})
+    ctx.play('p23-hit-playback-early')
+    time.sleep(1.5)
+    ctx.play('tr2-fsmash')
+    steps._wait_clip(ctx, clip, 9000)
+    out['during_playback'] = {'clip': str(clip), 'di_hook_entries': len(_trace_entries(ctx, ident, 'x0')),
+                              'trace_summary': _trace_summary(ctx, ident),
+                              'lines': [x[-170:] for x in _tick_lines(ctx, tick, ['di entry=', 'di_before', 'playback_'])][:12]}
+    _disarm(ctx, ident)
+    out['during_playback']['after'] = b.capture(ctx, 'n4trace-playback-after', 'After the during-playback hit')
+    out['playback_diag_copy'] = _diag_copy(ctx, 'n4trace-playback')
+    (ctx.row_dir / 'n4trace.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+def _diag_copy(ctx, label):
+    """Both diag files copied into the row folder right after a hit (the 128 KiB log rotates)."""
+    copied = []
+    for name in ('practice-diagnostics.previous.log', 'practice-diagnostics.log'):
+        src = plugin_dir(ctx) / name
+        if src.exists():
+            dst = ctx.row_dir / f'{label}-{name}'
+            dst.write_bytes(src.read_bytes())
+            copied.append(str(dst))
+    return copied
+
+
+def c6slow(ctx):
+    """C6 at reduced game speed (no product change): core.speed_limit 10 so a 30 fps capture holds every
+    game frame of the ~1-frame catch box; hitbox visualization On; standing grab; speed restored to 100."""
+    out = {'attempts': []}
+    _recorder_reset(ctx)
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [1, 0]}}, 'c6slow-hitbox-on')
+    ctx.gate('training-hud-unpaused')
+    try:
+        for i in range(2):
+            chord(ctx, 'lra')
+            ctx.gate('training-hud-unpaused')
+            time.sleep(0.5)
+            out['speed_set'] = ctx.call('settings.set', {'key': 'core.speed_limit', 'value': 10})
+            tick = _now_tick(ctx)
+            clip = _clip(ctx, 'c6slow-grab')
+            ctx.call('recording.start', {'path': str(clip), 'duration_ms': 14000, 'width': 1280, 'fps': 30})
+            time.sleep(1.0)
+            ctx.play('p23-chord-zl-a')         # standing grab
+            steps._wait_clip(ctx, clip, 14000)
+            ctx.call('settings.set', {'key': 'core.speed_limit', 'value': 100})
+            lines = [x[-220:] for x in _tick_lines(ctx, tick, ['[Hitbox] command', '[Hitbox] pass', '[Hitbox] rebound'])]
+            out['attempts'].append({'clip': str(clip), 'lines': lines[:20]})
+            (ctx.row_dir / 'c6slow.json').write_text(json.dumps(out, indent=2) + '\n')
+    finally:
+        out['speed_restored'] = ctx.call('settings.set', {'key': 'core.speed_limit', 'value': 100})
+        (ctx.row_dir / 'c6slow.json').write_text(json.dumps(out, indent=2, default=str) + '\n')
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [0, 0]}}, 'c6slow-hitbox-off')
+    ctx.gate('training-hud-unpaused')
+    return out
+
+
+
+SDI_HOOK = 'libtraining_rooms.nro!cpu_sdi_hook'
+
+
+def n4sanity(ctx):
+    """Two traces armed before one control hit (DI Up, no playback running): cpu_sdi_hook (positive
+    control) and the DI hook. Recorded, not gated."""
+    out = {'di_symbol': DI_HOOK, 'di_offset_in_diag_elf': '0xdfed8 (nm, local t)',
+           'sdi_symbol': SDI_HOOK, 'sdi_offset_in_diag_elf': '0x1a1338 (nm, T)'}
+    patch = json.loads((HERE / 'rc-settings' / 'p23-n4.json').read_text())
+    b.reload_settings(ctx, patch, 'n4sanity-di-up')
+    ctx.gate('training-hud-unpaused')
+    chord(ctx, 'lra')
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    ctx.stick(1, 0, 750)
+    time.sleep(0.3)
+    out['placed'] = b.capture(ctx, 'n4sanity-placed', 'P1 adjacent to the CPU, CPU 0%')
+    sdi_id = _arm(ctx, SDI_HOOK, ['x0', 'x30'], on_return=False, max_hits=256)
+    di_id = _arm(ctx, DI_HOOK, ['x0', 'x30'], on_return=False, max_hits=256)
+    tick = _now_tick(ctx)
+    clip = _clip(ctx, 'n4sanity-hit')
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 5000, 'width': 640, 'fps': 30})
+    ctx.play('tr2-fsmash')
+    steps._wait_clip(ctx, clip, 5000)
+    out['clip'] = str(clip)
+    out['sdi_trace'] = {'entries': len(_trace_entries(ctx, sdi_id, 'x0')), 'summary': _trace_summary(ctx, sdi_id)}
+    out['di_trace'] = {'entries': len(_trace_entries(ctx, di_id, 'x0')), 'summary': _trace_summary(ctx, di_id)}
+    _disarm(ctx, di_id)
+    _disarm(ctx, sdi_id)
+    out['after'] = b.capture(ctx, 'n4sanity-after', 'After the swing: the CPU damage on the HUD')
+    out['diag_copy'] = _diag_copy(ctx, 'n4sanity')
+    out['lines_by_tick'] = [x[-170:] for x in _tick_lines(ctx, tick, ['di entry=', 'di_before', 'sdi_', 'cpu_hook_counts'])][:12]
+    out['trace_jsonl'] = ctx.instance.get('trace_jsonl')
+    (ctx.row_dir / 'n4sanity.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+
+GAME_DI = 'nro:13f5177a7e86f0150f1a22aa9e611eacd010397c000000000000000000000000+0x15df0'
+
+
+def _arm_raw(ctx, target):
+    point = ctx.call('trace.arm', {'target': target, 'registers': ['x0', 'x30'], 'on_return': False,
+                                   'max_hits': 512, 'rate_limit': 2000, 'captures': []})
+    return (point.get('id') if isinstance(point, dict) else None) or '0', point
+
+
+def _counts(ctx, ids):
+    points = {str(pt.get('id')): pt for pt in ctx.call('trace.list').get('points', [])}
+    return {name: {'hits': points.get(str(i), {}).get('hits'), 'address': points.get(str(i), {}).get('address'),
+                   'target': points.get(str(i), {}).get('target')} for name, i in ids.items()}
+
+
+def _sequence(ctx, label, ids, swings=5):
+    """Five swings at the CPU without a reset; the trace counts and the HUD after each."""
+    seq = {'hits': []}
+    chord(ctx, 'lra')
+    ctx.gate('training-hud-unpaused')
+    time.sleep(0.5)
+    clip = _clip(ctx, f'n4di-{label}')
+    tick = _now_tick(ctx)
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 30000, 'width': 640, 'fps': 30})
+    for i in range(swings):
+        ctx.stick(1, 0, 600 if i else 750)
+        time.sleep(0.3)
+        ctx.play('tr2-fsmash')
+        time.sleep(1.6)
+        seq['hits'].append({'after_shot': b.capture(ctx, f'n4di-{label}-hit{i + 1}', f'{label}: after swing {i + 1}, CPU damage on the HUD'),
+                            'counts': _counts(ctx, ids)})
+    seq['clip'] = steps._wait_clip(ctx, clip, 30000)
+    seq['lines_by_tick'] = [x[-170:] for x in _tick_lines(ctx, tick, ['di entry=', 'di_before', 'sdi_'])][:20]
+    seq['diag_copy'] = _diag_copy(ctx, f'n4di-{label}')
+    return seq
+
+
+def n4di(ctx):
+    out = {'game_target': GAME_DI, 'game_symbol': '_ZN7lua2cpp16L2CFighterCommon46FighterStatusDamage__correctDamageVectorCommonEN3lib8L2CValueE',
+           'game_offset_note': 'ELF symtab value 0x15df0 size 0x1224; NRO bytes at +0x15df0 equal sites_pkg2.rs:782-785 guard',
+           'di_hook': DI_HOOK, 'sdi_hook': SDI_HOOK}
+    try:
+        out['symbols_load'] = ctx.call('symbols.load', {'module': 'libtraining_rooms.nro', 'elf': TRACE_ELF})
+    except RuntimeError as error:
+        out['symbols_load'] = f'error: {error}'[:200]
+    out['events_log'] = _copy_opt(ctx, 'events.log', 'n4di')
+    di_up = json.loads((HERE / 'rc-settings' / 'p23-n4.json').read_text())
+    b.reload_settings(ctx, di_up, 'n4di-di-up')
+    ctx.gate('training-hud-unpaused')
+    ids = {}
+    for name, target in (('game_correctDamageVectorCommon', GAME_DI), ('di_hook', DI_HOOK), ('cpu_sdi_hook', SDI_HOOK)):
+        ids[name], out[f'arm_{name}'] = _arm_raw(ctx, target)
+    out['armed'] = _counts(ctx, ids)
+    out['di_up'] = _sequence(ctx, 'di-up', ids)
+    steps.settle(ctx)
+    ctx.gate('training-hud-unpaused')
+    b.reload_settings(ctx, {'menu': {'di_state': [0] * 11, 'sdi_state': [0] * 11, 'settings_override_playback': [0, 0]}}, 'n4di-di-none')
+    ctx.gate('training-hud-unpaused')
+    out['di_none'] = _sequence(ctx, 'di-none', ids)
+    steps.settle(ctx)
+    ctx.gate('training-hud-unpaused')
+    # the CPU hits P1: Mash Forward Smash on Always
+    mash = [0] * 30
+    mash[15] = 1
+    trig = [0] * 17
+    trig[16] = 1
+    b.reload_settings(ctx, {'menu': {'mash_state': mash, 'mash_triggers': trig}}, 'n4di-cpu-attacks')
+    try:
+        ctx.gate('training-hud-unpaused')
+    except RuntimeError:
+        pass
+    chord(ctx, 'lra')
+    time.sleep(0.5)
+    before = _counts(ctx, ids)
+    tick = _now_tick(ctx)
+    clip = _clip(ctx, 'n4di-cpu-hits-p1')
+    ctx.call('recording.start', {'path': str(clip), 'duration_ms': 6000, 'width': 640, 'fps': 30})
+    ctx.stick(1, 0, 500)
+    time.sleep(3.0)
+    out['cpu_hits_p1'] = {'before': before, 'after': _counts(ctx, ids), 'clip': steps._wait_clip(ctx, clip, 6000),
+                          'after_shot': b.capture(ctx, 'n4di-cpu-hits-p1-after', 'After the CPU attacked: P1 damage on the HUD'),
+                          'lines_by_tick': [x[-170:] for x in _tick_lines(ctx, tick, ['di entry=', 'di_before', 'sdi_'])][:12]}
+    out['cpu_hits_p1']['diag_copy'] = _diag_copy(ctx, 'n4di-cpu-hits-p1')
+    for i in ids.values():
+        _disarm(ctx, i)
+    b.reload_settings(ctx, {'menu': {}}, 'n4di-baseline-restore')
+    (ctx.row_dir / 'n4di.json').write_text(json.dumps(out, indent=2, default=str) + '\n')
+    ctx.play('p23-walkoff-left')           # P1 walks off: the respawn brings P1's damage back to 0 for the next row's gate
+    time.sleep(4.0)
+    out['p1_reset_shot'] = b.capture(ctx, 'n4di-p1-respawned', 'P1 back at 0% after the walk-off')
+    (ctx.row_dir / 'n4di.json').write_text(json.dumps(out, indent=2, default=str) + '\n')
+    return out
+
+
+
+def b7tilt(ctx):
+    out = {}
+    fixture = json.loads((HERE / 'rc-settings' / 'p23-b7.json').read_text())
+    no_tilt = json.loads(json.dumps(fixture))
+    no_tilt['menu']['shield_tilt'] = [0] * 11
+    b.reload_settings(ctx, no_tilt, 'b7tilt-none')
+    ctx.gate('training-hud-unpaused')
+    out['rearm_side1_no_tilt'] = _b7_attempt(ctx, 'b7tilt-rearm-side1', 1, 'cpu_event shield_tilt')
+    steps.settle(ctx)
+    ctx.gate('training-hud-unpaused')
+    b.reload_settings(ctx, fixture, 'b7tilt-in')
+    ctx.gate('training-hud-unpaused')
+    for side in (1, 2):
+        out[f'in_side{side}'] = _b7_attempt(ctx, f'b7tilt-in-side{side}', side, 'cpu_event shield_tilt')
+        out[f'in_side{side}_diag_copy'] = _diag_copy(ctx, f'b7tilt-in-side{side}')
+        (ctx.row_dir / 'b7tilt.json').write_text(json.dumps(out, indent=2) + '\n')
+        try:
+            ctx.gate('training-hud-unpaused')
+        except RuntimeError:
+            steps.settle(ctx)
+    return out
+
+
+
 _CLIP_SEQ = [0]
 
 
@@ -317,7 +749,7 @@ def chord(ctx, buttons, hold=120):
     input.button calls straddle frames and the chord never fires."""
     names = {'zl,up': 'p23-chord-zl-up', 'minus': 'p23-chord-minus',
              'zr,down': 'p23-chord-zr-down', 'zr,up': 'p23-chord-zr-up',
-             'lra': 'p23-chord-lra', 'zl,a': 'p23-chord-zl-a'}
+             'lra': 'p23-chord-lra', 'zl,a': 'p23-chord-zl-a', 'zl,down': 'p23-chord-zl-down'}
     ctx.play(names[buttons])
 
 
@@ -479,7 +911,15 @@ def n4t(ctx):
     _recorder_reset(ctx)
     b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off; the CPU pool = Lucas only
     ctx.gate('training-hud-unpaused')
-    b.cycle(ctx, 1, 0x28, 'n4-cpu-lucas')              # the cycle chord: the CPU to Lucas (a stable target)
+    observed = _tick_lines(ctx, 0, ['[CharacterRoster] observed owner=1 '])
+    if observed and 'kind=0x28 ' in observed[-1] + ' ':
+        out['cpu'] = 'already Lucas after the re-entry: ' + observed[-1][-90:]
+    else:
+        b.cycle(ctx, 1, 0x28, 'n4-cpu-lucas')          # the cycle chord: the CPU to Lucas (a stable target)
+        out['cpu'] = 'cycled to Lucas'
+    ctx.gate('training-hud-unpaused')
+    out['control_before_recording'] = _post_hit(ctx, 'n4-control-di-up', ['di entry=', 'di_before', 'sdi_'])
+    steps.settle(ctx)
     ctx.gate('training-hud-unpaused')
     record_tick = _now_tick(ctx)
     chord(ctx, 'zr,down')                  # Input Record chord
@@ -508,19 +948,15 @@ def n4t(ctx):
         out[f'di_lines_{case}'] = [x for x in lines if 'di_before' in x or 'di entry=' in x][:8]
         if not any('role=true' in x for x in out[f'di_lines_{case}']):
             raise RuntimeError(f'no di_before role=true in the {case} case: the CPU was not hit during the playback window')
-        after_tick = _now_tick(ctx)
-        for swing in ('tr2-fsmash', 'tr2-fsmash-left', 'tr2-fsmash'):
-            ctx.play(swing)                 # the CPU ends up behind P1 after the walk: alternate facing
-            try:
-                ctx.gate('training-hud-unpaused')
-            except RuntimeError:
-                steps.settle(ctx)
-            after = _tick_lines(ctx, after_tick, ['di entry='])
-            if after:
-                break
-        out[f'di_after_playback_{case}'] = after[:4] or 'no re-hit landed (the first hit launched the CPU away)'
+        out[f'playback_complete_{case}'] = _wait_tick(ctx, case_tick, 'playback_complete', 15)[-160:]
+        out[f'post_playback_{case}'] = _post_hit(ctx, f'n4-after-{case}', ['di entry=', 'di_before', 'sdi_', 'playback'])
         steps.settle(ctx)
         ctx.gate('training-hud-unpaused')
+    b.reload_settings(ctx, {'menu': {'di_state': [0] * 11, 'sdi_state': [0] * 11,
+                                     'settings_override_playback': [0, 0]}}, 'n4-baseline-nodi')
+    ctx.gate('training-hud-unpaused')
+    out['baseline_nodi'] = _post_hit(ctx, 'n4-baseline-nodi', ['di entry=', 'di_before', 'sdi_'])
+    (ctx.row_dir / 'n4.json').write_text(json.dumps(out, indent=2) + '\n')
     if any('di entry=' in x for x in out['di_lines_off']):
         raise RuntimeError('DI applied during playback with the override Off (the recording should win)')
     if not any('di entry=' in x for x in out['di_lines_on']):
