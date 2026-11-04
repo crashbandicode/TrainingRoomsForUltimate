@@ -1,0 +1,70 @@
+{
+  "id": "RC-BOOT-postrows",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb",
+  "started": 1793752985.5040858,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "post_rows_allocations": "651026745 #1888 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49016 hooks=input_caller_a_note:54509,input_caller_a_apply:222384,reset_check:26558,hazard_rule:6,reset_hub:32,cpu_frame:52462,cpu_stick_x:52462,cpu_stick_y:52462,cpu_transition_term:263150,cpu_motion_change:270,cpu_check_button_on:157212,cpu_shield_param:104916,ui_archive:177,ui_pass_calculate:256883,ui_register_calculate:112,live_replay:104924,hitbox_attack:2,hitbox_frame:52462,roster_input:54509,roster_sources:25950,roster_kirby:25950,roster_items:25950,roster_preload:25950,practice_lease:25950,state_frame:52462,recorder_ai:25991,recorder_poll:27792,named_service:78974,menu_input:27792,menu_draw:25845,menu_thumbs:25845,developer_float:100,other:285029",
+        "post_rows_heap": "651024287 #1886 [TrainingRooms] state_hook_counts frames=600 param=3 quake=0 sound=2 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0",
+        "trace_counters": {
+          "boot_error": "",
+          "file_lost": "0",
+          "output": "/home/intpa/eden-runs/lr-15/state/run-yoga/yoga.trace.jsonl",
+          "output_error": "",
+          "points": [
+            {
+              "abandoned_returns": "0",
+              "address": "0x81116240",
+              "dropped": "0",
+              "hits": "40",
+              "id": "1",
+              "matched": "40",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "40",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x653240"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x811154e0",
+              "dropped": "0",
+              "hits": "54",
+              "id": "2",
+              "matched": "54",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "54",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0x6524e0"
+            },
+            {
+              "abandoned_returns": "0",
+              "address": "0x81659770",
+              "dropped": "0",
+              "hits": "11",
+              "id": "3",
+              "matched": "11",
+              "mode": "records",
+              "process_id": "81",
+              "recorded": "22",
+              "return_overflow": "0",
+              "state": "armed",
+              "target": "main+0xb96770"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793752993.2906768
+}

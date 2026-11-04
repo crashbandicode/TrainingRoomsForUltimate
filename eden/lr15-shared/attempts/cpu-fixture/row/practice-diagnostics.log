@@ -1,0 +1,592 @@
+650436225 #1 [PracticeDiagnostics] adapter=ring-diag session_start; max_files=2 max_bytes_each=131072 ring_bytes=131072 line_max=12288
+650436228 #2 [ThreadStack] spawn name=boot base=0x10f5cf1000 size=0x10000 top=0x10f5d01000 sp=0x10f5d00b50 kind=0xb table=0x0
+650436232 #3 [ThreadStack] spawn name=tr-heartbeat base=0x10f0828000 size=0x8000 top=0x10f0830000 sp=0x10f082f390 kind=0xb table=0x8000
+650436236 #4 [SyncProbe] write_all Ok(())
+650436236 #5 [SyncProbe] sync_all Ok(())
+650436236 #6 [SyncProbe] sync_data Ok(())
+650436237 #7 [SyncProbe] rename Ok(())
+650436238 #8 [SyncProbe] remove Ok(())
+650436238 #9 [SyncProbe] done sync_all_ok=true
+650436238 #10 [Sync] arbiter self_test mismatch=0xfa01 timeout=0xea01 signal=0x0 ok=true
+650436243 #11 [ThreadStack] spawn name=tr-import base=0x10a638b000 size=0xa000 top=0x10a6395000 sp=0x10a6394a50 kind=0xb table=0x8000
+650436257 #12 [Migration] skipped training_modpack_menu.conf reason=exists
+650436267 #13 [ThreadStack] exit name=tr-import used=9888 size=40960 free=31072 low=false
+650436272 #14 [ThreadStack] spawn name=tr-settings-load base=0x10ee97d000 size=0xa000 top=0x10ee987000 sp=0x10ee986e30 kind=0xb table=0x8000
+650436283 #15 [ThreadStack] exit name=tr-settings-load used=9904 size=40960 free=31056 low=false
+650436289 #16 [ThreadStack] spawn name=tr-state-load base=0x10a7621000 size=0xa000 top=0x10a762b000 sp=0x10a762a160 kind=0xb table=0xa000
+650436291 #17 [ThreadStack] exit name=tr-state-load used=18456 size=40960 free=22504 low=false
+650436294 #18 [ThreadStack] spawn name=tr-state-writer base=0x10d91bb000 size=0xa000 top=0x10d91c5000 sp=0x10d91c2a10 kind=0xb table=0xa000
+650436295 #19 [ThreadStack] spawn name=tr-state-diag base=0x10e2e03000 size=0xa000 top=0x10e2e0d000 sp=0x10e2e0cc10 kind=0xb table=0xa000
+650436300 #20 [ThreadStack] spawn name=tr-ini-writer base=0x10e9b42000 size=0x7000 top=0x10e9b49000 sp=0x10e9b48b10 kind=0xb table=0x7000
+650436313 #21 [ThreadStack] spawn name=tr-diag-reload base=0x10d9e22000 size=0xa000 top=0x10d9e2c000 sp=0x10d9e2bbc0 kind=0xb table=0xa000
+650436407 #22 [Probe] arcropolis exports absent version=0x0 register=0x0 size=0x0 load=0x0
+650436410 #23 [LayoutArchive] boot buffers 2 x 1570692 B
+650436412 #24 [ThreadStack] spawn name=tr-archive base=0x10df9cd000 size=0x7000 top=0x10df9d4000 sp=0x10df9d3d50 kind=0xb table=0x7000
+650436416 #25 [Ui] anchors installed manager_slot=main+0x593ba90 pilot_present=true
+650436416 #26 [ThreadStack] spawn name=tr-menu base=0x10dd06b000 size=0xe000 top=0x10dd079000 sp=0x10dd078e50 kind=0xb table=0xe000
+650436417 #27 [Texture] install usable=true guards=[Stock, Stock, Stock, Stock, Stock, Stock, Stock, Stock, Stock] service_slot=0x85df5f20
+650436417 #28 [EffTex] install usable=true guards=[Stock, Stock, Stock, Stock, Stock, Stock, Stock, Stock, Stock, Stock] manager_slot=0x85df7920
+650436420 #29 [ThreadStack] spawn name=mii-catalog base=0x10e850a000 size=0x7000 top=0x10e8511000 sp=0x10e8510ce0 kind=0xb table=0x7000
+650436422 #30 [ThreadStack] spawn name=replay-capture-save base=0x10d48b0000 size=0xe000 top=0x10d48be000 sp=0x10d48bde40 kind=0xb table=0xe000
+650436427 #31 [ReplayCapture] live_enabled=false
+650436430 #32 [TrainingRooms] deluxe_row registered handle=2 descriptor=4 host_status=0x1 host_build=0.10.1-03e9d42ad2ef-1793545262
+650436455 #33 [ReplayCapture] guarded live adapter ready capture=off host_registered=true save=shared
+650436461 #34 [ThreadStack] spawn name=tr-macro-diag base=0x109f9ad000 size=0x7000 top=0x109f9b4000 sp=0x109f9b3b80 kind=0xb table=0x7000
+650436461 #35 [NamedMacroDiag] thread tr-macro-diag stack_near=0x109f9b3ccc
+650436465 #36 [CyclePreload] loaded slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+650436478 #37 [NativeUnlink] experimental missing-parent guard enabled; observer=false; writer unknown
+650436478 #38 [NativeGcGuard] null constant guard enabled; malformed-value writer unknown
+650436486 #39 [CharacterLifecycle] main21450c647b8c5940; fingerprints passed
+650436488 #40 [MiiSavedAlpha] enabled; native Training saved-original same-class alpha only
+650436491 #41 [MiiOrdinaryPlayer] enabled: staged Player0 alpha; one owner for ordinary and saved origins
+650436495 #42 [NativeSourceCapacity] managed third-source alpha enabled; native Training; separate_ldn_opt_in=true
+650436496 #43 [MiiOrdinaryCpu] enabled: CPU1 ordinary index0/native selector1 cycle alpha; ordered targets and same-class menu reload
+650436535 #44 [BodyBank] identity_view result=installed sites=[acquire:stock,acquire_joker:stock,worker_0:stock,worker_1:stock,worker_2:stock,release:stock,path:stock,construct:stock,init_register:stock,init_prepare_entry:stock,setup_construct:stock,setup_key_a:stock,setup_key_b:stock,unload:stock,object_a:stock,object_b:stock,object_c:stock,item_owner:stock] region=1 weapon_owner_table=match
+650436537 #45 [GroupSwap] fingerprint mismatch +0x354ccd0 word 0
+650436537 #46 [GroupSwap] async build enabled functor_slot=0x80e8e2a0 expected=0x80e8e2a0 control_slot=0x8111a4e0 expected=0x8111a4e0
+650436541 #47 [IcPair] enabled N1=+0x6555a0 N2=+0x656ee0 N3=+0x6581f0 outgoing_owner=+0x646fe0 deactivate=+0x60ffd0 flags pair/extra=0x6/0x4
+650436553 #48 [MiiPortrait] armed: helper-rendered portrait, scoped template skip at +0x32c7404, channels [3, 4]
+650436555 #49 [CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled=true; one existing entry per role; no manual loader pumping
+650436557 #50 [Q15Context] observer installed limit_per_caller=8
+650436558 #51 [LobbyPractice] verified_13_0_5=true
+650436558 #52 [TrainingRotation] verified=true default_off=true
+650436560 #53 [LobbyStageProbe] verified=true quickplay=true
+650436563 #54 [TrainingModpack] group=practice_stage_observer result=skipped sites=9
+650436563 #55 [PracticeStageObserver] verified=false passive=true
+650436576 #56 [ThreadStack] exit name=boot used=33344 size=65536 free=32192 low=false
+650443712 #57 [TrainingSeams] late image=item sites=12 stock=12 other=[] skipped=[] shadow_diff=[] unusable=[] unchecked=0
+650450852 #58 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=575 hooks=ui_archive:9,ui_pass_calculate:562,ui_register_calculate:4
+650450853 #59 [ThreadStack] high_water name=tr-heartbeat used=11056 size=32768 free=21712 low=false
+650450853 #60 [ThreadStack] high_water name=tr-state-writer used=10736 size=40960 free=30224 low=false
+650450853 #61 [ThreadStack] high_water name=tr-state-diag used=8384 size=40960 free=32576 low=false
+650450853 #62 [ThreadStack] high_water name=tr-ini-writer used=9056 size=28672 free=19616 low=false
+650450853 #63 [ThreadStack] high_water name=tr-diag-reload used=8464 size=40960 free=32496 low=false
+650450853 #64 [ThreadStack] high_water name=tr-archive used=7840 size=28672 free=20832 low=false
+650450853 #65 [ThreadStack] high_water name=tr-menu used=27040 size=57344 free=30304 low=false
+650450853 #66 [ThreadStack] high_water name=mii-catalog used=7952 size=28672 free=20720 low=false
+650450853 #67 [ThreadStack] high_water name=replay-capture-save used=21584 size=57344 free=35760 low=false
+650450853 #68 [ThreadStack] high_water name=tr-macro-diag used=8592 size=28672 free=20080 low=false
+650450853 #69 [HookStack] site=pipeline_before_tick calls=330 min_free=1030096 stack=0x100000 base=0x1089404000 kind=0xb
+650450853 #70 [HookStack] site=pipeline_after_tick calls=330 min_free=1028272 stack=0x100000 base=0x1089404000 kind=0xb
+650450853 #71 [HookStack] site=ui_archive calls=9 min_free=90941840 stack=0x56cb000 base=0x1188672000 kind=0x5
+650450853 #72 [HookStack] site=ui_register_calculate calls=4 min_free=1034784 stack=0x100000 base=0x1089404000 kind=0xb
+650450853 #73 [HookStack] site=ui_pass_calculate calls=562 min_free=1169952 stack=0x56cb000 base=0x1188672000 kind=0x5
+650460897 #74 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1204 hooks=ui_archive:9,ui_pass_calculate:1766,ui_register_calculate:4
+650470940 #75 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1196 hooks=ui_archive:9,ui_pass_calculate:2962,ui_register_calculate:4
+650481048 #76 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=3158 hooks=ui_archive:15,ui_pass_calculate:6106,ui_register_calculate:12
+650483170 #77 [TrainingRotation] sequence_initialized context=0x11eba47c00
+650491280 #78 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=2224 hooks=ui_archive:24,ui_pass_calculate:8312,ui_register_calculate:21
+650491280 #79 [HookStack] site=ui_archive calls=24 min_free=745824 stack=0xc6000 base=0x118dc77000 kind=0x5
+650501328 #80 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1809 hooks=ui_archive:24,ui_pass_calculate:10121,ui_register_calculate:21
+650509407 #81 [LobbyPractice] scene initialized=true melee=0x20 mode=0x04040000
+650509419 #82 [Ui] menu session cleared
+650509876 #83 [TrainingRooms] cpu_event common_params object=0x11a4519018
+650510256 #84 [TrioBoundary] allocation owner=0 caller=main+0x14ec2bc descriptor=(1, [58, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650510264 #85 [TrioBoundary] allocation owner=1 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650510264 #86 [TrioBoundary] allocation owner=2 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650510264 #87 [TrioBoundary] allocation owner=3 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650510268 #88 [CharacterSources] cpu_quantity=4294967294 seen_by_service slot=0
+650510491 #89 [BuildSplit] stall owner=0 gap_us=173540 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+650510491 #90 [BuildSplit] stall owner=1 gap_us=174219 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+650511207 #91 [TrainingRooms] cpu_event camera_setup game=[-47.0, 130.0, 6000.0] class=Other stage=308 write=None
+650511689 #92 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=3137 hooks=input_caller_a_note:131,input_caller_a_apply:1056,hazard_rule:1,ui_archive:26,ui_pass_calculate:11669,ui_register_calculate:23,roster_input:131,recorder_poll:131,menu_input:131,other:4
+650511689 #93 [HookStack] site=ui_archive calls=26 min_free=738080 stack=0xc6000 base=0x118dc77000 kind=0x5
+650511689 #94 [HookStack] site=hazard_rule calls=1 min_free=1033088 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #95 [HookStack] site=input_caller_a_apply calls=1056 min_free=1033472 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #96 [HookStack] site=other calls=4 min_free=735248 stack=0xc6000 base=0x118dc77000 kind=0x5
+650511689 #97 [HookStack] site=input_caller_a_note calls=131 min_free=1033456 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #98 [HookStack] site=menu_input calls=131 min_free=1029824 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #99 [HookStack] site=roster_input calls=131 min_free=1029824 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #100 [HookStack] site=recorder_poll calls=131 min_free=1029824 stack=0x100000 base=0x1089404000 kind=0xb
+650511689 #101 [HookStack] site=native_service calls=312 min_free=1032992 stack=0x100000 base=0x1089404000 kind=0xb
+650513036 #102 [BuildSplit] stall owner=0 gap_us=148011 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+650513036 #103 [BuildSplit] stall owner=1 gap_us=148023 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+650513884 #104 [CharacterRoster] observed owner=0 entry=0x1216a54000 kind=0x58 epoch=1
+650513920 #105 [TrainingRooms] settings.json written by the writer thread
+650514006 #106 [PracticeRecording] recorder_stop mode=0 =0
+650514007 #107 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=2
+650514009 #108 [CharacterRoster] observed owner=1 entry=0x1216a5a000 kind=0x28 epoch=1
+650514032 #109 [TrainingRooms] settings.json written by the writer thread
+650514452 #110 [LayoutArchive] dumped stock info_training bytes=451604 fnv=8833748e9518a461
+650514459 #111 [LayoutArchive] handed out info_training bytes=742292 stock=451604 base=stock load_allocations=0
+650514561 #112 [TrainingRooms] diag_pause_menu object=0x1216f18000
+650514570 #113 [CharacterSources] cpu_quantity=1 seen_by_service slot=0
+650514838 #114 [TrainingRooms] cpu_ids SITUATION_KIND_GROUND=0 SITUATION_KIND_AIR=2 SITUATION_KIND_CLIFF=1 FIGHTER_KIND_POPO=75 FIGHTER_KIND_NANA=76 FIGHTER_STATUS_KIND_NONE=-1 
+650514838 #115 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_WAIT=0 FIGHTER_STATUS_KIND_DAMAGE=71 FIGHTER_STATUS_KIND_DAMAGE_FLY=73 FIGHTER_STATUS_KIND_DAMAGE_FALL=79 FIGHTER_STATUS_KIND_TREAD_DAMAGE=185 FIGHTER_STATUS_KIND_TREAD_FALL=188 
+650514838 #116 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_GUARD_ON=27 FIGHTER_STATUS_KIND_GUARD=28 FIGHTER_STATUS_KIND_GUARD_OFF=29 FIGHTER_STATUS_KIND_GUARD_DAMAGE=30 FIGHTER_STATUS_KIND_DOWN_STAND=87 FIGHTER_STATUS_KIND_DOWN_STAND_ATTACK=89 
+650514838 #117 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_PASSIVE=103 FIGHTER_STATUS_KIND_PASSIVE_CEIL=107 FIGHTER_STATUS_KIND_CLIFF_ROBBED=278 FIGHTER_STATUS_KIND_LANDING=22 FIGHTER_STATUS_KIND_LANDING_DAMAGE_LIGHT=26 FIGHTER_STATUS_KIND_CLIFF_CATCH=118 
+650514838 #118 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_CLIFF_WAIT=119 FIGHTER_STATUS_KIND_CLIFF_CLIMB=121 FIGHTER_STATUS_KIND_CLIFF_ESCAPE=122 FIGHTER_STATUS_KIND_CLIFF_JUMP1=123 FIGHTER_STATUS_KIND_CLIFF_ATTACK=120 FIGHTER_STATUS_KIND_DOWN=80 
+650514838 #119 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D=78 FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR=76 FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U=77 FIGHTER_STATUS_KIND_PASSIVE_FB=104 FIGHTER_STATUS_KIND_PASSIVE_WALL=105 FIGHTER_STATUS_KIND_PASSIVE_WALL_JUMP=106 
+650514838 #120 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_STOP_WALL=108 FIGHTER_STATUS_KIND_STOP_CEIL=109 FIGHTER_STATUS_KIND_DOWN_WAIT=83 FIGHTER_STATUS_KIND_DOWN_WAIT_CONTINUE=84 FIGHTER_STATUS_KIND_DOWN_STAND_FB=88 FIGHTER_STATUS_KIND_LAY_DOWN=86 
+650514838 #121 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_SLIP_WAIT=136 FIGHTER_STATUS_KIND_SLIP_STAND=137 FIGHTER_STATUS_KIND_SLIP_STAND_ATTACK=138 FIGHTER_STATUS_KIND_SLIP_STAND_F=139 FIGHTER_STATUS_KIND_SLIP_STAND_B=140 FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE=503316499 
+650514838 #122 [TrainingRooms] cpu_ids FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE_WALL=503316501 FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE_CEIL=503316504 FIGHTER_INSTANCE_WORK_ID_FLOAT_CURSOR_OFFSET_Y=26 CAMERA_QUAKE_KIND_NONE=0 FIGHTER_STATUS_KIND_ESCAPE=31 FIGHTER_STATUS_KIND_ESCAPE_F=32 
+650514838 #123 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_ESCAPE_B=33 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE=503316518 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_AIR=503316541 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_GUARD_ON=503316521 FIGHTER_STATUS_TRANSITION_TERM_ID_DOWN_STAND=503316495 CONTROL_PAD_BUTTON_GUARD=3 
+650514838 #124 [TrainingRooms] cpu_ids CONTROL_PAD_BUTTON_GUARD_HOLD=16 FIGHTER_PAD_COMMAND_CATEGORY1=0 FIGHTER_PAD_COMMAND_CATEGORY2=1 FIGHTER_PAD_CMD_CAT1_FLAG_AIR_ESCAPE=4194304 FIGHTER_PAD_CMD_CAT1_FLAG_JUMP_BUTTON=2097152 FIGHTER_PAD_CMD_CAT1_FLAG_ESCAPE=16777216 
+650514838 #125 [TrainingRooms] cpu_ids FIGHTER_PAD_CMD_CAT1_FLAG_ESCAPE_F=33554432 FIGHTER_PAD_CMD_CAT1_FLAG_ESCAPE_B=67108864 FIGHTER_PAD_CMD_CAT1_FLAG_SPECIAL_N=4096 FIGHTER_PAD_CMD_CAT1_FLAG_SPECIAL_S=8192 FIGHTER_PAD_CMD_CAT1_FLAG_SPECIAL_HI=16384 FIGHTER_PAD_CMD_CAT1_FLAG_SPECIAL_LW=32768 
+650514838 #126 [TrainingRooms] cpu_ids FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_HI4=32 FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_S4=16 FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_LW4=64 FIGHTER_PAD_CMD_CAT1_FLAG_CATCH=536870912 FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_N=1 FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_S3=2 
+650514838 #127 [TrainingRooms] cpu_ids FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_HI3=4 FIGHTER_PAD_CMD_CAT1_FLAG_ATTACK_LW3=8 FIGHTER_PAD_CMD_CAT2_FLAG_THROW_F=1048576 FIGHTER_PAD_CMD_CAT2_FLAG_THROW_B=2097152 FIGHTER_PAD_CMD_CAT2_FLAG_THROW_HI=4194304 FIGHTER_PAD_CMD_CAT2_FLAG_THROW_LW=8388608 
+650514838 #128 [TrainingRooms] cpu_ids FIGHTER_COMMAND_ATTACK_AIR_KIND_N=1 FIGHTER_COMMAND_ATTACK_AIR_KIND_F=2 FIGHTER_COMMAND_ATTACK_AIR_KIND_B=3 FIGHTER_COMMAND_ATTACK_AIR_KIND_HI=4 FIGHTER_COMMAND_ATTACK_AIR_KIND_LW=5 FIGHTER_STATUS_KIND_ESCAPE_AIR=34 
+650514839 #129 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_JUMP_SQUAT=10 FIGHTER_STATUS_KIND_JUMP_AERIAL=12 FIGHTER_STATUS_KIND_JUMP=11 FIGHTER_STATUS_KIND_DASH=3 FIGHTER_STATUS_KIND_ATTACK_DASH=41 FIGHTER_STATUS_KIND_ATTACK_AIR=54 
+650514839 #130 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_FALL=14 FIGHTER_STATUS_KIND_SPECIAL_N=476 FIGHTER_STATUS_KIND_SPECIAL_S=477 FIGHTER_STATUS_KIND_SPECIAL_HI=478 FIGHTER_STATUS_KIND_SPECIAL_LW=479 FIGHTER_STATUS_KIND_ATTACK_HI4_START=51 
+650514839 #131 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_ATTACK_S4_START=45 FIGHTER_STATUS_KIND_ATTACK_LW4_START=48 FIGHTER_STATUS_KIND_CATCH=55 FIGHTER_STATUS_KIND_ATTACK=39 FIGHTER_STATUS_KIND_ATTACK_S3=42 FIGHTER_STATUS_KIND_ATTACK_HI3=43 
+650514839 #132 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_ATTACK_LW3=44 FIGHTER_STATUS_KIND_CATCH_WAIT=60 FIGHTER_STATUS_KIND_CATCH_PULL=56 FIGHTER_STATUS_KIND_CATCH_ATTACK=61 FIGHTER_STATUS_KIND_SQUAT=17 FIGHTER_STATUS_KIND_SQUAT_B=20 
+650514839 #133 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_SQUAT_F=19 FIGHTER_STATUS_KIND_SQUAT_RV=21 FIGHTER_STATUS_KIND_SQUAT_WAIT=18 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_DASH=503316525 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_CATCH_DASH=503316592 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ATTACK_AIR=503316578 
+650514839 #134 [TrainingRooms] cpu_ids FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_THROW_HI=503316589 FIGHTER_INSTANCE_WORK_ID_INT_INVALID_CATCH_FRAME=268435580 FIGHTER_STATUS_WORK_ID_FLAG_RESERVE_DIVE=553648129 FIGHTER_KINETIC_ENERGY_ID_GRAVITY=1 CONTROL_PAD_BUTTON_JUMP=2 CONTROL_PAD_BUTTON_FLICK_JUMP=12 
+650514839 #135 [TrainingRooms] cpu_ids FIGHTER_KIND_KOOPA=15 FIGHTER_KIND_TRAIL=93 FIGHTER_KIND_KROOL=69 FIGHTER_KIND_KIRBY=6 FIGHTER_KOOPA_STATUS_KIND_SPECIAL_HI_G=481 FIGHTER_KOOPA_STATUS_KIND_SPECIAL_HI_A=482 
+650514839 #136 [TrainingRooms] cpu_ids FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1=483 FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_SHOOT=484 FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_END=485 FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N2=486 FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N3=487 FIGHTER_TRAIL_STATUS_KIND_ATTACK_AIR_N=481 
+650514839 #137 [TrainingRooms] cpu_ids FIGHTER_TRAIL_STATUS_KIND_ATTACK_AIR_F=482 FIGHTER_KROOL_STATUS_KIND_SPECIAL_S_THROW=486 FIGHTER_KROOL_STATUS_KIND_SPECIAL_S_CATCH=487 FIGHTER_KROOL_STATUS_KIND_SPECIAL_S_FAILURE=488 FIGHTER_KROOL_STATUS_KIND_SPECIAL_S_GET=489 FIGHTER_KIRBY_STATUS_KIND_MIIFIGHTER_SPECIAL_N=518 
+650514839 #138 [TrainingRooms] cpu_ids FIGHTER_KIRBY_STATUS_KIND_NUM=893 FIGHTER_STATUS_KIND_CAPTURE_PULLED=65 FIGHTER_STATUS_KIND_CAPTURE_WAIT=66 FIGHTER_STATUS_KIND_CAPTURE_DAMAGE=67 FIGHTER_STATUS_KIND_SHOULDERED_DONKEY_START=197 FIGHTER_STATUS_KIND_SHOULDERED_DONKEY=198 
+650514839 #139 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_BURY=200 FIGHTER_STATUS_KIND_BURY_WAIT=201 FIGHTER_STATUS_KIND_CAPTURE_YOSHI=243 FIGHTER_STATUS_KIND_YOSHI_EGG=244 FIGHTER_STATUS_KIND_CAPTURE_PULLED_YOSHI=245 FIGHTER_STATUS_KIND_CAPTURE_WAIT_YOSHI=246 
+650514839 #140 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_CAPTURE_DAMAGE_YOSHI=247 FIGHTER_STATUS_KIND_SWALLOWED=230 FIGHTER_STATUS_KIND_SWALLOWED_CAPTURE=233 FIGHTER_STATUS_KIND_CATCHED_AIR_GANON=191 FIGHTER_STATUS_KIND_CATCHED_AIR_FALL_GANON=192 FIGHTER_STATUS_KIND_BIND=102 
+650514839 #141 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_DAMAGE_SONG=99 FIGHTER_STATUS_KIND_BITTEN_WARIO=238 FIGHTER_STATUS_KIND_CLUNG_DIDDY=240 FIGHTER_STATUS_KIND_CLUNG_DAMAGE_DIDDY=241 FIGHTER_STATUS_KIND_ICE=203 FIGHTER_STATUS_KIND_CATCHED_REFLET=254 
+650514839 #142 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_KAMUI_PIERCE=342 FIGHTER_STATUS_KIND_SWING_GAOGAEN_CATCHED=374 FIGHTER_STATUS_KIND_DRAGGED_RIDLEY=370 FIGHTER_STATUS_KIND_CATCHED_PICKEL_TROLLEY=446 FIGHTER_STATUS_KIND_SLEEP=424 FIGHTER_STATUS_KIND_FURAFURA=96 
+650514839 #143 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_GIMMICK_FISH_CAPTURE=212 FIGHTER_STATUS_KIND_CAPTURE_MASTERHAND=255 FIGHTER_STATUS_KIND_CAPTURE_ITEM=264 FIGHTER_STATUS_KIND_CAPTURE_BEETLE=265 FIGHTER_STATUS_KIND_CAPTURE_BLACKHOLE=266 FIGHTER_STATUS_KIND_CAPTURE_BEITCRANE=267 
+650514839 #144 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_CAPTURE_KAWASAKI=268 FIGHTER_STATUS_KIND_CAPTURE_DRIVER=269 FIGHTER_STATUS_KIND_CAPTURE_MIMIKKYU=270 FIGHTER_STATUS_KIND_CAPTURE_CLAPTRAP=271 FIGHTER_STATUS_KIND_CAPTURE_BOSSGALAGA=292 FIGHTER_STATUS_KIND_CAPTURE_NABBIT=307 
+650514839 #145 [TrainingRooms] cpu_ids FIGHTER_STATUS_KIND_CAPTURE_MASTERCORE=308 FIGHTER_STATUS_KIND_CAPTURE_WAIT_OCTOPUS=396 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_CLIFF_ATTACK=503316550 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_CLIFF_CLIMB=503316553 FIGHTER_INSTANCE_WORK_ID_FLAG_CATCH_CLIFF=536870914 FIGHTER_INSTANCE_WORK_ID_FLAG_DISABLE_ESCAPE_PENALTY=536871087 
+650514839 #146 [TrainingRooms] cpu_ids FIGHTER_STATUS_DAMAGE_WORK_FLOAT_VECOR_CORRECT_STICK_X=16777232 FIGHTER_STATUS_DAMAGE_WORK_FLOAT_VECOR_CORRECT_STICK_Y=16777233 EFFECT_SUB_ATTRIBUTE_NO_JOINT_SCALE=16777216 EFFECT_SUB_ATTRIBUTE_FOLLOW=65536 EFFECT_SUB_ATTRIBUTE_CONCLUDE_STATUS=16384 FIGHTER_STATUS_KIND_ESCAPE_AIR_SLIDE=35 
+650514839 #147 [TrainingRooms] cpu_ids FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_SPECIAL_HI=503316581 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_JUMP_SQUAT=503316523 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_JUMP_AERIAL=503316542 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_F=503316519 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_CATCH=503316591 FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_SPECIAL_S=503316580 
+650514839 #148 [TrainingRooms] cpu_ids FIGHTER_KIND_SHULK=57 FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID=268435456 FIGHTER_INSTANCE_WORK_ID_INT_COLOR=268435522 FIGHTER_SHULK_INSTANCE_WORK_ID_FLAG_SPECIAL_N_CIRCLE_MENU=536871141 FIGHTER_STATUS_CLIFF_WORK_INT_CATCH_REST_TIME=285212677 MODEL_COLOR_TYPE_COLOR_BLEND=1 
+650514843 #149 [TrainingRooms] practice_session held=true
+650514844 #150 [ItemTable] choice=0 FIGHTER_KIND_BUDDY=84 ITEM_KIND_BUDDYBOMB=429 variation=none
+650514844 #151 [ItemTable] choice=1 FIGHTER_KIND_KOOPAJR=58 ITEM_KIND_MECHAKOOPA=146 variation=none
+650514844 #152 [ItemTable] choice=2 FIGHTER_KIND_DAISY=14 kind=article ITEM_VARIATION_DAISYDAIKON_1=0
+650514844 #153 [ItemTable] choice=3 FIGHTER_KIND_DAISY=14 kind=article ITEM_VARIATION_DAISYDAIKON_6=5
+650514844 #154 [ItemTable] choice=4 FIGHTER_KIND_DAISY=14 kind=article ITEM_VARIATION_DAISYDAIKON_7=6
+650514844 #155 [ItemTable] choice=5 FIGHTER_KIND_DAISY=14 kind=article ITEM_VARIATION_DAISYDAIKON_8=7
+650514844 #156 [ItemTable] choice=6 FIGHTER_KIND_DAISY=14 ITEM_KIND_DOSEISAN=70 variation=none
+650514844 #157 [ItemTable] choice=7 FIGHTER_KIND_DAISY=14 ITEM_KIND_BOMBHEI=66 ITEM_VARIATION_BOMBHEI_NORMAL=0
+650514844 #158 [ItemTable] choice=8 FIGHTER_KIND_DIDDY=39 kind=article variation=none
+650514844 #159 [ItemTable] choice=9 FIGHTER_KIND_DIDDY=39 ITEM_KIND_DIDDYPEANUTS=119 variation=none
+650514844 #160 [ItemTable] choice=10 FIGHTER_KIND_KROOL=69 ITEM_KIND_KROOLCROWN=149 variation=none
+650514844 #161 [ItemTable] choice=11 FIGHTER_KIND_LINK=2 ITEM_KIND_LINKBOMB=120 variation=none
+650514844 #162 [ItemTable] choice=12 FIGHTER_KIND_LINK=2 ITEM_KIND_LINKARROW=156 variation=none
+650514844 #163 [ItemTable] choice=13 FIGHTER_KIND_ROCKMAN=49 ITEM_KIND_METALBLADE=142 variation=none
+650514844 #164 [ItemTable] choice=14 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANCHERRY=133 variation=none
+650514844 #165 [ItemTable] choice=15 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANSTRAWBERRY=134 variation=none
+650514844 #166 [ItemTable] choice=16 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANORANGE=135 variation=none
+650514844 #167 [ItemTable] choice=17 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANAPPLE=136 variation=none
+650514844 #168 [ItemTable] choice=18 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANMELON=137 variation=none
+650514844 #169 [ItemTable] choice=19 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANBOSS=138 variation=none
+650514844 #170 [ItemTable] choice=20 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANBELL=139 variation=none
+650514844 #171 [ItemTable] choice=21 FIGHTER_KIND_PACMAN=55 ITEM_KIND_PACMANKEY=140 variation=none
+650514844 #172 [ItemTable] choice=22 FIGHTER_KIND_PEACH=13 kind=article ITEM_VARIATION_PEACHDAIKON_1=0
+650514844 #173 [ItemTable] choice=23 FIGHTER_KIND_PEACH=13 kind=article ITEM_VARIATION_PEACHDAIKON_6=5
+650514844 #174 [ItemTable] choice=24 FIGHTER_KIND_PEACH=13 kind=article ITEM_VARIATION_PEACHDAIKON_7=6
+650514844 #175 [ItemTable] choice=25 FIGHTER_KIND_PEACH=13 kind=article ITEM_VARIATION_PEACHDAIKON_8=7
+650514844 #176 [ItemTable] choice=26 FIGHTER_KIND_PEACH=13 ITEM_KIND_DOSEISAN=70 variation=none
+650514844 #177 [ItemTable] choice=27 FIGHTER_KIND_PEACH=13 ITEM_KIND_BOMBHEI=66 ITEM_VARIATION_BOMBHEI_NORMAL=0
+650514844 #178 [ItemTable] choice=28 FIGHTER_KIND_RICHTER=68 ITEM_KIND_RICHTERHOLYWATER=155 variation=none
+650514844 #179 [ItemTable] choice=29 FIGHTER_KIND_ROBOT=45 ITEM_KIND_ROBOTGYRO=122 ITEM_VARIATION_ROBOTGYRO_1P=0
+650514844 #180 [ItemTable] choice=30 FIGHTER_KIND_REFLET=56 ITEM_KIND_BOOK=131 variation=none
+650514844 #181 [ItemTable] choice=31 FIGHTER_KIND_REFLET=56 ITEM_KIND_THUNDERSWORD=132 variation=none
+650514844 #182 [ItemTable] choice=32 FIGHTER_KIND_SHEIK=16 ITEM_KIND_EXPLOSIONBOMB=130 variation=none
+650514844 #183 [ItemTable] choice=33 FIGHTER_KIND_SIMON=67 ITEM_KIND_SIMONHOLYWATER=154 variation=none
+650514844 #184 [ItemTable] choice=34 FIGHTER_KIND_SNAKE=34 ITEM_KIND_SNAKEGRENADE=150 variation=none
+650514844 #185 [ItemTable] choice=35 FIGHTER_KIND_TOONLINK=46 ITEM_KIND_TOONLINKBOMB=123 variation=none
+650514844 #186 [ItemTable] choice=36 FIGHTER_KIND_MURABITO=48 ITEM_KIND_WOOD=147 variation=none
+650514844 #187 [ItemTable] choice=37 FIGHTER_KIND_YOUNGLINK=23 ITEM_KIND_YOUNGLINKBOMB=152 variation=none
+650514852 #188 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11ad162180
+650514852 #189 [TrainingRooms] cpu_event status entry=1 partner=false status=0 prev=-1 situation=0 motion_frame=1
+650514852 #190 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+650515034 #191 [BuildSplit] stall owner=0 gap_us=281261 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[58] flags=0x0
+650515034 #192 [BuildSplit] stall owner=1 gap_us=281273 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650515061 #193 [TrainingRooms] cpu_event command_query entry=1 cat=2 status=0 bits=0x0 request=None queued=false latched=false situation=Ground
+650515094 #194 [Q15UiContext] registration=true ordinal=1 name=info_training thread=0x8930a088 sp=0x1089500df0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515095 #195 [TrainingRooms] hud_draw layout registrations=1
+650515097 #196 [TrainingRooms] notice_visible=true menu_open=false
+650515099 #197 [TrainingRooms] notice_draw header="TrainingRooms" body="Welcome!" color=[0, 0, 0, 255]
+650515099 #198 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+650515103 #199 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+650515103 #200 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11d7961cf0 around=[b978, 16e4, 0012, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+650515203 #201 [Q15UiContext] registration=false ordinal=1 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515209 #202 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+650515210 #203 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11d7961cf0 around=[b978, 16e4, 0012, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+650515215 #204 [BuildSplit] stall owner=0 gap_us=88406 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[58] flags=0x0
+650515215 #205 [BuildSplit] stall owner=1 gap_us=88423 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650515222 #206 [Q15UiContext] registration=false ordinal=2 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515282 #207 [Q15UiContext] registration=false ordinal=3 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515286 #208 [BuildSplit] stall owner=0 gap_us=60570 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[58] flags=0x0
+650515286 #209 [BuildSplit] stall owner=1 gap_us=61033 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650515288 #210 [MiiAutoInit] catalog read queued generations=[2, 2] opening=2
+650515295 #211 [Q15UiContext] registration=false ordinal=4 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515296 #212 [TrainingRooms] input_display_plan ops=17 rows=1 icons=1
+650515309 #213 [Q15UiContext] registration=false ordinal=5 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515309 #214 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650515317 #215 [Q15UiContext] registration=false ordinal=6 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515320 #216 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[2, 2] opening=2
+650515336 #217 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+650515350 #218 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+650515359 #219 [Q15UiContext] registration=false ordinal=7 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515368 #220 [Q15UiContext] registration=false ordinal=8 name=info_training thread=0x1181033f10 sp=0x118878fdf0 layout=0x11e83eb100 holder=0x1216e4b500 draw_info=0x1216e4b550
+650515390 #221 [TrainingRooms] cpu_event tech_call accessor=0x120fb5d940 requested=1 role=false
+650516092 #222 [PreloadStatus] state=Waiting planned=2 ready=0 prefetched=0 failed=0 pending=0 unstarted=2 swap=3 blocked=false scheduler_blocked=false text="Swap both once to load"
+650516092 #223 [PreloadStatus] raise text="Swap both once to load" frames=120
+650516111 #224 [CharacterSources] install slot=2 kind=0x4a
+650516113 #225 [TrioBoundary] reload entry=0x11e1220000 owner=2 caller=main+0x7c2809c2c0 guard=0 incoming=(1, [4a, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650516221 #226 [TrainingRooms] notice_draw header="Open Menu" body="B + D-pad Up or Minus" color=[0, 0, 0, 255]
+650516279 #227 [MiiHelper] prequeue source=SourceToken { slot: 2, entry: NativeEntry(76791545856), generation: 1, epoch: SceneEpoch(1) } selected=0x11f2957d00 init=false header=[2, 28, ffffffff, ffffffff, 1] index=0 tokens=[0, 0, 0, 0] task=0x0 outstanding=Some(0) Dindex=0 rebuild=0 before=Snapshot { layout: Training, helpers: View { layout: Training, epoch: Some(SceneEpoch(1)), slots: [Unavailable { token: SourceToken { slot: 2, entry: NativeEntry(76791545856), generation: 1, epoch: SceneEpoch(1) }, phase: Loading }, Unmanaged], miis: [None, None], created_slots: [Unmanaged, Unmanaged, Unmanaged, Unmanaged], created_miis: [None, None, None, None] }, created: None, extras: Extras { layout: Training, entries: [0, 0, 0, 0], roots: [None, None, None, None] }, binding: Binding { epoch: 2, owner: 2, entry: 76791545856, row: 2245561328, holder: 76555867536, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, thread: 2301665416, original_kind: 40, descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 103, 240, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 120, 25, 104, 223, 17, 0, 0, 0], header: [2, 40, 4294967295, 4294967295, 1], scalars: Scalars { e: Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0, 0, 0, 0] }, d_outfit: 0, d_colour: 0, d_specials: [0, 0, 0, 0] }, index: 0, record: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 137, 112, 205, 17, 0, 0, 0, 224, 40, 23, 211, 17, 0, 0, 0, 240, 79, 113, 205, 17, 0, 0, 0, 16, 115, 112, 205, 17, 0, 0, 0, 32, 174, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 192, 112, 205, 17, 0, 0, 0, 192, 34, 113, 205, 17, 0, 0, 0, 80, 7, 23, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current_record: [48, 31, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 113, 205, 17, 0, 0, 0, 80, 22, 23, 211, 17, 0, 0, 0, 80, 40, 23, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 113, 205, 17, 0, 0, 0, 192, 214, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 1, 0, 2], symbol: 2245510392, manager: 76555867232, internal: 75180418048, entries: [77689339904, 77689364480, 76791545856, 76791570432, 0, 0, 0, 0], owners: [Some(Owner { entry: 77689339904, row: 2245560112, information: 77689340176, object: 75996821760, index: 0, selector: 0, alias: 0 }), Some(Owner { entry: 77689364480, row: 2245560720, information: 77689364752, object: 77084325888, index: 0, selector: 1, alias: 0 }), Some(Owner { entry: 76791545856, row: 2245561328, information: 76791546128, object: 77084327168, index: 0, selector: 2, alias: 0 }), Some(Owner { entry: 76791570432, row: 2245561936, information: 76791570704, object: 77084328448, index: 0, selector: 3, alias: 0 }), None, None, None, None], protected: [Some(Protected { owner: Owner { entry: 77689339904, row: 2245560112, information: 77689340176, object: 75996821760, index: 0, selector: 0, alias: 0 }, descriptor: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 88, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 103, 240, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 216, 24, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [0, 0, 0, 255, 0, 0, 0] }), Some(Protected { owner: Owner { entry: 77689364480, row: 2245560720, information: 77689364752, object: 77084325888, index: 0, selector: 1, alias: 0 }, descriptor: [0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 100, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 103, 240, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 40, 25, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 0, 0, 1] }), None, Some(Protected { owner: Owner { entry: 76791570432, row: 2245561936, information: 76791570704, object: 77084328448, index: 0, selector: 3, alias: 0 }, descriptor: [0, 0, 0, 0, 3, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 103, 240, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 200, 25, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 4, 0, 3] }), None, None, None, None], records: [Some((0, [48, 31, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 113, 205, 17, 0, 0, 0, 80, 22, 23, 211, 17, 0, 0, 0, 80, 40, 23, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 113, 205, 17, 0, 0, 0, 192, 214, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((1, [128, 156, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 123, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 64, 23, 211, 17, 0, 0, 0, 64, 3, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 237, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((3, [32, 132, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 219, 112, 205, 17, 0, 0, 0, 80, 14, 113, 205, 17, 0, 0, 0, 48, 121, 113, 205, 17, 0, 0, 0, 80, 170, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 43, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 154, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), None, None, None, None, None] }
+650516291 #228 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0
+650516356 #229 [CyclePreload] applied slots=5 fighters=true hats=true measurements=false bank_members=2 group_swap=true ready_fighters=12 ic_pair_bank=true original_bank=true solo_popo_groups=true ic_pair_groups=true native_groups=true pair_groups=true mii_groups=true
+650516370 #230 [BuildSplit] stall owner=0 gap_us=98912 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[58] flags=0x0
+650516370 #231 [BuildSplit] stall owner=1 gap_us=98926 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650516391 #232 [CharacterRoster] settings role=Player size=3 kinds=[b, 6, 2d]
+650516392 #233 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Direct(TrioFighter(0))
+650516393 #234 [MiiOrdinaryCpu] request accepted selection=Direct(TrioFighter(0)) user=true install_active=true
+650516414 #235 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((2, 0)), refresh_partners: false } on="INSTALL held" install_holder(slot,kind,ticks,speculative)=Some((2, 4a, 10, true))
+650516520 #236 [TrainingRooms] pause_owner begin queue_dropped=2 owners=0x10
+650516524 #237 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((2, 0)), refresh_partners: false } on="menu captures input" install_holder(slot,kind,ticks,speculative)=None
+650516843 #238 [MiiHelper] exact parked completion source=SourceToken { slot: 2, entry: NativeEntry(76791545856), generation: 1, epoch: SceneEpoch(1) } proof=MiiProof { binding: Binding { epoch: 2, owner: 2, entry: 76791545856, row: 2245561328, holder: 76555867536, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, configuration: Configuration { class: Gunner, canonical_hash: 8791295788063903869, tokens: Tokens { outfit: 69, hat: 0, colour: 2, voice: 37, specials: [0, 0, 0, 0] }, .. }, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 144, 140, 226, 227, 17, 0, 0, 0, 64, 97, 196, 224, 17, 0, 0, 0], descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 1, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 103, 240, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 120, 25, 104, 223, 17, 0, 0, 0] }
+650516844 #239 [CharacterSources] memory slot=2 kinds=[4a] phase=helper committed=Some(2233643008)->Some(2298392576) delta=64749568 estimate=85524480 headroom=Some(1146179584)
+650516844 #240 [CharacterSources] ready slot=2 kind=0x4a ticks=47
+650518303 #241 [TrainingRooms] notice_draw header="Save State" body="ZL + D-pad Down" color=[0, 0, 0, 255]
+650518403 #242 [MiiOrdinaryCpu] request waiting request=Request { selection: None, replay: None, receipt_only: false, direct: Some((2, 0)), refresh_partners: false } on="match not at ready-go" install_holder(slot,kind,ticks,speculative)=None
+650518851 #243 [Destroy] plan owner=0 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650518851 #244 [GroupSwap] pad route released owner=0 reason=finalize contexts=1 cleared=1
+650518972 #245 [TrainingRooms] pause_owner end queued_at_begin=2 owned_polls=140 owned_non_neutral=0 owners=0x00
+650518973 #246 [MiiSavedAlpha] destroyed owner=0 entry=0x1216a54000 cleanup_writes=false
+650518974 #247 [CharacterRoster] invalidated observed entry before destruction owner=0 entry=0x1216a54000
+650518974 #248 [CharacterRoster] practice consumers invalidated on P1 entry destruction
+650518974 #249 [TrioBoundary] destroy entry=0x1216a54000 owner=0 active=(1, [58, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650518975 #250 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650518976 #251 [Destroy] plan owner=1 reason=finalize steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650518976 #252 [GroupSwap] pad route released owner=1 reason=finalize contexts=1 cleared=1
+650519000 #253 [MiiSavedAlpha] destroyed owner=1 entry=0x1216a5a000 cleanup_writes=false
+650519000 #254 [CharacterRoster] invalidated observed entry before destruction owner=1 entry=0x1216a5a000
+650519000 #255 [TrioBoundary] destroy entry=0x1216a5a000 owner=1 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650519000 #256 [Destroy] plan owner=1 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650519000 #257 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650519015 #258 [Ui] menu session cleared
+650519040 #259 [CharacterSources] destroyed slot=2 tracked_leases=0
+650519040 #260 [TrioBoundary] destroy entry=0x11e1220000 owner=2 active=(1, [4a, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650519040 #261 [Destroy] plan owner=2 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650519040 #262 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650519089 #263 [TrioBoundary] destroy entry=0x11e1226000 owner=3 active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) installed=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650519089 #264 [Destroy] plan owner=3 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650519198 #265 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10
+650519198 #266 [TrainingRooms] notice_visible=false menu_open=false
+650519460 #267 [LayoutArchive] released info_training bytes=742292 after=5001ms
+650520596 #268 [NamedMacroDiag] stall frames=203 step=0
+650522315 #269 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=19443 hooks=input_caller_a_note:761,input_caller_a_apply:4304,reset_check:192,hazard_rule:1,reset_hub:2,cpu_frame:406,cpu_stick_x:406,cpu_stick_y:406,cpu_transition_term:2032,cpu_motion_change:6,cpu_check_button_on:1224,cpu_shield_param:818,ui_archive:50,ui_pass_calculate:14456,ui_register_calculate:37,live_replay:812,hitbox_frame:406,roster_input:761,roster_sources:203,roster_kirby:203,roster_items:203,roster_preload:203,practice_lease:203,state_frame:406,recorder_ai:80,recorder_poll:537,named_service:609,menu_input:537,menu_draw:213,menu_thumbs:213,other:2056
+650522315 #270 [ThreadStack] high_water name=tr-ini-writer used=9216 size=28672 free=19456 low=false
+650522315 #271 [ThreadStack] high_water name=tr-diag-reload used=14912 size=40960 free=26048 low=false
+650522315 #272 [ThreadStack] high_water name=replay-capture-save used=25232 size=57344 free=32112 low=false
+650522315 #273 [HookStack] site=reset_hub calls=2 min_free=747888 stack=0xc6000 base=0x118dc77000 kind=0x5
+650522315 #274 [HookStack] site=cpu_shield_param calls=818 min_free=742432 stack=0xc6000 base=0x118dc77000 kind=0x5
+650522315 #275 [HookStack] site=cpu_motion_change calls=6 min_free=742496 stack=0xc6000 base=0x118dc77000 kind=0x5
+650522315 #276 [HookStack] site=cpu_check_button_on calls=1224 min_free=746368 stack=0xc6000 base=0x118dc77000 kind=0x5
+650522315 #277 [HookStack] site=cpu_transition_term calls=2032 min_free=742624 stack=0xc6000 base=0x118dc77000 kind=0x5
+650522315 #278 [HookStack] site=live_replay calls=812 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #279 [HookStack] site=cpu_stick_x calls=406 min_free=1023792 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #280 [HookStack] site=cpu_stick_y calls=406 min_free=1020176 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #281 [HookStack] site=named_service calls=609 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #282 [HookStack] site=cpu_frame calls=406 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #283 [HookStack] site=hitbox_frame calls=406 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #284 [HookStack] site=state_frame calls=406 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #285 [HookStack] site=practice_lease calls=203 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #286 [HookStack] site=roster_sources calls=203 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #287 [HookStack] site=roster_kirby calls=203 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #288 [HookStack] site=roster_items calls=203 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #289 [HookStack] site=roster_preload calls=203 min_free=1024800 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #290 [HookStack] site=q15_ui_context calls=9 min_free=1034544 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #291 [HookStack] site=menu_draw calls=213 min_free=1031856 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #292 [HookStack] site=menu_thumbs calls=213 min_free=1031856 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #293 [HookStack] site=recorder_ai calls=80 min_free=1022272 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #294 [HookStack] site=reset_check calls=192 min_free=1032624 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #295 [HookStack] site=actor_cleanup calls=5 min_free=1018848 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #296 [HookStack] site=mii_ordinary_gate_decide calls=1 min_free=1031920 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #297 [HookStack] site=finalize_entry calls=8 min_free=1034816 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #298 [HookStack] site=destruction_trace calls=4 min_free=1020096 stack=0x100000 base=0x1089404000 kind=0xb
+650522315 #299 [HookStack] site=listener_removed calls=4 min_free=1024560 stack=0x100000 base=0x1089404000 kind=0xb
+650532059 #300 [TrainingRooms] cpu_event common_params object=0x11f69fa818
+650532108 #301 [TrioBoundary] allocation owner=0 caller=main+0x14ec2bc descriptor=(1, [58, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650532108 #302 [TrioBoundary] allocation owner=1 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650532108 #303 [TrioBoundary] allocation owner=2 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650532108 #304 [TrioBoundary] allocation owner=3 caller=main+0x14ec2bc descriptor=(1, [28, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650532118 #305 [BuildSplit] stall owner=0 gap_us=13332357 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+650532118 #306 [CharacterSources] cpu_quantity=4294967294 seen_by_service slot=0
+650532118 #307 [BuildSplit] stall owner=1 gap_us=13332371 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+650532267 #308 [BuildSplit] stall owner=0 gap_us=132861 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[58] flags=0x0
+650532267 #309 [BuildSplit] stall owner=1 gap_us=132869 loader=14 outer=0 installed=0 changing=0 count=1 kinds=[28] flags=0x0
+650532492 #310 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=1955 hooks=input_caller_a_note:783,input_caller_a_apply:4488,reset_check:192,hazard_rule:2,reset_hub:2,cpu_frame:406,cpu_stick_x:406,cpu_stick_y:406,cpu_transition_term:2032,cpu_motion_change:6,cpu_check_button_on:1224,cpu_shield_param:818,ui_archive:52,ui_pass_calculate:16131,ui_register_calculate:39,live_replay:812,hitbox_frame:406,roster_input:783,roster_sources:203,roster_kirby:203,roster_items:203,roster_preload:203,practice_lease:203,state_frame:406,recorder_ai:80,recorder_poll:559,named_service:609,menu_input:559,menu_draw:213,menu_thumbs:213,other:2059
+650533057 #311 [TrainingRooms] cpu_event camera_setup game=[-47.0, 130.0, 6000.0] class=Other stage=308 write=None
+650534087 #312 [PracticeRecording] recorder_stop mode=0 =0
+650534087 #313 [TrainingRooms] hub_run cause=TrainingReset input_delay_cleared=0
+650534261 #314 [LayoutArchive] dumped stock info_training bytes=451604 fnv=8833748e9518a461
+650534263 #315 [LayoutArchive] handed out info_training bytes=742292 stock=451604 base=stock load_allocations=0
+650534328 #316 [TrainingRooms] diag_pause_menu object=0x11f0eaac00
+650534336 #317 [CharacterSources] cpu_quantity=1 seen_by_service slot=0
+650534468 #318 [TrainingRooms] practice_session held=false (retired or acquired before this frame)
+650534468 #319 [TrainingRooms] practice_session held=true
+650534468 #320 [TrainingRooms] cpu_event role entry=1 partner=false kind=40 lobby=false accessor=0x11ad16c180
+650534468 #321 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+650534521 #322 [Q15UiContext] registration=true ordinal=2 name=info_training thread=0x8930a088 sp=0x1089500df0 layout=0x11e83f4580 holder=0x12178c5200 draw_info=0x12178c5250
+650534522 #323 [TrainingRooms] pause_owner end queued_at_begin=0 owned_polls=145 owned_non_neutral=0 owners=0x00
+650534522 #324 [TrainingRooms] hud_draw layout registrations=2
+650534522 #325 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+650534523 #326 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+650534523 #327 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11d7961cf0 around=[5678, 178c, 0012, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+650534526 #328 [CharacterRoster] observed owner=0 entry=0x1204e8a000 kind=0x58 epoch=1
+650534526 #329 [CharacterRoster] observed owner=1 entry=0x12176c0000 kind=0x28 epoch=1
+650534536 #330 [Ui] layout=info_training resolved total=4096 holders=11 menu_panes=311 missing=0 host_complete=true text_capacity=2 help=true status_r=true
+650534536 #331 [Ui] text_box buf_len=2 len=0 bits=0x15 pos=3 size_of_pane=216 buffer=0x11d7961cf0 around=[5678, 178c, 0012, 0000, 0002, 0000, 0015, 0003, 0000, 0000, 0000, 3f80, 0000, bf80, 0000, 3f80, 0000, 3f80, 0000, ff00, 0000, ff00, 0000, 0000]
+650534539 #332 [TrainingRooms] pause_owner resume_checked delay=2 leaked=0
+650534571 #333 [MiiAutoInit] catalog read queued generations=[3, 3] opening=4
+650534585 #334 [TrainingRooms] input_display_plan ops=17 rows=1 icons=1
+650534588 #335 [MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[3, 3] opening=4
+650534588 #336 [MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained
+650534588 #337 [MiiOrdinaryCpu] catalog owner qualified; immutable origin retained
+650534592 #338 [TrainingRooms] settings.json written by the writer thread
+650534601 #339 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650534757 #340 [TrainingRooms] cpu_event tech_call accessor=0x120a941700 requested=1 role=false
+650535054 #341 [TrainingRooms] chords_passed bits=0x20
+650535054 #342 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+650535059 #343 [BodyBank] layout owner=0 target=0xb cells=[6, b] active=1 form=single
+650535061 #344 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 1 } outgoing=0x58 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false
+650535061 #345 [Destroy] plan owner=0 reason=mod reload steps=1 routes_cleared=1 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650535061 #346 [GroupSwap] pad route released owner=0 reason=mod reload contexts=1 cleared=1
+650535061 #347 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650535062 #348 [BodyBank] build owner=0 entry=0x1204e8a000 members=Members { kinds: [6, 11, 4294967295], count: 2, pair_lead: false, special: None }
+650535062 #349 [Destroy] plan owner=0 reason=mod reload steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0
+650535063 #350 [TrioBoundary] reload entry=0x1204e8a000 owner=0 caller=main+0x7c280474b4 guard=0 incoming=(2, [6, b, ffffffff], 1, 1) active=(1, [58, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=6 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650535068 #351 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+650535070 #352 [Ui] menu session cleared
+650535074 #353 [TrainingRooms] input_display_plan ops=16 rows=0 icons=0
+650535277 #354 [MiiOrdinaryPlayer] published ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 1 } target=0xb O=0x11e0c27f00 index=0 retained_same_class_O=false native_resources_untouched=true
+650535281 #355 [Ledger] acquire owner=0 kind=0xb keys=[1ce, 1cf, 1d4] holder=Build(GroupId(255)) recipe=ConstructionTail batch=1 issued=true
+650535282 #356 [BodyBank] resource owner=0 alias=0x11e0c27f00 supplemental=[b] native=[6] flags r48=0 r7d=0 r7f=0
+650536341 #357 [BuildSplit] stall owner=0 gap_us=104272 loader=11 outer=3 installed=1 changing=1 count=2 kinds=[6, b] flags=0x4
+650536341 #358 [BuildSplit] stall owner=1 gap_us=104294 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650536729 #359 [BuildSplit] stall owner=0 gap_us=75115 loader=14 outer=6 installed=2 changing=0 count=2 kinds=[6, b] flags=0x4
+650536732 #360 [BodyBank] ready owner=0 index=1 kind=0xb previous=Building bodies=[Body { address: 75918328912, id: 1 }, Body { address: 75918584144, id: 262144 }, Body { address: 0, id: 0 }]
+650536732 #361 [BodyBank] identity_view owner=0 reason=ready R=0x11e0c27f00 header=[6, b, ffffffff] costume=0 region=1 published=0x0 prepare_entry_kind_mismatch=0 changed=[]
+650536740 #362 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+650536742 #363 [CharacterRoster] HUD refresh owner=0 kind=0xb delivered=1 listeners=1
+650536743 #364 [Hud] readback owner=0 kind=0xb exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+650536744 #365 [PreloadGrace] start generation=5 us=650536743976 deadline_us=650538743976
+650536744 #366 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 1 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+650536745 #367 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 1 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false
+650536745 #368 [BuildSplit] stall owner=1 gap_us=90727 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650536773 #369 [TrainingRooms] notice_visible=true menu_open=false
+650536773 #370 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+650536842 #371 [TrainingRooms] settings.json written by the writer thread
+650537039 #372 [GroupSwap] plan owner=0 group=0 kinds=[2d, 58] special=None bodies=2 ready_fighters=12 pool=5/24 reserve=6 hats=0 alias=0x11e0c27f00 identity=None
+650537041 #373 [PreloadStatus] state=Loading planned=4 ready=1 prefetched=0 failed=0 pending=2 unstarted=1 swap=2 blocked=false scheduler_blocked=false text="Loading 1/4"
+650537041 #374 [PreloadStatus] raise text="Loading 1/4" frames=90
+650537056 #375 [PreloadGrace] speculative-admission-deferred generation=5 us=650537056264 deadline_us=650538743976
+650538753 #376 [PreloadGrace] expire generation=5 us=650538753238
+650538756 #377 [BodyBank] identity_view publish owner=0 R=0x11e0c27f00 kind=0x2d epoch=new published=0x200000000000
+650538757 #378 [Ledger] acquire owner=0 kind=0x2d keys=[762, 768] holder=Prefetch(GroupId(0)) recipe=ConstructionTail batch=2 issued=true
+650538757 #379 [BodyBank] identity_view publish owner=0 R=0x11e0c27f00 kind=0x58 epoch=same published=0x10000000000200000000000
+650538758 #380 [Ledger] acquire owner=0 kind=0x58 keys=[e70, e71, e76] holder=Prefetch(GroupId(0)) recipe=ConstructionTail batch=2 issued=true
+650538758 #381 [GroupSwap] prefetch owner=0 group=0 kinds=[2d, 58] R=0x11e0c27f00 map=5 flags=0x0 task_pending=0 pool=5/24 headroom=1079791616 INSTALL(resource) outstanding=0 need=151699456
+650538773 #382 [CopyPkg] sync owner=0 reason=tick sets=[[6, b, ffffffff], [2d, 58, ffffffff]] acquired=2 released=0 held=2
+650538774 #383 [CopyPkg] held owner=0 acquisitions=2 keys=[17003f, 51003f]
+650539217 #384 [GroupSwap] prefetched owner=0 group=0 kinds=[2d, 58] us=463963 INSTALL_released=true map=5 tree=4
+650539217 #385 [GroupSwap] memory owner=0 group=0 kinds=[2d, 58] phase=prefetch committed=Some(2364780544)->Some(2445062144) delta=80281600 estimate=83099648 headroom=Some(999510016)
+650539218 #386 [PreloadGrace] speculative-admission-consumed generation=5 us=650539218202
+650539218 #387 [CharacterSources] install slot=2 kind=0x4a
+650539218 #388 [TrioBoundary] reload entry=0x12176c6000 owner=2 caller=main+0x7c2809c2c0 guard=0 incoming=(1, [4a, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650539233 #389 [CopyPkg] sync owner=0 reason=tick sets=[[6, b, ffffffff], [2d, 58, ffffffff]] acquired=2 released=2 held=2
+650539233 #390 [CopyPkg] held owner=0 acquisitions=2 keys=[17003f, 51003f, 95003f]
+650539264 #391 [LayoutArchive] released info_training bytes=742292 after=5001ms
+650539304 #392 [MiiHelper] prequeue source=SourceToken { slot: 2, entry: NativeEntry(77702389760), generation: 2, epoch: SceneEpoch(2) } selected=0x11f2962c00 init=false header=[2, 28, ffffffff, ffffffff, 6] index=0 tokens=[0, 0, 0, 0] task=0x0 outstanding=Some(0) Dindex=0 rebuild=0 before=Snapshot { layout: Training, helpers: View { layout: Training, epoch: Some(SceneEpoch(2)), slots: [Unavailable { token: SourceToken { slot: 2, entry: NativeEntry(77702389760), generation: 2, epoch: SceneEpoch(2) }, phase: Loading }, Unmanaged], miis: [None, None], created_slots: [Unmanaged, Unmanaged, Unmanaged, Unmanaged], created_miis: [None, None, None, None] }, created: None, extras: Extras { layout: Training, entries: [0, 0, 0, 0], roots: [None, None, None, None] }, binding: Binding { epoch: 3, owner: 2, entry: 77702389760, row: 2245561328, holder: 76555867536, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, thread: 2301665416, original_kind: 40, descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 6, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 72, 225, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 40, 10, 104, 223, 17, 0, 0, 0], header: [2, 40, 4294967295, 4294967295, 6], scalars: Scalars { e: Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0, 0, 0, 0] }, d_outfit: 0, d_colour: 0, d_specials: [0, 0, 0, 0] }, index: 0, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current_record: [48, 31, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 113, 205, 17, 0, 0, 0, 80, 22, 23, 211, 17, 0, 0, 0, 80, 40, 23, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 113, 205, 17, 0, 0, 0, 192, 214, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 6, 0, 2], symbol: 2245510392, manager: 76555867232, internal: 75180418048, entries: [77391765504, 77702365184, 77702389760, 77702414336, 0, 0, 0, 0], owners: [Some(Owner { entry: 77391765504, row: 2245560112, information: 77391765776, object: 76785286912, index: 0, selector: 0, alias: 0 }), Some(Owner { entry: 77702365184, row: 2245560720, information: 77702365456, object: 77084370688, index: 0, selector: 1, alias: 0 }), Some(Owner { entry: 77702389760, row: 2245561328, information: 77702390032, object: 77084371968, index: 0, selector: 2, alias: 0 }), Some(Owner { entry: 77702414336, row: 2245561936, information: 77702414608, object: 77084373248, index: 0, selector: 3, alias: 0 }), None, None, None, None], protected: [Some(Protected { owner: Owner { entry: 77391765504, row: 2245560112, information: 77391765776, object: 76785286912, index: 0, selector: 0, alias: 0 }, descriptor: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 6, 0, 0, 0, 11, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 72, 225, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 136, 9, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [0, 0, 0, 255, 0, 0, 0] }), Some(Protected { owner: Owner { entry: 77702365184, row: 2245560720, information: 77702365456, object: 77084370688, index: 0, selector: 1, alias: 0 }, descriptor: [0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 100, 207, 0, 144, 127, 4, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 72, 225, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 216, 9, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 0, 0, 1] }), None, Some(Protected { owner: Owner { entry: 77702414336, row: 2245561936, information: 77702414608, object: 77084373248, index: 0, selector: 3, alias: 0 }, descriptor: [0, 0, 0, 0, 3, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 40, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 72, 225, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 120, 10, 104, 223, 17, 0, 0, 0], e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], d: [0, 0, 0, 0, 0, 0, 0, 0], specials: [0, 0, 0, 0], o: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], control: [1, 1, 21, 255, 4, 0, 3] }), None, None, None, None], records: [Some((0, [48, 31, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 137, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 104, 113, 205, 17, 0, 0, 0, 80, 22, 23, 211, 17, 0, 0, 0, 80, 40, 23, 211, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 68, 113, 205, 17, 0, 0, 0, 192, 214, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((1, [128, 156, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 123, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 64, 23, 211, 17, 0, 0, 0, 64, 3, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 237, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), Some((3, [32, 132, 112, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 219, 112, 205, 17, 0, 0, 0, 80, 14, 113, 205, 17, 0, 0, 0, 48, 121, 113, 205, 17, 0, 0, 0, 80, 170, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 43, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 154, 113, 205, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), None, None, None, None, None] }
+650539331 #393 [TrainingRooms] chords_passed bits=0x20
+650539331 #394 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
+650539738 #395 [MiiHelper] exact parked completion source=SourceToken { slot: 2, entry: NativeEntry(77702389760), generation: 2, epoch: SceneEpoch(2) } proof=MiiProof { binding: Binding { epoch: 3, owner: 2, entry: 77702389760, row: 2245561328, holder: 76555867536, manager: 75208802304, vector_begin: 75216168960, vector_end: 75216182792, record_index: 2 }, configuration: Configuration { class: Gunner, canonical_hash: 8791295788063903869, tokens: Tokens { outfit: 69, hat: 0, colour: 2, voice: 37, specials: [0, 0, 0, 0] }, .. }, record: [143, 97, 109, 215, 240, 20, 74, 203, 161, 82, 104, 68, 126, 133, 251, 159, 87, 48, 131, 48, 82, 48, 77, 48, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 64, 64, 0, 0, 0, 0, 0, 0, 105, 5, 1, 4, 11, 4, 3, 3, 2, 12, 19, 5, 3, 0, 7, 2, 11, 10, 0, 11, 33, 19, 2, 0, 13, 8, 0, 0, 4, 10, 0, 8, 4, 10, 0, 4, 2, 20, 0, 0, 132, 226, 227, 17, 0, 0, 0, 0, 100, 192, 223, 17, 0, 0, 0], descriptor: [0, 0, 0, 0, 2, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 0, 74, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 21, 207, 0, 144, 127, 4, 0, 0, 0, 255, 6, 0, 0, 0, 0, 2, 0, 69, 0, 0, 0, 2, 0, 37, 0, 1, 0, 0, 1, 0, 0, 0, 0, 96, 0, 72, 225, 17, 0, 0, 0, 48, 135, 216, 133, 0, 0, 0, 0, 40, 10, 104, 223, 17, 0, 0, 0] }
+650539738 #396 [CharacterSources] memory slot=2 kinds=[4a] phase=helper committed=Some(2445062144)->Some(2503585792) delta=58523648 estimate=85524480 headroom=Some(940986368)
+650539738 #397 [CharacterSources] ready slot=2 kind=0x4a ticks=36
+650539751 #398 [TrainingRooms] notice_draw header="Fighters" body="Loading 1/4" color=[0, 0, 0, 255]
+650539767 #399 [Ledger] release owner=0 kind=0x2d calls=[2d] reason=Kirby target (drain before live)
+650539767 #400 [Ledger] release owner=0 kind=0x58 calls=[58] reason=Kirby target (drain before live)
+650539767 #401 [GroupSwap] keys returned owner=0 group=0 kinds=[2d, 58] released=2 kept=0 reason=Kirby target (drain before live); replanned map=0
+650539767 #402 [BodyBank] reuse owner=0 from=1 to=0 kind=0x6
+650539768 #403 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 2 } outgoing=0xb target=0x6 index=0 mii=false
+650539768 #404 [TrainingRooms] cpu_event stale_flag value=false resolved=true
+650539773 #405 [Ui] menu session cleared
+650539776 #406 [TrainingRooms] notice_visible=false menu_open=false
+650539813 #407 [BodyBank] ready owner=0 index=0 kind=0x6 previous=Changing bodies=[Body { address: 75918328912, id: 1 }, Body { address: 75918584144, id: 262144 }, Body { address: 0, id: 0 }]
+650539814 #408 [BodyBank] identity_view owner=0 reason=ready R=0x11e0c27f00 header=[6, b, ffffffff] costume=0 region=1 published=0x10000000000200000000000 prepare_entry_kind_mismatch=0 changed=[acquire:1:0x2d/0->1]
+650539814 #409 [CopyPkg] sync owner=0 reason=tick sets=[] acquired=0 released=2 held=0
+650539814 #410 [CopyPkg] held owner=0 acquisitions=0 keys=[]
+650539814 #411 [GroupSwap] prefetch deferred owner=0 group=0 kinds=[2d, 58] reason=live Kirby may copy a group kind (D-KIRBY1)
+650539817 #412 [CharacterRoster] HUD listener owner=0 vtable=0x5063320 member=0x1377b40
+650539817 #413 [CharacterRoster] HUD refresh owner=0 kind=0x6 delivered=1 listeners=1
+650539817 #414 [Hud] readback owner=0 kind=0x6 exact=false why=publish ok=true slot=0 bust=1 bound=0 table=4294967295 icon=n/a body_costume=4294967295 row_costume=4294967295 icon_bound=0x0 icon_expected=0x0 icon_reason="" 
+650539817 #415 [PreloadGrace] start generation=5 us=650539817441 deadline_us=650541817441
+650539817 #416 [Txn] outcome=Applied role=player ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 2 } reason=ready proof passed loader=None published=true INSTALL_released=true INSTALL_active=false
+650539817 #417 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 3, entry: 77391765504, sequence: 2 } target=0x6 physical=0x6 index=0 original=false mii=false resource_pair=None released=true
+650539823 #418 [TrainingRooms] notice_visible=true menu_open=false
+650539823 #419 [TrainingRooms] notice_draw header="Player Character" body="Player fighter applied" color=[0, 0, 0, 255]
+650539880 #420 [TrainingRooms] settings.json written by the writer thread
+650539956 #421 [PreloadStatus] wiped text=Some("Loading 1/4"); raised again
+650539956 #422 [PreloadStatus] raise text="Loading 1/4" frames=90
+650539974 #423 [PreloadGrace] speculative-admission-deferred generation=5 us=650539974692 deadline_us=650541817441
+650540870 #424 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1101 stick_y=1101 clatter_start=0 transition_term=5702 motion_change=16 quake_pos=0 command_flag=4428 air_kind=0 stick_dir=0 heap_allocations=0
+650541821 #425 [PreloadGrace] expire generation=5 us=650541821323
+650541821 #426 [PreloadGrace] speculative-admission-consumed generation=5 us=650541821864
+650541821 #427 [CharacterSources] install slot=2 kind=0x0
+650541822 #428 [TrioBoundary] reload entry=0x12176c6000 owner=2 caller=main+0x7c2807e614 guard=0 incoming=(1, [0, ffffffff, ffffffff], 1, 0) active=(1, [4a, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650542471 #429 [TrainingRooms] state_hook_counts frames=600 param=6 quake=0 sound=4 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650542538 #430 [CharacterSources] memory slot=2 kinds=[0] phase=helper committed=Some(2502602752)->Some(2428153856) delta=-74448896 estimate=58064896 headroom=Some(1016418304)
+650542538 #431 [CharacterSources] ready slot=2 kind=0x0 ticks=45
+650542538 #432 [CharacterSources] install slot=3 kind=0x1
+650542538 #433 [TrioBoundary] reload entry=0x12176cc000 owner=3 caller=main+0x7c2807e614 guard=0 incoming=(1, [1, ffffffff, ffffffff], 1, 0) active=(1, [28, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650542649 #434 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=39098 hooks=input_caller_a_note:1911,input_caller_a_apply:9496,reset_check:693,hazard_rule:2,reset_hub:6,cpu_frame:1320,cpu_stick_x:1320,cpu_stick_y:1320,cpu_transition_term:6798,cpu_motion_change:18,cpu_check_button_on:3978,cpu_shield_param:2656,ui_archive:73,ui_pass_calculate:20714,ui_register_calculate:48,live_replay:2640,hitbox_frame:1320,roster_input:1911,roster_sources:611,roster_kirby:611,roster_items:611,roster_preload:611,practice_lease:611,state_frame:1320,recorder_ai:581,recorder_poll:1185,named_service:2029,menu_input:1185,menu_draw:693,menu_thumbs:693,other:6834
+650542819 #435 [TrainingRooms] notice_draw header="Fighters" body="Loading 1/4" color=[0, 0, 0, 255]
+650542938 #436 [TrainingRooms] input_hook_counts p1_poll=1204 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650543121 #437 [CharacterSources] memory slot=3 kinds=[1] phase=helper committed=Some(2428153856)->Some(2472783872) delta=44630016 estimate=50987008 headroom=Some(971788288)
+650543121 #438 [CharacterSources] ready slot=3 kind=0x1 ticks=37
+650543354 #439 [TrioBoundary] allocation owner=7 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650543362 #440 [GroupedHelperCapacity] creation layout=Training entry=0x11f6eca000 preserved=true before=[None, None] after=Some([None, None])
+650543363 #441 [GroupedVisibleCapacity] creation layout=Training entry=0x11f6eca000 preserved=true before=[Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None] after=Some([Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None])
+650543365 #442 [CharacterSources] capacity creation epoch=SceneEpoch(2) backend=Training slot=7 speculative=true qualified=true entry=0x11f6eca000 owner=0x11e73bae00 visible_mii_kept=[None, None] visible_bank_kept=[Some(true), None]
+650543490 #443 [KirbyHats] request role=0 kind=0x0 source_slot=2 body=0x1
+650543609 #444 [BuildSplit] stall owner=0 gap_us=121472 loader=14 outer=6 installed=2 changing=0 count=2 kinds=[6, b] flags=0x4
+650543609 #445 [BuildSplit] stall owner=1 gap_us=121477 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650543610 #446 [KirbyHats] confirmed role=0 kind=0x0 body=0x1
+650544328 #447 [KirbyHats] native cleanup body=0x1 groups_before=0x1 groups_after=Some(0)
+650544330 #448 [KirbyHats] cleanup settled body=0x1 released=1
+650544330 #449 [KirbyHats] request role=0 kind=0x1 source_slot=3 body=0x1
+650544344 #450 [KirbyHats] confirmed role=0 kind=0x1 body=0x1
+650544402 #451 [TrainingRooms] notice_draw header="Kirby Hats" body="Donkey Kong" color=[0, 0, 0, 255]
+650544412 #452 [TrainingSeams] late group=character_sources sites=1 stock=1 other=[] skipped=[] shadow_diff=[] unusable=[] unchecked=0
+650544842 #453 [PreloadStatus] delivered text=Some("Loading 1/4")
+650544856 #454 [CharacterSources] install slot=2 kind=0x2
+650544856 #455 [TrioBoundary] reload entry=0x12176c6000 owner=2 caller=main+0x7c2807e614 guard=0 incoming=(1, [2, ffffffff, ffffffff], 1, 0) active=(1, [0, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650544980 #456 [KirbyHats] native cleanup body=0x1 groups_before=0x0 groups_after=Some(0)
+650544988 #457 [KirbyHats] cleanup settled body=0x1 released=1
+650545721 #458 [CharacterSources] memory slot=2 kinds=[2] phase=helper committed=Some(2469965824)->Some(2482024448) delta=12058624 estimate=112852992 headroom=Some(962547712)
+650545721 #459 [CharacterSources] ready slot=2 kind=0x2 ticks=53
+650545721 #460 [KirbyHats] request role=0 kind=0x2 source_slot=2 body=0x1
+650545775 #461 [KirbyHats] confirmed role=0 kind=0x2 body=0x1
+650545780 #462 [TrainingRooms] notice_draw header="Kirby Hats" body="Link" color=[0, 0, 0, 255]
+650545820 #463 [CharacterSources] install slot=3 kind=0x3
+650545820 #464 [TrioBoundary] reload entry=0x12176cc000 owner=3 caller=main+0x7c2807e614 guard=0 incoming=(1, [3, ffffffff, ffffffff], 1, 0) active=(1, [1, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650545943 #465 [KirbyHats] native cleanup body=0x1 groups_before=0x4 groups_after=Some(0)
+650545954 #466 [KirbyHats] cleanup settled body=0x1 released=1
+650546620 #467 [CharacterSources] memory slot=3 kinds=[3] phase=helper committed=Some(2482548736)->Some(2499391488) delta=16842752 estimate=139132928 headroom=Some(945180672)
+650546620 #468 [CharacterSources] ready slot=3 kind=0x3 ticks=48
+650546621 #469 [KirbyHats] request role=0 kind=0x3 source_slot=3 body=0x1
+650546638 #470 [KirbyHats] confirmed role=0 kind=0x3 body=0x1
+650546652 #471 [TrainingRooms] notice_draw header="Kirby Hats" body="Samus" color=[0, 0, 0, 255]
+650546789 #472 [KirbyHats] native cleanup body=0x1 groups_before=0x8 groups_after=Some(0)
+650546804 #473 [KirbyHats] cleanup settled body=0x1 released=1
+650546822 #474 [CharacterSources] install slot=2 kind=0x7
+650546822 #475 [TrioBoundary] reload entry=0x12176c6000 owner=2 caller=main+0x7c2807e614 guard=0 incoming=(1, [7, ffffffff, ffffffff], 1, 0) active=(1, [2, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650547606 #476 [CharacterSources] memory slot=2 kinds=[7] phase=helper committed=Some(2499260416)->Some(2501423104) delta=2162688 estimate=76939264 headroom=Some(943149056)
+650547606 #477 [CharacterSources] ready slot=2 kind=0x7 ticks=50
+650547606 #478 [KirbyHats] request role=0 kind=0x7 source_slot=2 body=0x1
+650547623 #479 [KirbyHats] confirmed role=0 kind=0x7 body=0x1
+650547635 #480 [TrainingRooms] notice_draw header="Kirby Hats" body="Fox" color=[0, 0, 0, 255]
+650547720 #481 [CharacterSources] install slot=3 kind=0x0
+650547720 #482 [TrioBoundary] reload entry=0x12176cc000 owner=3 caller=main+0x7c2807e614 guard=0 incoming=(1, [0, ffffffff, ffffffff], 1, 0) active=(1, [3, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650547761 #483 [KirbyHats] native cleanup body=0x1 groups_before=0x80 groups_after=Some(0)
+650547771 #484 [KirbyHats] cleanup settled body=0x1 released=1
+650548420 #485 [CharacterSources] memory slot=3 kinds=[0] phase=helper committed=Some(2501423104)->Some(2487660544) delta=-13762560 estimate=58064896 headroom=Some(956911616)
+650548420 #486 [CharacterSources] ready slot=3 kind=0x0 ticks=43
+650548420 #487 [KirbyHats] request role=0 kind=0x0 source_slot=3 body=0x1
+650548438 #488 [KirbyHats] confirmed role=0 kind=0x0 body=0x1
+650548452 #489 [TrainingRooms] notice_draw header="Kirby Hats" body="Mario" color=[0, 0, 0, 255]
+650548606 #490 [TrainingRooms] cpu_event tech_call accessor=0x11ad15c840 requested=471 role=false
+650548633 #491 [TrainingRooms] input_display_plan ops=17 rows=1 icons=1
+650548644 #492 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650548703 #493 [CharacterSources] install slot=2 kind=0x1
+650548703 #494 [TrioBoundary] reload entry=0x12176c6000 owner=2 caller=main+0x7c2807e614 guard=0 incoming=(1, [1, ffffffff, ffffffff], 1, 0) active=(1, [7, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=1 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650548735 #495 [TrainingRooms] input_display_plan ops=17 rows=2 icons=1
+650548751 #496 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650549320 #497 [CharacterSources] memory slot=2 kinds=[1] phase=helper committed=Some(2485628928)->Some(2472783872) delta=-12845056 estimate=50987008 headroom=Some(971788288)
+650549320 #498 [CharacterSources] ready slot=2 kind=0x1 ticks=38
+650549376 #499 [TrainingRooms] cpu_event tech_call accessor=0x11ad15c840 requested=0 role=false
+650549754 #500 [CharacterSources] first capacity load stable slot=7 callbacks=30
+650549754 #501 [CharacterSources] install slot=7 kind=0x2
+650549754 #502 [TrioBoundary] reload entry=0x11f6eca000 owner=7 caller=main+0x7c2807e614 guard=0 incoming=(1, [2, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650549872 #503 [KirbyHats] request role=0 kind=0x0 source_slot=3 body=0x1
+650549888 #504 [KirbyHats] confirmed role=0 kind=0x0 body=0x1
+650549901 #505 [TrainingRooms] notice_draw header="Kirby Hats" body="Mario" color=[0, 0, 0, 255]
+650550358 #506 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 7, entry: NativeEntry(77157146624), generation: 1, epoch: SceneEpoch(2) } kind=0x2 actors=Some(Actors { pointers: [11ed18d080, 0, 0, 0, 0], actors: [Some(Actor { actor: 11ed18d080, control: 1180ee9e00, partner: 0, owner: 7, cleanup_owner: 7, kind: 2, flags: [0, 1, 0], control_actor: 11ed18d080, input_index: 7, binding: 11e518a190, alias_index: 7, partner_control: 0 }), None, None] })
+650550358 #507 [CharacterSources] memory slot=7 kinds=[2] phase=helper committed=Some(2472914944)->Some(2536550400) delta=63635456 estimate=112852992 headroom=Some(908021760)
+650550358 #508 [CharacterSources] ready slot=7 kind=0x2 ticks=39
+650550470 #509 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=5866 motion_change=12 quake_pos=0 command_flag=4808 air_kind=0 stick_dir=0 heap_allocations=0
+650550787 #510 [TrioBoundary] allocation owner=6 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650550787 #511 [GroupedHelperCapacity] creation layout=Training entry=0x11f7d40000 preserved=true before=[None, None] after=Some([None, None])
+650550787 #512 [GroupedVisibleCapacity] creation layout=Training entry=0x11f7d40000 preserved=true before=[Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None] after=Some([Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None])
+650550787 #513 [CharacterSources] capacity creation epoch=SceneEpoch(2) backend=Training slot=6 speculative=true qualified=true entry=0x11f7d40000 owner=0x11f0efac00 visible_mii_kept=[None, None] visible_bank_kept=[Some(true), None]
+650551254 #514 [CharacterSources] first capacity load stable slot=6 callbacks=30
+650551254 #515 [CharacterSources] install slot=6 kind=0x3
+650551254 #516 [TrioBoundary] reload entry=0x11f7d40000 owner=6 caller=main+0x7c2807e614 guard=0 incoming=(1, [3, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650551870 #517 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 6, entry: NativeEntry(77172310016), generation: 1, epoch: SceneEpoch(2) } kind=0x3 actors=Some(Actors { pointers: [11ed18df80, 0, 0, 0, 0], actors: [Some(Actor { actor: 11ed18df80, control: 1180eeac00, partner: 0, owner: 6, cleanup_owner: 6, kind: 3, flags: [0, 1, 0], control_actor: 11ed18df80, input_index: 6, binding: 11e5189f10, alias_index: 6, partner_control: 0 }), None, None] })
+650551870 #518 [CharacterSources] memory slot=6 kinds=[3] phase=helper committed=Some(2536747008)->Some(2600316928) delta=63569920 estimate=139132928 headroom=Some(844255232)
+650551870 #519 [CharacterSources] ready slot=6 kind=0x3 ticks=39
+650551901 #520 [TrainingRooms] notice_visible=false menu_open=false
+650552037 #521 [TrainingRooms] state_hook_counts frames=600 param=2 quake=0 sound=14 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650552119 #522 [TrioBoundary] allocation owner=5 caller=main+0x4eb750 descriptor=(1, [ffffffff, ffffffff, ffffffff], 1, 0) mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650552119 #523 [GroupedHelperCapacity] creation layout=Training entry=0x11f7d46000 preserved=true before=[None, None] after=Some([None, None])
+650552119 #524 [GroupedVisibleCapacity] creation layout=Training entry=0x11f7d46000 preserved=true before=[Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None] after=Some([Some(CreationVisible { descriptor: [0, 0, 1, 0, 0, 2, 6, b, ffffffff, 0, 1, 1, 0, 0, 7f9000cf, 4, 10000ff, 0, 0, 0, 1000001, 0, e1480060, 11, 85d88730, 0, df680988, 11], resource: (11e0c27f00, 6, 0), forms: Forms { count: 1, kinds: [6, ffffffff, ffffffff], actor_count: 1, flags: 0 }, active_kind: 6, form: [0, 0, ff, 4, 0], bodies: [(11ad15c450, 1, 6, 0, 4, 11ad15c840), (11ad19a950, 40000, b, 0, 3, 11ad19ad40), (0, 0, 0, 0, 0, 0)], actors: Actors { pointers: [11b174f580, 0, 11b174f580, 11b174f680, 0], actors: [Some(Actor { actor: 11b174f580, control: 11d510a200, partner: 0, owner: 0, cleanup_owner: 0, kind: 6, flags: [1, 1, 0], control_actor: 11b174f580, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), Some(Actor { actor: 11b174f680, control: 1180ee8200, partner: 0, owner: 0, cleanup_owner: 0, kind: b, flags: [0, 1, 0], control_actor: 11b174f680, input_index: 0, binding: 11e5189010, alias_index: 0, partner_control: 0 }), None] }, alternate: Some(Bank { entry: 1204e8a000, owner: 0, resource: (11e0c27f00, 6, 0), kinds: [6, b, ffffffff], bodies: [(11ad15c450, 1), (11ad19a950, 40000), (0, 0)], members: [Some(Member { actor: 11b174f580, control: 11d510a200, kind: 6 }), Some(Member { actor: 11b174f680, control: 1180ee8200, kind: b }), None], active: 0, record: 11e5189010, route: (0, 11e5189010, 0) }), body_bank: true }), None])
+650552119 #525 [CharacterSources] capacity creation epoch=SceneEpoch(2) backend=Training slot=5 speculative=true qualified=true entry=0x11f7d46000 owner=0x11f0efcf00 visible_mii_kept=[None, None] visible_bank_kept=[Some(true), None]
+650552537 #526 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650552603 #527 [CharacterSources] first capacity load stable slot=5 callbacks=30
+650552603 #528 [CharacterSources] install slot=5 kind=0x7
+650552604 #529 [TrioBoundary] reload entry=0x11f7d46000 owner=5 caller=main+0x7c2807e614 guard=0 incoming=(1, [7, ffffffff, ffffffff], 1, 0) active=(1, [ffffffff, ffffffff, ffffffff], 1, 0) pending=(1, [ffffffff, ffffffff, ffffffff], 1, 0) loader=14 outer=0 mode=Some(Mode { initialized: true, melee: 32, mode: 67371008 })
+650552833 #530 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=50386 hooks=input_caller_a_note:3185,input_caller_a_apply:14592,reset_check:1330,hazard_rule:2,reset_hub:6,cpu_frame:2594,cpu_stick_x:2594,cpu_stick_y:2594,cpu_transition_term:13034,cpu_motion_change:30,cpu_check_button_on:7665,cpu_shield_param:5162,ui_archive:73,ui_pass_calculate:26159,ui_register_calculate:48,live_replay:5188,hitbox_attack:1,hitbox_frame:2594,roster_input:3185,roster_sources:1248,roster_kirby:1248,roster_items:1248,roster_preload:1248,practice_lease:1248,state_frame:2594,recorder_ai:1218,recorder_poll:1822,named_service:3940,menu_input:1822,menu_draw:1298,menu_thumbs:1298,developer_float:50,other:13867
+650552833 #531 [HookStack] site=other calls=13867 min_free=392384 stack=0xab000 base=0x11e7710000 kind=0x5
+650552833 #532 [HookStack] site=hitbox_attack calls=1 min_free=391056 stack=0xab000 base=0x11e7710000 kind=0x5
+650552833 #533 [HookStack] site=developer_float calls=50 min_free=1032896 stack=0x100000 base=0x1089404000 kind=0xb
+650553144 #534 [BuildSplit] stall owner=0 gap_us=74445 loader=14 outer=6 installed=2 changing=0 count=2 kinds=[6, b] flags=0x4
+650553144 #535 [BuildSplit] stall owner=1 gap_us=74452 loader=14 outer=6 installed=1 changing=0 count=1 kinds=[28] flags=0x0
+650553287 #536 [ManagedSourceCleanup] canonical ready source=SourceToken { slot: 5, entry: NativeEntry(77172334592), generation: 1, epoch: SceneEpoch(2) } kind=0x7 actors=Some(Actors { pointers: [11ed18e080, 0, 0, 0, 0], actors: [Some(Actor { actor: 11ed18e080, control: 1180eeba00, partner: 0, owner: 5, cleanup_owner: 5, kind: 7, flags: [0, 1, 0], control_actor: 11ed18e080, input_index: 5, binding: 11e5189c90, alias_index: 5, partner_control: 0 }), None, None] })
+650553287 #537 [CharacterSources] memory slot=5 kinds=[7] phase=helper committed=Some(2600316928)->Some(2672799744) delta=72482816 estimate=76939264 headroom=Some(771772416)
+650553287 #538 [CharacterSources] ready slot=5 kind=0x7 ticks=44
+650555002 #539 [TrainingRooms] input_display_plan ops=1 rows=1 icons=0
+650555118 #540 [TrainingRooms] input_display_plan ops=2 rows=2 icons=0
+650558252 #541 [TrainingRooms] input_display_plan ops=2 rows=1 icons=0
+650558270 #542 [TrainingRooms] input_display_plan ops=1 rows=1 icons=0
+650558368 #543 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650560237 #544 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=10 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650561820 #545 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650562287 #546 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650562886 #547 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49286 hooks=input_caller_a_note:4421,input_caller_a_apply:19536,reset_check:1948,hazard_rule:2,reset_hub:6,cpu_frame:3830,cpu_stick_x:3830,cpu_stick_y:3830,cpu_transition_term:19214,cpu_motion_change:41,cpu_check_button_on:11373,cpu_shield_param:7634,ui_archive:73,ui_pass_calculate:31586,ui_register_calculate:48,live_replay:7660,hitbox_attack:1,hitbox_frame:3830,roster_input:4421,roster_sources:1866,roster_kirby:1866,roster_items:1866,roster_preload:1866,practice_lease:1866,state_frame:3830,recorder_ai:1836,recorder_poll:2440,named_service:5794,menu_input:2440,menu_draw:1901,menu_thumbs:1901,developer_float:50,other:20665
+650569937 #548 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=8 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650571471 #549 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650571953 #550 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650572930 #551 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49686 hooks=input_caller_a_note:5669,input_caller_a_apply:24528,reset_check:2572,hazard_rule:2,reset_hub:6,cpu_frame:5078,cpu_stick_x:5078,cpu_stick_y:5078,cpu_transition_term:25454,cpu_motion_change:49,cpu_check_button_on:15117,cpu_shield_param:10130,ui_archive:73,ui_pass_calculate:37004,ui_register_calculate:48,live_replay:10156,hitbox_attack:1,hitbox_frame:5078,roster_input:5669,roster_sources:2490,roster_kirby:2490,roster_items:2490,roster_preload:2490,practice_lease:2490,state_frame:5078,recorder_ai:2460,recorder_poll:3064,named_service:7666,menu_input:3064,menu_draw:2503,menu_thumbs:2503,developer_float:50,other:27529
+650579571 #552 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=7 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650581154 #553 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650581604 #554 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650582977 #555 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49699 hooks=input_caller_a_note:6917,input_caller_a_apply:29520,reset_check:3196,hazard_rule:2,reset_hub:6,cpu_frame:6326,cpu_stick_x:6326,cpu_stick_y:6326,cpu_transition_term:31694,cpu_motion_change:59,cpu_check_button_on:18861,cpu_shield_param:12626,ui_archive:73,ui_pass_calculate:42431,ui_register_calculate:48,live_replay:12652,hitbox_attack:1,hitbox_frame:6326,roster_input:6917,roster_sources:3114,roster_kirby:3114,roster_items:3114,roster_preload:3114,practice_lease:3114,state_frame:6326,recorder_ai:3084,recorder_poll:3688,named_service:9538,menu_input:3688,menu_draw:3106,menu_thumbs:3106,developer_float:50,other:34393
+650589137 #556 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=11 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650590737 #557 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650591236 #558 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650593015 #559 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49548 hooks=input_caller_a_note:8161,input_caller_a_apply:34496,reset_check:3818,hazard_rule:2,reset_hub:6,cpu_frame:7570,cpu_stick_x:7570,cpu_stick_y:7570,cpu_transition_term:37914,cpu_motion_change:67,cpu_check_button_on:22593,cpu_shield_param:15114,ui_archive:73,ui_pass_calculate:47849,ui_register_calculate:48,live_replay:15140,hitbox_attack:1,hitbox_frame:7570,roster_input:8161,roster_sources:3736,roster_kirby:3736,roster_items:3736,roster_preload:3736,practice_lease:3736,state_frame:7570,recorder_ai:3706,recorder_poll:4310,named_service:11404,menu_input:4310,menu_draw:3708,menu_thumbs:3708,developer_float:50,other:41235
+650598890 #560 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=8 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650600488 #561 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650600956 #562 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650603080 #563 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49846 hooks=input_caller_a_note:9413,input_caller_a_apply:39504,reset_check:4444,hazard_rule:2,reset_hub:6,cpu_frame:8822,cpu_stick_x:8822,cpu_stick_y:8822,cpu_transition_term:44174,cpu_motion_change:75,cpu_check_button_on:26349,cpu_shield_param:17618,ui_archive:73,ui_pass_calculate:53285,ui_register_calculate:48,live_replay:17644,hitbox_attack:1,hitbox_frame:8822,roster_input:9413,roster_sources:4362,roster_kirby:4362,roster_items:4362,roster_preload:4362,practice_lease:4362,state_frame:8822,recorder_ai:4332,recorder_poll:4936,named_service:13282,menu_input:4936,menu_draw:4312,menu_thumbs:4312,developer_float:50,other:48121
+650608604 #564 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=8 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650610188 #565 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650610672 #566 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650613140 #567 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49570 hooks=input_caller_a_note:10657,input_caller_a_apply:44480,reset_check:5066,hazard_rule:2,reset_hub:6,cpu_frame:10066,cpu_stick_x:10066,cpu_stick_y:10066,cpu_transition_term:50394,cpu_motion_change:83,cpu_check_button_on:30081,cpu_shield_param:20106,ui_archive:73,ui_pass_calculate:58721,ui_register_calculate:48,live_replay:20132,hitbox_attack:1,hitbox_frame:10066,roster_input:10657,roster_sources:4984,roster_kirby:4984,roster_items:4984,roster_preload:4984,practice_lease:4984,state_frame:10066,recorder_ai:4954,recorder_poll:5558,named_service:15148,menu_input:5558,menu_draw:4916,menu_thumbs:4916,developer_float:50,other:54963
+650618254 #568 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=6 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650619838 #569 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650620322 #570 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650623183 #571 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49683 hooks=input_caller_a_note:11905,input_caller_a_apply:49472,reset_check:5690,hazard_rule:2,reset_hub:6,cpu_frame:11314,cpu_stick_x:11314,cpu_stick_y:11314,cpu_transition_term:56634,cpu_motion_change:88,cpu_check_button_on:33825,cpu_shield_param:22602,ui_archive:73,ui_pass_calculate:64139,ui_register_calculate:48,live_replay:22628,hitbox_attack:1,hitbox_frame:11314,roster_input:11905,roster_sources:5608,roster_kirby:5608,roster_items:5608,roster_preload:5608,practice_lease:5608,state_frame:11314,recorder_ai:5578,recorder_poll:6182,named_service:17020,menu_input:6182,menu_draw:5518,menu_thumbs:5518,developer_float:50,other:61827
+650627937 #572 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=5 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650629538 #573 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650630037 #574 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650633237 #575 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49290 hooks=input_caller_a_note:13141,input_caller_a_apply:54416,reset_check:6308,hazard_rule:2,reset_hub:6,cpu_frame:12550,cpu_stick_x:12550,cpu_stick_y:12550,cpu_transition_term:62814,cpu_motion_change:92,cpu_check_button_on:37533,cpu_shield_param:25074,ui_archive:73,ui_pass_calculate:69575,ui_register_calculate:48,live_replay:25100,hitbox_attack:1,hitbox_frame:12550,roster_input:13141,roster_sources:6226,roster_kirby:6226,roster_items:6226,roster_preload:6226,practice_lease:6226,state_frame:12550,recorder_ai:6196,recorder_poll:6800,named_service:18874,menu_input:6800,menu_draw:6122,menu_thumbs:6122,developer_float:50,other:68625
+650637670 #576 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=4 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650639271 #577 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650639737 #578 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650643286 #579 [TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=49414 hooks=input_caller_a_note:14381,input_caller_a_apply:59376,reset_check:6928,hazard_rule:2,reset_hub:6,cpu_frame:13790,cpu_stick_x:13790,cpu_stick_y:13790,cpu_transition_term:69014,cpu_motion_change:98,cpu_check_button_on:41253,cpu_shield_param:27554,ui_archive:73,ui_pass_calculate:74999,ui_register_calculate:48,live_replay:27580,hitbox_attack:1,hitbox_frame:13790,roster_input:14381,roster_sources:6846,roster_kirby:6846,roster_items:6846,roster_preload:6846,practice_lease:6846,state_frame:13790,recorder_ai:6816,recorder_poll:7420,named_service:20734,menu_input:7420,menu_draw:6724,menu_thumbs:6724,developer_float:50,other:75445
+650647420 #580 [TrainingRooms] cpu_hook_counts frames=600 sdi=0 stick_x=1200 stick_y=1200 clatter_start=0 transition_term=6000 motion_change=5 quake_pos=0 command_flag=4800 air_kind=0 stick_dir=0 heap_allocations=0
+650648921 #581 [TrainingRooms] state_hook_counts frames=600 param=0 quake=0 sound=0 effect=0 follow=0 rumble=0 star_ko=0 se_silenced=0 se_passed=0 switch_fx=0 decide=0 copy_hook=0 heap_allocations=0
+650649388 #582 [TrainingRooms] input_hook_counts p1_poll=600 ai_frame=600 inject=0 notice_tick=600 heap_allocations=0
+650649453 #583 [TrainingRooms] cpu_event tech_call accessor=0x11ad15c840 requested=471 role=false
+650649469 #584 [TrainingRooms] input_display_plan ops=17 rows=1 icons=1
+650649485 #585 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650649603 #586 [TrainingRooms] input_display_plan ops=17 rows=2 icons=1
+650649618 #587 [TrainingRooms] input_display_plan ops=1 rows=0 icons=0
+650650204 #588 [TrainingRooms] cpu_event tech_call accessor=0x11ad15c840 requested=0 role=false
+650650890 #589 [KirbyHats] request role=0 kind=0x0 source_slot=3 body=0x1
+650650905 #590 [KirbyHats] confirmed role=0 kind=0x0 body=0x1
+650650918 #591 [TrainingRooms] notice_visible=true menu_open=false
+650650918 #592 [TrainingRooms] notice_draw header="Kirby Hats" body="Mario" color=[0, 0, 0, 255]

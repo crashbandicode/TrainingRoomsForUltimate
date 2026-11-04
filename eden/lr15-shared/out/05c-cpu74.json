@@ -1,0 +1,31 @@
+{
+  "id": "05c-cpu74",
+  "start": "cpu-held-review",
+  "end": "cpu-held74",
+  "evidence": [],
+  "manifest_sha256": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e",
+  "started": 1793752461.9735217,
+  "results": [
+    {
+      "play": "lr04-cpu85-to74",
+      "on": "yoga"
+    },
+    {
+      "gate": "cpu74-fresh",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "step screen=css dir=up from=85 to=74 token=p2"
+      }
+    },
+    {
+      "gate": "cpu-held74",
+      "on": "yoga",
+      "evidence": "/home/intpa/eden-runs/lr-15/out/05c-cpu74/yoga-003422Z-193932-gate-cpu-held74.png"
+    },
+    {
+      "shot": "/home/intpa/eden-runs/lr-15/out/05c-cpu74/yoga-003422Z-832023-cpu74.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793752462.7223184
+}

@@ -1,0 +1,116 @@
+[
+  {
+    "group": "hats",
+    "label": "0 0",
+    "path": "out/RC-HATS-P1/yoga-003510Z-055592-confirmed-0-0.png",
+    "sha256": "d9b6c00ccf65528f465143ed5cfef662ee776c219273cb824464251e11ee17ad"
+  },
+  {
+    "group": "hats",
+    "label": "1 1",
+    "path": "out/RC-HATS-P1/yoga-003511Z-969209-confirmed-0-1.png",
+    "sha256": "4c84fb688a51e068f3243ad041a109ec4bc3f960446a8b488d817eddfd5de6c2"
+  },
+  {
+    "group": "hats",
+    "label": "2 2",
+    "path": "out/RC-HATS-P1/yoga-003512Z-993225-confirmed-0-2.png",
+    "sha256": "c371b9853565015216cfe271faa7c396b580f71edf3bfc5f9e5d42194b54a2da"
+  },
+  {
+    "group": "hats",
+    "label": "3 3",
+    "path": "out/RC-HATS-P1/yoga-003513Z-912078-confirmed-0-3.png",
+    "sha256": "de8df93bb92ea6ba0fe4e5e9359c2991ef550572bbf9cd2a64d0ba020c949063"
+  },
+  {
+    "group": "hats",
+    "label": "4 7",
+    "path": "out/RC-HATS-P1/yoga-003514Z-680318-confirmed-0-7.png",
+    "sha256": "aee91656f652feaed6fb3dbc15cdd775abaf40888433b6966e1a20cd92c3a6f5"
+  },
+  {
+    "group": "hats",
+    "label": "5 0",
+    "path": "out/RC-HATS-P1/yoga-003514Z-991660-confirmed-0-0.png",
+    "sha256": "342fad7aff185d2a2dba714110c8e135f9a8ef9ba7af231ed60c66cb4efcd4f4"
+  },
+  {
+    "group": "loss",
+    "label": "taunt loss",
+    "path": "out/RC-HATS-copy-loss/yoga-003657Z-668529-native-copy-loss.png",
+    "sha256": "246fb2bb1fe2315357ad2c605c1013862b8b83a81449364f946a108e147767c0"
+  },
+  {
+    "group": "loss",
+    "label": "reacquired",
+    "path": "out/RC-HATS-copy-loss/yoga-003657Z-181181-confirmed-0-0.png",
+    "sha256": "9ce62b32f88e560b0c68b72eca17089ba4dffb139f729c815fe7a1b89cd248b7"
+  },
+  {
+    "group": "rob",
+    "label": "0",
+    "path": "out/RC-KIRBY-ROB/yoga-004144Z-777036-settled-kirby-6.png",
+    "sha256": "ef49781aefdd52533495a510e86d74162d5d3196597a5aa869bd7ceee0e39905"
+  },
+  {
+    "group": "rob",
+    "label": "1",
+    "path": "out/RC-KIRBY-ROB/yoga-004146Z-573505-settled-kirby-b.png",
+    "sha256": "7673d3ad5b138119c5ad67bdb4c0ffd707ce123cd6719f591e4c7a1e2c1a6897"
+  },
+  {
+    "group": "rob",
+    "label": "2",
+    "path": "out/RC-KIRBY-ROB/yoga-004150Z-956791-settled-kirby-2d.png",
+    "sha256": "9091848a375cc2e9c84b2100b501c062099191c74cf9bc6a274964b1eb8fb7d2"
+  },
+  {
+    "group": "rob",
+    "label": "3",
+    "path": "out/RC-KIRBY-ROB/yoga-004155Z-268553-settled-kirby-2c.png",
+    "sha256": "8594987adf293330c89c9712441679e377216a6c4cc72d285b28ccb7b567b700"
+  },
+  {
+    "group": "rob",
+    "label": "4",
+    "path": "out/RC-KIRBY-ROB/yoga-004159Z-401341-settled-kirby-1c.png",
+    "sha256": "deb417864e40c1a299beb599851cba3ea4e51f5ca6b08285bd6222f923ccab5b"
+  },
+  {
+    "group": "rob",
+    "label": "5",
+    "path": "out/RC-KIRBY-ROB/yoga-004201Z-413370-settled-kirby-58.png",
+    "sha256": "61b9d66eaa89ba0a15319d24e6d175973234789fb1223f1664ce22774bf7168d"
+  },
+  {
+    "group": "rob",
+    "label": "6",
+    "path": "out/RC-KIRBY-ROB/yoga-004204Z-079651-settled-kirby-6.png",
+    "sha256": "6d1846a7cbc19ea950d037a9bb12d2499bf03a1d26b63056fe968e98fb137f75"
+  },
+  {
+    "group": "rob",
+    "label": "copy",
+    "path": "out/RC-KIRBY-ROB/yoga-004205Z-678057-confirmed-0-0.png",
+    "sha256": "4a7fabb2d16726936e194be39dfc3edd780ac44ed743d7875b913ac2e2a4f901"
+  },
+  {
+    "group": "rob",
+    "label": "away",
+    "path": "out/RC-KIRBY-ROB/yoga-004209Z-357803-settled-copied-kirby-away.png",
+    "sha256": "ff265ff13257a36cacb6f96e5360d18f58db7b1b44ffaa7fb8945a247452ea61"
+  },
+  {
+    "group": "rob",
+    "label": "normal ROB",
+    "path": "out/RC-KIRBY-ROB/yoga-004212Z-500392-settled-normal-rob.png",
+    "sha256": "c6db15160cba89728eca8a3aef0a0bf9061d3b59770cbf5b8614704a2962a0b3"
+  },
+  {
+    "group": "teardown",
+    "label": "continuation",
+    "path": "out/RC-TEARDOWN-slow36/yoga-004305Z-896103-settled-Captain-Falcon.png",
+    "sha256": "affdfc686cdfcecd8525cd798996d658037410b48f4328be3571c24dd4970749"
+  }
+]

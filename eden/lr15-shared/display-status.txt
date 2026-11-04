@@ -1,0 +1,7 @@
+Id=eden-life-f2bcd5a7f43145eb8a84adecd9912499-yoga-display.service
+ActiveState=inactive
+SubState=dead
+
+Id=eden-life-f2bcd5a7f43145eb8a84adecd9912499-yoga-display-x.service
+ActiveState=inactive
+SubState=dead

@@ -1,0 +1,18 @@
+# lr-15 — 2026-11-04
+- RC9 source5205a8f9083a099f131ccc8a6ef3005e3fb2225b; diag5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f; build-binding/HANDOFF.json.
+- Unchanged Eden6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb; executing playbook5ddfae6; canonical new --from lr14 --plugin.
+- Final plan16PASS/0FAILED/0unrun includes CPU recovery, NOT CPU HATS;4failed attempts retained. Up28s/rows359s over5calls/Down56s (GENERATED-RESULTS.md).
+- Manifest7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb; every receipt bound to its retained plan; executed hook revisions retained in attempts/.
+- P1 second-ranked Kirby: Mario/DK/Link/Samus/Fox visibly confirmed; repeat Mario confirmed in log and following gate frame (immediate shot transitional).
+- Five cleanup entry/return pairs bind Fighter0x11ad15c450/accessor0x11ad15c840/body1/kind6/role0; sequences14/15,17/18,20/21,22/23,26/27; removed bool point off, trace loss0.
+- Every replacement: native cleanup→released1→new request→confirmation. Old helper slots retained through settlement; slots2/3 reused. Exact lease token/generation unobserved.
+- Native taunt copy-loss pair34/35, caller main+b99ef0/variant1; bare Kirby and Mario reacquisition visible. Initial wrong cursor gate failure retained.
+- CPU second-ranked Kirby ready but two B+RStick attempts produced no request, including helper-ready retry; fixture KeyError retained. CPU HATS DEFERRED, no defect attribution.
+- KIRBY-ROB: settled body/HUD sequence and copied-Kirby canonical departure→Falcon→normal R.O.B. visible; PASS scoped to recorded route.
+- ONE slow Sora/Kazuya/Steve+36frame quit: queue1731→finalize1733(+750ms)→drain1735(+1094ms,wait343826us,alias_ok)→teardown1738→empty ledger1739; fresh-scene Falcon1838.
+- TEARDOWN original three-interruption requirement remains open; continuation is same process, not a fresh process.
+- BOOT install heap_allocations=0; post-row hook_stats1888 allocations=0 delta=0 and state_hook_counts1886 heap_allocations=0. M5q numerical comparison unavailable (unmetered).
+- Immediate Down/released/cleanup_failures[]; restore+separateverify21410equal. Forced SIGKILL/code2/status9; full867018-byte console and owned journal0Unmapped/fatal, no cap termination.
+- Reproduce: python3 -B -I eden/lr15-shared/review.py <raw archive> --out <review.json>;3review tests PASS;2prior timeline tests PASS; see MEDIA-REVIEW.md.
+- Raw: artifacts/trainingrooms-lead-astra4/rc9/lr15; raw-index.json binds retained archive. CPU/cancel/KO/exact-token/M5q/three-interruption clauses unverified; physical nonzero Kirby cell invalid by contract.
+- Local evidence only; no product edit/merge/push/tag/release/card/DBI. Lane compliance records model recheck timing debt; Primary owns phase verdict and further authorization.

@@ -1,0 +1,13 @@
+{
+  "utc": "2026-11-04T00:51:07.907780+00:00",
+  "shell_job": "sh_1a3ebd0bd001DBj9Is9P3AZm6g",
+  "completion_notification": "completed; no error output",
+  "stop_file_exists": true,
+  "matching_watcher_pids": [],
+  "live_model_recheck": {
+    "provider": "nvidia",
+    "model": "openai/openai/gpt-6-astra",
+    "effort": "medium"
+  },
+  "limitation": "Explicit post-compaction recheck delayed until offline work already began; existing watcher was still armed."
+}

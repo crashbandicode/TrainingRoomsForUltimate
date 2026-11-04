@@ -1,0 +1,84 @@
+{
+  "id": "RC-KIRBY-ROB",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb",
+  "started": 1793752881.045815,
+  "results": [
+    {
+      "run": "lead.py:dispatch",
+      "on": "yoga",
+      "value": {
+        "cycle": [
+          {
+            "request": "650934854 #1086 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 4 } outgoing=0x58 target=0x6 index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+            "done": "650936172 #1109 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 4 } target=0x6 index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004142Z-298225-kirby-6.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004144Z-777036-settled-kirby-6.png"
+          },
+          {
+            "request": "650938139 #1124 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 5 } outgoing=0x6 target=0xb index=0 mii=false",
+            "done": "650938188 #1136 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 5 } target=0xb physical=0x6 index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004145Z-937002-kirby-b.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004146Z-573505-settled-kirby-b.png"
+          },
+          {
+            "request": "650940638 #1177 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 6 } outgoing=0xb target=0x2d index=0 mii=false",
+            "done": "650941152 #1205 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 6 } target=0x2d physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004147Z-920152-kirby-2d.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004150Z-956791-settled-kirby-2d.png"
+          },
+          {
+            "request": "650943904 #1227 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 7 } outgoing=0x2d target=0x2c index=0 mii=false",
+            "done": "650943957 #1238 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 7 } target=0x2c physical=0x2d index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004150Z-014310-kirby-2c.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004155Z-268553-settled-kirby-2c.png"
+          },
+          {
+            "request": "650949105 #1252 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 8 } outgoing=0x2c target=0x1c index=0 mii=false",
+            "done": "650950322 #1279 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 8 } target=0x1c physical=0x1c index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004156Z-471872-kirby-1c.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004159Z-401341-settled-kirby-1c.png"
+          },
+          {
+            "request": "650952855 #1289 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 9 } outgoing=0x1c target=0x58 index=0 mii=false",
+            "done": "650952914 #1299 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 9 } target=0x58 physical=0x1c index=0 original=true mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004159Z-082836-kirby-58.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004201Z-413370-settled-kirby-58.png"
+          },
+          {
+            "request": "650954738 #1306 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 10 } outgoing=0x58 target=0x6 index=0 mii=false",
+            "done": "650954831 #1326 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 10 } target=0x6 physical=0x6 index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004201Z-407679-kirby-6.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004204Z-079651-settled-kirby-6.png"
+          }
+        ],
+        "copy": {
+          "request": "650958322 #1363 [KirbyHats] request role=0 kind=0x0 source_slot=2 body=0x1",
+          "confirmed": "650958339 #1364 [KirbyHats] confirmed role=0 kind=0x0 body=0x1",
+          "body": "0x1",
+          "kind": 0,
+          "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004205Z-678057-confirmed-0-0.png"
+        },
+        "copied_departure": {
+          "away": {
+            "request": "650959021 #1372 [MiiOrdinaryPlayer] submit ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 11 } outgoing=0x6 target=0xb index=0 bank_build=true resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+            "done": "650960570 #1400 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 11 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004207Z-969809-copied-kirby-away.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004209Z-357803-settled-copied-kirby-away.png"
+          },
+          "canonical": "650959021 #1370 [KirbyPark] fallback owner=0 target=0xb reason=Kirby holds a copy ability; canonical Reload",
+          "rob": {
+            "request": "650964021 #1437 [MiiOrdinaryPlayer] bank switch ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 12 } outgoing=0xb target=0x2d index=0 mii=false",
+            "done": "650964070 #1448 [MiiOrdinaryPlayer] bank ready ticket=Ticket { epoch: 5, entry: 77855866880, sequence: 12 } target=0x2d physical=0xb index=0 original=false mii=false resource_pair=None released=true",
+            "shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004210Z-113376-normal-rob.png",
+            "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-KIRBY-ROB/yoga-004212Z-500392-settled-normal-rob.png"
+          }
+        }
+      }
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793752932.4134707
+}

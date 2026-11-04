@@ -1,0 +1,89 @@
+{
+  "scope": "Earliest explicit owner0 finalization marker retained in each route window; not an inferred actual scene-change timestamp or universal UI bound. Negative pause offsets mean pause preceded bodies-queued.",
+  "routes": [
+    {
+      "route": "RC-TEARDOWN",
+      "source": "lr14-shared/out/RC-TEARDOWN/pending-window.json",
+      "sha256": "eb3d429670b1542c7bf5f95c4f41602c5284c2633f2df1a722840e9046752466",
+      "observations": {
+        "queue": "646856569 #1069 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cec1c0, 1180cec120, 1180cedf20] control_us=232078 us=233630; frames run until the tasks settle",
+        "built": "646857518 #1073 [GroupSwap] built owner=0 group=0 ok=true us=1182655 installed=3 pool_live=6->9 bodies=Some([Body { address: 76991001104, id: 393216 }, Body { address: 76991064912, id: 458752 }, Body { address: 76991128720, id: 524288 }]) map=0 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f12a0a28, 11f301af08]) mii_setup=None mode=async setup_us=532 queued_us=233630 settled_us=[532788, 782299, 1182093] ticks=71 max_tick_gap_us=23981",
+        "pause": "646856433 #1067 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+        "earliest_scene_end_observed": null,
+        "group_teardown": null,
+        "drained": null
+      },
+      "queue_relative_ms": {
+        "queue": 0,
+        "built": 949,
+        "pause": -136,
+        "earliest_scene_end_observed": null,
+        "group_teardown": null,
+        "drained": null
+      }
+    },
+    {
+      "route": "RC-TEARDOWN-retry2",
+      "source": "lr14-shared/out/RC-TEARDOWN-retry2/pending-window.json",
+      "sha256": "58d5537021d2afb624d8894c2f400df115a2d06f98a8f4eec34dcb8fbd8c2520",
+      "observations": {
+        "queue": "647108735 #1583 [GroupSwap] bodies queued owner=0 group=0 tasks=[1180cede80, 1180cec1c0, 1180cedf20] control_us=233187 us=233291; frames run until the tasks settle",
+        "built": "647109484 #1587 [GroupSwap] built owner=0 group=0 ok=true us=982486 installed=3 pool_live=6->9 bodies=Some([Body { address: 76795802256, id: 393216 }, Body { address: 76795866064, id: 458752 }, Body { address: 76795929872, id: 524288 }]) map=0 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f505e568, 11f301b6c8]) mii_setup=None mode=async setup_us=74 queued_us=233291 settled_us=[450337, 616478, 982437] ticks=59 max_tick_gap_us=25005",
+        "pause": "647108600 #1581 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+        "earliest_scene_end_observed": "647109617 #1592 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0",
+        "group_teardown": "647109709 #1595 [GroupSwap] teardown owner=0 reason=finalize groups=1 bodies=2 contexts=2 routes=1 dispatchers=1 records=0 keys=0 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 7))",
+        "drained": null
+      },
+      "queue_relative_ms": {
+        "queue": 0,
+        "built": 749,
+        "pause": -135,
+        "earliest_scene_end_observed": 882,
+        "group_teardown": 974,
+        "drained": null
+      }
+    },
+    {
+      "route": "RC-TEARDOWN-retry3",
+      "source": "lr14-shared/out/RC-TEARDOWN-retry3/pending-window.json",
+      "sha256": "fa5924c4d071204fe0c66d0a28135a70411d1844be92aaf7d27576b1e674ef9e",
+      "observations": {
+        "queue": "647242851 #1994 [GroupSwap] bodies queued owner=0 group=0 tasks=[11e5c51800, 1180cedde0] control_us=183164 us=183239; frames run until the tasks settle",
+        "built": "647243235 #1998 [GroupSwap] built owner=0 group=0 ok=true us=567055 installed=2 pool_live=6->8 bodies=Some([Body { address: 76749296208, id: 393216 }, Body { address: 76749360016, id: 458752 }, Body { address: 0, id: 0 }]) map=6 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([11f36709e8, 11f301b868]) mii_setup=None mode=async setup_us=48 queued_us=183239 settled_us=[400282, 566908, 0] ticks=34 max_tick_gap_us=17662",
+        "pause": "647242766 #1992 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+        "earliest_scene_end_observed": "647243650 #2003 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0",
+        "group_teardown": "647243743 #2008 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=2 contexts=2 routes=1 dispatchers=1 records=0 keys=2 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 6))",
+        "drained": null
+      },
+      "queue_relative_ms": {
+        "queue": 0,
+        "built": 384,
+        "pause": -85,
+        "earliest_scene_end_observed": 799,
+        "group_teardown": 892,
+        "drained": null
+      }
+    },
+    {
+      "route": "RC-TEARDOWN-three-1",
+      "source": "lr14-shared/out/RC-TEARDOWN-three-1/pending-window.json",
+      "sha256": "f611fba62e754c078cc94cf895e2196080f61aad6e6f5112c2537d371a389d32",
+      "observations": {
+        "queue": "647380168 #2428 [GroupSwap] bodies queued owner=0 group=0 tasks=[11e5c543c0, 1180cedfc0, 1180cee060] control_us=215866 us=215970; frames run until the tasks settle",
+        "built": "647380785 #2432 [GroupSwap] built owner=0 group=0 ok=true us=832963 installed=3 pool_live=7->10 bodies=Some([Body { address: 77227427024, id: 458752 }, Body { address: 77227490832, id: 524288 }, Body { address: 77227554640, id: 589824 }]) map=3 flags=0x0 refs=0 entry_flags=0x4 records=[0, 0, 0] dispatch=Some([1205486708, 11f301b728]) mii_setup=None mode=async setup_us=61 queued_us=215970 settled_us=[416457, 599360, 832918] ticks=51 max_tick_gap_us=17669",
+        "pause": "647380050 #2426 [TrainingRooms] pause_owner begin queue_dropped=0 owners=0x10",
+        "earliest_scene_end_observed": "647380917 #2437 [Destroy] plan owner=0 reason=finalize steps=0 routes_cleared=0 attached=NativeRetiring routes_stale=0 kirby=0 kirby_misplaced=0 kirby_branch_mismatch=0 bodies=0 contexts=0 skipped=0",
+        "group_teardown": "647381004 #2441 [GroupSwap] teardown owner=0 reason=finalize groups=2 bodies=3 contexts=3 routes=1 dispatchers=1 records=0 keys=1 keys_kept=0 map_after=0 skipped=0 alias_ok=true pool=Some((24, 7))",
+        "drained": null
+      },
+      "queue_relative_ms": {
+        "queue": 0,
+        "built": 617,
+        "pause": -118,
+        "earliest_scene_end_observed": 749,
+        "group_teardown": 836,
+        "drained": null
+      }
+    }
+  ]
+}

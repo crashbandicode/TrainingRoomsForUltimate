@@ -1,0 +1,162 @@
+{
+  "id": "01-main",
+  "start": "boot",
+  "end": "main",
+  "evidence": [],
+  "manifest_sha256": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e",
+  "started": 1793752422.2921667,
+  "results": [
+    {
+      "run": "navigation.py:trace_wiring",
+      "on": "yoga",
+      "value": {
+        "point_ids": {
+          "main+0x653240": "1",
+          "main+0x6524e0": "2"
+        },
+        "trace_jsonl": "/home/intpa/eden-runs/lr-15/state/run-yoga/yoga.trace.jsonl",
+        "modules": {
+          "modules": [
+            {
+              "base": "0x80abf000",
+              "build_id": "285183cac95179371cc22cec3723f882e1589659000000000000000000000000",
+              "name": "rtld",
+              "size": "16384"
+            },
+            {
+              "base": "0x80ac3000",
+              "build_id": "21450c647b8c5940ed5b68218ea128fd3c5d597d000000000000000000000000",
+              "name": "main",
+              "size": "121929728"
+            },
+            {
+              "base": "0x87f0b000",
+              "build_id": "60c6edbbfcebd4176cc301d5d9cb5a6f094f9360000000000000000000000000",
+              "name": "subsdk0",
+              "size": "7426048"
+            },
+            {
+              "base": "0x88620000",
+              "build_id": "eaa2c23a4aa1fabbeb98f389c47e0450570cab0c000000000000000000000000",
+              "name": "subsdk9",
+              "size": "122880"
+            },
+            {
+              "base": "0x8863e000",
+              "build_id": "5fd4f531c1195e9e5510c9e73f22cd39612839f8000000000000000000000000",
+              "name": "sdk",
+              "size": "13611008"
+            },
+            {
+              "base": "0x65e0cc000",
+              "build_id": "d9d3ca4865e015d425e8f94a58da63077145db01bcf290adc27e052db4e074ad",
+              "name": "nro:d9d3ca4865e015d425e8f94a58da63077145db01bcf290adc27e052db4e074ad",
+              "size": "139264"
+            },
+            {
+              "base": "0x871392000",
+              "build_id": "4fc17f530e56f29473461204d4a50cf7423f398d812e418653c8d6085eb448ce",
+              "name": "nro:4fc17f530e56f29473461204d4a50cf7423f398d812e418653c8d6085eb448ce",
+              "size": "126976"
+            },
+            {
+              "base": "0xa1cecb000",
+              "build_id": "eeee91e4d8b78657d1bc5721ca522d1622f09ae3000000000000000000000000",
+              "name": "nro:eeee91e4d8b78657d1bc5721ca522d1622f09ae3000000000000000000000000",
+              "size": "2424832"
+            },
+            {
+              "base": "0x25d7fd1000",
+              "build_id": "13f5177a7e86f0150f1a22aa9e611eacd010397c000000000000000000000000",
+              "name": "nro:13f5177a7e86f0150f1a22aa9e611eacd010397c000000000000000000000000",
+              "size": "8544256"
+            },
+            {
+              "base": "0x2772ea6000",
+              "build_id": "8a0af59aa8aa2e452c03fd979490b1f102edaface3ad0a4faaded275c216d965",
+              "name": "nro:8a0af59aa8aa2e452c03fd979490b1f102edaface3ad0a4faaded275c216d965",
+              "size": "57344"
+            },
+            {
+              "base": "0x2d872d6000",
+              "build_id": "fb9ef633eef26ca4cf3bf9cfdef95e00e09a52ef34d4aaa1c680a39150c7bb4f",
+              "name": "nro:fb9ef633eef26ca4cf3bf9cfdef95e00e09a52ef34d4aaa1c680a39150c7bb4f",
+              "size": "114688"
+            },
+            {
+              "base": "0x3913090000",
+              "build_id": "dc2dae6e32420e16d652598582fe51fea6e6e4c5000000000000000000000000",
+              "name": "nro:dc2dae6e32420e16d652598582fe51fea6e6e4c5000000000000000000000000",
+              "size": "1515520"
+            },
+            {
+              "base": "0x3be0f1c000",
+              "build_id": "508704be83a09b949e5f6f26d8a61600af7dce120c9e82b26c5b550a17053621",
+              "name": "nro:508704be83a09b949e5f6f26d8a61600af7dce120c9e82b26c5b550a17053621",
+              "size": "57344"
+            },
+            {
+              "base": "0x3c91acc000",
+              "build_id": "c3cfb834914e233ab0068d5607f03d55c2fcb947bc861df032b96e63168f10a1",
+              "name": "nro:c3cfb834914e233ab0068d5607f03d55c2fcb947bc861df032b96e63168f10a1",
+              "size": "503808"
+            },
+            {
+              "base": "0x51e1570000",
+              "build_id": "36691450546d301f8ead9993be2e974311aeb4fd000000000000000000000000",
+              "name": "nro:36691450546d301f8ead9993be2e974311aeb4fd000000000000000000000000",
+              "size": "1568768"
+            },
+            {
+              "base": "0x51fb02c000",
+              "build_id": "9c3f75756ba27d7c99e2c9b4f69054c30475444d000000000000000000000000",
+              "name": "nro:9c3f75756ba27d7c99e2c9b4f69054c30475444d000000000000000000000000",
+              "size": "1470464"
+            },
+            {
+              "base": "0x69cc021000",
+              "build_id": "10b23442aaf54a1709837213cf470c031e9568635d538b1d17f30537913fcec4",
+              "name": "nro:10b23442aaf54a1709837213cf470c031e9568635d538b1d17f30537913fcec4",
+              "size": "126976"
+            },
+            {
+              "base": "0x7386386000",
+              "build_id": "adcd051806c2ef5ce4404e6ea584c0ffbcd87dcffe49102611aa6784f505c0c7",
+              "name": "nro:adcd051806c2ef5ce4404e6ea584c0ffbcd87dcffe49102611aa6784f505c0c7",
+              "size": "1208320"
+            },
+            {
+              "base": "0x7ca8a3a000",
+              "build_id": "70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8",
+              "name": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8",
+              "size": "6033408"
+            },
+            {
+              "base": "0x7f4261f000",
+              "build_id": "6a467d2797fe8fe85eb4f3b7f99e700a9d37aa83000000000000000000000000",
+              "name": "nro:6a467d2797fe8fe85eb4f3b7f99e700a9d37aa83000000000000000000000000",
+              "size": "13348864"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "gate": "main",
+      "on": "yoga",
+      "evidence": "/home/intpa/eden-runs/lr-15/out/01-main/yoga-003401Z-166207-gate-main.png"
+    },
+    {
+      "gate": "installed",
+      "on": "yoga",
+      "evidence": {
+        "yoga": "cpu_common=installed"
+      }
+    },
+    {
+      "shot": "/home/intpa/eden-runs/lr-15/out/01-main/yoga-003401Z-935214-main.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793752441.7147498
+}

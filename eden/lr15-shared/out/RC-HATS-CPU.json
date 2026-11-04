@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS-CPU",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "bcccb49d2aef61e30a36e16bfbd24b12e39f55bcf87c15c975b88d37fc37ae3e",
+  "started": 1793752800.46644,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[KirbyHats\\\\] request role=1 kind=0x0\\\\b')",
+  "ended": 1793752841.1370625
+}

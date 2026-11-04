@@ -1,0 +1,56 @@
+{
+  "run_directory": "/home/intpa/eden-runs/lr-15/state/run-yoga",
+  "label": "yoga",
+  "unmapped_access": "log",
+  "symbols": [],
+  "points": [
+    {
+      "target": "main+0x653240",
+      "registers": [
+        "x0",
+        "x1",
+        "x2",
+        "pc",
+        "x30"
+      ],
+      "captures": [
+        {
+          "expression": "x0+0xe0",
+          "type": "u32"
+        },
+        {
+          "expression": "x1+0x18",
+          "type": "u32"
+        },
+        {
+          "expression": "x2",
+          "type": "u8"
+        }
+      ],
+      "on_return": false,
+      "max_hits": 256,
+      "rate_limit": 1000
+    },
+    {
+      "target": "main+0x6524e0",
+      "registers": [
+        "x0",
+        "pc",
+        "x30"
+      ],
+      "captures": [
+        {
+          "expression": "x0+0xe0",
+          "type": "u32"
+        },
+        {
+          "expression": "x0+0x18",
+          "type": "u32"
+        }
+      ],
+      "on_return": false,
+      "max_hits": 256,
+      "rate_limit": 1000
+    }
+  ]
+}

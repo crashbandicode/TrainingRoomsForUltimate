@@ -1,0 +1,447 @@
+[
+  {
+    "index": 1,
+    "kind": 0,
+    "name": "Mario"
+  },
+  {
+    "index": 2,
+    "kind": 1,
+    "name": "Donkey Kong"
+  },
+  {
+    "index": 3,
+    "kind": 2,
+    "name": "Link"
+  },
+  {
+    "index": 4,
+    "kind": 3,
+    "name": "Samus"
+  },
+  {
+    "index": 5,
+    "kind": 4,
+    "name": "Dark Samus"
+  },
+  {
+    "index": 6,
+    "kind": 5,
+    "name": "Yoshi"
+  },
+  {
+    "index": 7,
+    "kind": 6,
+    "name": "Kirby"
+  },
+  {
+    "index": 8,
+    "kind": 7,
+    "name": "Fox"
+  },
+  {
+    "index": 9,
+    "kind": 8,
+    "name": "Pikachu"
+  },
+  {
+    "index": 10,
+    "kind": 9,
+    "name": "Luigi"
+  },
+  {
+    "index": 11,
+    "kind": 10,
+    "name": "Ness"
+  },
+  {
+    "index": 12,
+    "kind": 11,
+    "name": "Captain Falcon"
+  },
+  {
+    "index": 13,
+    "kind": 12,
+    "name": "Jigglypuff"
+  },
+  {
+    "index": 14,
+    "kind": 13,
+    "name": "Peach"
+  },
+  {
+    "index": 15,
+    "kind": 14,
+    "name": "Daisy"
+  },
+  {
+    "index": 16,
+    "kind": 15,
+    "name": "Bowser"
+  },
+  {
+    "index": 17,
+    "kind": 16,
+    "name": "Sheik"
+  },
+  {
+    "index": 18,
+    "kind": 17,
+    "name": "Zelda"
+  },
+  {
+    "index": 19,
+    "kind": 18,
+    "name": "Dr. Mario"
+  },
+  {
+    "index": 20,
+    "kind": 19,
+    "name": "Pichu"
+  },
+  {
+    "index": 21,
+    "kind": 20,
+    "name": "Falco"
+  },
+  {
+    "index": 22,
+    "kind": 21,
+    "name": "Marth"
+  },
+  {
+    "index": 23,
+    "kind": 22,
+    "name": "Lucina"
+  },
+  {
+    "index": 24,
+    "kind": 23,
+    "name": "Young Link"
+  },
+  {
+    "index": 25,
+    "kind": 24,
+    "name": "Ganondorf"
+  },
+  {
+    "index": 26,
+    "kind": 25,
+    "name": "Mewtwo"
+  },
+  {
+    "index": 27,
+    "kind": 26,
+    "name": "Roy"
+  },
+  {
+    "index": 28,
+    "kind": 27,
+    "name": "Chrom"
+  },
+  {
+    "index": 29,
+    "kind": 28,
+    "name": "Mr. Game & Watch"
+  },
+  {
+    "index": 30,
+    "kind": 29,
+    "name": "Meta Knight"
+  },
+  {
+    "index": 31,
+    "kind": 30,
+    "name": "Pit"
+  },
+  {
+    "index": 32,
+    "kind": 31,
+    "name": "Dark Pit"
+  },
+  {
+    "index": 33,
+    "kind": 32,
+    "name": "Zero Suit Samus"
+  },
+  {
+    "index": 34,
+    "kind": 33,
+    "name": "Wario"
+  },
+  {
+    "index": 35,
+    "kind": 34,
+    "name": "Snake"
+  },
+  {
+    "index": 36,
+    "kind": 35,
+    "name": "Ike"
+  },
+  {
+    "index": 37,
+    "kind": 39,
+    "name": "Diddy Kong"
+  },
+  {
+    "index": 38,
+    "kind": 40,
+    "name": "Lucas"
+  },
+  {
+    "index": 39,
+    "kind": 41,
+    "name": "Sonic"
+  },
+  {
+    "index": 40,
+    "kind": 42,
+    "name": "King Dedede"
+  },
+  {
+    "index": 41,
+    "kind": 43,
+    "name": "Olimar"
+  },
+  {
+    "index": 42,
+    "kind": 44,
+    "name": "Lucario"
+  },
+  {
+    "index": 43,
+    "kind": 45,
+    "name": "R.O.B."
+  },
+  {
+    "index": 44,
+    "kind": 46,
+    "name": "Toon Link"
+  },
+  {
+    "index": 45,
+    "kind": 47,
+    "name": "Wolf"
+  },
+  {
+    "index": 46,
+    "kind": 48,
+    "name": "Villager"
+  },
+  {
+    "index": 47,
+    "kind": 49,
+    "name": "Mega Man"
+  },
+  {
+    "index": 48,
+    "kind": 50,
+    "name": "Wii Fit Trainer"
+  },
+  {
+    "index": 49,
+    "kind": 51,
+    "name": "Rosalina & Luma"
+  },
+  {
+    "index": 50,
+    "kind": 52,
+    "name": "Little Mac"
+  },
+  {
+    "index": 51,
+    "kind": 53,
+    "name": "Greninja"
+  },
+  {
+    "index": 52,
+    "kind": 54,
+    "name": "Palutena"
+  },
+  {
+    "index": 53,
+    "kind": 55,
+    "name": "PAC-MAN"
+  },
+  {
+    "index": 54,
+    "kind": 56,
+    "name": "Robin"
+  },
+  {
+    "index": 55,
+    "kind": 57,
+    "name": "Shulk"
+  },
+  {
+    "index": 56,
+    "kind": 58,
+    "name": "Bowser Jr."
+  },
+  {
+    "index": 57,
+    "kind": 59,
+    "name": "Duck Hunt"
+  },
+  {
+    "index": 58,
+    "kind": 60,
+    "name": "Ryu"
+  },
+  {
+    "index": 59,
+    "kind": 61,
+    "name": "Ken"
+  },
+  {
+    "index": 60,
+    "kind": 62,
+    "name": "Cloud"
+  },
+  {
+    "index": 61,
+    "kind": 63,
+    "name": "Corrin"
+  },
+  {
+    "index": 62,
+    "kind": 64,
+    "name": "Bayonetta"
+  },
+  {
+    "index": 63,
+    "kind": 65,
+    "name": "Inkling"
+  },
+  {
+    "index": 64,
+    "kind": 66,
+    "name": "Ridley"
+  },
+  {
+    "index": 65,
+    "kind": 67,
+    "name": "Simon"
+  },
+  {
+    "index": 66,
+    "kind": 68,
+    "name": "Richter"
+  },
+  {
+    "index": 67,
+    "kind": 69,
+    "name": "King K. Rool"
+  },
+  {
+    "index": 68,
+    "kind": 70,
+    "name": "Isabelle"
+  },
+  {
+    "index": 69,
+    "kind": 71,
+    "name": "Incineroar"
+  },
+  {
+    "index": 70,
+    "kind": 81,
+    "name": "Piranha Plant"
+  },
+  {
+    "index": 71,
+    "kind": 82,
+    "name": "Joker"
+  },
+  {
+    "index": 72,
+    "kind": 83,
+    "name": "Hero"
+  },
+  {
+    "index": 73,
+    "kind": 84,
+    "name": "Banjo & Kazooie"
+  },
+  {
+    "index": 74,
+    "kind": 85,
+    "name": "Terry"
+  },
+  {
+    "index": 75,
+    "kind": 86,
+    "name": "Byleth"
+  },
+  {
+    "index": 76,
+    "kind": 87,
+    "name": "Min Min"
+  },
+  {
+    "index": 77,
+    "kind": 88,
+    "name": "Steve"
+  },
+  {
+    "index": 78,
+    "kind": 89,
+    "name": "Sephiroth"
+  },
+  {
+    "index": 79,
+    "kind": 92,
+    "name": "Kazuya"
+  },
+  {
+    "index": 80,
+    "kind": 93,
+    "name": "Sora"
+  },
+  {
+    "index": 81,
+    "kind": 90,
+    "name": "Pyra"
+  },
+  {
+    "index": 82,
+    "kind": 91,
+    "name": "Mythra"
+  },
+  {
+    "index": 83,
+    "kind": 36,
+    "name": "Squirtle"
+  },
+  {
+    "index": 84,
+    "kind": 37,
+    "name": "Ivysaur"
+  },
+  {
+    "index": 85,
+    "kind": 38,
+    "name": "Charizard"
+  },
+  {
+    "index": 86,
+    "kind": 75,
+    "name": "Ice Climbers"
+  },
+  {
+    "index": 87,
+    "kind": 73,
+    "name": "Mii Swordfighter"
+  },
+  {
+    "index": 88,
+    "kind": 72,
+    "name": "Mii Brawler"
+  },
+  {
+    "index": 89,
+    "kind": 74,
+    "name": "Mii Gunner"
+  }
+]

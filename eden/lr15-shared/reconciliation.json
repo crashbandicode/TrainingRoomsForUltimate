@@ -1,0 +1,10 @@
+{
+  "final_plan_equal": true,
+  "final_hook_equal": true,
+  "manifest_bound_receipts": 21,
+  "executed_hook_revisions": 4,
+  "raw_files": 806,
+  "results_lines": 18,
+  "dry_run": "READY",
+  "scope": "offline reconciliation only; final plan is same-boot continuation, not a new-boot route"
+}

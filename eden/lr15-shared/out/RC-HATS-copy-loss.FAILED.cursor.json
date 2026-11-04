@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS-copy-loss",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e",
+  "started": 1793752514.9123635,
+  "results": [],
+  "status": "FAILED",
+  "error": "RuntimeError('Missing positive evidence: \\\\[KirbyHats\\\\] request role=0 kind=0x1\\\\b')",
+  "ended": 1793752556.9470634
+}

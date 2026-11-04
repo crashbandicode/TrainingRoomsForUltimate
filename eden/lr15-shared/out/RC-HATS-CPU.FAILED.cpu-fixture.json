@@ -1,0 +1,12 @@
+{
+  "id": "RC-HATS-CPU",
+  "start": "training",
+  "end": "training",
+  "evidence": [],
+  "manifest_sha256": "b6b198c17edde48266f1ce5b00f7855d235d10510c6192a96aa256b12e95af6e",
+  "started": 1793752617.9243486,
+  "results": [],
+  "status": "FAILED",
+  "error": "KeyError('cpu_roster')",
+  "ended": 1793752617.9328482
+}

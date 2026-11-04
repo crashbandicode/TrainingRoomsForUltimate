@@ -1,0 +1,9 @@
+{
+  "phase": "down",
+  "claimed": true,
+  "released": true,
+  "owned_pids": {
+    "yoga": []
+  },
+  "cleanup_failures": []
+}

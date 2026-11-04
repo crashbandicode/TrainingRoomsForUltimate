@@ -1,0 +1,108 @@
+{
+  "role": 1,
+  "cleanup_trace": {
+    "abandoned_returns": "0",
+    "address": "0x81659770",
+    "dropped": "0",
+    "hits": "7",
+    "id": "3",
+    "matched": "7",
+    "mode": "records",
+    "process_id": "81",
+    "recorded": "14",
+    "return_overflow": "0",
+    "state": "armed",
+    "target": "main+0xb96770"
+  },
+  "attempts": [],
+  "scene_since": 715,
+  "nonfirst_prefix": {
+    "request": "650709410 #757 [MiiOrdinaryCpu] submit ticket=Ticket { epoch: 4, entry: 77537411072, sequence: 1 } outgoing=0x28 target=0xb index=0 cursor=Some(0) resource_before=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] saved_files_written=false",
+    "done": "650710705 #783 [MiiOrdinaryCpu] ready ticket=Ticket { epoch: 4, entry: 77537411072, sequence: 1 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+    "shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-CPU/yoga-003757Z-870162-Captain-Falcon.png",
+    "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-CPU/yoga-003800Z-931814-settled-Captain-Falcon.png"
+  },
+  "kirby": {
+    "request": "650714377 #834 [MiiOrdinaryCpu] bank switch ticket=Ticket { epoch: 4, entry: 77537411072, sequence: 2 } outgoing=0xb target=0x6 index=0 cursor=Some(1) mii=false",
+    "done": "650714425 #851 [MiiOrdinaryCpu] bank ready ticket=Ticket { epoch: 4, entry: 77537411072, sequence: 2 } target=0x6 physical=0x6 index=0 original=false mii=false resource_pair=None released=true",
+    "shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-CPU/yoga-003801Z-351423-Kirby.png",
+    "settled_shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-CPU/yoga-003804Z-713647-settled-Kirby.png"
+  },
+  "choices": [
+    {
+      "index": 1,
+      "kind": 0,
+      "name": "Mario"
+    },
+    {
+      "index": 2,
+      "kind": 1,
+      "name": "Donkey Kong"
+    },
+    {
+      "index": 3,
+      "kind": 2,
+      "name": "Link"
+    },
+    {
+      "index": 4,
+      "kind": 3,
+      "name": "Samus"
+    },
+    {
+      "index": 8,
+      "kind": 7,
+      "name": "Fox"
+    }
+  ],
+  "trace_counters": {
+    "boot_error": "",
+    "file_lost": "0",
+    "output": "/home/intpa/eden-runs/lr-15/state/run-yoga/yoga.trace.jsonl",
+    "output_error": "",
+    "points": [
+      {
+        "abandoned_returns": "0",
+        "address": "0x81116240",
+        "dropped": "0",
+        "hits": "20",
+        "id": "1",
+        "matched": "20",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "20",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x653240"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x811154e0",
+        "dropped": "0",
+        "hits": "22",
+        "id": "2",
+        "matched": "22",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "22",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x6524e0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x81659770",
+        "dropped": "0",
+        "hits": "8",
+        "id": "3",
+        "matched": "8",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "16",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0xb96770"
+      }
+    ]
+  }
+}

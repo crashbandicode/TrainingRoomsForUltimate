@@ -1,0 +1,11 @@
+{"bindings":{"gamepad":"","keyboard":""},"duration_frames":36,"events":[
+{"buttons":0,"frame":0,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":16640,"frame":1,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":0,"frame":3,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":1024,"frame":4,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":0,"frame":8,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":8192,"frame":18,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":0,"frame":22,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":1,"frame":28,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]},
+{"buttons":0,"frame":32,"sticks":[0,0,0,0],"triggers":[0,0],"motion":[{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]},{"accel":[0,0,-1],"delta_us":1000,"gyro":[0,0,0]}]}
+],"format":"eden-input-macro","game_id":"01006A800016E000","markers":[],"name":"lr14-request-quit-frames","parent":{"marker":"","name":""},"player":0,"version":1}

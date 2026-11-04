@@ -1,0 +1,230 @@
+{
+  "clippy": {
+    "exit_code": 0,
+    "log_sha256": "730a73a141c4f82b9924787798b13d3759f9fc7a334b79dc3ffdc80087c16fb5",
+    "binaries": 0,
+    "memory_peak": "1930752000",
+    "source_before_after": true
+  },
+  "nodefault": {
+    "exit_code": 0,
+    "log_sha256": "850c571581b3c8714c68c71033735ec102a17b78635f669e4d310f33a8e5f811",
+    "binaries": 0,
+    "memory_peak": "1170415616",
+    "source_before_after": true
+  },
+  "test4": {
+    "exit_code": 0,
+    "log_sha256": "696622a7461622235a1b13094d050529381cc623086457b2f9752165793278d5",
+    "binaries": 91,
+    "memory_peak": "2083627008",
+    "source_before_after": true,
+    "count_status": 0,
+    "counts": {
+      "harnesses": 91,
+      "top_level_tests_passed": 15908,
+      "harness_counts": [
+        1326,
+        216,
+        4,
+        7,
+        8,
+        6,
+        2,
+        1,
+        24,
+        221,
+        274,
+        212,
+        221,
+        223,
+        215,
+        220,
+        218,
+        221,
+        216,
+        214,
+        206,
+        207,
+        230,
+        1284,
+        213,
+        212,
+        1,
+        2,
+        12,
+        9,
+        212,
+        7,
+        205,
+        176,
+        167,
+        230,
+        223,
+        223,
+        228,
+        214,
+        205,
+        211,
+        209,
+        7,
+        211,
+        3,
+        5,
+        219,
+        226,
+        171,
+        169,
+        3,
+        178,
+        169,
+        5,
+        175,
+        169,
+        174,
+        173,
+        6,
+        10,
+        25,
+        1,
+        2,
+        11,
+        212,
+        209,
+        206,
+        4,
+        204,
+        2,
+        216,
+        228,
+        211,
+        214,
+        215,
+        210,
+        210,
+        210,
+        213,
+        208,
+        222,
+        209,
+        211,
+        207,
+        212,
+        204,
+        204,
+        5,
+        208,
+        207
+      ],
+      "log_sha256": "696622a7461622235a1b13094d050529381cc623086457b2f9752165793278d5"
+    }
+  },
+  "list": {
+    "exit_code": 0,
+    "log_sha256": "28410815e8220a81d2213444ebc1eed4c28bc781d0b5d89a96415074255fb0fa",
+    "binaries": 91,
+    "memory_peak": "2154201088",
+    "source_before_after": true
+  },
+  "release": {
+    "exit_code": 0,
+    "log_sha256": "14985cd79d278813515fd79cb6f34bfc0bc27a1e9a9e6b3fa5998cc8b8249eb1",
+    "binaries": 2,
+    "memory_peak": "2502877184",
+    "source_before_after": true
+  },
+  "diag": {
+    "exit_code": 0,
+    "log_sha256": "6501e93088dc4dcccddec9ef5c706cbcb813b016d6164ba7e0b687fa3758fb57",
+    "binaries": 2,
+    "memory_peak": "1330630656",
+    "source_before_after": true
+  },
+  "matchdata": {
+    "exit_code": 0,
+    "log_sha256": "4faf661e82b63708af51740c4c84dc7bebce397b011f3f4d15f16151e288f1f3",
+    "binaries": 6,
+    "memory_peak": "1103151104",
+    "source_before_after": true,
+    "count_status": 0,
+    "counts": {
+      "harnesses": 6,
+      "top_level_tests_passed": 24,
+      "harness_counts": [
+        3,
+        13,
+        3,
+        1,
+        2,
+        2
+      ],
+      "log_sha256": "4faf661e82b63708af51740c4c84dc7bebce397b011f3f4d15f16151e288f1f3"
+    }
+  },
+  "matchdata-list": {
+    "exit_code": 0,
+    "log_sha256": "b62caf620a0084753e667d141fe820ce16e34a3560b6f6ff99f008bce9602232",
+    "binaries": 6,
+    "memory_peak": "27201536",
+    "source_before_after": true
+  },
+  "oracle": {
+    "exit_code": 0,
+    "log_sha256": "74a0e9bd63137b8bb84f3b58e7fccb273a50c92fd23fa70656ad578239a69ac0",
+    "binaries": 1,
+    "memory_peak": "297086976",
+    "source_before_after": true,
+    "count_status": 0,
+    "counts": {
+      "harnesses": 1,
+      "top_level_tests_passed": 0,
+      "harness_counts": [
+        0
+      ],
+      "log_sha256": "74a0e9bd63137b8bb84f3b58e7fccb273a50c92fd23fa70656ad578239a69ac0"
+    }
+  },
+  "oracle-list": {
+    "exit_code": 0,
+    "log_sha256": "151e2ac42ce41689f98eb0b403ab0fcafdc0183530ec788caed045172431b2aa",
+    "binaries": 1,
+    "memory_peak": "26374144",
+    "source_before_after": true
+  },
+  "hoslock": {
+    "exit_code": 0,
+    "log_sha256": "6bb2f976495981c8a2daec2eff22f7f055ccba9a7e5d3871e360dee87a977a4f",
+    "binaries": 2,
+    "memory_peak": "129245184",
+    "source_before_after": true,
+    "count_status": 0,
+    "counts": {
+      "harnesses": 2,
+      "top_level_tests_passed": 23,
+      "harness_counts": [
+        18,
+        5
+      ],
+      "log_sha256": "6bb2f976495981c8a2daec2eff22f7f055ccba9a7e5d3871e360dee87a977a4f"
+    }
+  },
+  "hoslock-list": {
+    "exit_code": 0,
+    "log_sha256": "a6c2a94803454ba6dd866cc6ddbdfe2b11a48a0f3f330c11210d3f3718e75202",
+    "binaries": 2,
+    "memory_peak": "26054656",
+    "source_before_after": true
+  },
+  "committed_source_vs_tested": {
+    "different_paths": [
+      "HANDOFF.md"
+    ],
+    "executable_and_carry_identity": true
+  },
+  "artifact_hashes": {
+    "/home/intpa/smash-training-lobby/artifacts/trainingrooms-pkg6-rc9/build3/release/libtraining_rooms.so": "8036cf472f51e3b2d504735414adadcb596e10a4e7d50e0f0df326891077a6fc",
+    "/home/intpa/smash-training-lobby/artifacts/trainingrooms-pkg6-rc9/build3/release/libtraining_rooms.nro": "7e6b7c13e134fde08a63b7ecc52f68a98c1d73b85bb6908c0817ea31d3079a89",
+    "/home/intpa/smash-training-lobby/artifacts/trainingrooms-pkg6-rc9/build3/diag/libtraining_rooms.so": "11f286872547f800890a31e76b6f10d12fca0fab7c4305709c9465b33c79be52",
+    "/home/intpa/smash-training-lobby/artifacts/trainingrooms-pkg6-rc9/build3/diag/libtraining_rooms.nro": "5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f"
+  }
+}

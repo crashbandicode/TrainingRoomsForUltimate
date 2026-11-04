@@ -1,0 +1,281 @@
+{
+  "previous_copy": {
+    "request": "650548420 #487 [KirbyHats] request role=0 kind=0x0 source_slot=3 body=0x1",
+    "confirmed": "650548438 #488 [KirbyHats] confirmed role=0 kind=0x0 body=0x1",
+    "body": "0x1",
+    "kind": 0,
+    "cleanup": "650547761 #483 [KirbyHats] native cleanup body=0x1 groups_before=0x80 groups_after=Some(0)",
+    "settled": "650547771 #484 [KirbyHats] cleanup settled body=0x1 released=1",
+    "native_pair": {
+      "entry": {
+        "backtrace": [],
+        "captures": [
+          {
+            "address": "0x11ad15c450",
+            "error": "",
+            "expression": "x0",
+            "hex": "1032a485000000000100000006000000000000000000000034ddf4091200000040c815ad1100000090bd16ad11000000f0b0a9e51100000000100400ffff0000",
+            "type": "bytes"
+          },
+          {
+            "address": "0x11ad15c458",
+            "error": "",
+            "expression": "x0+0x8",
+            "hex": "01000000",
+            "type": "u32",
+            "value": "1"
+          },
+          {
+            "address": "0x11ad15c45c",
+            "error": "",
+            "expression": "x0+0xc",
+            "hex": "06000000",
+            "type": "u32",
+            "value": "6"
+          },
+          {
+            "address": "0x11ad15c460",
+            "error": "",
+            "expression": "x0+0x10",
+            "hex": "0000000000000000",
+            "type": "u64",
+            "value": "0"
+          },
+          {
+            "address": "0x11ad15c470",
+            "error": "",
+            "expression": "x0+0x20",
+            "hex": "40c815ad11000000",
+            "type": "u64",
+            "value": "75918329920"
+          }
+        ],
+        "core_id": 0,
+        "event": "entry",
+        "frame": "6790",
+        "locations": {
+          "0x7ca8b7965c": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+          "0x81659770": "main+0xb96770"
+        },
+        "point_id": "3",
+        "process_id": "81",
+        "registers": {
+          "pc": "0x81659770",
+          "x0": "0x11ad15c450",
+          "x1": "0x0",
+          "x30": "0x7ca8b7965c"
+        },
+        "schema": 1,
+        "sequence": "26",
+        "thread_id": "80",
+        "wall_time_ns": "1793752514176951067"
+      },
+      "return": {
+        "backtrace": [],
+        "captures": [
+          {
+            "address": "0x0",
+            "error": "memory_unavailable",
+            "expression": "x0",
+            "hex": "",
+            "type": "bytes"
+          },
+          {
+            "address": "0x8",
+            "error": "memory_unavailable",
+            "expression": "x0+0x8",
+            "hex": "",
+            "type": "u32"
+          },
+          {
+            "address": "0xc",
+            "error": "memory_unavailable",
+            "expression": "x0+0xc",
+            "hex": "",
+            "type": "u32"
+          },
+          {
+            "address": "0x10",
+            "error": "memory_unavailable",
+            "expression": "x0+0x10",
+            "hex": "",
+            "type": "u64"
+          },
+          {
+            "address": "0x20",
+            "error": "memory_unavailable",
+            "expression": "x0+0x20",
+            "hex": "",
+            "type": "u64"
+          }
+        ],
+        "core_id": 0,
+        "event": "return",
+        "frame": "6790",
+        "locations": {
+          "0x7ca8b7965c": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c"
+        },
+        "point_id": "3",
+        "process_id": "81",
+        "registers": {
+          "pc": "0x7ca8b7965c",
+          "x0": "0x0",
+          "x1": "0x11802801c8",
+          "x30": "0x7ca8b7965c"
+        },
+        "schema": 1,
+        "sequence": "27",
+        "thread_id": "80",
+        "wall_time_ns": "1793752514179195623"
+      }
+    },
+    "shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-P1/yoga-003514Z-991660-confirmed-0-0.png"
+  },
+  "point": {
+    "abandoned_returns": "0",
+    "address": "0x81659770",
+    "dropped": "0",
+    "hits": "6",
+    "id": "3",
+    "matched": "6",
+    "mode": "records",
+    "process_id": "81",
+    "recorded": "12",
+    "return_overflow": "0",
+    "state": "armed",
+    "target": "main+0xb96770"
+  },
+  "started_ns": 1793752615760584938,
+  "native_loss_trace": {
+    "entry": {
+      "backtrace": [],
+      "captures": [
+        {
+          "address": "0x11ad15c450",
+          "error": "",
+          "expression": "x0",
+          "hex": "1032a485000000000100000006000000000000000000000034ddf4091200000040c815ad1100000090bd16ad11000000f0b0a9e51100000000100400ffff0000",
+          "type": "bytes"
+        },
+        {
+          "address": "0x11ad15c458",
+          "error": "",
+          "expression": "x0+0x8",
+          "hex": "01000000",
+          "type": "u32",
+          "value": "1"
+        },
+        {
+          "address": "0x11ad15c45c",
+          "error": "",
+          "expression": "x0+0xc",
+          "hex": "06000000",
+          "type": "u32",
+          "value": "6"
+        },
+        {
+          "address": "0x11ad15c460",
+          "error": "",
+          "expression": "x0+0x10",
+          "hex": "0000000000000000",
+          "type": "u64",
+          "value": "0"
+        },
+        {
+          "address": "0x11ad15c470",
+          "error": "",
+          "expression": "x0+0x20",
+          "hex": "40c815ad11000000",
+          "type": "u64",
+          "value": "75918329920"
+        }
+      ],
+      "core_id": 0,
+      "event": "entry",
+      "frame": "12892",
+      "locations": {
+        "0x81659770": "main+0xb96770",
+        "0x8165cef0": "main+0xb99ef0"
+      },
+      "point_id": "3",
+      "process_id": "81",
+      "registers": {
+        "pc": "0x81659770",
+        "x0": "0x11ad15c450",
+        "x1": "0x1",
+        "x30": "0x8165cef0"
+      },
+      "schema": 1,
+      "sequence": "34",
+      "thread_id": "80",
+      "wall_time_ns": "1793752615872787657"
+    },
+    "return": {
+      "backtrace": [],
+      "captures": [
+        {
+          "address": "0x0",
+          "error": "memory_unavailable",
+          "expression": "x0",
+          "hex": "",
+          "type": "bytes"
+        },
+        {
+          "address": "0x8",
+          "error": "memory_unavailable",
+          "expression": "x0+0x8",
+          "hex": "",
+          "type": "u32"
+        },
+        {
+          "address": "0xc",
+          "error": "memory_unavailable",
+          "expression": "x0+0xc",
+          "hex": "",
+          "type": "u32"
+        },
+        {
+          "address": "0x10",
+          "error": "memory_unavailable",
+          "expression": "x0+0x10",
+          "hex": "",
+          "type": "u64"
+        },
+        {
+          "address": "0x20",
+          "error": "memory_unavailable",
+          "expression": "x0+0x20",
+          "hex": "",
+          "type": "u64"
+        }
+      ],
+      "core_id": 0,
+      "event": "return",
+      "frame": "12892",
+      "locations": {
+        "0x8165cef0": "main+0xb99ef0"
+      },
+      "point_id": "3",
+      "process_id": "81",
+      "registers": {
+        "pc": "0x8165cef0",
+        "x0": "0x0",
+        "x1": "0x11802801c8",
+        "x30": "0x8165cef0"
+      },
+      "schema": 1,
+      "sequence": "35",
+      "thread_id": "80",
+      "wall_time_ns": "1793752615876332169"
+    }
+  },
+  "taunt_shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-copy-loss/yoga-003657Z-668529-native-copy-loss.png",
+  "reacquired": {
+    "request": "650650890 #589 [KirbyHats] request role=0 kind=0x0 source_slot=3 body=0x1",
+    "confirmed": "650650905 #590 [KirbyHats] confirmed role=0 kind=0x0 body=0x1",
+    "body": "0x1",
+    "kind": 0,
+    "shot": "/home/intpa/eden-runs/lr-15/out/RC-HATS-copy-loss/yoga-003657Z-181181-confirmed-0-0.png"
+  },
+  "scope": "Native cleanup entry/return after taunt, followed by new confirmed copy; exact body/caller and visual loss require review"
+}

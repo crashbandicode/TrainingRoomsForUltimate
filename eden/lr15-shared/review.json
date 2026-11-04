@@ -1,0 +1,446 @@
+{
+  "artifact_identity": {
+    "source_commit": "5205a8f9083a099f131ccc8a6ef3005e3fb2225b",
+    "source_content_sha256_from_build_handoff": "e1c2b62f66658e40dc639738a88f0dc203a1361d99be2bf867afc808d59ad268",
+    "diag_nro_sha256": "5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f",
+    "nro_build_id": "70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8",
+    "loaded_module": {
+      "base": "0x7ca8a3a000",
+      "build_id": "70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8",
+      "name": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8",
+      "size": "6033408"
+    },
+    "config_plugin_sha256": "5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f",
+    "eden": {
+      "path": "/home/intpa/Applications/Eden-GIF/20261103-063f1b80bb2c-persistent-tracing-6a0c80d2b858/Eden.AppImage",
+      "sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb"
+    },
+    "build_handoff_sha256": "35ba62b1b646f1bb9927997c6447ca28bd5351851bae2c0babfc83a4ccce70fb",
+    "build_audit_sha256": "fe80df14f96867baf5b025ad6bd5b223c17a6fcdc9157be61bc6428b4cc1bde4",
+    "scope": "NRO bytes/pin/loaded build-ID matched; source content provenance from retained Primary/pkg6 build audit, no lane rebuild."
+  },
+  "final_manifest_sha256": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb",
+  "final_counts": {
+    "PASS": 16,
+    "FAILED": 0
+  },
+  "retained_failed_archives": 4,
+  "receipt_bindings": [
+    {
+      "path": "out/05a-cpu-approach.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/06-lucas.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-BOOT-postrows.json",
+      "status": "PASS",
+      "manifest": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb"
+    },
+    {
+      "path": "out/03-css.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/02-stage.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-copy-loss.json",
+      "status": "PASS",
+      "manifest": "b6b198c17edde48266f1ce5b00f7855d235d10510c6192a96aa256b12e95af6e"
+    },
+    {
+      "path": "out/RC-HATS-CPU.FAILED.cpu-fixture.json",
+      "status": "FAILED",
+      "manifest": "b6b198c17edde48266f1ce5b00f7855d235d10510c6192a96aa256b12e95af6e"
+    },
+    {
+      "path": "out/07-training.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-CPU-recovery.json",
+      "status": "PASS",
+      "manifest": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb"
+    },
+    {
+      "path": "out/01-main.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/05b-cpu-pick.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-CPU.FAILED.cpu-ready-chord.json",
+      "status": "FAILED",
+      "manifest": "bcccb49d2aef61e30a36e16bfbd24b12e39f55bcf87c15c975b88d37fc37ae3e"
+    },
+    {
+      "path": "out/04-steve.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-BOOT-install.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-copy-loss.FAILED.cursor.json",
+      "status": "FAILED",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/05c-cpu74.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-P1.json",
+      "status": "PASS",
+      "manifest": "ec323f6b24030e41bbf5ac04418cdf9259c6fe7ba7fd7acf93d95393369ca26e"
+    },
+    {
+      "path": "out/RC-HATS-CPU.json",
+      "status": "FAILED",
+      "manifest": "bcccb49d2aef61e30a36e16bfbd24b12e39f55bcf87c15c975b88d37fc37ae3e"
+    },
+    {
+      "path": "out/RC-KIRBY-ROB.json",
+      "status": "PASS",
+      "manifest": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb"
+    },
+    {
+      "path": "out/RC-TEARDOWN-slow36.json",
+      "status": "PASS",
+      "manifest": "7cad94d32f09f052594b0a7e2f8b72afc25dd4e375eb6cc294960d63f91111eb"
+    },
+    {
+      "path": "out/RC-HATS-CPU.FAILED.cpu-first-chord.json",
+      "status": "FAILED",
+      "manifest": "b6b198c17edde48266f1ce5b00f7855d235d10510c6192a96aa256b12e95af6e"
+    }
+  ],
+  "executed_hooks": [
+    {
+      "action": "boot",
+      "lead_sha256": "3c7fab0f55184183a722e478731340dc9901e4dd7ba8729fed48a099267264a8",
+      "retained_in": [
+        "attempts/copy-loss-cursor/rows"
+      ]
+    },
+    {
+      "action": "hats",
+      "lead_sha256": "3c7fab0f55184183a722e478731340dc9901e4dd7ba8729fed48a099267264a8",
+      "retained_in": [
+        "attempts/copy-loss-cursor/rows"
+      ]
+    },
+    {
+      "action": "copy_loss",
+      "lead_sha256": "3c7fab0f55184183a722e478731340dc9901e4dd7ba8729fed48a099267264a8",
+      "retained_in": [
+        "attempts/copy-loss-cursor/rows"
+      ]
+    },
+    {
+      "action": "copy_loss",
+      "lead_sha256": "44e9c064f1d2a95f66d127a3b8d61fae3821d320602a104a0335c25ed2698af8",
+      "retained_in": [
+        "attempts/cpu-fixture/rows"
+      ]
+    },
+    {
+      "action": "hats",
+      "lead_sha256": "44e9c064f1d2a95f66d127a3b8d61fae3821d320602a104a0335c25ed2698af8",
+      "retained_in": [
+        "attempts/cpu-fixture/rows"
+      ]
+    },
+    {
+      "action": "hats",
+      "lead_sha256": "9f4837181097752e479324baa2591ceaa6937fb9556f886f9f35be68f847a085",
+      "retained_in": [
+        "attempts/cpu-first-chord/rows"
+      ]
+    },
+    {
+      "action": "hats",
+      "lead_sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a",
+      "retained_in": [
+        "rows",
+        "attempts/cpu-ready-chord/rows"
+      ]
+    },
+    {
+      "action": "recover",
+      "lead_sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a",
+      "retained_in": [
+        "rows",
+        "attempts/cpu-ready-chord/rows"
+      ]
+    },
+    {
+      "action": "kirby_rob",
+      "lead_sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a",
+      "retained_in": [
+        "rows",
+        "attempts/cpu-ready-chord/rows"
+      ]
+    },
+    {
+      "action": "teardown",
+      "lead_sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a",
+      "retained_in": [
+        "rows",
+        "attempts/cpu-ready-chord/rows"
+      ]
+    },
+    {
+      "action": "final_alloc",
+      "lead_sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a",
+      "retained_in": [
+        "rows",
+        "attempts/cpu-ready-chord/rows"
+      ]
+    }
+  ],
+  "native_replacement_pairs": [
+    {
+      "sequences": [
+        "14",
+        "15"
+      ],
+      "body": 1,
+      "role": 0,
+      "kind": 6,
+      "fighter": "0x11ad15c450",
+      "accessor": "0x11ad15c840",
+      "caller": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+      "variant": "0x0"
+    },
+    {
+      "sequences": [
+        "17",
+        "18"
+      ],
+      "body": 1,
+      "role": 0,
+      "kind": 6,
+      "fighter": "0x11ad15c450",
+      "accessor": "0x11ad15c840",
+      "caller": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+      "variant": "0x0"
+    },
+    {
+      "sequences": [
+        "20",
+        "21"
+      ],
+      "body": 1,
+      "role": 0,
+      "kind": 6,
+      "fighter": "0x11ad15c450",
+      "accessor": "0x11ad15c840",
+      "caller": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+      "variant": "0x0"
+    },
+    {
+      "sequences": [
+        "22",
+        "23"
+      ],
+      "body": 1,
+      "role": 0,
+      "kind": 6,
+      "fighter": "0x11ad15c450",
+      "accessor": "0x11ad15c840",
+      "caller": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+      "variant": "0x0"
+    },
+    {
+      "sequences": [
+        "26",
+        "27"
+      ],
+      "body": 1,
+      "role": 0,
+      "kind": 6,
+      "fighter": "0x11ad15c450",
+      "accessor": "0x11ad15c840",
+      "caller": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8+0x13f65c",
+      "variant": "0x0"
+    }
+  ],
+  "source_slot_retention": [
+    {
+      "old_kind": 0,
+      "slot": 2,
+      "cleanup": 447,
+      "release": 448,
+      "next_slot_install": 454
+    },
+    {
+      "old_kind": 1,
+      "slot": 3,
+      "cleanup": 456,
+      "release": 457,
+      "next_slot_install": 463
+    },
+    {
+      "old_kind": 2,
+      "slot": 2,
+      "cleanup": 465,
+      "release": 466,
+      "next_slot_install": 474
+    },
+    {
+      "old_kind": 3,
+      "slot": 3,
+      "cleanup": 472,
+      "release": 473,
+      "next_slot_install": 481
+    },
+    {
+      "old_kind": 7,
+      "slot": 2,
+      "cleanup": 483,
+      "release": 484,
+      "next_slot_install": null
+    }
+  ],
+  "source_slots": [
+    2,
+    3,
+    2,
+    3,
+    2,
+    3
+  ],
+  "lease_scope": "Old slots unchanged through cleanup+released=1; subsequent slot reuse observed. Exact token/generation identity not captured.",
+  "copy_loss": {
+    "sequences": [
+      "34",
+      "35"
+    ],
+    "body": 1,
+    "role": 0,
+    "kind": 6,
+    "fighter": "0x11ad15c450",
+    "accessor": "0x11ad15c840",
+    "caller": "main+0xb99ef0",
+    "variant": "0x1"
+  },
+  "teardown": {
+    "sequences": [
+      1731,
+      1733,
+      1735,
+      1738,
+      1739
+    ],
+    "queue_to_finalize_ms": 750,
+    "queue_to_drain_ms": 1094,
+    "drain_wait_us": 343826,
+    "interruptions": 1,
+    "continuation_ready": "651016605 #1838 [MiiOrdinaryPlayer] ready ticket=Ticket { epoch: 7, entry: 77941063680, sequence: 18 } target=0xb index=0 resource=[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00] released=true saved_files_written=false",
+    "scope": "fresh scene in the same process; one interruption only"
+  },
+  "trace_counters": {
+    "boot_error": "",
+    "file_lost": "0",
+    "output": "/home/intpa/eden-runs/lr-15/state/run-yoga/yoga.trace.jsonl",
+    "output_error": "",
+    "points": [
+      {
+        "abandoned_returns": "0",
+        "address": "0x81116240",
+        "dropped": "0",
+        "hits": "40",
+        "id": "1",
+        "matched": "40",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "40",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x653240"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x811154e0",
+        "dropped": "0",
+        "hits": "54",
+        "id": "2",
+        "matched": "54",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "54",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0x6524e0"
+      },
+      {
+        "abandoned_returns": "0",
+        "address": "0x81659770",
+        "dropped": "0",
+        "hits": "11",
+        "id": "3",
+        "matched": "11",
+        "mode": "records",
+        "process_id": "81",
+        "recorded": "22",
+        "return_overflow": "0",
+        "state": "armed",
+        "target": "main+0xb96770"
+      }
+    ]
+  },
+  "console_bytes": 867018,
+  "console_sha256": "88dde7fb4c252b12e9a70ab38b1ff7a8f30303d06ab854d4539318e30cbf9386",
+  "journal_sha256": "d04a72b624075ca2ad735c9286e3ce641c5027d4781e80c4cb700c9257227b15",
+  "console_health_matches": [],
+  "journal_health_matches": [],
+  "down": {
+    "released": true,
+    "cleanup_failures": [],
+    "restore": {
+      "restored": true,
+      "preserved": "/home/intpa/eden-runs/lr-15/state/post-run-yoga"
+    },
+    "verify": {
+      "equal": true,
+      "snapshot_equal": true,
+      "entries": 21410
+    },
+    "unit": {
+      "ActiveState": "failed",
+      "SubState": "failed",
+      "RuntimeMaxUSec": "20min",
+      "Result": "signal",
+      "ExecMainStartTimestamp": "Tue 2026-11-03 19:33:16 EST",
+      "ExecMainExitTimestamp": "Tue 2026-11-03 19:43:57 EST",
+      "ExecMainCode": "2",
+      "ExecMainStatus": "9"
+    }
+  },
+  "unverified": [
+    "CPU HATS (two no-request attempts)",
+    "cancellation",
+    "KO",
+    "exact lease-token identity",
+    "three-interruption acceptance",
+    "M5q numeric comparison (unmetered)"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "commit": "5205a8f9083a099f131ccc8a6ef3005e3fb2225b",
+  "branch": "rc9-hats",
+  "committed_by": "Primary after worker pause; no second commit created",
+  "source_content_sha256": "e1c2b62f66658e40dc639738a88f0dc203a1361d99be2bf867afc808d59ad268",
+  "release_nro_sha256": "7e6b7c13e134fde08a63b7ecc52f68a98c1d73b85bb6908c0817ea31d3079a89",
+  "diag_nro_sha256": "5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f",
+  "authoritative_audit": "AUDIT.json",
+  "worker_native_acceptance": "not performed; Primary/lead own lr15",
+  "logging_execution": "lr14t proves load at0x21 returned0 without HW.Memory/Unmapped; specific mapping/path mechanism unobserved"
+}
