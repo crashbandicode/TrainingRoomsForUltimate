@@ -768,7 +768,7 @@
       ]
     },
     {
-      "id": "p23-q7-native-write",
+      "id": "p23-q7-native-write-probe",
       "budget_min": 4,
       "start": "training",
       "end": "training",
@@ -776,37 +776,7 @@
         {
           "run": "steps2.py:dispatch",
           "args": {
-            "action": "q7"
-          },
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "p23-n7-capture-apply-menu-closed",
-      "budget_min": 5,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
-          "args": {
-            "action": "n7"
-          },
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "p23-b7-airdodge-shield-tilt-side2",
-      "budget_min": 5,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
-          "args": {
-            "action": "b7side2"
+            "action": "q7probe"
           },
           "check": true
         }

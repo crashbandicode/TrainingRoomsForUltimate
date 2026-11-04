@@ -28,6 +28,58 @@ steps = _load('p23steps', 'steps.py')
 nav = _load('p23nav', 'navigation.py')
 
 
+
+CHORDS_CONSUME = ('libtraining_rooms.nro!'
+                  '_RNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features6chords7consume')
+ON_AI_FRAME = ('libtraining_rooms.nro!'
+               '_RNCNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features8recorder11on_ai_frame0B9_')
+MENU_PRESS = ('libtraining_rooms.nro!'
+              '_RNvMs0_NtNtCs9BO14eBq18m_14training_rooms5model4menuNtB5_4Menu5press')
+
+
+def _trace_entries(ctx, ident, register):
+    """A trace point's entry-event values of one register, from the run's trace JSONL."""
+    path = ctx.instance.get('trace_jsonl')
+    values = []
+    if not path:
+        return values
+    try:
+        for line in Path(path).read_text(errors='replace').splitlines():
+            record = json.loads(line)
+            if str(record.get('point_id')) == str(ident) and record.get('event') == 'entry':
+                values.append(record.get('registers', {}).get(register))
+    except OSError as error:
+        ctx.log({'trace_read': str(error)[:120]})
+    return values
+
+
+def q7probe(ctx):
+    """Q7 probe: does the A press reach the menu model? Trace Menu::press (entry x1 = the Button
+    discriminant: Up0 Down1 Left2 Right3 A4 B5 X6 Y7 L8 R9 ZL10 ZR11) around the played route and
+    the A press; the after-A shot and the outbox write at close decide the rest."""
+    out = {}
+    b.fixture(ctx, 'p23-q7.json', fresh=True)          # last_page=recording
+    ctx.gate('training-hud-unpaused')
+    ctx.play('tr-menu-open')
+    ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+    time.sleep(1.5)
+    press_id = _arm(ctx, MENU_PRESS, ['x0', 'x1', 'x30'], on_return=False, max_hits=64)
+    ctx.play('q7-menu-to-row')             # the recorded 14-Down route
+    out['page_shot'] = b.capture(ctx, 'q7-replay-row', 'Recording page, focus on the Replay capture row')
+    since_tick = _now_tick(ctx)
+    ctx.press('a', 150)
+    time.sleep(0.8)
+    out['after_a_shot'] = b.capture(ctx, 'q7-after-a', 'The Replay capture row right after the A press')
+    out['presses'] = _trace_entries(ctx, press_id, 'x1')
+    out['press_summary'] = _trace_summary(ctx, press_id)
+    _disarm(ctx, press_id)
+    steps.close_menu(ctx)
+    ctx.gate('training-hud-unpaused')
+    out['write'] = _wait_tick(ctx, since_tick, 'replay_capture.ini written', 20)
+    out['ini_after'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after')
+    (ctx.row_dir / 'q7probe.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)

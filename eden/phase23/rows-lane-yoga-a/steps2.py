@@ -28,6 +28,58 @@ steps = _load('p23steps', 'steps.py')
 nav = _load('p23nav', 'navigation.py')
 
 
+
+CHORDS_CONSUME = ('libtraining_rooms.nro!'
+                  '_RNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features6chords7consume')
+ON_AI_FRAME = ('libtraining_rooms.nro!'
+               '_RNCNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features8recorder11on_ai_frame0B9_')
+MENU_PRESS = ('libtraining_rooms.nro!'
+              '_RNvMs0_NtNtCs9BO14eBq18m_14training_rooms5model4menuNtB5_4Menu5press')
+
+
+def _trace_entries(ctx, ident, register):
+    """A trace point's entry-event values of one register, from the run's trace JSONL."""
+    path = ctx.instance.get('trace_jsonl')
+    values = []
+    if not path:
+        return values
+    try:
+        for line in Path(path).read_text(errors='replace').splitlines():
+            record = json.loads(line)
+            if str(record.get('point_id')) == str(ident) and record.get('event') == 'entry':
+                values.append(record.get('registers', {}).get(register))
+    except OSError as error:
+        ctx.log({'trace_read': str(error)[:120]})
+    return values
+
+
+def n4probe(ctx):
+    """N4 probe: where does the record-stop request die? Trace chords::consume (entry x0 = the
+    Request discriminant: SaveState0 LoadState1 InputRecord2 InputPlayback3 …) and
+    recorder::on_ai_frame (does the AI hook run while the recorder possesses the CPU?). Then the
+    record chord, one second, the stop chord, three seconds, and the trace is read."""
+    out = {}
+    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
+    ctx.gate('training-hud-unpaused')
+    consume_id = _arm(ctx, CHORDS_CONSUME, ['x0', 'x30'], max_hits=1024, rate_limit=2000)
+    ai_id = _arm(ctx, ON_AI_FRAME, ['x30'], on_return=False, max_hits=4096, rate_limit=4000)
+    record_tick = _now_tick(ctx)
+    chord(ctx, 'zr,down')                  # the record chord
+    out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
+    time.sleep(1.0)
+    out['ai_mid'] = _trace_summary(ctx, ai_id)
+    record_tick2 = _now_tick(ctx)
+    chord(ctx, 'zr,down')                  # the stop chord
+    time.sleep(3.0)
+    out['stop_tick'] = record_tick2
+    out['consume_requests'] = _trace_entries(ctx, consume_id, 'x0')
+    out['ai_summary'] = _trace_summary(ctx, ai_id)
+    _disarm(ctx, consume_id)
+    _disarm(ctx, ai_id)
+    out['diag'] = [x[-160:] for x in _tick_lines(ctx, record_tick, ['PracticeRecording'])][:12]
+    (ctx.row_dir / 'n4probe.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)

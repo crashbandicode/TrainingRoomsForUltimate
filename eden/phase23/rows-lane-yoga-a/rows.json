@@ -775,22 +775,7 @@
       ]
     },
     {
-      "id": "p23-n10-e7-sdi-streak-redo",
-      "budget_min": 3,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
-          "args": {
-            "action": "n10t"
-          },
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "p23-n3-delay-range-picks-redo",
+      "id": "p23-n4-di-during-playback-probe",
       "budget_min": 4,
       "start": "training",
       "end": "training",
@@ -798,37 +783,7 @@
         {
           "run": "steps2.py:dispatch",
           "args": {
-            "action": "n3t"
-          },
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "p23-n4-di-during-playback-redo",
-      "budget_min": 5,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
-          "args": {
-            "action": "n4t"
-          },
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "p23-n2-natural-death-invincibility-redo2",
-      "budget_min": 6,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
-          "args": {
-            "action": "n2redo2"
+            "action": "n4probe"
           },
           "check": true
         }
