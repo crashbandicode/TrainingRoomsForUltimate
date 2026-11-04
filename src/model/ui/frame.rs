@@ -185,6 +185,9 @@ pub struct Frame {
     /// Climbers cell).
     pub tile_badges_p: [Text<4>; super::panes::TILES],
     pub tile_badges_c: [Text<4>; super::panes::TILES],
+    /// The fork's All-stripes (`roster_all_p/c_NN`): the cell is in that role's All order.
+    pub tile_stripes_p: [bool; super::panes::TILES],
+    pub tile_stripes_c: [bool; super::panes::TILES],
     pub tile_solo_p: bool,
     pub tile_solo_c: bool,
     pub range: RangeView,
@@ -228,6 +231,8 @@ impl Frame {
         self.tile_state.fill(0);
         self.tile_badges_p.fill(Text::new());
         self.tile_badges_c.fill(Text::new());
+        self.tile_stripes_p.fill(false);
+        self.tile_stripes_c.fill(false);
         self.tile_solo_p = false;
         self.tile_solo_c = false;
         self.range = RangeView::default();
@@ -274,6 +279,8 @@ impl Frame {
             tile_state: [0; super::panes::TILES],
             tile_badges_p: [Text::new(); super::panes::TILES],
             tile_badges_c: [Text::new(); super::panes::TILES],
+            tile_stripes_p: [false; super::panes::TILES],
+            tile_stripes_c: [false; super::panes::TILES],
             tile_solo_p: false,
             tile_solo_c: false,
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },

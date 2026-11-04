@@ -8,6 +8,11 @@ use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::TILE_HIDDEN;
 use crate::model::panes as p;
+
+/// The fork's role colours (`src/training/ui/roster_grid.rs:9-10`): the roster grid's Player and CPU badges, stripes,
+/// Solo Popo markers and cursor tint.
+const PLAYER: [u8; 4] = [255, 83, 92, 255];
+const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
 
 /// The resolved panes of the menu in the layout now showing.
@@ -361,7 +366,15 @@ impl Panes {
         }
         if shown && frame.tile_count > 0 {
             let (x, y) = centre(usize::from(frame.tile_focus));
-            self.rect(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, p::ACCENT);
+            // The fork's cursor tint (roster_grid.rs:279-291): the active cell's highlight takes the
+            // editing role's colour at alpha 80, so the same-role order badge stays legible over it.
+            let tint = if frame.tile_roster_grid {
+                let [r, g, b, _] = if frame.tile_cpu { CPU } else { PLAYER };
+                [r, g, b, 80]
+            } else {
+                p::ACCENT
+            };
+            self.rect(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
         } else {
             self.hide(p::IDX_TILE_HI);
         }
@@ -373,12 +386,22 @@ impl Panes {
     /// centre; Player left red, CPU right blue), the Solo Popo "S" 40x28 at x±36/y−35 (below it) on
     /// the Ice Climbers cell. Both roles' badges show at once; empty badges hide.
     unsafe fn draw_roster_badges(&self, frame: &Frame, centre: &dyn Fn(usize) -> (f32, f32)) {
-        const PLAYER: [u8; 4] = [255, 83, 92, 255];
-        const CPU: [u8; 4] = [75, 164, 255, 255];
         let roster = frame.view == View::Tiles && frame.tile_roster_grid;
         for i in 0..p::TILES {
             let shown = roster && i < usize::from(frame.tile_count) && frame.tile_state[i] != TILE_HIDDEN;
             let (x, y) = centre(i);
+            // The fork's All-stripes (roster_grid.rs:213-225; builder main.rs:316-332): 4-wide
+            // vertical stripes at x±56, the role's tint.
+            if shown && frame.tile_stripes_p[i] {
+                self.rect(p::IDX_TILE_STRIPE_P + i, x - 56.0, y, 4.0, 86.0, PLAYER);
+            } else {
+                self.hide(p::IDX_TILE_STRIPE_P + i);
+            }
+            if shown && frame.tile_stripes_c[i] {
+                self.rect(p::IDX_TILE_STRIPE_C + i, x + 56.0, y, 4.0, 86.0, CPU);
+            } else {
+                self.hide(p::IDX_TILE_STRIPE_C + i);
+            }
             if shown && !frame.tile_badges_p[i].is_empty() {
                 self.label(p::IDX_TILE_BADGE_P + i, frame.tile_badges_p[i].units(), x - 36.0, y + 35.0, 52.0, PLAYER);
             } else {
@@ -396,12 +419,12 @@ impl Panes {
         if let Some(i) = ic {
             let (x, y) = centre(i);
             if frame.tile_solo_p {
-                self.label(p::IDX_TILE_SOLO_P, &[(83u16), 0], x - 36.0, y - 35.0, 40.0, PLAYER);
+                self.label(p::IDX_TILE_SOLO_P, &[u16::from(b'S')], x - 36.0, y - 35.0, 40.0, PLAYER);
             } else {
                 self.hide(p::IDX_TILE_SOLO_P);
             }
             if frame.tile_solo_c {
-                self.label(p::IDX_TILE_SOLO_C, &[(83u16), 0], x + 36.0, y - 35.0, 40.0, CPU);
+                self.label(p::IDX_TILE_SOLO_C, &[u16::from(b'S')], x + 36.0, y - 35.0, 40.0, CPU);
             } else {
                 self.hide(p::IDX_TILE_SOLO_C);
             }

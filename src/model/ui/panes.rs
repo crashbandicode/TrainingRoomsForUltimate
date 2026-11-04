@@ -232,7 +232,9 @@ pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
 /// Appended after the input log, so no existing index moves.
 pub const IDX_TILE_BADGE_P: usize = IDX_LOG_STATUS + LOG_ROWS;
 pub const IDX_TILE_BADGE_C: usize = IDX_TILE_BADGE_P + TILES;
-pub const IDX_TILE_SOLO_P: usize = IDX_TILE_BADGE_C + TILES;
+pub const IDX_TILE_STRIPE_P: usize = IDX_TILE_BADGE_C + TILES;
+pub const IDX_TILE_STRIPE_C: usize = IDX_TILE_STRIPE_P + TILES;
+pub const IDX_TILE_SOLO_P: usize = IDX_TILE_STRIPE_C + TILES;
 pub const IDX_TILE_SOLO_C: usize = IDX_TILE_SOLO_P + 1;
 /// How many panes the plugin adds to the layout.
 pub const COUNT: usize = IDX_TILE_SOLO_C + 1;
@@ -317,6 +319,8 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
         i if i >= IDX_TILE_BADGE_P && i < IDX_TILE_BADGE_P + TILES => Name::indexed("tr_bp_", i - IDX_TILE_BADGE_P),
         i if i >= IDX_TILE_BADGE_C && i < IDX_TILE_BADGE_C + TILES => Name::indexed("tr_bc_", i - IDX_TILE_BADGE_C),
+        i if i >= IDX_TILE_STRIPE_P && i < IDX_TILE_STRIPE_P + TILES => Name::indexed("tr_ts_", i - IDX_TILE_STRIPE_P),
+        i if i >= IDX_TILE_STRIPE_C && i < IDX_TILE_STRIPE_C + TILES => Name::indexed("tr_us_", i - IDX_TILE_STRIPE_C),
         IDX_TILE_SOLO_P => Name::new("tr_sp"),
         IDX_TILE_SOLO_C => Name::new("tr_sc"),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
@@ -422,6 +426,8 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, 40.0], Align::Center, FONT_SMALL, 28, TEXT) },
         i if i >= IDX_TILE_BADGE_P && i < IDX_TILE_BADGE_P + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
         i if i >= IDX_TILE_BADGE_C && i < IDX_TILE_BADGE_C + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
+        i if i >= IDX_TILE_STRIPE_P && i < IDX_TILE_STRIPE_P + TILES => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], [255, 83, 92, 255], false) },
+        i if i >= IDX_TILE_STRIPE_C && i < IDX_TILE_STRIPE_C + TILES => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], [75, 164, 255, 255], false) },
         i if i == IDX_TILE_SOLO_P || i == IDX_TILE_SOLO_C => Spec { visible: false, ..text(name, [0.0, 0.0, 40.0, 28.0], Align::Center, FONT_SMALL, 2, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),

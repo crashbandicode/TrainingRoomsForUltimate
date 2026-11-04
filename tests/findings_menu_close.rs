@@ -131,3 +131,38 @@ fn a_close_with_no_edits_leaves_the_live_settings_unchanged() {
     committed_extra.remove("last_page");
     assert_eq!(committed_extra, extra, "no session edits: the top-level keys are the live ones");
 }
+
+/// The operator's console finding (release v0.1.0, `artifacts/release-v0.1.0/p1-cycle-evidence/`):
+/// the fork-settings import adopted `trio_practice` ON after the menu's open-time copy was made;
+/// the release's close then reverted it to the copy (OFF) and every P1 cycle logged
+/// "request ignored role=Player selection=Cycle: this role's roster cycle is off"
+/// (`TrainingRooms__practice-diagnostics.log` #144; `TrainingRooms__settings.json`:
+/// `trio_practice [0,1]`). MENU-CLOSE (`87a5105`): the close commits only the rows the player
+/// changed, so the adopted row survives — and the P1 cycle's role gate
+/// (`character_roster.rs:245`: `trio_practice == On`) is open again.
+#[test]
+fn an_adopted_trio_practice_survives_a_no_edit_close_and_the_p1_cycle_is_accepted() {
+    // The menu opens on the settings where Player Swapping is OFF (the open-time copy).
+    let mut opened = Settings::factory();
+    opened.menu.set("trio_practice", &[0, 1]).unwrap();
+    let mut menu = Menu::new(opened.clone(), Env::default());
+
+    // While the menu is open, the first-boot fork import adopts trio_practice ON into the live
+    // settings (`ui::worker::adopt_typed`, decision D1).
+    let mut adopted = opened;
+    adopted.menu.set("trio_practice", &[1, 0]).unwrap();
+
+    // Open → close without touching the row: the close commits onto the live settings.
+    let committed = menu.commit_onto(&adopted);
+    assert_eq!(
+        committed.menu.get("trio_practice").unwrap(),
+        &[1, 0][..],
+        "decision MENU-CLOSE: the adopted Player Swapping must survive a no-edit close"
+    );
+    // The P1 cycle's role gate reads exactly this row (the fork's `Role::enabled`,
+    // `character_roster.rs:245`): ON means the next cycle request is not "ignored ... cycle is off".
+    assert!(
+        committed.menu.get("trio_practice").unwrap().first() == Some(&1),
+        "the P1 cycle's role gate is open again"
+    );
+}

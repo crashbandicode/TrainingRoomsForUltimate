@@ -234,6 +234,46 @@ impl RosterEditor {
         let cycles = self.use_ == RosterUse::Cycles;
         frame.tile_solo_p = cycles && player_solo;
         frame.tile_solo_c = cycles && cpu_solo;
+        // The All-stripes (the fork's `roster_grid.rs:213-225`): per cell — All on, the cell a
+        // supported fighter, not excluded/disabled. TR has no manual view.
+        let stripe = |role: Role, values: &[u8]| {
+            let all = values.first() == Some(&1);
+            // The fork's role_cycle_exclusion (app.rs:690-703): the Player's original solo is its
+            // own preference; the CPU's original solo is its cycle solo.
+            let excluded = match role {
+                Role::Player => cycle_exclusion(player_original, original_solo, player_solo),
+                Role::Cpu => cycle_exclusion(cpu_original, original_solo, cpu_solo),
+            };
+            let mut out = [false; crate::model::panes::TILES];
+            for (cell, slot) in out.iter_mut().enumerate().take(CELLS) {
+                *slot = self.grid.info(cell).is_some_and(|info| match info.kind() {
+                    Some(kind) if matches!(self.use_, RosterUse::Cycles | RosterUse::Hats) => {
+                        all && !hat_cell_disabled_for(self.use_, kind)
+                            && !not_a_cycle_member_for(self.use_, kind)
+                            && excluded != Some(group_kind(kind))
+                    }
+                    _ => false,
+                });
+            }
+            out
+        };
+        frame.tile_stripes_p = stripe(Role::Player, &player_values);
+        frame.tile_stripes_c = stripe(Role::Cpu, &cpu_values);
+    }
+}
+
+fn hat_cell_disabled_for(use_: RosterUse, kind: u32) -> bool {
+    // Kirby cannot be a hat; this build has no Mii helper hats (the fork's app.rs:564-573).
+    use_ == RosterUse::Hats && (group_kind(kind) == 0x06 || (0x48..=0x4a).contains(&kind))
+}
+
+fn not_a_cycle_member_for(use_: RosterUse, kind: u32) -> bool {
+    // This build's cycle engine excludes the Miis from every cycle roster
+    // (`src/runtime/roster/character_roster.rs:513`); the hats' member set is the hat order's.
+    match use_ {
+        RosterUse::Cycles => (0x48..=0x4a).contains(&kind),
+        RosterUse::Hats => (0x48..=0x4a).contains(&kind) || group_kind(kind) == 0x06,
+        _ => true,
     }
 }
 
@@ -248,13 +288,10 @@ pub fn roster_badges_from_values(use_: RosterUse, role: Role, values: &[u8],
     if matches!(use_, RosterUse::PlayerPick | RosterUse::CpuPick) {
         return vec![None; kinds.len()];
     }
-    let hat_cell_disabled = |kind: u32| {
-        // Kirby cannot be a hat; this build has no Mii helper hats (the fork's app.rs:564-573).
-        use_ == RosterUse::Hats && (group_kind(kind) == 0x06 || (0x48..=0x4a).contains(&kind))
-    };
+    let hat_cell_disabled = |kind: u32| hat_cell_disabled_for(use_, kind);
     // This build's cycle engine excludes the Miis from every cycle roster
     // (`src/runtime/roster/character_roster.rs:513`), so they take no badge and no order slot.
-    let not_a_cycle_member = |kind: u32| (0x48..=0x4a).contains(&kind);
+    let not_a_cycle_member = |kind: u32| not_a_cycle_member_for(use_, kind);
     // The fork's `roster_slot_zero` (app.rs:621-643) without its Mii-catalog branch: a Mii original
     // has no numbered alternative here.
     let slot_zero = |kind: u32| {
