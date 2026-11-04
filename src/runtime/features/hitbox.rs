@@ -19,8 +19,10 @@
 //! enabled parts and the dispatch into the same handle sets): the pass's dispatch takes the hurt reader as the draw route's
 //! plug-in point. The draw route itself is not wired: the operator's option A (an isolated visualization sphere) against the
 //! fork's shared-pool `sys_shield` route is still open (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`), so the runtime
-//! requests no hurt spheres and reads no HitModule table yet; the wiring is one `Some(GameHurt(accessor))` plus the three
-//! relied `hurtbox_*` guard rows re-added to `sites_hitbox`.
+//! requests no hurt spheres; the wiring is one `Some(GameHurt { .. })` at the dispatch, over the three relied `hurtbox_*`
+//! guard rows now back in `sites_hitbox`. The diag build runs the reader once per fighter per frame as the hurt census
+//! (`[Hitbox] hurt census`: the parts, the first pass and the read cost) and requests no spheres; the shipped build reads no
+//! HitModule at all.
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
@@ -142,11 +144,11 @@ fn book_set(accessor: usize, slept: bool) {
 struct Store {
     table: SetTable,
     seen_epoch: [u32; hitbox::FIGHTER_SETS],
-    wants: [Sphere; hitbox::MAX_HELD],
+    wants: [Sphere; hitbox::WANT_SCRATCH],
 }
 
 static STORE: Mutex<Store> =
-    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::MAX_HELD] });
+    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::WANT_SCRATCH] });
 /// Spheres held by every fighter together (the per-frame pass skips everything when this is 0 and the setting is Off).
 static HELD: AtomicUsize = AtomicUsize::new(0);
 /// Bumped when a save state was loaded: every fighter's set kills its spheres on its next pass.
@@ -315,8 +317,8 @@ pub unsafe fn frame(fighter: usize) {
         seen_epoch[i] = epoch;
         counts = set.clear(&mut fx);
     }
-    // The hurt reader stays unwired (the draw route is the operator's option A vs the shared-pool route, see the module
-    // notes): `None` plans no hurt spheres and reads no HitModule table.
+    // The dispatch passes `None` (the draw route is the operator's option A vs the shared-pool route, see the module
+    // notes): no hurt sphere is planned or requested; the diag census's own HitModule read is separate, below.
     let (c, hits) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), None, &mut fx);
     #[cfg(feature = "diag")]
     stats::wanted(hits as u32, 0);
@@ -331,6 +333,12 @@ pub unsafe fn frame(fighter: usize) {
     let held_now = set.len();
     HELD.store(table.held_spheres(), Ordering::Relaxed);
     drop(store);
+    // The diag hurt census (decision HB1): one HitModule read per fighter per frame, no sphere requested; the shipped build
+    // has no such read (the module notes).
+    #[cfg(feature = "diag")]
+    if enabled && visualizes {
+        stats::hurt_census(accessor);
+    }
     let slept_now = hitbox::slept_after(facts, plan);
     if slept_now != facts.slept {
         book_set(accessor, slept_now);
@@ -479,8 +487,9 @@ pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport
 mod stats {
     use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-    use crate::model::hitbox::{Counts, FramePlan};
+    use crate::model::hitbox::{self, Counts, FramePlan};
     use crate::runtime::diag_log::diagnostic;
+    use hos_lock::Mutex;
 
     static PASSES: AtomicU32 = AtomicU32::new(0);
     static WORK: AtomicU32 = AtomicU32::new(0);
@@ -608,5 +617,73 @@ mod stats {
 
     pub fn rebound_cleared(killed: u32) {
         diagnostic(format_args!("[Hitbox] rebound cleared: killed={killed}"));
+    }
+
+    // ---- the hurt census (decision HB1) -------------------------------------------------------------------------------
+
+    /// Census kinds tracked at once (eight distinct fighter kinds in a Training boot; a ninth takes the least
+    /// recently used slot).
+    const CENSUS_KINDS: usize = 8;
+
+    /// One slot per fighter kind: the kind's open census window and its LRU clock. Game-thread state (the
+    /// per-frame pass), one uncontended lock like `BOOK`.
+    struct CensusBook {
+        kinds: [i32; CENSUS_KINDS],
+        used: [u64; CENSUS_KINDS],
+        clock: u64,
+        states: [hitbox::HurtCensus; CENSUS_KINDS],
+    }
+
+    impl CensusBook {
+        const fn new() -> CensusBook {
+            CensusBook { kinds: [i32::MIN; CENSUS_KINDS], used: [0; CENSUS_KINDS], clock: 0, states: [hitbox::HurtCensus::EMPTY; CENSUS_KINDS] }
+        }
+
+        fn slot_for(&mut self, kind: i32) -> &mut hitbox::HurtCensus {
+            self.clock += 1;
+            let i = match self.kinds.iter().position(|k| *k == kind) {
+                Some(i) => i,
+                None => {
+                    let i = (0..CENSUS_KINDS).min_by_key(|&i| (self.kinds[i] != i32::MIN, self.used[i])).unwrap_or(0);
+                    self.kinds[i] = kind;
+                    self.states[i] = hitbox::HurtCensus::EMPTY;
+                    i
+                }
+            };
+            self.used[i] = self.clock;
+            &mut self.states[i]
+        }
+    }
+
+    static CENSUS: Mutex<CensusBook> = Mutex::new(CensusBook::new());
+
+    /// The census read of one fighter's pass: the enabled parts and the spheres they want, the read's cost in
+    /// ticks, one bounded line per fighter kind per `REPORT_EVERY` frames. No sphere is requested, nothing drawn.
+    pub fn hurt_census(accessor: usize) {
+        // SAFETY: the current fighter's pass, after the feature's closure passed; the native checks its own grant.
+        let kind = unsafe { crate::runtime::game::natives::fighter_kind(accessor) }.unwrap_or(-1);
+        let window = {
+            let mut book = CENSUS.lock();
+            let slot = book.slot_for(kind);
+            let mut reader = hitbox::GameHurt { accessor, load: mem_load };
+            let start = now();
+            let mut spheres = 0usize;
+            let parts = hitbox::hurt_parts(&mut reader, |_, shape| spheres += hitbox::spheres(shape.a, shape.b, shape.size).count());
+            slot.observe(parts, spheres, now().wrapping_sub(start));
+            slot.window(REPORT_EVERY)
+        };
+        if let Some(window) = window {
+            diagnostic(format_args!("[Hitbox] hurt census kind={kind} {window}"));
+        }
+    }
+
+    /// One raw game-memory read for `hitbox::GameHurt` (the census above). The reader type-checks every pointer
+    /// it dereferences before it calls this: a null or misaligned address or pointer is refused there (Eden
+    /// answers 0 for an unmapped read, so a missing check would not show there).
+    fn mem_load(at: usize, out: &mut [u8]) {
+        // SAFETY: the census runs inside the installed feature's pass for a live fighter, on the game thread;
+        // every address the reader passes was type-checked first (`model::hitbox::GameHurt`), and the read
+        // writes nothing but `out`.
+        unsafe { std::ptr::copy_nonoverlapping(at as *const u8, out.as_mut_ptr(), out.len()) };
     }
 }

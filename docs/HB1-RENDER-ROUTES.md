@@ -10,8 +10,11 @@ isolated visualization sphere ("option A") by default. `OPTION-A-DESIGN.md`
 `model::hitbox::HurtboxReader` (the HitModule reads) and
 `reconcile_frame(..., hurt: Option<&mut dyn HurtboxReader>, fx: &mut impl
 Effects)`: a route is an `Effects` implementation (request/alive/kill per
-sphere) plus the runtime wiring `Some(GameHurt(accessor))`. The runtime passes
-`None` today: no read, no hurt sphere.
+sphere) plus the runtime wiring `Some(GameHurt { .. })` at the dispatch. The
+runtime passes `None`: no hurt sphere. The diag build already runs the reader
+once per fighter per frame as the `[Hitbox] hurt census` (parts, first pass,
+read cost), over the three relied `hurtbox_*` rows restored in `sites_hitbox`;
+the shipped build reads no HitModule.
 
 ## Route A — a separate visualization renderer or effect system
 
@@ -40,18 +43,18 @@ sphere) plus the runtime wiring `Some(GameHurt(accessor))`. The runtime passes
   (`M+0x19460/+0x19468`, 56→55→54 in ly-01): Ridley's first pass wanted 55
   spheres and 2 were refused (hb-04), recovering only when other effects end;
   while On, script effects are slept by design, and refusals land on whatever
-  else asks the pool; Ridley's true part count is not censused.
-- **One trace boot settles:** the Ridley part census at the natural part-update
-  moment `main+0x469e50` (x19 = executing HitModule, 128 B; per the lr02
-  disposition) plus one diag-boot `[Hitbox] stats` line over 600 passes gives
-  the spec §8 per-frame cost row and the worst-case pool demand.
+  else asks the pool; Ridley's part census comes from the diag census line
+  (`[Hitbox] hurt census`, per fighter kind) without a trace boot.
+- **One trace boot settles (fallback):** the Ridley part census at the natural
+  part-update moment `main+0x469e50` (x19 = executing HitModule, 128 B; per
+  the lr02 disposition), when the census line is absent or contradicts hb-04.
 
-## Before either route is wired
+## Done since this study was written (C2, 2026-11-04)
 
 The three relied `hurtbox_*` guard rows (`hurtbox_module` `0x203db10`,
-`hurtbox_groups` `0x469af0`, `hurtbox_part_shape` `0x468490`, bytes as they
-were before the RC7 removal) go back into `sites_hitbox` so boot blocks the
-feature if the game's bytes differ; the want scratch buffer then needs room
-for hit + hurt spheres together (Ridley: 55 + 8 slots' hits ≤ 128 today's
-`MAX_HELD`, but 64 parts × 16 spheres is not), with the overfall counted in
-`Counts::dropped` as the model already does.
+`hurtbox_groups` `0x469af0`, `hurtbox_part_shape` `0x468490`) are back in
+`sites_hitbox`, byte-identical to before the RC7 removal (taken out by
+`cab6603`; restored from its parent), so boot blocks the feature if the
+game's bytes differ. The want scratch is sized for hit + hurt spheres
+together (`WANT_SCRATCH`: 8 slots × 16 + 64 parts × 16), overflow counted in
+`Counts::dropped`; the wiring stays open, the dispatch still passes `None`.

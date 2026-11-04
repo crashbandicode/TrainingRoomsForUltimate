@@ -1,4 +1,12 @@
-# Phase 23 trace request — worker C, HB1 (planning only; no Eden boot by this worker)
+# Phase 23 trace request — worker C, HB1 (**fallback only**; no Eden boot by this worker)
+
+**Fallback only (C2):** the diag build now runs the hurt census itself — one
+`[Hitbox] hurt census` line per fighter kind per 600 frames (`parts=`,
+`parts_max=`, `first_pass=`, the read's `ticks_min/avg/max`), over the three
+relied HitModule rows restored in `sites_hitbox`. The rows file (rows-C.md)
+takes C1/C4 from that line. Request this trace boot only if a combined Eden
+boot shows the census line absent or contradicting the recorded counts
+(hb-03/hb-04); everything below is that fallback's plan, unchanged.
 
 What the host cannot settle and one combined trace boot can: **Ridley's
 hurtbox part census** — how many parts group 0 of his `HitModule` holds and
