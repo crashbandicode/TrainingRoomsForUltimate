@@ -347,7 +347,6 @@ fn every_native_the_runtime_names_is_a_guarded_row() {
         "FIGHTER_MANAGER_SLOT_OFFSET",
         "ITEM_MANAGER_SLOT_OFFSET",
         "UI_MANAGER_SLOT_OFFSET",
-        "BATTLE_OBJECT_MANAGER_SLOT_OFFSET",
         "FLAG_OFFSET",
         "FIGHTER_ENTRY_ID_FIELD",
         "WORK_CURSOR_OFFSET",

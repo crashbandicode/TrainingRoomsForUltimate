@@ -70,7 +70,7 @@ pub(crate) mod presentation;
 
 /// The rows of other packages' tables (and its own `roster_*` rows of `sites_pkg6`) that cover the `smash::` calls of the cycle's
 /// release code (`tests/pkg6_smash_calls.rs` maps each call to its row). The cycle starts only when all of them passed their guard.
-pub(crate) const CALLED_ROWS: [&str; 17] = [
+pub(crate) const CALLED_ROWS: [&str; 16] = [
     "state_get_have_item_id",
     "state_have_item",
     "state_is_have_item",
@@ -86,7 +86,6 @@ pub(crate) const CALLED_ROWS: [&str; 17] = [
     "roster_have_item_kind",
     "roster_posture_pos",
     "roster_status_is_changing",
-    "roster_find_battle_object",
     "state_kirby_copy_setup",
 ];
 

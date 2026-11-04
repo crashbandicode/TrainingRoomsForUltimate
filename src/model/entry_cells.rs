@@ -12,6 +12,32 @@ pub const BODY_FIELD: usize = 0x4160;
 const COUNT_FIELD: usize = 0x4150;
 const ACTIVE_FIELD: usize = 0x5918;
 
+/// Strict resolver for native copy cleanup. Unlike the legacy accessor reader,
+/// this path never falls back to an unguarded cell or retains a game pointer.
+/// `resolve_entry` validates the native entry id and manager before reading it.
+pub fn read_cleanup_body(
+    entry: i32,
+    layout_guarded: bool,
+    mut resolve_entry: impl FnMut(i32) -> usize,
+    word: impl FnMut(usize) -> u64,
+    byte: impl FnMut(usize) -> u8,
+) -> usize {
+    if !layout_guarded {
+        return 0;
+    }
+    read_active_body(resolve_entry(entry), true, word, byte)
+}
+
+/// Identity must match both fields before invoking native copy cleanup.
+pub fn cleanup_identity_matches(
+    callback_accessor: usize,
+    callback_id: u32,
+    object_accessor: usize,
+    object_id: u32,
+) -> bool {
+    callback_accessor != 0 && callback_accessor == object_accessor && callback_id == object_id
+}
+
 /// Read the live window through the caller's native-memory reader. The layout
 /// guard admits the count/index fields; without it only the legacy first-body
 /// field is read, per F11's recorded fallback contract. No pointer is retained.

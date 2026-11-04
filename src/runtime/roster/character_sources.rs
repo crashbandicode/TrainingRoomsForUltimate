@@ -1037,8 +1037,14 @@ pub unsafe fn clear_hat_for_switch(body: *mut app::BattleObjectModuleAccessor)
     let Some(before) = retained_copy_kinds(body) else {
         return Err("Kirby's previous copy resources are not ready");
     };
-    let object = crate::runtime::compat::common::try_get_battle_object((*body).battle_object_id)
-        .filter(|object| object.module_accessor == body)
+    let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    let object = crate::runtime::compat::common::try_get_fighter_object(entry)
+        .filter(|object| {
+            let object = &(*object.as_ptr()).battle_object;
+            crate::model::entry_cells::cleanup_identity_matches(
+                body as usize, (*body).battle_object_id,
+                object.module_accessor as usize, object.battle_object_id)
+        })
         .ok_or("Kirby is still changing characters")?;
     let base = super::BASE.load(Ordering::Acquire);
     // Seam row `sources.kirby_copy_clear` (Called). The `character_sources` group is authoritative (SEAMS-ALL):
@@ -1058,7 +1064,7 @@ pub unsafe fn clear_hat_for_switch(body: *mut app::BattleObjectModuleAccessor)
                 if id == (*body).battle_object_id) { live.settle_polls = 2; }
         }
     }
-    clear(object as *const app::BattleObject as *mut app::Fighter, 0);
+    clear(object.as_ptr(), 0);
     let after = retained_copy_kinds(body);
     crate::engine::compat::logging::diagnostic(format_args!(
         "[KirbyHats] native cleanup body=0x{:x} groups_before=0x{:x} groups_after={:?}",

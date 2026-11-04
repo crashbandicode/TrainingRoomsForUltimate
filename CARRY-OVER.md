@@ -1,5 +1,21 @@
 # Carry-over ledger (package 1)
 
+## RC9 Kirby copy cleanup object identity — 2026-11-03
+
+Operator approved the HATS defect fix at 23:50Z. The carried
+`character_sources::clear_hat_for_switch` resolves the Fighter through its
+entry's existing guarded active-cell reader and verifies accessor plus object
+id. The old clean-room native wrapper incorrectly treated a boolean activity
+predicate as an object pointer (lr14 captured return x0=1). Full native cleanup,
+copy-group checks and lease pin/settle/release order are unchanged. Exact carry
+transform and regenerated destination hash/ledger preserve reproducibility;
+no fork/stage edit. Astra APPROVE-WITH-CHANGES applied: reject layout failure
+before lookup/read, unsafe game-thread NonNull Fighter (no static reference),
+retire the unused predicate row/constants/data-slot exemption and CALLED_ROWS
+dependency, update adapter/stale spec contracts, and add strict resolver/identity
+cleanup-call spies. Generic cells 1/2 are not a claim about Kirby's cell0 layout.
+Build/review receipts: `docs/RC9-HATS.md`.
+
 ## RC7 shared retirement adapter consumption — 2026-11-03
 
 UI consumes ONLY `src/model/lobby/practice_policy.rs` and its exact carry entry

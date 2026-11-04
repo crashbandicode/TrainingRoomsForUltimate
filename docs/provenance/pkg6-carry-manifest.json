@@ -3694,7 +3694,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "c30741f0928794aa3a08853ee46eefde92b3f05ddbef448da619dae9aab86f6f",
+   "dest_sha256": "af4e255c971ab52d6eb1e712b1545cea39f329da399370f8182c94e42157103d",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -4651,6 +4651,16 @@
      "old": "            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiHelper] native submit refused; INSTALL retained source={:?}\",load.source()));\n        }\n        return;\n    }\n    if active_reload { native_source::reload(entry, wanted.kind); }\n    else { native_source::install(entry, wanted.kind); }\n}\n\n/// Association uses the native destructor's current actor and current entry7,\n/// including old actors released while a new managed install is pending.\n",
      "new": "            crate::engine::compat::logging::diagnostic(format_args!(\"[MiiHelper] native submit refused; INSTALL retained source={:?}\",load.source()));\n        }\n        return;\n    }\n    native_source::install(entry, wanted.kind);\n}\n\n/// Association uses the native destructor's current actor and current entry7,\n/// including old actors released while a new managed install is pending.\n",
      "reason": "RC reset lead composition: apply reviewed pkg6 cf161f5 F9/created-exact retirement after Slim 7950485 observer removal; preserve both closures and ordinary Mii/helper safety."
+    },
+    {
+     "old": "    let object = crate::runtime::compat::common::try_get_battle_object((*body).battle_object_id)\n        .filter(|object| object.module_accessor == body)",
+     "new": "    let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);\n    let object = crate::runtime::compat::common::try_get_fighter_object(entry)\n        .filter(|object| {\n            let object = &(*object.as_ptr()).battle_object;\n            crate::model::entry_cells::cleanup_identity_matches(\n                body as usize, (*body).battle_object_id,\n                object.module_accessor as usize, object.battle_object_id)\n        })",
+     "reason": "RC9 HATS root fix, operator approved 2026-11-03 23:50Z and Astra safety review applied: the 0x1fca0b0 activity predicate returns bool (lr14 x0=1), never a Fighter pointer. Resolve the entry's current published cell only with the layout guard, using a game-thread unsafe NonNull<Fighter> helper, and check accessor AND object id before full native cleanup. No cleanup or lease-order bypass, new native site, or fork edit."
+    },
+    {
+     "old": "    clear(object as *const app::BattleObject as *mut app::Fighter, 0);",
+     "new": "    clear(object.as_ptr(), 0);",
+     "reason": "RC9 Astra review: the strict entry resolver returns a non-retained NonNull<Fighter>, not a safe static BattleObject reference; repr(C) Fighter begins with BattleObject. Preserve native full-copy cleanup and argument 0."
     }
    ]
   },
@@ -8359,9 +8369,9 @@
   },
   {
    "src": "src/mii_editor_bridge/fingerprints.rs",
-    "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
-    "crate": "root",
-    "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
+   "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
+   "crate": "root",
+   "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
    "dest_sha256": "85adac4fa29da42c4086c80e41c03d5b9708428a840ba8e63f043d16549a0dbf",
    "edits": [
     {
@@ -8627,9 +8637,9 @@
   },
   {
    "src": "src/mii_editor_bridge/mod.rs",
-    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
-    "crate": "root",
-    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
+   "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
+   "crate": "root",
+   "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
    "dest_sha256": "4b0c6125dd053e37f7f59cb033b2eb1a67a5baf728f7412971a4410ce25a24e7",
    "edits": [
     {
@@ -8897,7 +8907,7 @@
     {
      "old": "fn begin_session(\n    origin: Origin, seed: Draft, catalog: Arc<Snapshot>,\n    restore: Option<(ResumeTicket, ui_resume::Screen, i32)>,\n) -> Result<(), &'static str> {\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().ok_or(\"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n",
      "new": "fn begin_session(\n    origin: Origin, seed: Draft, catalog: Arc<Snapshot>,\n    restore: Option<(ResumeTicket, ui_resume::Screen, i32)>,\n) -> Result<(), &'static str> {\n    if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return Err(\"Native Mii editor is unavailable\"); }\n    seed.validate()?;\n    if !catalog.is_complete() { return Err(\"Mii catalog is incomplete\"); }\n    let mut state = STATE.try_lock().ok_or(\"Editor request is busy\")?;\n    if ACTIVE.load(Ordering::Acquire) { return Err(\"An editor request is already active\"); }\n",
-      "reason": "RC reset: adapter capability hides unproven native Mii editor and provider refuses fresh/resumed sessions, while saved catalog selection and generic enabled policy remain."
+     "reason": "RC reset: adapter capability hides unproven native Mii editor and provider refuses fresh/resumed sessions, while saved catalog selection and generic enabled policy remain."
     },
     {
      "old": "use crate::engine::mii::ldn_handshake as handshake;\nmod fingerprints;\n\n#[cfg(feature = \"diag\")]\n",

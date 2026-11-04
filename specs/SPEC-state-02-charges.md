@@ -21,7 +21,7 @@ When a state is saved, the charge level of the fighter's chargeable special (Sam
 - The saved record's `charge` object (SPEC-state-01 §7.2) and `fighter_kind`.
 - The current fighter kind, the fighter's module accessor on the PosMove completion frame of SPEC-state-01 §5.3 step 8c.
 - For Olimar: the Pikmin troops manager pointer (work int64 id `0x100000C0` on Olimar's module accessor) and each Pikmin's module accessor by battle object id.
-- For Sora: the fighter's `BattleObject` resolved from `module_accessor.battle_object_id` through the game's battle-object lookup (`main+0x3ac560`, the function used by `try_get_battle_object`).
+- Historical fork contract for Sora: the fighter's `BattleObject` resolved from `module_accessor.battle_object_id` through the genuine lookup `main+0x3ac560`. Current clean-room Sora uses its callback Fighter directly. RC9 Kirby cleanup uses the guarded active entry cell; the retired `0x1fca0b0` boolean predicate was never this lookup.
 
 ## 4. Outputs and native state touched
 

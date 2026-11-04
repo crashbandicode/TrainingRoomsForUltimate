@@ -2,6 +2,7 @@
 //! natives of `runtime::game::natives`, decision D5; the input-owner mask of `runtime::published`).
 
 use smash::app::BattleObjectModuleAccessor;
+use std::sync::atomic::Ordering;
 use smash::lib::lua_const::FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID;
 
 use crate::model::lra_reset::{entry_id_valid, FIGHTER_MANAGER_SLOT_OFFSET};
@@ -168,12 +169,21 @@ pub fn try_get_module_accessor(id: crate::runtime::compat::consts::FighterId) ->
     unsafe { natives::module_accessor(entry) }.map(|accessor| accessor as *mut BattleObjectModuleAccessor)
 }
 
-/// The active battle object with `object_id`, `None` for an unknown or inactive id. The roster cycle starts only when the row
-/// `roster_find_battle_object` passed its guard (`roster::CALLED_ROWS`), and this runs only from the cycle; the native layer
-/// answers nothing when the call was not granted (R2-1).
-pub fn try_get_battle_object(object_id: u32) -> Option<&'static smash::app::BattleObject> {
-    // SAFETY: a guarded called function; the answer is a live battle object or null (an unknown id).
-    unsafe { (natives::find_battle_object(object_id) as *const smash::app::BattleObject).as_ref() }
+/// The running Fighter of an entry. Refuses a rejected active-cell layout guard.
+/// `BattleObjectManager::is_active_find_battle_object` returns bool, not an object pointer.
+///
+/// # Safety
+/// Game thread only, during the live fighter callback. The returned raw pointer
+/// must not outlive it; validate accessor and object id before native cleanup.
+pub unsafe fn try_get_fighter_object(entry: i32) -> Option<std::ptr::NonNull<smash::app::Fighter>> {
+    let object = crate::model::entry_cells::read_cleanup_body(
+        entry,
+        natives::ACTIVE_CELL_GUARDED.load(Ordering::Acquire),
+        |id| natives::fighter_entry(id),
+        |address| (address as *const u64).read(),
+        |address| (address as *const u8).read(),
+    );
+    std::ptr::NonNull::new(object as *mut smash::app::Fighter)
 }
 
 /// The mapped input record the carried files read and write.

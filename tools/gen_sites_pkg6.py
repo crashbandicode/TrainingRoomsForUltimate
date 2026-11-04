@@ -17,7 +17,6 @@ ROWS = [
     ("p1_entry_current_fighter_id", 0x20CBCB0, "P1Cpu", "Called", "FighterEntry::current_fighter_id (lua_bind thunk, symbol _ZN3app8lua_bind37FighterEntry__current_fighter_id_implEPNS_12FighterEntryE): the battle-object id of an entry, which `sv_battle_object::module_accessor` (guarded by package 3's `state_object_module_accessor`) turns into the accessor."),
     ("roster_have_item_kind", 0x2098CD0, "Roster", "Called", "ItemModule::get_have_item_kind (lua_bind thunk, symbol _ZN3app8lua_bind35ItemModule__get_have_item_kind_implEPNS_26BattleObjectModuleAccessorEi): the kind of the item a fighter holds; the turnip identity read and the item cycle use it."),
     ("roster_posture_pos", 0x206ADE0, "Roster", "Called", "PostureModule::pos (lua_bind thunk, symbol _ZN3app8lua_bind23PostureModule__pos_implEPNS_26BattleObjectModuleAccessorE): the body position the replacement fighter is placed at."),
-    ("roster_find_battle_object", 0x1FCA0B0, "Roster", "Called", "BattleObjectManager::is_active_find_battle_object (lua_bind thunk, symbol _ZN3app8lua_bind54BattleObjectManager__is_active_find_battle_object_implEPNS_19BattleObjectManagerEj): the battle object of an id (the Kirby copy cleanup takes the object itself); the manager is the singleton slot at main+0x52b7a00."),
     ("roster_status_is_changing", 0x2087760, "Roster", "Called", "StatusModule::is_changing (lua_bind thunk, symbol _ZN3app8lua_bind30StatusModule__is_changing_implEPNS_26BattleObjectModuleAccessorE): whether the body is between two statuses (the Kirby hat step waits)."),
     ("roster_cpu_quantity_root", 0x1416C70, "Roster", "Relied", "F9: the game loads the Training state root from main+0x52c3420 here (adrp x8,#0x52c3000; ldr x23,[x8,#0x420]); `native_source::training_cpu_quantity` starts its pointer path at the same global."),
     ("roster_cpu_quantity_reader", 0x1417030, "Roster", "Relied", "F9: the game's own read of No. of CPUs (ldr x8,[x19,#0xb38]; ldr x8,[x8]; ldr x8,[x8,#0x210]; ldr x8,[x8,#8]; ldr x8,[x8,#0x80]; ldr w9,[x8,#0xb40]): the pointer path and the field `training_cpu_quantity` reads."),
@@ -70,12 +69,6 @@ def main():
         if kind == "Hook":
             const = name.upper() + "_OFFSET"
             out.append(f"pub const {const}: usize = {off:#x};")
-    # R2-1: a called function the native-call layer (`runtime::game::natives`) calls is named by its row's offset constant, so the grant
-    # check and the capability scanner see the row. The singleton slot is read data (a `data_slots` entry of tests/capabilities.rs).
-    out.append("/// `BattleObjectManager::is_active_find_battle_object` (row `roster_find_battle_object`).")
-    out.append(f"pub const ROSTER_FIND_BATTLE_OBJECT_OFFSET: usize = {next(off for name, off, *_ in ROWS if name == 'roster_find_battle_object'):#x};")
-    out.append("/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.")
-    out.append("pub const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;")
     out.append("")
     out.append(f"pub static SITES: [Site; {len(ROWS)}] = [")
     for name, off, feature, kind, note in ROWS:
