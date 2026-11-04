@@ -428,6 +428,21 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | # | Decision | Answer |
 | --- | --- | --- |
 | HB1-route | How hitbox and hurtbox spheres are drawn | **Route B** (as recommended): the fork's shared-pool `sys_shield` spheres. This **reverses** the 2026-11-03 Phase 3 default "option A (isolated sphere)", which the option A study could not route safely. Route A stays later research. The Ridley first-frame refusals are counted and logged |
+| MENU-CLOSE (~13:58Z) | Closing the menu published its open-time snapshot and undid rows the game adopted while it was open (D1 write-backs, e.g. a CPU Kirby copy; Ally batch finding 2, `artifacts/phase23/FINDINGS-REPORT.md`) | **Close commits only the rows the player changed in this menu session** (as recommended). Every other row keeps its live value, including write-backs adopted while the menu was open. When the player and the game changed the same row, the player's edit wins. Regression test `tests/findings_menu_close.rs` (branch `p23/findings`) |
+
+The MENU-CLOSE choice as shown to the operator:
+
+```text
+open:    cpu=DK   hat=none
+while open:
+  you set cpu=Kirby
+  game sets hat=Pikachu
+close ->  cpu=Kirby  hat=Pikachu
+          (your edit) (game kept)
+```
+
+The alternatives were "game updates win on the same row" and "refresh the open menu on every write-back", which can
+overwrite an edit in progress.
 
 ### HB1-route · How hitbox and hurtbox spheres are drawn (the question as asked)
 
