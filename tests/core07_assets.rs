@@ -50,7 +50,7 @@ fn core07_no_portrait_pictures() {
     // (a) Every PNG in the repo lives in a folder that never ships: the 38 item icons, the review
     // mockup and the decision pictures under docs/, or the Eden run evidence under eden/.
     let mut pngs = Vec::new();
-    walk(root, root, &mut |path| {
+    walk(root, &mut |path| {
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
             pngs.push(path.to_path_buf());
         }
@@ -118,7 +118,7 @@ fn is_item_icon(name: &str) -> bool {
     number.len() == 2 && number.bytes().all(|digit| digit.is_ascii_digit())
 }
 
-fn walk(dir: &Path, root: &Path, visit: &mut impl FnMut(&Path)) {
+fn walk(dir: &Path, visit: &mut impl FnMut(&Path)) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
@@ -126,7 +126,7 @@ fn walk(dir: &Path, root: &Path, visit: &mut impl FnMut(&Path)) {
         let name = name.to_string_lossy();
         if path.is_dir() {
             if name != ".git" && name != "target" && name != "tmp" {
-                walk(&path, root, visit);
+                walk(&path, visit);
             }
         } else if name != "Cargo.lock" {
             visit(&path);
