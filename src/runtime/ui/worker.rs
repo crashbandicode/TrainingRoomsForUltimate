@@ -593,6 +593,20 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
+/// A publish made outside the menu (the diag reload, diag builds): the committed settings the menu
+/// opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
+/// The saved defaults are the player's and stay.
+#[cfg(feature = "diag")]
+pub fn adopt_published(settings: &Settings) {
+    let mut guard = SETTINGS.lock();
+    if let Some(current) = guard.as_mut() {
+        current.menu = settings.menu.clone();
+        current.extra = settings.extra.clone();
+    } else {
+        *guard = Some(settings.clone());
+    }
+}
+
 
 /// Construct once on the worker. No settings/outbox side effects occur until
 /// the native handoff owns the intent; a full queue keeps this exact value.
@@ -642,7 +656,13 @@ fn retry_close(s: &mut Session) {
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     let outbox = menu.take_outbox();
-    let settings = menu.commit().clone();
+    // Decision MENU-CLOSE (`review/menu-proposal` `9a9cc47`): the close commits only the rows the
+    // player changed this session; every other row keeps its live value in `SETTINGS` — the D1
+    // write-backs and publishes adopted while the menu was open. The player's edit wins.
+    let settings = match SETTINGS.lock().clone() {
+        Some(live) => menu.commit_onto(&live),
+        None => menu.commit().clone(),
+    };
     published::publish(&settings.menu, outbox.rerolls);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);

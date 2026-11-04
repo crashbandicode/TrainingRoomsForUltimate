@@ -247,6 +247,9 @@ pub struct Menu {
     closed: bool,
     chord_capture: ChordCapture,
     chord_refusal: Option<super::ini_files::EditRefusal>,
+    /// The row ids, kept keys and top-level keys the player changed this menu session
+    /// (decision MENU-CLOSE): what the close commits on top of the live settings.
+    edits: Vec<String>,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -269,6 +272,7 @@ impl Menu {
             closed: false,
             chord_capture: ChordCapture::Preview,
             chord_refusal: None,
+            edits: Vec::new(),
         };
         menu.sync();
         menu
@@ -284,6 +288,7 @@ impl Menu {
         self.closed = false;
         self.chord_capture = ChordCapture::Preview;
         self.chord_refusal = None;
+        self.edits.clear();
         self.sync();
     }
 
@@ -306,6 +311,7 @@ impl Menu {
         }
         // Loading is not a change the player made.
         self.outbox = Outbox::default();
+        self.edits.clear();
     }
 
     // ---- pages and entries -------------------------------------------------------------------
@@ -454,6 +460,38 @@ impl Menu {
         &self.settings
     }
 
+    /// The close commit (decision MENU-CLOSE, `review/menu-proposal` `9a9cc47`): the rows, kept keys
+    /// and top-level keys the player changed this session keep the model's values — the player's
+    /// edit wins a same-row conflict — and every other row keeps its live value in `live`, the
+    /// write-backs and publishes adopted while the menu was open. `commit` stays the model's own
+    /// snapshot; the close path commits onto the live settings.
+    pub fn commit_onto(&mut self, live: &Settings) -> Settings {
+        let mut merged = live.clone();
+        for id in &self.edits {
+            if let Some(elements) = self.settings.menu.get(id) {
+                let elements = elements.to_vec();
+                let _ = merged.menu.set(id, &elements);
+            }
+            if let Some(value) = self.settings.menu.extra().get(id).cloned() {
+                let _ = merged.menu.set_kept(id, value);
+            }
+            if let Some(value) = self.settings.extra.get(id).cloned() {
+                merged.extra.insert(id.clone(), value);
+            }
+        }
+        // The saved defaults are the player's (`save_defaults`); adoption never touches them.
+        merged.defaults = self.settings.defaults.clone();
+        merged.set_last_page(self.page.id());
+        merged
+    }
+
+    /// A row, kept key or top-level key the player changed this session (MENU-CLOSE).
+    fn note_edit(&mut self, id: &str) {
+        if !self.edits.iter().any(|edit| edit == id) {
+            self.edits.push(id.to_owned());
+        }
+    }
+
     pub fn into_settings(mut self) -> Settings {
         self.settings.set_last_page(self.page.id());
         self.settings
@@ -588,6 +626,7 @@ impl Menu {
             return;
         }
         self.outbox.changed = true;
+        self.note_edit(id);
         for (reroll_id, bit) in REROLL_IDS {
             if reroll_id == id {
                 self.outbox.rerolls |= bit;
@@ -1370,6 +1409,7 @@ impl Menu {
     pub fn set_kept(&mut self, key: &str, value: serde_json::Value) {
         if self.kept(key) != Some(&value) && self.settings.menu.set_kept(key, value).is_ok() {
             self.outbox.changed = true;
+            self.note_edit(key);
         }
     }
 
@@ -1383,6 +1423,7 @@ impl Menu {
         if self.top_extra(key) != Some(&value) {
             self.settings.extra.insert(key.to_owned(), value);
             self.outbox.changed = true;
+            self.note_edit(key);
         }
     }
 }
