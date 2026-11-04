@@ -20,3 +20,18 @@ Files this worker changed: `src/model/hitbox.rs`,
 `tests/core06_hitbox.rs`, plus new `docs/HB1-RENDER-ROUTES.md`,
 `eden/phase23/{rows,trace}-C.md` and this ledger. `sites_hitbox.rs` and
 `tests/capabilities.rs` were left untouched (not in this brief's owned list).
+
+## C2 — runtime reader, census, restored rows (session tr-glm-hb1-reader, 2026-11-04)
+
+| Carried fact | Source (commit / doc) | Where it landed |
+|---|---|---|
+| The three relied `hurtbox_*` guard rows, bytes exactly as before the RC7 removal | removed by `cab6603` ("exclude deferred HB1 from RC hitbox dispatch and guards"); bytes recovered from its parent `719255d`, where they had been generated from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` (the generator's three rows restored too) | `src/model/sites_hitbox.rs` (`SITES` 18→21; consts `HITBOX_HURT_{MODULE,GROUPS,PART}_OFFSET`), re-checked against the owned ELF by `core06_rows_match_the_owned_elf` |
+| The checked-pointer live reader: type-check every pointer (null/misaligned refused, 0) because Eden answers 0 for an unmapped read | playbook EDEN "Read the results"; the runtime's raw-read pattern (`GameAttacks`) | `model::hitbox::GameHurt` (reads bound to one `load`, host-probed over a fake layout at exact addresses), runtime `stats::mem_load` |
+| The windowed diag-line pattern (accumulate, close a window, one formatted line) | `model::hook_stats::Observer` + `Display` (review R5 precedent) | `model::hitbox::HurtCensus`/`HurtWindow`, runtime `stats::CensusBook`/`hurt_census` (diag only), line `[Hitbox] hurt census kind=… parts=… parts_max=… first_pass=… frames=… ticks_min/avg/max=…` |
+
+Not carries but this session's decisions, for the record: `WANT_SCRATCH`
+(hit + hurt spheres together, `model::hitbox`); Hitbox's `CROSS_NEEDS` gains
+`utility_get_kind` — the census names each line with the fighter's kind
+through the already-guarded `utility::get_kind` row (diag-only caller; the
+release build calls no native and reads no HitModule; reverting is one
+identifier in the census line if the lead prefers an accessor-keyed line).
