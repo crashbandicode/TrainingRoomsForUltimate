@@ -2166,18 +2166,19 @@ unsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u3
 }
 
 /// The roster-grid stock icon, queried on the UI job thread. The native builder supplies patch
-/// paths, names and regional costume remapping. `picture=0` is the game's own small stock icon
-/// (the waiting-room icon) at the fighter's default costume - the art the fork's menu showed
-/// (its SmashWiki stock-icon PNGs), which the operator asked the character grids to use
-/// (2026-11-03, SPEC-core-07 Q16 amendment), loaded at run time through the game's mod-aware
-/// file-resource service instead of baked into the layout.
+/// paths, names and regional costume remapping. `picture=2` is the game's stock-icon set
+/// (`chara_2`, the 64×64 flat head icon — the art the fork's menu showed, its SmashWiki
+/// stock-icon PNGs, which the operator asked the character grids to use; 2026-11-03 decision
+/// amended 2026-11-04, SPEC-core-07 Q16), loaded at run time through the game's mod-aware
+/// file-resource service instead of baked into the layout. `picture=0` is the game's 128×128
+/// `chara_0` portrait crop, not the stock icon.
 ///
 /// The costume is the fighter's default (0), never a presentation-row byte: the grid lists every
 /// fighter, and the costume a live entry wears is not a property of the list. The first cut read
 /// the role's presentation row (`E[0]`/`E[1]`) here; that byte belongs to the match entries, so a
 /// grid followed whatever the entries wore (Eden glm-icons-03: the CPU list drew every fighter at
 /// costume 7, wedding Mario and pink DK) or named files that do not exist (glm-gifs-04 and
-/// glm-mods-10: blank text tiles; the byte then held a value without a `chara_0_*` file). The
+/// glm-mods-10: blank text tiles; the byte then held a value without a `chara_2_*` file). The
 /// tracepoints on the key builder `main+0x3238a70` (glm-icons-03 out/04-trace-grid) captured
 /// costume 0 for the Player page and costume 7 for the CPU page of the same grid.
 pub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {
@@ -2186,7 +2187,7 @@ pub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {
     // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).
     // These carried seams are not members of game::Granted's core Site tables.
     if base == 0 { return None; }
-    let hash = fighter_picture_hash(base, kind, 0, 0);
+    let hash = fighter_picture_hash(base, kind, 0, 2);
     (hash & 0xffffffffff != 0).then_some(hash)
 }
 

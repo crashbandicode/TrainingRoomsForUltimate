@@ -2,15 +2,19 @@
 
 Demonstration clips of the TrainingRooms menu, recorded for the operator's
 review. All six are actual Eden footage (Eden-GIF's built-in recorder, whole
-screen, 1280×720) from RC10 release boots on the Surface: runs `glm-gifs-04`
+screen, 1280×720; the fighter-grid clip re-encoded to 640×360 under the
+operator's 2026-11-04 ≤10 MB evidence-clip rule) from RC10 release boots on the
+Surface: runs `glm-gifs-04`
 and `glm-gifs-05` on 2026-11-04Z, the stage-grid clip from `glm-mods-10`, and
 the fighter-grid clip retaken from `glm-zr-03` (Eden-GIF `fefd2b5f0cfc…`; the
 card's ARCropolis `92171b2f…` pinned and the profile's Cosmic Destination
 stage mod live, so the mod-aware loader's mod side is exercised). The
 character grids draw the game's own stock icons (the native key builder's
-`picture=0` waiting-room icon at the fighter's default costume — the art the
+`picture=2` stock-icon set `chara_2`, the 64×64 flat head icon, at the fighter's
+default costume — the art the
 fork's menu showed), loaded at run time through the game's mod-aware
-file-resource service (operator decision 2026-11-03; SPEC-core-07 Q16
+file-resource service (operator decision 2026-11-03, amended 2026-11-04;
+SPEC-core-07 Q16
 amendment). The first cut read the role's presentation row for the costume
 instead; that byte belongs to the match entries, so a grid followed the
 entries' costume (Eden `glm-icons-03` tracepoints on the key builder: the CPU
@@ -46,12 +50,15 @@ Eden, 2026-11-04Z, RC10 candidate, NRO `50d95130`.*
 *`R` steps to Fighters & Stages and Character Cycles opens: the grid draws each
 fighter's own stock icon at the default costume, loaded from the game at run
 time (the art the fork's menu showed, matching the decoded stock
-`chara_0_mario_00`/`chara_0_donkey_00`); `ZR` switches role three times —
+`chara_2_mario_00`/`chara_2_donkey_00` — the key builder's `picture=2`
+stock-icon set; the operator amended Q16 on 2026-11-04 after the first cut
+drew the `chara_0` portrait crop); `ZR` switches role three times —
 Player → CPU → Player → CPU — and the icons stay on screen through every
 switch (the fix keeps each tile's texture instead of releasing and re-requesting
 it; guest tracepoints on the release build show no `find`/`make`/`clear` call
-from the plugin at any switch frame). 10.0 s. Eden, 2026-11-04Z, RC10
-candidate, release NRO `b13a4c34`, ARCropolis `92171b2f`.*
+from the plugin at any switch frame). 10.0 s, 640×360 (the operator's
+2026-11-04 ≤10 MB clip rule). Eden, 2026-11-04Z, RC10 stock-icon fix,
+release NRO `73e5ad24`, ARCropolis `92171b2f`.*
 
 ![Stage grid](media/menu-stages.gif)
 *Fighters & Stages → Lobby Stages stage grid: the thumbnails load at run time

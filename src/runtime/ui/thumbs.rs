@@ -2,9 +2,10 @@
 //! stage page opens, each tile asks the game for its stage's own UI texture
 //! (`ui/replace[_patch]/stage/stage_1/stage_1_<name>.bntx`, by path hash, through the game's loader,
 //! which is the layer ARCropolis hooks: a stage mod's picture is what loads); when a roster page opens,
-//! each tile asks for the fighter's own stock icon (the native key builder's `picture=0` waiting-room
-//! icon at the fighter's default costume — the same stock-icon art the fork's menu showed, operator
-//! decision 2026-11-03). Each texture binds to the tile's picture pane once it is ready, and is unbound and
+//! each tile asks for the fighter's own stock icon (the native key builder's `picture=2`
+//! stock-icon set `chara_2`, the 64×64 flat head icon, at the fighter's default costume — the same
+//! stock-icon art the fork's menu showed, operator decision 2026-11-03 amended 2026-11-04). Each texture binds
+//! to the tile's picture pane once it is ready, and is unbound and
 //! retired when the page changes or the menu closes — except a texture the new page wants at the same tile
 //! (`facts::carry`): a role switch re-shows the same files, and re-requesting a hash whose previous texture
 //! is still being released stalls the game's loader. A tile whose file is missing, refused or too slow
