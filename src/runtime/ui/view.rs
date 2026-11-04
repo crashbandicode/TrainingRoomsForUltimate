@@ -365,6 +365,50 @@ impl Panes {
         } else {
             self.hide(p::IDX_TILE_HI);
         }
+        self.draw_roster_badges(frame, &centre);
+    }
+
+    /// The roster grid's corner badges and Solo Popo markers, the fork's geometry
+    /// (`scripts/roster-grid/main.rs:299-348`): the order badges 52x28 at x±36/y+35 (above the cell
+    /// centre; Player left red, CPU right blue), the Solo Popo "S" 40x28 at x±36/y−35 (below it) on
+    /// the Ice Climbers cell. Both roles' badges show at once; empty badges hide.
+    unsafe fn draw_roster_badges(&self, frame: &Frame, centre: &dyn Fn(usize) -> (f32, f32)) {
+        const PLAYER: [u8; 4] = [255, 83, 92, 255];
+        const CPU: [u8; 4] = [75, 164, 255, 255];
+        let roster = frame.view == View::Tiles && frame.tile_roster_grid;
+        for i in 0..p::TILES {
+            let shown = roster && i < usize::from(frame.tile_count) && frame.tile_state[i] != TILE_HIDDEN;
+            let (x, y) = centre(i);
+            if shown && !frame.tile_badges_p[i].is_empty() {
+                self.label(p::IDX_TILE_BADGE_P + i, frame.tile_badges_p[i].units(), x - 36.0, y + 35.0, 52.0, PLAYER);
+            } else {
+                self.hide(p::IDX_TILE_BADGE_P + i);
+            }
+            if shown && !frame.tile_badges_c[i].is_empty() {
+                self.label(p::IDX_TILE_BADGE_C + i, frame.tile_badges_c[i].units(), x + 36.0, y + 35.0, 52.0, CPU);
+            } else {
+                self.hide(p::IDX_TILE_BADGE_C + i);
+            }
+        }
+        // The Solo Popo "S" markers sit on the Ice Climbers cell (the tile whose kind is 0x4b).
+        let ic = roster.then(|| (0..usize::from(frame.tile_count))
+            .find(|i| frame.tile_n[*i] == u16::try_from(0x4b).unwrap_or(u16::MAX))).flatten();
+        if let Some(i) = ic {
+            let (x, y) = centre(i);
+            if frame.tile_solo_p {
+                self.label(p::IDX_TILE_SOLO_P, &[(83u16), 0], x - 36.0, y - 35.0, 40.0, PLAYER);
+            } else {
+                self.hide(p::IDX_TILE_SOLO_P);
+            }
+            if frame.tile_solo_c {
+                self.label(p::IDX_TILE_SOLO_C, &[(83u16), 0], x + 36.0, y - 35.0, 40.0, CPU);
+            } else {
+                self.hide(p::IDX_TILE_SOLO_C);
+            }
+        } else {
+            self.hide(p::IDX_TILE_SOLO_P);
+            self.hide(p::IDX_TILE_SOLO_C);
+        }
     }
 }
 

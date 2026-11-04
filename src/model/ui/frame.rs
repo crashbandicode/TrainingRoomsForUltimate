@@ -180,6 +180,13 @@ pub struct Frame {
     pub tile_sig: u32,
     /// Delay popup: per tile 0 clear, 1 ticked, 2 greyed (tile_focus 255 = the cursor is on a range handle).
     pub tile_state: [u8; super::panes::TILES],
+    /// The roster grid's corner badges (the fork's per-cell per-role order numbers; `Text<4>` holds the
+    /// number, `0` or `All`), and the Solo Popo "S" markers' visibility per role (drawn on the Ice
+    /// Climbers cell).
+    pub tile_badges_p: [Text<4>; super::panes::TILES],
+    pub tile_badges_c: [Text<4>; super::panes::TILES],
+    pub tile_solo_p: bool,
+    pub tile_solo_c: bool,
     pub range: RangeView,
     pub clip: ClipBar,
     pub title: Text<40>,
@@ -219,6 +226,10 @@ impl Frame {
         self.tile_centre_last = false;
         self.tile_sig = 0;
         self.tile_state.fill(0);
+        self.tile_badges_p.fill(Text::new());
+        self.tile_badges_c.fill(Text::new());
+        self.tile_solo_p = false;
+        self.tile_solo_c = false;
         self.range = RangeView::default();
         self.clip = ClipBar::default();
         self.title.clear();
@@ -261,6 +272,10 @@ impl Frame {
             tile_centre_last: false,
             tile_sig: 0,
             tile_state: [0; super::panes::TILES],
+            tile_badges_p: [Text::new(); super::panes::TILES],
+            tile_badges_c: [Text::new(); super::panes::TILES],
+            tile_solo_p: false,
+            tile_solo_c: false,
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
             clip: ClipBar { total: 0, start: 0, end: 0, cursor: 0, handle: 0, playing: false },
             title: Text::new(),

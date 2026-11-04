@@ -538,6 +538,7 @@ fn publish_frame(s: &Session) {
                 let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
                 let values = editor.values(menu.kept(editor.key()));
                 editor.decorate(&mut next, &values, editor.solo_enabled(menu));
+                editor.decorate_badges(&mut next, menu, &values);
             }
         }
         if let Some(reason) = s.refusal {
