@@ -3,19 +3,23 @@
 Demonstration clips of the TrainingRooms menu, recorded for the operator's
 review. All six are actual Eden footage (Eden-GIF's built-in recorder, whole
 screen, 1280×720) from RC10 release boots on the Surface: runs `glm-gifs-04`
-and `glm-gifs-05` on 2026-11-04Z, and the stage-grid clip from `glm-mods-10`
-(same release NRO, SHA-256
-`50d95130b34fc7ad2863953e47cd15aac55db4c37503328182a195484777de0b`, with the
+and `glm-gifs-05` on 2026-11-04Z, the stage-grid clip from `glm-mods-10`, and
+the fighter-grid clip retaken from `glm-icons-06` (Eden-GIF `6a0c80d2…`; the
 card's ARCropolis `92171b2f…` pinned and the profile's Cosmic Destination
 stage mod live, so the mod-aware loader's mod side is exercised). The
 character grids draw the game's own stock icons (the native key builder's
-`picture=0` waiting-room icon at the active role's costume), loaded at run
-time through the game's mod-aware file-resource service — the same stock-icon
-art the fork's menu showed, now read natively instead of baked (operator
-decision 2026-11-03; SPEC-core-07 Q16 amendment). With ARCropolis pinned
-(`glm-mods-10`) the stage grid still draws every thumbnail, but the character
-grids came out blank: the roster stock-icon request does not survive
-ARCropolis's presence (recorded 2026-11-04, under investigation).
+`picture=0` waiting-room icon at the fighter's default costume — the art the
+fork's menu showed), loaded at run time through the game's mod-aware
+file-resource service (operator decision 2026-11-03; SPEC-core-07 Q16
+amendment). The first cut read the role's presentation row for the costume
+instead; that byte belongs to the match entries, so a grid followed the
+entries' costume (Eden `glm-icons-03` tracepoints on the key builder: the CPU
+page requested `chara_0_*_07` for every fighter) or named files that do not
+exist (`glm-gifs-04`, `glm-mods-10`: blank tiles) — fixed on this build. The
+Player list draws the stock icons; after `ZR` the CPU list still renders blank
+for at least ~2.5 s while it re-requests the same files the Player list just
+released (`glm-icons-06`; with never-before-loaded files the same page drew in
+≤2 s in `glm-icons-03`) — open defect, under investigation, not hidden.
 
 Each clip is one continuous take, trimmed only at the ends and under 10 s
 (game-speed timing untouched); the first, middle and last frames of every
@@ -37,10 +41,13 @@ Eden, 2026-11-04Z, RC10 candidate, NRO `50d95130`.*
 
 ![Character stock icons](media/menu-fighters.gif)
 *`R` steps to Fighters & Stages and Character Cycles opens: the grid draws each
-fighter's own stock icon, loaded from the game at run time (the art the fork's
-menu showed); `A` adds the focused fighter to the Player cycle order and the
-rank badges appear (5. Mario, 6. Donkey Kong), `ZR` switches role. 8.9 s.
-Eden, 2026-11-04Z, RC10 candidate, NRO `50d95130`.*
+fighter's own stock icon at the default costume, loaded from the game at run
+time (the art the fork's menu showed); `A` adds the focused fighter to the
+Player cycle order and the rank badges appear (1. Squirtle, 4. Captain
+Falcon), `ZR` switches role — and the CPU list re-request of the same files
+still renders blank (open defect, see above). 9.9 s. Eden, 2026-11-04Z, RC10
+candidate, NRO `7cc1d6ce` (diag-feature build; the release build of the same
+commit is `cf8fc543`), ARCropolis `92171b2f`.*
 
 ![Stage grid](media/menu-stages.gif)
 *Fighters & Stages → Lobby Stages stage grid: the thumbnails load at run time
