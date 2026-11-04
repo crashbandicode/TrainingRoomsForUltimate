@@ -4,3 +4,4 @@
 /eden/runs/
 /eden/refs/
 __pycache__/
+/eden/phase23/*/out/
