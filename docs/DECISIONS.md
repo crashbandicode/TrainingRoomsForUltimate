@@ -422,3 +422,35 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | L1 | Deluxe plugin SDK licence | **the operator handles the SDK licence himself** (corrected 2026-11-02; nothing was added to the Deluxe repo by agents). Until a licensed SDK commit exists the clean room builds without `deluxe-sdk` and the Deluxe Plugins page row stays "waits for L1"; then it is carried as the fork uses it, licence recorded per crate. Agents do not touch the Deluxe repo |
 | FW1 | Ally Eden rigs and the Windows firewall prompt | agents may add an inbound **Block** rule (Windows Defender Firewall) for each rig `eden.exe` path they create (Training rows need no inbound network); never Allow rules; never answer the prompt itself; each rule recorded in the rig notes |
 | F6 | First-boot group-build hitch (~0.1 s first-use setup on the game thread; Kirby-first 91–109 ms) | **fix in both trees**: a fork worker root-causes it on M5q and ships M5r; the clean room carries the fix (fix-ledger row F6) |
+
+## Open 2026-11-04 (the primary, for the operator)
+
+### HB1-route · How hitbox and hurtbox spheres are drawn
+
+HB1 (a) above draws hurtboxes in yellow. On 2026-11-03 (~11:0xZ, Phase 3 scope) the operator asked for an isolated
+visualization sphere ("option A") by default. The follow-up study (`OPTION-A-DESIGN.md`, stream/slim-phase3-rc6,
+2026-11-03) found **no safe route for option A within its scope**, and that result had not come back to the operator.
+The rest of HB1 (the hurtbox reader, its tests, a diag-only part census) is built without depending on this choice.
+
+**Recommendation: route B now, route A as later research.** Route B is how the fork draws spheres: each is a
+`sys_shield` effect from the game's own effect pool. It is proven on Eden (hb-03: 23 spheres on Luigi, 19 on Steve,
+zero failed requests, idle pass about 12 µs). Its known limit is Ridley: on his first frame he wanted 55 spheres from a
+pool of about 56 free slots, and 2 were refused until other effects ended (hb-04). The diag build's census line will
+measure Ridley's real part count and the per-frame cost in the combined Phase 2/3 Eden boot.
+
+Route A would give the spheres their own system, so they never take the game's slots. Nothing it needs exists yet:
+GPU, allocator and teardown ownership for a second system, draw order, bone following, and an authored sphere asset
+(`ef_common.eff` has none). HB1 drawing would stay Off until those are built and proven (one trace boot plus an Eden
+screenshot row).
+
+Options:
+
+1. **Route B now, A later** (recommended). Ridley may miss a couple of spheres on his first frame; the drop is counted
+   and logged.
+2. **Route A only.** HB1 drawing stays disabled in Phase 3 until a separate system and a sphere asset are proven.
+3. **Route B now with an on-screen notice** when a sphere is refused; decide on A after the Ridley census.
+
+![HB1 route](decisions/HB1-route.png)
+
+Sources: `docs/HB1-RENDER-ROUTES.md` (branch `p23/hb1`), `OPTION-A-DESIGN.md`, Eden runs hb-03 and hb-04 (stream
+`hitbox`). Picture: `tools/render_hb1_route.py`.
