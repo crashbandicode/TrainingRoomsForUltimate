@@ -825,15 +825,16 @@ def d_ledgechange():
 
 def d_pausehelper():
     """PAUSE-HELPER (2026-11-04): the game's pause loops against a created helper entry's phases."""
-    h = 720
+    h = 760
     c = DCanvas(WIDE, h)
     c.rect(12, 12, WIDE - 12, h - 12, fill=PANEL, outline=LINE, radius=8)
-    c.text(28, 24, "Pause or quit while a helper entry is still loading: the game's two loops", "h", FG)
+    c.text(28, 24, "Pause or quit while a helper entry has no actor yet: the game's two loops", "h", FG)
     tx = tag(c, 28, 54, "TrainingRooms p23", ADV)
-    tag(c, tx + 8, 54, "the fork: same path by source, not console-confirmed", ADV)
+    tx = tag(c, tx + 8, 54, "seen once in Eden; console fault inferred, not shown", ADV)
+    tag(c, tx + 8, 54, "the fork: by source only", ADV)
     cols = [(330, 604), (616, 890), (902, 1176)]
     phases = [["1 · created", "entry_summon_fighter", "no actor: +0x4178 = 0"],
-              ["2 · loading", "still no actor;", "no progress seen in the pause"],
+              ["2 · loading", "still no actor;", "no load step logged (paused)"],
               ["3 · ready", "actor + AI controller", "(actor +0x58)"]]
     c.text(28, 104, "Helper entry (slot 5-7)", "s", FG)
     c.text(28, 128, "FighterManager entry", "xs", MUTED)
@@ -854,17 +855,20 @@ def d_pausehelper():
                      "calls 0x6b82b0([e+0x4178], 1)"])
     for x0, x1 in cols[:2]:
         box(c, x0, y - 4, x1, y + 92, ["0x6b82b0(actor = 0, 1)", "Read64 @0x58 (null actor),",
-                                       "then writes @0xc08 ...", "console: Data Abort"], col=BAD, fill=TILE)
+                                       "then writes @0xc08 ...", "console: fault inferred"], col=BAD, fill=TILE)
     box(c, cols[2][0], y - 4, cols[2][1], y + 92, ["actor present: no fault", "(session 1 quit)",
                                                    "if walked: control type 1", "into its AI (to check)"],
         col=ADV, fill=TILE)
-    c.text((cols[0][0] + cols[1][1]) / 2, y + 100, "b3 run, session 2 quit: slot 6 created 60 ms before the pause",
+    c.text((cols[0][0] + cols[1][1]) / 2, y + 100,
+           "Eden, TrainingRooms, run b3 session 2: quit with slot 6 created 60 ms before the pause (once)",
            "xxs", BAD, "m")
-    c.text(28, 408, "Item 4 (does a plain resume also run the exit loop?): trace result pending", "xs", ADV)
+    c.text(28, 398, "No-actor window (creation -> actor install), Surface measurement: pending", "xs", ADV)
+    c.text(28, 418, "Item 4 (does a plain resume also run the exit loop?): trace result pending", "xs", ADV)
     # the options
     opts = [("(a) Cancel at pause-open", True,
              ["retire the unfinished entry", "through finalize's own path;", "recreate it after the pause"],
-             ["cost: one more helper load", "after the pause; a mid-scene", "retire must be proved safe"]),
+             ["cost: one more load, only", "after a pause in the window;", "proving a mid-scene retire",
+              "safe costs the same even if", "the window is milliseconds"]),
             ("(b) Hold creation", False,
              ["create only when no pause", "can open in the load window"],
              ["cost: not enforceable; the", "player can pause on any frame"]),
@@ -873,16 +877,17 @@ def d_pausehelper():
              ["cost: rejected; phase 3", "drives the Reload loader"]),
             ("(d) Skip in the exit loop", False,
              ["hook the game's loop to skip", "entries without an actor"],
-             ["cost: a guard (needs approval);", "a hook on game code; the", "half-built state stays"])]
+             ["cost: a guard (needs approval);", "a hook on game code; the", "half-built state stays;",
+              "smaller build cost than (a)"])]
     w = (WIDE - 48 - 3 * 12) / 4
     for i, (title, rec, what, cost) in enumerate(opts):
         x0 = 24 + i * (w + 12)
-        c.rect(x0, 440, x0 + w, h - 28, fill=TILE, outline=OURS if rec else LINE, width=3 if rec else 1, radius=6)
-        c.text(x0 + 12, 452, title, "s", FG)
+        c.rect(x0, 450, x0 + w, h - 28, fill=TILE, outline=OURS if rec else LINE, width=3 if rec else 1, radius=6)
+        c.text(x0 + 12, 462, title, "s", FG)
         if rec:
-            tag(c, x0 + 12, 478, "recommended", OURS)
-        lines(c, x0 + 12, 512, what, "xs", FG)
-        lines(c, x0 + 12, 600, cost, "xs", BAD if not rec else MUTED)
+            tag(c, x0 + 12, 488, "recommended (window unmeasured)", OURS)
+        lines(c, x0 + 12, 522, what, "xs", FG)
+        lines(c, x0 + 12, 610, cost, "xs", BAD if not rec else MUTED)
     c.save("PAUSE-HELPER-null-access")
 
 

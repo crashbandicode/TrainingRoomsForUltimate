@@ -527,60 +527,75 @@ Sources: Surface lane report `artifacts/phase23/LANE-SURFACE-REPORT.md` ("Round 
 
 ### PAUSE-HELPER · Pausing or quitting while a helper entry is still loading — open (2026-11-04)
 
-Raised 2026-11-04 ~21:42Z by the Ally lane's root cause, from the Surface lane's B3 finding. No fix exists yet. Any
-guard, skip or tolerance waits for this decision.
+Raised 2026-11-04 ~21:42Z by the Ally lane's root cause of the Surface lane's B3 finding; corrected ~21:51Z. No fix
+exists yet. Any guard, skip or tolerance waits for this decision.
 
-**What happens.** The Surface run `tr-p23-surface-b3` quit Training a second time 60 ms after the plugin had created
-helper slot 6 (Kirby). The game then made 17 null accesses in its own code (`out/console-at-down.log:13794-13810`).
-On a console the first one is a Data Abort, so this is release-relevant. Session 1's quit, with both helpers ready,
-had none.
+**What is shown, and what is not:**
+
+- **Shown, once, in Eden, on the TrainingRooms build.** Run `tr-p23-surface-b3` quit Training a second time 60 ms
+  after the plugin had created helper slot 6 (Kirby). The game's own code then made 17 logged null accesses
+  (`out/console-at-down.log:13794-13810`). Session 1's quit, with both helpers ready, logged none.
+- **Inferred, not shown: a console crash.** Eden returns 0 for these reads; the console normally faults on a null
+  read. The operator reports that a similar quit on the console did **not** crash. The likely reason, not yet
+  measured: the no-actor window (creation → actor install) is much shorter than the "loading" period the UI shows,
+  so an ordinary quit rarely lands inside it.
+- **The fork: by source only.** `UltimateTrainingModpack-lobby-parity` `experiment/cycle-preload` (`2521f5c`)
+  creates helpers through the same call (`src/native_source_capacity.rs:705-722`), and its documented release
+  build (`README.md:25`) turns that code on. Nothing has been run on the fork for this.
+
+**No-actor window, measured by the Surface lane:** _(to be filled in)_
 
 **The cause** (13.0.5 ELF and the run's logs):
 
 - **The helper.** The plugin creates helper entries through `kiiladarzmanager::entry_summon_fighter`
-  (`main+0x1652f40`). That puts an entry into `FighterManager` (slots 5–7) with **no actor yet** at `+0x4178`. The
-  actor appears only when the helper's load installs it.
-  - Slot 6 never logged its first load step before the quit. It retired with `ready_actors=0`.
-  - In this run the load showed no progress while the game was paused.
-- **The pause-enter loop** (`main+0x1558540`) only touches entries in phase 6 (`+0x5920 == 6`). It skipped the
-  half-built helper, and no access was logged at pause open.
-- **The pause-exit loop** (`main+0x1558f4c`, in the pause state `main+0x1558720`) skips **only phase 3**.
+  (`main+0x1652f40`). That puts an entry into `FighterManager` (slots 5–7) with no actor yet at `+0x4178`. The actor
+  appears when the helper's load installs it.
+  - Slot 6 logged no load step between its creation and the finalize 2.3 s later, which included the pause. It
+    retired with `ready_actors=0`.
+- **The pause-enter loop** (`main+0x1558540`) only touches entries in phase 6 (`+0x5920 == 6`). No access was logged
+  at pause open.
+- **The pause-exit loop** (`main+0x1558f4c`, in the pause state `main+0x1558720`) skips only phase 3.
   - It calls the AI control-type setter `0x6b82b0([entry+0x4178], 1)` for every other entry 1–7 whose
     `+0x5aa0 == 0x50000000`.
   - For the helper, `[entry+0x4178]` was 0. The setter's `ldr x0,[x0,#0x58]` read address `0x58`, then wrote
     through that null at `0xc08`, `0xc12`, `0xc4c` and `0xc4d`.
 - **Why native code never meets this.** Native Training has only entries 0 and 1, both complete before play, so the
   exit loop never meets an entry without an actor. The plugin builds a state the game never builds, and the game's
-  own pause code walks it.
-
-**The fork.** It has the same path by source; this is **not console-confirmed**.
-- `UltimateTrainingModpack-lobby-parity` `experiment/cycle-preload` (`2521f5c`) creates helpers through the same call
-  (`src/native_source_capacity.rs:705-722`).
-- Its documented release build (`README.md:25`) turns that code on.
-- Neither tree reacts to the game's pause while a created helper is loading.
+  pause code can walk it while that state lasts.
+- **The exposure.** A pause that opens inside the no-actor window, followed by a quit (and, if item 4 says so, a
+  resume). In the one case seen, the window did not close during the pause.
 
 **Item 4: does a plain resume (not only quit) run the exit loop?** _(trace result: to be filled in by the primary)_
 
 ![Pause and helper null access](decisions/PAUSE-HELPER-null-access.png)
 
-**Options:**
+**Options.** Each one is weighed against both a wide window (seconds) and a narrow one (milliseconds).
 
-1. **(a) Cancel at pause-open (recommended).** When the game's pause opens while a created helper has no actor,
-   retire that entry through the native path finalize already uses, and create it again after the pause.
+1. **(a) Cancel at pause-open (recommended while the window is unmeasured).** When the game's pause opens while a
+   created helper has no actor, retire that entry through the native path finalize already uses, and create it
+   again after the pause.
    - This keeps the rule the game relies on: every entry the pause loops can see is complete.
-   - Cost: one more helper load after such a pause, so the helper is ready later. It also needs proof, with a host
-     test and an Eden row, that retiring an entry mid-scene is safe; today that path runs only inside finalize.
-2. **(b) Hold creation** until no pause can open during the load.
-   - Cost: not enforceable from the plugin. The player can pause on any frame, and a load takes 0.5–2.5 s.
+   - Cost to the player: one more helper load, only after a pause that opened inside the window, so a narrow
+     window makes it rare.
+   - Cost to build: a mid-scene retire must be proved safe (a host test and an Eden row); today that path runs only
+     inside finalize. This cost does not shrink with the window. If the window is milliseconds, it may not be
+     justified against the risk.
+2. **(b) Hold creation** until no pause can open during the window.
+   - Cost: the plugin can't enforce this, because the player can pause on any frame. A narrow window shrinks the
+     exposure but does not close it.
 3. **(c) Write phase 3** on the actor-less entry, so the exit loop skips it.
-   - Cost: rejected. Phase 3 drives the game's Reload loader (`src/model/mii/mii_setup.rs:32-77`), so the write
-     would start a load the game did not ask for.
+   - Cost: rejected whatever the window. Phase 3 drives the game's Reload loader
+     (`src/model/mii/mii_setup.rs:32-77`), so the write would start a load the game did not ask for.
 4. **(d) Skip in the exit loop.** Hook the game's loop to skip entries without an actor.
-   - Cost: a guard, which needs this approval. It adds a hook on game code, and the half-built state stays, so any
-     other native path that assumes complete entries can still meet it.
+   - Cost: a guard, which needs this approval. It adds a hook on game code, and the half-built state stays for any
+     other native path that assumes complete entries.
+   - Its build cost is smaller than (a)'s and does not depend on the window.
+
+If the measured window is milliseconds, the operator may also judge the remaining risk acceptable for now and
+decide after more console play. This item records the facts; it does not claim the console fails.
 
 **The operator's choices for the fork.** The 11-03 ruling is no fork work, so the fork is your call:
-- leave the fork as it is (it is exposed by source, as above);
+- leave it as it is (exposed by source, nothing run);
 - port the chosen fix to the fork as well;
 - or turn helper creation off in the fork's next build. Creation compiles with `managed-third-source-alpha`, which
   `cycle-preload-extended`, `lobby-preload-extended` and `native-body-bank-alpha` each pull in. Dropping all three
