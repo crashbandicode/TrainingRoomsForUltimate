@@ -120,7 +120,7 @@ impl Panes {
         self.draw_clip(frame);
         // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; p::ROWS] };
-        for i in 0..p::ROWS {
+        for (i, line) in panel.into_iter().enumerate() {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
                 self.place(p::row_label_index(i), p::ROW_LEFT + p::ROW_LABEL_W / 2.0, p::row_y(i), p::ROW_LABEL_W);
@@ -136,7 +136,7 @@ impl Panes {
                 self.place(p::row_value_index(i), vx, vy, vw);
                 self.text(p::row_label_index(i), line.label.units(), tone_color(line.label_tone));
                 self.text(p::row_value_index(i), line.value.units(), tone_color(line.value_tone));
-            } else if let Some((name, weight, tone)) = panel[i] {
+            } else if let Some((name, weight, tone)) = line {
                 self.place(p::row_label_index(i), PANEL_X + PANEL_NAME_W / 2.0, p::row_y(i), PANEL_NAME_W);
                 self.place(p::row_value_index(i), PANEL_X + PANEL_NAME_W + PANEL_WEIGHT_W / 2.0, p::row_y(i) - p::VALUE_DROP, PANEL_WEIGHT_W);
                 self.text(p::row_label_index(i), name.units(), tone_color(tone));
