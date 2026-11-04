@@ -257,6 +257,19 @@ const fn name2(prefix: &str, row: usize, slot: usize) -> Name {
     Name::from_raw(bytes, (len + 2) as u8)
 }
 
+/// A roster mark's name: one prefix per block (Player and CPU badges, Player and CPU stripes, the Solo markers) and the
+/// tile as two digits. `name2` writes its second number as one digit, so it cannot name 88 tiles.
+const fn mark_name(n: usize) -> Name {
+    let prefix = match n / TILES {
+        0 => "tr_rb0_",
+        1 => "tr_rb1_",
+        2 => "tr_rs0_",
+        3 => "tr_rs1_",
+        _ => "tr_rp_",
+    };
+    Name::indexed(prefix, n % TILES)
+}
+
 pub const fn tab_index(i: usize) -> usize {
     IDX_TAB + i
 }
@@ -316,7 +329,7 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Name::indexed("tr_cb_", i - IDX_CHIP_BADGE),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
-        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => name2("tr_rm", (i - IDX_TILE_BADGE) / TILES, i % TILES),
+        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => mark_name(i - IDX_TILE_BADGE),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
         i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
@@ -461,8 +474,11 @@ mod tests {
         let all = specs();
         for (i, a) in all.iter().enumerate() {
             assert!(a.name.as_bytes().len() <= 24 && !a.name.as_bytes().is_empty());
+            // The layout builder and the resolver read names as text: every byte must be printable ASCII
+            // (2026-11-04: the roster marks' one-digit `name2` slot produced bytes above '9', invalid text).
+            assert!(a.name.as_bytes().iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_'), "pane {i} has a non-text name {:?}", a.name.as_bytes());
             for b in &all[i + 1..] {
-                assert_ne!(a.name, b.name, "{:?} is listed twice", a.name);
+                assert_ne!(a.name.as_str(), b.name.as_str(), "{:?} is listed twice", a.name);
             }
         }
         assert_ne!(ROOT, name_of(IDX_BG));
