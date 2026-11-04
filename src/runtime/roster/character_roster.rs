@@ -2165,9 +2165,12 @@ unsafe fn fighter_picture_hash(base: usize, kind: u32, costume: u32, picture: u3
     key(fighter_kind_hash(base, kind), costume, picture)
 }
 
-/// The active role's costume portrait, queried on the UI job thread. The native
-/// builder supplies patch paths, names and regional costume remapping.
-pub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {
+/// The active role's roster-grid stock icon, queried on the UI job thread. The native builder
+/// supplies patch paths, names and regional costume remapping. `picture=0` is the game's own small
+/// stock icon (the waiting-room icon): the same stock-icon art the fork's menu showed, which the
+/// operator asked the character grids to use (2026-11-03), loaded at run time through the game's
+/// mod-aware file-resource service instead of baked into the layout.
+pub(crate) unsafe fn menu_stock_icon_hash(kind: u32, cpu: bool) -> Option<u64> {
     let base = BASE.load(Ordering::Acquire);
     // init publishes BASE only after the enforcing character_roster seam gate
     // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).
@@ -2175,7 +2178,7 @@ pub(crate) unsafe fn menu_portrait_hash(kind: u32, cpu: bool) -> Option<u64> {
     if base == 0 { return None; }
     let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };
     let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));
-    let hash = fighter_picture_hash(base, kind, costume, 1);
+    let hash = fighter_picture_hash(base, kind, costume, 0);
     (hash & 0xffffffffff != 0).then_some(hash)
 }
 

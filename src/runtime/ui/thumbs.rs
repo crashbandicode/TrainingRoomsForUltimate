@@ -1,8 +1,12 @@
-//! The stage grid's thumbnails (SPEC-core-07 §4.5, decision "read at run time, never baked"): when a stage page opens, each
-//! tile asks the game for its stage's own UI texture (`ui/replace[_patch]/stage/stage_1/stage_1_<name>.bntx`, by path hash,
-//! through the game's loader, which is the layer ARCropolis hooks: a stage mod's picture is what loads), binds it to the tile's
-//! picture pane once it is ready, and unbinds and retires it when the page changes or the menu closes. A tile whose file is
-//! missing, refused or too slow keeps its text tile; nothing is substituted.
+//! The stage grid's thumbnails and the roster grids' fighter stock icons (SPEC-core-07 §4.5): when a
+//! stage page opens, each tile asks the game for its stage's own UI texture
+//! (`ui/replace[_patch]/stage/stage_1/stage_1_<name>.bntx`, by path hash, through the game's loader,
+//! which is the layer ARCropolis hooks: a stage mod's picture is what loads); when a roster page opens,
+//! each tile asks for the fighter's own stock icon (the native key builder's `picture=0` waiting-room
+//! icon — the same stock-icon art the fork's menu showed, operator decision 2026-11-03) at the active
+//! role's costume. Each texture binds to the tile's picture pane once it is ready, and is unbound and
+//! retired when the page changes or the menu closes. A tile whose file is missing, refused or too slow
+//! keeps its text tile; nothing is substituted.
 //!
 //! Runs on the UI job thread inside the layout tick (`tick::tick`), where `texture` requires its calls. Never allocates
 //! (fixed slots, a stack path buffer). A layout destroyed or re-registered while textures are bound drops them without
@@ -152,7 +156,7 @@ unsafe fn request(s: &mut State) -> usize {
     for i in 0..s.count {
         let mut buffer = [0u8; 96];
         let hash = if s.roster {
-            (s.want[i] != u16::MAX).then(|| crate::runtime::roster::character_roster::menu_portrait_hash(u32::from(s.want[i]), s.cpu)).flatten()
+            (s.want[i] != u16::MAX).then(|| crate::runtime::roster::character_roster::menu_stock_icon_hash(u32::from(s.want[i]), s.cpu)).flatten()
         } else {
             stage_id(s.want[i])
                 .and_then(|id| stage_textures::path_into(id, &mut buffer))
