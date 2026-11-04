@@ -5,12 +5,8 @@
 use super::guard::{SeamKind, GUARD_BYTES};
 use super::sites::{Feature, Site};
 
-/// `BattleObjectManager::is_active_find_battle_object` (row `roster_find_battle_object`).
-pub const ROSTER_FIND_BATTLE_OBJECT_OFFSET: usize = 0x1fca0b0;
-/// The `BattleObjectManager` singleton's slot (`lib::Singleton<app::BattleObjectManager>::instance_`), main + this.
-pub const BATTLE_OBJECT_MANAGER_SLOT_OFFSET: usize = 0x52b7a00;
 
-pub static SITES: [Site; 13] = [
+pub static SITES: [Site; 12] = [
     Site {
         name: "p1_attack_is_infliction",
         feature: Feature::P1Cpu,
@@ -101,19 +97,6 @@ pub static SITES: [Site; 13] = [
             0xfd, 0x7b, 0xbf, 0xa9, 0xfd, 0x03, 0x00, 0x91, 0x00, 0x1c, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9,
         ],
         note: "PostureModule::pos (lua_bind thunk, symbol _ZN3app8lua_bind23PostureModule__pos_implEPNS_26BattleObjectModuleAccessorE): the body position the replacement fighter is placed at.",
-    },
-    Site {
-        name: "roster_find_battle_object",
-        feature: Feature::Roster,
-        offset: 0x1fca0b0,
-        kind: SeamKind::Called,
-        guard: [
-            0xf3, 0x0f, 0x1e, 0xf8, 0xfd, 0x7b, 0x01, 0xa9, 0xfd, 0x43, 0x00, 0x91, 0xe0, 0x03, 0x01, 0x2a,
-            0x28, 0x89, 0x8f, 0x97, 0x60, 0x01, 0x00, 0xb4, 0x08, 0x00, 0x40, 0xf9, 0x08, 0x01, 0x40, 0xf9,
-            0xf3, 0x03, 0x00, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0x60, 0x00, 0x00, 0x36, 0xe0, 0x03, 0x1f, 0x2a,
-            0x04, 0x00, 0x00, 0x14, 0x68, 0xea, 0x40, 0x39, 0x1f, 0x0d, 0x00, 0x71, 0xe0, 0x97, 0x9f, 0x1a,
-        ],
-        note: "BattleObjectManager::is_active_find_battle_object (lua_bind thunk, symbol _ZN3app8lua_bind54BattleObjectManager__is_active_find_battle_object_implEPNS_19BattleObjectManagerEj): the battle object of an id (the Kirby copy cleanup takes the object itself); the manager is the singleton slot at main+0x52b7a00.",
     },
     Site {
         name: "roster_status_is_changing",

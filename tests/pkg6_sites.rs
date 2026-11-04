@@ -12,7 +12,7 @@ use model::guard::{SeamKind, GUARD_BYTES};
 use model::sites_pkg6::SITES;
 use model::{sites, sites_pkg2, sites_pkg3, sites_pkg4, sites_ui};
 
-const SYMBOLS: [(&str, &str); 9] = [
+const SYMBOLS: [(&str, &str); 8] = [
     ("p1_attack_is_infliction", "_ZN3app8lua_bind39AttackModule__is_infliction_status_implEPNS_26BattleObjectModuleAccessorEj"),
     ("p1_manager_entry_count", "_ZN3app8lua_bind32FighterManager__entry_count_implEPNS_14FighterManagerE"),
     ("p1_manager_is_result_mode", "_ZN3app8lua_bind35FighterManager__is_result_mode_implEPNS_14FighterManagerE"),
@@ -20,7 +20,6 @@ const SYMBOLS: [(&str, &str); 9] = [
     ("p1_entry_current_fighter_id", "_ZN3app8lua_bind37FighterEntry__current_fighter_id_implEPNS_12FighterEntryE"),
     ("roster_have_item_kind", "_ZN3app8lua_bind35ItemModule__get_have_item_kind_implEPNS_26BattleObjectModuleAccessorEi"),
     ("roster_posture_pos", "_ZN3app8lua_bind23PostureModule__pos_implEPNS_26BattleObjectModuleAccessorE"),
-    ("roster_find_battle_object", "_ZN3app8lua_bind54BattleObjectManager__is_active_find_battle_object_implEPNS_19BattleObjectManagerEj"),
     ("roster_status_is_changing", "_ZN3app8lua_bind30StatusModule__is_changing_implEPNS_26BattleObjectModuleAccessorE"),
 ];
 
@@ -103,4 +102,21 @@ fn retired_source_owner_calls_leave_only_product_rows() {
     assert_eq!(SITES.len(), SYMBOLS.len() + RELIED.len());
     assert!(SITES.iter().all(|site| site.feature != sites::Feature::Probes));
     assert!(SITES.iter().all(|site| !site.name.starts_with("probe_")));
+}
+
+#[test]
+fn retired_boolean_predicate_cannot_disable_the_roster() {
+    assert!(SITES.iter().all(|site| site.name != "roster_find_battle_object" && site.offset != 0x1fca0b0));
+    let roster = include_str!("../src/runtime/roster.rs");
+    assert!(roster.contains("CALLED_ROWS: [&str; 16]"));
+    assert!(!roster.contains("roster_find_battle_object"));
+    let generated = include_str!("../src/model/sites_pkg6.rs");
+    assert!(!generated.contains("ROSTER_FIND_BATTLE_OBJECT_OFFSET"));
+    assert!(!generated.contains("BATTLE_OBJECT_MANAGER_SLOT_OFFSET"));
+    // The strict cleanup path still depends on the real active-cell guard.
+    assert!(SITES.iter().any(|site| site.name == "entry_active_cell" && site.kind == SeamKind::Relied));
+    let common = include_str!("../src/runtime/compat/common.rs");
+    assert!(common.contains("entry_cells::read_cleanup_body("));
+    assert!(common.contains("natives::ACTIVE_CELL_GUARDED.load(Ordering::Acquire)"));
+    assert!(common.contains("|id| natives::fighter_entry(id)"));
 }

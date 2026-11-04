@@ -1,5 +1,57 @@
 # TrainingRooms RC handoff
 
+## RC9 isolated HATS build-worker handoff — 2026-11-04
+
+Branch `rc9-hats`, worktree `/home/intpa/smash-training-lobby/TrainingRoomsForUltimate-rc9`,
+isolated from `work/implementation` at `97ca441a699a1733ebb3c965c6862b847c8e164a`.
+No shared product edits, worker Eden boot, push/tag/release/card/DBI action.
+The one local fix commit is resolved by `git rev-parse rc9-hats`; its immutable
+full SHA is bound in the parent inbox's **Pkg6 → Primary RC9 built** post and the
+external artifact handoff. This is not an RC READY/runtime-acceptance claim.
+
+Root defect: `main+0x1fca0b0` returns bool (lr14 x0=1), not a Fighter pointer.
+The strict active-entry resolver refuses a rejected layout before any entry/cell
+read, returns a callback-scoped raw NonNull<Fighter> from a game-thread-only unsafe
+helper, and checks both accessor and object id before full native cleanup. Old
+hat leases remain pinned through cleanup and are released only on the later
+callback. The unused predicate row/constants and roster dependency are retired.
+Astra APPROVE-WITH-CHANGES source requirements applied; see `docs/RC9-HATS.md`.
+Kirby remains physically pinned to cell0; generic non-zero-cell resolution and
+non-first-roster Kirby are different acceptance clauses.
+
+Authoritative evidence root: `../artifacts/trainingrooms-pkg6-rc9/build3/`.
+Tested source content SHA256 `e1c2b62f66658e40dc639738a88f0dc203a1361d99be2bf867afc808d59ad268`,
+archive SHA256 `83cd1bd7c246933f5368dfc2d1f0e17b9f9913e52c4d0de5fd4e7092eb9cf008`.
+Only this documentation handoff differs after that freeze; executable/test/
+generator/carry/dependency bytes must match `AUDIT.json`. No source gate is
+substituted by a successful transport or an older candidate's result.
+
+- Release: `release/libtraining_rooms.nro`, SHA256
+  `7e6b7c13e134fde08a63b7ecc52f68a98c1d73b85bb6908c0817ea31d3079a89`.
+- Diagnostic: `diag/libtraining_rooms.nro`, SHA256
+  `5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f`.
+- Each retained `.so`, source-before/after, log, executed test ELF, resource,
+  admission and release receipt is adjacent. Final test4/list and standalone
+  test/list counts are computed by the bound helper; `AUDIT.json` is the gate
+  authority. Never sum overlapping crate/model harness totals.
+- Build1 pre-review clippy, build2 test-literal compile failure, first full test
+  missing-Pillow/cache-verification failure and namespace/dev-null failures are
+  retained, not silently replaced. Final tests use a private matching Pillow
+  test-child namespace; no system dependency install. Compilers stay on Ally
+  with an owned target, ext4 TMPDIR and bounded fresh admissions.
+- `COMPLIANCE.md` explicitly disposes manual rows, including the unguarded
+  read-only Get-Command discovery exception and interrupted/rearmed model watcher.
+  `owned-target-retirement.json` records only owned finished-target cleanup.
+
+Primary next: verify the final audit/full commit/artifact SHA bindings, then own
+native P1/CPU Training/waiting multi-hat replacement, non-first-roster Kirby,
+cancellation/loss/KO, cleanup entry/return and later lease settlement/source reuse.
+No extra worker boot is authorized. The separate logging audit in
+`../artifacts/trainingrooms-pkg6-rc9/logging/` leaves the missing-log cause unresolved:
+zero Unmapped lines is not proof that no invalid read happened.
+
+## Historical RC8 handoff
+
 Updated 2026-11-03, RC8 batched gate repair. RC NOT READY. Operator reset supersedes the old359-row/full-feature acceptance bar.
 
 ## Current continuation

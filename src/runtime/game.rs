@@ -11,7 +11,7 @@ use skyline::nn::oe::{DisplayVersion, GetDisplayVersion};
 
 use crate::model::capabilities::Granted;
 use crate::model::guard::GUARD_BYTES;
-use crate::model::{lra_reset, sites, sites_pkg2, sites_pkg4, sites_pkg6};
+use crate::model::{lra_reset, sites, sites_pkg2, sites_pkg4};
 use crate::model::version::BUILD_ID_SCAN_BYTES;
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
@@ -136,7 +136,7 @@ pub mod natives {
     use std::sync::atomic::Ordering;
 
     use super::{
-        lra_reset, sites, sites_pkg2, sites_pkg4, sites_pkg6, text_base, CATEGORY_NATIVES_USABLE, ENTRY_NATIVES_USABLE, OPERATOR_NATIVES_USABLE,
+        lra_reset, sites, sites_pkg2, sites_pkg4, text_base, CATEGORY_NATIVES_USABLE, ENTRY_NATIVES_USABLE, OPERATOR_NATIVES_USABLE,
     };
     use crate::model::cpu::ids::UNRESOLVED;
     use crate::runtime::features::cpu;
@@ -406,19 +406,6 @@ pub mod natives {
         }
         let id = ((accessor + ACCESSOR_OBJECT_ID_FIELD) as *const u32).read();
         at::<extern "C" fn(u32) -> i32>(sites_pkg2::UTILITY_GET_CATEGORY_OFFSET).map_or_else(Default::default, |f| f(id)) == CATEGORY_FIGHTER
-    }
-
-    /// `BattleObjectManager::is_active_find_battle_object(manager, object id)` (row `roster_find_battle_object`): the active battle
-    /// object with `object_id`, 0 for an unknown or inactive id, a missing manager or a call that was not granted.
-    pub unsafe fn find_battle_object(object_id: u32) -> usize {
-        let Some(find) = at::<extern "C" fn(usize, u32) -> usize>(sites_pkg6::ROSTER_FIND_BATTLE_OBJECT_OFFSET) else {
-            return 0;
-        };
-        let manager = ((text_base() + sites_pkg6::BATTLE_OBJECT_MANAGER_SLOT_OFFSET) as *const usize).read_volatile();
-        if manager == 0 {
-            return 0;
-        }
-        find(manager, object_id)
     }
 
     /// Whether the body is on the ground (`StatusModule::situation_kind` is `SITUATION_KIND_GROUND`);

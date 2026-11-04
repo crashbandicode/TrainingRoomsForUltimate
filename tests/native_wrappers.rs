@@ -66,3 +66,22 @@ fn the_scan_sees_a_duplicate() {
                 pub unsafe fn b(x: usize) -> f32 {\n    at::<extern \"C\" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET).map_or(0.0, |f| f(x))\n}\n";
     assert_eq!(wrapped(text), vec![("a".to_owned(), "POS_Y_OFFSET".to_owned()), ("b".to_owned(), "POS_Y_OFFSET".to_owned())]);
 }
+
+#[test]
+fn kirby_cleanup_never_uses_an_activity_predicate_as_an_object_pointer() {
+    // ABI regression: the pinned predicate returned x0=1 in lr14. A guarded
+    // function address is not proof that its result has the right type.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let game = fs::read_to_string(root.join("src/runtime/game.rs")).unwrap();
+    assert!(!game.contains("sites_pkg6::ROSTER_FIND_BATTLE_OBJECT_OFFSET"));
+    let common = fs::read_to_string(root.join("src/runtime/compat/common.rs")).unwrap();
+    assert!(common.contains("pub unsafe fn try_get_fighter_object(entry: i32) -> Option<std::ptr::NonNull<smash::app::Fighter>>"));
+    assert!(common.contains("entry_cells::read_cleanup_body("));
+    assert!(!common.contains("natives::find_battle_object("));
+    let sources = fs::read_to_string(root.join("src/runtime/roster/character_sources.rs")).unwrap();
+    assert!(sources.contains("common::try_get_fighter_object(entry)"));
+    assert!(sources.contains("entry_cells::cleanup_identity_matches("));
+    assert!(sources.contains("body as usize, (*body).battle_object_id"));
+    assert!(sources.contains("object.module_accessor as usize, object.battle_object_id"));
+    assert!(sources.contains("clear(object.as_ptr(), 0)"));
+}

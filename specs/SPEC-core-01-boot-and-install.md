@@ -49,7 +49,7 @@ Every row is a 13.0.5 `main+0x…` offset. The fork resolved each needle site at
 | Build-id note | scan the last 0x1000 bytes of `.rodata` backwards, 4-aligned, for a GNU build-id note | boot, first | descriptor must equal `MAIN_BUILD_ID` |
 | FighterManager / StageManager / ItemManager singleton slots | `LookupSymbol` by the mangled names in §3; the value is the address of a pointer to the manager | boot | a null result leaves every dependent helper returning "none" (fork fix; upstream dereferenced unconditionally) |
 | `is_training_mode` | symbol `_ZN3app9smashball16is_training_modeEv`, called | every hook | called function: 64-byte guard, other plugins' hooks allowed |
-| `get_battle_object_from_id` | `main+0x3ac560`, called (upstream needle 32 bytes) | on demand | Called row; refusal returns "none" (fork fix) |
+| Historical fork `get_battle_object_from_id` | genuine lookup `main+0x3ac560` (upstream needle 32 bytes); not the retired RC8 bool predicate `0x1fca0b0` | historical on demand; current Sora uses callback Fighter, RC9 Kirby uses guarded active entry cell | No new lookup site installed by RC9; entry and active-cell guards plus accessor/object-id identity are required for copy cleanup |
 | Emulator detection | `.text` region address equals `0x8004000` | boot | informational only (upstream skipped the auto-update check and dialogs on emulators) |
 
 ### 4.2 Sites written at boot (hooks, patches, vtable slots)
