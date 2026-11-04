@@ -35,3 +35,17 @@ Not carries but this session's decisions, for the record: `WANT_SCRATCH`
 through the already-guarded `utility::get_kind` row (diag-only caller; the
 release build calls no native and reads no HitModule; reverting is one
 identifier in the census line if the lead prefers an accessor-keyed line).
+
+## C3 — route B wired (session tr-glm-hb1-routeb, 2026-11-04)
+
+| Carried fact | Source (commit / doc) | Where it landed |
+|---|---|---|
+| Route B: hitbox, grab-box and hurtbox spheres drawn the fork's way, shared-pool `sys_shield`; hurtboxes yellow; refusals counted and logged | operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` commit `5ca5e3b` (reverses the 2026-11-03 option A default; route A stays later research) | the runtime dispatch (`frame` constructs `GameHurt` behind `enabled`, both builds), spec help-text line, rows-C C2/C3 |
+| The persistent-sphere HandleSet semantics the wiring reuses unchanged: one request per want per pass, refusals counted (`Counts::failed`), a refused want asked again on a later pass once the pool has room, never a respawn loop | `stream/hitbox` `src/model/hitbox.rs` `HandleSet` (proven Eden hb-03; refusals recorded hb-04: 53 asked, 2 refused, `failed=0` after) | already ported in C1 (`model::hitbox`); the Ridley test now pins one attempt per refused want per pass and the recovery |
+| The shipped build reads the HitModule only while the setting is On | the C2 release-silence gate, re-formed for the wired route | test `core06_release_reads_the_hit_module_only_while_the_setting_is_on` (source scan) + the built-NRO string check at the gates |
+| Help text "On: hitboxes, grab boxes and hurtboxes are drawn."; §8 cost row pending until the Eden census | the brief (task 1), rows-C C4 | `specs/SPEC-core-06-hitbox-visualizer.md` (help-text line, §8 note) |
+
+Not a carry: the runtime read (`mem_load`) moved from the diag `stats` module
+to the module level — the same raw read C2 host-probed, now reachable in the
+release build behind the same reader type-checks. No new native, no new site;
+the three `hurtbox_*` rows stay relied on, never written.
