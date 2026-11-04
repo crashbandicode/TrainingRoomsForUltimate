@@ -823,10 +823,73 @@ def d_ledgechange():
     c.save("B11-ledge-change")
 
 
+def d_pausehelper():
+    """PAUSE-HELPER (2026-11-04): the game's pause loops against a created helper entry's phases."""
+    h = 720
+    c = DCanvas(WIDE, h)
+    c.rect(12, 12, WIDE - 12, h - 12, fill=PANEL, outline=LINE, radius=8)
+    c.text(28, 24, "Pause or quit while a helper entry is still loading: the game's two loops", "h", FG)
+    tx = tag(c, 28, 54, "TrainingRooms p23", ADV)
+    tag(c, tx + 8, 54, "the fork: same path by source, not console-confirmed", ADV)
+    cols = [(330, 604), (616, 890), (902, 1176)]
+    phases = [["1 · created", "entry_summon_fighter", "no actor: +0x4178 = 0"],
+              ["2 · loading", "still no actor;", "no progress seen in the pause"],
+              ["3 · ready", "actor + AI controller", "(actor +0x58)"]]
+    c.text(28, 104, "Helper entry (slot 5-7)", "s", FG)
+    c.text(28, 128, "FighterManager entry", "xs", MUTED)
+    for i, ((x0, x1), lab) in enumerate(zip(cols, phases)):
+        box(c, x0, 92, x1, 160, lab, col=OURS if i == 2 else LINE, fill=TILE_HI)
+        if i:
+            arrow(c, (cols[i - 1][1] + 1, 126), (x0 - 1, 126))
+    # the enter loop: needs phase 6, so it never touches a helper
+    y = 186
+    lines(c, 28, y, [("Pause opens", FG), "enter loop main+0x1558540", "needs phase == 6", "reads [[e+0x4178]+0x58]"])
+    for x0, x1 in cols[:2]:
+        box(c, x0, y - 4, x1, y + 70, ["skipped", "(not phase 6: no access", "logged at pause open)"], col=LINE,
+            fill=TILE, tcol=MUTED)
+    box(c, cols[2][0], y - 4, cols[2][1], y + 70, ["only if phase 6", "(not traced)"], col=LINE, fill=TILE, tcol=MUTED)
+    # the exit loop: skips only phase 3
+    y = 280
+    lines(c, 28, y, [("Pause closes / quit", FG), "exit loop main+0x1558f4c", "skips only phase 3",
+                     "calls 0x6b82b0([e+0x4178], 1)"])
+    for x0, x1 in cols[:2]:
+        box(c, x0, y - 4, x1, y + 92, ["0x6b82b0(actor = 0, 1)", "Read64 @0x58 (null actor),",
+                                       "then writes @0xc08 ...", "console: Data Abort"], col=BAD, fill=TILE)
+    box(c, cols[2][0], y - 4, cols[2][1], y + 92, ["actor present: no fault", "(session 1 quit)",
+                                                   "if walked: control type 1", "into its AI (to check)"],
+        col=ADV, fill=TILE)
+    c.text((cols[0][0] + cols[1][1]) / 2, y + 100, "b3 run, session 2 quit: slot 6 created 60 ms before the pause",
+           "xxs", BAD, "m")
+    c.text(28, 408, "Item 4 (does a plain resume also run the exit loop?): trace result pending", "xs", ADV)
+    # the options
+    opts = [("(a) Cancel at pause-open", True,
+             ["retire the unfinished entry", "through finalize's own path;", "recreate it after the pause"],
+             ["cost: one more helper load", "after the pause; a mid-scene", "retire must be proved safe"]),
+            ("(b) Hold creation", False,
+             ["create only when no pause", "can open in the load window"],
+             ["cost: not enforceable; the", "player can pause on any frame"]),
+            ("(c) Write phase 3", False,
+             ["mark the actor-less entry", "phase 3 so the loop skips it"],
+             ["cost: rejected; phase 3", "drives the Reload loader"]),
+            ("(d) Skip in the exit loop", False,
+             ["hook the game's loop to skip", "entries without an actor"],
+             ["cost: a guard (needs approval);", "a hook on game code; the", "half-built state stays"])]
+    w = (WIDE - 48 - 3 * 12) / 4
+    for i, (title, rec, what, cost) in enumerate(opts):
+        x0 = 24 + i * (w + 12)
+        c.rect(x0, 440, x0 + w, h - 28, fill=TILE, outline=OURS if rec else LINE, width=3 if rec else 1, radius=6)
+        c.text(x0 + 12, 452, title, "s", FG)
+        if rec:
+            tag(c, x0 + 12, 478, "recommended", OURS)
+        lines(c, x0 + 12, 512, what, "xs", FG)
+        lines(c, x0 + 12, 600, cost, "xs", BAD if not rec else MUTED)
+    c.save("PAUSE-HELPER-null-access")
+
+
 ALL = [d_pages, d_dropdown, d_delays, d_subscreens, d_firstpage, d_itemonload, d_replaycapture, d_preloadsamples,
        d_shortcuts, d_helptext, d_p1fallback, d_weights, d_paging, d_miirows, d_portraits, d_dichips, d_applychange,
        d_import, d_corrupt, d_name, d_panic, d_layoutmods, d_p1ai, d_playback, d_perfighter, d_inout, d_fixes,
-       d_devcode, d_readme, d_ledgechange]
+       d_devcode, d_readme, d_ledgechange, d_pausehelper]
 
 
 def main():
