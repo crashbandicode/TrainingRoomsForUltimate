@@ -76,13 +76,16 @@ sha256 `92171b2f…`, for rows 6–7; tile cursor NRO alongside):
    - Setup: the profile stages, before `Up`: the card's ARCropolis pinned NRO (above) and one owned
      temporary character/costume mod under `ultimate/mods` (staged with its own manifest, removed at
      `down`; the lent staging script preserves mods — never overwrite an existing mod), plus a deliberately
-     unreadable portrait case (a fixture file whose read is refused) for the fallback half; via `fixture`.
+     unreadable portrait case (a VALID mod icon file whose host read is refused after the HUD settles; never a
+     malformed file, which crashes the game's own loader) for the E9 half; via `fixture`.
    - Inputs: `ui-roster` library segment to the roster grid; cycle one fighter with a costume (the mod's
-     row), then the broken-file row.
-   - Pass: the grids draw the game's own *stock icon* (`picture=0`) read at run time through the mod-aware
-     loader — the modded character/costume shows its own icon (E8), an unreadable file keeps the text tile
-     (E9), and no baked picture is substituted (the archive stays the recipe's: row `core07_no_portrait_pictures`
-     green on the built branch).
+     row), then the refused-file row.
+   - Pass (E9 amended 2026-11-04 by the operator, `docs/DECISIONS.md` Q16): the grids draw the game's own
+     `chara_2` *stock icon* (`picture=2`) read at run time through the mod-aware loader. The modded
+     character/costume shows its own icon (E8). An unreadable mod file shows the **stock** icon, because
+     ARCropolis serves the original (E9). No baked picture is substituted (the archive stays the recipe's:
+     row `core07_no_portrait_pictures` green on the built branch). The names-only tile is the texture
+     helper's safety state, covered by host tests, not by this row.
    - Evidence: grid screenshots (mod case, fallback case) beside the stock case, the mod staging/removal
      manifest, receipts.
 7. **`p23-b3-modified-archive-reload`** (B3, SPEC-core-05 :117,123; `EDEN-UI-SCREENS.md` "B3 fixture and
