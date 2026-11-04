@@ -203,7 +203,6 @@ def n10t(ctx):
     entry accessor is, is proven against the same-scene cpu_event tech_call … role=true line's accessor."""
     out = {}
     since = b.fixture(ctx, 'p23-n10.json', fresh=True)   # sdi Up (index 2), strength High, last_page=cpu
-    out['reload'] = b.wait(ctx, since, r'\[TrainingRooms\] diag_settings_reload rerolls=\S+ issues=0', 15)[-160:]
     ctx.gate('training-hud-unpaused')
     ctx.play('tr-menu-open')
     ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
@@ -238,7 +237,6 @@ def n3t(ctx):
     every DelayRow::pick return in the window (the other delay rows are empty, so theirs read 0)."""
     out = {}
     since = b.fixture(ctx, 'p23-n3.json', fresh=True)
-    out['reload'] = b.wait(ctx, since, r'\[TrainingRooms\] diag_settings_reload rerolls=\S+ issues=0', 15)[-160:]
     ctx.gate('training-hud-unpaused')
     pick_id = _arm(ctx, DELAY_PICK_TRACE, ['x0', 'x30'], max_hits=512)
     air_id = _arm(ctx, 'libtraining_rooms.nro!cpu_attack_air_kind_hook', ['x0', 'x30'], max_hits=256)
@@ -258,6 +256,33 @@ def n3t(ctx):
     return out
 
 
+def _tick_of(line):
+    m = re.match(r'(\d+) ', line)
+    return int(m.group(1)) if m else 0
+
+
+def _now_tick(ctx):
+    _, _, _, read = b.tools(ctx)
+    return max((_tick_of(x) for x in read()), default=0)
+
+
+def _tick_lines(ctx, start_tick, patterns):
+    _, _, _, read = b.tools(ctx)
+    return [x[-200:] for x in read() if _tick_of(x) > start_tick and any(p in x for p in patterns)]
+
+
+def _wait_tick(ctx, start_tick, pattern, cap=20):
+    """Rotation-proof diag wait: the 128 KiB diag log rotates mid-row and shifts line-count marks, so
+    the window is the game tick (each diag line's first field), not a line index."""
+    end = time.monotonic() + cap
+    while time.monotonic() < end:
+        hits = _tick_lines(ctx, start_tick, [pattern])
+        if hits:
+            return hits[-1]
+        time.sleep(0.5)
+    raise RuntimeError('Missing positive evidence: ' + pattern)
+
+
 def n4t(ctx):
     """N4 redo: the slot-1 record is gated on the plugin's own [PracticeRecording] lines; the playback
     starts BEFORE the hit (p23-hit-playback-early: the chord at frame 5, the fsmash connects ~frame 18),
@@ -269,37 +294,35 @@ def n4t(ctx):
     b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
     ctx.gate('training-hud-unpaused')
     record_path = ctx.row_dir / 'n4-slot1-record.gif'
-    since = b.mark(ctx)
+    record_tick = _now_tick(ctx)
     ctx.call('recording.start', {'path': str(record_path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
     chord(ctx, 'zr,down')                  # Input Record chord
-    out['record_start'] = b.wait(ctx, since, r'\[PracticeRecording\] record_lockout ', 15)[-160:]
+    out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
     ctx.stick(0, -1, 200)
-    ctx.stick(-1, 0, 400)                  # neutral-to-left sway, about two seconds
-    ctx.stick(0, 0, 200)
-    ctx.stick(1, 0, 400)
-    ctx.stick(0, 0, 300)
+    ctx.stick(-1, 0, 300)                  # neutral-to-left sway, under a second: the stop chord must
+    ctx.stick(0, 0, 200)                   # land inside the 150-frame recording window
     chord(ctx, 'zr,down')                  # stop the record
-    out['record_done'] = b.wait(ctx, since, r'\[PracticeRecording\] recording_complete ', 20)[-160:]
+    out['record_done'] = _wait_tick(ctx, record_tick, 'recording_complete', 20)[-160:]
     out['record'] = steps._wait_clip(ctx, record_path, 9000)
     ctx.gate('training-hud-unpaused')
     for case in ('off', 'on'):
         if case == 'on':
             b.fixture(ctx, 'p23-n4-on.json', fresh=True)   # the same rows with override On (full keys)
         path = ctx.row_dir / f'n4-playback-{case}.gif'
-        since = b.mark(ctx)
+        case_tick = _now_tick(ctx)
         ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
         ctx.play('p23-hit-playback-early')  # playback first, the hit lands inside the playback window
         out[f'playback_{case}'] = steps._wait_clip(ctx, path, 9000)
-        out[f'playback_start_{case}'] = b.wait(ctx, since, r'\[PracticeRecording\] playback_shortcut ', 15)[-160:]
-        lines = diag_lines_since(ctx, since)
+        out[f'playback_start_{case}'] = _wait_tick(ctx, case_tick, '[PracticeRecording] playback_shortcut ', 15)[-160:]
+        lines = _tick_lines(ctx, case_tick, ['PracticeRecording', 'di_before', 'di entry='])
         out[f'recording_lines_{case}'] = [x[-160:] for x in lines if 'PracticeRecording' in x][:8]
-        out[f'di_lines_{case}'] = [x[-200:] for x in lines if 'di_before' in x or 'di entry=' in x][:8]
+        out[f'di_lines_{case}'] = [x for x in lines if 'di_before' in x or 'di entry=' in x][:8]
         if not any('role=true' in x for x in out[f'di_lines_{case}']):
             raise RuntimeError(f'no di_before role=true in the {case} case: the CPU was not hit during the playback window')
-        since = b.mark(ctx)
+        after_tick = _now_tick(ctx)
         ctx.play('tr2-fsmash')              # after the playback ends: the overrides apply again
         ctx.gate('training-hud-unpaused')
-        after = [x[-200:] for x in diag_lines_since(ctx, since) if 'di entry=' in x]
+        after = [x for x in _tick_lines(ctx, after_tick, ['di entry='])]
         out[f'di_after_playback_{case}'] = after[:4]
         if not after:
             raise RuntimeError(f'no DI after the playback ended ({case})')
@@ -311,8 +334,6 @@ def n4t(ctx):
         raise RuntimeError('no DI applied during playback with the override On')
     (ctx.row_dir / 'n4.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def _burst(ctx, name, count, gap):
     """Full-res screenshots through a window (the respawn platform and the invincibility flash are
     judged at full resolution; the 640/15 clip cannot show the flash)."""

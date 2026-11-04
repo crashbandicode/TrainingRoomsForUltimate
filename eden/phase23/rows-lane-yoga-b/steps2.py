@@ -258,8 +258,35 @@ def n4t(ctx):
     return out
 
 
+def _tick_of(line):
+    m = re.match(r'(\d+) ', line)
+    return int(m.group(1)) if m else 0
+
+
+def _now_tick(ctx):
+    _, _, _, read = b.tools(ctx)
+    return max((_tick_of(x) for x in read()), default=0)
+
+
+def _tick_lines(ctx, start_tick, patterns):
+    _, _, _, read = b.tools(ctx)
+    return [x[-200:] for x in read() if _tick_of(x) > start_tick and any(p in x for p in patterns)]
+
+
+def _wait_tick(ctx, start_tick, pattern, cap=20):
+    """Rotation-proof diag wait: the window is the diag line's game tick, not a line index."""
+    end = time.monotonic() + cap
+    while time.monotonic() < end:
+        hits = _tick_lines(ctx, start_tick, [pattern])
+        if hits:
+            return hits[-1]
+        time.sleep(0.5)
+    raise RuntimeError('Missing positive evidence: ' + pattern)
+
+
 def q7(ctx):
-    """Q7: the Replay-capture toggle writes replay_capture.ini once per confirmed change."""
+    """Q7: the Replay-capture toggle writes replay_capture.ini once per confirmed change — the write
+    is served from the menu's outbox at menu close (attempt 1: the A press alone wrote nothing)."""
     out = {'writes': []}
     out['boot_ini'] = copy_ini(ctx, 'replay_capture.ini', 'q7-boot')
     b.fixture(ctx, 'p23-q7.json', fresh=True)          # last_page=recording (pushed before any menu open)
@@ -274,30 +301,29 @@ def q7(ctx):
             time.sleep(0.35)
     out['route'] = _route(ctx, 'q7-menu-to-row', navigate)
     out['page_shot'] = b.capture(ctx, 'q7-replay-row', 'Recording page, focus on the Replay capture row')
-    since = b.mark(ctx)
+    since_tick = _now_tick(ctx)
     ctx.press('a', 150)                                 # confirmed change 1: On -> Off
-    out['writes'].append(b.wait(ctx, since, r'\[TrainingRooms\] replay_capture\.ini written by the writer thread enabled=\S+', 15))
-    out['ini_off'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-off')
-    out['off_shot'] = b.capture(ctx, 'q7-after-off', 'Replay capture row Off (the Deluxe Plugins-page row check is not staged in this lane)')
+    out['off_shot'] = b.capture(ctx, 'q7-after-off', 'Replay capture row Off before the close')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['writes'].append(_wait_tick(ctx, since_tick, 'replay_capture.ini written', 20))
+    out['ini_off'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-off')
     ctx.play('tr-menu-open')                            # reopen: the page and the cursor are kept
     ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
     time.sleep(1.5)
-    since = b.mark(ctx)
+    since_tick = _now_tick(ctx)
     ctx.press('a', 150)                                 # confirmed change 2: Off -> On
-    out['writes'].append(b.wait(ctx, since, r'\[TrainingRooms\] replay_capture\.ini written by the writer thread enabled=\S+', 15))
-    out['ini_on'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-on')
-    out['on_shot'] = b.capture(ctx, 'q7-after-on', 'Replay capture row On again')
+    out['on_shot'] = b.capture(ctx, 'q7-after-on', 'Replay capture row On again before the close')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['writes'].append(_wait_tick(ctx, since_tick, 'replay_capture.ini written', 20))
+    out['ini_on'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-on')
     out['down_ini'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-down')
     (ctx.row_dir / 'q7.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def n7(ctx):
-    """N7: capture a menu shortcut in the editor, confirm, then apply it with the menu closed."""
+    """N7: capture a menu shortcut in the editor, confirm, then apply it with the menu closed. The
+    button_config.ini write is served from the outbox at menu close (attempt-1 evidence for q7)."""
     out = {}
     out['boot_ini'] = copy_ini(ctx, 'button_config.ini', 'n7-boot')
     b.fixture(ctx, 'p23-n7.json', fresh=True)          # last_page=display_controls
@@ -324,32 +350,30 @@ def n7(ctx):
     ctx.call('input.reset')                             # release everything: the capture settles
     time.sleep(0.8)
     out['captured_shot'] = b.capture(ctx, 'n7-captured', 'Editor readback shows the captured chord (ZL + DPad Up)')
-    since = b.mark(ctx)
-    ctx.press('a', 150)                                 # confirm: the INI is written at once
-    out['write'] = b.wait(ctx, since, r'\[TrainingRooms\] button_config\.ini written by the writer thread', 15)
-    out['ini_after'] = copy_ini(ctx, 'button_config.ini', 'n7-after-confirm')
+    since_tick = _now_tick(ctx)
+    ctx.press('a', 150)                                 # confirm: the row shows the new chord
     out['readback_shot'] = b.capture(ctx, 'n7-readback', 'The row now shows the new chord')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['write'] = _wait_tick(ctx, since_tick, 'button_config.ini written', 20)
+    out['ini_after'] = copy_ini(ctx, 'button_config.ini', 'n7-after-confirm')
     # With the menu closed: the new chord opens the menu, the old default chord does not; repeat once.
     for i in (1, 2):
+        since_tick = _now_tick(ctx)
         chord(ctx, 'zl,up')
         ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
         out[f'new-opens-{i}'] = b.capture(ctx, f'n7-new-opens-{i}', 'Menu opened with the new chord, menu closed')
         steps.close_menu(ctx)
         ctx.gate('training-hud-unpaused')
-        since = b.mark(ctx)
         chord(ctx, 'minus')
         time.sleep(3.0)
-        stray = [x for x in diag_lines_since(ctx, since) if '[Ui] menu opened' in x]
+        stray = [x for x in _tick_lines(ctx, since_tick, ['[Ui] menu opened'])]
         if stray:
             raise RuntimeError(f'the old default chord opened the menu: {stray[-1]}')
         out[f'old-idle-{i}'] = b.capture(ctx, f'n7-old-idle-{i}', 'Minus with the menu closed: no menu opened')
     out['ini_final'] = copy_ini(ctx, 'button_config.ini', 'n7-final')
     (ctx.row_dir / 'n7.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def q16(ctx):
     """Q16: the plugin's grids draw the game's own stock icon at run time (ARCropolis pinned).
 
