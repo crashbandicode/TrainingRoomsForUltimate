@@ -34,6 +34,7 @@ pub mod view;
 pub mod worker;
 
 use crate::model::guard::GuardOutcome;
+use crate::model::recording::PilotStateExport;
 use crate::model::settings::Settings;
 use crate::model::sites_ui::{self, UI_SITES};
 use crate::runtime::diag_log::diagnostic;
@@ -82,12 +83,14 @@ pub fn reports(install: &UiInstall) -> Vec<crate::model::install_line::SiteRepor
 
 /// Compare the package's sites and install what is usable. `input_ready`: the final-input-mapping caller
 /// hooks (Input Delay's four sites) are installed, which is where the menu reads Player 1.
-/// Whether the standalone CPU pilot plugin is loaded: it exports ssbu_cpu_pilot_state_v1 (Skyline loads every plugin before any main runs, so the answer is final at boot).
-fn pilot_present() -> bool {
+/// The standalone CPU pilot plugin's state export ssbu_cpu_pilot_state_v1, when that plugin is loaded (Skyline loads every
+/// plugin before any main runs, so presence is final at boot).
+pub(crate) fn pilot_export() -> Option<PilotStateExport> {
     let mut address = 0usize;
-    // SAFETY: a plain symbol lookup with a NUL-terminated name.
-    let result = unsafe { skyline::nn::ro::LookupSymbol(&mut address, b"ssbu_cpu_pilot_state_v1\0".as_ptr()) };
-    result == 0 && address != 0
+    // SAFETY: a plain symbol lookup with a NUL-terminated name; a found address is that export, whose ABI
+    // `PilotStateExport` declares (ssbu-cpu-pilot `src/runtime.rs:510-538`).
+    unsafe { skyline::nn::ro::LookupSymbol(&mut address, b"ssbu_cpu_pilot_state_v1\0".as_ptr()) };
+    (address != 0).then(|| unsafe { core::mem::transmute::<usize, PilotStateExport>(address) })
 }
 
 /// The menu's session ends with Training (the fork's `clear_session_state`): the menu is closed without a
@@ -110,7 +113,7 @@ pub fn clear_session_state() {
 }
 
 pub fn install(settings: &Settings, input_ready: bool, found: [GuardOutcome; UI_SITES.len()]) -> UiInstall {
-    state::PILOT_PRESENT.store(pilot_present(), std::sync::atomic::Ordering::Release);
+    state::PILOT_PRESENT.store(pilot_export().is_some(), std::sync::atomic::Ordering::Release);
     #[cfg(feature = "diag")]
     probe::install();
     // Authoritative pre-write outcomes from boot. The native observer has now

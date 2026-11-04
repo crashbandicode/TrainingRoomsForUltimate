@@ -262,6 +262,35 @@ pub const fn record_refusal(
     }
 }
 
+/// The standalone ssbu-cpu-pilot's state export, `ssbu_cpu_pilot_state_v1(out) -> bool` (ABI 1, its
+/// `src/runtime.rs:510-538`, the same at 0162eed and 8b03e3b): `false` while the plugin is inactive.
+pub type PilotStateExport = unsafe extern "C" fn(*mut PilotStateV1) -> bool;
+
+/// The export's out-struct, field for field (`#[repr(C)]`, 24 bytes).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PilotStateV1 {
+    pub abi_version: u32,
+    pub settings: u32,
+    /// 0 while P1 is the player, else the CPU level driving P1.
+    pub armed_level: u8,
+    pub reserved: [u8; 7],
+    pub last_input: u64,
+}
+
+/// B4's `p1_driven_by_ai` for `record_refusal`: the game's operator flag on entry 0, or the standalone
+/// pilot's own answer. That pilot drives P1 without flipping the flag (it arms the AI and returns its
+/// decision as P1's mapped input, `core/src/native.rs:242`), so its export must answer and say
+/// `armed_level != 0`.
+///
+/// # Safety
+/// `export` is the pilot's `ssbu_cpu_pilot_state_v1`, or another function with that ABI.
+pub unsafe fn p1_driven_by_ai(operation_cpu: bool, export: Option<PilotStateExport>) -> bool {
+    let mut s = PilotStateV1::default();
+    let answered = export.is_some_and(|f| unsafe { f(&mut s) });
+    operation_cpu || (answered && s.abi_version >= 1 && s.armed_level != 0)
+}
+
 /// Why a playback was not started (decision B8: an unrecorded slot, or playback while recording).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayRefusal {

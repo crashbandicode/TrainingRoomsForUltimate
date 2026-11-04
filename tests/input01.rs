@@ -580,3 +580,36 @@ fn record_refused_when_p1_ai() {
     assert_eq!(record_refusal(false, true, false), None, "a human-driven P1 records");
     assert_eq!(RecordRefusal::P1DrivenByAi.text(), "P1 is controlled by an AI: recording is off");
 }
+
+/// Stand-ins for the standalone pilot's `ssbu_cpu_pilot_state_v1` (ssbu-cpu-pilot `src/runtime.rs:526-538`): the same
+/// signature and the same write, with `armed_level` 3 (the Surface lane's `p1=cpu / level=3`) or 0.
+unsafe extern "C" fn pilot_armed_l3(out: *mut PilotStateV1) -> bool {
+    out.write(PilotStateV1 { abi_version: 1, settings: 0x31, armed_level: 3, reserved: [0; 7], last_input: 0 });
+    true
+}
+unsafe extern "C" fn pilot_unarmed(out: *mut PilotStateV1) -> bool {
+    out.write(PilotStateV1 { abi_version: 1, settings: 0x31, ..PilotStateV1::default() });
+    true
+}
+unsafe extern "C" fn pilot_inactive(_: *mut PilotStateV1) -> bool {
+    false
+}
+
+/// B4-1 (`artifacts/phase23/LANE-SURFACE-REPORT.md` "B4-1 root cause"): the standalone pilot arms P1 without flipping
+/// `is_operation_cpu(0)`, so the refusal reads its export. Armed: refused with the existing notice. Unarmed, inactive or
+/// absent: P1 records.
+#[test]
+fn record_refused_while_the_standalone_pilot_drives_p1() {
+    let refusal = |export: Option<PilotStateExport>| record_refusal(unsafe { p1_driven_by_ai(false, export) }, true, false);
+    assert_eq!(refusal(Some(pilot_armed_l3)), Some(RecordRefusal::P1DrivenByAi));
+    assert_eq!(refusal(Some(pilot_armed_l3)).map(RecordRefusal::text), Some("P1 is controlled by an AI: recording is off"));
+    assert_eq!(refusal(Some(pilot_unarmed)), None, "an unarmed pilot leaves P1 to the player: it records");
+    assert_eq!(refusal(Some(pilot_inactive)), None, "an inactive export (false) is not an AI");
+    assert_eq!(refusal(None), None, "no pilot on the card: it records");
+    // The game's own operator flag still refuses on its own (the fallback / a CPU-operated entry 0).
+    assert!(unsafe { p1_driven_by_ai(true, None) });
+    // The declared ABI: 24 bytes, `armed_level` at offset 8, `last_input` at 16 (the pilot's #[repr(C)] struct).
+    assert_eq!(std::mem::size_of::<PilotStateV1>(), 24);
+    assert_eq!(std::mem::offset_of!(PilotStateV1, armed_level), 8);
+    assert_eq!(std::mem::offset_of!(PilotStateV1, last_input), 16);
+}

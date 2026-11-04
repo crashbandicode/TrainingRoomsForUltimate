@@ -204,7 +204,8 @@ impl RosterEditor {
             return;
         }
         for (r, role) in [Role::Player, Role::Cpu].into_iter().enumerate() {
-            let (mut editor, pick) = (*self, Self::new([RosterUse::PlayerPick, RosterUse::CpuPick][r]));
+            let pick = Self::new([RosterUse::PlayerPick, RosterUse::CpuPick][r]);
+            let mut editor = *self;
             editor.grid = RosterGrid::new(role);
             let values = editor.values(menu.kept(editor.key()));
             let picked = pick.values(menu.kept(pick.key()));
@@ -232,7 +233,7 @@ impl RosterEditor {
 
 /// A kept `[on, off]` toggle reads On.
 fn flag_on(menu: &Menu, key: &str) -> bool {
-    menu.kept(key).and_then(Value::as_array).is_some_and(|v| v.len() == 2 && v[0].as_u64() == Some(1) && v[1].as_u64() == Some(0))
+    menu.kept(key) == Some(&serde_json::json!([1, 0]))
 }
 
 /// Cells that never take an order badge: the Miis (this build's cycle engine drops them from every roster,

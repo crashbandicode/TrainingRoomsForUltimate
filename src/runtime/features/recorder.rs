@@ -546,10 +546,11 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
 }
 
 /// Why a recording (numbered or named) is not started now: B4 an AI drives P1, a fighter is missing, a save state is loading.
-/// The order lives in the model (`record_refusal`, host-tested); these are the live facts, all guarded per-frame reads.
+/// The order lives in the model (`record_refusal`, host-tested); these are the live facts, all guarded per-frame reads. B4's AI
+/// fact includes the standalone pilot, read through its own export (`p1_driven_by_ai`).
 unsafe fn record_refusal() -> Option<RecordRefusal> {
     crate::model::recording::record_refusal(
-        natives::is_operation_cpu(0),
+        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export()),
         natives::fighter_entry(0) != 0,
         states::is_loading(),
     )
