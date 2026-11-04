@@ -830,7 +830,7 @@ def d_pausehelper():
     c.rect(12, 12, WIDE - 12, h - 12, fill=PANEL, outline=LINE, radius=8)
     c.text(28, 24, "Pause or quit while a helper entry has no actor yet: the game's two loops", "h", FG)
     tx = tag(c, 28, 54, "TrainingRooms p23", ADV)
-    tx = tag(c, tx + 8, 54, "seen once in Eden; console fault inferred, not shown", ADV)
+    tx = tag(c, tx + 8, 54, "seen in Eden on quit and on resume; console fault inferred, not shown", ADV)
     tag(c, tx + 8, 54, "the fork: by source only", ADV)
     cols = [(330, 604), (616, 890), (902, 1176)]
     phases = [["1 · created", "entry_summon_fighter", "no actor: +0x4178 = 0"],
@@ -860,32 +860,33 @@ def d_pausehelper():
                                                    "if walked: control type 1", "into its AI (to check)"],
         col=ADV, fill=TILE)
     c.text((cols[0][0] + cols[1][1]) / 2, y + 100,
-           "Eden, TrainingRooms, run b3 session 2: quit with slot 6 created 60 ms before the pause (once)",
+           "Eden, TrainingRooms: run b3 (quit) and run b4t (plain resume, traced: actor 0); 1 of 2 deliberate tries",
            "xxs", BAD, "m")
-    c.text(28, 398, "No-actor window (creation -> actor install), Surface measurement: pending", "xs", ADV)
-    c.text(28, 418, "Item 4 (does a plain resume also run the exit loop?): trace result pending", "xs", ADV)
+    c.text(28, 398, "Windows: creation 0.24 s after a resume, frozen by a pause; hat reloads: actor 0 for 1.0 / 5.5 s"
+           " (phase 3? not captured)", "xs", ADV)
+    c.text(28, 418, "Item 4: yes, a plain resume runs the exit loop (b4t, slot 6, +0x4178 = 0, 17 accesses)", "xs", ADV)
     # the options
     opts = [("(a) Cancel at pause-open", True,
              ["retire the unfinished entry", "through finalize's own path;", "recreate it after the pause"],
-             ["cost: one more load, only", "after a pause in the window;", "proving a mid-scene retire",
-              "safe costs the same even if", "the window is milliseconds"]),
+             ["cost: one more load after a", "pause in a window (windows", "last up to 5.5 s); proving a",
+              "mid-scene retire safe"]),
             ("(b) Hold creation", False,
              ["create only when no pause", "can open in the load window"],
-             ["cost: not enforceable; the", "player can pause on any frame"]),
+             ["cost: not enforceable; the", "player can pause on any frame,", "and windows last seconds"]),
             ("(c) Write phase 3", False,
              ["mark the actor-less entry", "phase 3 so the loop skips it"],
              ["cost: rejected; phase 3", "drives the Reload loader"]),
             ("(d) Skip in the exit loop", False,
              ["hook the game's loop to skip", "entries without an actor"],
              ["cost: a guard (needs approval);", "a hook on game code; the", "half-built state stays;",
-              "smaller build cost than (a)"])]
+              "smaller build cost than (a);", "covers reload windows too"])]
     w = (WIDE - 48 - 3 * 12) / 4
     for i, (title, rec, what, cost) in enumerate(opts):
         x0 = 24 + i * (w + 12)
         c.rect(x0, 450, x0 + w, h - 28, fill=TILE, outline=OURS if rec else LINE, width=3 if rec else 1, radius=6)
         c.text(x0 + 12, 462, title, "s", FG)
         if rec:
-            tag(c, x0 + 12, 488, "recommended (window unmeasured)", OURS)
+            tag(c, x0 + 12, 488, "recommended", OURS)
         lines(c, x0 + 12, 522, what, "xs", FG)
         lines(c, x0 + 12, 610, cost, "xs", BAD if not rec else MUTED)
     c.save("PAUSE-HELPER-null-access")

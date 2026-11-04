@@ -525,74 +525,84 @@ Sources: Surface lane report `artifacts/phase23/LANE-SURFACE-REPORT.md` ("Round 
 `src/model/swap/character_forms.rs` (`Forms::starting`, `EntryState::ready`),
 `src/runtime/roster/build_split.rs` (`tick_any`, the stall meter). Picture: drawn for this decision.
 
-### PAUSE-HELPER · Pausing or quitting while a helper entry is still loading — open (2026-11-04)
+### PAUSE-HELPER · Pausing while a helper entry has no actor — open (2026-11-04)
 
-Raised 2026-11-04 ~21:42Z by the Ally lane's root cause of the Surface lane's B3 finding; corrected ~21:51Z. No fix
-exists yet. Any guard, skip or tolerance waits for this decision.
+Raised 2026-11-04 ~21:42Z by the Ally lane's root cause of the Surface lane's B3 finding. Corrected ~21:51Z, and
+measured by the Surface lane ~22:02Z (run `tr-p23-surface-b4t`, diag `3aaa3288`). No fix exists yet. Any guard, skip
+or tolerance waits for this decision.
 
 **What is shown, and what is not:**
 
-- **Shown, once, in Eden, on the TrainingRooms build.** Run `tr-p23-surface-b3` quit Training a second time 60 ms
-  after the plugin had created helper slot 6 (Kirby). The game's own code then made 17 logged null accesses
-  (`out/console-at-down.log:13794-13810`). Session 1's quit, with both helpers ready, logged none.
-- **Inferred, not shown: a console crash.** Eden returns 0 for these reads; the console normally faults on a null
-  read. The operator reports that a similar quit on the console did **not** crash. The likely reason, not yet
-  measured: the no-actor window (creation → actor install) is much shorter than the "loading" period the UI shows,
-  so an ordinary quit rarely lands inside it.
-- **The fork: by source only.** `UltimateTrainingModpack-lobby-parity` `experiment/cycle-preload` (`2521f5c`)
-  creates helpers through the same call (`src/native_source_capacity.rs:705-722`), and its documented release
-  build (`README.md:25`) turns that code on. Nothing has been run on the fork for this.
+- **Shown in Eden, on the TrainingRooms build, twice.**
+  - `tr-p23-surface-b3`: a quit 60 ms after helper slot 6 was created.
+  - `tr-p23-surface-b4t`: a **plain resume** (no quit). There, a trace point on the exit loop's call
+    (`main+0x15590d8`) saw it walk slot 6 with `[entry+0x4178] = 0`, and the same 17 null accesses followed.
+  - Deliberate tries reproduced it in 1 of 2. The miss was a pause that opened only after the actor was installed.
+- **Inferred, not shown: a console fault.** Eden logs these accesses and continues. A console would normally fault on
+  the first one, a write near address 0. The operator reports that a similar console quit did not crash. That fits a
+  pause that landed outside the windows below; one console report allows no more than that.
+- **The fork: by source only.** `UltimateTrainingModpack-lobby-parity` `experiment/cycle-preload` (`2521f5c`) creates
+  helpers through the same call (`src/native_source_capacity.rs:705-722`). Its documented release build
+  (`README.md:25`) turns that code on. Nothing has been run on the fork for this.
 
-**No-actor window, measured by the Surface lane:** _(to be filled in)_
+**The windows** (Surface lane, per-frame trace of `[entry+0x4178]`, `LANE-SURFACE-REPORT.md` "Pause-exit null write:
+reproduced on a plain RESUME"):
 
-**The cause** (13.0.5 ELF and the run's logs):
+| What opens it | Actor null for | Opens |
+| --- | --- | --- |
+| A helper's creation (`entry_summon_fighter`) | until its load installs the actor | helpers are created 0.24 s after a resume |
+| A Kirby hat reload of helper slot 7 | 59 frames ≈ 1.0 s | 0.66 s after the hat input |
+| A Kirby hat reload of helper slot 6 | 329 frames ≈ 5.5 s | 1.41 s after the hat input |
+
+**A pause that opens inside a window freezes it for the whole pause.** In `b4t` the load did not progress during a
+≈44 s pause, so the resume found the null actor.
+
+**Open: are the hat-reload windows exposed?** The hat reloads go through the native install `main+0x653240`
+(`native_source::install`, the same call in both trees). The fork's own note says that a Reload through it writes outer
+phase 3 (`src/native_body_bank.rs:1692`), and the exit loop skips phase 3. Whether the entry stays at phase 3 for the
+whole null-actor window of a hat reload was not captured. The creation window is shown exposed. The hat-reload
+windows are measured but not shown exposed.
+
+**Item 4: does a plain resume run the exit loop?** **Yes** (`b4t`, trace frame 38112): the resume at 21:53:47Z walked
+slot 6 with a null actor.
+
+**The cause** (13.0.5 ELF):
 
 - **The helper.** The plugin creates helper entries through `kiiladarzmanager::entry_summon_fighter`
-  (`main+0x1652f40`). That puts an entry into `FighterManager` (slots 5–7) with no actor yet at `+0x4178`. The actor
-  appears when the helper's load installs it.
-  - Slot 6 logged no load step between its creation and the finalize 2.3 s later, which included the pause. It
-    retired with `ready_actors=0`.
-- **The pause-enter loop** (`main+0x1558540`) only touches entries in phase 6 (`+0x5920 == 6`). No access was logged
-  at pause open.
+  (`main+0x1652f40`), which puts an entry into `FighterManager` (slots 5–7) with no actor yet at `+0x4178`.
+- **The pause-enter loop** (`main+0x1558540`) only touches entries in phase 6.
 - **The pause-exit loop** (`main+0x1558f4c`, in the pause state `main+0x1558720`) skips only phase 3.
   - It calls the AI control-type setter `0x6b82b0([entry+0x4178], 1)` for every other entry 1–7 whose
     `+0x5aa0 == 0x50000000`.
-  - For the helper, `[entry+0x4178]` was 0. The setter's `ldr x0,[x0,#0x58]` read address `0x58`, then wrote
-    through that null at `0xc08`, `0xc12`, `0xc4c` and `0xc4d`.
-- **Why native code never meets this.** Native Training has only entries 0 and 1, both complete before play, so the
-  exit loop never meets an entry without an actor. The plugin builds a state the game never builds, and the game's
-  pause code can walk it while that state lasts.
-- **The exposure.** A pause that opens inside the no-actor window, followed by a quit (and, if item 4 says so, a
-  resume). In the one case seen, the window did not close during the pause.
-
-**Item 4: does a plain resume (not only quit) run the exit loop?** _(trace result: to be filled in by the primary)_
+  - With the actor at 0, the setter reads address `0x58`, then writes at `0xc08`, `0xc12`, `0xc4c` and `0xc4d`.
+- **Why native code never meets this.** Native Training has only entries 0 and 1, both complete before play. The
+  plugin builds a state the game never builds, and the game's pause code walks it on resume and on quit.
 
 ![Pause and helper null access](decisions/PAUSE-HELPER-null-access.png)
 
-**Options.** Each one is weighed against both a wide window (seconds) and a narrow one (milliseconds).
+**Options, weighed against windows of up to 5.5 s.** A pause that opens inside a window is an ordinary player action:
+the windows open 0.24–1.41 s after a resume or a hat input, and they last seconds.
 
-1. **(a) Cancel at pause-open (recommended while the window is unmeasured).** When the game's pause opens while a
-   created helper has no actor, retire that entry through the native path finalize already uses, and create it
-   again after the pause.
+1. **(a) Cancel at pause-open (recommended).** When the game's pause opens while a helper has no actor, retire that
+   entry through the native path finalize already uses, and create (or reload) it again after the pause.
    - This keeps the rule the game relies on: every entry the pause loops can see is complete.
-   - Cost to the player: one more helper load, only after a pause that opened inside the window, so a narrow
-     window makes it rare.
-   - Cost to build: a mid-scene retire must be proved safe (a host test and an Eden row); today that path runs only
-     inside finalize. This cost does not shrink with the window. If the window is milliseconds, it may not be
-     justified against the risk.
+   - Cost to the player: one more helper load after such a pause. With windows of seconds this happens in normal
+     play, but only as a later-ready helper.
+   - Cost to build: a mid-scene retire must be proved safe (a host test and an Eden row). Hat reloads would need the
+     same treatment if the phase-3 question above shows them exposed.
 2. **(b) Hold creation** until no pause can open during the window.
-   - Cost: the plugin can't enforce this, because the player can pause on any frame. A narrow window shrinks the
-     exposure but does not close it.
+   - Cost: the plugin can't enforce this, because the player can pause on any frame. Windows of seconds make it
+     weaker still.
 3. **(c) Write phase 3** on the actor-less entry, so the exit loop skips it.
-   - Cost: rejected whatever the window. Phase 3 drives the game's Reload loader
-     (`src/model/mii/mii_setup.rs:32-77`), so the write would start a load the game did not ask for.
+   - Cost: rejected. Phase 3 drives the game's Reload loader (`src/model/mii/mii_setup.rs:32-77`), so the write would
+     start a load the game did not ask for.
 4. **(d) Skip in the exit loop.** Hook the game's loop to skip entries without an actor.
    - Cost: a guard, which needs this approval. It adds a hook on game code, and the half-built state stays for any
      other native path that assumes complete entries.
-   - Its build cost is smaller than (a)'s and does not depend on the window.
+   - Its build cost is smaller than (a)'s, and it covers creation and reload windows alike.
 
-If the measured window is milliseconds, the operator may also judge the remaining risk acceptable for now and
-decide after more console play. This item records the facts; it does not claim the console fails.
+With windows of seconds, leaving it as is is no longer a reasonable default. The choice is between (a), the root
+fix, and (d), the smaller guard.
 
 **The operator's choices for the fork.** The 11-03 ruling is no fork work, so the fork is your call:
 - leave it as it is (exposed by source, nothing run);
@@ -601,8 +611,7 @@ decide after more console play. This item records the facts; it does not claim t
   `cycle-preload-extended`, `lobby-preload-extended` and `native-body-bank-alpha` each pull in. Dropping all three
   also drops their features.
 
-Sources: `artifacts/phase23/LANE-ALLY-REPORT.md` ("Round 4" §2) and `LANE-SURFACE-REPORT.md` ("B3 console finding");
-run `tr-p23-surface-b3` (`out/console-at-down.log`,
-`state/post-run-b/user/sdmc/ultimate/TrainingRooms/practice-diagnostics.log` #523-#569). The owned 13.0.5
-`main-13.0.5.elf` was read with llvm-objdump. Picture: drawn for this decision (`tools/render_decisions.py
-d_pausehelper`).
+Sources: `artifacts/phase23/LANE-ALLY-REPORT.md` ("Round 4" §2) and `LANE-SURFACE-REPORT.md` ("B3 console finding";
+"Pause-exit null write: reproduced on a plain RESUME"). Runs `tr-p23-surface-b3` and `tr-p23-surface-b4t`
+(`out/trace/b4t-kirby.trace.jsonl`, `out/pause-exit/`). The owned 13.0.5 `main-13.0.5.elf` was read with llvm-objdump.
+Picture: drawn for this decision (`tools/render_decisions.py d_pausehelper`).
