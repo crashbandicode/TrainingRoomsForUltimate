@@ -18,7 +18,7 @@ use model::cpu::ids::{self, Table, C, UNRESOLVED};
 use model::cpu::mash::{effective, Action, BufferContext, Buffered, Mash};
 use model::cpu::playback::{covered_setting_applies, PlaybackState};
 use model::cpu::rng::Rng;
-use model::cpu::role::{is_cpu_role, FighterKey, RoleTable, Scene};
+use model::cpu::role::{is_cpu_role, FighterKey, RoleTable, Scene, LOBBY_CPU_ENTRY};
 use model::cpu::settings::{CpuSettings, DelayRow, Strength, Weights};
 use model::cpu::state::Cpu;
 use model::cpu::status::{self, Situation};
@@ -316,6 +316,30 @@ fn cpu_core_role_table_finds_bodies_by_accessor() {
     let keys: std::collections::BTreeSet<_> =
         (0..8).flat_map(|e| [false, true].map(|p| FighterKey::new(e, p).unwrap().index())).collect();
     assert_eq!(keys.len(), FighterKey::COUNT);
+}
+
+/// B4: under the P1 pilot the CPU settings can never write entry 0. The role table is the one place a
+/// body becomes a CPU role (every consumer resolves bodies through it), and `set` refuses entry 0 even
+/// with a current receipt and an AI-operated scene — so nothing downstream can resolve or write it.
+#[test]
+fn cpu_core_role_table_never_registers_entry_0() {
+    let mut roles = RoleTable::new();
+    let scene = Some(Scene::Training);
+    roles.observe_scene(scene);
+    let p1 = FighterKey::new(0, false).unwrap();
+    let receipt = roles.receipt(0).unwrap();
+    assert!(!roles.set(receipt, 0x3000, p1), "entry 0 is never a CPU role");
+    assert_eq!(roles.find(scene, 0x3000), None);
+    assert_eq!(roles.accessor_of(scene, p1), None);
+    assert!(!roles.any());
+    // The waiting room is the same: only the practice CPU's entry 4 ever registers.
+    let mut lobby = RoleTable::new();
+    lobby.observe_scene(Some(Scene::Lobby));
+    let cpu = FighterKey::new(LOBBY_CPU_ENTRY, false).unwrap();
+    let receipt = lobby.receipt(LOBBY_CPU_ENTRY).unwrap();
+    assert!(lobby.set(receipt, 0x4000, cpu));
+    assert_eq!(lobby.accessor_of(Some(Scene::Lobby), p1), None);
+    assert_eq!(lobby.find(Some(Scene::Lobby), 0x4000), Some(cpu));
 }
 
 #[test]

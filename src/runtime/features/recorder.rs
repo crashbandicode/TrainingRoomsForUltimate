@@ -546,16 +546,13 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
 }
 
 /// Why a recording (numbered or named) is not started now: B4 an AI drives P1, a fighter is missing, a save state is loading.
+/// The order lives in the model (`record_refusal`, host-tested); these are the live facts, all guarded per-frame reads.
 unsafe fn record_refusal() -> Option<RecordRefusal> {
-    if natives::is_operation_cpu(0) {
-        Some(RecordRefusal::P1DrivenByAi)
-    } else if natives::fighter_entry(0) == 0 {
-        Some(RecordRefusal::FightersMissing)
-    } else if states::is_loading() {
-        Some(RecordRefusal::SaveStateLoading)
-    } else {
-        None
-    }
+    crate::model::recording::record_refusal(
+        natives::is_operation_cpu(0),
+        natives::fighter_entry(0) != 0,
+        states::is_loading(),
+    )
 }
 
 unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {

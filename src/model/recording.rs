@@ -242,6 +242,26 @@ impl RecordRefusal {
     }
 }
 
+/// The first reason a recording cannot start, in the runtime's check order (`features/recorder.rs`
+/// applies it to the live facts). B4 (SPEC-input-01 question 7, decided 2026-11-01): an AI-driven P1
+/// is checked first — the pilot or the fallback drives entry 0 — then the missing fighters, then a
+/// save state loading.
+pub const fn record_refusal(
+    p1_driven_by_ai: bool,
+    entry0_present: bool,
+    save_state_loading: bool,
+) -> Option<RecordRefusal> {
+    if p1_driven_by_ai {
+        Some(RecordRefusal::P1DrivenByAi)
+    } else if !entry0_present {
+        Some(RecordRefusal::FightersMissing)
+    } else if save_state_loading {
+        Some(RecordRefusal::SaveStateLoading)
+    } else {
+        None
+    }
+}
+
 /// Why a playback was not started (decision B8: an unrecorded slot, or playback while recording).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayRefusal {

@@ -98,6 +98,47 @@ unsafe fn role_body(role: usize) -> Option<*mut app::BattleObjectModuleAccessor>
     (app::utility::get_kind(&mut *body) == *FIGHTER_KIND_KIRBY).then_some(body)
 }
 
+/// The facts behind a failed `role_body`, read once at the failed chord for the one-line diagnostic
+/// (glm-03: `role_body(1)` returned `None` for a CPU Kirby while the bank still called it ready, and
+/// accessor-missing versus kind-mismatch was not split). `entry` is the id the lobby maps the role to,
+/// `entry_ptr` the game's entry object, and `active_index`/`installed` the game's own active-cell
+/// fields (`model::entry_cells` F11: `+0x5918`, `+0x4150`) at the moment of the read.
+struct RoleLookup {
+    accessor: Option<*mut app::BattleObjectModuleAccessor>,
+    kind: Option<i32>,
+    entry: i32,
+    entry_ptr: usize,
+    active_index: u8,
+    installed: u64,
+}
+
+/// Never retained: the pointer is an equality/diagnostic token, read in the same callback.
+unsafe fn role_lookup(role: usize) -> RoleLookup {
+    let entry = crate::runtime::lobby::training::lobby::entry_id(if role == 0 {
+        FighterId::Player
+    } else {
+        FighterId::CPU
+    });
+    let mut lookup = RoleLookup { accessor: None, kind: None, entry, entry_ptr: 0, active_index: 0, installed: 0 };
+    let entry_ptr = crate::runtime::game::natives::fighter_entry(entry);
+    if entry_ptr == 0 {
+        return lookup;
+    }
+    lookup.entry_ptr = entry_ptr;
+    lookup.installed = ((entry_ptr + 0x4150) as *const u64).read_volatile();
+    lookup.active_index = ((entry_ptr + 0x5918) as *const u8).read_volatile();
+    let accessor = crate::runtime::game::natives::fighter_accessor(
+        crate::runtime::game::natives::entry_active_body(entry_ptr),
+    );
+    if accessor == 0 {
+        return lookup;
+    }
+    let accessor = accessor as *mut app::BattleObjectModuleAccessor;
+    lookup.kind = Some(app::utility::get_kind(&mut *accessor));
+    lookup.accessor = Some(accessor);
+    lookup
+}
+
 unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {
     WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY)
         .then(|| WorkModule::get_int(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_INT_COPY_CHARA) as u32)
@@ -148,6 +189,22 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
     if shortcut.would_request(special, neutral, left_click, right_click) && permitted() {
         let role = usize::from(right_click);
         bodies[role] = role_body(role);
+        if bodies[role].is_none() {
+            // The chord was eligible and permitted but the role had no Kirby body: say which case it
+            // is (glm-03 follow-up), once per chord attempt (the latch edges this branch).
+            let lookup = role_lookup(role);
+            match lookup.accessor {
+                Some(accessor) => crate::engine::compat::logging::diagnostic(format_args!(
+                    "[KirbyHats] role_body role={} case=kind kind_seen=0x{:x} accessor=0x{:x} entry={} entry_ptr=0x{:x} active_index={} installed={}",
+                    role, lookup.kind.unwrap_or(0) as u32, accessor as usize, lookup.entry,
+                    lookup.entry_ptr, lookup.active_index, lookup.installed
+                )),
+                None => crate::engine::compat::logging::diagnostic(format_args!(
+                    "[KirbyHats] role_body role={} case=accessor entry={} entry_ptr=0x{:x} active_index={} installed={}",
+                    role, lookup.entry, lookup.entry_ptr, lookup.active_index, lookup.installed
+                )),
+            }
+        }
     }
     let (request, suppress) = shortcut.sample(
         special,

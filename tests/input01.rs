@@ -563,3 +563,20 @@ fn r2_5_mash_interrupt_stops_a_running_playback_only_when_enabled() {
     let (_, control, _) = frame(&mut r, &s, MappedInputs::NEUTRAL);
     assert!(control.write.is_none());
 }
+
+/// B4 (decided 2026-11-01, SPEC-input-01 question 7 / SPEC-cpu-01 question 7): while an AI — the pilot or
+/// the fallback — drives P1, Record is refused with a notice and nothing is recorded. The AI fact is
+/// checked first, ahead of the missing-fighter and save-state reasons, and the notice names it.
+#[test]
+fn record_refused_when_p1_ai() {
+    assert_eq!(record_refusal(true, true, false), Some(RecordRefusal::P1DrivenByAi));
+    assert_eq!(
+        record_refusal(true, false, true),
+        Some(RecordRefusal::P1DrivenByAi),
+        "the AI fact is checked first"
+    );
+    assert_eq!(record_refusal(false, true, true), Some(RecordRefusal::SaveStateLoading));
+    assert_eq!(record_refusal(false, false, false), Some(RecordRefusal::FightersMissing));
+    assert_eq!(record_refusal(false, true, false), None, "a human-driven P1 records");
+    assert_eq!(RecordRefusal::P1DrivenByAi.text(), "P1 is controlled by an AI: recording is off");
+}
