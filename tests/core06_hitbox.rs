@@ -646,10 +646,13 @@ struct HurtSpy {
     count: i16,
     records: Vec<[u8; 0x50]>,
     parts_read: Vec<usize>,
+    /// How often the reader asked for the module pointer (the Off/stop paths must not ask at all).
+    module_calls: usize,
 }
 
 impl hitbox::HurtboxReader for HurtSpy {
     fn module(&mut self) -> usize {
+        self.module_calls += 1;
         self.module
     }
 
@@ -687,7 +690,7 @@ impl hitbox::HurtboxReader for HurtSpy {
 }
 
 fn hurt_spy(records: Vec<[u8; 0x50]>, first: i16, count: i16) -> HurtSpy {
-    HurtSpy { module: 0xb000, groups: 0xc000, parts: 0xd000, total: records.len() as i32, first, count, records, parts_read: Vec::new() }
+    HurtSpy { module: 0xb000, groups: 0xc000, parts: 0xd000, total: records.len() as i32, first, count, records, parts_read: Vec::new(), module_calls: 0 }
 }
 
 #[test]
@@ -807,13 +810,45 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
         assert!(fx.fx.live.contains(&900));
         assert!(set.is_empty());
     }
-    // The unwired runtime passes None: no hurt read, no hurt sphere, the ordinary pass untouched.
+    // A dispatch without a reader (`None`) plans and requests the hit spheres only: what the runtime passes on its
+    // Off and stop paths never asks for a hurt sphere.
     let mut set = hitbox::HandleSet::new();
     let mut fx = RequestSpy::new();
     let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
     let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), None, &mut fx);
     assert_eq!((counts.spawned, len), (1, 1), "the hit sphere only");
     assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HIT));
+}
+
+#[test]
+fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
+    // Route B (decision `5ca5e3b`): with the setting On the dispatch constructs the reader and reads the HitModule;
+    // with it Off — and on the stop paths it takes first (shielding, a grab status) — the reader is never touched:
+    // no module read, no part read, no hurt sphere. The runtime constructs the reader behind `enabled` itself; this
+    // pins the dispatch side of the same gate.
+    let mut hurt = hurt_spy(vec![part(0, [0.0, 1.0, 0.0], [0.0, 5.0, 0.0], 2.0, 0x51a3_6341)], 0, 1);
+    let mut set = hitbox::HandleSet::new();
+    let mut fx = RequestSpy::new();
+    let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    // Off: the set is cleared and the HitModule is not read at all.
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, false, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+    assert_eq!((counts.killed, counts.spawned, len), (0, 0, 0));
+    assert_eq!((hurt.module_calls, hurt.parts_read.len(), fx.requests.len()), (0, 0, 0));
+    // Shielding and grabbing (the stop paths the dispatch takes before the reader): no HitModule read either.
+    for status in [ids().guard_on, ids().catch] {
+        let mut set = hitbox::HandleSet::new();
+        let mut fx = RequestSpy::new();
+        let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, status), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+        assert_eq!((counts.spawned, len), (0, 0));
+        assert_eq!(hurt.module_calls, 0, "status {status}: no HitModule read on a stop path");
+    }
+    // On, ordinary status: the module is read and the part's capsule drawn (one part, centres 4 apart at size 2:
+    // ceil(4 / 3.5) + 1 = 3 spheres).
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+    assert_eq!((counts.spawned, len), (3, 3));
+    assert!(hurt.module_calls >= 1, "On: the HitModule is read");
+    assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HURT && s.tint == hitbox::HURTBOX_TINT));
 }
 
 #[test]
@@ -841,9 +876,16 @@ fn core06_ridley_first_pass_completes_in_the_model() {
     let mut short = FakeFx::new(53);
     let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
     assert_eq!((counts.spawned, counts.failed, counts.dropped), (53, 2, 0));
+    // No retry in a loop: a refused want is attempted exactly once per pass (two refused requests in the log,
+    // no third), and the refusals are counted, not silently dropped.
+    let refused: Vec<_> = short.log.iter().filter(|l| l.starts_with("refused ")).collect();
+    assert_eq!(refused.len(), 2, "one attempt per refused want in the pass: {refused:?}");
+    assert_eq!(counts.failed, 2);
     short.pool = 55; // the game's own effects end; the pool gets room
+    let before = short.log.len();
     let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
     assert_eq!((counts.kept, counts.spawned, counts.failed), (53, 2, 0), "the two refused spheres are asked again");
+    assert_eq!(short.log[before..].iter().filter(|l| l.starts_with("refused ")).count(), 0, "recovered: no refusal stays");
 }
 
 // ---- the live reader over a fake memory layout, the census, the shipped build's silence (C2) -------------------------
@@ -1074,17 +1116,19 @@ fn core06_hurt_census_window_and_line_format() {
 }
 
 #[test]
-fn core06_release_build_never_touches_the_hit_module() {
-    // The shipped build reads no HitModule: the live reader (`GameHurt`, its raw `mem_load`) and the
-    // model walk (`hurt_parts`, `want_hurtboxes`) are named only inside the runtime file's diag-gated
-    // `stats` module, the per-frame census call is itself `#[cfg(feature = "diag")]`, and the dispatch
-    // keeps passing `None` (the model tests above pin what that does). The built release NRO is
-    // re-checked at the gates (no census string in it; the diag NRO carries the line).
+fn core06_release_reads_the_hit_module_only_while_the_setting_is_on() {
+    // Route B (operator decision 2026-11-04, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` `5ca5e3b`): the
+    // shipped build reads the HitModule only while the setting is On. The runtime's only reader construction sits in
+    // `frame`, behind `enabled` (`enabled.then(|| GameHurt …)`), and the dispatch's stop paths (not a practice fighter,
+    // shielding, grab, Off) return before any part is read; the diag census keeps its own reader inside the diag-gated
+    // `stats` module. The built release NRO is re-checked at the gates (no census string in it; the diag NRO carries the
+    // line), and the model tests above pin that a disabled or stop-path dispatch touches no HitModule.
     let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/hitbox.rs")).unwrap();
     let toks = callgraph::lex(&src);
     let refs = |name: &str| -> Vec<usize> {
         toks.iter().enumerate().filter(|(_, t)| matches!(t, callgraph::Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
     };
+    // The two spans the reader may live in: the diag-gated `stats` module and the per-frame pass.
     let mut stats_span = None;
     for i in 0..toks.len() - 2 {
         if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "mod")
@@ -1114,16 +1158,76 @@ fn core06_release_build_never_touches_the_hit_module() {
         toks[..stats_open].iter().rev().take(10).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
         "the stats module is diag-gated"
     );
-    let inside = |i: usize| i > stats_open && i < stats_close;
-    for name in ["GameHurt", "mem_load", "hurt_parts", "HurtCensus"] {
+    let inside_stats = |i: usize| i > stats_open && i < stats_close;
+    let mut frame_span = None;
+    for i in 0..toks.len() - 2 {
+        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "fn")
+            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "frame")
+            && matches!(&toks[i + 2], callgraph::Tok::Punct('('))
+        {
+            let mut depth = 0i32;
+            let body_open = (i + 2..toks.len())
+                .find(|&k| match &toks[k] {
+                    callgraph::Tok::Punct('(') => {
+                        depth += 1;
+                        false
+                    }
+                    callgraph::Tok::Punct(')') => {
+                        depth -= 1;
+                        depth == 0
+                    }
+                    _ => false,
+                })
+                .and_then(|close| (close..toks.len()).find(|&k| matches!(&toks[k], callgraph::Tok::Punct('{'))))
+                .expect("the frame body opens");
+            let mut depth = 0i32;
+            let close = (body_open..toks.len())
+                .find(|&k| match &toks[k] {
+                    callgraph::Tok::Punct('{') => {
+                        depth += 1;
+                        false
+                    }
+                    callgraph::Tok::Punct('}') => {
+                        depth -= 1;
+                        depth == 0
+                    }
+                    _ => false,
+                })
+                .expect("the frame body closes");
+            frame_span = Some((body_open, close));
+            break;
+        }
+    }
+    let (frame_open, frame_close) = frame_span.expect("one `fn frame`");
+    let inside_frame = |i: usize| i > frame_open && i < frame_close;
+    // The reader and its raw read exist in the shipped build — but only where the pass runs them.
+    for name in ["GameHurt", "mem_load"] {
         let found = refs(name);
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
-        assert!(found.iter().all(|&i| inside(i)), "{name} is named outside the diag-gated stats module");
+        for &i in &found {
+            let definition = toks[..i].iter().rev().take(3).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "fn"));
+            assert!(definition || inside_frame(i) || inside_stats(i), "{name} at token {i} is outside `frame` and the diag census");
+        }
+    }
+    // The construction is behind the setting: `enabled` names itself within the few tokens before `GameHurt`.
+    for &i in &refs("GameHurt") {
+        if inside_frame(i) {
+            assert!(
+                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled")),
+                "the pass's reader at token {i} is not gated on `enabled`"
+            );
+        }
+    }
+    // The census stays diag-only: its walk and its window type are named only inside the gated module.
+    for name in ["hurt_parts", "HurtCensus"] {
+        let found = refs(name);
+        assert!(!found.is_empty(), "{name} must appear in the runtime file");
+        assert!(found.iter().all(|&i| inside_stats(i)), "{name} is named outside the diag-gated stats module");
     }
     // The per-frame census call: cfg-gated wherever it sits.
     for i in refs("hurt_census") {
         assert!(
-            inside(i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+            inside_stats(i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
             "the census call at token {i} is cfg-gated"
         );
     }
@@ -1323,13 +1427,13 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
 }
 
 #[test]
-fn core06_rc_closure_holds_hb1_at_the_unwired_draw_route() {
+fn core06_rc_closure_holds_hb1_on_route_b() {
     // Identical SITES/closure is used with and without `diag`; run this probe
     // in both host feature closures, and verify each compiled RC NRO separately.
-    // The draw route is the operator's call (option A, an isolated visualization sphere, or the fork's shared-pool
-    // `sys_shield` route; `docs/HB1-RENDER-ROUTES.md`): the three relied HitModule windows are back (the reader and
-    // the diag census read them), but no hurt sphere is requested yet and no hurtbox site is hooked — the rows are
-    // relied on, never written, and the runtime's dispatch still passes `None` (the source scan below pins that).
+    // The draw route is wired (route B, operator decision 2026-11-04, `docs/DECISIONS.md` HB1-route,
+    // `review/menu-proposal` `5ca5e3b`): the three relied HitModule windows stay relied on — the pass reads them
+    // while the setting is On — but no hurtbox site is hooked: the rows are relied on, never written, and no
+    // `hurtbox_*` row is a hook site.
     for (offset, name) in [(sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"), (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"), (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape")] {
         let site = SITES.iter().find(|s| s.offset == offset).unwrap_or_else(|| panic!("{name} back"));
         assert_eq!(site.name, name);

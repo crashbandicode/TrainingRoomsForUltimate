@@ -13,7 +13,7 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 
 ## 2. User-visible behaviour
 
-- Menu item **Hitbox Visualization** (`hitbox_vis`, Misc tab, single choice On/Off, default **Off**). Upstream help: "Display a visual representation for active hitboxes (hides other visual effects)".
+- Menu item **Hitbox Visualization** (`hitbox_vis`, Misc tab, single choice On/Off, default **Off**). Upstream help: "Display a visual representation for active hitboxes (hides other visual effects)". Fork help (route B, 2026-11-04): "On: hitboxes, grab boxes and hurtboxes are drawn."
 - Button chords: none.
 - Visible output when On, in Training only:
   - For each fighter, each frame, each of the fighter's eight attack slots that is active is drawn with the game's `sys_shield` effect (a translucent sphere) attached to the hitbox's bone at the hitbox position, scaled to `size × 19/200`, tinted with the colour for `id mod 8`, playing at 8× rate so the effect does not pulse. Hitboxes with a second centre (extended/capsule) are drawn as `n` spheres evenly spaced along the segment, `n = ceil(distance / (size × 1.75)) + 1` clamped to 2..16.
@@ -93,6 +93,9 @@ Only the `hitbox_vis` setting (SPEC-core-04).
 | resident bytes (code + data) | not measured separately (small: three hooks, one colour table) | see `docs/resource-costs.md` (W5) | `tools/build/nro_size.py` per-feature build |
 | per-frame work (Off) | one `set_sleep_effect(false)` + one setting read per fighter (upstream); `077a8e43`: plus the Training check first | one setting read per fighter; no game call when Off (Q4) | diag counters |
 | per-frame work (On) | kill_kind + up to 8 × 16 `req_follow` + 2 setter calls each, per fighter | same unless Q1/Q3 change the model | diag counters, effect-pool occupancy |
+
+§8 cost rows stay **pending** until the Eden census (rows-C C1/C4: the `[Hitbox] hurt census` and `[Hitbox] stats`
+lines record the HitModule read's cost and the pass's own cost on the integrated candidate's diag build).
 | heap allocations in hooks | upstream's shield rewrite collects 36 Lua values into a `Vec` per attack command; the visualizer itself allocates nothing | 0 (fixed-size array for the rewrite) | counting allocator |
 
 ## 9. Test provenance
