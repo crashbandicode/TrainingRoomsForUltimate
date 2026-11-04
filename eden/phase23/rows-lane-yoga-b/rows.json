@@ -670,16 +670,30 @@
       ]
     },
     {
-      "id": "p23-coinwalk-ridley",
-      "budget_min": 5,
+      "id": "p23-coin-any-cpu",
+      "budget_min": 6,
       "start": "steve-selected",
       "end": "training",
       "steps": [
         {
-          "run": "steps2.py:coinwalk_dispatch",
+          "run": "steps2.py:coinany_dispatch",
           "args": {
-            "action": "coinwalk",
-            "tile": 65
+            "action": "coinany"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-c6-cpu-ridley",
+      "budget_min": 6,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "c6cpu"
           },
           "check": true
         }
@@ -687,7 +701,7 @@
     },
     {
       "id": "p23-c6-grab-half",
-      "budget_min": 5,
+      "budget_min": 6,
       "start": "training",
       "end": "training",
       "steps": [
@@ -702,7 +716,7 @@
     },
     {
       "id": "p23-n7-capture-apply-menu-closed",
-      "budget_min": 5,
+      "budget_min": 6,
       "start": "training",
       "end": "training",
       "steps": [
@@ -717,7 +731,7 @@
     },
     {
       "id": "p23-b7-airdodge-shield-tilt-side2",
-      "budget_min": 5,
+      "budget_min": 6,
       "start": "training",
       "end": "training",
       "steps": [

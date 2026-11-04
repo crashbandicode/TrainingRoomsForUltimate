@@ -182,6 +182,28 @@ def coinwalk_dispatch(ctx, action=None, **args):
     return coinwalk(ctx, **args)
 
 
+def coinany_dispatch(ctx, action=None, **args):
+    """coinany's own entry: no settle — the CSS with P1's token just placed is the start state."""
+    return coinany(ctx)
+
+
+def coinany(ctx):
+    """The CPU coin pickup without tile-log gates: the lr04-cpu-pick macro picks the coin up
+    (wherever the restored save's cursor put it), the next A drops it back (the CPU reads Random),
+    and Training is entered. The rows' fixtures then set the exact fighters via their kept keys."""
+    out = {}
+    ctx.play('lr04-cpu-pick')
+    time.sleep(1.0)
+    ctx.press('a', 120)                    # drop the coin where the hand is: the CPU reads Random
+    time.sleep(1.2)
+    ctx.gate('ready')
+    out['ready'] = b.capture(ctx, 'coin-any-ready', 'The CSS with P1 Steve placed and the CPU coin dropped (Random)')
+    ctx.play('enter-training')
+    ctx.gate('training-hud-unpaused')
+    (ctx.row_dir / 'coinany.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)
@@ -375,44 +397,54 @@ def n3t(ctx):
 
 
 def n4t(ctx):
-    """N4 redo: the recorded slot is a real stick sway; the Input Playback chord fires during the
-    CPU's hitstun (the p23-hit-playback macro), Off vs On override, filmed and DI-traced."""
+    """N4: the slot-1 record auto-completes at its 150 frames (no stop chord — it would restart the
+    recording, fork parity); the playback starts BEFORE the hit (p23-hit-playback-early), so the
+    damage-vector correction happens while the playback possesses the CPU. Override Off: the
+    recording wins — no `di entry=` during the playback window; On: `di entry=1`. Each case's hit is
+    proven by `di_before … role=true`; after the playback ends one more hit shows the overrides
+    apply again in both cases."""
     out = {}
-    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, settings_override_playback Off
+    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
+    ctx.gate('training-hud-unpaused')
     record_path = ctx.row_dir / 'n4-slot1-record.gif'
-    ctx.call('recording.start', {'path': str(record_path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
+    record_tick = _now_tick(ctx)
     chord(ctx, 'zr,down')                  # Input Record chord
+    out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
     ctx.stick(0, -1, 200)
-    ctx.stick(-1, 0, 400)                  # neutral-to-left sway, about two seconds
+    ctx.stick(-1, 0, 300)                  # the sway: the standby's first non-neutral input
     ctx.stick(0, 0, 200)
-    ctx.stick(1, 0, 400)
-    ctx.stick(0, 0, 300)
-    chord(ctx, 'zr,down')                  # stop the record
+    out['record_done'] = _wait_tick(ctx, record_tick, 'recording_complete', 25)[-160:]
     out['record'] = steps._wait_clip(ctx, record_path, 9000)
     ctx.gate('training-hud-unpaused')
-    ident = _arm(ctx, 'libtraining_rooms.nro!cpu_di_hook', ['x0', 'x30'], max_hits=512)
     for case in ('off', 'on'):
         if case == 'on':
-            b.reload_settings(ctx, {'menu': {'settings_override_playback': [1, 0]}}, 'n4-override-on')
+            b.fixture(ctx, 'p23-n4-on.json', fresh=True)   # the same rows with override On (full keys)
         path = ctx.row_dir / f'n4-playback-{case}.gif'
-        since = b.mark(ctx)
+        case_tick = _now_tick(ctx)
         ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
-        ctx.play('p23-hit-playback')       # the hit, and the playback chord inside the CPU's hitstun
+        ctx.play('p23-hit-playback-early')  # playback first, the hit lands inside the playback window
         out[f'playback_{case}'] = steps._wait_clip(ctx, path, 9000)
-        time.sleep(1.0)
-        lines = diag_lines_since(ctx, since)
-        out[f'di_lines_{case}'] = [x[-160:] for x in lines if 'di entry=' in x or 'di_before' in x][:8]
-        if case == 'on' and not out[f'di_lines_{case}']:
-            raise RuntimeError('no DI applied during playback with the override On')
+        out[f'playback_start_{case}'] = _wait_tick(ctx, case_tick, '[PracticeRecording] playback_shortcut ', 15)[-160:]
+        lines = _tick_lines(ctx, case_tick, ['PracticeRecording', 'di_before', 'di entry='])
+        out[f'recording_lines_{case}'] = [x[-160:] for x in lines if 'PracticeRecording' in x][:8]
+        out[f'di_lines_{case}'] = [x for x in lines if 'di_before' in x or 'di entry=' in x][:8]
+        if not any('role=true' in x for x in out[f'di_lines_{case}']):
+            raise RuntimeError(f'no di_before role=true in the {case} case: the CPU was not hit during the playback window')
+        after_tick = _now_tick(ctx)
+        ctx.play('tr2-fsmash')              # after the playback ends: the overrides apply again
+        ctx.gate('training-hud-unpaused')
+        after = _tick_lines(ctx, after_tick, ['di entry='])
+        out[f'di_after_playback_{case}'] = after[:4]
+        if not after:
+            raise RuntimeError(f'no DI after the playback ended ({case})')
         steps.settle(ctx)
         ctx.gate('training-hud-unpaused')
-    b.reload_settings(ctx, {'menu': {'settings_override_playback': [0, 0]}}, 'n4-override-off')
-    out['di_trace'] = _trace_summary(ctx, ident)
-    _disarm(ctx, ident)
+    if any('di entry=' in x for x in out['di_lines_off']):
+        raise RuntimeError('DI applied during playback with the override Off (the recording should win)')
+    if not any('di entry=' in x for x in out['di_lines_on']):
+        raise RuntimeError('no DI applied during playback with the override On')
     (ctx.row_dir / 'n4.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def _tick_of(line):
     m = re.match(r'(\d+) ', line)
     return int(m.group(1)) if m else 0

@@ -677,16 +677,45 @@
       ]
     },
     {
-      "id": "p23-coinwalk-lucas",
-      "budget_min": 5,
+      "id": "p23-coin-any-cpu",
+      "budget_min": 6,
       "start": "steve-selected",
       "end": "training",
       "steps": [
         {
-          "run": "steps2.py:coinwalk_dispatch",
+          "run": "steps2.py:coinany_dispatch",
           "args": {
-            "action": "coinwalk",
-            "tile": 39
+            "action": "coinany"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-n4-di-during-playback",
+      "budget_min": 6,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "n4t"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-n2-natural-death-invincibility-redo2",
+      "budget_min": 6,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "n2redo2"
           },
           "check": true
         }
