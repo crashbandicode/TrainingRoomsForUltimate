@@ -74,7 +74,9 @@ def owned():
 def launch(phase):
     owned(); p, j, a, l = modules(); m = j.system_memory()
     assert not p.processes(), p.processes()
-    assert m['available_bytes'] > 10 * 1024 ** 3 and m['commit_available_bytes'] > 8 * 1024 ** 3, m
+    # Commit-available gate is 7 GiB on the Ally (operator approval 2026-11-04 ~13:3xZ): its commit limit is 23.0 GB with
+    # ~7.6 GB non-process kernel/driver commit, so 8 GiB never passes. The 10 GiB physical gate and the 8 GiB Job cap stay.
+    assert m['available_bytes'] > 10 * 1024 ** 3 and m['commit_available_bytes'] > 7 * 1024 ** 3, m
     assert sha(PROFILE / 'eden.exe') == EDEN_SHA and not (O / 'runs' / phase).exists()
     for key in list(os.environ):
         if key == 'EDEN_NSO_LAN_CONFIG' or key.startswith('EDEN_LAN_'):
