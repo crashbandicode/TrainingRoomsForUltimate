@@ -615,3 +615,48 @@ Sources: `artifacts/phase23/LANE-ALLY-REPORT.md` ("Round 4" §2) and `LANE-SURFA
 "Pause-exit null write: reproduced on a plain RESUME"). Runs `tr-p23-surface-b3` and `tr-p23-surface-b4t`
 (`out/trace/b4t-kirby.trace.jsonl`, `out/pause-exit/`). The owned 13.0.5 `main-13.0.5.elf` was read with llvm-objdump.
 Picture: drawn for this decision (`tools/render_decisions.py d_pausehelper`).
+
+### HAT-REQUEST-END · A Kirby hat request must always end — open (2026-11-04)
+
+Raised 2026-11-04 ~21:53Z by the primary, from the Ally lane's B4-3 root cause (`LANE-ALLY-REPORT.md` "Round 4" §3).
+This is source analysis only. Nothing here is implemented, and the call-site fix for B4-3 is separate (branch
+`p23/kirby-hat-cpu`). The two rules below change TrainingRooms' behaviour, so they come here as one decision.
+
+**Today's lifecycle** (`src/runtime/roster/kirby_hats.rs`):
+- The chord sets a pending request for the role (`:240-250`).
+- Each call of `on_frame` on that role's own Kirby body advances its age (`:307`). Once the body stands still, the
+  copy is set up and the request is started; once the hat is equipped, it is confirmed.
+- A request ends by being confirmed, by "Kirby hat could not be loaded" after 900 counted frames (`:334`), or by being
+  cleared when the body's identity changes or the shortcut is no longer permitted (`:302-305`).
+
+**Stuck paths.** In each of these the request never ends, and every later chord for that role is dropped silently
+(`:232`):
+1. **The role's Kirby never reaches `on_frame`.** This is B4-3: only Player 1's body was passed. It is fixed
+   separately, at the call site.
+2. **The role stops being Kirby while a request is pending**, for example after a cycle swap. No body matches any
+   more, and `fighter_committed` (`:442-447`) resets the hat cycle but keeps the pending request. This is from source;
+   it has not been run.
+3. **In both cases the timeout can't fire,** because the age only advances after a role match (`:307`). The fork has
+   the same placement (`src/kirby_hats.rs:287`, `:314`).
+
+![Hat request end](decisions/HAT-REQUEST-END.png)
+
+**Proposed ending rules:**
+- **R1 · the timeout counts every game frame.** The age runs on a clock that advances whether or not the role's body
+  matched, so after 900 frames the request always ends with "Kirby hat could not be loaded".
+- **R2 · a role that stops being Kirby ends its request.** `fighter_committed(role, kind)` with a non-Kirby kind clears
+  that role's pending request and releases its lease, as `clear_pending` already does.
+
+**Options:**
+1. **A: both rules (recommended).** Every request ends, whatever happens to the body. With the call-site fix in place,
+   neither rule changes a request that is progressing normally.
+2. **B: R2 only.** The swap case ends cleanly, but any other mismatch (a future call-site or accessor change) sticks
+   again with no notice.
+3. **C: neither.** Rely on the call-site fix alone; the swap case stays stuck.
+
+R1 on its own, without the call-site fix, would only mask B4-3: the request would end, but every CPU hat would fail
+after 15 s with "could not be loaded".
+
+Sources: `src/runtime/roster/kirby_hats.rs` (TrainingRooms `p23/b4-pilot-refusal` `0254849`), the fork's
+`src/kirby_hats.rs` and `src/training/character_specific/kirby.rs:37`, and `LANE-SURFACE-REPORT.md` "B4-3 root cause".
+Picture: drawn for this decision (`tools/render_decisions.py d_hatrequest`).

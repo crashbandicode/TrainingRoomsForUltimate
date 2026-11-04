@@ -892,10 +892,49 @@ def d_pausehelper():
     c.save("PAUSE-HELPER-null-access")
 
 
+def d_hatrequest():
+    """HAT-REQUEST-END (2026-11-04): a Kirby hat request's lifecycle, today's stuck paths and the proposed ending rules."""
+    h = 640
+    c = DCanvas(WIDE, h)
+    c.rect(12, 12, WIDE - 12, h - 12, fill=PANEL, outline=LINE, radius=8)
+    c.text(28, 24, "A Kirby hat request must always end: today's stuck paths and the proposed rules", "h", FG)
+    tag(c, 28, 54, "source only; not implemented; the call-site fix (B4-3) is separate", ADV)
+    steps = [["Special + stick", "click: request", "pending, age 0"], ["each frame on the", "role's own Kirby:", "age + 1"],
+             ["body still (Wait/Fall):", "copy set up", "started"], ["equipped == kind:", "confirmed", "(the hat shows)"]]
+    xs = [28 + i * 290 for i in range(4)]
+    for i, (x, lab) in enumerate(zip(xs, steps)):
+        box(c, x, 92, x + 250, 160, lab, col=OURS if i == 3 else LINE, fill=TILE_HI)
+        if i:
+            arrow(c, (xs[i - 1] + 252, 126), (x - 2, 126))
+    lines(c, 28, 176, ["Ends today: confirmed; 'Kirby hat could not be loaded' after 900 counted frames (kirby_hats.rs:334);",
+                       "cleared when the body's identity changes or the shortcut is no longer permitted (:302-305)."], "xs", MUTED)
+    c.text(28, 236, "Stuck today (the request never ends; every later chord for that role is dropped silently, :232)", "s", BAD)
+    stuck = [["the role's Kirby never reaches", "on_frame (B4-3: only P1's body", "was passed; fixed separately)"],
+             ["the role stops being Kirby", "(a cycle swap): no body matches,", "fighter_committed keeps it (:442)"],
+             ["age only advances after a", "match (:307), so the 900-frame", "timeout cannot fire in either"]]
+    for i, lab in enumerate(stuck):
+        box(c, 28 + i * 386, 266, 28 + i * 386 + 366, 340, lab, col=BAD, fill=TILE)
+    c.text(28, 366, "Proposed ending rules (one decision)", "s", OURS)
+    rules = [("R1 · the timeout counts every game frame", ["a clock that runs whatever the body does;",
+                                                         "after 900 frames: 'Kirby hat could not be loaded'"]),
+             ("R2 · a role that stops being Kirby ends its request", ["fighter_committed(role, not Kirby) clears the",
+                                                                     "pending request and releases its lease"])]
+    for i, (title, body) in enumerate(rules):
+        x0 = 28 + i * 580
+        c.rect(x0, 396, x0 + 560, 500, fill=TILE, outline=OURS, width=3, radius=6)
+        c.text(x0 + 12, 408, title, "s", FG)
+        lines(c, x0 + 12, 440, body, "xs", FG)
+    lines(c, 28, 522, ["Options: A both rules (recommended) · B R2 only (the timeout stays match-counted) ·",
+                       "C neither (rely on the call-site fix alone; any other mismatch sticks again).",
+                       "R1 alone would mask a call-site defect: the request ends, but every CPU hat fails after 15 s."],
+          "xs", MUTED)
+    c.save("HAT-REQUEST-END")
+
+
 ALL = [d_pages, d_dropdown, d_delays, d_subscreens, d_firstpage, d_itemonload, d_replaycapture, d_preloadsamples,
        d_shortcuts, d_helptext, d_p1fallback, d_weights, d_paging, d_miirows, d_portraits, d_dichips, d_applychange,
        d_import, d_corrupt, d_name, d_panic, d_layoutmods, d_p1ai, d_playback, d_perfighter, d_inout, d_fixes,
-       d_devcode, d_readme, d_ledgechange, d_pausehelper]
+       d_devcode, d_readme, d_ledgechange, d_pausehelper, d_hatrequest]
 
 
 def main():
