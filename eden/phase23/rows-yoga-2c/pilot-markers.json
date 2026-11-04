@@ -1,0 +1,85 @@
+{
+  "size": [
+    1280,
+    674
+  ],
+  "provenance": {
+    "prep": "/home/intpa/ssbu-cpu-pilot/eden/runs/w01/PREP-w01.json",
+    "pilot_sha256": "0830f3fc272c825a2ba6e81d1bafd5e95849fdd1cadcb38bcb8ac6d59d871180",
+    "deluxe_sha256": "a070b1a7a766c7da1d542362eb60bb9d72103b3d065b08485a3fd9d19618795c",
+    "limit": "OLDER BINARIES: shape references only, never current native acceptance",
+    "current_player": "lr12 RC-PILOT page7; visually reviewed selected P1 Player",
+    "current_cpu": "lr13 initial PILOT arm; selected P1 CPU (L3) visually reviewed; retry uses this shape, initial failure retained"
+  },
+  "page": {
+    "anchors": [
+      [
+        994,
+        1,
+        1055,
+        13
+      ],
+      [
+        996,
+        19,
+        1035,
+        31
+      ]
+    ],
+    "anchor_max_mismatch": 0.02,
+    "value_box": [
+      1096,
+      19,
+      1151,
+      32
+    ],
+    "max_mismatch": 0.015,
+    "min_margin": 0.035,
+    "references": {
+      "Player": [
+        {
+          "path": "refs/current-pilot-player.png",
+          "sha256": "5f04fce5640cd388096879d640d41aa62fcef931b9363f427f36f24447b775fb"
+        }
+      ],
+      "CPU": [
+        {
+          "path": "refs/current-pilot-cpu.png",
+          "sha256": "6a109b1da041e11c0a89f5214deec9c45bbfe02b2406b1507de96a023b6ee4ba"
+        }
+      ]
+    }
+  },
+  "hud": {
+    "value_box": [
+      249,
+      626,
+      330,
+      642
+    ],
+    "max_mismatch": 0.015,
+    "min_margin": 0.035,
+    "references": {
+      "Player": [
+        {
+          "path": "/home/intpa/ssbu-cpu-pilot/eden/runs/w01/shots/112253-player-row.png",
+          "sha256": "16f38936547346bff699dd5c3009b492a24af02837ed38483b26d03e6fb02931"
+        },
+        {
+          "path": "/home/intpa/ssbu-cpu-pilot/eden/runs/w01/shots/112256-player-tag.png",
+          "sha256": "8fbab7baa4cca0e919234ce2588a5a1e026c9cf40edd168c58809304ff02832a"
+        }
+      ],
+      "CPU": [
+        {
+          "path": "/home/intpa/ssbu-cpu-pilot/eden/runs/w01/shots/112112-cpu-row.png",
+          "sha256": "85308502ea5df5574095975894616e99e1f6c6b7e66c3f07942f837b2ffb33d7"
+        },
+        {
+          "path": "/home/intpa/ssbu-cpu-pilot/eden/runs/w01/shots/112115-cpu-tag.png",
+          "sha256": "ffba72e5517692a3034bf7d5d8091e4e0b03cf7588facd920b81d562009c6acf"
+        }
+      ]
+    }
+  }
+}
