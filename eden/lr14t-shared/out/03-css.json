@@ -1,0 +1,24 @@
+{
+  "id": "03-css",
+  "start": "stage",
+  "end": "css",
+  "evidence": [],
+  "manifest_sha256": "68d7b6f046528193393f2efe7e4812bca8be422dec1eeab59e833f716e067970",
+  "started": 1793751658.5243595,
+  "results": [
+    {
+      "play": "stage-css",
+      "on": "yoga"
+    },
+    {
+      "gate": "css",
+      "on": "yoga",
+      "evidence": "/home/intpa/eden-runs/lr-14t/out/03-css/yoga-002103Z-705213-gate-css.png"
+    },
+    {
+      "shot": "/home/intpa/eden-runs/lr-14t/out/03-css/yoga-002103Z-035072-css.png"
+    }
+  ],
+  "status": "PASS",
+  "ended": 1793751663.48057
+}

@@ -1,0 +1,33 @@
+{
+  "elf_sha256": "dc22cb4332f1d47e36f3acbdaa0a60f0cf8d233a05447ee57a91584ad6f9b5c6",
+  "observed": {
+    "native_return_x0": "0x1",
+    "load_x0": "0x1",
+    "effective_address": "0x21",
+    "successor_x8": "0x0",
+    "sequences": [
+      "15",
+      "16",
+      "17"
+    ],
+    "frame": "6571",
+    "thread": "80"
+  },
+  "console_sha256": "53e4091e146d503380d01827c6fc541861057a5cae8a32cd5dea990afa8519ba",
+  "console_bytes": 821572,
+  "memory_lines": [],
+  "fatal_console": [],
+  "fatal_journal": [],
+  "cleanup_failures": [],
+  "released": true,
+  "restore": {
+    "restored": true,
+    "preserved": "/home/intpa/eden-runs/lr-14t/state/post-run-yoga"
+  },
+  "verify": {
+    "equal": true,
+    "snapshot_equal": true,
+    "entries": 21410
+  },
+  "scope": "Executed low-address load returned zero with no memory log if lists empty; page-zero mapping and emulator fallback mechanism unobserved"
+}
