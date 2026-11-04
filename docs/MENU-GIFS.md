@@ -2,15 +2,20 @@
 
 Demonstration clips of the TrainingRooms menu, recorded for the operator's
 review. All six are actual Eden footage (Eden-GIF's built-in recorder, whole
-screen, 1280×720) from the RC10 candidate release boot on the Surface: runs
-`glm-gifs-04` and `glm-gifs-05` on 2026-11-04Z, branch `rc10-menu-assets`,
-release NRO SHA-256
-`50d95130b34fc7ad2863953e47cd15aac55db4c37503328182a195484777de0b`. The
+screen, 1280×720) from RC10 release boots on the Surface: runs `glm-gifs-04`
+and `glm-gifs-05` on 2026-11-04Z, and the stage-grid clip from `glm-mods-10`
+(same release NRO, SHA-256
+`50d95130b34fc7ad2863953e47cd15aac55db4c37503328182a195484777de0b`, with the
+card's ARCropolis `92171b2f…` pinned and the profile's Cosmic Destination
+stage mod live, so the mod-aware loader's mod side is exercised). The
 character grids draw the game's own stock icons (the native key builder's
 `picture=0` waiting-room icon at the active role's costume), loaded at run
 time through the game's mod-aware file-resource service — the same stock-icon
 art the fork's menu showed, now read natively instead of baked (operator
-decision 2026-11-03; SPEC-core-07 Q16 amendment).
+decision 2026-11-03; SPEC-core-07 Q16 amendment). With ARCropolis pinned
+(`glm-mods-10`) the stage grid still draws every thumbnail, but the character
+grids came out blank: the roster stock-icon request does not survive
+ARCropolis's presence (recorded 2026-11-04, under investigation).
 
 Each clip is one continuous take, trimmed only at the ends and under 10 s
 (game-speed timing untouched); the first, middle and last frames of every
@@ -39,11 +44,12 @@ Eden, 2026-11-04Z, RC10 candidate, NRO `50d95130`.*
 
 ![Stage grid](media/menu-stages.gif)
 *Fighters & Stages → Lobby Stages stage grid: the thumbnails load at run time
-through the game's mod-aware loader, so the profile's Cosmic Destination Final
-Destination mod is what the Final Destination tile shows while every other
-tile shows stock; the cursor steps along page 1 and `A` adds Battlefield to
-the rotation (rank 2 appears). 7.8 s. Eden, 2026-11-04Z, RC10 candidate, NRO
-`50d95130`.*
+through the game's mod-aware loader, and with ARCropolis pinned and Cosmic
+Destination in `ultimate/mods` the Final Destination tile draws the mod's
+nebula picture (matching the mod's decoded `stage_1_end.bntx`) while every
+other tile shows stock; the cursor steps along page 1 and `A` adds Battlefield
+to the rotation (rank 2 appears). 9.7 s. Eden, 2026-11-04Z, RC10 candidate,
+NRO `50d95130`, ARCropolis `92171b2f`.*
 
 ![Record and playback](media/menu-recording.gif)
 *The recording side: with `ZR`+`Down` armed, Player 1's inputs are captured
